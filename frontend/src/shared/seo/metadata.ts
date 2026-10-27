@@ -2,9 +2,26 @@ import type { PublicContentPage } from '../../content/publicContent';
 
 export const INDEX_ROBOTS = 'index, follow';
 export const NOINDEX_ROBOTS = 'noindex, nofollow';
+export const NOINDEX_FOLLOW_ROBOTS = 'noindex, follow';
 export const SOCIAL_IMAGE_PATH = '/assets/brand/yfc-social-preview.png';
 export const SOCIAL_IMAGE_ALT =
   'Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram';
+export const ARTICLE_INDEX_TITLE = 'Статьи о тренировках, питании и прогрессе — Your Fitness Coach';
+export const ARTICLE_INDEX_DESCRIPTION =
+  'Понятные статьи о тренировках, питании, спортивном питании и прогрессе: источники, ограничения и практический смысл без громких обещаний.';
+export const ATHLETE_LANDING_ALIAS_PATH = '/for-athletes';
+
+export interface PublicArticleSeoData {
+  slug: string;
+  title: string;
+  description: string;
+  canonical_url: string;
+  published_at: string;
+  updated_at: string;
+  author: { name: string; type: 'Organization' | 'Person' };
+  editor: { name: string; type: 'Organization' | 'Person' };
+  domain_reviewer: { name: string; type: 'Organization' | 'Person' } | null;
+}
 
 function upsertMeta(
   selector: string,
@@ -120,7 +137,12 @@ function replaceStructuredData(page: PublicContentPage | undefined): void {
 export function applyRouteMetadata(path: string, page?: PublicContentPage): void {
   const title = page?.title ?? 'Your Fitness Coach';
   const description = page?.description ?? 'Личный интерфейс Your Fitness Coach.';
-  const robots = page ? INDEX_ROBOTS : NOINDEX_ROBOTS;
+  const isAthleteLandingAlias = path === ATHLETE_LANDING_ALIAS_PATH;
+  const robots = isAthleteLandingAlias
+    ? NOINDEX_FOLLOW_ROBOTS
+    : page
+      ? INDEX_ROBOTS
+      : NOINDEX_ROBOTS;
 
   document.title = title;
   upsertMeta('meta[name="description"]', 'name', 'description', description);
@@ -134,7 +156,7 @@ export function applyRouteMetadata(path: string, page?: PublicContentPage): void
       canonical.rel = 'canonical';
       document.head.append(canonical);
     }
-    canonical.href = absoluteUrl(page.path);
+    canonical.href = absoluteUrl(isAthleteLandingAlias ? '/' : page.path);
     upsertMeta('meta[property="og:title"]', 'property', 'og:title', title);
     upsertMeta('meta[property="og:description"]', 'property', 'og:description', page.ogDescription);
     upsertMeta(
@@ -170,5 +192,73 @@ export function applyRouteMetadata(path: string, page?: PublicContentPage): void
     canonical?.remove();
     removeSocialMetadata();
   }
-  replaceStructuredData(page);
+  replaceStructuredData(isAthleteLandingAlias ? undefined : page);
+}
+
+export function applyArticleRouteMetadata(path: string, article?: PublicArticleSeoData): void {
+  const isIndex = path === '/articles';
+  const title = article?.title ?? (isIndex ? ARTICLE_INDEX_TITLE : 'Your Fitness Coach');
+  const description =
+    article?.description ?? (isIndex ? ARTICLE_INDEX_DESCRIPTION : 'Статья Your Fitness Coach.');
+  const canonical = article?.canonical_url ?? absoluteUrl('/articles');
+
+  document.title = title;
+  upsertMeta('meta[name="description"]', 'name', 'description', description);
+  upsertMeta('meta[name="robots"]', 'name', 'robots', INDEX_ROBOTS);
+  upsertMeta('meta[name="yandex"]', 'name', 'yandex', INDEX_ROBOTS);
+  let canonicalElement = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (!canonicalElement) {
+    canonicalElement = document.createElement('link');
+    canonicalElement.rel = 'canonical';
+    document.head.append(canonicalElement);
+  }
+  canonicalElement.href = canonical;
+  upsertMeta('meta[property="og:title"]', 'property', 'og:title', title);
+  upsertMeta('meta[property="og:description"]', 'property', 'og:description', description);
+  upsertMeta('meta[property="og:type"]', 'property', 'og:type', article ? 'article' : 'website');
+  upsertMeta('meta[property="og:url"]', 'property', 'og:url', canonical);
+  upsertMeta('meta[property="og:site_name"]', 'property', 'og:site_name', 'Your Fitness Coach');
+  upsertMeta('meta[property="og:locale"]', 'property', 'og:locale', 'ru_RU');
+  upsertMeta('meta[property="og:image"]', 'property', 'og:image', absoluteUrl(SOCIAL_IMAGE_PATH));
+  upsertMeta('meta[property="og:image:type"]', 'property', 'og:image:type', 'image/png');
+  upsertMeta('meta[property="og:image:width"]', 'property', 'og:image:width', '1200');
+  upsertMeta('meta[property="og:image:height"]', 'property', 'og:image:height', '630');
+  upsertMeta('meta[property="og:image:alt"]', 'property', 'og:image:alt', SOCIAL_IMAGE_ALT);
+  upsertMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
+  upsertMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
+  upsertMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
+  upsertMeta('meta[name="twitter:image"]', 'name', 'twitter:image', absoluteUrl(SOCIAL_IMAGE_PATH));
+  upsertMeta('meta[name="twitter:image:alt"]', 'name', 'twitter:image:alt', SOCIAL_IMAGE_ALT);
+
+  const graph: Record<string, unknown> = isIndex
+    ? {
+        '@type': 'CollectionPage',
+        name: title,
+        description,
+        url: canonical,
+      }
+    : {
+        '@type': 'Article',
+        headline: article?.title,
+        description,
+        url: canonical,
+        mainEntityOfPage: canonical,
+        datePublished: article?.published_at.slice(0, 10),
+        dateModified: article?.updated_at.slice(0, 10),
+        author: article?.author,
+        editor: article?.editor,
+        reviewedBy: article?.domain_reviewer ?? undefined,
+        publisher: { '@type': 'Organization', name: 'Your Fitness Coach' },
+      };
+  document.head
+    .querySelectorAll('script[type="application/ld+json"]')
+    .forEach((element) => element.remove());
+  const structured = document.createElement('script');
+  structured.type = 'application/ld+json';
+  structured.dataset.publicSeo = 'true';
+  structured.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    ...graph,
+  }).replaceAll('</', '<\\/');
+  document.head.append(structured);
 }

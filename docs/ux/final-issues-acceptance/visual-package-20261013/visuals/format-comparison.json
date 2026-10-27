@@ -1,0 +1,9 @@
+{
+  "base_sha": "11cff463834fd41c1392d646f6baaf361ac9bebc",
+  "platform": "Windows, same checkout line endings",
+  "master_default_failures": 509,
+  "integration_default_failures": 444,
+  "new_failures": [],
+  "ci_format_command": "npx prettier --check . --end-of-line auto",
+  "unrelated_files_mass_formatted": false
+}

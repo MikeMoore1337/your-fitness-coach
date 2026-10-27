@@ -15,29 +15,53 @@ from fitminiapp_api.models.program import (
     TrainingBlockPriorityMuscle,
     UserWorkout,
     UserWorkoutExercise,
+    UserWorkoutSet,
     WorkoutAdaptation,
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.workout import WorkoutAdaptationRequest
-from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
+from fitminiapp_api.services.audit import record_audit_event
+from fitminiapp_api.services.exercise_catalog import (
+    _source_exercise_slug,
+    get_visible_exercise_display_map,
+)
+from fitminiapp_api.services.exercise_catalog_metadata import (
+    CANONICAL_EXERCISE_REDIRECTS,
+    exercise_catalog_metadata,
+)
+from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
+from fitminiapp_api.services.prescription_semantics import compatible_for_substitution
+from fitminiapp_api.services.workout_metrics import (
+    exercise_metric_type,
+    workout_exercise_metric_type,
+)
 
-RULESET_VERSION = "workout-adaptation-v1"
+RULESET_VERSION = "workout-adaptation-v2"
 ACTIVE_SECONDS_PER_SET = 45
 TRANSITION_SECONDS_PER_EXERCISE = 60
 CORE_GROUP_COUNT = 2
 
 
 class WorkoutAdaptationError(ValueError):
-    def __init__(self, detail: str, *, status_code: int = 409) -> None:
+    def __init__(
+        self,
+        detail: str,
+        *,
+        status_code: int = 409,
+        outcome: str | None = None,
+    ) -> None:
         super().__init__(detail)
         self.detail = detail
         self.status_code = status_code
+        self.outcome = outcome
 
 
 @dataclass(frozen=True)
 class AlternativeCandidate:
     exercise: Exercise
     equipment_ids: tuple[str, ...]
+    score: int
+    reason_keys: tuple[str, ...]
 
 
 def _effective_exercise_id(exercise: Exercise) -> int:
@@ -133,6 +157,7 @@ def _exercise_payload(
         "rest_seconds": item.rest_seconds,
         "sort_order": item.sort_order,
         "superset_group": item.superset_group,
+        "prescription": item.prescription,
         "priority": priority,
     }
 
@@ -174,16 +199,28 @@ def _preview_token(snapshot: dict, request: dict, changes: list[dict]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _validate_today_state(workout: UserWorkout, current_user: User, *, safety: bool) -> None:
+def _validate_today_state(
+    workout: UserWorkout,
+    current_user: User,
+    *,
+    safety: bool,
+    allow_in_progress: bool = False,
+) -> None:
     if workout.scheduled_date != today_for_user(current_user):
-        raise WorkoutAdaptationError("Можно адаптировать только тренировку на сегодня")
-    allowed = {"planned", "in_progress"} if safety else {"planned"}
+        raise WorkoutAdaptationError(
+            "Можно адаптировать только тренировку на сегодня",
+            outcome="rejected_stale",
+        )
+    allowed = {"planned"}
+    if safety or allow_in_progress:
+        allowed.add("in_progress")
     if workout.status not in allowed:
         raise WorkoutAdaptationError(
             "Изменить состав можно только до начала тренировки",
+            outcome="rejected_stale",
         )
     if not workout.user_program.is_active:
-        raise WorkoutAdaptationError("Программа уже завершена или архивирована")
+        raise WorkoutAdaptationError("Программа сейчас неактивна", outcome="rejected_stale")
 
 
 def _find_workout_exercise(workout: UserWorkout, workout_exercise_id: int | None):
@@ -204,6 +241,7 @@ def _alternative_candidates(
     *,
     visible: dict[int, Exercise] | None = None,
     pairs: list[ExerciseAlternative] | None = None,
+    allow_catalog_fallback: bool = False,
 ) -> list[AlternativeCandidate]:
     from fitminiapp_api.services.training_preferences import avoided_exercise_ids
 
@@ -221,22 +259,67 @@ def _alternative_candidates(
             )
             .all()
         )
-    candidate_ids = {
+    curated_ids = {
         pair.alternative_exercise_id if pair.exercise_id == target_id else pair.exercise_id
         for pair in pairs
         if target_id in {pair.exercise_id, pair.alternative_exercise_id}
     }
+    candidate_ids = set(visible) if allow_catalog_fallback else curated_ids
+    target_metric = workout_exercise_metric_type(target)
+    target_metadata = exercise_catalog_metadata(_source_exercise_slug(target.exercise))
+    target_muscles = _primary_muscle_ids(target.exercise)
     candidates = []
     for candidate_id in candidate_ids:
         exercise = visible.get(candidate_id)
         if exercise is None or _effective_exercise_id(exercise) in avoided_ids:
             continue
+        if exercise_metric_type(exercise) != target_metric:
+            continue
         equipment_ids = _equipment_ids(exercise)
-        if equipment_ids and set(equipment_ids).issubset(available_equipment_ids):
-            candidates.append(AlternativeCandidate(exercise=exercise, equipment_ids=equipment_ids))
+        if equipment_ids and not set(equipment_ids).issubset(available_equipment_ids):
+            continue
+        if _effective_exercise_id(exercise) == target_id:
+            continue
+        metadata = exercise_catalog_metadata(_source_exercise_slug(exercise))
+        reason_keys: list[str] = []
+        score = 0
+        if _effective_exercise_id(exercise) in curated_ids:
+            score += 100
+            reason_keys.append("curated_pair")
+        if (
+            target_metadata
+            and metadata
+            and metadata["movement_pattern"] == target_metadata["movement_pattern"]
+        ):
+            score += 50
+            reason_keys.append("movement_pattern")
+        if target_muscles & _primary_muscle_ids(exercise):
+            score += 30
+            reason_keys.append("primary_muscle")
+        if target_metadata and metadata:
+            if set(target_metadata["machine_variant_tags"]) & set(metadata["machine_variant_tags"]):
+                score += 5
+                reason_keys.append("machine_variant")
+            if set(target_metadata["execution_variant_tags"]) & set(
+                metadata["execution_variant_tags"]
+            ):
+                score += 5
+                reason_keys.append("execution_variant")
+        candidates.append(
+            AlternativeCandidate(
+                exercise=exercise,
+                equipment_ids=equipment_ids,
+                score=score,
+                reason_keys=tuple(reason_keys),
+            )
+        )
     return sorted(
         candidates,
-        key=lambda item: (item.exercise.title.casefold(), _effective_exercise_id(item.exercise)),
+        key=lambda item: (
+            -item.score,
+            item.exercise.title.casefold(),
+            _effective_exercise_id(item.exercise),
+        ),
     )
 
 
@@ -247,23 +330,34 @@ def list_compatible_alternatives(
     workout_exercise_id: int,
     available_equipment_ids: set[str],
 ) -> list[dict]:
-    _validate_today_state(workout, current_user, safety=False)
+    _validate_today_state(workout, current_user, safety=False, allow_in_progress=True)
     target = _find_workout_exercise(workout, workout_exercise_id)
+    _ensure_replacement_unstarted(workout, target)
     used_ids = {_effective_exercise_id(item.exercise) for item in workout.exercises}
-    return [
-        {
-            "exercise_id": candidate.exercise.id,
-            "title": candidate.exercise.title,
-            "equipment_ids": list(candidate.equipment_ids),
-        }
-        for candidate in _alternative_candidates(
-            db,
-            current_user,
-            target,
-            available_equipment_ids,
+    alternatives = []
+    for candidate in _alternative_candidates(
+        db,
+        current_user,
+        target,
+        available_equipment_ids,
+        allow_catalog_fallback=workout.status == "planned",
+    ):
+        if _effective_exercise_id(candidate.exercise) in used_ids:
+            continue
+        source_slug = _source_exercise_slug(candidate.exercise)
+        media = get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
+        alternatives.append(
+            {
+                "exercise_id": candidate.exercise.id,
+                "title": candidate.exercise.title,
+                "equipment_ids": list(candidate.equipment_ids),
+                "score": candidate.score,
+                "reason_keys": list(candidate.reason_keys),
+                "media_thumbnail_url": media["thumbnail_url"],
+                "media_thumbnail_sources": media["thumbnail_sources"],
+            }
         )
-        if _effective_exercise_id(candidate.exercise) not in used_ids
-    ]
+    return alternatives
 
 
 def _replacement_change(
@@ -277,7 +371,37 @@ def _replacement_change(
         "from_title": target.exercise.title,
         "to_exercise_id": candidate.exercise.id,
         "to_title": candidate.exercise.title,
+        "transfer": "compatible_with_load_reset",
+        "load_reset_required": True,
+        "reason_keys": list(candidate.reason_keys),
     }
+
+
+def _ensure_replacement_unstarted(workout: UserWorkout, target: UserWorkoutExercise) -> None:
+    if workout.status not in {"planned", "in_progress"}:
+        raise WorkoutAdaptationError(
+            "Заменить упражнение можно только в незавершённой тренировке",
+            outcome="rejected_stale",
+        )
+
+    def has_execution_evidence(item: UserWorkoutSet) -> bool:
+        return bool(
+            item.is_completed
+            or item.actual_reps is not None
+            or item.actual_weight is not None
+            or item.duration_minutes is not None
+            or item.distance_km is not None
+            or item.average_heart_rate_bpm is not None
+            or item.heart_rate_zone is not None
+            or item.rir is not None
+            or item.reached_failure is not None
+        )
+
+    if any(has_execution_evidence(item) for item in target.sets):
+        raise WorkoutAdaptationError(
+            "Заменить упражнение нельзя: в нём уже есть фактические данные",
+            outcome="rejected_target_started",
+        )
 
 
 def _time_budget_changes(
@@ -355,6 +479,7 @@ def _replacement_changes(
     used_ids = {_effective_exercise_id(item.exercise) for item in workout.exercises}
     changes = []
     for target in sorted(targets, key=lambda item: (item.sort_order, item.id)):
+        _ensure_replacement_unstarted(workout, target)
         candidates = [
             candidate
             for candidate in _alternative_candidates(
@@ -364,6 +489,9 @@ def _replacement_changes(
                 available,
                 visible=visible,
                 pairs=pairs,
+                allow_catalog_fallback=(
+                    payload.reason == "replace_exercise" and workout.status == "planned"
+                ),
             )
             if _effective_exercise_id(candidate.exercise) not in used_ids
         ]
@@ -380,16 +508,31 @@ def _replacement_changes(
             if candidate is None:
                 raise WorkoutAdaptationError(
                     "Выбранная замена не входит в проверенные альтернативы или требует "
-                    "недоступное оборудование"
+                    "недоступное оборудование",
+                    outcome="no_compatible_alternative",
                 )
         else:
             candidate = candidates[0] if candidates else None
             if candidate is None:
                 raise WorkoutAdaptationError(
                     f"Для упражнения «{target.exercise.title}» нет проверенной замены "
-                    "под выбранное оборудование"
+                    "под выбранное оборудование",
+                    outcome="no_compatible_alternative",
                 )
-        changes.append(_replacement_change(target, candidate))
+        compatible, reason_keys = compatible_for_substitution(
+            target.prescription,
+            target.prescription,
+            source_metric=workout_exercise_metric_type(target),
+            target_metric=exercise_metric_type(candidate.exercise),
+        )
+        if not compatible:
+            raise WorkoutAdaptationError(
+                "Выбранная замена несовместима с предписанием",
+                outcome="no_compatible_alternative",
+            )
+        change = _replacement_change(target, candidate)
+        change["reason_keys"] = list(dict.fromkeys([*change["reason_keys"], *reason_keys]))
+        changes.append(change)
         used_ids.add(_effective_exercise_id(candidate.exercise))
     return changes
 
@@ -401,7 +544,12 @@ def build_adaptation_preview(
     payload: WorkoutAdaptationRequest,
 ) -> dict:
     safety = payload.reason == "pain_or_injury"
-    _validate_today_state(workout, current_user, safety=safety)
+    _validate_today_state(
+        workout,
+        current_user,
+        safety=safety,
+        allow_in_progress=payload.reason in {"unavailable_equipment", "replace_exercise"},
+    )
     visible = get_visible_exercise_display_map(db, current_user)
     snapshot = _snapshot(db, workout, current_user, visible=visible)
     original_exercises = snapshot["exercises"]
@@ -507,15 +655,22 @@ def apply_adaptation(
     )
     if existing is not None:
         if existing.request_payload != _request_payload(payload):
-            raise WorkoutAdaptationError("Preview token не соответствует условиям изменения")
+            raise WorkoutAdaptationError(
+                "Preview token не соответствует условиям изменения",
+                outcome="rejected_stale",
+            )
         return existing
 
     preview = build_adaptation_preview(db, current_user, workout, payload)
     if preview["status"] != "preview" or not preview["changes"]:
-        raise WorkoutAdaptationError("Нет изменений, которые можно применить")
+        raise WorkoutAdaptationError(
+            "Нет изменений, которые можно применить",
+            outcome="rejected_stale",
+        )
     if preview["preview_token"] != preview_token:
         raise WorkoutAdaptationError(
-            "Тренировка или условия изменились. Сформируйте preview заново"
+            "Тренировка или условия изменились. Сформируйте preview заново",
+            outcome="rejected_stale",
         )
 
     original_snapshot = {
@@ -532,6 +687,7 @@ def apply_adaptation(
             db.delete(target)
         else:
             target.exercise_id = change["to_exercise_id"]
+            target.metric_type = workout_exercise_metric_type(target)
 
     adaptation = WorkoutAdaptation(
         workout_id=workout.id,
@@ -544,6 +700,58 @@ def apply_adaptation(
         applied_at=now_for_user_naive(current_user),
     )
     db.add(adaptation)
+    db.flush()
+    record_audit_event(
+        db,
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        action="workout.adaptation_applied",
+        resource_type="user_workout",
+        resource_id=workout.id,
+        details={
+            "outcome": "applied",
+            "adaptation_id": adaptation.id,
+            "reason": payload.reason,
+            "ruleset_version": RULESET_VERSION,
+            "workout_status": workout.status,
+            "changed_workout_exercise_ids": [
+                change["workout_exercise_id"] for change in preview["changes"]
+            ],
+        },
+    )
     db.commit()
     db.refresh(adaptation)
     return adaptation
+
+
+def record_adaptation_outcome(
+    db: Session,
+    current_user: User,
+    *,
+    workout_id: int,
+    reason: str,
+    outcome: str,
+    workout_status: str | None = None,
+    target_workout_exercise_id: int | None = None,
+    changed_workout_exercise_ids: list[int] | None = None,
+) -> None:
+    details: dict[str, object] = {
+        "outcome": outcome,
+        "reason": reason,
+        "ruleset_version": RULESET_VERSION,
+    }
+    if workout_status is not None:
+        details["workout_status"] = workout_status
+    if target_workout_exercise_id is not None:
+        details["target_workout_exercise_id"] = target_workout_exercise_id
+    if changed_workout_exercise_ids is not None:
+        details["changed_workout_exercise_ids"] = changed_workout_exercise_ids
+    record_audit_event(
+        db,
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        action="workout.adaptation_outcome",
+        resource_type="user_workout",
+        resource_id=workout_id,
+        details=details,
+    )

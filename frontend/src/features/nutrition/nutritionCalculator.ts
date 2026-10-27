@@ -9,6 +9,7 @@ type CardioTraining = NonNullable<NutritionTargetSave['cardio_trainings']>[numbe
 export type NutritionCalculatorInput = Omit<
   NutritionTargetSave,
   | 'daily_activity_level'
+  | 'record_weight_measurement'
   | 'cardio_trainings_per_week'
   | 'cardio_training_duration_minutes'
   | 'cardio_intensity'
@@ -16,7 +17,11 @@ export type NutritionCalculatorInput = Omit<
   | 'steps_range'
   | 'strength_training_type'
   | 'cardio_trainings'
+  | 'weight_kg'
+  | 'height_cm'
 > & {
+  weight_kg: number;
+  height_cm: number;
   daily_routine: DailyRoutine;
   steps_range: StepsRange;
   strength_training_type: StrengthTrainingType;
@@ -109,7 +114,7 @@ const legacyCardioIntensities = {
 
 export const goalMultipliers = {
   fat_loss: 0.85,
-  recomposition: 1,
+  recomposition: 0.95,
   maintenance: 1,
   muscle_gain: 1.05,
 } as const;
@@ -138,7 +143,6 @@ export type NutritionCalculationResult =
 
 const roundNumber = (value: number) => Math.max(0, Math.floor(value + 0.5));
 const roundToTen = (value: number) => Math.max(0, Math.floor(value / 10 + 0.5) * 10);
-const roundUpToTen = (value: number) => Math.max(0, Math.ceil(value / 10) * 10);
 
 const netExerciseCalories = (met: number, weightKg: number, durationMinutes: number) =>
   Math.max(0, (met - 1) * 3.5 * weightKg * durationMinutes) / 200;
@@ -162,8 +166,8 @@ const normalizeInput = (
   return {
     target_telegram_user_id: form.target_telegram_user_id,
     sex: form.sex,
-    weight_kg: form.weight_kg,
-    height_cm: form.height_cm,
+    weight_kg: Number(form.weight_kg),
+    height_cm: Number(form.height_cm),
     age: form.age,
     daily_routine:
       form.daily_routine ?? legacyDailyRoutines[legacy.daily_activity_level ?? 'sedentary'],
@@ -245,7 +249,7 @@ export function calculateNutritionEstimate(
     }, 0) / 7;
   const maintenanceExact = baseTdeeExact + strengthDailyExact + cardioDailyExact;
   const goalMultiplier = goalMultipliers[input.goal];
-  let calories = roundToTen(maintenanceExact * goalMultiplier);
+  const calories = roundToTen(maintenanceExact * goalMultiplier);
 
   const proteinPerKg = {
     fat_loss: 2.2,
@@ -256,11 +260,15 @@ export function calculateNutritionEstimate(
   const fatPerKg = input.goal === 'maintenance' || input.goal === 'muscle_gain' ? 0.9 : 0.8;
   const protein = roundNumber(input.weight_kg * proteinPerKg);
   const fat = roundNumber(input.weight_kg * fatPerKg);
-  let remainingCalories = calories - protein * 4 - fat * 9;
-  const macroWarning = remainingCalories < 0;
-  if (macroWarning) {
-    calories = roundUpToTen(protein * 4 + fat * 9);
-    remainingCalories = calories - protein * 4 - fat * 9;
+  const remainingCalories = calories - protein * 4 - fat * 9;
+  if (remainingCalories < 0) {
+    return {
+      valid: false,
+      estimate: null,
+      errors: [
+        'Расчёт не сформирован: белки и жиры превышают целевую калорийность. Стандартные нормы на текущий вес здесь неприменимы; нужна индивидуальная настройка питания.',
+      ],
+    };
   }
 
   return {
@@ -278,7 +286,7 @@ export function calculateNutritionEstimate(
       protein,
       fat,
       carbs: roundNumber(remainingCalories / 4),
-      macroWarning,
+      macroWarning: false,
       accuracy: calculationAccuracy(input),
     },
   };

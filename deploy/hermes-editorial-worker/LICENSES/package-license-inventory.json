@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "task129-license-inventory-v1",
+  "purpose": "Expected licenses for the bounded editorial worker runtime",
+  "upstream": {
+    "name": "hermes-agent",
+    "version": "0.21.0",
+    "tag": "v2026.8.31",
+    "commit": "29112bef099274229cadff79cdff7bf7b99c4b77",
+    "license": "MIT",
+    "licenseSha256": "821556e6336796450ab852d375117b48a4887e71d255794fd6318d99982a5ab6"
+  },
+  "base": {
+    "image": "python:3.13-alpine",
+    "digest": "sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee",
+    "platform": "linux/amd64",
+    "alpine": "3.24.1",
+    "licenseSource": "alpine-installed-packages.txt"
+  },
+  "pythonPackages": [
+    {"name": "annotated-types", "version": "0.8.0", "licenses": ["MIT"]},
+    {"name": "anyio", "version": "4.15.0", "licenses": ["MIT"]},
+    {"name": "certifi", "version": "2026.10.19", "licenses": ["MPL-2.0"]},
+    {"name": "h11", "version": "0.16.0", "licenses": ["MIT"]},
+    {"name": "httpcore", "version": "1.0.9", "licenses": ["BSD-3-Clause"]},
+    {"name": "httpx", "version": "0.28.1", "licenses": ["BSD-3-Clause"]},
+    {"name": "idna", "version": "3.19", "licenses": ["BSD-3-Clause"]},
+    {"name": "pydantic", "version": "2.13.4", "licenses": ["MIT"]},
+    {"name": "pydantic-core", "version": "2.46.4", "licenses": ["MIT"]},
+    {"name": "sniffio", "version": "1.3.1", "licenses": ["MIT", "Apache-2.0"]},
+    {"name": "typing-extensions", "version": "4.16.0", "licenses": ["PSF-2.0"]},
+    {"name": "typing-inspection", "version": "0.4.4", "licenses": ["MIT"]}
+  ],
+  "alpinePackages": {
+    "source": "/lib/apk/db/installed",
+    "licenseField": "L",
+    "versionField": "V",
+    "architectureField": "A"
+  }
+}

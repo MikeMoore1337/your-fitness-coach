@@ -37,6 +37,7 @@ description: >
 - разумную performance cost.
 
 Прочитай `../../references/DESIGN_GUARDRAILS.md`.
+Прочитай `../../../docs/design/YFC_PRODUCT_UI_CONTRACT.md` перед изменением visible authenticated UI.
 
 ## Два режима
 
@@ -49,6 +50,8 @@ description: >
 - не создавай случайный параллельный стиль;
 - улучшай в пределах scope;
 - visual inconsistency текущей системы можно исправлять, но не устраивать скрытый redesign.
+- слова «улучшить», «modernize», «app-like», «Stage», «v3» и «polish» не меняют режим на
+  Rethink и не являются owner approval.
 
 ### Rethink
 
@@ -62,6 +65,10 @@ Explicit design exploration/redesign:
 - новый direction должен пройти owner selection до массовой production rollout.
 
 Если нужно сравнить направления, используй `$ui-prototyper`.
+
+Rethink нельзя выводить из названия App Experience или внешнего visual reference. Он требует
+отдельной owner-approved redesign/exploration task, bounded scope и owner selection направления
+до массового rollout.
 
 ## Product task first
 
@@ -251,6 +258,16 @@ Nutrition, workout, progress и analytics не должны быть "табли
 - визуально выразительными, если это усиливает понимание.
 
 Animation data не должна искажать scale/value.
+
+## Apple-specific reference
+
+Если current task явно требует Apple/Liquid Glass/native-like direction, physical materials,
+gesture-driven sheets/drawers/swipes или Apple-like interaction feel, подключай `$apple-design`
+как reference skill.
+
+Он не определяет visual identity YFC. Сохраняй sport-tech характер, lime/black/white core и выбранный
+owner direction. Не копируй iOS chrome/geometry механически и не превращай Apple reference в скрытый
+global redesign.
 
 ## Motion
 

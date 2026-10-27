@@ -14,6 +14,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import get_args
 
+from PIL import Image
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 BACKEND_DIR = ROOT_DIR / "backend"
 MEDIA_DIR = BACKEND_DIR / "assets" / "exercise-guides"
@@ -35,11 +37,13 @@ ExerciseMovementPattern = schema.ExerciseMovementPattern
 CANONICAL_EXERCISE_REDIRECTS = metadata_module.CANONICAL_EXERCISE_REDIRECTS
 CATALOG_METADATA = metadata_module.CATALOG_METADATA
 ITEM_GUIDE_CONTENT = metadata_module.ITEM_GUIDE_CONTENT
-MEDIA_ALT_BY_PHASE = metadata_module.MEDIA_ALT_BY_PHASE
+MEDIA_STATE_BY_SLUG = metadata_module.MEDIA_STATE_BY_SLUG
 REMAINING_COVERAGE_SLUGS = metadata_module.REMAINING_COVERAGE_SLUGS
+structured_catalog_metadata = metadata_module.structured_catalog_metadata
 canonical_equipment_identifier = domain_module.canonical_equipment_identifier
 canonical_muscle_identifier = domain_module.canonical_muscle_identifier
 SLUG_TO_PROFILE = guides_module.SLUG_TO_PROFILE
+PROFILES = guides_module.PROFILES
 YFC_GENERATED_120D_SLUGS = guides_module.YFC_GENERATED_120D_SLUGS
 EXERCISE_CATALOG = seed_module.EXERCISE_CATALOG
 
@@ -71,7 +75,7 @@ def _validate_aliases(catalog_slugs: set[str]) -> None:
     for slug, title, *_ in EXERCISE_CATALOG:
         search_terms[normalize_search_text(title)].add(canonical_slug(slug))
 
-    for slug, metadata in CATALOG_METADATA.items():
+    for slug, metadata in structured_catalog_metadata().items():
         _require(slug in catalog_slugs, f"Metadata references unknown exercise: {slug}")
         aliases = metadata["aliases"]
         normalized = [normalize_search_text(alias) for alias in aliases]
@@ -96,36 +100,384 @@ def _validate_aliases(catalog_slugs: set[str]) -> None:
     _require(not collisions, f"Cross-canonical search term collisions: {collisions}")
 
 
-def _validate_media(catalog_slugs: set[str]) -> tuple[int, int]:
+def _validate_structured_metadata(catalog_slugs: set[str]) -> dict[str, int]:
+    canonical_slugs = {canonical_slug(slug) for slug in catalog_slugs}
+    records = structured_catalog_metadata()
+    _require(set(records) == canonical_slugs, "Structured metadata/canonical catalogue mismatch")
+    allowed_movements = set(get_args(ExerciseMovementPattern))
+    allowed_machine_tags = set(get_args(ExerciseMachineVariantTag))
+    allowed_execution_tags = set(get_args(ExerciseExecutionVariantTag))
+
+    for slug, metadata in records.items():
+        _require(metadata["primary_muscle"], f"Missing primary muscle metadata: {slug}")
+        _require(metadata["secondary_muscles"], f"Missing secondary muscle metadata: {slug}")
+        _require(metadata["equipment"], f"Missing equipment metadata: {slug}")
+        _require(metadata["movement_pattern"] in allowed_movements, f"Invalid movement: {slug}")
+        _require(
+            metadata["difficulty_level"] in {"beginner", "intermediate", "advanced"},
+            f"Invalid difficulty: {slug}",
+        )
+        _require(
+            metadata["metric_type"] in {"strength", "cardio"},
+            f"Invalid metric type: {slug}",
+        )
+        _require(
+            canonical_muscle_identifier(metadata["primary_muscle"]) is not None,
+            f"Unknown structured primary muscle: {slug}",
+        )
+        _require(
+            canonical_equipment_identifier(metadata["equipment"]) is not None,
+            f"Unknown structured equipment: {slug}",
+        )
+        _require(
+            set(metadata["machine_variant_tags"]) <= allowed_machine_tags,
+            f"Invalid structured machine tags: {slug}",
+        )
+        _require(
+            set(metadata["execution_variant_tags"]) <= allowed_execution_tags,
+            f"Invalid structured execution tags: {slug}",
+        )
+
+    machine_applicable = sum(
+        canonical_equipment_identifier(metadata["equipment"]) == "machine"
+        for metadata in records.values()
+    )
+    aliases_populated = sum(bool(metadata["aliases"]) for metadata in records.values())
+    execution_populated = sum(
+        bool(metadata["execution_variant_tags"]) for metadata in records.values()
+    )
+    machine_populated = sum(bool(metadata["machine_variant_tags"]) for metadata in records.values())
+    return {
+        "metadata_records": len(records),
+        "metadata_required_missing": 0,
+        "metadata_aliases_populated": aliases_populated,
+        "metadata_aliases_reviewed_empty": len(records) - aliases_populated,
+        "metadata_execution_populated": execution_populated,
+        "metadata_execution_reviewed_empty": len(records) - execution_populated,
+        "metadata_machine_applicable": machine_applicable,
+        "metadata_machine_populated": machine_populated,
+        "metadata_machine_reviewed_empty": machine_applicable - machine_populated,
+    }
+
+
+def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     exercises = manifest["exercises"]
-    _require(set(exercises) == catalog_slugs, "Manifest/catalog exercise mismatch")
-    cross_exercise_hashes: dict[str, set[str]] = defaultdict(set)
+    manifest_slugs = set(exercises)
+    canonical_slugs = {canonical_slug(slug) for slug in catalog_slugs}
+    _require(manifest.get("schema_version") == 3, "Stage 4 media manifest is not active")
+    _require(manifest_slugs == canonical_slugs, "Stage 4 manifest/catalog canonical mismatch")
+    counts = manifest.get("counts", {})
+    _require(counts.get("canonical_exercises") == len(canonical_slugs), "Canonical count drift")
+    _require(
+        counts.get("remote_runtime_assets") == 0,
+        "Remote runtime asset count drift",
+    )
+    actual_animated = 0
+    actual_static = 0
+    actual_blocked = 0
+    referenced_paths: set[str] = set()
+
+    def asset_path(relative: str, slug: str, field: str) -> Path:
+        path = Path(relative)
+        _require(
+            not path.is_absolute() and ".." not in path.parts, f"Invalid media path: {slug}/{field}"
+        )
+        resolved = MEDIA_DIR / path
+        _require(resolved.is_file(), f"Referenced media is missing: {relative}")
+        referenced_paths.add(relative)
+        return resolved
+
+    def check_source(source: dict, slug: str, field: str, *, require_image: bool = False) -> None:
+        path = asset_path(str(source["path"]), slug, field)
+        data = path.read_bytes()
+        _require(source.get("byte_size") == len(data), f"Stale media byte count: {source['path']}")
+        if source.get("sha256") is not None:
+            _require(
+                source["sha256"] == hashlib.sha256(data).hexdigest(),
+                f"Stale media hash: {source['path']}",
+            )
+        if require_image:
+            with Image.open(path) as image:
+                _require(
+                    image.size == (source["width"], source["height"]),
+                    f"Image dimensions drifted: {source['path']}",
+                )
+                _require(
+                    image.format in {"JPEG", "WEBP"}, f"Unsupported image format: {source['path']}"
+                )
+                _require(not image.getexif(), f"Image metadata was not stripped: {source['path']}")
 
     for slug, item in exercises.items():
         source = item.get("source", {})
-        _require(source.get("name") and source.get("license"), f"Invalid provenance: {slug}")
-        _require(item.get("media"), f"Missing guide media: {slug}")
+        status = item.get("status")
+        if status == "blocked":
+            _require(not source and not item.get("media"), f"Blocked media is not empty: {slug}")
+            actual_blocked += 1
+            continue
+        _require(status == "approved", f"Invalid Stage 4 media status: {slug}")
+        _require(
+            len(item.get("media", [])) == 1, f"Approved media must have one media item: {slug}"
+        )
         for media in item["media"]:
+            media_type = media.get("type")
+            _require(media_type in {"animation", "image"}, f"Invalid media type: {slug}")
+            if media_type == "animation":
+                actual_animated += 1
+                _require(
+                    source.get("name") == "Gym visual"
+                    and source.get("url") == "https://github.com/hasaneyldrm/exercises-dataset"
+                    and source.get("license") == "Owner-purchased GymVisual license",
+                    f"Invalid animation provenance: {slug}",
+                )
+            else:
+                actual_static += 1
+                _require(
+                    source.get("name") == "Exercises Media"
+                    and source.get("url") == "https://github.com/akajdid-mostafa/exercises-media"
+                    and source.get("source_revision") == "18742da40b0627c85925c5dd4441dc3eac0594d0",
+                    f"Invalid static provenance: {slug}",
+                )
+            path = asset_path(str(media["path"]), slug, "path")
+            poster_path = asset_path(str(media["poster_path"]), slug, "poster_path")
             path = MEDIA_DIR / media["path"]
-            _require(path.is_file(), f"Referenced media is missing: {media['path']}")
+            poster_path = MEDIA_DIR / media["poster_path"]
             _require(
                 media.get("width", 0) > 0 and media.get("height", 0) > 0,
                 f"Invalid dimensions: {slug}",
             )
-            _require(
-                media.get("alt") == MEDIA_ALT_BY_PHASE.get(slug, {}).get(media["phase_id"]),
-                f"Missing or stale media alt: {slug}/{media['phase_id']}",
-            )
+            if media_type == "animation":
+                _require(
+                    media.get("animated") is True and media.get("frame_count", 0) > 1,
+                    f"Animation metadata is invalid: {slug}",
+                )
+            else:
+                _require(
+                    media.get("animated") is False and media.get("frame_count") == 1,
+                    f"Static metadata is invalid: {slug}",
+                )
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             _require(media.get("asset_sha256") == digest, f"Stale media hash: {media['path']}")
-            cross_exercise_hashes[digest].add(canonical_slug(slug))
+            poster_digest = hashlib.sha256(poster_path.read_bytes()).hexdigest()
+            _require(
+                media.get("poster_sha256") == poster_digest,
+                f"Stale poster hash: {media['poster_path']}",
+            )
+            _require(
+                media.get("poster_byte_size") == poster_path.stat().st_size,
+                f"Stale poster byte count: {slug}",
+            )
+            poster_source = media.get("poster_source")
+            if poster_source is not None:
+                _require(
+                    poster_source.get("name") == "Exercises Media"
+                    and poster_source.get("url")
+                    == "https://github.com/akajdid-mostafa/exercises-media"
+                    and poster_source.get("source_revision")
+                    == "18742da40b0627c85925c5dd4441dc3eac0594d0"
+                    and poster_source.get("rights_basis")
+                    == "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16"
+                    and media["poster_path"].startswith("exercises-media/")
+                    and media.get("poster_dimensions") == {"width": 1280, "height": 720}
+                    and media.get("poster_preferred") is True,
+                    f"Unauthorized or malformed HQ poster provenance: {slug}",
+                )
+                with Image.open(poster_path) as hq_poster:
+                    _require(
+                        hq_poster.format == "JPEG"
+                        and hq_poster.size == (1280, 720)
+                        and not hq_poster.getexif(),
+                        f"HQ poster image metadata mismatch: {slug}",
+                    )
+            if media_type == "animation":
+                _require(
+                    media.get("sources")
+                    == [
+                        {
+                            "path": media["path"],
+                            "mime_type": "image/gif",
+                            "width": media["width"],
+                            "height": media["height"],
+                            "byte_size": media["byte_size"],
+                        }
+                    ],
+                    f"Animation source metadata drifted: {slug}",
+                )
+            else:
+                _require(
+                    len(media.get("sources", [])) == 6,
+                    f"Static responsive source count drift: {slug}",
+                )
+            for descriptor in media.get("sources", []):
+                check_source(descriptor, slug, "source", require_image=media_type == "image")
+            for descriptor in media.get("poster_sources", []):
+                check_source(descriptor, slug, "poster_source", require_image=True)
+            video_sources = media.get("video_sources", [])
+            if video_sources:
+                provenance = media.get("video_provenance") or {}
+                ai_upscaled = provenance.get("source_kind") == "ai_upscaled_gymvisual"
+                if ai_upscaled:
+                    _require(
+                        slug
+                        in {"deadlift", "machine-chest-press", "russian-twist", "walking-lunge"},
+                        f"Unreviewed AI animation: {slug}",
+                    )
+                    _require(
+                        media_type == "animation"
+                        and len(video_sources) == 1
+                        and provenance.get("source_path") == media["path"]
+                        and provenance.get("source_sha256") == media.get("asset_sha256")
+                        and provenance.get("source_asset_id") == media.get("asset_id")
+                        and provenance.get("source_dimensions") == {"width": 180, "height": 180}
+                        and provenance.get("source_animation_frames") == media.get("frame_count")
+                        and provenance.get("source_animation_duration_ms")
+                        == media.get("duration_ms")
+                        and provenance.get("model") == "RealESRGAN_x4plus"
+                        and provenance.get("scale") == 4
+                        and provenance.get("native_hd") is False
+                        and provenance.get("owner_visual_approval")
+                        == "2026-10-17 #1073 four-sample review",
+                        f"Invalid AI source provenance: {slug}",
+                    )
+                    profiles = [(720, 720)]
+                else:
+                    _require(len(video_sources) == 2, f"Unexpected HD video profile count: {slug}")
+                    _require(
+                        provenance.get("source_revision")
+                        == "18742da40b0627c85925c5dd4441dc3eac0594d0",
+                        f"Unpinned H.264 source: {slug}",
+                    )
+                    if slug not in {"barbell-curl", "burpee"}:
+                        poster_provenance = media.get("poster_source") or {}
+                        _require(
+                            bool(poster_provenance)
+                            and provenance.get("source_path")
+                            == "public/videos/"
+                            + poster_provenance["source_gender"]
+                            + "/"
+                            + poster_provenance["source_slug"]
+                            + ".mp4",
+                            f"Video does not match verified poster: {slug}",
+                        )
+                    profiles = [(854, 480), (1280, 720)]
+                for video, (width, height) in zip(video_sources, profiles, strict=True):
+                    _require(
+                        video.get("mime_type") == "video/mp4"
+                        and video.get("width") == width
+                        and video.get("height") == height,
+                        f"Invalid H.264 source profile: {slug}",
+                    )
+                    relative_video = Path(video.get("path", ""))
+                    expected_path = (
+                        f"gymvisual/ai-reviewed/{slug}-x4plus-720.mp4"
+                        if ai_upscaled
+                        else f"exercises-media/videos/{slug}-{height}p-h264.mp4"
+                    )
+                    _require(
+                        relative_video.as_posix() == expected_path,
+                        f"Unexpected video path: {slug}",
+                    )
+                    video_file = MEDIA_DIR / relative_video
+                    _require(video_file.is_file(), f"Missing video file: {slug}")
+                    referenced_paths.add(str(relative_video))
+                    data = video_file.read_bytes()
+                    _require(
+                        data[4:8] == b"ftyp"
+                        and len(data) == video.get("byte_size")
+                        and hashlib.sha256(data).hexdigest() == video.get("sha256"),
+                        f"Invalid video file checksum/size: {slug}",
+                    )
+    approved_videos = [
+        media
+        for item in exercises.values()
+        for media in item.get("media", [])
+        if media.get("video_sources")
+        and (media.get("video_provenance") or {}).get("source_kind") != "ai_upscaled_gymvisual"
+    ]
+    ai_upscaled_videos = [
+        media
+        for item in exercises.values()
+        for media in item.get("media", [])
+        if media.get("video_sources")
+        and (media.get("video_provenance") or {}).get("source_kind") == "ai_upscaled_gymvisual"
+    ]
+    _require(
+        len(approved_videos) == manifest.get("hq_video_count"),
+        "Verified H.264 exercise count drift",
+    )
+    _require(
+        sum(video["byte_size"] for media in approved_videos for video in media["video_sources"])
+        == manifest.get("hq_video_total_bytes"),
+        "Verified H.264 total size drift",
+    )
+    _require(
+        len(ai_upscaled_videos) == manifest.get("ai_upscaled_video_count"),
+        "AI-upscaled animated exercise count drift",
+    )
+    _require(
+        sum(video["byte_size"] for media in ai_upscaled_videos for video in media["video_sources"])
+        == manifest.get("ai_upscaled_video_total_bytes"),
+        "AI-upscaled animated video total size drift",
+    )
+    # Some approved canonical variants intentionally point to the same source
+    # record. The manifest keeps the source asset identity explicit instead of
+    # inventing a derivative to make hashes unique.
+    _require(counts.get("approved_animated") == actual_animated, "Approved animation count drift")
+    _require(counts.get("approved_static") == actual_static, "Approved static count drift")
+    _require(counts.get("static_only") == actual_static, "Static-only count drift")
+    _require(counts.get("blocked") == actual_blocked, "Blocked media total drift")
+    _require(manifest.get("asset_count") == len(referenced_paths), "Manifest asset count drift")
+    _require(
+        manifest.get("total_bytes")
+        == sum((MEDIA_DIR / relative).stat().st_size for relative in referenced_paths),
+        "Manifest total byte count drift",
+    )
+    _require(
+        manifest.get("derivative_count")
+        == sum(
+            1
+            for item in exercises.values()
+            for media in item.get("media", [])
+            if media.get("poster_source")
+        ),
+        "HD derivative count drift",
+    )
+    return (
+        manifest["asset_count"],
+        manifest["derivative_count"],
+        manifest["counts"]["approved_animated"],
+        manifest["counts"]["blocked"],
+        manifest["counts"]["static_only"],
+    )
 
-    duplicates = {
-        digest: sorted(slugs) for digest, slugs in cross_exercise_hashes.items() if len(slugs) > 1
+
+def _validate_guide_content(catalog_slugs: set[str]) -> dict[str, int]:
+    canonical_slugs = {canonical_slug(slug) for slug in catalog_slugs}
+    _require(set(SLUG_TO_PROFILE) >= canonical_slugs, "Guide profile coverage is incomplete")
+    _require(
+        set(MEDIA_STATE_BY_SLUG) <= canonical_slugs,
+        "Media state references a non-canonical exercise",
+    )
+    for slug in canonical_slugs:
+        profile_name = SLUG_TO_PROFILE[slug]
+        content = ITEM_GUIDE_CONTENT.get(slug, PROFILES[profile_name])
+        _require(len(content["steps"]) == 3, f"Expected three technique steps: {slug}")
+        _require(len(content["mistakes"]) >= 3, f"Expected three common mistakes: {slug}")
+        _require(bool(content["breathing"]), f"Missing breathing guidance: {slug}")
+    for slug, state in MEDIA_STATE_BY_SLUG.items():
+        if state["state"] == "repdb_phased":
+            _require(state["phases"] == ("start", "peak"), f"Invalid phased media state: {slug}")
+        elif state["state"] == "repdb_single_static":
+            _require(state["phases"] == ("main",), f"Invalid static media state: {slug}")
+        else:
+            _require(not state["phases"], f"Source-gap media state has phases: {slug}")
+    return {
+        "guide_profile_records": len(canonical_slugs),
+        "guide_item_content_records": sum(slug in ITEM_GUIDE_CONTENT for slug in canonical_slugs),
+        "new_guide_content_records": sum(
+            slug in ITEM_GUIDE_CONTENT for slug in MEDIA_STATE_BY_SLUG
+        ),
     }
-    _require(not duplicates, f"Cross-exercise duplicate media: {duplicates}")
-    return manifest["asset_count"], manifest["derivative_count"]
 
 
 def _validate_final_coverage() -> int:
@@ -206,7 +558,11 @@ def validate_catalog() -> dict[str, int]:
         _require(bool(content["breathing"]), f"Missing breathing guidance: {slug}")
 
     _validate_aliases(catalog_slugs)
-    asset_count, derivative_count = _validate_media(catalog_slugs)
+    metadata_report = _validate_structured_metadata(catalog_slugs)
+    guide_report = _validate_guide_content(catalog_slugs)
+    asset_count, derivative_count, approved_media, blocked_media, static_only_media = (
+        _validate_media(catalog_slugs)
+    )
     coverage_decisions = _validate_final_coverage()
     cardio_count = sum(
         canonical_muscle_identifier(muscle) == "cardio" for _, _, muscle, _ in EXERCISE_CATALOG
@@ -219,6 +575,12 @@ def validate_catalog() -> dict[str, int]:
         "assets": asset_count,
         "derivatives": derivative_count,
         "coverage_decisions": coverage_decisions,
+        "media_approved_animated": approved_media,
+        "media_blocked": blocked_media,
+        "media_static_only": static_only_media,
+        "media_remote_runtime_assets": 0,
+        **metadata_report,
+        **guide_report,
     }
 
 

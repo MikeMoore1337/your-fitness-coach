@@ -21,10 +21,23 @@ class HttpResponse:
     headers: dict[str, str]
 
 
-def _read(base_url: str, path: str, *, timeout: float) -> HttpResponse:
+def _read(
+    base_url: str,
+    path: str,
+    *,
+    timeout: float,
+    method: str = "GET",
+    body: bytes | None = None,
+    headers: dict[str, str] | None = None,
+) -> HttpResponse:
+    request_headers = {"User-Agent": "fitminiapp-deployment-check/2"}
+    if headers:
+        request_headers.update(headers)
     request = urllib.request.Request(
         urljoin(base_url.rstrip("/") + "/", path.lstrip("/")),
-        headers={"User-Agent": "fitminiapp-deployment-check/2"},
+        data=body,
+        method=method,
+        headers=request_headers,
     )
     try:
         response = urllib.request.urlopen(request, timeout=timeout)
@@ -73,6 +86,7 @@ def check_deployment(
     timeout: float,
     expected_environment: str | None = None,
     require_progress_report_shell: bool = False,
+    check_refresh_boundary: bool = True,
     read=None,
 ) -> str:
     reader = read or _read
@@ -126,6 +140,21 @@ def check_deployment(
         raise RuntimeError(
             f"authenticated boundary returned {auth_boundary.status}, expected anonymous 401"
         )
+
+    if check_refresh_boundary:
+        auth_refresh = reader(
+            base_url,
+            "/api/v1/auth/refresh",
+            timeout=timeout,
+            method="POST",
+            body=b"{}",
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+        )
+        _expect_same_origin(base_url, auth_refresh, "browser auth refresh boundary")
+        if auth_refresh.status != 401:
+            raise RuntimeError(
+                f"browser auth refresh boundary returned {auth_refresh.status}, expected anonymous 401"
+            )
 
     app = reader(base_url, "/app", timeout=timeout)
     _expect_same_origin(base_url, app, "application shell")

@@ -347,7 +347,7 @@ export async function newMobilePage(
   const context = await browser.newContext({
     viewport: MOBILE_CONTEXTS[viewport],
     hasTouch: true,
-    isMobile: true,
+    ...(browser.browserType().name() === 'firefox' ? {} : { isMobile: true }),
     reducedMotion: 'reduce',
   });
   return { context, page: await context.newPage() };
@@ -385,6 +385,39 @@ export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
       ),
     )
     .toBe(true);
+}
+
+export async function expectElementsWithinHorizontalViewport(
+  page: Page,
+  selector: string,
+): Promise<void> {
+  const boxes = await page.locator(selector).evaluateAll((elements) => {
+    const viewportWidth = document.documentElement.clientWidth;
+    return elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        width: rect.width,
+        height: rect.height,
+        viewportWidth,
+      };
+    });
+  });
+  expect(boxes.length).toBeGreaterThan(0);
+  expect(boxes.filter((box) => box.left < -1 || box.right > box.viewportWidth + 1)).toEqual([]);
+}
+
+export async function expectDockWithinViewport(page: Page, selector = '#appBottomNav') {
+  const dock = page.locator(selector);
+  const box = await dock.boundingBox();
+  expect(box).not.toBeNull();
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(-1);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width + 1);
+  expect(box!.y).toBeGreaterThanOrEqual(-1);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height + 1);
 }
 
 export async function expectTouchTargets(locator: Locator, minimum = 44): Promise<void> {

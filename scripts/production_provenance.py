@@ -1,0 +1,750 @@
+"""Audit production provenance and reconcile only existing metadata.
+
+The helper reads GitHub/host evidence supplied by the caller and inspects the
+running Docker services.  ``reconcile`` may atomically update the existing
+marker and ``current`` symlink after every read-only safety check passes; it
+never pulls images, starts or stops services, runs migrations, or changes
+application configuration.
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import threading
+from collections.abc import Collection, Sequence
+from datetime import datetime
+from pathlib import Path, PurePosixPath
+from typing import cast
+
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+REVISION_LABEL = "org.opencontainers.image.revision"
+BOT_RUNTIME_MARKERS = ("polling_file_lock_acquired", "telegram_polling_started")
+SERVICES = ("backend", "worker", "bot")
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+ALEMBIC_REVISION_LINE_RE = re.compile(r"(?P<revision>[^\s()]+)(?:\s+\([^)]*\))?")
+
+
+class ProvenanceError(RuntimeError):
+    """Production provenance is not safe to accept."""
+
+
+def is_full_sha(value: object) -> bool:
+    return isinstance(value, str) and SHA_RE.fullmatch(value) is not None
+
+
+def parse_alembic_revisions(output: str) -> set[str]:
+    """Extract revision tokens from deterministic ``alembic`` output lines."""
+
+    revisions: set[str] = set()
+    for raw_line in output.splitlines():
+        line = ANSI_ESCAPE_RE.sub("", raw_line).strip()
+        if not line:
+            continue
+        match = ALEMBIC_REVISION_LINE_RE.fullmatch(line)
+        if match:
+            revisions.add(match.group("revision"))
+    return revisions
+
+
+def alembic_revisions_are_consistent(current: Collection[str], heads: Collection[str]) -> bool:
+    """Return whether current database revisions include every Alembic head."""
+
+    return bool(current) and bool(heads) and set(heads).issubset(current)
+
+
+def _validate_image_reference(
+    image_ref: str,
+    *,
+    revision: object,
+    repo_digests: Sequence[object],
+) -> None:
+    """Accept only an exact revision tag or a matching immutable repository digest."""
+
+    if not is_full_sha(revision):
+        raise ProvenanceError("OCI revision is not a full lowercase Git SHA")
+    if not image_ref or any(character.isspace() for character in image_ref):
+        raise ProvenanceError(f"image reference {image_ref!r} is malformed")
+
+    if "@" in image_ref:
+        if image_ref.count("@") != 1:
+            raise ProvenanceError(f"immutable image reference {image_ref!r} is malformed")
+        repository, digest = image_ref.split("@", maxsplit=1)
+        repository_name = repository.rsplit("/", maxsplit=1)[-1]
+        if not repository or ":" in repository_name or not DIGEST_RE.fullmatch(digest):
+            raise ProvenanceError(f"immutable image reference {image_ref!r} is malformed")
+        if image_ref not in {value for value in repo_digests if isinstance(value, str)}:
+            raise ProvenanceError(
+                f"immutable image reference {image_ref!r} is absent from RepoDigests"
+            )
+        return
+
+    _repository, separator, tag = image_ref.rpartition(":")
+    if not separator or not _repository or tag != revision:
+        raise ProvenanceError(f"image reference {image_ref!r} is not an exact OCI revision tag")
+
+
+def classify_marker_runtime(recorded_revision: object, runtime_revisions: Sequence[object]) -> str:
+    """Classify the durable marker against the currently running services."""
+
+    revisions = [value for value in runtime_revisions if isinstance(value, str)]
+    if len(revisions) != len(runtime_revisions) or not revisions:
+        return "INVALID_RUNTIME"
+    if any(not is_full_sha(value) for value in revisions):
+        return "INVALID_RUNTIME"
+    if len(set(revisions)) != 1:
+        return "MIXED_RUNTIME"
+    if not is_full_sha(recorded_revision):
+        return "INVALID_MARKER"
+    if recorded_revision == revisions[0]:
+        return "OK"
+    return "PROVENANCE_RECONCILIATION_REQUIRED"
+
+
+def _run(command: Sequence[str]) -> str:
+    completed = subprocess.run(
+        list(command),
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return completed.stdout
+
+
+def _json_command(command: Sequence[str]) -> object:
+    try:
+        return json.loads(_run(command))
+    except json.JSONDecodeError as exc:
+        raise ProvenanceError(f"command returned invalid JSON: {' '.join(command)}") from exc
+
+
+def _read_revision(path: Path) -> str | None:
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return None
+    if not value:
+        return None
+    return value
+
+
+def _container_id(service: str) -> str:
+    rows = [
+        value.strip()
+        for value in _run(
+            [
+                "docker",
+                "ps",
+                "--filter",
+                f"label=com.docker.compose.service={service}",
+                "--format",
+                "{{.ID}}",
+            ]
+        ).splitlines()
+        if value.strip()
+    ]
+    if len(rows) != 1:
+        raise ProvenanceError(
+            f"expected exactly one running {service} container, found {len(rows)}"
+        )
+    return rows[0]
+
+
+def _bot_startup_markers(container_id: str, started_at: str) -> dict[str, bool]:
+    """Stream this container run's logs without retaining or reporting their contents."""
+    boundary = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+    markers = dict.fromkeys(BOT_RUNTIME_MARKERS, False)
+    with subprocess.Popen(
+        ["docker", "logs", "--timestamps", "--since", started_at, container_id],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    ) as process:
+        timer = threading.Timer(60, process.kill)
+        timer.start()
+        try:
+            assert process.stdout is not None
+            for line in iter(lambda: process.stdout.readline(65536), b""):
+                try:
+                    timestamp, payload = line.decode("utf-8").split(" ", 1)
+                    if datetime.fromisoformat(timestamp.replace("Z", "+00:00")) < boundary:
+                        continue
+                    event = json.loads(payload)
+                except ValueError:
+                    continue
+                if (
+                    isinstance(event, dict)
+                    and event.get("service") == "telegram-bot"
+                    and event.get("logger") == "__main__"
+                    and isinstance(event.get("message"), str)
+                    and event["message"] in markers
+                ):
+                    markers[event["message"]] = True
+            if process.wait() != 0:
+                raise ProvenanceError("bot current-run log evidence unavailable")
+        finally:
+            timer.cancel()
+    if not all(markers.values()):
+        raise ProvenanceError("bot current-run startup evidence incomplete")
+    return markers
+
+
+def _container_path(root: Path, path: str) -> Path:
+    """Resolve container symlinks without letting absolute targets use the host root."""
+    pending = list(PurePosixPath(path).parts[1:])
+    resolved: list[str] = []
+    symlinks = 0
+    while pending:
+        part = pending.pop(0)
+        if part == "..":
+            resolved = resolved[:-1]
+            continue
+        candidate = root.joinpath(*resolved, part)
+        if candidate.is_symlink():
+            symlinks += 1
+            if symlinks > 40:
+                raise ProvenanceError("bot lock path has too many symlinks")
+            target = PurePosixPath(os.readlink(candidate))
+            if target.is_absolute():
+                resolved = []
+            pending = list(target.parts[1:] if target.is_absolute() else target.parts) + pending
+        else:
+            resolved.append(part)
+    return root.joinpath(*resolved)
+
+
+def _bot_process_owner(pid: int, *, proc_root: Path = Path("/proc")) -> str:
+    """Corroborate the current bot's descriptor with host kernel lock ownership."""
+    process = proc_root / str(pid)
+    identity = (process / "stat").read_text().rsplit(")", 1)[1].split()
+    if identity[0] in {"Z", "X", "x"}:
+        raise ProvenanceError("bot process is not live")
+    command = (process / "cmdline").read_bytes().split(b"\0")
+    if len(command) != 4 or command[1:] != [b"-m", b"fitminiapp_bot.bot", b""]:
+        raise ProvenanceError("bot container init is not the expected polling process")
+    if not Path(os.fsdecode(command[0])).name.startswith("python"):
+        raise ProvenanceError("bot process executable is not Python")
+    environment = dict(
+        item.split(b"=", 1)
+        for item in (process / "environ").read_bytes().split(b"\0")
+        if b"=" in item
+    )
+    token = environment.get(b"TELEGRAM_BOT_TOKEN")
+    directory = os.fsdecode(environment.get(b"BOT_POLLING_LOCK_DIR", b"/var/lock/fitminiapp-bot"))
+    if not token or not directory.startswith("/"):
+        raise ProvenanceError("bot polling configuration evidence incomplete")
+    token_hash = hashlib.sha256(token).hexdigest()[:24]
+    lock_path = _container_path(process / "root", f"{directory}/polling-{token_hash}.lock")
+    lock_stat = lock_path.stat()
+    inode = (lock_stat.st_dev, lock_stat.st_ino)
+    # Compare device/inode, never report token-derived paths or raw procfs data.
+    descriptors = []
+    for fd in (process / "fd").iterdir():
+        stat = fd.stat()
+        if (stat.st_dev, stat.st_ino) == inode:
+            descriptors.append(fd)
+    if len(descriptors) != 1:
+        raise ProvenanceError("bot polling descriptor ownership is ambiguous or missing")
+    expected = ["FLOCK", "ADVISORY", "WRITE", str(pid)]
+    locks = []
+    for line in (proc_root / "locks").read_text().splitlines():
+        fields = line.split()
+        if len(fields) != 8:
+            continue
+        device = fields[5].split(":")
+        if len(device) != 3:
+            continue
+        if (os.makedev(int(device[0], 16), int(device[1], 16)), int(device[2])) == inode:
+            locks.append(fields[1:])
+    if len(locks) != 1 or locks[0][:4] != expected or locks[0][-2:] != ["0", "EOF"]:
+        raise ProvenanceError("bot exclusive kernel FLOCK owner is unverified")
+    fdinfo = (process / "fdinfo" / descriptors[0].name).read_text()
+    if not any(
+        line.split()[2:] == locks[0] for line in fdinfo.splitlines() if line.startswith("lock:")
+    ):
+        raise ProvenanceError("bot descriptor and kernel FLOCK evidence disagree")
+    final_identity = (process / "stat").read_text().rsplit(")", 1)[1].split()
+    if final_identity[0] in {"Z", "X", "x"} or final_identity[19] != identity[19]:
+        raise ProvenanceError("bot process changed during audit")
+    return identity[19]
+
+
+# The deploy user cannot ptrace UID 10001 on production. Run a bounded read-only
+# check *as that same UID* inside the already verified bot container instead.
+# Never run this probe as root or treat missing data as a valid owner.
+_BOT_CONTAINER_OWNER_PROBE = r"""
+import hashlib
+import json
+import os
+from pathlib import Path
+
+process = Path("/proc/1")
+def starttime():
+    fields = (process / "stat").read_text().rsplit(")", 1)[1].split()
+    if fields[0] in {"Z", "X", "x"}:
+        raise ValueError("bot process not live")
+    return fields[19]
+
+before = starttime()
+command = (process / "cmdline").read_bytes().split(b"\0")
+if len(command) != 4 or command[1:] != [b"-m", b"fitminiapp_bot.bot", b""]:
+    raise ValueError("unexpected bot command")
+if not Path(os.fsdecode(command[0])).name.startswith("python"):
+    raise ValueError("unexpected bot executable")
+
+environment = dict(
+    part.split(b"=", 1)
+    for part in (process / "environ").read_bytes().split(b"\0")
+    if b"=" in part
+)
+token = environment.get(b"TELEGRAM_BOT_TOKEN")
+directory = os.fsdecode(environment.get(b"BOT_POLLING_LOCK_DIR", b"/var/lock/fitminiapp-bot"))
+if not token or not directory.startswith("/"):
+    raise ValueError("missing polling identity")
+
+name = hashlib.sha256(token).hexdigest()[:24]
+lock = Path(directory) / ("polling-" + name + ".lock")
+stat = lock.stat()
+inode = (stat.st_dev, stat.st_ino)
+descriptors = [fd for fd in (process / "fd").iterdir()
+               if (fd.stat().st_dev, fd.stat().st_ino) == inode]
+if len(descriptors) != 1:
+    raise ValueError("polling descriptor not unique")
+
+locks = []
+for line in Path("/proc/locks").read_text().splitlines():
+    parts = line.split()
+    if len(parts) != 8:
+        continue
+    device = parts[5].split(":")
+    if len(device) != 3:
+        continue
+    if (os.makedev(int(device[0], 16), int(device[1], 16)), int(device[2])) == inode:
+        locks.append(parts[1:])
+if len(locks) != 1 or locks[0][:4] != ["FLOCK", "ADVISORY", "WRITE", "1"] \
+        or locks[0][-2:] != ["0", "EOF"]:
+    raise ValueError("kernel flock owner not verified")
+fdinfo = (process / "fdinfo" / descriptors[0].name).read_text()
+if not any(line.split()[2:] == locks[0]
+           for line in fdinfo.splitlines() if line.startswith("lock:")):
+    raise ValueError("fdinfo does not match kernel flock")
+if starttime() != before:
+    raise ValueError("process identity changed")
+print(json.dumps({"verified": True, "starttime": before}, separators=(",", ":")))
+"""
+
+
+def _bot_process_owner_in_container(container_id: str, host_pid: int) -> str:
+    """Verify polling FLOCK as the bot UID when host /proc is access-restricted."""
+    host_process = Path("/proc") / str(host_pid) / "stat"
+
+    def host_starttime() -> str:
+        fields = host_process.read_text().rsplit(")", 1)[1].split()
+        if fields[0] in {"Z", "X", "x"}:
+            raise ProvenanceError("bot host process is not live")
+        return fields[19]
+
+    before = host_starttime()
+    completed = subprocess.run(
+        [
+            "docker",
+            "exec",
+            "--user",
+            "10001:10001",
+            container_id,
+            "python",
+            "-c",
+            _BOT_CONTAINER_OWNER_PROBE,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=20,
+    )
+    evidence = json.loads(completed.stdout)
+    if (
+        not isinstance(evidence, dict)
+        or evidence != {"verified": True, "starttime": before}
+        or host_starttime() != before
+    ):
+        raise ProvenanceError("bot container polling ownership evidence does not match host")
+    return before
+
+
+def _bot_process_owner_with_container_fallback(container_id: str, host_pid: int) -> str:
+    try:
+        return _bot_process_owner(host_pid)
+    except PermissionError:
+        # Docker exec is not a privilege escalation: bot/Dockerfile uses UID 10001.
+        # An unsuccessful same-UID probe remains a hard release blocker.
+        return _bot_process_owner_in_container(container_id, host_pid)
+
+
+def _bot_runtime_snapshot(container: dict[str, object]) -> dict[str, object]:
+    try:
+        state = container["State"]
+        if not isinstance(state, dict):
+            raise ProvenanceError("bot container state evidence incomplete")
+        container_id, pid, started_at = container["Id"], state["Pid"], state["StartedAt"]
+        if (
+            not isinstance(container_id, str)
+            or re.fullmatch(r"[0-9a-f]{64}", container_id) is None
+            or type(pid) is not int
+            or pid <= 0
+            or not isinstance(started_at, str)
+            or not started_at.endswith("Z")
+        ):
+            raise ProvenanceError("bot container identity evidence incomplete")
+        before = _bot_process_owner_with_container_fallback(container_id, pid)
+        if _run(["docker", "top", container_id, "-eo", "pid"]).split() != ["PID", str(pid)]:
+            raise ProvenanceError("bot container process ownership is ambiguous")
+        markers = _bot_startup_markers(container_id, started_at)
+        after = _bot_process_owner_with_container_fallback(container_id, pid)
+        if _run(["docker", "top", container_id, "-eo", "pid"]).split() != ["PID", str(pid)]:
+            raise ProvenanceError("bot container process ownership is ambiguous")
+        current = _json_command(["docker", "inspect", container_id])
+        if (
+            not isinstance(current, list)
+            or len(current) != 1
+            or not isinstance(current[0], dict)
+            or any(current[0].get(key) != container.get(key) for key in ("Id", "Image", "State"))
+            or _container_id("bot") != container_id[:12]
+            or before != after
+        ):
+            raise ProvenanceError("bot container or process changed during audit")
+        return {"runtime_markers": markers, "polling_owner": {"verified": True, "pid": pid}}
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        KeyError,
+        IndexError,
+        AssertionError,
+        subprocess.SubprocessError,
+    ) as exc:
+        raise ProvenanceError("bot runtime evidence unavailable or malformed") from exc
+
+
+def _service_snapshot(service: str) -> dict[str, object]:
+    container_id = _container_id(service)
+    container_payload = _json_command(["docker", "inspect", container_id])
+    if not isinstance(container_payload, list) or len(container_payload) != 1:
+        raise ProvenanceError(f"docker inspect returned no unique {service} container")
+    container = container_payload[0]
+    if not isinstance(container, dict):
+        raise ProvenanceError(f"docker inspect returned invalid {service} data")
+    config = container.get("Config")
+    state = container.get("State")
+    if not isinstance(config, dict) or not isinstance(state, dict):
+        raise ProvenanceError(f"{service} container metadata is incomplete")
+    container_image_id = container.get("Image")
+    image_ref = config.get("Image")
+    if not isinstance(image_ref, str) or not image_ref:
+        raise ProvenanceError(f"{service} container image reference is missing")
+    image_payload = _json_command(["docker", "image", "inspect", image_ref])
+    if not isinstance(image_payload, list) or len(image_payload) != 1:
+        raise ProvenanceError(f"docker image inspect returned no unique {service} image")
+    image = image_payload[0]
+    if not isinstance(image, dict):
+        raise ProvenanceError(f"docker image metadata for {service} is invalid")
+    labels = image.get("Config", {}).get("Labels", {})
+    if not isinstance(labels, dict):
+        labels = {}
+    revision = labels.get(REVISION_LABEL)
+    repo_digests = image.get("RepoDigests", [])
+    if not isinstance(repo_digests, list):
+        repo_digests = []
+    immutable_digests = [
+        value.rsplit("@", maxsplit=1)[-1]
+        for value in repo_digests
+        if isinstance(value, str) and "@" in value and DIGEST_RE.fullmatch(value.rsplit("@", 1)[-1])
+    ]
+    status = state.get("Status")
+    health_payload = state.get("Health")
+    health = health_payload.get("Status") if isinstance(health_payload, dict) else None
+    result: dict[str, object] = {
+        "service": service,
+        "container_id": container_id,
+        "image_ref": image_ref,
+        "container_image_id": container_image_id,
+        "image_id": image.get("Id"),
+        "revision": revision,
+        "repo_digests": sorted(immutable_digests),
+        "status": status,
+        "health": health,
+        "immutable_image": bool(immutable_digests)
+        and container_image_id == image.get("Id")
+        and isinstance(container_image_id, str)
+        and container_image_id.startswith("sha256:"),
+    }
+    if service in {"backend", "worker"} and health != "healthy":
+        raise ProvenanceError(f"{service} health is {health!r}, expected 'healthy'")
+    if status != "running":
+        raise ProvenanceError(f"{service} status is {status!r}, expected 'running'")
+    if not is_full_sha(revision):
+        raise ProvenanceError(f"{service} OCI revision is not a full lowercase Git SHA")
+    if not immutable_digests:
+        raise ProvenanceError(f"{service} image has no immutable RepoDigest")
+    if not result["immutable_image"]:
+        raise ProvenanceError(f"{service} container does not match its immutable image ID")
+    _validate_image_reference(image_ref, revision=revision, repo_digests=repo_digests)
+    if service == "bot":
+        result.update(_bot_runtime_snapshot(container))
+    return result
+
+
+def _database_snapshot(container_id: str) -> dict[str, object]:
+    current = _run(["docker", "exec", container_id, "alembic", "current"])
+    heads = _run(["docker", "exec", container_id, "alembic", "heads"])
+    current_revisions = sorted(parse_alembic_revisions(current))
+    head_revisions = sorted(parse_alembic_revisions(heads))
+    consistent = alembic_revisions_are_consistent(current_revisions, head_revisions)
+    return {
+        "current": current.strip(),
+        "heads": heads.strip(),
+        "current_revisions": current_revisions,
+        "head_revisions": head_revisions,
+        "consistent": consistent,
+    }
+
+
+def _summaries(state_root: Path) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for path in sorted(
+        state_root.glob("*/summary.json"), key=lambda item: item.stat().st_mtime, reverse=True
+    )[:20]:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            rows.append({"path": str(path), "error": f"{type(exc).__name__}: {exc}"})
+            continue
+        rows.append(
+            {
+                "path": str(path),
+                "target_revision": payload.get("target_revision")
+                if isinstance(payload, dict)
+                else None,
+                "previous_revision": payload.get("previous_revision")
+                if isinstance(payload, dict)
+                else None,
+                "verdict": payload.get("verdict") if isinstance(payload, dict) else None,
+            }
+        )
+    return rows
+
+
+def inspect_production(app_root: Path) -> dict[str, object]:
+    """Read the host state without changing it."""
+
+    state_root = app_root / ".artifacts" / "operations" / "deployments"
+    marker_path = state_root / "last-successful-revision"
+    recorded_revision = _read_revision(marker_path)
+    services: dict[str, dict[str, object]] = {}
+    errors: list[str] = []
+    for service in SERVICES:
+        try:
+            services[service] = _service_snapshot(service)
+        except (OSError, ProvenanceError, subprocess.CalledProcessError) as exc:
+            services[service] = {"service": service, "error": f"{type(exc).__name__}: {exc}"}
+            errors.append(f"{service}: {exc}")
+
+    revisions = [
+        services[service].get("revision") for service in SERVICES if "revision" in services[service]
+    ]
+    valid_revisions = [value for value in revisions if isinstance(value, str)]
+    runtime_revision = (
+        valid_revisions[0]
+        if len(valid_revisions) == len(SERVICES) and len(set(valid_revisions)) == 1
+        else None
+    )
+    status = classify_marker_runtime(recorded_revision, revisions)
+    if errors:
+        status = "INVALID_RUNTIME"
+
+    current_path = app_root / "current"
+    current_target: str | None = None
+    current_error: str | None = None
+    if current_path.is_symlink():
+        try:
+            current_target = str(current_path.resolve(strict=True))
+        except OSError as exc:
+            current_error = f"{type(exc).__name__}: {exc}"
+            errors.append(f"current symlink: {exc}")
+    elif current_path.exists():
+        current_error = "current is not a symlink"
+        errors.append(current_error)
+
+    release_path = (
+        app_root / "releases" / runtime_revision if isinstance(runtime_revision, str) else None
+    )
+    release_sha = _read_revision(release_path / ".deployment-sha") if release_path else None
+    release_ok = bool(release_path and release_path.is_dir() and release_sha == runtime_revision)
+    if runtime_revision and not release_ok:
+        errors.append(f"immutable release for runtime {runtime_revision} is missing or mismatched")
+
+    database: dict[str, object] = {"consistent": False, "error": "backend container unavailable"}
+    backend = services.get("backend", {})
+    backend_id = backend.get("container_id")
+    if isinstance(backend_id, str):
+        try:
+            database = _database_snapshot(backend_id)
+            if not database["consistent"]:
+                errors.append("database migration state is not at a known Alembic head")
+        except (OSError, ProvenanceError, subprocess.CalledProcessError) as exc:
+            database = {"consistent": False, "error": f"{type(exc).__name__}: {exc}"}
+            errors.append(f"database: {exc}")
+
+    return {
+        "status": status,
+        "recorded_revision": recorded_revision,
+        "runtime_revision": runtime_revision,
+        "runtime_revisions": revisions,
+        "runtime_uniform": runtime_revision is not None,
+        "services": services,
+        "release": {
+            "path": str(release_path) if release_path else None,
+            "deployment_sha": release_sha,
+            "exists_and_matches": release_ok,
+        },
+        "current": {"target": current_target, "error": current_error},
+        "database": database,
+        "summaries": _summaries(state_root),
+        "errors": errors,
+    }
+
+
+def _verification_errors(snapshot: dict[str, object], expected_revision: str) -> list[str]:
+    errors: list[str] = []
+    if not is_full_sha(expected_revision):
+        errors.append("requested revision must be a full lowercase Git SHA")
+    if snapshot.get("runtime_revision") != expected_revision:
+        errors.append(
+            f"runtime revision {snapshot.get('runtime_revision')!r} does not match requested {expected_revision}"
+        )
+    if not snapshot.get("runtime_uniform"):
+        errors.append("runtime services are not uniform")
+    if snapshot.get("status") in {"MIXED_RUNTIME", "INVALID_RUNTIME", "INVALID_MARKER"}:
+        errors.append(f"runtime provenance status is {snapshot.get('status')}")
+    services = snapshot.get("services")
+    if not isinstance(services, dict) or set(services) != set(SERVICES):
+        errors.append("backend, worker and bot service evidence is incomplete")
+    else:
+        for service in SERVICES:
+            raw_data = services.get(service)
+            data = cast(dict[str, object], raw_data) if isinstance(raw_data, dict) else {}
+            if not isinstance(data, dict) or data.get("error"):
+                errors.append(f"{service} runtime evidence is invalid")
+                continue
+            if data.get("revision") != expected_revision:
+                errors.append(f"{service} OCI revision does not match requested revision")
+            if not data.get("immutable_image"):
+                errors.append(f"{service} image is not immutable")
+            if service == "bot":
+                owner = data.get("polling_owner")
+                if not isinstance(owner, dict) or owner.get("verified") is not True:
+                    errors.append("bot live polling ownership is not verified")
+    release = snapshot.get("release")
+    if not isinstance(release, dict) or not release.get("exists_and_matches"):
+        errors.append("requested immutable release directory is not verified")
+    database = snapshot.get("database")
+    if not isinstance(database, dict) or database.get("consistent") is not True:
+        errors.append("database/migration state is not verified")
+    snapshot_errors = snapshot.get("errors")
+    if isinstance(snapshot_errors, list):
+        errors.extend(str(error) for error in snapshot_errors)
+    return list(dict.fromkeys(errors))
+
+
+def _atomic_text(path: Path, value: str) -> None:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(value)
+        os.replace(temporary, path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporary)
+        raise
+
+
+def _atomic_symlink(link: Path, target: Path) -> None:
+    temporary = link.with_name(f".{link.name}.reconcile")
+    with contextlib.suppress(FileNotFoundError):
+        temporary.unlink()
+    os.symlink(target, temporary, target_is_directory=True)
+    os.replace(temporary, link)
+
+
+def reconcile(app_root: Path, expected_revision: str) -> dict[str, object]:
+    snapshot = inspect_production(app_root)
+    errors = _verification_errors(snapshot, expected_revision)
+    if errors:
+        raise ProvenanceError("; ".join(errors))
+    release = snapshot["release"]
+    assert isinstance(release, dict)
+    release_path = Path(str(release["path"]))
+    state_root = app_root / ".artifacts" / "operations" / "deployments"
+    marker = state_root / "last-successful-revision"
+    previous_marker = snapshot.get("recorded_revision")
+    _atomic_text(marker, expected_revision + "\n")
+    current = app_root / "current"
+    current_snapshot = snapshot.get("current")
+    previous_current = (
+        current_snapshot.get("target") if isinstance(current_snapshot, dict) else None
+    )
+    if previous_current != str(release_path):
+        _atomic_symlink(current, release_path)
+    return {
+        "status": "RECONCILED",
+        "recorded_revision": previous_marker,
+        "runtime_revision": expected_revision,
+        "post_marker": _read_revision(marker),
+        "post_current": str(current.resolve(strict=True)),
+        "application_mutation": False,
+    }
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    for command in ("snapshot", "verify", "reconcile"):
+        subparser = subparsers.add_parser(command)
+        subparser.add_argument("--app-root", type=Path, required=True)
+        if command != "snapshot":
+            subparser.add_argument("--expected-revision", required=True)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        if args.command == "snapshot":
+            result = inspect_production(args.app_root)
+        elif args.command == "verify":
+            result = inspect_production(args.app_root)
+            errors = _verification_errors(result, args.expected_revision)
+            if errors:
+                raise ProvenanceError("; ".join(errors))
+            result["status"] = "VERIFIED"
+        else:
+            result = reconcile(args.app_root, args.expected_revision)
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
+    except (OSError, ProvenanceError, subprocess.CalledProcessError) as exc:
+        print(json.dumps({"status": "BLOCKED", "error": str(exc)}), file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

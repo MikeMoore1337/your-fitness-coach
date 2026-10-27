@@ -5,6 +5,36 @@ import pytest
 
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.user import User
+from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
+from fitminiapp_api.schemas.coach_capacity import CoachCapacityResponse
+from fitminiapp_api.schemas.coach_crm import (
+    CoachAgendaResponse,
+    CoachClientOperationsResponse,
+    CoachOperationsTodayResponse,
+    CoachPackageResponse,
+    CoachPaymentResponse,
+    CoachSessionResponse,
+    CoachTaskResponse,
+)
+from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
+from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
+from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
+from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
+from fitminiapp_api.schemas.program import (
+    ClientResponse,
+    CoachAssignedProgramResponse,
+    ProgramTemplateResponse,
+)
+from fitminiapp_api.schemas.progress import NutritionReportResponse, ProgressSummaryResponse
+from fitminiapp_api.schemas.user import UserResponse
+from fitminiapp_api.schemas.workout import (
+    ExerciseHistoryResponse,
+    TrainingAnalyticsResponse,
+    WorkoutScheduleItem,
+    WorkoutStatusResponse,
+    WorkoutTimelineItem,
+    WorkoutTodayResponse,
+)
 from fitminiapp_api.services.demo_sessions import DemoSessionExpiredError, DemoSessionStore
 
 
@@ -16,27 +46,39 @@ def _create_session(client, scenario: str) -> tuple[str, dict]:
     return payload.pop("session_token"), payload
 
 
+def _transport(client, token: str, path: str, method: str = "GET", body=None):
+    return client.post(
+        "/api/v1/demo/sessions/current/transport",
+        headers={"X-Demo-Session": token},
+        json={"path": path, "method": method, "body": body},
+    )
+
+
 def test_demo_scenarios_are_deterministic_and_do_not_write_user_tables(client) -> None:
     with get_session_context() as db:
         users_before = db.query(User).count()
 
-    conversion_titles = {
-        "self_training": "Ведите настоящую историю тренировок",
-        "nutrition": "Настройте дневник питания под себя",
-        "trainer": "Начните работать с реальными клиентами",
-    }
+    conversion_title = "Готово. Вы посмотрели основной сценарий"
     for scenario in ("self_training", "nutrition", "trainer"):
         first_token, first = _create_session(client, scenario)
         second_token, second = _create_session(client, scenario)
 
         assert first_token != second_token
         assert first["capability"] == "demo"
-        assert first["fixture_version"] == "demo-curated-v1"
+        assert first["fixture_version"] == "demo-curated-v2"
         assert first["scenario"] == scenario
         assert first["state"] == second["state"]
         assert first["cabinet"] == second["cabinet"]
         assert first["cabinet"]["meaningful_action_completed"] is False
-        assert first["cabinet"]["conversion_title"] == conversion_titles[scenario]
+        assert first["cabinet"]["conversion_title"] == conversion_title
+        assert len(first["cabinet"]["progress"]["training_history"]) == 4
+        assert len(first["cabinet"]["progress"]["nutrition_history"]) == 7
+        if scenario == "trainer":
+            assert {client["id"] for client in first["state"]["clients"]} == {
+                "alexey",
+                "maria",
+                "ivan",
+            }
 
     with get_session_context() as db:
         assert db.query(User).count() == users_before
@@ -107,14 +149,27 @@ def test_nutrition_and_trainer_sessions_are_isolated(client) -> None:
     assert nutrition.json()["cabinet"]["progress"]["nutrition_completion_percent"] == 74
     assert nutrition.json()["cabinet"]["meaningful_action_completed"] is True
 
+    selected_trainer = client.post(
+        "/api/v1/demo/sessions/current/actions",
+        headers={"X-Demo-Session": trainer_token},
+        json={"action": "select_client", "client_id": "maria"},
+    )
+    assert selected_trainer.status_code == 200
+    assert selected_trainer.json()["state"]["selected_client_id"] == "maria"
+    assert selected_trainer.json()["cabinet"]["trainer"]["selected_client_id"] == "maria"
+
     trainer = client.post(
         "/api/v1/demo/sessions/current/actions",
         headers={"X-Demo-Session": trainer_token},
         json={"action": "save_comment", "comment": "  Техника стабильна, сохраняем темп.  "},
     )
     assert trainer.status_code == 200
-    assert trainer.json()["state"]["comment"] == "Техника стабильна, сохраняем темп."
-    assert trainer.json()["cabinet"]["trainer"]["comment"] == "Техника стабильна, сохраняем темп."
+    assert trainer.json()["state"]["clients"][0]["comment"] is None
+    assert trainer.json()["state"]["clients"][1]["comment"] == "Техника стабильна, сохраняем темп."
+    assert (
+        trainer.json()["cabinet"]["trainer"]["clients"][1]["comment"]
+        == "Техника стабильна, сохраняем темп."
+    )
     assert trainer.json()["cabinet"]["meaningful_action_completed"] is True
 
     nutrition_after = client.get(
@@ -192,7 +247,7 @@ def test_concurrent_demo_sessions_keep_independent_state() -> None:
         token, _ = store.create(scenario)
         if scenario == "trainer":
             state = store.apply_action(token, "save_comment", f"Комментарий {index}")
-            return token, state["state"]["comment"]
+            return token, state["state"]["clients"][0]["comment"]
         state = store.apply_action(token, "add_recent")
         return token, str(state["state"]["calories"])
 
@@ -211,3 +266,312 @@ def test_demo_frontend_route_is_noindex(client) -> None:
 
     assert response.status_code == 200
     assert response.headers["x-robots-tag"] == "noindex, nofollow"
+
+
+def test_demo_transport_returns_production_dtos_and_keeps_set_updates_independent(client) -> None:
+    token, _ = _create_session(client, "self_training")
+
+    UserResponse.model_validate(_transport(client, token, "/api/v1/me").json())
+    workout_response = _transport(client, token, "/api/v1/workouts/today")
+    workout = WorkoutTodayResponse.model_validate(workout_response.json())
+    assert [item.is_completed for item in workout.exercises[0].sets] == [True, True, False]
+    for item in _transport(client, token, "/api/v1/workouts/week").json():
+        WorkoutScheduleItem.model_validate(item)
+    progress_summary = _transport(client, token, "/api/v1/workouts/progress/summary").json()
+    ProgressSummaryResponse.model_validate(progress_summary)
+    assert any(
+        trend["label"] == "Пользовательский показатель"
+        for trend in progress_summary["body"]["trends"]
+    )
+    assert all(trend["label"] != "Обхват живота" for trend in progress_summary["body"]["trends"])
+    TrainingAnalyticsResponse.model_validate(
+        _transport(client, token, "/api/v1/workouts/progress/training-analytics").json()
+    )
+    NutritionReportResponse.model_validate(
+        _transport(client, token, "/api/v1/workouts/progress/nutrition-report").json()
+    )
+    FoodDiaryDayResponse.model_validate(_transport(client, token, "/api/v1/nutrition/diary").json())
+    HydrationDayResponse.model_validate(
+        _transport(client, token, "/api/v1/nutrition/hydration").json()
+    )
+    ProgramTemplateResponse.model_validate(
+        _transport(client, token, "/api/v1/programs/templates/mine").json()[0]
+    )
+
+    started = _transport(client, token, "/api/v1/workouts/50001/start", "POST")
+    assert started.status_code == 200
+    pending_set = workout.exercises[0].sets[-1]
+    saved = _transport(
+        client,
+        token,
+        f"/api/v1/workouts/sets/{pending_set.id}",
+        "PATCH",
+        {
+            "actual_reps": 9,
+            "actual_weight": 17.5,
+            "rir": "3",
+            "set_kind": "working",
+            "reached_failure": False,
+            "is_completed": True,
+            "expected_version": pending_set.version,
+            "mutation_id": "demo-set-mutation-0001",
+        },
+    )
+    assert saved.status_code == 200
+    saved_set = WorkoutStatusResponse.model_validate(saved.json())
+    assert saved_set.is_completed is True
+    assert saved_set.actual_reps == 9
+    assert saved_set.actual_weight == 17.5
+    assert saved_set.version == pending_set.version + 1
+    repeated = _transport(
+        client,
+        token,
+        f"/api/v1/workouts/sets/{pending_set.id}",
+        "PATCH",
+        {
+            "actual_reps": 9,
+            "actual_weight": 17.5,
+            "rir": "3",
+            "set_kind": "working",
+            "reached_failure": False,
+            "is_completed": True,
+            "expected_version": pending_set.version,
+            "mutation_id": "demo-set-mutation-0001",
+        },
+    )
+    assert repeated.status_code == 200
+    assert repeated.json() == saved.json()
+    refreshed = WorkoutTodayResponse.model_validate(
+        _transport(client, token, "/api/v1/workouts/today").json()
+    )
+    assert [item.is_completed for item in refreshed.exercises[0].sets] == [True, True, True]
+
+
+def test_demo_transport_maps_coach_capacity_to_current_response_dto(client) -> None:
+    token, _ = _create_session(client, "trainer")
+
+    response = _transport(client, token, "/api/v1/coach/capacity")
+
+    assert response.status_code == 200, response.text
+    payload = CoachCapacityResponse.model_validate(response.json())
+    assert payload.active_client_count == 3
+    assert payload.pending_invite_count == 1
+    assert payload.clients_with_active_program_count == 2
+    assert payload.roster_coverage_percent == 66.7
+    assert payload.capacity_band == "0_9"
+    assert payload.next_capacity_boundary == 10
+    assert payload.scale_boundaries == (10, 30, 100)
+    assert payload.bottlenecks[0].key == "attention"
+
+
+def test_demo_transport_exposes_synthetic_coach_inbox_without_account_access(client) -> None:
+    with get_session_context() as db:
+        users_before = db.query(User).count()
+
+    trainer_token, _ = _create_session(client, "trainer")
+    response = _transport(client, trainer_token, "/api/v1/coach/inbox?limit=50")
+
+    assert response.status_code == 200, response.text
+    inbox = CoachInboxResponse.model_validate(response.json())
+    assert inbox.total == 1
+    assert inbox.items[0].client.id == 51_003
+    assert inbox.items[0].action == "assign_program"
+
+    self_token, _ = _create_session(client, "self_training")
+    assert _transport(client, self_token, "/api/v1/coach/inbox?limit=50").status_code == 403
+
+    with get_session_context() as db:
+        assert db.query(User).count() == users_before
+
+
+def test_demo_transport_exposes_owned_fixture_history_and_denies_unknown_exercises(client) -> None:
+    trainer_token, _ = _create_session(client, "trainer")
+
+    response = _transport(client, trainer_token, "/api/v1/programs/exercises/1001/history")
+
+    assert response.status_code == 200, response.text
+    history = ExerciseHistoryResponse.model_validate(response.json())
+    assert history.exercise_id == 1001
+    assert history.recent_sessions[0].workout_exercise_id == 61_001
+    assert history.recent_sessions[0].sets[0].rir == "2"
+
+    assert (
+        _transport(client, trainer_token, "/api/v1/programs/exercises/1002/history").status_code
+        == 403
+    )
+
+
+def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_writes(
+    client,
+) -> None:
+    nutrition_token, _ = _create_session(client, "nutrition")
+    before = _transport(client, nutrition_token, "/api/v1/nutrition/hydration").json()
+    added_water = _transport(
+        client,
+        nutrition_token,
+        "/api/v1/nutrition/hydration/entries",
+        "POST",
+        {"volume_ml": 350, "beverage_type": "water", "source": "quick_preset"},
+    )
+    entry = HydrationEntryResponse.model_validate(added_water.json())
+    assert entry.volume_ml == 350
+    after = HydrationDayResponse.model_validate(
+        _transport(client, nutrition_token, "/api/v1/nutrition/hydration").json()
+    )
+    assert after.total_ml == before["total_ml"] + 350
+    assert any(item.id == entry.id for item in after.entries)
+    assert (
+        _transport(
+            client, nutrition_token, f"/api/v1/nutrition/hydration/entries/{entry.id}", "DELETE"
+        ).status_code
+        == 200
+    )
+
+    added_food = _transport(
+        client,
+        nutrition_token,
+        "/api/v1/nutrition/diary/entries",
+        "POST",
+        {"diary_date": "2026-09-15", "meal_type": "breakfast"},
+    )
+    assert added_food.status_code == 200
+    FoodDiaryDayResponse.model_validate(
+        _transport(client, nutrition_token, "/api/v1/nutrition/diary").json()
+    )
+    report = NutritionReportResponse.model_validate(
+        _transport(client, nutrition_token, "/api/v1/workouts/progress/nutrition-report").json()
+    )
+    assert report.summary.current_day_status == "complete"
+    assert report.daily[0].calories == 1_588
+    assert (
+        _transport(
+            client,
+            nutrition_token,
+            "/api/v1/exports/current",
+            "POST",
+            {},
+        ).status_code
+        == 403
+    )
+
+    trainer_token, _ = _create_session(client, "trainer")
+    for item in _transport(client, trainer_token, "/api/v1/coach/clients").json():
+        ClientResponse.model_validate(item)
+    for item in _transport(client, trainer_token, "/api/v1/coach/assigned-programs").json():
+        CoachAssignedProgramResponse.model_validate(item)
+    attention = CoachAttentionResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/attention").json()
+    )
+    assert attention.total == 1
+    assert attention.items[0].kind == "without_program"
+    assert attention.items[0].client.id == 51003
+    CoachOperationsTodayResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/operations/today").json()
+    )
+    agenda = CoachAgendaResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/agenda").json()
+    )
+    assert {item.status for item in agenda.items} >= {"scheduled", "completed", "no_show"}
+    packages = _transport(client, trainer_token, "/api/v1/coach/packages").json()
+    assert {item["state"] for item in packages} >= {"active", "finished", "cancelled"}
+    for item in packages:
+        CoachPackageResponse.model_validate(item)
+    payments = _transport(client, trainer_token, "/api/v1/coach/payments").json()
+    assert {item["status"] for item in payments} >= {"expected", "partial", "paid"}
+    for item in payments:
+        CoachPaymentResponse.model_validate(item)
+    for item in _transport(client, trainer_token, "/api/v1/coach/tasks").json():
+        CoachTaskResponse.model_validate(item)
+    CoachClientOperationsResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/clients/51001/operations").json()
+    )
+    created_task = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/tasks",
+        "POST",
+        {
+            "client_id": 51001,
+            "title": "Подтвердить план",
+            "due_at": "2026-09-19T12:00:00",
+            "timezone": "Europe/Moscow",
+            "fold": 0,
+        },
+    )
+    CoachTaskResponse.model_validate(created_task.json())
+    created_session = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/sessions",
+        "POST",
+        {
+            "client_id": 51001,
+            "starts_at": "2026-09-20T18:00:00",
+            "timezone": "Europe/Moscow",
+            "fold": 0,
+            "duration_minutes": 60,
+            "format": "online",
+        },
+    )
+    CoachSessionResponse.model_validate(created_session.json()[0])
+    created_payment = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/payments",
+        "POST",
+        {
+            "client_id": 51001,
+            "expected_amount_minor": 20_000,
+            "paid_amount_minor": 0,
+            "currency": "RUB",
+        },
+    )
+    CoachPaymentResponse.model_validate(created_payment.json())
+    edited_payment = _transport(
+        client,
+        trainer_token,
+        f"/api/v1/coach/payments/{created_payment.json()['id']}",
+        "PATCH",
+        {"paid_amount_minor": 20_000},
+    )
+    assert CoachPaymentResponse.model_validate(edited_payment.json()).status == "paid"
+    timeline = _transport(client, trainer_token, "/api/v1/coach/clients/51002/workouts?limit=30")
+    WorkoutTimelineItem.model_validate(timeline.json()[0])
+    comment = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/clients/51002/workouts/50011/comments",
+        "POST",
+        {"body": "Техника стабильна", "workout_exercise_id": 62001},
+    )
+    WorkoutCommentResponse.model_validate(comment.json())
+    saved_comments = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/clients/51002/workouts/50011/comments",
+    )
+    assert saved_comments.json()[0]["client_user_id"] == 51002
+
+
+def test_demo_transport_rejects_unknown_path_extensions(client) -> None:
+    token, _ = _create_session(client, "self_training")
+
+    for path in (
+        "/api/v1/workouts/cardio/unknown",
+        "/api/v1/coach/clients/51002/workouts/50011/comments/extra",
+    ):
+        response = _transport(client, token, path)
+        assert response.status_code == 403
+
+
+def test_demo_transport_bounds_progress_period(client) -> None:
+    token, _ = _create_session(client, "self_training")
+
+    valid = _transport(client, token, "/api/v1/workouts/progress/summary?period_days=366")
+    assert valid.status_code == 200
+
+    too_long = _transport(client, token, "/api/v1/workouts/progress/summary?period_days=999999999")
+    assert too_long.status_code == 403
+
+    out_of_range = _transport(client, token, "/api/v1/workouts/progress/summary?period_days=0")
+    assert out_of_range.status_code == 403

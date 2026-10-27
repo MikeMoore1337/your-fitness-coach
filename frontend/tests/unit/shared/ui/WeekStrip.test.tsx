@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   formatWeekRange,
   TRAINING_WEEK_LEGEND,
@@ -14,7 +14,36 @@ vi.mock('../../../../src/shared/navigation/router', () => ({
   ),
 }));
 
+afterEach(cleanup);
+
 describe('WeekStrip', () => {
+  it('reveals a selected date inside the narrow rail without scrolling the page', () => {
+    const scrollPage = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const measure = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('week-strip__days')) {
+          return { left: 20, right: 300 } as DOMRect;
+        }
+        return { left: 310, right: 354 } as DOMRect;
+      });
+    const { container } = render(
+      <WeekStrip
+        anchorDate="2026-08-20"
+        ariaLabel="Неделя дневника"
+        mode="picker"
+        onSelect={vi.fn()}
+        selectedDate="2026-08-20"
+        title="Эта неделя"
+        today="2026-08-20"
+      />,
+    );
+    expect(container.querySelector('.week-strip__days')?.scrollLeft).toBeGreaterThan(0);
+    expect(scrollPage).not.toHaveBeenCalled();
+    measure.mockRestore();
+    scrollPage.mockRestore();
+  });
+
   it('supports an exact rolling seven-day range for report contexts', () => {
     render(
       <WeekStrip
@@ -57,6 +86,7 @@ describe('WeekStrip', () => {
     const selected = within(week).getByRole('button', { name: /20 августа.*выбрано/i });
     const today = within(week).getByRole('button', { name: /23 августа.*сегодня/i });
     expect(selected).toHaveAttribute('aria-pressed', 'true');
+    expect(selected).toHaveAttribute('data-yfc-choice', 'compact');
     expect(selected).not.toHaveAttribute('aria-current');
     expect(today).toHaveAttribute('aria-current', 'date');
     expect(today).toHaveAttribute('aria-pressed', 'false');
@@ -115,15 +145,9 @@ describe('WeekStrip', () => {
     expect(
       container.querySelector('[data-pictogram="in-progress"] [data-icon="week-in-progress"]'),
     ).toBeInTheDocument();
-    expect(
-      container.querySelector('[data-icon="week-planned"] circle[cx="17"][cy="17"]'),
-    ).toBeInTheDocument();
-    expect(
-      container.querySelector('[data-icon="week-in-progress"] line[x1="10"][y1="9"]'),
-    ).toBeInTheDocument();
-    expect(
-      container.querySelector('[data-icon="week-skipped"] path[d="M8 7l6 5-6 5Z"]'),
-    ).toBeInTheDocument();
+    expect(container.querySelector('svg[data-icon="week-planned"]')).toBeInTheDocument();
+    expect(container.querySelector('svg[data-icon="week-in-progress"]')).toBeInTheDocument();
+    expect(container.querySelector('svg[data-icon="week-skipped"]')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Выполнено.*Открыть тренировку/i })).toHaveAttribute(
       'href',
       '/app?section=progress&workout_id=42',

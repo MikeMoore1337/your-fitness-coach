@@ -347,7 +347,7 @@ def main() -> int:
     parser.add_argument(
         "--artifact-root",
         type=Path,
-        default=Path(".artifacts/deployments/zero-downtime-drill"),
+        default=Path(".artifacts/operations/deployments/zero-downtime-drill"),
     )
     args = parser.parse_args()
     try:

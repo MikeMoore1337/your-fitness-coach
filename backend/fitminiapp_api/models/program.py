@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
@@ -8,10 +9,10 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
-    Float,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     Time,
@@ -34,6 +35,10 @@ class ProgramTemplate(Base):
             "('full_body', 'upper_lower', 'push_pull_legs', 'body_part', 'hybrid')",
             name="ck_program_templates_split_type",
         ),
+        CheckConstraint(
+            "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
+            name="ck_program_templates_default_duration_weeks",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -49,6 +54,19 @@ class ProgramTemplate(Base):
         ForeignKey("users.id"), index=True, nullable=True
     )
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The online expand keeps this column nullable; legacy NULL rows use the effective
+    # one-week value below while creation/update paths provide a validated default.
+    default_duration_weeks: Mapped[int] = mapped_column(
+        Integer, nullable=True, default=1, server_default="1"
+    )
+    provenance_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    program_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    @property
+    def effective_duration_weeks(self) -> int:
+        return self.default_duration_weeks or 1
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=now_msk_naive,
@@ -128,8 +146,62 @@ class ProgramTemplateExercise(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    group_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     day: Mapped[ProgramTemplateDay] = relationship("ProgramTemplateDay", back_populates="exercises")
+    exercise: Mapped[Exercise] = relationship("Exercise")
+    weekly_prescriptions: Mapped[list[ProgramTemplateExerciseWeekPrescription]] = relationship(
+        "ProgramTemplateExerciseWeekPrescription",
+        back_populates="template_exercise",
+        cascade="all, delete-orphan",
+        order_by="ProgramTemplateExerciseWeekPrescription.week_number",
+    )
+
+
+class ProgramTemplateExerciseWeekPrescription(Base):
+    __tablename__ = "program_template_exercise_weeks"
+    __table_args__ = (
+        UniqueConstraint(
+            "template_exercise_id",
+            "week_number",
+            name="uq_program_template_exercise_week",
+        ),
+        CheckConstraint(
+            "week_number >= 1 AND week_number <= 24",
+            name="ck_program_template_exercise_weeks_number",
+        ),
+        CheckConstraint(
+            "prescribed_sets >= 1 AND prescribed_sets <= 10",
+            name="ck_program_template_exercise_weeks_sets",
+        ),
+        CheckConstraint(
+            "prescribed_duration_minutes IS NULL OR prescribed_duration_minutes >= 1",
+            name="ck_program_template_exercise_weeks_duration",
+        ),
+        CheckConstraint(
+            "rest_seconds >= 0 AND rest_seconds <= 600",
+            name="ck_program_template_exercise_weeks_rest",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    template_exercise_id: Mapped[int] = mapped_column(
+        ForeignKey("program_template_exercises.id", ondelete="CASCADE"), index=True
+    )
+    exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
+    week_number: Mapped[int] = mapped_column(Integer)
+    prescribed_sets: Mapped[int] = mapped_column(Integer)
+    prescribed_reps: Mapped[str] = mapped_column(String(32))
+    prescribed_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    template_exercise: Mapped[ProgramTemplateExercise] = relationship(
+        "ProgramTemplateExercise", back_populates="weekly_prescriptions"
+    )
     exercise: Mapped[Exercise] = relationship("Exercise")
 
 
@@ -144,7 +216,7 @@ class UserProgram(Base):
             sqlite_where=text("is_active = 1"),
         ),
         CheckConstraint(
-            "status IN ('scheduled', 'active', 'completed', 'archived')",
+            "status IN ('scheduled', 'active', 'paused', 'completed', 'terminated', 'archived')",
             name="ck_user_programs_status",
         ),
         CheckConstraint("duration_weeks >= 1", name="ck_user_programs_duration_weeks"),
@@ -186,6 +258,9 @@ class UserProgram(Base):
     current_revision_number: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
+    # Server-owned lineage is validated by the lifecycle service. It is deliberately a
+    # nullable scalar so the online expand migration does not add a lock-prone FK or index.
+    restarted_from_program_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     template: Mapped[ProgramTemplate | None] = relationship("ProgramTemplate")
     workouts: Mapped[list[UserWorkout]] = relationship(
@@ -221,7 +296,8 @@ class ProgramRevision(Base):
         CheckConstraint(
             "change_kind IN "
             "('assigned', 'program_archived', 'plan_updated', 'block_created', "
-            "'block_updated', 'block_status_changed')",
+            "'block_updated', 'block_status_changed', 'program_lifecycle', "
+            "'program_restarted')",
             name="ck_program_revisions_change_kind",
         ),
     )
@@ -441,6 +517,8 @@ class UserWorkoutExercise(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
+    source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_weekly_prescription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
     prescribed_sets: Mapped[int] = mapped_column(Integer)
@@ -450,6 +528,10 @@ class UserWorkoutExercise(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    group_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     workout: Mapped[UserWorkout] = relationship("UserWorkout", back_populates="exercises")
     exercise: Mapped[Exercise] = relationship("Exercise")
@@ -486,14 +568,19 @@ class UserWorkoutSet(Base):
     )
     set_number: Mapped[int] = mapped_column(Integer)
     actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    actual_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    distance_km: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
     average_heart_rate_bpm: Mapped[int | None] = mapped_column(Integer, nullable=True)
     heart_rate_zone: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
     set_kind: Mapped[str | None] = mapped_column(String(16), nullable=True, default="working")
     reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    planned_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    planned_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    planned_group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    planned_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    planned_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 

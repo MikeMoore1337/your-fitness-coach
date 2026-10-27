@@ -13,9 +13,28 @@
 		max_size 65536
 	}
 
-	@default not path /api/v1/auth /api/v1/auth/* /api/v1/me/avatar
+	@program_import path /api/v1/programs/imports /api/v1/programs/imports/*
+	request_body @program_import {
+		max_size 2400000
+	}
+
+	@default not path /api/v1/auth /api/v1/auth/* /api/v1/me/avatar /api/v1/programs/imports /api/v1/programs/imports/*
 	request_body @default {
 		max_size 1048576
+	}
+
+	@robots path /robots.txt
+	handle @robots {
+		header Cache-Control "public, max-age=3600"
+		header Content-Type "text/plain; charset=utf-8"
+		respond <<ROBOTS
+			User-agent: *
+			Allow: /
+			Allow: /api/v1/public/
+			Disallow: /api/
+			Sitemap: https://your-fitness-coach.ru/sitemap.xml
+
+			ROBOTS 200
 	}
 
 	@versioned_assets path /assets/*

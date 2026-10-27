@@ -1,0 +1,424 @@
+# Landing v10 — final pre-delivery gate (#895–#900 / PR #902)
+
+## Current delivery authority — complete recovery approved
+
+OWNER_VISUAL_APPROVAL=APPROVED · VISUAL_BASELINE=FROZEN.
+Latest complete recovery WIP is approved for both audiences/themes,
+desktop/mobile and all six Coach OS chapters. Historical archive pixel
+differences are accepted **for PR #902 only**; ARCHIVE_VISUAL_PARITY stays **FAIL**.
+Protected merge/deploy are authorized after mandatory technical checks pass.
+No runtime or visual change is made after approval.
+
+[Current scope, acceptance and owner exception](product-v10-landing-release-895.md).
+PR #902 / Issues #895–#900 and Actions record current delivery results.
+Earlier rejections and pending states below are preserved as history.
+
+<details>
+<summary>Historical visual gates before final owner delivery approval — superseded statuses, preserved evidence</summary>
+
+## Current visual acceptance reconciliation — 2026-10-09
+
+The authoritative local report is [visual acceptance reconciliation](product-v10-landing-visual-acceptance.md).
+Current complete WIP owner approval is **PENDING**; prior final-correction design
+approval remains **APPROVED / FROZEN** for its unchanged recorded scope.
+
+All 48 historical failed regions now have exact evidence and exclusive disposition:
+2 confirmed regions (one athlete FAQ wording defect, fixed), 0 whole-region owner
+supersessions, 0 proven whole-region capture mismatches, 46 unresolved. Trainer FAQ
+wording has explicit owner evidence, but that does not approve all other crop pixels.
+Athlete FAQ is restored to «Понятные границы.» without changing answers.
+
+Functional Chromium/WebKit **66/66 each**, Vitest **88/88**, auth/demo/privacy **9/9**,
+SEO **1/1** and scoped frontend quality checks PASS. Dedicated visual suite exits 1:
+**7 PASS / 40 FAIL**, zero skips/retries. Archive **0/13 complete scenes PASS**,
+48/50 regions FAIL; current frozen **4/20 PASS**, sixteen mobile FAIL. All 20 upper
+700px areas are identical; the remaining mobile difference is a bounded lower hero
+strip after the existing 44px link fix. This diagnosis is not a whole-frame waiver.
+
+The separate versioned 176-state candidate set covers both audiences/themes,
+desktop 1440 and mobile 320/390/430, all six chapter initial/changed states. It is
+**NOT_APPROVED**. The completeness gate deliberately fails until every required
+state has authoritative approval and an approved pixel reference; fresh matched
+comparisons will still be required. No golden, fixture or threshold was changed.
+
+READY_FOR_MERGE_APPROVAL=NO: current lower/restored implementation needs approval,
+unexplained mandatory pixel differences need evidence or explicit bounded decisions,
+and the local WIP has no exact-head remote CI. PR #902 and Issues #895–#900 were read
+only, not updated/closed. No commit/push/merge/deploy/cutover occurred.
+
+## Prior targeted polish record — historical, superseded by reconciliation above
+
+The current report is [final targeted polish](product-v10-landing-targeted-polish.md).
+Both mobile cycle headings and actual lazy progress readiness are fixed locally.
+Chromium/WebKit 66/66 each, Vitest 88/88 and scoped quality checks PASS.
+Archive parity remains FAIL: 13 active scenes / 48 failed regions; dedicated suite
+7 PASS / 39 FAIL. Original/frozen hashes, fixtures and thresholds are unchanged.
+Final recovery approval and reference/copy decisions remain pending.
+READY_FOR_MERGE_APPROVAL=NO. No commit/push/PR update/merge/deploy/cutover or Issue closure.
+
+## Prior regional recovery record — superseded by current report above
+
+The final-correction owner approval remains **APPROVED** and its baseline **FROZEN**.
+The newly restored lower trainer journey and progress frame are **local WIP awaiting
+new owner review**. They are not covered by first-screen screenshots or by the green
+CI of the unchanged PR head. Older REJECTED/WAITING/NOT_CREATED and STRUCTURE_PASS
+records below are historical, not current visual acceptance.
+
+[PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902) remains OPEN,
+MERGEABLE and CLEAN at `a4df49e80e1e15f1ab125ff7047d75f03f3890f2`, covering
+#895, #896, #897, #898, #899 and #900. Required CI run
+[37941546491](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37941546491)
+is GREEN for that exact head only. `origin/master` is
+`64e90857157a013ce1f28c655eeefaf765cb779b`, an ancestor. No commit or push was made
+for this recovery; no remote CI result validates the uncommitted changes.
+
+[Current report and criterion reconciliation](product-v10-landing-region-recovery.md) ·
+[Unified archive/source/candidate/heatmap gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/region-recovery/index.html) ·
+[All regional metrics and immutable hashes](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/region-recovery/recovery-summary.json).
+
+All 28 original PNG hashes PASS; 25 are product scenes and three are gallery-only.
+Thirteen active scenes now have 50 separate unchanged-region comparisons at 0.01:
+2 partial-region PASS / 48 FAIL, no complete active-scene PASS. Header and adjacent
+teaser overrides are explicitly scoped. Ten lower owner-superseded scenes are
+VISUAL_NOT_PROVEN; DOM structure is not visual approval. Four immutable #895 desktop
+first-screen comparisons PASS; sixteen mobile first-screen/menu comparisons FAIL
+because their captures predate the existing 44px hero-footer-link fix. No golden or
+tolerance was changed. The full dedicated suite exits 1 (7 tests PASS / 39 FAIL).
+
+Trainer flow: hero → cycle → one existing Coach Today → existing process summary →
+six independent synthetic chapters (connect, program/version, Client 360, weekly
+review, selected-client preview/confirm, editable draft/confirm) → demos → continuity
+→ FAQ → closing/footer. The six chapters reuse #852 source because the archive does
+not depict them. Athlete product sections are not duplicated into trainer.
+Four initial and four interacted full-page trainer images and all intermediate
+states are in the gallery for new owner review.
+
+Current functional checks: Chromium 56/56, WebKit 56/56, targeted Vitest 88/88,
+auth/privacy/DemoCabinet 9/9, correct-origin SEO 1/1 PASS. TypeScript, scoped ESLint,
+Russian UI guard, changed-file formatting and build PASS. Earlier WebKit failures
+are retained with their readiness/focus-return corrections. No backend, auth, demo
+route, SEO or analytics implementation changed. Native TMA/Firefox were not run.
+The historical nutrition quick-add failure did not recur; Windows sandbox EPERM
+required permitted outside-sandbox test/build runs. Neither excuses visual FAIL.
+
+A dedicated manual GitHub workflow and managed-preview visual config are prepared;
+they are not pushed, not run remotely and not added as a knowingly-red required job.
+See the current report for remaining visual/provenance/requirements blockers.
+
+```text
+TASK_895_OWNER_VISUAL_APPROVAL=APPROVED (final-correction scope only)
+TASK_895_VISUAL_BASELINE=FROZEN
+LOCAL_RECOVERY_OWNER_VISUAL_APPROVAL=PENDING
+TASK_895_PR=OPEN
+PR_HEAD_CI=GREEN
+LOCAL_WIP_REMOTE_CI=NOT_RUN
+ARCHIVE_ORIGINALS_HASHES=PASS (28/28)
+ARCHIVE_VISUAL_PARITY=FAIL
+ACTIVE_ARCHIVE_REGIONS=50 (2 PASS / 48 FAIL)
+LOWER_SUPERSEDED_VISUAL_NOT_PROVEN=10
+TRAINER_SIX_CHAPTERS=LOCAL_WIP_REVIEW_REQUIRED
+VISUAL_REGRESSION_GATE=FAIL
+READY_FOR_MERGE_APPROVAL=NO
+COMMIT_PUSH=NOT_PERFORMED
+MERGE_DEPLOY_PRODUCTION_CUTOVER=FORBIDDEN
+ISSUES_895_TO_900=OPEN
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+env change required: no
+```
+
+## Historical pre-delivery records
+
+The records below describe the remote a4df49e8 and earlier candidates, before this
+uncommitted regional recovery. Their STRUCTURE_PASS, incomplete six-chapter and
+runtime-unchanged statements must not be read as the current WIP status. Issues
+remain OPEN; GitHub still describes the unchanged remote head.
+
+<details>
+<summary>Historical gate evidence — current state is above</summary>
+
+Audit date: 2026-10-09. Controlled parity recovery started from the existing PR #902
+worktree at `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is now verified at the
+current PR #902 exact head; `origin/master` remains
+`64e90857157a013ce1f28c655eeefaf765cb779b`. The recovery diff is limited to the
+dedicated visual spec, its disposition fixture and these traceability documents;
+runtime/frontend/backend code is unchanged. PR #902 is OPEN, CLEAN and MERGEABLE;
+the required exact-head Checks are GREEN (the current run is linked from PR #902).
+
+```text
+OWNER_VISUAL_APPROVAL=APPROVED
+APPROVAL_SCOPE=FINAL_CORRECTION_VISUAL_DESIGN
+VISUAL_BASELINE=FROZEN
+ARCHIVE_ORIGINALS_HASHES=PASS (28/28)
+ARCHIVE_VISUAL_PARITY=FAIL
+ARCHIVE_PRODUCT_SCENES_ATTEMPTED=25
+ARCHIVE_PRODUCT_SCENES_PIXEL_COMPARED=13
+ARCHIVE_PRODUCT_SCENES_PASS=0
+ARCHIVE_PRODUCT_SCENES_PIXEL_FAIL=13
+ARCHIVE_PRODUCT_SCENES_TIMEOUT=0
+ARCHIVE_SUPERSEDED_SCENES=12
+SUPERSEDED_REFERENCE_COVERAGE=PASS
+TRAINER_SIX_CHAPTER_ACCEPTANCE=OWNER_DECISION_REQUIRED
+VISUAL_REGRESSION_GATE=FAIL
+READY_FOR_MERGE_APPROVAL=NO
+MERGE=FORBIDDEN
+DEPLOY=FORBIDDEN
+PRODUCTION_CUTOVER=FORBIDDEN
+ISSUES_895_TO_900=OPEN
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+env change required: no
+```
+
+The latest owner approval remains valid for the frozen design. Earlier REJECTED and
+WAITING records describe earlier candidates. Approval does not turn failed archive
+comparisons into PASS, authorize release, or close acceptance criteria.
+
+## Current controlled recovery result
+
+- The dedicated configuration `frontend/playwright.landing-visual.config.ts` ran
+  against a local Vite preview with `updateSnapshots: 'none'`; originals and the
+  `0.01` threshold were not changed.
+- All 28 original PNG hashes pass. The final three are comparison/gallery material;
+  25 product scenes are in the disposition matrix.
+- Twelve archive cases are OWNER_SUPERSEDED by later owner decisions. Their current
+  approved page structure passed the separate assertions; the old archive pixels are
+  recorded as `NOT_COMPARABLE`, never as PASS.
+- Thirteen ACTIVE_COMPARABLE cases reached a deterministic state and have no selector
+  timeout, but all thirteen remain `PIXEL_FAIL` at the unchanged threshold. The
+  recovery fixed three capture defects in the harness: the lowered StrengthScene
+  effort phase and lazy progress readiness for two progress cases.
+- The loaded progress cases (`14-07_1`, `14-07_2`) retain a concrete nested-frame/
+  geometry mismatch. Other active failures remain unresolved crop/geometry differences;
+  no visual CSS change is authorized by this gate.
+
+Evidence: [controlled recovery gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/index.html),
+[scene matrix](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/archive-recovery-report.md),
+and [summary JSON](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/archive-recovery-summary.json).
+
+## Checks and reproducibility
+
+- [Required exact-head Checks on PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902/checks): GREEN on the current exact head,
+  aggregate `checks` green; frontend/unit/smoke, Python, security/CodeQL/audits,
+  migrated stack, containers and workflow/deployment policy jobs succeeded.
+- [Required mobile checks on PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902/checks):
+  Chromium + WebKit, 10/10 PASS. The checked-in mobile config selects both projects;
+  this is the shared application mobile regression group, not archive Landing
+  pixel parity in WebKit.
+- Historical pre-recovery CI run [37922378285](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37922378285)
+  remains retained for chronology only; it is not evidence for the current exact head.
+- Firefox/extended scheduled cross-browser groups: **SKIPPED by scope**, neither
+  PASS nor FAIL. No Firefox archive or Landing parity claim is made.
+- Fresh local TypeScript and Vite production build passed (562 modules). Vite
+  sandbox realpath EPERM is discussed below; the same build passed outside sandbox.
+- Fresh `landing-production.spec.ts`: **50/50 PASS**. Matrix: athlete/coach ×
+  light/dark × 320/360/390/430/768/1280/1366/1440/1498/1600/1920; labels, line
+  wrapping, overflow, hero controls, routes, menu focus/theme/Escape/resize,
+  hash/history, synthetic actions and mocked TMA safe-area.
+- Fresh landing + analytics + navigation Vitest: **73/73 PASS** (10 files).
+- Fresh auth/privacy/DemoCabinet selection: **8/8 applicable tests PASS**. A ninth
+  SEO test expected hardcoded origin 4173 and failed on the audit server 4195;
+  it passed **1/1 on its normal origin 4173**, without changing its assertion.
+- Fresh nutrition/coach local-mutation regression: **1/1 PASS**, discussed below.
+
+Evidence root (ignored local evidence, not a production service or lifecycle store):
+`.artifacts/tasks/895/evidence/final-pre-delivery-gate/`. Raw logs, Playwright JSON,
+traces, candidate PNGs, normalized source derivatives, heatmaps, per-file hashes,
+diagnostic readiness captures and eight full-page captures are preserved there.
+`final-correction/` is unchanged; its approved images and manifest have a separate
+`frozen-visual-evidence-hashes.json` inventory in the gate evidence directory.
+
+Run from the existing task worktree's `frontend/`, after its fresh build:
+
+```powershell
+npx vite preview --host 127.0.0.1 --port 4195 --strictPort
+# In a second terminal:
+$env:PW_BASE_URL='http://127.0.0.1:4195'
+$env:LANDING_VISUAL_COMPARE='1'
+$env:LANDING_VISUAL_EVIDENCE_DIR='D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite'
+npx playwright test --config=playwright.landing-visual.config.ts --reporter=list,json
+```
+
+The historical run above returned exit 1: **1 hash test PASS, 25 scene tests FAIL**,
+with ten stale-selector timeouts. It predates the controlled recovery. The current
+recovery result is recorded above and in the linked gallery; `playwright.config.ts`
+still explicitly ignores this spec, while the dedicated config keeps
+`updateSnapshots: 'none'`.
+
+## Historical pre-recovery archive hashes and scene results
+
+[Canonical manifest](design/references/landing-archive-owner-canonical/MANIFEST.json):
+all 28 PNGs matched their SHA-256 values. The actual local `Landing.zip` also matched
+`2be733d3539d98ecb575e9da0449978dfaf8ee993dda8bebbadb7d7e03d3acef`.
+The last three (`14-13`, `14-13_1`, `14-13_2`) are comparison-only gallery images;
+they were hashed but are not product scenes or public sections.
+The 35 older manifest files also matched their hashes, and all 10 supplemental
+PNGs exist. Availability of these 45 references is not 45-scene visual acceptance.
+
+Official threshold: changedPixelRatio ≤ **0.01**; RGB channel tolerance **16**;
+candidate DPR **1**, fonts awaited, browser chrome excluded using the checked-in
+source crops. The original browser viewport/DPR/zoom provenance is not independently
+recorded in the PNGs, so the fixture's inferred dimensions cannot be certified as
+fully calibrated merely because the crops have equal dimensions.
+
+Candidate links below refer to local files on the review machine. Diagnostic links
+for timeouts show current replacement content; they do **not** substitute a matching
+scene or create a changedPixelRatio. `N/A` is not zero. All rows remain FAIL.
+
+| Original                                                                                                                                                                                                              | Audience / state            | Result | changedPixelRatio | Threshold | Candidate                                                                                                                                            | Classification                                                                                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------ | ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [2026-10-08_14-04.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-04.png)     | athlete / initial           | FAIL   | 0.459176          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-04.png)   | Hero/photo crop and height differ materially; header/tertiary CTA also contain explicit later owner overrides. Original viewport provenance is not calibrated well enough to attribute the crop entirely to normalization.                       |
+| [2026-10-08_14-05.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-05.png)     | athlete / effort            | FAIL   | 0.095206          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-05.png)   | State normalization defect: phase=0 includes multiple lift poses; fixture progress=0.46 captures the raised pose while the original effort photo is lowered. Sticky header and residual alignment also differ.                                   |
+| [2026-10-08_14-05_1.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-05_1.png) | athlete / record            | FAIL   | 0.079586          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-05_1.png) | Sticky header absent in source scroll capture; small geometry/text/photo residuals remain. Cannot classify all residuals as antialiasing.                                                                                                        |
+| [2026-10-08_14-05_2.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-05_2.png) | athlete / result            | FAIL   | 0.069269          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-05_2.png) | Sticky header plus result-frame alignment/overlay residuals. No proven renderer-only explanation.                                                                                                                                                |
+| [2026-10-08_14-05_3.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-05_3.png) | athlete / initial           | FAIL   | 0.051342          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-05_3.png) | Sticky header plus residual text/panel alignment and Glass treatment differences; unchanged archive crop does not pass.                                                                                                                          |
+| [2026-10-08_14-06.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-06.png)     | athlete / summary-purchases | FAIL   | 0.057196          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-06.png)   | Summary/purchases state reached. Sticky header and panel/text residuals remain; not a timeout or real data write.                                                                                                                                |
+| [2026-10-08_14-07.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-07.png)     | athlete / progress-diary    | FAIL   | 0.074357          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-07.png)   | Progress/diary state reached. Sticky header, photo/section offset and text/panel residuals remain.                                                                                                                                               |
+| [2026-10-08_14-07_1.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-07_1.png) | athlete / initial           | FAIL   | 0.250702          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-07_1.png) | Capture readiness defect: loading fallback instead of chart. Loaded diagnostic shows nested progress frame, spacing/height differences and owner-approved compact teaser replacing photographic bridge. Waiting alone does not establish parity. |
+| [2026-10-08_14-07_2.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-07_2.png) | athlete / weekly            | FAIL   | 0.240439          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-07_2.png) | Weekly selection reached but chart still loading in official capture. Loaded diagnostic retains nested-frame/geometry differences and compact-teaser override.                                                                                   |
+| [2026-10-08_14-08.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-08.png)     | athlete / initial           | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-08.png)          | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-08_1.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-08_1.png) | athlete / changes           | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-08_1.png)        | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-08_2.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-08_2.png) | athlete / message           | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-08_2.png)        | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-08_3.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-08_3.png) | athlete / initial           | FAIL   | 0.062159          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-08_3.png) | Sticky header, small section/text offsets and public terminology changes. Some copy follows later owner screenshots; remaining exact geometry not accepted by archive test.                                                                      |
+| [2026-10-08_14-08_4.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-08_4.png) | athlete / initial           | FAIL   | 0.055343          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-08_4.png) | Sticky header and FAQ title/copy change (boundaries to rules) plus residual geometry. Later owner follow-up uses rules; strict archive comparison still fails.                                                                                   |
+| [2026-10-08_14-09.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-09.png)     | athlete / initial           | FAIL   | 0.099265          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-09.png)   | FAQ/footer alignment and title/CTA copy/style differences, plus sticky header. Final owner visual approval is not a measured archive-parity waiver.                                                                                              |
+| [2026-10-08_14-10.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-10.png)     | coach / initial             | FAIL   | 0.508467          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-10.png)   | Material hero/photo crop and height difference plus later owner-approved header/tertiary CTA. Original viewport/crop needs provenance reconciliation; not merely font rasterization.                                                             |
+| [2026-10-08_14-10_1.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-10_1.png) | coach / initial             | FAIL   | 0.070315          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-10_1.png) | Coach Today and repeatable-process chapters present. Sticky header plus text/panel alignment residuals remain.                                                                                                                                   |
+| [2026-10-08_14-10_2.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-10_2.png) | coach / bridge-effort       | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-10_2.png)        | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-10_3.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-10_3.png) | coach / effort              | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-10_3.png)        | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-10_4.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-10_4.png) | coach / record              | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-10_4.png)        | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-11.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-11.png)     | coach / result              | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-11.png)          | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-11_1.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-11_1.png) | coach / initial             | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-11_1.png)        | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-11_2.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-11_2.png) | coach / initial             | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-11_2.png)        | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-12.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-12.png)     | coach / initial             | FAIL   | N/A (timeout)     | 0.01      | [diagnostic only](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/diagnostic/2026-10-08_14-12.png)          | Owner-approved composition override; stale archive selector causes timeout. Current replacement capture is diagnostic only, not a matching candidate or a PASS.                                                                                  |
+| [2026-10-08_14-12_1.png](https://github.com/MikeMoore1337/your-fitness-coach/blob/4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c/docs/design/references/landing-archive-owner-canonical/screenshots/2026-10-08_14-12_1.png) | coach / initial             | FAIL   | 0.092391          | 0.01      | [suite PNG](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite/candidate/2026-10-08_14-12_1.png) | FAQ/footer alignment/title and closing CTA/style differences, plus sticky header. Exact archive pixels not matched.                                                                                                                              |
+
+## Failure classification and owner overrides
+
+The official outcome is FAIL, not a new visual rejection by the agent. The owner
+approved the current look; a failed test cannot silently revoke that approval or
+silently waive archive acceptance either.
+
+1. **Confirmed stale state/selector normalization:** 10 timeouts seek `.ref-bridge`
+   on athlete, or `.ref-bridge`/StrengthScene/training/progress/difference on coach.
+   The post-restoration owner directive explicitly replaced the athlete photographic
+   bridge with a compact teaser + Coach Today preview and removed self-like trainer
+   chapters. `LandingV10AthletePage.tsx` and `LandingV10CoachPage.tsx` implement that
+   composition. These are bounded documented owner changes, not missing network data.
+2. **Confirmed capture-readiness defect:** progress images `14-07_1/2` capture
+   `Загружаем пример прогресса…`. The suite waits for fonts and visible images but
+   not lazy `LandingProgressContent`. A separate diagnostic awaits the actual
+   `Объём тренировок` heading and resamples geometry. It does not replace official
+   screenshots or results. Even after readiness, nested panel borders/spacing and
+   section height differ; diagnostic full-frame ratios are 0.272072 / 0.279744.
+3. **Confirmed phase/pose under-specification:** strength effort progress 0.46 is
+   still phase 0 but renders the lifted photograph; the archive effort pose is
+   lowered. `data-phase=0` alone does not establish the same animation frame.
+4. **Visible non-parity beyond rendering noise:** hero/photo crops and heights,
+   progress nested frame/spacing, header presence after scrolling, FAQ wording and
+   footer/CTA alignment differ. Some header/CTA/teaser/copy changes have explicit
+   later owner approval; the full set of residuals has no bounded parity disposition.
+   Sticky header removal or other appearance changes are not authorized by this audit.
+5. **Rendering variability remains unquantified:** small text edges may contain
+   antialiasing differences, but no evidence justifies labelling every residual as
+   rendering-only. Original viewport/zoom and reference scroll alignment need careful
+   calibration. Threshold stays 1%; no masking or golden recapture was performed.
+
+`LandingProgress.tsx` now wraps shared lazy content in a `ref-product` panel while
+the retained inner styles also draw a frame. The loaded diagnostic visibly contains
+two borders. This is a concrete candidate/archive geometry difference; the audit
+does not fix it while the visual baseline is frozen. At 1440 both themes have the
+same current measured section heights: hero 860 px, athlete progress 1027.75 px,
+athlete teaser 720.390625 px, coach work 728.390625 px and coach process 598.171875 px.
+These candidate-only measures do not prove their equality with the archive.
+
+Latest explicit approved overrides: audience switch only in hero; no switch/label
+in desktop header or mobile menu; same translucent matte Glass in both themes;
+full compact tertiary Glass CTAs; compact athlete Coach OS teaser with preview;
+no self proof chapters on trainer. They are recorded in the owner follow-ups and
+the latest approval, not inferred from CI. No new waiver of unrelated pixel or
+six-interactive-chapter criteria is inferred.
+
+## Current recovery reconciliation for Issues #895–#900
+
+| Issue | Current evidence                                                                                                                                                                      | Status                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| #895  | Owner visual approval and frozen final-correction evidence; recovery is test/fixture/docs only                                                                                        | APPROVED / OPEN; delivery gate remains blocked                        |
+| #896  | `landing-production.spec.ts`: 50/50 Chromium pass across 320–1920, themes and audiences; archive active scenes remain 13/13 pixel FAIL                                                | Functional checks verified; visual parity unresolved                  |
+| #897  | Athlete route contains the approved compact Coach OS teaser and existing interactive athlete scenes; 13 active archive scenes fail unchanged 0.01 threshold                           | Implemented and functionally checked; exact archive parity unresolved |
+| #898  | Trainer route retains Coach Today and process; no separate six interactive chapters for invite, program, Client 360, weekly review, selected-client preview/confirm and draft/confirm | `OWNER_DECISION_REQUIRED`; no UI added                                |
+| #899  | Responsive Chromium matrix 50/50, keyboard/menu/hash and mocked TMA safe-area checks pass; native Telegram and exact archive crops are not proven                                     | Functional checks verified; visual/native coverage partial            |
+| #900  | Canonical MANIFEST hash check 28/28; 25 product scenes dispositioned; dedicated comparator excluded by ordinary `testIgnore` and reports 13 active pixel FAIL                         | Evidence complete; visual gate FAIL                                   |
+
+The historical table below is retained for audit chronology. Its older timeout counts
+and pre-recovery candidate links are not the current result.
+
+## Historical acceptance reconciliation (pre-recovery snapshot)
+
+Implementation, verification and issue closure are separate. Every issue below is
+OPEN; no unchecked original acceptance item was changed to checked. Source/test
+links are repository-relative; screenshots/logs are in the local gate directory.
+
+| Issue / criterion                                                                                        | Implementation and concrete evidence                                                                                                                                                                       | Verification / remaining gap                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #896 A1: 1280/1440 hero, two audiences/themes, no lone В                                                 | [Hero](../frontend/src/pages/landing/LandingV10Hero.tsx); [matrix regression](../frontend/tests/e2e/landing-production.spec.ts), geometry test; final-correction desktop PNGs                              | Functional wrap/destinations PASS at all 11 widths; archive hero 14-04 / 14-10 FAIL. Exact four old-image equality not proven.                                                                                                                                                                 |
+| #896 A2: normal/sticky/focus glass header vs old crops                                                   | [Shell](../frontend/src/pages/landing/LandingV10Shell.tsx), [CSS](../frontend/src/pages/landing/landing-v10.css); final-correction header crops; menu focus test                                           | Latest hero-only switch and transparent Glass approved. Original header-switch/СЦЕНАРИЙ requirement superseded by explicit owner directive. Old crop identity not PASS.                                                                                                                        |
+| #896 A3: photo/brand/CTA/keyboard/reduced motion                                                         | Hero/Shell/StrengthScene; 50-test matrix/menu and required CI brand/soft-glass/strength tests                                                                                                              | Interaction checks PASS; photo-crop parity unresolved. This combined acceptance criterion is PARTIAL.                                                                                                                                                                                          |
+| #896 A4: fresh diffs, typography/viewport measures, sign-off                                             | 25-case JSON + heatmaps; diagnostic/results.json (DPR/fonts/section boxes); frozen final-correction screenshots                                                                                            | Owner final-correction sign-off APPROVED. Measured archive parity FAIL; original viewport provenance incomplete.                                                                                                                                                                               |
+| #897 A1: four full athlete pages, identical section order/height/density                                 | [Athlete page](../frontend/src/pages/landing/LandingV10AthletePage.tsx); fresh athlete light/dark 1440/390 full PNGs                                                                                       | Current composition implemented; exact old full-page identity superseded for explicit teaser/header changes, otherwise NOT PROVEN. 15 athlete archive cases FAIL.                                                                                                                              |
+| #897 A2: no huge blanks/cutoffs/color transitions                                                        | StrengthScene retained; 50-test section overflow assertions; eight full-page captures; progress-ready diagnostics                                                                                          | No horizontal overflow verified. Blank/height fidelity cannot be PASS: suite captures a loading state and loaded progress geometry differs.                                                                                                                                                    |
+| #897 A3: synthetic interactions/privacy, plan ≠ consumed, preview ≠ Demo                                 | [Scenes](../frontend/src/pages/landing/LandingV10Scenes.tsx), [shared sections](../frontend/src/pages/landing/LandingV10SharedSections.tsx); interactive no-API-writes test; DemoCabinet entry regressions | Local training, nutrition plan/purchases/diary, explicit confirmation and no writes PASS. Athlete has a compact shared Coach Today preview authorized by later owner follow-up; no full #coach-work/process mounted.                                                                           |
+| #897 A4: before/after measures + owner reapproval                                                        | Archived original/candidate/heatmap links, full-page captures, final-correction approval                                                                                                                   | APPROVED frozen look; archive measurements FAIL. No issue-close or release sign-off.                                                                                                                                                                                                           |
+| #898 A1: four coach full pages / exact geometry                                                          | [Coach page](../frontend/src/pages/landing/LandingV10CoachPage.tsx); fresh coach light/dark 1440/390 full PNGs                                                                                             | Own hero/cycle/Coach Today/process/demo/continuity/FAQ/closing implemented; self chapters removed by owner follow-up. 10 coach archive cases FAIL (7 timeouts). Old full-page identity not proven.                                                                                             |
+| #898 A2: one Coach Today, six interactive synthetic proof chapters                                       | Shared ArchiveCoachWork facts/changes/draft; coach-process static four-row path; matrix checks #coach-work once; synthetic interaction test                                                                | One Coach Today verified. Six separate interactive invite/program/Client360/weekly/selected-client rollout/message chapters are NOT present in this page. Three interactive tabs + static path do not satisfy six chapters. Owner acceptance reconciliation remains unresolved; no UI changed. |
+| #898 A3: desktop/mobile themes, privacy, real demo routes/auth                                           | Matrix 50/50, auth/Demo/public acquisition 8/8, analytics/navigation units, [auth spec](../frontend/tests/e2e/auth.spec.ts)                                                                                | Functional route/consent/TMA/synthetic boundary PASS. Pixel/theme parity beyond approved captures NOT PROVEN. Existing #875 flow preserved.                                                                                                                                                    |
+| #898 A4: side-by-side + fresh owner approval before release                                              | Local gallery and final-correction matrix                                                                                                                                                                  | Latest design APPROVED; new gate shows residual archive gaps. Release NOT AUTHORIZED.                                                                                                                                                                                                          |
+| #899 A1: 320/360/390/430 no overflow/wrap/clipped controls                                               | Matrix geometry tests (both themes/audiences); fresh 1440/390 full pages + frozen 320/390 hero/menu evidence                                                                                               | Functional assertions PASS, including one-line last hero span, active labels and all-section horizontal overflow. Not a screenshot parity PASS.                                                                                                                                                |
+| #899 A2: glass/audience/menu focus/Escape/scroll/theme                                                   | Shell focus loop/outside pointer/Escape; hero audience links; mobile menu regression at 320, resize at 1440                                                                                                | Keyboard/focus/theme/navigation PASS. Latest owner explicitly removes audience from menu/header; it remains only in hero.                                                                                                                                                                      |
+| #899 A3: no CTA overlap, 44px+, safe-area, final photo crop                                              | Matrix hero touch heights ≥44 and hero overlap/width assertions; mocked TMA safe-area 24/34; final-correction PNGs                                                                                         | Hero targets and mocked safe-area PASS. Native hardware safe-area and exact final photo-crop parity are not established by these tests; criterion PARTIAL.                                                                                                                                     |
+| #899 A4: same light/dark geometry, contrast/tokens                                                       | Measured sections identical between themes at 1440; computed Glass assertions, visible-label tests, frozen owner-reviewed captures                                                                         | Geometry/token/label functional checks PASS. No blanket WCAG compliance or pixel equality claim; full contrast audit not repeated. СЦЕНАРИЙ is removed by later owner decision.                                                                                                                |
+| #899 A5: open/closed menus, screenshot diffs, keyboard/reduced motion/TMA                                | Frozen 320/390 open/closed PNGs; menu/mocked-TMA matrix; 50/50 + CI strength motion tests                                                                                                                  | Behavior and available captures verified. Old mobile reference pixel diffs not reaccepted; native Telegram client not tested (mocked TMA only).                                                                                                                                                |
+| #899 A6: owner mobile approval/evidence before delivery                                                  | Latest owner approved current baseline; frozen final-correction gallery includes both 320/390 audiences/themes/menus                                                                                       | Design APPROVED; release/production approval absent. Keep issue OPEN pending remaining evidence/release disposition.                                                                                                                                                                           |
+| #900: originals pinned; full 45-photo availability/mapping                                               | 28 current hashes PASS, 35 legacy manifest hashes PASS, 10 supplemental PNGs present; canonical manifest + legacy-reference-availability.json                                                              | Availability verified. Full 45-photo comparison/disposition is NOT COMPLETE; 25 canonical product scenes attempted; 3 gallery-only excluded.                                                                                                                                                   |
+| #900: fresh normalization/fonts/DPR/state, full matrix                                                   | Dedicated visual config/spec + normalization fixture; fresh build; 50 functional tests; scene JSON/diagnostics                                                                                             | DPR1/fonts awaited; inferred original crop/viewport and strength pose/lazy readiness are insufficient. Deterministic parity gate FAIL. Zoom/DPR variants not covered by current suite.                                                                                                         |
+| #900: detect geometry/chapters; pinned references in required CI                                         | [Dedicated spec](../frontend/tests/e2e/landing-approved-visual.spec.ts); [ordinary config](../frontend/playwright.config.ts) testIgnore                                                                    | Comparator detects mismatch locally, but it is EXCLUDED from ordinary PR E2E. Required GREEN does not enforce archive parity. Incomplete six-chapter coverage is documented, not hidden.                                                                                                       |
+| #900: a11y/focus/motion/routes/Demo/no real writes/SEO/UTM/hash/TMA                                      | 50/50 Landing, 73/73 unit, 8/8 auth/privacy/demo + SEO origin retry 1/1; original exact-head CI/security/mobile job                                                                                        | Scoped functional verification PASS. No exhaustive accessibility/security certification or native TMA/Firefox claim.                                                                                                                                                                           |
+| #900 release 1–2: diagnosis + fresh visual approval                                                      | This report, immutable diffs, final-correction owner approval                                                                                                                                              | Diagnosis recorded and frozen look APPROVED; archive/acceptance gaps need disposition. No new appearance changes authorized.                                                                                                                                                                   |
+| #900 release 3–4: protected merge, post-merge CI, digest deploy, smoke/readiness/provenance/live screens | No merge commit or deploy run for this candidate                                                                                                                                                           | NOT STARTED / FORBIDDEN. #900 and parent #895 cannot close. Historical #858 deploy evidence is not delivery of PR #902.                                                                                                                                                                        |
+
+## Known problems, blockers and scope
+
+**Blockers to merge readiness:** failed dedicated archive gate; incomplete provenance/
+state normalization and unaccepted residual geometry; incomplete #898 six-interactive-
+chapter criterion; archive comparator excluded from ordinary required E2E; incomplete
+per-reference acceptance disposition. Current visual approval is preserved. Resolving
+these requires a bounded owner disposition and/or authorized test calibration/visual
+fix; this audit neither changes the design nor weakens the test.
+
+**Known non-blockers for this frozen frontend gate:**
+
+- Historical `demo-mode.spec.ts:1318` nutrition quick-add failure. Fresh exact-runtime
+  regression now passes 1/1, including nutrition/coach local mutations. This test body
+  and nutrition runtime were not changed by #895; the changed DemoCabinet file only
+  moves TaskProgress's import, and the only demo spec diff scopes the public hero
+  locator. A persistent independent product defect is **not reproduced**, and the
+  historical root cause is not asserted as proven. Keep the prior failure record;
+  no nutrition fix, skip or assertion change was made.
+- Windows sandbox EPERM on Vite realpath for `src/main.tsx` was reproduced; the
+  identical fresh build outside sandbox passed. Earlier setup.ts/unit EPERM is a
+  historical environment symptom; current outside-sandbox 73/73 units pass. Required
+  Linux CI is green. No source workaround or lowered quality gate was introduced.
+- The SEO campaign test's fixed `127.0.0.1:4173` expectation fails against 4195;
+  correct-origin 4173 retry passes. Both results remain in evidence.
+- Firefox scheduled groups were scope-skipped. Mocked TMA does not prove native
+  Telegram client behavior. Legal footer actions expose explicit preview-document
+  placeholders; they are not evidence of completed production legal delivery.
+
+No backend, auth, analytics, SEO runtime, dependencies, env keys, app layout, branch,
+service, golden or threshold was changed by this gate. No merge/deploy/cutover or
+issue closure was performed. Standard Git/GitHub remains the operational source of
+truth; the artifact directory contains evidence only.
+
+</details>
+
+</details>

@@ -1,9 +1,13 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  coachPathForTab,
+  coachTabFromSearch,
   demoReturnPathFromLogin,
   focusedContextReturn,
   NavigationProvider,
+  safeTrainerReturnPath,
+  progressReportReturn,
 } from '../../../../src/shared/navigation/router';
 
 describe('NavigationProvider Telegram BackButton', () => {
@@ -84,6 +88,36 @@ describe('NavigationProvider Telegram BackButton', () => {
         `?workout_id=943&program_history=77&program_revision=4&return_to=${encodeURIComponent('https://example.com/steal')}`,
       ),
     ).toBe('/app?section=progress');
+    expect(
+      focusedContextReturn(
+        `?section=programs&workout_id=43&return_to=${encodeURIComponent('/app?section=today')}`,
+      ),
+    ).toBe('/app?section=today');
+    expect(focusedContextReturn('?section=programs&workout_id=43')).toBe('/app?section=programs');
+  });
+
+  it('возвращает из detail-state Progress в Overview с выбранным периодом', () => {
+    expect(
+      focusedContextReturn('?section=progress&progress_period=days_90&progress_view=nutrition'),
+    ).toBe('/app?section=progress&progress_period=days_90');
+  });
+
+  it('сохраняет раздел и период при возврате из личного отчёта без внешнего перехода', () => {
+    expect(progressReportReturn('?period=days_90&progress_view=history')).toBe(
+      '/app?section=progress&progress_view=history&progress_period=90',
+    );
+    expect(
+      progressReportReturn(
+        '?period=custom&date_from=2026-10-01&date_to=2026-10-09&progress_view=body',
+      ),
+    ).toBe(
+      '/app?section=progress&progress_view=body&progress_period=custom&progress_from=2026-10-01&progress_to=2026-10-09',
+    );
+    expect(
+      progressReportReturn(
+        '?progress_view=https://evil.example&return_to=https://evil.example&period=custom&date_from=bad&date_to=bad',
+      ),
+    ).toBe('/app?section=progress');
   });
 
   it('возвращает из публичного demo на landing без запуска защищённого TMA auth', async () => {
@@ -119,6 +153,45 @@ describe('NavigationProvider Telegram BackButton', () => {
     expect(demoReturnPathFromLogin('?from=demo&scenario=nutrition&cabinet=1&section=trainer')).toBe(
       '/demo?cabinet=1&scenario=nutrition&section=today',
     );
+    expect(
+      demoReturnPathFromLogin('?from=demo&scenario=self_training&cabinet=1&section=plan'),
+    ).toBe('/demo?cabinet=1&scenario=self_training&section=plan');
+    expect(
+      demoReturnPathFromLogin('?from=demo&scenario=self_training&cabinet=1&section=profile'),
+    ).toBe('/demo?cabinet=1&scenario=self_training&section=profile');
     expect(demoReturnPathFromLogin('?from=demo&scenario=https://evil.example')).toBeNull();
+  });
+
+  it('использует текущие trainer tabs и отклоняет stale return context', () => {
+    expect(coachTabFromSearch('')).toBe('today');
+    expect(coachTabFromSearch('?tab=clients')).toBe('clients');
+    expect(coachTabFromSearch('?tab=tools')).toBe('tools');
+    expect(coachTabFromSearch('?tab=unknown')).toBe('today');
+    expect(coachTabFromSearch('?client_id=42')).toBe('clients');
+    expect(coachTabFromSearch('?client_id=bad')).toBe('today');
+    expect(coachTabFromSearch('?client_id=9007199254740992')).toBe('today');
+    expect(coachTabFromSearch('?tab=clients&tab=programs')).toBe('today');
+    expect(coachPathForTab('programs')).toBe('/coach?tab=programs');
+    expect(safeTrainerReturnPath('/coach?tab=clients')).toBe('/coach?tab=clients');
+    expect(safeTrainerReturnPath('/coach?tab=unknown')).toBeNull();
+    expect(safeTrainerReturnPath('/coach?client_id=42')).toBeNull();
+    expect(safeTrainerReturnPath('/coach?tab=clients&tab=programs')).toBeNull();
+    expect(safeTrainerReturnPath('https://evil.example/coach?tab=clients')).toBeNull();
+  });
+
+  it('отклоняет неоднозначные и небезопасные query-параметры навигации', () => {
+    expect(coachTabFromSearch('?client_id=42&client_id=bad')).toBe('today');
+    expect(demoReturnPathFromLogin('?from=demo&scenario=nutrition&scenario=trainer')).toBeNull();
+    expect(
+      progressReportReturn(
+        '?handoff_id=9007199254740992&return_to=%2Fapp%3Fsection%3Dprofile%23profile-notifications',
+      ),
+    ).toBe('/app?section=progress');
+    expect(focusedContextReturn('?workout_id=9007199254740992')).toBeNull();
+    expect(
+      focusedContextReturn(
+        `?workout_id=43&return_to=${encodeURIComponent('/app?section=profile&section=profile#profile-notifications')}`,
+      ),
+    ).toBe('/app?section=progress');
   });
 });

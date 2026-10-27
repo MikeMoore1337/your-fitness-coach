@@ -1,5 +1,15 @@
 # Trigger and owner decision matrix
 
+## Current Product v8 reconciliation — 2026-10-04
+
+This matrix remains a provenance record for direction-specific triggers. It is not an automatic
+queue. Product v8 is now `COMPLETED / CLOSED`; the bounded review found the core directions `81/82/83/84/85/86/86A/93A/93B` and the
+bounded AI/Progress/trainer work already implemented in current source. Task `124B` / V8-00 is
+`REMOVED_FROM_PRODUCT_V8 / NO_GO BY OWNER`; no row in this matrix may restore it as a universal
+evidence gate or create V8-03. Measurement boundedness remains a separate optional
+`BLOCKED_ON_EVIDENCE` reliability candidate. Parked/gated rows do not transfer automatically to a
+future product version.
+
 Перед запуском направления заполнить его строку фактическим evidence. Для downstream task
 дополнительно проверить dependency и собственный checkpoint из task-файла.
 
@@ -11,22 +21,23 @@
 | `83` | | | | Есть потребность в explicit handoff сверх пассивного coach access | | |
 | `84` | | | | Пользователи явно включают meal/water/movement templates; anti-spam contract принят | | |
 | `85` | | | | Есть editorial capacity, primary sources и подтверждённые вопросы пользователей | | |
-| `86` | | | | Измеримый Web return/installability gap не закрывается текущим shell | | |
+| `86` | Owner/product inputs from Task 86 continuation brief, 2026-09-05 | Web ~60%, TMA ~40%; Web users regularly return; Web is an independent primary channel | Browser/TMA return requires more actions and has worse availability; no home-screen icon/standalone UX; Telegram is not universal; active workout must survive background/lock/suspend/freeze/discard/reopen | Owner-provided evidence closes the trigger gate; quantitative analytics fields remain to be instrumented and verified in Task 86 | `Go` | 2026-09-05 |
+| `86A` | Owner/product inputs recorded for Task 86 | Web Push is product-necessary because notifications exist and Telegram is not universal | Web notification subscriptions, delivery, permission UX, backend integration and lifecycle are not covered by Task 86 | Start only after Task 86 PWA/SW foundation is complete; separate owner launch and privacy/security gate | Pending after `86` | 2026-09-05 |
 | `87` | | | | Определены конкретные AI jobs, privacy boundary, evals и допустимая стоимость | | |
 | `88` | Результат `87` | | | Только explicit owner `Go` после provider/privacy decision | | |
 | `89` | Результат `88` | | | Grounded core прошёл evals; доказана потребность в consented personal tools | | |
 | `90A` | Результат `89` | | | Core/tools готовы к internal UI/evaluation gate | | |
 | `90B` | Результат `90A` | | | Есть реальные participants, consent и готовность к ограниченному rollout | | |
 | `91` | Результат `90B` | | | Rollout получил `Go`, а пользователям нужна интерпретация factual report | | |
-| `92A` memory | Результат `90B` | | | Beta доказала конкретный repeated continuity job | | |
-| `92B` provider routing | Результат `90B` | | | Beta выявила измеримый provider outage/capability/cost gap | | |
-| `93A` | Corpus structured XLSX/CSV и baseline ручного переноса | | | Versioned template/approved layouts покрывают полезную долю job; deterministic extraction/matching/preview проходят заданные критерии без AI dependency | | |
+| `92A` memory | Owner decision в текущей сессии, 2026-09-11; scope и категории memory перечислены в owner decision | Current AI Coach canonical data остаются источником истины; durable memory ранее отсутствовала | Owner подтвердил узкий continuity/personalization job только для данных вне canonical product model | Только четыре approved non-medical categories; explicit confirmation, user controls, provenance, canonical precedence и запрет sensitive/history duplication | `Go`, narrow scope | 2026-09-11 |
+| `92B` provider routing | Owner decision в текущей сессии, 2026-09-11; фактическое provider evidence ещё не предоставлено | Текущий single-provider route и graceful unavailable state | Измеримый outage/capability/latency/cost/privacy/quality gap пока не установлен | `Research first`: metadata-only evidence; implementation только после нового evidence-backed owner decision, максимум 2 providers | `Research first` | 2026-09-11 |
+| `93A` | Owner Narrow Go в launch brief Task 93A, 2026-09-06; synthetic versioned corpus добавлен в `backend/tests/test_program_import.py`; реальный пользовательский corpus недоступен | `pre-implementation quantitative baseline: not measured` | Канонический шаблон v1 даёт ограниченный deterministic scope; нужны bounded extraction/matching/preview, manual resolution, privacy-safe telemetry и atomic private unassigned confirm | Versioned canonical template покрывает согласованный v1 job; AI dependency и произвольные layouts исключены | `Narrow Go` | 2026-09-06 |
 | `93B` | Результат и usage baseline `93A`; corpus heterogeneous XLSX/CSV/TXT/DOCX | | | Измеримый unsupported/manual-resolution gap сохраняется; compatible provider privacy/cost contract принят; AI улучшает locked baseline без critical failures | | |
 | `94A` | | | | После AI-блока manual food entry friction измерим; owner одобрил bounded research/provider-cost boundary | | |
 | `94B` | Результат `94A` | | | Только owner `Go/Narrow Go` с locked cases/thresholds/privacy/cost | | |
 | `95A` | | | | Browser print-to-PDF из `67` не закрывает повторяемый delivery job | | |
 | `95B` | Результат `95A` | | | Отдельно доказан temporary share и/или Telegram delivery | | |
-| `96` | | | | Подтверждён один конкретный wearable datum/platform/job | | |
+| `96` | Owner/product discovery signal, 2026-09-16 | Current YFC manual cardio/measurement contracts; `single-user/owner signal; broad-market demand not validated` | Owner identifies no-repeat-manual-entry job across iOS/Android health platforms; target platforms and P0/P1/P2 data specified | Discovery may compare one concrete datum/platform/job and define safe provenance; no production Go; no invented market evidence | `DEFER UNTIL NATIVE FOUNDATION; not NO-GO; return to implementation backlog after native foundation` | 2026-09-16 |
 | `97` | | | | Есть реальная команда и owner-approved responsibility matrix | | |
 | `98` | | | | Есть измеримое ограничение Web/TMA/PWA, требующее native feasibility | | |
 | `99A` | | | | Есть payer/value contract и измеримые operating/AI/storage costs | | |
@@ -57,3 +68,9 @@
 
 Допустимые решения для pending: `Go`, `Defer`, `No-Go`, `Research first`. Пустая строка, номер или
 завершённая dependency не считаются согласием.
+
+Для Task `86` evidence предоставлен владельцем в continuation brief, а не production analytics
+или синтетическим user test. Не предоставлены source/period/sample/latency/browser-distribution
+поля количественной аналитики; они не выдумываются и остаются ограничениями измерения/задачами
+реализации и верификации. Это не блокирует запуск, поскольку текущий `Go` опирается на явное
+описание пользовательского gap и критического active-workout lifecycle владельцем.

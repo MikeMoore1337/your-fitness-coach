@@ -20,8 +20,13 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.news import NewsCluster, NewsItem, NewsSource
-from fitminiapp_api.services.news_freshness import is_current_month_publication
+from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_state import transition_news_cluster
+from fitminiapp_api.services.news_taxonomy import (
+    classify_editorial_text,
+    evaluate_editorial_relevance,
+    evaluate_publication_policy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +67,7 @@ PROHIBITED_PATTERNS = {
     ),
 }
 TOPIC_KEYWORDS = {
-    "fitness": (
+    "fitness_training": (
         "fitness",
         "exercise",
         "training",
@@ -70,58 +75,48 @@ TOPIC_KEYWORDS = {
         "strength",
         "resistance training",
         "hypertrophy",
-        "muscle",
         "cardio",
         "aerobic",
-        "recovery",
-        "sleep",
-        "running",
+        "endurance",
+        "athlete",
+        "sports performance",
+        "sports injury",
         "фитнес",
         "трениров",
         "упражнен",
         "силов",
         "гипертроф",
-        "мышц",
         "кардио",
-        "восстанов",
-        "сон",
-        "бег",
+        "вынослив",
+        "спортсмен",
     ),
-    "nutrition": (
-        "nutrition",
-        "diet",
-        "food",
-        "protein",
-        "creatine",
-        "caffeine",
-        "supplement",
-        "питани",
-        "диет",
-        "рацион",
-        "протеин",
-        "креатин",
-        "кофеин",
-        "добавк",
+    "bodybuilding": (
+        "bodybuilding",
+        "bodybuilder",
+        "physique competition",
+        "men's physique",
+        "mens physique",
+        "mr. olympia",
+        "olympia bodybuilding",
+        "classic physique olympia",
+        "contest prep",
+        "бодибилд",
+        "соревновательн подготовк",
     ),
-    "medicine_pharmacology": (
-        "medicine",
-        "medical",
-        "clinical",
-        "pharmacology",
-        "medication",
-        "therapy",
-        "patient",
-        "disease",
-        "drug safety",
-        "regulatory",
-        "медицин",
-        "клиническ",
-        "фармаколог",
-        "лекарств",
-        "терапи",
-        "пациент",
-        "заболеван",
-        "регулятор",
+    "sports_bodybuilding_pharmacology": (
+        "anabolic steroid",
+        "anabolic-androgenic",
+        "performance-enhancing drug",
+        "aas",
+        "sarm",
+        "testosterone",
+        "growth hormone",
+        "анабол",
+        "стероид",
+        "допинг",
+        "тестостерон",
+        "сарм",
+        "гормон роста",
     ),
     "peptides": (
         "peptide",
@@ -129,29 +124,91 @@ TOPIC_KEYWORDS = {
         "glp 1",
         "semaglutide",
         "tirzepatide",
+        "retatrutide",
         "пептид",
         "гпп-1",
         "семаглутид",
         "тирзепатид",
+        "ретатрутид",
     ),
-    "bodybuilding": (
-        "bodybuilding",
-        "bodybuilder",
-        "physique competition",
-        "contest prep",
-        "anabolic steroid",
-        "testosterone",
-        "trenbolone",
-        "sarm",
-        "бодибилд",
-        "соревновательн",
-        "анаболик",
-        "стероид",
-        "тестостерон",
-        "тренболон",
-        "сарм",
+    "nutrition": (
+        "nutrition",
+        "diet",
+        "dietary pattern",
+        "energy intake",
+        "body composition",
+        "weight management",
+        "weight loss",
+        "fat loss",
+        "appetite",
+        "питани",
+        "диет",
+        "рацион",
+        "состав тел",
+        "контроль веса",
+        "снижен веса",
+        "снижен жира",
+        "аппетит",
+    ),
+    "sports_nutrition": (
+        "sports nutrition",
+        "protein powder",
+        "protein supplement",
+        "creatine",
+        "bcaa",
+        "eaa",
+        "electrolyte",
+        "pre-workout",
+        "preworkout",
+        "спортивн питани",
+        "протеин",
+        "креатин",
+        "электролит",
+        "изотоник",
+        "предтренировоч",
+    ),
+    "dietary_supplements": (
+        "dietary supplement",
+        "supplementation",
+        "supplement safety",
+        "omega-3",
+        "omega 3",
+        "probiotic",
+        "prebiotic",
+        "vitamin d supplement",
+        "бад",
+        "пищев добавк",
+        "омега-3",
+        "пробиотик",
+        "пребиотик",
+    ),
+    "healthy_lifestyle": (
+        "healthy lifestyle",
+        "physical activity",
+        "sleep quality",
+        "sleep duration",
+        "recovery",
+        "habit",
+        "sedentary",
+        "здоров образ жизни",
+        "физическ актив",
+        "качество сна",
+        "восстанов",
+        "привыч",
+        "малоподвиж",
     ),
 }
+OWNER_TOPIC_PRIORITY = (
+    "sports_bodybuilding_pharmacology",
+    "peptides",
+    "bodybuilding",
+    "sports_nutrition",
+    "dietary_supplements",
+    "fitness_training",
+    "nutrition",
+    "healthy_lifestyle",
+)
+
 PRIORITY_KEYWORDS = {
     "practical": (
         "practical",
@@ -263,6 +320,7 @@ class ParsedNewsItem:
     canonical_url: str
     title: str
     summary: str = ""
+    content: str = ""
     primary_url: str | None = None
     author: str | None = None
     publisher: str | None = None
@@ -774,8 +832,8 @@ def _topic(text: str) -> str:
         topic: sum(1 for keyword in keywords if keyword in normalized)
         for topic, keywords in TOPIC_KEYWORDS.items()
     }
-    selected, count = max(scored.items(), key=lambda pair: pair[1])
-    return selected if count else "other"
+    selected = max(OWNER_TOPIC_PRIORITY, key=lambda topic: scored[topic])
+    return selected if scored[selected] else "other"
 
 
 def prohibited_flags(text: str) -> list[str]:
@@ -816,7 +874,10 @@ def score_candidate(
     supporting_source_count: int,
     uncertain_duplicate: bool,
     now: datetime,
+    allow_sensitive_manual_review: bool = False,
 ) -> tuple[int, str, list[str], list[str]]:
+    """Score a source item; Hermes may retain sensitive topics for owner review only."""
+
     text = f"{item.title} {item.summary}"
     topic = _topic(text)
     reasons = [f"source_quality:{SOURCE_QUALITY[source.source_type]}"]
@@ -833,10 +894,10 @@ def score_candidate(
         if any(keyword in normalized_text for keyword in keywords):
             score += 10
             reasons.append(f"priority:{priority}")
-    current_month = is_current_month_publication(item.published_at, now=now)
-    if current_month:
+    fresh = is_fresh_publication(item.published_at, now=now)
+    if fresh:
         score += 15
-        reasons.append("freshness:current_month")
+        reasons.append("freshness:60_days")
     else:
         risks.append("source_not_current_month")
         reasons.append("freshness_gate_failed")
@@ -854,10 +915,14 @@ def score_candidate(
         score -= 10
     prohibited = prohibited_flags(text)
     risks.extend(f"prohibited_{flag}" for flag in prohibited)
-    if prohibited:
+    # Only the authenticated Hermes intake opts into sensitive-topic recall. Legacy source
+    # acquisition keeps the strict rejection path, while publication gates remain unchanged.
+    if prohibited and not allow_sensitive_manual_review:
         score = 0
         reasons.append("prohibited_topic")
-    if not current_month or topic == "other":
+    elif prohibited:
+        reasons.append("sensitive_topic_manual_review")
+    if not fresh or topic == "other":
         score = 0
     return max(0, min(100, score)), topic, reasons, list(dict.fromkeys(risks))
 
@@ -898,6 +963,7 @@ def ingest_items(
     *,
     candidate_threshold: int,
     fetched_at: datetime | None = None,
+    allow_sensitive_manual_review: bool = False,
 ) -> dict[str, int]:
     current = fetched_at or utcnow()
     counts = {
@@ -927,6 +993,11 @@ def ingest_items(
         if not title:
             counts["rejected"] += 1
             _log_candidate(item=parsed, outcome="rejected", reason="missing_title")
+            continue
+        relevance = evaluate_editorial_relevance(title, summary, parsed.content)
+        if not relevance.allowed:
+            counts["rejected"] += 1
+            _log_candidate(item=parsed, outcome="rejected", reason=relevance.reason_code)
             continue
         external_id = parsed.external_id.strip()[:512] or canonical_url
         external_hash = sha256_text(external_id)
@@ -1025,11 +1096,34 @@ def ingest_items(
             supporting_source_count=max(0, len(representative_items) - 1),
             uncertain_duplicate=uncertain,
             now=current,
+            allow_sensitive_manual_review=allow_sensitive_manual_review,
         )
+        classification = classify_editorial_text(
+            primary.title,
+            primary.summary,
+            source_type=primary_source.source_type,
+            geography=tuple(primary_source.fetch_options.get("jurisdiction", []))
+            if isinstance(primary_source.fetch_options, dict)
+            else (),
+        )
+        policy = evaluate_publication_policy(classification)
         cluster.score = score
         cluster.topic = topic
         cluster.score_reasons = reasons
         cluster.risk_flags = risks
+        cluster.primary_topic = classification.primary_topic
+        cluster.topics = list(classification.topics)
+        cluster.content_type = classification.content_type
+        cluster.product_class = classification.product_class
+        cluster.evidence_level = classification.evidence_level
+        cluster.risk_level = classification.risk_level
+        cluster.audience = classification.audience
+        cluster.geography = list(classification.geography)
+        cluster.classification_version = classification.classification_version
+        cluster.classification_reasons = list(classification.classification_reasons)
+        cluster.publication_policy = policy.publication_policy
+        cluster.risk_reasons = list(dict.fromkeys((*classification.risk_reasons, *risks)))
+        cluster.risk_policy_version = policy.risk_policy_version
         cluster.merge_reason = merge_reason
         conflicts: list[str] = []
         dates = [value.published_at for value in items if value.published_at]
@@ -1043,7 +1137,51 @@ def ingest_items(
             counts["clustered"] += 1
             continue
         prohibited = any(flag.startswith("prohibited_") for flag in risks)
-        if prohibited:
+        hard_prohibited = prohibited and not allow_sensitive_manual_review
+        fresh = "source_not_current_month" not in risks
+        broad_recall_candidate = (
+            relevance.allowed
+            and relevance.strength in {"strong", "moderate"}
+            and fresh
+            and source.source_type
+            in {"primary_research", "systematic_review", "official_organization", "yfc"}
+            and topic == "other"
+            and bool(classification.topics)
+            and not (
+                "esport" in f"{primary.title} {primary.summary}".lower()
+                and not any(
+                    marker in f"{primary.title} {primary.summary}".lower()
+                    for marker in ESPORTS_PHYSICAL_CONTEXT
+                )
+            )
+            and not hard_prohibited
+        )
+        discovery_eligible = not hard_prohibited and (
+            score >= candidate_threshold or broad_recall_candidate
+        )
+        cluster.discovery_eligible = discovery_eligible
+        cluster.discovery_reasons = list(
+            dict.fromkeys(
+                [
+                    relevance.reason_code,
+                    f"relevance_strength:{relevance.strength}",
+                    f"relevance_version:{relevance.relevance_version}",
+                    *(f"relevance_topic:{topic}" for topic in relevance.topics),
+                    "score_threshold_met"
+                    if score >= candidate_threshold
+                    else "broad_source_recall",
+                    *classification.classification_reasons,
+                    *(["source_not_current_month"] if not fresh else []),
+                    *(["prohibited_content"] if hard_prohibited else []),
+                    *(
+                        ["sensitive_topic_manual_review"]
+                        if prohibited and allow_sensitive_manual_review
+                        else []
+                    ),
+                ]
+            )
+        )
+        if hard_prohibited:
             transition_news_cluster(
                 db,
                 cluster,
@@ -1061,7 +1199,7 @@ def ingest_items(
             )
         else:
             item.status = "clustered"
-            if score >= candidate_threshold:
+            if discovery_eligible:
                 if cluster.status in {"clustered", "candidate"}:
                     transition_news_cluster(
                         db,
@@ -1089,7 +1227,7 @@ def ingest_items(
                 if "source_not_current_month" in risks:
                     counts["stale"] += 1
                     reason = "source_not_current_month"
-                elif "topic_not_allowlisted" in risks:
+                elif "topic_not_allowlisted" in risks and not broad_recall_candidate:
                     reason = "topic_not_allowlisted"
                 else:
                     counts["below_threshold"] += 1

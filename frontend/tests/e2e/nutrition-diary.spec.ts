@@ -1,6 +1,32 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
-import type { FoodDiaryEntry, HydrationEntry } from '../../src/shared/api/types';
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { PNG } from './fixtures/landing-pixels';
+import type {
+  FoodDiaryEntry,
+  HydrationEntry,
+  NutritionSuggestions as NutritionSuggestionsResponse,
+} from '../../src/shared/api/types';
 import { nutritionDaySummary } from './fixtures/locators';
+import { installTelegramHarness } from './fixtures/mobile-tma';
+import { expectSelectedChoice } from './fixtures/selected-state';
+
+test.use({ serviceWorkers: 'block' });
+
+const CAPTURE_974_AFTER = process.env.CAPTURE_974_AFTER === '1';
+const ISSUE_974_AFTER_DIR = resolve(
+  process.env.CAPTURE_974_AFTER_DIR ??
+    resolve(
+      process.cwd(),
+      '..',
+      'docs',
+      'ux',
+      'final-issues-acceptance',
+      'evidence',
+      '869-contrast-rework-20261013',
+      'after',
+    ),
+);
 
 const zeroNutrition = {
   energy_kcal: '0.00',
@@ -76,7 +102,47 @@ const importedRiceFood = {
   name: 'Рис белый приготовленный, без добавления масла',
   food_type: 'user',
   is_favorite: false,
+  catalog_quality: 'private',
 };
+
+const verifiedRiceFood = {
+  ...riceFood,
+  id: 83,
+  name: 'Рис бурый нешлифованный, отварной',
+  food_type: 'system',
+  is_favorite: false,
+  catalog_quality: 'verified',
+};
+
+const localPotatoFoods = [
+  {
+    ...riceFood,
+    id: 84,
+    name: 'Картофель запечённый, способ приготовления не указан',
+    energy_kcal_per_100g: '93.00',
+    food_type: 'system',
+    is_favorite: false,
+    catalog_quality: 'verified',
+  },
+  {
+    ...riceFood,
+    id: 85,
+    name: 'Картофель отварной, способ приготовления не указан',
+    energy_kcal_per_100g: '87.00',
+    food_type: 'system',
+    is_favorite: false,
+    catalog_quality: 'verified',
+  },
+  {
+    ...riceFood,
+    id: 86,
+    name: 'Картофель фри из свежего картофеля, жареный',
+    energy_kcal_per_100g: '289.00',
+    food_type: 'system',
+    is_favorite: false,
+    catalog_quality: 'verified',
+  },
+].map((food) => ({ ...food, nutrition_basis_kind: 'per_100_g' as const }));
 
 const externalRiceFoods = [
   {
@@ -211,12 +277,16 @@ async function mockNutritionApi(
   page: Page,
   hydrationState: 'data' | 'empty' | 'error' | 'loading' = 'data',
   profileSex: 'female' | null = 'female',
+  hydrationPercent?: number,
+  hydrationGoalEnabled = true,
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
     releaseHydrationLoading = resolve;
   });
   let entries: FoodDiaryEntry[] = [yogurtEntry];
+  let suggestionCommitCount = 0;
+  let lastSuggestionCommit: unknown = null;
   let hydrationEntries: HydrationEntry[] =
     hydrationState === 'empty'
       ? []
@@ -245,6 +315,118 @@ async function mockNutritionApi(
           },
         ];
   let dayStatus: 'incomplete' | 'complete' = 'incomplete';
+  const plannerTargets = {
+    energy_kcal: '2000.00',
+    protein_g: '140.000',
+    fat_g: '70.000',
+    carbs_g: '220.000',
+  };
+  const plannerPlanned = {
+    energy_kcal: '360.00',
+    protein_g: '12.000',
+    fat_g: '6.000',
+    carbs_g: '62.000',
+    fiber_g: '8.000',
+  };
+  const plannerRemaining = {
+    energy_kcal: '1640.00',
+    protein_g: '128.000',
+    fat_g: '64.000',
+    carbs_g: '158.000',
+  };
+  const plannerItem = {
+    id: 101,
+    meal_type: 'breakfast',
+    position: 0,
+    item_kind: 'food',
+    food_id: oatmealFood.id,
+    recipe_id: null,
+    source_template_id: null,
+    name: oatmealFood.name,
+    brand: oatmealFood.brand,
+    amount: '100.000',
+    amount_unit: 'g',
+    weight_g: '100.000',
+    nutrition: plannerPlanned,
+    available: true,
+    message: null,
+    status: 'planned' as const,
+    diary_entry_id: null,
+  };
+  let plannerRevision = 1;
+  let plannerStatus: 'planned' | 'consumed' | 'skipped' = 'planned';
+  let plannerDiaryEntryId: number | null = null;
+  type MockGroceryItem = {
+    id: number;
+    source_kind: 'generated' | 'manual';
+    food_id: number | null;
+    name: string;
+    brand: string | null;
+    amount: string | null;
+    amount_unit: 'g' | 'ml' | 'piece' | 'serving' | null;
+    checked: boolean;
+    owned: boolean;
+    sources: Array<{
+      plan_item_id: number;
+      recipe_id: number | null;
+      plan_date: string;
+      meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+      recipe_name: string;
+    }>;
+  };
+  let groceryGenerated = false;
+  let groceryItems: MockGroceryItem[] = [
+    {
+      id: 301,
+      source_kind: 'generated' as const,
+      food_id: oatmealFood.id,
+      name: oatmealFood.name,
+      brand: oatmealFood.brand,
+      amount: '150.000',
+      amount_unit: 'g' as const,
+      checked: false,
+      owned: false,
+      sources: [
+        {
+          plan_item_id: 101,
+          recipe_id: 41,
+          plan_date: '2026-08-19',
+          meal_type: 'breakfast' as const,
+          recipe_name: 'Каша с яблоком',
+        },
+      ],
+    },
+  ];
+  const groceryResponse = () => ({
+    id: 55,
+    week_start: '2026-08-17',
+    week_end: '2026-08-23',
+    generated: groceryGenerated,
+    refresh_required: false,
+    updated_at: '2026-08-19T08:00:00',
+    items: groceryGenerated ? groceryItems : [],
+    stale_sources: [],
+  });
+  const plannerDay = (planDate: string) => ({
+    plan_date: planDate,
+    timezone: 'Europe/Moscow',
+    revision: planDate === '2026-08-19' ? plannerRevision : 0,
+    slots: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type) => ({
+      meal_type,
+      items:
+        meal_type === 'breakfast' && planDate === '2026-08-19'
+          ? [{ ...plannerItem, status: plannerStatus, diary_entry_id: plannerDiaryEntryId }]
+          : [],
+      planned:
+        meal_type === 'breakfast' && planDate === '2026-08-19' ? plannerPlanned : zeroNutrition,
+    })),
+    planned: planDate === '2026-08-19' ? plannerPlanned : zeroNutrition,
+    targets: plannerTargets,
+    remaining: planDate === '2026-08-19' ? plannerRemaining : plannerTargets,
+    nutrition_complete: false,
+    updated_at: null,
+    replayed: false,
+  });
 
   await page.addInitScript(() => {
     sessionStorage.setItem('fit_access_token', 'e2e-token');
@@ -298,7 +480,11 @@ async function mockNutritionApi(
       if (hydrationState === 'error') {
         return route.fulfill({ status: 503, json: { detail: 'Гидратация временно недоступна' } });
       }
-      const totalMl = hydrationEntries.reduce((sum, entry) => sum + entry.volume_ml, 0);
+      const targetMl = hydrationPercent == null ? 2200 : 1000;
+      const totalMl =
+        hydrationPercent == null
+          ? hydrationEntries.reduce((sum, entry) => sum + entry.volume_ml, 0)
+          : Math.round((targetMl * hydrationPercent) / 100);
       return route.fulfill({
         json: {
           diary_date: url.searchParams.get('diary_date') || '2026-08-19',
@@ -309,8 +495,8 @@ async function mockNutritionApi(
               ? null
               : {
                   id: 1,
-                  enabled: true,
-                  target_ml: 2200,
+                  enabled: hydrationGoalEnabled,
+                  target_ml: hydrationGoalEnabled ? targetMl : null,
                   source: 'national_academies_beverages',
                   method_version: 'nasem-ai-2005-observed-beverages-v1',
                   reference_scope: 'beverages',
@@ -321,8 +507,10 @@ async function mockNutritionApi(
                   created_at: '2026-08-19T08:00:00',
                 },
           progress_percent:
-            hydrationState === 'empty' ? null : Math.round((totalMl * 1000) / 2200) / 10,
-          entries: hydrationEntries,
+            hydrationState === 'empty' || !hydrationGoalEnabled
+              ? null
+              : (hydrationPercent ?? Math.round((totalMl * 1000) / targetMl) / 10),
+          entries: hydrationPercent == null ? hydrationEntries : [],
           presets: [
             { id: null, label: 'Стакан', volume_ml: 250, beverage_type: 'water', is_default: true },
             {
@@ -446,11 +634,221 @@ async function mockNutritionApi(
         },
       });
     }
+    if (path === '/api/v1/nutrition/plans/day' && request.method() === 'GET') {
+      return route.fulfill({ json: plannerDay(url.searchParams.get('plan_date') || '2026-08-19') });
+    }
+    if (path === '/api/v1/nutrition/grocery-list' && request.method() === 'GET') {
+      return route.fulfill({ json: groceryResponse() });
+    }
+    if (path === '/api/v1/nutrition/grocery-list' && request.method() === 'PUT') {
+      groceryGenerated = true;
+      return route.fulfill({ json: groceryResponse() });
+    }
+    if (path === '/api/v1/nutrition/grocery-list/items' && request.method() === 'POST') {
+      const body = request.postDataJSON() as {
+        name: string;
+        amount: string | null;
+        amount_unit: 'g' | 'ml' | 'piece' | 'serving' | null;
+      };
+      groceryItems = [
+        ...groceryItems,
+        {
+          id: 302,
+          source_kind: 'manual' as const,
+          food_id: null,
+          name: body.name,
+          brand: null,
+          amount: body.amount,
+          amount_unit: body.amount_unit,
+          checked: false,
+          owned: false,
+          sources: [],
+        },
+      ];
+      return route.fulfill({ status: 201, json: groceryResponse() });
+    }
+    if (path.startsWith('/api/v1/nutrition/grocery-list/items/') && request.method() === 'PATCH') {
+      const id = Number(path.split('/').at(-1));
+      const body = request.postDataJSON() as Partial<(typeof groceryItems)[number]>;
+      groceryItems = groceryItems.map((item) => (item.id === id ? { ...item, ...body } : item));
+      return route.fulfill({ json: groceryResponse() });
+    }
+    if (path.startsWith('/api/v1/nutrition/grocery-list/items/') && request.method() === 'DELETE') {
+      const id = Number(path.split('/').at(-1));
+      groceryItems = groceryItems.filter((item) => item.id !== id);
+      return route.fulfill({ json: groceryResponse() });
+    }
+    if (path === '/api/v1/nutrition/plans/week' && request.method() === 'GET') {
+      const days = [
+        '2026-08-17',
+        '2026-08-18',
+        '2026-08-19',
+        '2026-08-20',
+        '2026-08-21',
+        '2026-08-22',
+        '2026-08-23',
+      ].map(plannerDay);
+      return route.fulfill({
+        json: {
+          week_start: '2026-08-17',
+          week_end: '2026-08-23',
+          timezone: 'Europe/Moscow',
+          days,
+          planned: plannerPlanned,
+          targets: plannerTargets,
+          remaining: plannerRemaining,
+          nutrition_complete: false,
+        },
+      });
+    }
+    if (path === '/api/v1/nutrition/plans/suggestions' && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          mode: 'deterministic',
+          diary_date: url.searchParams.get('plan_date') || '2026-08-19',
+          targets: plannerTargets,
+          remaining: plannerRemaining,
+          remaining_confidence: 'exact',
+          limitations: ['Это варианты из уже сохранённых продуктов, рецептов и шаблонов.'],
+          max_candidates: 6,
+          candidates: [
+            {
+              candidate_id: 'food:7',
+              candidate_kind: 'food',
+              identity_id: 7,
+              name: oatmealFood.name,
+              items: [
+                {
+                  position: 0,
+                  item_kind: 'food',
+                  food_id: oatmealFood.id,
+                  recipe_id: null,
+                  name: oatmealFood.name,
+                  brand: oatmealFood.brand,
+                  amount: '100.000',
+                  amount_unit: 'g',
+                  nutrition: plannerPlanned,
+                  nutrition_confidence: 'exact',
+                },
+              ],
+              nutrition: plannerPlanned,
+              nutrition_confidence: 'exact',
+              sources: ['recent'],
+              reasons: ['recent'],
+            },
+          ],
+        },
+      });
+    }
+    if (path === '/api/v1/nutrition/plans/fill' && request.method() === 'POST') {
+      plannerRevision += 1;
+      return route.fulfill({ json: plannerDay('2026-08-19') });
+    }
+    if (path === '/api/v1/nutrition/plans/items/101/action' && request.method() === 'POST') {
+      const body = request.postDataJSON() as { action: 'consume' | 'skip' };
+      plannerRevision += 1;
+      plannerStatus = body.action === 'skip' ? 'skipped' : 'consumed';
+      plannerDiaryEntryId = body.action === 'skip' ? null : 222;
+      return route.fulfill({
+        json: {
+          action: body.action,
+          item: {
+            ...plannerItem,
+            status: plannerStatus,
+            diary_entry_id: plannerDiaryEntryId,
+          },
+          day: plannerDay('2026-08-19'),
+          diary_entry_id: plannerDiaryEntryId,
+          replayed: false,
+          diagnostic: body.action === 'skip' ? 'planned_item_skipped' : 'planned_item_consumed',
+        },
+      });
+    }
+    if (path === '/api/v1/nutrition/diary/suggestions' && request.method() === 'GET') {
+      const suggestions: NutritionSuggestionsResponse = {
+        mode: 'deterministic',
+        diary_date: url.searchParams.get('diary_date') || '2026-08-19',
+        targets: {
+          energy_kcal: '2000.00',
+          protein_g: '140.000',
+          fat_g: '70.000',
+          carbs_g: '220.000',
+        },
+        remaining: {
+          energy_kcal: '500.00',
+          protein_g: '30.000',
+          fat_g: null,
+          carbs_g: '60.000',
+        },
+        remaining_confidence: 'partial',
+        limitations: ['Часть БЖУ неизвестна: неполные записи не превращаются в нули.'],
+        max_candidates: 6,
+        candidates: [
+          {
+            candidate_id: 'food:7',
+            candidate_kind: 'food',
+            identity_id: 7,
+            name: oatmealFood.name,
+            items: [
+              {
+                position: 0,
+                item_kind: 'food',
+                food_id: oatmealFood.id,
+                recipe_id: null,
+                name: oatmealFood.name,
+                brand: oatmealFood.brand,
+                amount: '100.000',
+                amount_unit: 'g',
+                nutrition: {
+                  energy_kcal: oatmealFood.energy_kcal_per_100g,
+                  protein_g: oatmealFood.protein_g_per_100g,
+                  fat_g: null,
+                  carbs_g: oatmealFood.carbs_g_per_100g,
+                  fiber_g: oatmealFood.fiber_g_per_100g,
+                },
+                nutrition_confidence: 'partial',
+              },
+            ],
+            nutrition: {
+              energy_kcal: oatmealFood.energy_kcal_per_100g,
+              protein_g: oatmealFood.protein_g_per_100g,
+              fat_g: null,
+              carbs_g: oatmealFood.carbs_g_per_100g,
+              fiber_g: oatmealFood.fiber_g_per_100g,
+            },
+            nutrition_confidence: 'partial',
+            sources: ['recent'],
+            reasons: ['recent', 'protein_fit', 'partial_nutrition'],
+          },
+        ],
+      };
+      return route.fulfill({ json: suggestions });
+    }
+    if (path === '/api/v1/nutrition/diary/suggestions/commit' && request.method() === 'POST') {
+      suggestionCommitCount += 1;
+      lastSuggestionCommit = request.postDataJSON();
+      return route.fulfill({
+        status: 201,
+        json: {
+          operation_kind: 'suggestion',
+          diary_date: '2026-08-19',
+          meal_type: 'dinner',
+          entries: [],
+          replayed: false,
+        },
+      });
+    }
     if (path === '/api/v1/nutrition/foods/recent') {
       return route.fulfill({ json: { items: [oatmealFood], total: 1, limit: 12, offset: 0 } });
     }
     if (path === '/api/v1/nutrition/foods/favorites') {
       return route.fulfill({ json: { items: [oatmealFood], total: 1, limit: 12, offset: 0 } });
+    }
+    if (path === '/api/v1/nutrition/recipes' && request.method() === 'GET') {
+      return route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } });
+    }
+    if (path === '/api/v1/nutrition/templates' && request.method() === 'GET') {
+      return route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } });
     }
     if (path === '/api/v1/nutrition/foods/search') {
       const includeExternal = url.searchParams.get('include_external') === 'true';
@@ -578,11 +976,313 @@ async function mockNutritionApi(
       entries = [...entries, created];
       return route.fulfill({ status: 201, json: created });
     }
+    if (path === '/api/v1/nutrition/diary/copy/product/preview' && request.method() === 'POST') {
+      const body = request.postDataJSON() as {
+        source_entry_id: number;
+        source_date: string;
+        target_date: string;
+        source_meal_type: FoodDiaryEntry['meal_type'];
+        target_meal_type: FoodDiaryEntry['meal_type'];
+      };
+      const source = entries.find((entry) => entry.id === body.source_entry_id);
+      if (!source) return route.fulfill({ status: 404, json: { detail: 'Entry not found' } });
+      return route.fulfill({
+        json: {
+          copy_scope: 'product',
+          source_date: body.source_date,
+          source_meal_type: body.source_meal_type,
+          target_date: body.target_date,
+          target_meal_type: body.target_meal_type,
+          entries: [source],
+          preview_token: 'inline-preview-token-1234567890',
+          previewed_at: '2026-08-19T08:00:00Z',
+        },
+      });
+    }
     return route.fulfill({ status: 404, json: { detail: `Unhandled ${path}` } });
   });
 
-  return { releaseHydrationLoading };
+  return {
+    releaseHydrationLoading,
+    getSuggestionCommitCount: () => suggestionCommitCount,
+    getLastSuggestionCommit: () => lastSuggestionCommit,
+  };
 }
+
+async function assertTask748MobileSafeArea(page: Page, grocery: Locator): Promise<void> {
+  const controls: [Locator, Locator, Locator] = [
+    grocery.getByLabel('Название продукта'),
+    grocery.getByLabel('Количество'),
+    grocery.getByLabel('Единица'),
+  ];
+  const addButton = grocery.getByRole('button', { name: 'Добавить в список', exact: true });
+  const updateToast = page.locator('.toast').filter({ hasText: 'Список покупок обновлён' });
+
+  await grocery.getByRole('button', { name: 'Обновить список', exact: true }).click();
+  await expect(updateToast).toBeVisible();
+  await controls[0].fill('Соль');
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+
+  const readGeometry = () =>
+    page.evaluate(() => {
+      const readRect = (element: Element | null) => {
+        if (!element) return null;
+        const box = element.getBoundingClientRect();
+        return { top: box.top, right: box.right, bottom: box.bottom, left: box.left };
+      };
+      const action = Array.from(document.querySelectorAll<HTMLElement>('button')).find(
+        (element) => element.textContent?.trim() === 'Добавить в список',
+      );
+      return {
+        controls: [
+          readRect(document.querySelector('#grocery-manual-name')),
+          readRect(document.querySelector('#grocery-manual-amount')),
+          readRect(document.querySelector('#grocery-manual-unit')),
+        ],
+        action: readRect(action ?? null),
+        dock: readRect(document.querySelector('#appBottomNav')),
+        toast: readRect(document.querySelector('.toast:not([aria-hidden="true"])')),
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+
+  await addButton.scrollIntoViewIfNeeded();
+  const actionGeometry = await readGeometry();
+  expect(actionGeometry.action).not.toBeNull();
+  expect(actionGeometry.controls[2]).not.toBeNull();
+  expect(actionGeometry.dock).not.toBeNull();
+  expect(actionGeometry.toast).not.toBeNull();
+  expect(actionGeometry.action!.bottom).toBeLessThanOrEqual(actionGeometry.dock!.top);
+  expect(actionGeometry.controls[2]!.bottom).toBeLessThanOrEqual(actionGeometry.dock!.top);
+  expect(actionGeometry.toast!.bottom).toBeLessThanOrEqual(actionGeometry.dock!.top);
+  expect(actionGeometry.action!.bottom).toBeLessThanOrEqual(actionGeometry.toast!.top);
+  expect(actionGeometry.action!.left).toBeGreaterThanOrEqual(0);
+  expect(actionGeometry.action!.right).toBeLessThanOrEqual(actionGeometry.viewport.width);
+  expect(actionGeometry.scrollWidth).toBeLessThanOrEqual(actionGeometry.viewport.width);
+
+  const actionTopBeforeToastDismiss = actionGeometry.action!.top;
+  const scrollYBeforeToastDismiss = await page.evaluate(() => window.scrollY);
+  for (const control of controls) {
+    await control.scrollIntoViewIfNeeded();
+    const controlGeometry = await readGeometry();
+    const controlIndex = controls.indexOf(control);
+    expect(controlGeometry.controls[controlIndex]).not.toBeNull();
+    expect(controlGeometry.controls[controlIndex]!.top).toBeGreaterThanOrEqual(0);
+    expect(controlGeometry.controls[controlIndex]!.bottom).toBeLessThanOrEqual(
+      controlGeometry.dock!.top,
+    );
+  }
+  await addButton.scrollIntoViewIfNeeded();
+  await expect(updateToast.getByRole('button', { name: 'Закрыть сообщение' })).toBeVisible();
+  await updateToast.getByRole('button', { name: 'Закрыть сообщение' }).click();
+  await expect(updateToast).toBeHidden();
+  expect(
+    Math.abs((await page.evaluate(() => window.scrollY)) - scrollYBeforeToastDismiss),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs((await addButton.boundingBox())!.y - actionTopBeforeToastDismiss),
+  ).toBeLessThanOrEqual(1);
+}
+
+test('Task 746 meal planner stays separate from diary on mobile day and week views', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  const planner = page.getByTestId('meal-planner');
+  await expect(planner).toBeVisible();
+  await planner.locator('summary').click();
+  await expect(planner.getByText('План против цели', { exact: true })).toBeVisible();
+  await expect(
+    planner.locator('.meal-planner__slots').getByText('Овсяная каша', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Греческий йогурт', { exact: true })).toBeVisible();
+
+  await planner.getByRole('tab', { name: 'Неделя', exact: true }).click();
+  await expect(planner.getByText('План недели', { exact: true })).toBeVisible();
+  await expect(planner.getByRole('button', { name: 'Открыть день', exact: true })).toHaveCount(7);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('Task 747 mocked TMA keeps plan fill explicit and bridges one planned item to diary', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.Telegram = {
+      WebApp: {
+        initData: 'signed-task-747-init-data',
+        initDataUnsafe: {},
+        version: '8.0',
+        platform: 'android',
+        colorScheme: 'light',
+        themeParams: {},
+        viewportHeight: 844,
+        viewportStableHeight: 844,
+        safeAreaInset: { top: 24, right: 0, bottom: 18, left: 0 },
+        contentSafeAreaInset: { top: 8, right: 0, bottom: 10, left: 0 },
+        ready() {},
+        expand() {},
+        onEvent() {},
+        offEvent() {},
+        setHeaderColor() {},
+        setBackgroundColor() {},
+        setBottomBarColor() {},
+      },
+    };
+  });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19#tgWebAppPlatform=android');
+
+  const planner = page.getByTestId('meal-planner');
+  await planner.locator('summary').click();
+  const planSuggestions = planner.getByRole('region', { name: 'Варианты для плана' });
+  await expect(planSuggestions.getByRole('button', { name: 'Проверить вариант' })).toBeVisible({
+    timeout: 15_000,
+  });
+  const fillRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/v1/nutrition/plans/fill') && request.method() === 'POST',
+  );
+  await planSuggestions.getByRole('button', { name: 'Проверить вариант' }).click();
+  await planSuggestions.getByRole('button', { name: 'Добавить в план' }).click();
+  expect((await fillRequest).postDataJSON()).toMatchObject({
+    candidate_id: 'food:7',
+    expected_revision: 1,
+  });
+
+  const actionRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/v1/nutrition/plans/items/101/action') &&
+      request.method() === 'POST',
+  );
+  await planner.getByRole('button', { name: 'Съел Овсяная каша' }).click();
+  expect((await actionRequest).postDataJSON()).toEqual({
+    action: 'consume',
+    expected_revision: 2,
+  });
+  await expect(planner.getByText('Съедено', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('Task 748 grocery list derives recipe items and keeps manual changes usable on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  await expect(
+    page.getByTestId('meal-planner').getByText('План питания', { exact: true }),
+  ).toBeVisible();
+  const grocery = page.getByTestId('grocery-list');
+  await expect(grocery).toBeVisible();
+  await expect(grocery.getByText('Список покупок', { exact: true })).toBeVisible();
+  await expect(page.getByText('Nutrition Planning', { exact: true })).toHaveCount(0);
+  await grocery.locator('summary').click();
+  await expect(grocery.getByText('Список ещё не сформирован', { exact: true })).toBeVisible();
+  await grocery.getByRole('button', { name: 'Сформировать список', exact: true }).click();
+  await expect(grocery.getByText('Овсяная каша', { exact: true })).toBeVisible();
+  await expect(
+    grocery.getByText('Каша с яблоком · Завтрак · 19 авг.', { exact: true }),
+  ).toBeVisible();
+
+  const bought = grocery.getByRole('checkbox', { name: 'Куплено: Овсяная каша' });
+  await bought.click();
+  await expect(bought).toBeChecked();
+  const owned = grocery.getByRole('checkbox', { name: 'Уже есть: Овсяная каша' });
+  await owned.click();
+  await expect(owned).toBeChecked();
+  const addButton = grocery.getByRole('button', { name: 'Добавить в список', exact: true });
+  await assertTask748MobileSafeArea(page, grocery);
+  await addButton.click();
+
+  const manual = grocery.locator('.grocery-list__item').filter({ hasText: 'Соль' });
+  await expect(manual).toBeVisible();
+  await manual.getByRole('button', { name: 'Изменить', exact: true }).click();
+  await manual.getByLabel('Название').fill('Морская соль');
+  await manual.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(grocery.getByText('Морская соль', { exact: true })).toBeVisible();
+  await manual.getByRole('button', { name: 'Удалить', exact: true }).click();
+  await expect(grocery.getByText('Морская соль', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('Task 748 grocery list keeps its primary action clear in mocked TMA dark mode', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.addInitScript(() => {
+    window.Telegram = {
+      WebApp: {
+        initData: 'signed-task-748-init-data',
+        initDataUnsafe: {},
+        version: '8.0',
+        platform: 'android',
+        colorScheme: 'dark',
+        themeParams: {},
+        viewportHeight: 844,
+        viewportStableHeight: 844,
+        safeAreaInset: { top: 24, right: 0, bottom: 18, left: 0 },
+        contentSafeAreaInset: { top: 8, right: 0, bottom: 10, left: 0 },
+        ready() {},
+        expand() {},
+        onEvent() {},
+        offEvent() {},
+        setHeaderColor() {},
+        setBackgroundColor() {},
+        setBottomBarColor() {},
+      },
+    };
+  });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19#tgWebAppPlatform=android');
+
+  const grocery = page.getByTestId('grocery-list');
+  await expect(grocery).toBeVisible();
+  await grocery.locator('summary').click();
+  await grocery.getByRole('button', { name: 'Сформировать список', exact: true }).click();
+  await expect(grocery.getByText('Овсяная каша', { exact: true })).toBeVisible();
+  const bought = grocery.getByRole('checkbox', { name: 'Куплено: Овсяная каша' });
+  await bought.click();
+  await expect(bought).toBeChecked();
+  await assertTask748MobileSafeArea(page, grocery);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('macro-aware suggestions show partial evidence and require an editable confirmation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const apiState = await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+  await expect(suggestions).toBeVisible();
+  await expect(suggestions.getByText('Частичные БЖУ', { exact: true })).toBeVisible();
+  await expect(
+    suggestions.getByText('Часть БЖУ неизвестна: неполные записи не превращаются в нули.'),
+  ).toBeVisible();
+  await suggestions.getByRole('button', { name: 'Проверить вариант' }).click();
+  const amount = suggestions.getByLabel('Количество');
+  await amount.fill('150');
+  await suggestions.getByLabel('Приём пищи').selectOption('dinner');
+  await expect.poll(apiState.getSuggestionCommitCount).toBe(0);
+
+  await suggestions.getByRole('button', { name: 'Добавить выбранное' }).click();
+  await expect.poll(apiState.getSuggestionCommitCount).toBe(1);
+  expect(apiState.getLastSuggestionCommit()).toEqual({
+    diary_date: '2026-08-19',
+    meal_type: 'dinner',
+    items: [{ food_id: 7, amount: '150', amount_unit: 'g' }],
+  });
+});
 
 test('Task 81A groups nutrition into five cards and keeps profile choices compact', async ({
   page,
@@ -593,11 +1293,10 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
 
   const cardTitles = [
-    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
-    page.locator('.nutrition-day-balance h2'),
-    page.locator('.nutrition-food-card__header h2'),
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
-    page.locator('.hydration-card h2'),
+    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
+    page.locator('.nutrition-food-card__header h2'),
+    page.getByText('Мои кружки и бутылки', { exact: true }),
   ];
   const titlePositions: number[] = [];
   for (const heading of cardTitles) {
@@ -605,9 +1304,6 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
     titlePositions.push((await heading.boundingBox())?.y ?? 0);
   }
   expect(titlePositions).toEqual([...titlePositions].sort((left, right) => left - right));
-  const balance = page.locator('.nutrition-day-balance');
-  await expect(balance.getByRole('progressbar', { name: /Еда:/ })).toBeVisible();
-  await expect(balance.getByRole('progressbar', { name: /Жидкость:/ })).toBeVisible();
   const foodCard = page.locator('.nutrition-food-card');
   const firstMeal = foodCard.getByRole('region', { name: 'Завтрак', exact: true });
   await expect(firstMeal).toHaveCount(1);
@@ -619,10 +1315,10 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   expect(
     foodCardBox!.x + foodCardBox!.width - firstMealBox!.x - firstMealBox!.width,
   ).toBeGreaterThanOrEqual(14);
-  await expect(page.getByRole('heading', { name: 'Мои кружки и бутылки' })).toBeVisible();
+  await expect(page.getByText('Мои кружки и бутылки', { exact: true })).toBeVisible();
   await page.screenshot({
     fullPage: true,
-    path: '../.artifacts/screenshots/task-81A/desktop-light-five-cards.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81A/desktop-light-five-cards.png',
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -630,10 +1326,9 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   const mobileCards = [
     page.getByRole('navigation', { name: 'Неделя дневника' }),
-    page.locator('.nutrition-completeness'),
-    page.locator('.nutrition-day-balance'),
-    page.locator('.nutrition-food-card'),
     nutritionDaySummary(page),
+    page.locator('.nutrition-completeness'),
+    page.locator('.nutrition-food-card'),
     page.locator('.hydration-card'),
   ];
   const mobileCardPositions: number[] = [];
@@ -653,17 +1348,20 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
       mobileFirstMealBox!.x -
       mobileFirstMealBox!.width,
   ).toBeGreaterThanOrEqual(12);
+  const hydrationPreferences = page.getByRole('region', { name: 'Гидратация' });
+  await hydrationPreferences.getByText('Личный ориентир', { exact: true }).click();
   const saveSex = page.getByText('Сохранить выбранный пол в профиле', { exact: true });
   await expect(saveSex).toBeVisible();
   expect(await saveSex.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
   expect((await saveSex.boundingBox())?.height).toBeLessThanOrEqual(24);
   await page.locator('.nutrition-diary').screenshot({
-    path: '../.artifacts/screenshots/task-81A/mobile-light-ordered-cards-round-2.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-ordered-cards-round-2.png',
   });
   const hydration = page.getByRole('region', { name: 'Гидратация' });
+  await hydration.getByText('Мои кружки и бутылки', { exact: true }).click();
   await hydration.scrollIntoViewIfNeeded();
   await hydration.screenshot({
-    path: '../.artifacts/screenshots/task-81A/mobile-light-expanded-profile-and-containers.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-expanded-profile-and-containers.png',
   });
 });
 
@@ -676,13 +1374,53 @@ test('hydration visual evidence: mobile web compact and quick add', async ({ pag
   await expect(hydration).toBeVisible();
   await expect(page.getByText('850 из 2200 мл')).toBeVisible();
   await hydration.screenshot({
-    path: '../.artifacts/screenshots/task-81/mobile-web-light-compact.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81/mobile-web-light-compact.png',
   });
   await hydration.getByRole('button', { name: /Стакан.*250 мл/ }).click();
   await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
   await hydration.screenshot({
-    path: '../.artifacts/screenshots/task-81/mobile-web-light-quick-add-undo.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81/mobile-web-light-quick-add-undo.png',
   });
+});
+
+test('hydration history keeps the last three visible and preserves native disclosures', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  const rows = hydration.locator('.hydration-history .hydration-entry');
+  const preset = hydration.getByRole('button', { name: /Стакан.*250 мл/ });
+  await expect(hydration.getByText('2 записи', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(2);
+  await expect(hydration.getByRole('button', { name: 'Показать всю историю' })).toHaveCount(0);
+
+  await preset.click();
+  await expect(hydration.getByText('3 записи', { exact: true })).toBeVisible();
+  await preset.click();
+  await expect(hydration.getByText('Последние 3 · всего 4', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(3);
+
+  await hydration.getByRole('button', { name: 'Показать всю историю' }).click();
+  await expect(hydration.getByText('Вся история · всего 4', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(4);
+  await hydration.getByRole('button', { name: 'Свернуть историю' }).click();
+  await expect(rows).toHaveCount(3);
+
+  const details = hydration.locator('details');
+  await expect(details).toHaveCount(2);
+  for (const detail of await details.all()) {
+    const summary = detail.locator(':scope > summary');
+    await expect(summary.locator('svg[data-icon="disclosure-closed"]')).toHaveCount(1);
+    await summary.press('Enter');
+    await expect(detail).toHaveAttribute('open', '');
+    await summary.press('Space');
+    await expect(detail).not.toHaveAttribute('open', '');
+  }
 });
 
 test('hydration visual evidence: mocked TMA dark expanded and reduced motion', async ({ page }) => {
@@ -713,14 +1451,138 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
     };
   });
   await mockNutritionApi(page);
-  await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+  await page.goto(
+    '/app?section=nutrition&date=2026-08-19&hydration=quick#tgWebAppPlatform=android',
+  );
   const hydration = page.getByRole('region', { name: 'Гидратация' });
-  await expect(hydration.getByRole('heading', { name: 'Личный ориентир' })).toBeVisible();
+  await hydration.getByText('Личный ориентир', { exact: true }).click();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
+  const orbText = hydration.locator('.hydration-orb strong');
+  await expect(orbText).toHaveCSS('color', 'rgb(245, 245, 245)');
+  await expect(orbText).toHaveCSS('-webkit-text-stroke-width', '0.75px');
   await hydration.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
   });
+});
+
+test.describe('#974 hydration orb contrast candidate', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  for (const theme of ['dark', 'light'] as const) {
+    for (const percent of [0, 25, 50, 75, 100, 103]) {
+      test(`${theme} ${percent}% remains readable across the fill boundary`, async ({
+        page,
+      }, info) => {
+        await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        await mockNutritionApi(page, 'data', 'female', percent);
+        await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+
+        const hydration = page.getByRole('region', { name: 'Гидратация' });
+        const orb = hydration.locator('.hydration-orb');
+        const text = orb.locator('strong');
+        const fill = orb.locator(':scope > span');
+        await expect(text).toHaveText(`${percent}%`);
+        await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
+        await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+        expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe(
+          `${Math.min(percent, 100)}%`,
+        );
+
+        const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
+        const orbBox = boxes[0];
+        const textBox = boxes[1];
+        if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
+        expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
+        expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
+        expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
+        expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
+
+        const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
+        const brightPixels = screenshot.data.reduce((count, channel, index) => {
+          if (index % 4 !== 0) return count;
+          const green = screenshot.data[index + 1] ?? 0;
+          const blue = screenshot.data[index + 2] ?? 0;
+          return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
+        }, 0);
+        expect(brightPixels).toBeGreaterThan(8);
+
+        if (CAPTURE_974_AFTER) {
+          await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
+          await orb.screenshot({
+            path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-${percent}.png`),
+            scale: 'device',
+          });
+        }
+      });
+    }
+  }
+});
+
+test.describe('#974 hydration orb H₂O without an enabled goal', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  for (const theme of ['dark', 'light'] as const) {
+    test(`${theme} H₂O remains readable with a disabled goal`, async ({ page }, info) => {
+      await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockNutritionApi(page, 'data', 'female', undefined, false);
+
+      const hydrationResponse = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return (
+          url.pathname === '/api/v1/nutrition/hydration' && response.request().method() === 'GET'
+        );
+      });
+      await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+      const hydrationPayload = await (await hydrationResponse).json();
+      expect(hydrationPayload.goal).toMatchObject({ enabled: false, target_ml: null });
+      expect(hydrationPayload.progress_percent).toBeNull();
+
+      const hydration = page.getByRole('region', { name: 'Гидратация' });
+      const orb = hydration.locator('.hydration-orb');
+      const text = orb.locator('strong');
+      const fill = orb.locator(':scope > span');
+      await expect(text).toHaveText('H2O');
+      await expect(text.locator('sub')).toHaveText('2');
+      await expect(text.locator('sub')).toHaveCSS('vertical-align', 'sub');
+      await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
+      await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+      await expect(hydration.getByText('850 мл записано', { exact: true })).toBeVisible();
+      expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe('0%');
+
+      const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
+      const orbBox = boxes[0];
+      const textBox = boxes[1];
+      if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
+      expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
+      expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
+      expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
+      expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
+
+      const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
+      const brightPixels = screenshot.data.reduce((count, channel, index) => {
+        if (index % 4 !== 0) return count;
+        const green = screenshot.data[index + 1] ?? 0;
+        const blue = screenshot.data[index + 2] ?? 0;
+        return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
+      }, 0);
+      expect(brightPixels).toBeGreaterThan(8);
+
+      if (CAPTURE_974_AFTER) {
+        await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
+        await orb.screenshot({
+          path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-h2o-disabled.png`),
+          scale: 'device',
+        });
+      }
+    });
+  }
 });
 
 for (const mode of ['light', 'dark'] as const) {
@@ -731,9 +1593,10 @@ for (const mode of ['light', 'dark'] as const) {
     await mockNutritionApi(page);
     await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
     const hydration = page.getByRole('region', { name: 'Гидратация' });
+    await hydration.getByText('Мои кружки и бутылки', { exact: true }).click();
     await expect(hydration.getByText('Термокружка · 420 мл')).toBeVisible();
     await hydration.screenshot({
-      path: `../.artifacts/screenshots/task-81/desktop-${mode}-expanded.png`,
+      path: `../.artifacts/runtime/tests/screenshots/task-81/desktop-${mode}-expanded.png`,
     });
   });
 }
@@ -752,10 +1615,12 @@ for (const state of ['loading', 'error', 'empty'] as const) {
       await expect(hydration.getByText('850 из 2200 мл', { exact: true })).toBeVisible();
     }
     if (state === 'error')
-      await expect(hydration.getByText('Гидратация временно недоступна')).toBeVisible();
+      await expect(
+        hydration.getByText('Сервис временно недоступен. Попробуйте ещё раз.'),
+      ).toBeVisible();
     if (state === 'empty') await expect(hydration.getByText('0 мл записано')).toBeVisible();
     await hydration.screenshot({
-      path: `../.artifacts/screenshots/task-81/mobile-${state}.png`,
+      path: `../.artifacts/runtime/tests/screenshots/task-81/mobile-${state}.png`,
     });
   });
 }
@@ -792,30 +1657,567 @@ test('hydration touch matrix has no horizontal overflow and keeps controls reach
 
 const russianSearchVisualCases = [
   { label: 'desktop-1280', viewport: { width: 1280, height: 900 }, dark: false },
+  { label: 'desktop-1280-dark', viewport: { width: 1280, height: 900 }, dark: true },
   { label: 'mobile-web-360', viewport: { width: 360, height: 800 }, dark: false },
   { label: 'dark-mobile-390', viewport: { width: 390, height: 844 }, dark: true },
+  { label: 'mobile-web-430', viewport: { width: 430, height: 932 }, dark: false },
 ] as const;
 
 for (const current of russianSearchVisualCases) {
   test(`Russian multi-variant food search visual evidence (${current.label})`, async ({ page }) => {
+    const unexpectedBrowserProblems: string[] = [];
+    page.on('console', (message) => {
+      const text = message.text();
+      const expectedHarnessNoise =
+        text === 'Service Worker registration blocked by Playwright' ||
+        text === 'Failed to load resource: the server responded with a status of 404 (Not Found)';
+      if (!expectedHarnessNoise && (message.type() === 'warning' || message.type() === 'error')) {
+        unexpectedBrowserProblems.push(`${message.type()}: ${text}`);
+      }
+    });
+    page.on('pageerror', (error) => unexpectedBrowserProblems.push(`pageerror: ${error.message}`));
     await page.setViewportSize(current.viewport);
     await page.emulateMedia({ colorScheme: current.dark ? 'dark' : 'light' });
     await mockNutritionApi(page);
     await page.goto('/app?section=nutrition');
     const breakfast = page.getByRole('region', { name: 'Завтрак' });
     await breakfast.getByRole('button', { name: /Добавить/ }).click();
-    await page.getByRole('searchbox', { name: 'Поиск по названию или бренду' }).fill('рис');
+    const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+    await search.fill('рис');
+    const clearSearch = page.getByRole('button', { name: 'Очистить поиск', exact: true });
+    await expect(clearSearch).toBeVisible();
+    await expect(clearSearch).toBeInViewport();
+    await expect(search).toHaveClass(/nutrition-picker__search-input--has-clear/);
+    expect(await page.locator('.nutrition-picker__search-clear').count()).toBe(1);
+    const searchGeometry = await search.evaluate((input) => {
+      const styles = getComputedStyle(input);
+      const inputRect = input.getBoundingClientRect();
+      const clear = input.parentElement?.querySelector('button');
+      const clearRect = clear?.getBoundingClientRect();
+      return {
+        paddingRight: Number.parseFloat(styles.paddingRight),
+        inputRect: { left: inputRect.left, right: inputRect.right },
+        clearRect: clearRect
+          ? {
+              left: clearRect.left,
+              right: clearRect.right,
+              width: clearRect.width,
+              height: clearRect.height,
+            }
+          : null,
+      };
+    });
+    expect(searchGeometry.paddingRight).toBeGreaterThanOrEqual(48);
+    expect(searchGeometry.clearRect?.width).toBeGreaterThanOrEqual(44);
+    expect(searchGeometry.clearRect?.height).toBeGreaterThanOrEqual(43.5);
+    expect(searchGeometry.clearRect?.right).toBeLessThanOrEqual(searchGeometry.inputRect.right);
+    await search.focus();
+    await expect(search).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(clearSearch).toBeFocused();
+    expect(await clearSearch.evaluate((button) => button.matches(':focus-visible'))).toBe(true);
+    await clearSearch.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(clearSearch).not.toBeAttached();
+    await search.fill('рис');
+    await search.press('Escape');
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await search.fill('рис');
     await expect(page.getByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис бурый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис дикий приготовленный, без добавления масла')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
       current.viewport.width,
     );
+    expect(unexpectedBrowserProblems).toEqual([]);
     await page.screenshot({
-      path: `../.artifacts/screenshots/task-114a/russian-food-variants-${current.label}.png`,
+      path: `../.artifacts/runtime/tests/screenshots/task-114a/russian-food-variants-${current.label}.png`,
     });
   });
 }
+
+const foodPickerAcceptanceCases = [
+  { label: '320-light', width: 320, height: 844, colorScheme: 'light' as const },
+  { label: '320-dark', width: 320, height: 844, colorScheme: 'dark' as const },
+  { label: '360-light', width: 360, height: 844, colorScheme: 'light' as const },
+  { label: '360-dark', width: 360, height: 844, colorScheme: 'dark' as const },
+  { label: '393-light', width: 393, height: 844, colorScheme: 'light' as const },
+  { label: '393-dark', width: 393, height: 844, colorScheme: 'dark' as const },
+  { label: '430-light', width: 430, height: 844, colorScheme: 'light' as const },
+  { label: '430-dark', width: 430, height: 844, colorScheme: 'dark' as const },
+];
+
+test.describe('Food picker mobile acceptance for #946-#948', () => {
+  test('keeps the search visible, preserves full product data and uses readable action states', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await mockNutritionApi(page);
+    let favoriteState = false;
+    let favoriteRequests = 0;
+    await page.route('**/api/v1/nutrition/foods/search*', async (route) => {
+      const url = new URL(route.request().url());
+      const query = url.searchParams.get('q') ?? '';
+      const includeExternal = url.searchParams.get('include_external') === 'true';
+      const isRice = query.includes('рис');
+      const isPotato = query.includes('картофель');
+      const localItems = isRice
+        ? [
+            { ...importedRiceFood, is_favorite: favoriteState, nutrition_basis_kind: 'per_100_g' },
+            { ...verifiedRiceFood, nutrition_basis_kind: 'per_100_g' },
+          ]
+        : isPotato
+          ? localPotatoFoods
+          : [];
+      await route.fulfill({
+        json: {
+          items: localItems,
+          external_items: includeExternal
+            ? isPotato
+              ? externalPotatoFoods
+              : isRice
+                ? externalRiceFoods
+                : []
+            : [],
+          total: localItems.length,
+          limit: 20,
+          offset: 0,
+          provider_status: includeExternal ? 'available' : 'not_requested',
+        },
+      });
+    });
+    await page.route('**/api/v1/nutrition/foods/*/favorite', async (route) => {
+      favoriteRequests += 1;
+      favoriteState = route.request().method() === 'PUT';
+      await route.fulfill({
+        status: 200,
+        json: { ...importedRiceFood, is_favorite: favoriteState },
+      });
+    });
+    const project = test.info().project.name.replace(/[^a-z0-9-]+/gi, '-');
+    const setViewportHeight = async (height: number) => {
+      const viewport = page.viewportSize();
+      if (!viewport) throw new Error('Food picker viewport is not configured');
+      await page.setViewportSize({ width: viewport.width, height });
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            document.documentElement.style.getPropertyValue('--yfc-viewport-height'),
+          ),
+        )
+        .toBe(`${height}px`);
+    };
+
+    for (const current of foodPickerAcceptanceCases) {
+      favoriteState = false;
+      favoriteRequests = 0;
+      await page.setViewportSize({ width: current.width, height: current.height });
+      await page.emulateMedia({ colorScheme: current.colorScheme });
+      await page.goto('/app?section=nutrition');
+
+      await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
+      const breakfast = page.getByRole('region', { name: 'Завтрак' });
+      await expect(breakfast.getByRole('button', { name: /Добавить/ })).toBeVisible();
+      await breakfast.getByRole('button', { name: /Добавить/ }).click();
+      const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+      await expect(search).toBeVisible();
+      await search.fill('рис');
+      const riceRow = page
+        .locator('.nutrition-food-result')
+        .filter({ hasText: 'Рис белый приготовленный, без добавления масла' })
+        .first();
+      await expect(riceRow).toBeVisible();
+      await expect(riceRow).toContainText('130 ккал / 100 г');
+      const verifiedRiceRow = page
+        .locator('.nutrition-food-result')
+        .filter({ hasText: 'Рис бурый нешлифованный, отварной' })
+        .first();
+      await expect(verifiedRiceRow).toBeVisible();
+      await expect(verifiedRiceRow).toContainText('Проверено YFC');
+      await expect(riceRow.locator('.nutrition-food-result__select-label')).toHaveCount(0);
+      await expect(riceRow.getByText('Выбрать', { exact: true })).toHaveCount(0);
+      const edit = riceRow.getByRole('button', { name: /Изменить Рис белый/ });
+      await expect(edit).toBeVisible();
+      await expect(verifiedRiceRow.getByRole('button', { name: /Изменить/ })).toHaveCount(0);
+
+      const riceLayout = await riceRow.evaluate((row) => {
+        const title = row.querySelector<HTMLElement>('.nutrition-food-result__main strong');
+        const select = row.querySelector<HTMLElement>('.nutrition-food-result__select');
+        const titleStyle = title ? getComputedStyle(title) : null;
+        return {
+          rowOverflow: row.scrollWidth > row.clientWidth,
+          titleOverflow: title ? title.scrollWidth > title.clientWidth : true,
+          titleWhiteSpace: titleStyle?.whiteSpace,
+          titleOverflowMode: titleStyle?.textOverflow,
+          selectWidth: select?.getBoundingClientRect().width ?? 0,
+        };
+      });
+      expect(riceLayout.rowOverflow).toBe(false);
+      expect(riceLayout.titleOverflow).toBe(false);
+      expect(riceLayout.titleWhiteSpace).toBe('normal');
+      expect(riceLayout.titleOverflowMode).toBe('clip');
+      expect(riceLayout.selectWidth).toBeGreaterThan(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        current.width,
+      );
+
+      await search.blur();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.dataset.yfcKeyboard))
+        .toBe('hidden');
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-search-closed.png`,
+      });
+
+      await search.focus();
+      await setViewportHeight(420);
+      const [searchBox, panelBox] = await Promise.all([
+        search.boundingBox(),
+        page.locator('.nutrition-picker__panel').boundingBox(),
+      ]);
+      expect(searchBox).not.toBeNull();
+      expect(panelBox).not.toBeNull();
+      expect(searchBox!.y + searchBox!.height).toBeLessThanOrEqual(420);
+      expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(420);
+      await expect(page.locator('.nutrition-food-results')).toBeVisible();
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-rice-search.png`,
+      });
+
+      const riceGeometry = await page.evaluate(() => {
+        const viewport = window.visualViewport;
+        const search = document.querySelector<HTMLElement>('#nutrition-food-search');
+        const firstResult = document.querySelector<HTMLElement>('.nutrition-food-result--picker');
+        const firstTitle = firstResult?.querySelector<HTMLElement>(
+          '.nutrition-food-result__main strong',
+        );
+        const firstFacts = firstResult?.querySelector<HTMLElement>(
+          '.nutrition-food-result__main span',
+        );
+        const resultRows = Array.from(
+          document.querySelectorAll<HTMLElement>('.nutrition-food-result--picker'),
+        );
+        const secondaryActions = document.querySelector<HTMLElement>(
+          '.nutrition-picker__secondary-tools',
+        );
+        const rect = (element: HTMLElement | null) => {
+          if (!element) return null;
+          const bounds = element.getBoundingClientRect();
+          return { top: bounds.top, bottom: bounds.bottom, height: bounds.height };
+        };
+        if (
+          !viewport ||
+          !search ||
+          !firstResult ||
+          !firstTitle ||
+          !firstFacts ||
+          !secondaryActions
+        ) {
+          throw new Error('Food picker geometry nodes are missing');
+        }
+        const visible = (bounds: { top: number; bottom: number } | null) =>
+          Boolean(
+            bounds &&
+            bounds.top >= viewport.offsetTop - 0.5 &&
+            bounds.bottom <= viewport.offsetTop + viewport.height + 0.5,
+          );
+        const firstResultBounds = rect(firstResult);
+        return {
+          viewport: {
+            offsetTop: viewport.offsetTop,
+            height: viewport.height,
+          },
+          scrollY: window.scrollY,
+          resultsScrollTop: document.querySelector<HTMLElement>('.nutrition-picker__search-flow')
+            ?.scrollTop,
+          search: rect(search),
+          firstResult: firstResultBounds,
+          firstTitle: rect(firstTitle),
+          firstFacts: rect(firstFacts),
+          firstTitleText: firstTitle.textContent,
+          firstFactsText: firstFacts.textContent,
+          firstResultVisible: visible(firstResultBounds),
+          searchVisible: visible(rect(search)),
+          firstTitleVisible: visible(rect(firstTitle)),
+          firstFactsVisible: visible(rect(firstFacts)),
+          secondaryAfterResults:
+            resultRows.length > 0 && firstResultBounds
+              ? secondaryActions.getBoundingClientRect().top >=
+                resultRows.at(-1)!.getBoundingClientRect().bottom - 0.5
+              : false,
+        };
+      });
+      expect(riceGeometry.viewport).toMatchObject({ offsetTop: 0, height: 420 });
+      expect(riceGeometry.scrollY).toBe(0);
+      expect(riceGeometry.resultsScrollTop).toBe(0);
+      expect(riceGeometry.searchVisible).toBe(true);
+      expect(riceGeometry.firstResultVisible).toBe(true);
+      expect(riceGeometry.firstTitleVisible).toBe(true);
+      expect(riceGeometry.firstFactsVisible).toBe(true);
+      expect(riceGeometry.firstTitleText).toContain('Рис белый приготовленный');
+      expect(riceGeometry.firstFactsText).toContain('130 ккал / 100 г');
+      expect(riceGeometry.secondaryAfterResults).toBe(true);
+
+      const scrollProof = await page.evaluate(() => {
+        const flow = document.querySelector<HTMLElement>('.nutrition-picker__search-flow');
+        if (!flow) throw new Error('Food picker results scroll container is missing');
+        const pageScrollY = window.scrollY;
+        const before = flow.scrollTop;
+        flow.scrollTop = flow.scrollHeight;
+        return { before, pageScrollY, after: flow.scrollTop };
+      });
+      expect(scrollProof.after).toBeGreaterThan(scrollProof.before);
+      expect(scrollProof.pageScrollY).toBe(0);
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-rice-results.png`,
+      });
+      await page.evaluate(() => {
+        const flow = document.querySelector<HTMLElement>('.nutrition-picker__search-flow');
+        if (flow) flow.scrollTop = 0;
+      });
+
+      await setViewportHeight(current.height);
+      await search.blur();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.dataset.yfcKeyboard))
+        .toBe('hidden');
+
+      await search.fill('картофель');
+      await expect(
+        page.getByText('Картофель жареный по-домашнему из свежего картофеля', { exact: true }),
+      ).toBeVisible();
+      await expect(page.getByText('289 ккал / 100 г', { exact: true })).toBeVisible();
+      await expect(page.locator('.nutrition-food-result--picker')).toHaveCount(3);
+      await expect(page.locator('.nutrition-food-result--picker').first()).toContainText(
+        'Проверено YFC',
+      );
+      await setViewportHeight(420);
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-potato-results.png`,
+      });
+
+      await search.fill('неизвестный продукт');
+      const emptyState = page.getByText(
+        'Здесь пока пусто. Найдите продукт по названию или создайте свой.',
+        { exact: true },
+      );
+      await expect(emptyState).toBeVisible();
+      const emptyGeometry = await page.evaluate(() => {
+        const empty = document.querySelector<HTMLElement>('.nutrition-picker__empty');
+        const secondary = document.querySelector<HTMLElement>('.nutrition-picker__secondary-tools');
+        if (!empty || !secondary) throw new Error('Empty food picker state is missing');
+        return {
+          emptyBottom: empty.getBoundingClientRect().bottom,
+          secondaryTop: secondary.getBoundingClientRect().top,
+        };
+      });
+      expect(emptyGeometry.secondaryTop).toBeGreaterThanOrEqual(emptyGeometry.emptyBottom - 0.5);
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-empty.png`,
+      });
+
+      await setViewportHeight(current.height);
+      await search.fill('рис');
+      await expect(riceRow).toBeVisible();
+      await search.blur();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.dataset.yfcKeyboard))
+        .toBe('hidden');
+      const action = riceRow.locator('.nutrition-food-result__select');
+      const favorite = riceRow.locator('.nutrition-food-result__favorite');
+      await favorite.click();
+      await expect.poll(() => favoriteRequests).toBeGreaterThan(0);
+      await expect.poll(() => favoriteState).toBe(true);
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(action).toBeVisible();
+      await expect(favorite).toHaveAttribute('aria-pressed', 'true');
+      await edit.click();
+      await expect(page.getByRole('heading', { name: 'Изменить продукт' })).toBeVisible();
+      await page.getByRole('button', { name: 'Отмена', exact: true }).click();
+      await expect(riceRow).toBeVisible();
+      for (const control of [favorite, edit]) {
+        const box = await control.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+
+      await action.hover();
+      await page.mouse.down();
+      await expect.poll(() => action.evaluate((button) => button.matches(':active'))).toBe(true);
+      const pressedState = await action.evaluate((button) => {
+        const parseColor = (value: string) => {
+          const channels = value.match(/[\d.]+/g)?.map(Number) ?? [];
+          const alpha = value.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/i)?.[1];
+          if (value.trim() === 'transparent' || alpha === '0') return null;
+          if (channels.length < 3) return null;
+          return value.trim().startsWith('color(')
+            ? channels.slice(0, 3)
+            : channels.slice(0, 3).map((channel) => channel / 255);
+        };
+        const luminance = (channels: number[]) => {
+          const weights = [0.2126, 0.7152, 0.0722];
+          return channels.reduce((total, normalized, index) => {
+            const linear =
+              normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+            return total + linear * (weights[index] ?? 0);
+          }, 0);
+        };
+        const styles = getComputedStyle(button);
+        const card = button.closest<HTMLElement>('.nutrition-food-result');
+        const background =
+          parseColor(styles.backgroundColor) ||
+          (card ? parseColor(getComputedStyle(card).backgroundColor) : null);
+        const foreground = parseColor(styles.color);
+        if (!background || !foreground)
+          return {
+            ratio: 0,
+            background: styles.backgroundColor,
+            color: styles.color,
+            active: button.matches(':active'),
+            hover: button.matches(':hover'),
+          };
+        const light = Math.max(luminance(background), luminance(foreground));
+        const dark = Math.min(luminance(background), luminance(foreground));
+        return {
+          ratio: (light + 0.05) / (dark + 0.05),
+          background: styles.backgroundColor,
+          color: styles.color,
+          active: button.matches(':active'),
+          hover: button.matches(':hover'),
+        };
+      });
+      expect(pressedState.ratio).toBeGreaterThanOrEqual(4.5);
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-pressed.png`,
+      });
+      await page.mouse.up();
+      await expect(
+        page.getByRole('heading', {
+          name: 'Рис белый приготовленный, без добавления масла',
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(page.getByRole('spinbutton', { name: 'Количество' })).toBeFocused();
+      await expect(page.getByLabel('Единица')).toHaveValue('g');
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-selected.png`,
+      });
+      await page.getByRole('button', { name: 'Выбрать другое' }).click();
+      await page.getByRole('button', { name: 'Закрыть добавление' }).click();
+      await expect(page.getByRole('dialog')).not.toBeAttached();
+    }
+  });
+});
+
+test('variant B keeps the first result visible in mocked TMA with safe-area insets', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await installTelegramHarness(page, {
+    colorScheme: 'dark',
+    viewportHeight: 844,
+    viewportStableHeight: 844,
+    safeAreaInset: { top: 24, right: 0, bottom: 20, left: 0 },
+    contentSafeAreaInset: { top: 24, right: 0, bottom: 20, left: 0 },
+  });
+  await mockNutritionApi(page);
+  await page.route('**/api/v1/nutrition/foods/search*', async (route) => {
+    const query = new URL(route.request().url()).searchParams.get('q') ?? '';
+    const isRice = query.includes('рис');
+    await route.fulfill({
+      json: {
+        items: isRice
+          ? [
+              { ...importedRiceFood, nutrition_basis_kind: 'per_100_g' },
+              { ...verifiedRiceFood, nutrition_basis_kind: 'per_100_g' },
+            ]
+          : [],
+        external_items: [],
+        total: isRice ? 2 : 0,
+        limit: 20,
+        offset: 0,
+        provider_status: 'not_requested',
+      },
+    });
+  });
+
+  await page.goto('/app?section=nutrition');
+  await page
+    .getByRole('region', { name: 'Завтрак' })
+    .getByRole('button', { name: /Добавить/ })
+    .click();
+  const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+  await search.fill('рис');
+  const emptyResults = page.locator('.nutrition-food-result--picker');
+  await expect(emptyResults).toHaveCount(2);
+  await search.focus();
+
+  await page.setViewportSize({ width: 393, height: 420 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.style.getPropertyValue('--yfc-viewport-height')),
+    )
+    .toBe('420px');
+
+  const geometry = await page.evaluate(() => {
+    const viewport = window.visualViewport;
+    const searchInput = document.querySelector<HTMLElement>('#nutrition-food-search');
+    const firstResult = document.querySelector<HTMLElement>('.nutrition-food-result--picker');
+    const title = firstResult?.querySelector<HTMLElement>('.nutrition-food-result__main strong');
+    const facts = firstResult?.querySelector<HTMLElement>('.nutrition-food-result__main span');
+    if (!viewport || !searchInput || !firstResult || !title || !facts) {
+      throw new Error('Mocked TMA food picker geometry nodes are missing');
+    }
+    const visible = (element: HTMLElement) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.top >= viewport.offsetTop - 0.5 && bounds.bottom <= viewport.height + 0.5;
+    };
+    const rootStyle = getComputedStyle(document.documentElement);
+    return {
+      viewportHeight: viewport.height,
+      searchVisible: visible(searchInput),
+      titleVisible: visible(title),
+      factsVisible: visible(facts),
+      titleText: title.textContent,
+      factsText: facts.textContent,
+      safeTop: rootStyle.getPropertyValue('--yfc-tg-safe-top').trim(),
+      safeBottom: rootStyle.getPropertyValue('--yfc-tg-safe-bottom').trim(),
+      scrollY: window.scrollY,
+      flowScrollTop: document.querySelector<HTMLElement>('.nutrition-picker__search-flow')
+        ?.scrollTop,
+    };
+  });
+  expect(geometry).toMatchObject({
+    viewportHeight: 420,
+    searchVisible: true,
+    titleVisible: true,
+    factsVisible: true,
+    safeTop: '24px',
+    safeBottom: '20px',
+    scrollY: 0,
+    flowScrollTop: 0,
+  });
+  expect(geometry.titleText).toContain('Рис белый приготовленный');
+  expect(geometry.factsText).toContain('130 ккал / 100 г');
+
+  await page.screenshot({
+    path: '../docs/ux/final-issues-acceptance/evidence/946-948/after/tma-393-dark-keyboard-open-rice.png',
+  });
+  await page.setViewportSize({ width: 393, height: 844 });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.style.getPropertyValue('--yfc-viewport-height')),
+    )
+    .toBe('844px');
+  await search.blur();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.yfcKeyboard))
+    .toBe('hidden');
+  await expect(search).toHaveValue('рис');
+});
 
 test('Russian search shows separate preparation states with their own macros', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -823,7 +2225,7 @@ test('Russian search shows separate preparation states with their own macros', a
   await page.goto('/app?section=nutrition');
   const breakfast = page.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  await page.getByRole('searchbox', { name: 'Поиск по названию или бренду' }).fill('картофель');
+  await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('картофель');
 
   await expect(
     page.getByText('Картофель запечённый, способ приготовления не указан'),
@@ -836,11 +2238,11 @@ test('Russian search shows separate preparation states with their own macros', a
   await expect(page.getByText('87 ккал / 100 г')).toBeVisible();
   await expect(page.getByText('289 ккал / 100 г')).toBeVisible();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/russian-food-preparation-states-mobile-390.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/russian-food-preparation-states-mobile-390.png',
   });
   await page.getByText('Картофель фри из свежего картофеля, жареный').scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/russian-food-preparation-states-lower-mobile-390.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/russian-food-preparation-states-lower-mobile-390.png',
   });
 });
 
@@ -850,7 +2252,7 @@ test('Russian preparation states and oil variants apply beyond potatoes', async 
   await page.goto('/app?section=nutrition');
   const breakfast = page.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  await page.getByRole('searchbox', { name: 'Поиск по названию или бренду' }).fill('яйцо');
+  await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('яйцо');
 
   await expect(page.getByText('Яйцо целое варёное или пашот')).toBeVisible();
   await expect(page.getByText('Яйцо целое жареное без добавления масла')).toBeVisible();
@@ -870,7 +2272,7 @@ test('Russian preparation states and oil variants apply beyond potatoes', async 
   await expect(friedWithButter).toContainText('196 ккал / 100 г');
   await page.getByText('Яйцо целое жареное с растительным маслом').scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/russian-food-oil-variants-mobile-390.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/russian-food-oil-variants-mobile-390.png',
   });
 });
 
@@ -947,7 +2349,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
     expect((await action.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
   await compactBreakfast.screenshot({
-    path: '../.artifacts/screenshots/task-113A-round-5/nutrition-collapsible-meals-360.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-113A-round-5/nutrition-collapsible-meals-360.png',
   });
 
   await page.getByRole('button', { name: 'Предыдущая неделя' }).click();
@@ -959,14 +2361,18 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   const calories = page.getByRole('spinbutton', { name: 'Калории' });
   await expect(calories).toHaveAttribute('inputmode', 'decimal');
   await expect(calories).toHaveAttribute('enterkeyhint', 'next');
-  await page.getByRole('textbox', { name: 'Название (необязательно)' }).fill('Обед вне дома');
+  await page
+    .getByRole('textbox', { name: 'Название или контекст (необязательно)' })
+    .fill('Обед вне дома');
   await calories.fill('640');
   await page.getByLabel('Время (необязательно)').fill('13:10');
   await expect(page.getByRole('button', { name: 'Сохранить Quick Add' })).toBeInViewport();
   await page.getByRole('button', { name: 'Сохранить Quick Add' }).click();
   await expect(page.getByRole('dialog')).not.toBeAttached();
   await expect(page.getByText('Обед вне дома')).toBeVisible();
-  await expect(page.getByText('Быстрый ввод · 13:10')).toBeVisible();
+  await expect(
+    page.getByText('Приблизительно · своя оценка · частичные БЖУ · 13:10'),
+  ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 
   await page.getByRole('button', { name: 'День заполнен' }).click();
@@ -976,11 +2382,17 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   const addButton = breakfast.getByRole('button', { name: /Добавить/ });
   await addButton.focus();
   await page.keyboard.press('Enter');
-  const barcodeEntry = page.getByRole('button', { name: 'Поиск по штрихкоду' });
-  const search = page.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
-  await expect(barcodeEntry).toBeFocused();
+  const photoEntry = page.getByRole('button', { name: 'По фото этикетки' });
+  const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+  await expect(search).toBeFocused();
+  await expect(photoEntry).toBeVisible();
   await expect(search).toBeVisible();
-  await expect(page.getByRole('button', { name: /Свой продукт/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Избранное' })).not.toBeVisible();
+  await page.getByText('Каталог и фильтры', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Избранное' })).toBeVisible();
+  await page.getByText('Другие способы добавления').click();
   await expect(page.getByRole('button', { name: 'Рецепты' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
   await page.keyboard.press('Escape');
@@ -988,22 +2400,210 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(addButton).toBeFocused();
 
   await addButton.click();
-  await page.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
+  const productResult = page.locator('.nutrition-food-result').filter({ hasText: 'Овсяная каша' });
+  const favoriteButton = productResult.locator('.nutrition-food-result__favorite');
+  await expect(favoriteButton).toBeVisible();
+  const favoriteGeometry = await favoriteButton.evaluate((button) => {
+    const buttonRect = button.getBoundingClientRect();
+    const icon = button.querySelector<SVGElement>('.yfc-icon');
+    const iconRect = icon?.getBoundingClientRect();
+    const rowRect = button.closest('.nutrition-food-result')?.getBoundingClientRect();
+    return {
+      button: {
+        left: buttonRect.left,
+        right: buttonRect.right,
+        top: buttonRect.top,
+        bottom: buttonRect.bottom,
+        width: buttonRect.width,
+        height: buttonRect.height,
+      },
+      icon: iconRect
+        ? {
+            centerX: iconRect.left + iconRect.width / 2,
+            centerY: iconRect.top + iconRect.height / 2,
+          }
+        : null,
+      row: rowRect
+        ? { left: rowRect.left, right: rowRect.right, top: rowRect.top, bottom: rowRect.bottom }
+        : null,
+    };
+  });
+  expect(favoriteGeometry.button.width).toBeGreaterThanOrEqual(44);
+  expect(favoriteGeometry.button.height).toBeGreaterThanOrEqual(44);
+  expect(favoriteGeometry.row).not.toBeNull();
+  expect(favoriteGeometry.button.left).toBeGreaterThan(favoriteGeometry.row!.left);
+  expect(favoriteGeometry.button.right).toBeLessThan(favoriteGeometry.row!.right);
+  expect(favoriteGeometry.icon).not.toBeNull();
+  expect(
+    Math.abs(
+      favoriteGeometry.icon!.centerX -
+        (favoriteGeometry.button.left + favoriteGeometry.button.width / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(
+      favoriteGeometry.icon!.centerY -
+        (favoriteGeometry.button.top + favoriteGeometry.button.height / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  await expect(favoriteButton).toHaveAttribute('aria-pressed', 'true');
+  await favoriteButton.focus();
+  await expect(favoriteButton).toBeFocused();
+  await page.getByRole('button', { name: 'Выбрать Овсяная каша' }).click();
   await expect(page.getByRole('spinbutton', { name: 'Количество' })).toHaveValue('1');
   await page.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(page.getByRole('dialog')).not.toBeAttached();
-  await expect(page.getByText('Овсяная каша')).toBeVisible();
+  await expect(page.locator('.nutrition-entry').filter({ hasText: 'Овсяная каша' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 
   const oatmeal = page.locator('.nutrition-entry').filter({ hasText: 'Овсяная каша' });
   await oatmeal.getByRole('button', { name: 'Повторить Овсяная каша' }).click();
   await expect(page.getByRole('dialog', { name: 'Повторить продукт' })).toBeVisible();
   await expect(page.getByText('Новые записи добавятся к уже существующим.')).toBeVisible();
+  await page.getByRole('dialog', { name: 'Повторить продукт' }).screenshot({
+    path: '../.artifacts/runtime/tests/screenshots/task-536/nutrition-repeat-preview-mobile-360.png',
+  });
   await expect(page.getByRole('textbox', { name: 'Дата назначения' })).toHaveValue('2026-08-19');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeAttached();
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 390, 393, 430]) {
+    test(`Quick Add geometry ${theme} ${width}px`, async ({ page }, testInfo) => {
+      await mockNutritionApi(page);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((selectedTheme) => {
+        localStorage.setItem('app-theme', selectedTheme);
+      }, theme);
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/app?section=nutrition');
+      await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+      const calories = page.getByRole('spinbutton', { name: 'Калории' });
+      const time = page.getByLabel('Время (необязательно)');
+      await expect(calories).toBeVisible();
+      await expect(time).toBeVisible();
+
+      for (const state of ['empty', 'filled', 'keyboard-safe-area-long-label'] as const) {
+        if (state === 'empty') {
+          await expect(calories).toHaveValue('');
+          await expect(time).toHaveValue('');
+          await calories.focus();
+        } else {
+          await calories.fill('512.5');
+          await time.fill('23:59');
+          await expect(time).toHaveAttribute('type', 'time');
+          if (state === 'keyboard-safe-area-long-label') {
+            await page.evaluate(() => {
+              const root = document.documentElement;
+              root.style.setProperty('--yfc-layout-safe-left', '24px');
+              root.style.setProperty('--yfc-layout-safe-right', '24px');
+              root.style.setProperty('--yfc-layout-safe-bottom', '20px');
+              document.querySelector('label[for="nutrition-quick-time"]')!.textContent =
+                'Время (необязательно) — можно заполнить позднее';
+            });
+            await page.setViewportSize({ width, height: 420 });
+          }
+          await time.focus();
+          await time.scrollIntoViewIfNeeded();
+          await expect(time).toBeFocused();
+          await expect(calories).toHaveValue('512.5');
+          await expect(time).toHaveValue('23:59');
+        }
+        const geometry = await page.evaluate(() => {
+          const measure = (selector: string) => {
+            const node = document.querySelector<HTMLElement>(selector);
+            if (!node) throw new Error(`Quick Add geometry node missing: ${selector}`);
+            const rect = node.getBoundingClientRect();
+            const style = getComputedStyle(node);
+            return {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+              width: rect.width,
+              height: rect.height,
+              scrollWidth: node.scrollWidth,
+              clientWidth: node.clientWidth,
+              boxShadow: style.boxShadow,
+              outlineStyle: style.outlineStyle,
+            };
+          };
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            colorScheme: document.documentElement.dataset.colorScheme,
+            keyboard: document.documentElement.dataset.yfcKeyboard,
+            safeLeft: getComputedStyle(document.documentElement)
+              .getPropertyValue('--yfc-layout-safe-left')
+              .trim(),
+            safeRight: getComputedStyle(document.documentElement)
+              .getPropertyValue('--yfc-layout-safe-right')
+              .trim(),
+            page: {
+              scrollWidth: document.documentElement.scrollWidth,
+              clientWidth: document.documentElement.clientWidth,
+            },
+            calories: measure('#nutrition-quick-calories'),
+            time: measure('.nutrition-quick-add__primary-fields .time-control'),
+            nativeTime: measure('#nutrition-quick-time'),
+            timeLabel: measure('label[for="nutrition-quick-time"]'),
+            body: measure('.nutrition-quick-add'),
+          };
+        });
+        await page.screenshot({
+          path: testInfo.outputPath(`quick-add-${state}.png`),
+          animations: 'disabled',
+        });
+        const geometryPath = testInfo.outputPath(`geometry-${state}.json`);
+        await writeFile(
+          geometryPath,
+          JSON.stringify(
+            { browser: testInfo.project.name, theme, width, state, ...geometry },
+            null,
+            2,
+          ),
+        );
+        await testInfo.attach(`geometry-${state}.json`, {
+          path: geometryPath,
+          contentType: 'application/json',
+        });
+
+        expect.soft(geometry.page.scrollWidth).toBeLessThanOrEqual(geometry.page.clientWidth + 1);
+        expect.soft(geometry.colorScheme).toBe(theme);
+        expect.soft(geometry.body.scrollWidth).toBeLessThanOrEqual(geometry.body.clientWidth + 1);
+        for (const control of [geometry.calories, geometry.time, geometry.nativeTime]) {
+          expect.soft(control.left).toBeGreaterThanOrEqual(geometry.body.left + 4);
+          expect.soft(control.right).toBeLessThanOrEqual(geometry.body.right - 4);
+          expect.soft(control.scrollWidth).toBeLessThanOrEqual(control.clientWidth + 1);
+          expect.soft(control.height).toBeGreaterThanOrEqual(44);
+        }
+        expect
+          .soft(Math.abs(geometry.calories.height - geometry.time.height))
+          .toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(geometry.calories.width - geometry.time.width)).toBeLessThanOrEqual(1);
+        if (width > 380) {
+          expect
+            .soft(Math.abs(geometry.calories.bottom - geometry.time.bottom))
+            .toBeLessThanOrEqual(1);
+        }
+        expect.soft(geometry.timeLabel.right).toBeLessThanOrEqual(geometry.body.right - 4);
+        if (state !== 'empty') {
+          expect.soft(geometry.time.boxShadow).not.toBe('none');
+          expect.soft(geometry.time.top).toBeGreaterThanOrEqual(geometry.body.top + 4);
+          expect.soft(geometry.time.bottom).toBeLessThanOrEqual(geometry.body.bottom - 4);
+          if (state === 'keyboard-safe-area-long-label') {
+            expect.soft(geometry.keyboard).toBe('visible');
+            expect.soft(geometry.safeLeft).toBe('24px');
+            expect.soft(geometry.safeRight).toBe('24px');
+          }
+        } else {
+          expect.soft(geometry.calories.outlineStyle).not.toBe('none');
+        }
+      }
+    });
+  }
+}
 
 test('dark nutrition uses the shared lime status and progress accents', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
@@ -1012,16 +2612,15 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   await page.goto('/app?section=nutrition');
 
   const status = page.getByText('Цель КБЖУ настроена');
-  await expect(status).toHaveCSS('background-color', 'rgb(30, 34, 30)');
+  await expect(status).toHaveCSS('background-color', 'rgb(34, 34, 34)');
   await expect(status).toHaveCSS('border-color', 'rgb(89, 111, 56)');
   await expect(status).toHaveCSS('color', 'rgb(185, 234, 114)');
   await expect(
     page.getByRole('progressbar', { name: /Калории:/ }).locator(':scope > span'),
-  ).toHaveCSS('background-color', 'rgb(168, 232, 58)');
-  await expect(page.getByRole('link', { name: 'Питание', exact: true })).toHaveCSS(
-    'background-color',
-    'rgb(30, 34, 30)',
-  );
+  ).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  const activeNutrition = page.getByRole('link', { name: 'Питание', exact: true });
+  await expect(activeNutrition).toHaveAttribute('aria-current', 'page');
+  await expectSelectedChoice(activeNutrition);
   const lunch = page.getByRole('region', { name: 'Обед' });
   await expect(lunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
     'aria-expanded',
@@ -1030,7 +2629,7 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   expect((await lunch.boundingBox())?.height).toBeLessThanOrEqual(88);
   await lunch.scrollIntoViewIfNeeded();
   await lunch.screenshot({
-    path: '../.artifacts/screenshots/task-113A-round-5/nutrition-collapsible-meals-dark-390x844.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-113A-round-5/nutrition-collapsible-meals-dark-390x844.png',
   });
 });
 
@@ -1044,16 +2643,16 @@ test('Russian search supplements local food with USDA generic result and persist
 
   const breakfast = page.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  const search = page.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
+  const search = page.getByRole('searchbox', { name: 'Найти продукт' });
   await search.fill('рис');
 
-  await expect(page.getByRole('button', { name: 'Добавить Рис домашний' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Выбрать Рис домашний' })).toBeVisible();
   await expect(page.getByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
   await expect(page.getByText('Рис бурый приготовленный, без добавления масла')).toBeVisible();
   await expect(page.getByText('Рис дикий приготовленный, без добавления масла')).toBeVisible();
   await expect(page.getByText(/CC0-1.0/).first()).toBeVisible();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/generic-rice-search-390x844.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/generic-rice-search-390x844.png',
   });
   await page
     .getByText('Рис белый приготовленный, без добавления масла')
@@ -1079,6 +2678,76 @@ test('Russian search supplements local food with USDA generic result and persist
   await expect(reloadedEntry).toBeVisible();
   await reloadedEntry.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/generic-rice-added-390x844.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/generic-rice-added-390x844.png',
   });
 });
+
+for (const width of [360, 393, 430]) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const runtime of ['web', 'tma'] as const) {
+      test(`#868 water intent ${width} ${theme} ${runtime}`, async ({ page }, testInfo) => {
+        await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+        if (runtime === 'tma') {
+          await installTelegramHarness(page, {
+            colorScheme: theme,
+            viewportHeight: 844,
+            safeAreaInset: { top: 24, bottom: 34, left: 0, right: 0 },
+            contentSafeAreaInset: { top: 16, bottom: 0, left: 0, right: 0 },
+          });
+        }
+        const apiState = await mockNutritionApi(page, 'loading');
+        await page.goto('/app?section=nutrition');
+        await expect(page.getByText('Загружаем гидратацию…')).toBeVisible();
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+        await page.goto('/app?section=today');
+        const water = async () => {
+          await page.getByRole('button', { name: 'Быстро добавить', exact: true }).click();
+          await page.getByRole('link', { name: 'Вода', exact: true }).click();
+        };
+        await water();
+        await expect(page).toHaveURL(/hydration=quick/);
+        apiState.releaseHydrationLoading();
+        const hydration = page.getByRole('region', { name: 'Гидратация' });
+        const preset = hydration.getByRole('button', { name: /Стакан.*250 мл/ });
+        await expect(preset).toBeInViewport({ ratio: 1 });
+        await expect(preset).toBeFocused();
+        await expect(page).not.toHaveURL(/hydration=quick/);
+        const dock = page.locator('#appBottomNav');
+        const presetBox = await preset.boundingBox();
+        const dockBox = await dock.boundingBox();
+        if (dockBox) expect(presetBox!.y + presetBox!.height).toBeLessThan(dockBox.y);
+        await page.screenshot({ path: testInfo.outputPath('water-intent-visible.png') });
+        await preset.click();
+        await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
+        await expect(hydration.getByText('1100 из 2200 мл', { exact: true })).toBeVisible();
+        const volume = hydration
+          .getByRole('region', { name: 'Другой объём' })
+          .getByLabel('Объём, мл');
+        await volume.fill('425');
+        await page.evaluate(() => {
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          window.scrollTo(0, 0);
+        });
+        await water();
+        await expect(preset).toBeInViewport({ ratio: 1 });
+        await expect(page).not.toHaveURL(/hydration=quick/);
+        await expect(volume).toHaveValue('425');
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.goBack();
+        await expect(page).not.toHaveURL(/hydration=quick/);
+        await expect(volume).toHaveValue('425');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width + 1,
+        );
+        await page.reload();
+        await expect(
+          hydration.getByRole('region', { name: 'Другой объём' }).getByLabel('Объём, мл'),
+        ).toBeVisible();
+        await expect(preset).not.toBeFocused();
+      });
+    }
+  }
+}

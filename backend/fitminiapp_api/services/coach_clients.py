@@ -123,6 +123,9 @@ def _client_entry_from_user(
     nutrition_target: NutritionTargetResponse | None,
     *,
     include_preferences_context: bool,
+    operational_status: str | None = "active",
+    labels: list[str] | None = None,
+    latest_weight_kg: float | None = None,
 ) -> dict:
     from fitminiapp_api.services.training_preferences import serialize_training_preferences
 
@@ -137,7 +140,13 @@ def _client_entry_from_user(
         "goal": profile.goal if profile else None,
         "level": profile.level if profile else None,
         "height_cm": profile.height_cm if profile else None,
-        "weight_kg": profile.weight_kg if profile else None,
+        "weight_kg": (
+            latest_weight_kg
+            if latest_weight_kg is not None
+            else profile.weight_kg
+            if profile
+            else None
+        ),
         "workouts_per_week": profile.workouts_per_week if profile else None,
         "cardio_trainings_per_week": (profile.cardio_trainings_per_week if profile else None),
         "resting_heart_rate": profile.resting_heart_rate if profile else None,
@@ -154,7 +163,9 @@ def _client_entry_from_user(
         ),
         "timezone": get_user_timezone_name(user),
         "kbju": nutrition_target,
+        "labels": list(labels or []),
         "status": "active",
+        "operational_status": operational_status or "active",
     }
 
 
@@ -180,7 +191,9 @@ def _client_entry_from_invite(invite: CoachClientInvite) -> dict:
         "training_preferences": None,
         "timezone": None,
         "kbju": None,
+        "labels": [],
         "status": "pending",
+        "operational_status": "active",
     }
 
 
@@ -233,7 +246,48 @@ def remove_client_for_coach(db: Session, coach: User, client_id: int) -> None:
     link.status = "ended"
     link.ended_at = now_msk_naive()
     link.ended_reason = "removed_by_trainer"
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=client_id,
+        action="coach.relation_ended",
+        resource_type="coach_client",
+        resource_id=link.id,
+        details={"status": "ended", "reason": "removed_by_trainer"},
+    )
     db.commit()
+
+
+def update_client_labels(
+    db: Session,
+    coach: User,
+    client_id: int,
+    labels: list[str],
+) -> list[str]:
+    client = get_client_managed_by_coach(db, coach, client_id)
+    link = (
+        db.query(CoachClient)
+        .filter(
+            CoachClient.coach_user_id == coach.id,
+            CoachClient.client_user_id == client.id,
+            CoachClient.status == "active",
+        )
+        .with_for_update()
+        .one()
+    )
+    previous = list(link.labels or [])
+    link.labels = list(labels)
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=client.id,
+        action="coach.client_labels_changed",
+        resource_type="coach_client",
+        resource_id=link.id,
+        details={"from_count": len(previous), "to_count": len(labels)},
+    )
+    db.commit()
+    return list(labels)
 
 
 def revoke_coach_invite(db: Session, coach: User, invite_id: int) -> None:
@@ -252,6 +306,15 @@ def revoke_coach_invite(db: Session, coach: User, invite_id: int) -> None:
 
     invite.status = "revoked"
     cancel_client_request_notification(db, invite.id)
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=invite.client_user_id,
+        action="coach.invite_revoked",
+        resource_type="coach_client_invite",
+        resource_id=invite.id,
+        details={"status": "revoked"},
+    )
     db.commit()
 
 
@@ -353,6 +416,15 @@ def create_coach_invite_link(db: Session, coach: User) -> dict:
         expires_at=now_msk_naive() + timedelta(days=14),
     )
     db.add(invite)
+    db.flush()
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        action="coach.invite_created",
+        resource_type="coach_client_invite",
+        resource_id=invite.id,
+        details={"source": invite.source, "status": invite.status},
+    )
     db.commit()
     db.refresh(invite)
     start_param = f"trainer_{raw_token}"
@@ -446,7 +518,8 @@ def confirm_coach_invite_link(db: Session, client: User, raw_token: str) -> None
         active_relation.status = "ended"
         active_relation.ended_at = now_msk_naive()
         active_relation.ended_reason = "client_switched_trainer"
-    if not active_relation or active_relation.coach_user_id != coach.id:
+    relation_created = not active_relation or active_relation.coach_user_id != coach.id
+    if relation_created:
         db.add(
             CoachClient(
                 coach_user_id=coach.id,
@@ -464,4 +537,13 @@ def confirm_coach_invite_link(db: Session, client: User, raw_token: str) -> None
     invite.username = normalize_telegram_username(client.username)
     invite.full_name = client.profile.full_name if client.profile else None
     cancel_client_request_notification(db, invite.id)
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=client.id,
+        action="coach.invite_accepted",
+        resource_type="coach_client_invite",
+        resource_id=invite.id,
+        details={"status": "accepted", "relation_created": relation_created},
+    )
     db.commit()

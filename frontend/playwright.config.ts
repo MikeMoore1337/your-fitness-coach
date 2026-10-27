@@ -1,11 +1,21 @@
 import { defineConfig, devices } from '@playwright/test';
+import { getPlaywrightReporters } from './playwright-reporting';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  outputDir: '../.artifacts/tests/playwright',
+  testIgnore: [
+    '**/mobile-ui-regression.spec.ts',
+    '**/ui-quality-sweep.spec.ts',
+    '**/landing-approved-visual.spec.ts',
+    '**/landing-frozen-visual.spec.ts',
+  ],
+  outputDir: '../.artifacts/runtime/tests/playwright',
   fullyParallel: true,
-  retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  // Trial 3 workers per 4-vCPU GitHub runner (previously Playwright's 2-worker CI default).
+  // Keep retries unchanged so the full CI run can report any extra flakiness.
+  workers: process.env.CI ? 3 : undefined,
+  retries: process.env.CI ? 1 : 0,
+  reporter: getPlaywrightReporters(),
   use: {
     baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
     trace: 'on-first-retry',

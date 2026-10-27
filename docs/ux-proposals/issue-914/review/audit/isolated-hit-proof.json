@@ -1,0 +1,1674 @@
+[
+  {
+    "engine": "chromium",
+    "source": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+    "status": "ISOLATED_ONE_LINE_CSS_PROBE_NOT_PRODUCTION_FIX",
+    "override": ".active-workout-rest { pointer-events: auto; }",
+    "before": {
+      "point": {
+        "x": 101.25,
+        "y": 99.203125
+      },
+      "panel": {
+        "x": 0,
+        "y": 0,
+        "width": 393,
+        "height": 107.203125,
+        "top": 0,
+        "right": 393,
+        "bottom": 107.203125,
+        "left": 0
+      },
+      "button": {
+        "x": 10,
+        "y": 52.203125,
+        "width": 182.5,
+        "height": 44,
+        "top": 52.203125,
+        "right": 192.5,
+        "bottom": 96.203125,
+        "left": 10
+      },
+      "under": {
+        "x": 12,
+        "y": 75.078125,
+        "width": 369,
+        "height": 48,
+        "top": 75.078125,
+        "right": 381,
+        "bottom": 123.078125,
+        "left": 12
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Готово",
+        "set": "201"
+      },
+      "pointerEvents": "none"
+    },
+    "after": {
+      "point": {
+        "x": 101.25,
+        "y": 99.203125
+      },
+      "panel": {
+        "x": 0,
+        "y": 0,
+        "width": 393,
+        "height": 107.203125,
+        "top": 0,
+        "right": 393,
+        "bottom": 107.203125,
+        "left": 0
+      },
+      "button": {
+        "x": 10,
+        "y": 52.203125,
+        "width": 182.5,
+        "height": 44,
+        "top": 52.203125,
+        "right": 192.5,
+        "bottom": 96.203125,
+        "left": 10
+      },
+      "under": {
+        "x": 12,
+        "y": 75.078125,
+        "width": 369,
+        "height": 48,
+        "top": 75.078125,
+        "right": 381,
+        "bottom": 123.078125,
+        "left": 12
+      },
+      "hit": {
+        "tag": "ASIDE",
+        "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить"
+      },
+      "pointerEvents": "auto"
+    },
+    "writes": [],
+    "events": [
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "click",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1862
+      },
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "click",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1862
+      },
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 74.19999694824219,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 74.199951171875,
+        "scrollY": 1862
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 74.19999694824219,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 74.199951171875,
+        "scrollY": 1862
+      },
+      {
+        "type": "click",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 74,
+        "scrollY": 1862
+      }
+    ]
+  },
+  {
+    "engine": "webkit",
+    "source": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+    "status": "ISOLATED_ONE_LINE_CSS_PROBE_NOT_PRODUCTION_FIX",
+    "override": ".active-workout-rest { pointer-events: auto; }",
+    "before": {
+      "point": {
+        "x": 101.25,
+        "y": 99.1875
+      },
+      "panel": {
+        "x": 0,
+        "y": 0,
+        "width": 393,
+        "height": 107.1875,
+        "top": 0,
+        "right": 393,
+        "bottom": 107.1875,
+        "left": 0
+      },
+      "button": {
+        "x": 10,
+        "y": 52.1875,
+        "width": 182.5,
+        "height": 44,
+        "top": 52.1875,
+        "right": 192.5,
+        "bottom": 96.1875,
+        "left": 10
+      },
+      "under": {
+        "x": 12,
+        "y": 75.84375,
+        "width": 369,
+        "height": 48,
+        "top": 75.84375,
+        "right": 381,
+        "bottom": 123.84375,
+        "left": 12
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Готово",
+        "set": "201"
+      },
+      "pointerEvents": "none"
+    },
+    "after": {
+      "point": {
+        "x": 101.25,
+        "y": 99.1875
+      },
+      "panel": {
+        "x": 0,
+        "y": 0,
+        "width": 393,
+        "height": 107.1875,
+        "top": 0,
+        "right": 393,
+        "bottom": 107.1875,
+        "left": 0
+      },
+      "button": {
+        "x": 10,
+        "y": 52.1875,
+        "width": 182.5,
+        "height": 44,
+        "top": 52.1875,
+        "right": 192.5,
+        "bottom": 96.1875,
+        "left": 10
+      },
+      "under": {
+        "x": 12,
+        "y": 75.84375,
+        "width": 369,
+        "height": 48,
+        "top": 75.84375,
+        "right": 381,
+        "bottom": 123.84375,
+        "left": 12
+      },
+      "hit": {
+        "tag": "ASIDE",
+        "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить"
+      },
+      "pointerEvents": "auto"
+    },
+    "writes": [],
+    "events": [
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "click",
+        "pointerType": "mouse",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых1:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 97,
+        "y": 95,
+        "scrollY": 1861
+      },
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "hit": {
+          "tag": "ASIDE",
+          "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+          "class": "active-workout-rest"
+        },
+        "path": [
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          },
+          {
+            "tag": "MAIN",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "container app-shell__content"
+          },
+          {
+            "tag": "DIV",
+            "text": "Your FitnessCoach🚴Добавить К сводкеСиловая базаТекущая тренировкаДень 1 · В про",
+            "class": "app-shell app-shell--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "click",
+        "pointerType": "mouse",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:00Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 97,
+        "y": 95,
+        "scrollY": 1861
+      },
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 74,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 74,
+        "scrollY": 1861
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 74,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 74,
+        "scrollY": 1861
+      },
+      {
+        "type": "click",
+        "pointerType": "mouse",
+        "target": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "secondary"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "+30 сек",
+            "class": "secondary"
+          },
+          {
+            "tag": "DIV",
+            "text": "+30 секПропустить",
+            "class": "active-workout-rest__actions app-action-group"
+          },
+          {
+            "tag": "ASIDE",
+            "text": "Отдых2:30Дальше: Жим штанги лёжа, подход 2+30 секПропустить",
+            "class": "active-workout-rest"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "today-workout-focus"
+          },
+          {
+            "tag": "SECTION",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack"
+          },
+          {
+            "tag": "DIV",
+            "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+            "class": "page-stack app-section app-section--today app-section--design-v2"
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 74,
+        "scrollY": 1861
+      }
+    ]
+  }
+]

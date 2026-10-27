@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from fastapi.encoders import jsonable_encoder
 
+from fitminiapp_api.api.v1 import me as me_api
 from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.account import AccountDataExport
@@ -84,6 +85,11 @@ def test_export_job_is_current_user_only_zip_and_replaces_previous_artifact(clie
         headers=other_headers,
     )
     assert denied.status_code == 404
+    denied_link = client.post(
+        f"/api/v1/me/exports/{status['export_id']}/download-link",
+        headers=other_headers,
+    )
+    assert denied_link.status_code == 404
     downloaded = client.get(
         f"/api/v1/me/exports/{status['export_id']}/download",
         headers=owner_headers,
@@ -178,6 +184,24 @@ def test_export_handles_empty_account_and_bounded_generation_error(client, monke
             .one()
         )
         assert row.archive_bytes is None
+
+
+def test_export_generation_removed_by_account_delete_returns_gone(client, monkeypatch) -> None:
+    headers = _login(client, 9_650_009)
+
+    def remove_generation(db, user_id: int, export_id: str):
+        db.query(AccountDataExport).filter(
+            AccountDataExport.user_id == user_id,
+            AccountDataExport.export_id == export_id,
+        ).delete(synchronize_session=False)
+        db.commit()
+        return None
+
+    monkeypatch.setattr(me_api, "lock_account_export_generation", remove_generation)
+    response = client.post("/api/v1/me/exports", headers=headers)
+
+    assert response.status_code == 410
+    assert response.json()["detail"] == "Аккаунт больше недоступен"
 
 
 def test_superseded_export_generation_cannot_lock_the_newer_job(client) -> None:

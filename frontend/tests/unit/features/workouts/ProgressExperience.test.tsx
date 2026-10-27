@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { ProgressExperience } from '../../../../src/features/workouts/ProgressExperience';
 import type {
   NutritionReport,
@@ -54,12 +55,17 @@ function makeSummary(): ProgressSummary {
       average_protein_g: 132,
       target_protein_g: 140,
       target_effective_on: '2029-12-01',
+      exact_entry_count: 0,
+      approximate_entry_count: 0,
+      partial_entry_count: 0,
     },
     body: {
       latest_measurement: { measured_on: '2030-01-29', weight_kg: 68.4, waist_cm: 72 },
       trends: [
         {
           metric: 'weight_kg',
+          label: 'Вес',
+          unit: 'kg',
           first_value: 69.4,
           latest_value: 68.4,
           change: -1,
@@ -77,6 +83,8 @@ function makeSummary(): ProgressSummary {
         },
         {
           metric: 'waist_cm',
+          label: 'Талия',
+          unit: 'cm',
           first_value: 73,
           latest_value: 72,
           change: -1,
@@ -88,6 +96,25 @@ function makeSummary(): ProgressSummary {
           points: [
             { measured_on: '2030-01-02', value: 73 },
             { measured_on: '2030-01-29', value: 72 },
+          ],
+        },
+        {
+          metric: 'custom:17',
+          label: 'Живот',
+          unit: 'cm',
+          definition_id: 17,
+          first_value: 86,
+          latest_value: 84,
+          change: -2,
+          first_measured_on: '2030-01-02',
+          latest_measured_on: '2030-01-29',
+          point_count: 3,
+          span_days: 27,
+          interpretation_status: 'available',
+          points: [
+            { measured_on: '2030-01-02', value: 86 },
+            { measured_on: '2030-01-15', value: 85 },
+            { measured_on: '2030-01-29', value: 84 },
           ],
         },
       ],
@@ -127,8 +154,14 @@ function makeAnalytics(): TrainingAnalytics {
     period_days: 30,
     period_start: '2030-01-01',
     period_end: '2030-01-30',
+    previous_period_start: '2029-12-02',
+    previous_period_end: '2029-12-31',
     exercise_history_limit: 20,
     completed_set_count: 28,
+    completed_workout_count: 7,
+    frequency_per_week: 1.63,
+    previous_completed_workout_count: 6,
+    previous_frequency_per_week: 1.4,
     reps_total: 226,
     reps_recorded_sets: 28,
     external_load_volume_kg: 12400,
@@ -196,6 +229,30 @@ function makeAnalytics(): TrainingAnalytics {
     secondary_muscle_exposure: [
       { muscle_id: 'triceps', muscle_name: 'Трицепс', completed_set_count: 18 },
     ],
+    muscle_group_workload: [
+      {
+        muscle_id: 'chest',
+        muscle_name: 'Грудные',
+        current: {
+          completed_set_count: 18,
+          primary_completed_set_count: 18,
+          secondary_completed_set_count: 0,
+          completed_session_count: 6,
+          frequency_per_week: 1.4,
+        },
+        previous: {
+          completed_set_count: 12,
+          primary_completed_set_count: 12,
+          secondary_completed_set_count: 0,
+          completed_session_count: 4,
+          frequency_per_week: 0.93,
+        },
+        completed_set_count_change: 6,
+        frequency_per_week_change: 0.47,
+        trend: 'increased',
+        contributing_exercises: [],
+      },
+    ],
     completed_sets_without_muscle_metadata: 0,
     data_sufficiency: {
       ruleset_version: 'data-sufficiency-v1',
@@ -240,6 +297,9 @@ function makeNutritionReport(): NutritionReport {
       calorie_tolerance_evaluated_days: 0,
       days_meeting_protein_target: 0,
       protein_target_evaluated_days: 0,
+      exact_entry_count: 0,
+      approximate_entry_count: 0,
+      partial_entry_count: 0,
     },
     daily: [],
     target_changes: [],
@@ -286,18 +346,41 @@ function installApi({
         { status: 200 },
       );
     }
+    if (path === '/api/v1/check-ins/weekly/current') {
+      return new Response(
+        JSON.stringify({
+          week_start: '2030-01-01',
+          week_end: '2030-01-07',
+          submitted_on: '2030-01-07',
+          timezone: 'UTC',
+          existing: null,
+          summary: {},
+          progress_action: {
+            kind: 'weekly_review',
+            status: 'available',
+            target: 'weekly_review',
+            reason: 'review_required',
+            title: 'Пройти недельный обзор',
+            detail: 'Сверьте факты недели и зафиксируйте следующий шаг.',
+            completed_at: null,
+          },
+        }),
+        { status: 200 },
+      );
+    }
     return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
   });
 }
 
-function renderExperience() {
+function renderExperience(search = '', measurementDiary?: ReactNode) {
+  window.history.replaceState({}, '', `/app${search}`);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <NavigationProvider>
       <QueryClientProvider client={queryClient}>
-        <ProgressExperience />
+        <ProgressExperience measurementDiary={measurementDiary} />
       </QueryClientProvider>
     </NavigationProvider>,
   );
@@ -313,22 +396,68 @@ describe('ProgressExperience', () => {
     installApi();
     renderExperience();
 
-    expect(await screen.findAllByText('84%')).toHaveLength(2);
+    expect(await screen.findByRole('heading', { name: 'Что изменилось' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Прогресс' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Тренировки' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Питание' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Соблюдение плана' })).toBeVisible();
+    expect(screen.getByRole('navigation', { name: 'Разделы прогресса' })).toBeVisible();
+    expect(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
+        name: 'Тренировки',
+      }),
+    ).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Замеры и приоритеты' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Питание' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Соблюдение плана' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Скачать отчёт' })).toHaveAttribute(
       'href',
       '/app/report?period=days_30',
     );
+    expect(screen.getByText(/3 новых личных рекорда/)).toBeVisible();
+    expect(screen.queryByText(/в неделю · .* PR/)).not.toBeInTheDocument();
+    const helpControl = screen.getByText('О показателях', { exact: true });
+    const helpDisclosure = helpControl.closest('details');
+    expect(helpDisclosure).not.toBeNull();
+    fireEvent.click(helpControl);
+    expect(helpDisclosure).toHaveAttribute('open');
+    expect(
+      within(helpDisclosure as HTMLDetailsElement).getByText(/Сначала смотрите на период/),
+    ).toBeVisible();
+    fireEvent.click(helpControl);
+    expect(helpDisclosure).not.toHaveAttribute('open');
     expect(screen.getByRole('img', { name: /Вес: 2 янв. — 69,4 кг/ })).toBeVisible();
 
-    fireEvent.click(screen.getByText('Жим штанги лёжа'));
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
+        name: /^Тренировки/,
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+    fireEvent.click(await screen.findByText('Жим штанги лёжа'));
     expect(screen.getByText('Детали тренировки')).toBeVisible();
     expect(screen.getByText('Показаны последние 20 тренировок упражнения.')).toBeVisible();
     expect(screen.queryByText('too_few_points')).not.toBeInTheDocument();
+  });
+
+  it('uses the server-selected weekly action in the progress hub', async () => {
+    installApi();
+    renderExperience();
+
+    expect(await screen.findByRole('heading', { name: 'Факты → действие' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Пройти недельный обзор' })).toHaveAttribute(
+      'href',
+      '/app?section=progress&progress_view=wellbeing',
+    );
+  });
+
+  it('mounts one measurement editor inside its disclosure', async () => {
+    installApi();
+    renderExperience(
+      '?section=progress&progress_view=body',
+      <div data-testid="measurement-editor" />,
+    );
+    const editor = await screen.findByTestId('measurement-editor');
+    expect(screen.getAllByTestId('measurement-editor')).toHaveLength(1);
+    expect(editor.closest('details')).toHaveClass('progress-measurement-editor');
+    expect(editor.closest('details')).not.toHaveAttribute('open');
   });
 
   it('shows selected priorities as preferences without treating circumference as muscle analytics', async () => {
@@ -342,14 +471,18 @@ describe('ProgressExperience', () => {
       'Окружность плеча не измеряет отдельно бицепс или трицепс.',
     ];
     installApi({ summary });
-    renderExperience();
+    renderExperience('?section=progress&progress_view=body');
 
+    await screen.findByRole('heading', { name: 'Тело' });
+    fireEvent.click(screen.getByText('Выбранные мышечные группы'));
     expect(await screen.findByText('Мышцы спины')).toBeVisible();
     expect(screen.getByText('Задняя поверхность тела')).toBeVisible();
     expect(
       screen.getByText(/Это предпочтение для планирования\. Оно не оценивает тело/),
     ).toBeVisible();
-    expect(screen.getAllByText('Окружность').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Талия').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Живот').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('84 см').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('Как сравнивать замеры'));
     expect(screen.getByText('Снимайте замеры в похожее время суток.')).toBeVisible();
     expect(
@@ -359,14 +492,14 @@ describe('ProgressExperience', () => {
 
   it('requests both backend aggregates when the period changes', async () => {
     installApi();
-    renderExperience();
-    await screen.findAllByText('84%');
+    renderExperience('?section=progress&progress_view=training');
+    await screen.findByRole('heading', { name: 'Тренировки', level: 2 });
 
-    fireEvent.click(
-      within(screen.getByRole('tablist', { name: 'Период прогресса' })).getByRole('tab', {
-        name: '7 дней',
-      }),
-    );
+    const periods = screen.getByRole('tablist', { name: 'Период прогресса' });
+    const sevenDays = within(periods).getByRole('tab', { name: '7 дней' });
+    const thirtyDays = within(periods).getByRole('tab', { name: '30 дней' });
+    thirtyDays.focus();
+    fireEvent.keyDown(thirtyDays, { key: 'ArrowLeft' });
 
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -380,8 +513,49 @@ describe('ProgressExperience', () => {
     });
     expect(screen.getByRole('link', { name: 'Скачать отчёт' })).toHaveAttribute(
       'href',
-      '/app/report?period=days_7',
+      '/app/report?period=days_7&progress_view=training',
     );
+    expect(sevenDays).toBe(screen.getByRole('tab', { name: '7 дней' }));
+    expect(sevenDays).toHaveFocus();
+  });
+
+  it('does not auto-select a custom metric when no canonical trend exists', async () => {
+    const summary = makeSummary();
+    const customTrend = summary.body.trends.find((trend) => trend.metric === 'custom:17');
+    if (!customTrend) throw new Error('Expected the custom trend fixture');
+    summary.body.trends = [customTrend];
+    installApi({ summary });
+    renderExperience('?section=progress&progress_view=body');
+
+    await screen.findByRole('heading', { name: 'Тело' });
+    expect(screen.getByRole('tab', { name: 'Живот' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.queryByRole('img', { name: /Живот/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Живот' }));
+    expect(await screen.findByRole('img', { name: /Живот/ })).toBeVisible();
+  });
+
+  it('keeps body metric tabs keyboard-operable and linked to their panel', async () => {
+    installApi();
+    renderExperience('?section=progress&progress_view=body');
+
+    await screen.findByRole('heading', { name: 'Тело' });
+    const tablist = screen.getByRole('tablist', { name: 'Показатель графика' });
+    const weightTab = within(tablist).getByRole('tab', { name: 'Вес' });
+    const waistTab = within(tablist).getByRole('tab', { name: 'Талия' });
+    const panel = screen.getByRole('tabpanel');
+
+    expect(weightTab).toHaveAttribute('tabindex', '0');
+    expect(waistTab).toHaveAttribute('tabindex', '-1');
+    expect(weightTab).toHaveAttribute('aria-controls', panel.id);
+    expect(panel).toHaveAttribute('aria-labelledby', weightTab.id);
+
+    weightTab.focus();
+    fireEvent.keyDown(weightTab, { key: 'ArrowRight' });
+
+    expect(waistTab).toHaveFocus();
+    expect(waistTab).toHaveAttribute('aria-selected', 'true');
+    expect(panel).toHaveAttribute('aria-labelledby', waistTab.id);
   });
 
   it('keeps empty, one-point and partial adherence states factual', async () => {
@@ -411,6 +585,16 @@ describe('ProgressExperience', () => {
         points: [{ measured_on: '2030-01-29', value: 68.4 }],
       },
     ];
+    summary.data_sufficiency.weight_trend = {
+      status: 'limited',
+      counters: {
+        point_count: 1,
+        span_days: 0,
+        required_point_count: 3,
+        required_span_days: 14,
+      },
+      reason_keys: ['too_few_points'],
+    };
     summary.adherence.overall_percent = null;
     summary.adherence.included_components = [];
     summary.adherence.workouts = {
@@ -434,19 +618,32 @@ describe('ProgressExperience', () => {
     installApi({ summary, analytics });
     renderExperience();
 
-    expect(await screen.findByText('Пока не оценить')).toBeVisible();
-    expect(screen.getByText('0 новых рекордов')).toBeVisible();
-    expect(screen.getByText('История упражнений пока пуста')).toBeVisible();
-    expect(screen.getByText('Нет подтверждённых дней питания')).toBeVisible();
+    expect((await screen.findAllByText('Мало данных')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('История упражнений пока пуста')).not.toBeInTheDocument();
+    expect(screen.queryByText('Нет подтверждённых дней питания')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
+        name: /^Тело/,
+      }),
+    );
+    expect(
+      await screen.findByText(
+        'Одна точка сохраняет факт, но ещё не показывает направление изменений.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/1 замер/)).toBeVisible();
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
+        name: /^Питание/,
+      }),
+    );
+    expect(await screen.findByText('Нет заполненных дней за период')).toBeVisible();
+    expect(screen.getAllByText('Нет заполненных дней за период')).toHaveLength(1);
     expect(
       screen.getByText('0 частичных и 29 отсутствующих дней не входят в средние значения.'),
     ).toBeVisible();
-    expect(screen.getByText(/1 точка/)).toBeVisible();
-    expect(
-      screen.getByText('Одна точка сохраняет факт, но ещё не показывает направление изменений.'),
-    ).toBeVisible();
-    expect(screen.getByText('Нет цели или плана')).toBeVisible();
-    expect(screen.getAllByText('Мало данных').length).toBeGreaterThan(0);
   });
 
   it('shows a loading state without inventing zero values', () => {
@@ -459,10 +656,16 @@ describe('ProgressExperience', () => {
 
   it('keeps training analytics available when the main summary fails', async () => {
     installApi({ failSummary: true });
-    renderExperience();
+    renderExperience('?section=progress&progress_view=training');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Сводка временно недоступна');
-    expect(await screen.findByText('Жим штанги лёжа')).toBeVisible();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Сервис временно недоступен. Попробуйте ещё раз.',
+    );
+    const history = screen
+      .getByRole('heading', { name: 'История упражнений' })
+      .closest('.progress-subsection');
+    expect(history).not.toBeNull();
+    expect(await within(history as HTMLElement).findByText('Жим штанги лёжа')).toBeVisible();
     expect(screen.getByText('28')).toBeVisible();
   });
 });

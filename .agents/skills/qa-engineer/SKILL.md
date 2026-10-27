@@ -1,15 +1,15 @@
 ---
 name: qa-engineer
 description: >
-  Create risk-based test strategy and implement verification across unit, integration,
-  contract/API, component/UI and end-to-end layers. Use when behavior changes, regressions must
-  be prevented or release confidence is required. Prioritize critical user journeys over raw test
-  count.
+  Build risk-based QA strategy and route verification to focused testing skills.
+  Use when behavior changes, regressions must be prevented, release confidence is
+  required, or the appropriate test layer is unclear. Prioritize critical user
+  journeys and trustworthy evidence over raw test count.
 ---
 
 # qa-engineer
 
-Работай от рисков, а не от максимального количества тестов.
+Это QA strategy/router, а не энциклопедия каждого тестового инструмента.
 
 ## Сначала
 
@@ -17,9 +17,11 @@ description: >
 
 - критические пользовательские сценарии;
 - бизнес-инварианты;
-- security-sensitive paths;
+- security/privacy-sensitive paths;
 - integration boundaries;
-- high-change/high-risk areas.
+- high-change/high-risk areas;
+- какой уровень тестирования даст самый дешёвый надёжный сигнал;
+- какой evidence нужен для утверждения, что риск действительно закрыт.
 
 ## Уровни
 
@@ -27,30 +29,47 @@ description: >
 
 - unit - чистая логика;
 - integration - БД/очереди/границы;
-- API/contract - внешние контракты;
+- API/contract - внешние и внутренние контракты;
 - component/UI - поведение интерфейса;
 - e2e - небольшое число критических сквозных потоков;
-- visual regression - стабильные критические представления, когда визуальный риск существенен;
-- accessibility - автоматические проверки плюс ручная keyboard/focus проверка для важных потоков.
+- visual regression - стабильные критические представления при существенном визуальном риске;
+- accessibility - автоматические проверки плюс keyboard/focus verification для важных потоков.
 
-Не дублируй один и тот же сценарий без причины на каждом уровне.
+Не дублируй один сценарий без причины на каждом уровне.
 
-## Обязательно для риска
+## Routing
 
-Проверяй:
+Подключай профильные skills только по фактическому риску:
+
+- Playwright/Web/TMA -> `$playwright-testing`;
+- доверие к E2E и false-green risk -> `$e2e-review`;
+- pytest/unit/integration design -> `$pytest-test-design`;
+- API contracts/HTTP behavior -> `$api-testing`;
+- SQL/DB persistence/migrations -> `$database-validation`;
+- fixtures/factories/seed/isolation -> `$test-data-management`;
+- Pydantic/schema validation -> `$pydantic-contracts`;
+- Allure evidence/report structure -> `$allure-reporting`;
+- конкретное падение/CI failure -> `$failure-triage`;
+- intermittent/flaky behavior -> `$flaky-analysis`;
+- пробелы risk/behavior coverage -> `$coverage-analysis`.
+
+Обычно достаточно base skill + 1-2 профильных skills.
+
+## Обязательные риски
+
+Проверяй по применимости:
 
 - validation boundaries;
 - auth/authz;
 - negative/error paths;
 - retries/idempotency;
-- concurrency/races, если возможны;
+- concurrency/races;
 - timezone/date boundaries;
 - empty/null/large inputs;
 - external dependency failures;
-- migrations;
-- backward compatibility;
-- критические usability states: loading/error/empty/recovery;
-- privacy-sensitive flows: export/deletion/telemetry leakage, если применимо.
+- migrations и backward compatibility;
+- loading/error/empty/recovery states;
+- privacy-sensitive export/deletion/telemetry flows.
 
 ## Mobile/TMA continuous gate
 
@@ -67,8 +86,6 @@ description: >
 - Mobile Web и mocked TMA parity;
 - desktop regression.
 
-Feature task должна добавить или расширить релевантный continuous smoke. Не создавать второй TMA fixture layer.
-
 Разделяй evidence:
 
 1. automated Mobile Web;
@@ -77,19 +94,21 @@ Feature task должна добавить или расширить релев�
 4. real Telegram iOS;
 5. непроверенные среды.
 
-Не использовать skipped tests как способ закрыть platform gap и не писать `проверено на мобильных`, если был только desktop browser с узким viewport.
+Не выдавай narrow desktop viewport за real-device verification.
 
-## Надёжность тестов
+## Test trust
 
-Избегай sleeps и flaky selectors.
-Используй явные ожидания.
-Тестовые данные должны быть детерминированы и очищаться/изолироваться.
+Количество зелёных тестов не является самостоятельным доказательством качества.
 
-После исправления дефекта добавляй regression test там, где он реально предотвращает повторение.
+Для критических новых или существенно изменённых E2E сценариев проверь:
 
-Для web UI, если проект не задаёт иной accessibility target, используй WCAG 2.2 AA как baseline для применимых критериев, но не считай автоматический accessibility scanner достаточной проверкой.
+- соответствует ли assertion заявленному intent;
+- может ли тест пройти при сломанной feature;
+- доказан ли side effect/persistence, если это часть обещания;
+- не маскируют ли retry/skip/conditional branch проблему;
+- не проверяется ли только optimistic UI вместо реального результата.
+
 ## Адаптация к проекту
 
-Перед запуском тестов найди существующие test scripts, wrappers, CI quality gates и каталоги для
-артефактов. Используй их вместо выдуманных команд. Приоритет покрытия определяй по риску
-конкретного продукта и изменяемой подсистемы.
+Перед запуском найди существующие scripts, wrappers, configs, CI quality gates и artifact directories.
+Используй их вместо выдуманных команд.

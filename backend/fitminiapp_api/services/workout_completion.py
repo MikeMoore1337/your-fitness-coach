@@ -13,7 +13,10 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import User
-from fitminiapp_api.services.workouts import counts_toward_working_volume, working_volume_set_filter
+from fitminiapp_api.services.workouts import (
+    is_pr_record_set,
+    pr_record_set_filter,
+)
 
 
 def _exercise_result(exercise: UserWorkoutExercise, title: str, metric_type: str) -> dict:
@@ -131,7 +134,7 @@ def _personal_records(
                     or_(Exercise.metric_type.is_(None), Exercise.metric_type == "strength"),
                 ),
             ),
-            working_volume_set_filter(),
+            pr_record_set_filter(),
         )
         .group_by(UserWorkoutExercise.exercise_id)
         .all()
@@ -148,7 +151,7 @@ def _personal_records(
         working_sets = [
             workout_set
             for workout_set in exercise.sets
-            if workout_set.is_completed and counts_toward_working_volume(workout_set)
+            if workout_set.is_completed and is_pr_record_set(workout_set)
         ]
         loads = [
             float(workout_set.actual_weight)

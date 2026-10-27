@@ -1,7 +1,10 @@
+import json
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -24,8 +27,44 @@ def normalize_food_search_text(name: str, brand: str | None) -> str:
     return normalized.casefold().replace("ё", "е")
 
 
+def normalize_food_catalog_identity(
+    name: str,
+    brand: str | None,
+    nutrition_basis_kind: str,
+    nutrition_basis_amount: Decimal | str | None,
+    nutrition_basis_unit: str,
+) -> str:
+    """Build the exact identity used for community commercial foods.
+
+    The identity deliberately does not use fuzzy matching.  Product names carry
+    variant/flavour/size information and the basis is part of the identity, so a
+    different product is never silently merged with an existing catalog item.
+    """
+
+    normalized_name = " ".join(name.split()).casefold().replace("ё", "е")
+    normalized_brand = " ".join((brand or "").split()).casefold().replace("ё", "е")
+    amount = Decimal(str(nutrition_basis_amount or "0")).normalize()
+    return json.dumps(
+        (
+            normalized_brand,
+            normalized_name,
+            nutrition_basis_kind,
+            format(amount, "f"),
+            nutrition_basis_unit,
+        ),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+
 class Food(Base):
     __tablename__ = "foods"
+
+    if TYPE_CHECKING:
+        # Response-only state attached by the food write service and never persisted.
+        _catalog_contribution_state: str
+        _catalog_contribution_outcome: str
+
     __table_args__ = (
         CheckConstraint("length(trim(name)) > 0", name="ck_foods_name_not_blank"),
         CheckConstraint(
@@ -33,7 +72,7 @@ class Food(Base):
             name="ck_foods_food_type",
         ),
         CheckConstraint(
-            "provenance IN ('internal', 'external', 'user')",
+            "provenance IN ('internal', 'external', 'user', 'user_confirmed_package')",
             name="ck_foods_provenance",
         ),
         CheckConstraint(
@@ -71,7 +110,7 @@ class Food(Base):
             "AND standard_serving_weight_g IS NULL OR "
             "standard_serving_amount > 0 AND "
             "standard_serving_unit IN ('g', 'ml', 'piece', 'serving') AND "
-            "standard_serving_weight_g > 0",
+            "(standard_serving_unit IN ('ml', 'serving') OR standard_serving_weight_g > 0)",
             name="ck_foods_standard_serving_complete",
         ),
         CheckConstraint(
@@ -102,15 +141,38 @@ class Food(Base):
         CheckConstraint(
             "status <> 'active' OR (energy_kcal_per_100g IS NOT NULL "
             "AND protein_g_per_100g IS NOT NULL AND fat_g_per_100g IS NOT NULL "
-            "AND carbs_g_per_100g IS NOT NULL)",
+            "AND carbs_g_per_100g IS NOT NULL) OR canonical_complete = true",
             name="ck_foods_active_nutrients",
         ),
         CheckConstraint(
-            "food_type = 'user' OR status <> 'active' OR trust_level = 'verified'",
+            "food_type = 'user' OR status <> 'active' OR trust_level = 'verified' "
+            "OR catalog_quality = 'community_unverified'",
             name="ck_foods_active_catalog_trust",
+        ),
+        CheckConstraint(
+            "catalog_quality IN ('private', 'verified', 'community_unverified')",
+            name="ck_foods_catalog_quality",
+        ),
+        CheckConstraint(
+            "nutrition_basis_kind IN ('per_100_g', 'per_100_ml', 'per_serving')",
+            name="ck_foods_nutrition_basis_kind",
+        ),
+        CheckConstraint(
+            "nutrition_basis_unit IN ('g', 'ml', 'serving')",
+            name="ck_foods_nutrition_basis_unit",
+        ),
+        CheckConstraint(
+            "(nutrition_basis_kind = 'per_100_g' AND nutrition_basis_unit = 'g' "
+            "AND nutrition_basis_amount = 100) OR "
+            "(nutrition_basis_kind = 'per_100_ml' AND nutrition_basis_unit = 'ml' "
+            "AND nutrition_basis_amount = 100) OR "
+            "(nutrition_basis_kind = 'per_serving' AND nutrition_basis_unit = 'serving' "
+            "AND nutrition_basis_amount = 1)",
+            name="ck_foods_nutrition_basis_shape",
         ),
         Index("ix_foods_owner_status", "owner_user_id", "status"),
         Index("ix_foods_status_type_name", "status", "food_type", "name"),
+        Index("ix_foods_catalog_identity", "catalog_identity"),
         Index(
             "ix_foods_search_text_trgm",
             "search_text",
@@ -140,6 +202,19 @@ class Food(Base):
             postgresql_where=text("provenance = 'external'"),
             sqlite_where=text("provenance = 'external'"),
         ),
+        Index(
+            "uq_foods_community_catalog_identity",
+            "catalog_identity",
+            unique=True,
+            postgresql_where=text(
+                "catalog_identity IS NOT NULL AND food_type = 'branded' "
+                "AND source_name = 'yfc_community'"
+            ),
+            sqlite_where=text(
+                "catalog_identity IS NOT NULL AND food_type = 'branded' "
+                "AND source_name = 'yfc_community'"
+            ),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -147,12 +222,34 @@ class Food(Base):
     brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
     barcode: Mapped[str | None] = mapped_column(String(14), nullable=True)
     search_text: Mapped[str] = mapped_column(String(1024), nullable=False, default="")
+    catalog_identity: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     energy_kcal_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     protein_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
     fat_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
     carbs_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
     fiber_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
+
+    # The legacy columns above remain the read-compatible 100 g projection.  The
+    # canonical JSON keeps source/normalized/derived values and makes 100 ml and
+    # serving-only labels first-class without pretending they are per-100-g facts.
+    nutrition_basis_kind: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, default="per_100_g", server_default="per_100_g"
+    )
+    nutrition_basis_amount: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 3), nullable=True, default=Decimal("100"), server_default="100"
+    )
+    nutrition_basis_unit: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, default="g", server_default="g"
+    )
+    canonical_facts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    nutrition_provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    canonical_complete: Mapped[bool | None] = mapped_column(
+        nullable=True, default=True, server_default="true"
+    )
+    catalog_quality: Mapped[str | None] = mapped_column(
+        String(24), nullable=True, default="verified", server_default="verified"
+    )
 
     standard_serving_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
     standard_serving_unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -162,7 +259,13 @@ class Food(Base):
     owner_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True
     )
-    provenance: Mapped[str] = mapped_column(String(16), nullable=False)
+    # The applied food schema keeps the historical 16-character provenance column. The
+    # additive canonical_provenance column carries the expanded API/domain values; the
+    # legacy column is retained for old constraints and indexes during the online rollout.
+    provenance: Mapped[str | None] = mapped_column(
+        "canonical_provenance", String(32), nullable=True
+    )
+    legacy_provenance: Mapped[str] = mapped_column("provenance", String(16), nullable=False)
     source_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_license: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -215,3 +318,21 @@ class FoodFavorite(Base):
 @event.listens_for(Food, "before_update")
 def _set_food_search_text(_mapper: object, _connection: object, target: Food) -> None:
     target.search_text = normalize_food_search_text(target.name, target.brand)
+    if (
+        target.food_type == "branded"
+        and target.source_name == "yfc_community"
+        and target.catalog_identity is None
+    ):
+        target.catalog_identity = normalize_food_catalog_identity(
+            target.name,
+            target.brand,
+            target.nutrition_basis_kind or "per_100_g",
+            target.nutrition_basis_amount or Decimal("100"),
+            target.nutrition_basis_unit or "g",
+        )
+    if target.provenance is None:
+        target.legacy_provenance = target.legacy_provenance or "internal"
+    elif target.provenance == "user_confirmed_package":
+        target.legacy_provenance = "internal"
+    else:
+        target.legacy_provenance = target.provenance

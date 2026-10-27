@@ -1,0 +1,1862 @@
+{
+  "commit": "5c8f4743a1afe6559a7db4e8797a96ef9d44053b",
+  "input": "Real Chromium/WebKit events, production frontend bundle, deterministic mocked API; no proposal DOM/CSS",
+  "cases": [
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2118,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2082,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2082,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 117,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 254,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 53.734375,
+          "width": 296,
+          "height": 48,
+          "top": 53.734375,
+          "right": 308,
+          "bottom": 101.734375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 296,
+          "height": 110,
+          "top": 0,
+          "right": 308,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-320-dark-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2118,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2082,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2082,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 117,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 254,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 53.734375,
+          "width": 296,
+          "height": 48,
+          "top": 53.734375,
+          "right": 308,
+          "bottom": 101.734375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 296,
+          "height": 110,
+          "top": 0,
+          "right": 308,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-320-light-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2112,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2076,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2076,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 130.328125,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 287.328125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 53.765625,
+          "width": 336,
+          "height": 48,
+          "top": 53.765625,
+          "right": 348,
+          "bottom": 101.765625,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 336,
+          "height": 110,
+          "top": 0,
+          "right": 348,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-360-dark-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2112,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2076,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2076,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 130.328125,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 287.328125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 53.765625,
+          "width": 336,
+          "height": 48,
+          "top": 53.765625,
+          "right": 348,
+          "bottom": 101.765625,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 336,
+          "height": 110,
+          "top": 0,
+          "right": 348,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-360-light-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2041,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2005,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2005,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 141.328125,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 314.828125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.078125,
+          "width": 369,
+          "height": 48,
+          "top": 54.078125,
+          "right": 381,
+          "bottom": 102.078125,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 369,
+          "height": 110,
+          "top": 0,
+          "right": 381,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-393-dark-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2041,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2005,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2005,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 141.328125,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 314.828125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.078125,
+          "width": 369,
+          "height": 48,
+          "top": 54.078125,
+          "right": 381,
+          "bottom": 102.078125,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 369,
+          "height": 110,
+          "top": 0,
+          "right": 381,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-393-light-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2026,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1990,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1990,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 122.65625,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 153.65625,
+            "y": 56,
+            "width": 122.671875,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 345.65625,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.1875,
+          "width": 406,
+          "height": 48,
+          "top": 54.1875,
+          "right": 418,
+          "bottom": 102.1875,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 406,
+          "height": 110,
+          "top": 0,
+          "right": 418,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-430-dark-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2026,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1990,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1990,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 122.65625,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 153.65625,
+            "y": 56,
+            "width": 122.671875,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 345.65625,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.1875,
+          "width": 406,
+          "height": 48,
+          "top": 54.1875,
+          "right": 418,
+          "bottom": 102.1875,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 406,
+          "height": 110,
+          "top": 0,
+          "right": 418,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/chromium-430-light-mobile-actions.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 150.734375,
+        "width": 124,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-320-dark-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 150.734375,
+        "width": 124,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-320-light-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 151.078125,
+        "width": 160.5,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-393-dark-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 151.078125,
+        "width": 160.5,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-393-light-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 768,
+      "theme": "dark",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 14,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-768-dark-desktop-keyboard.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 768,
+      "theme": "light",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 14,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-768-light-desktop-keyboard.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 380,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-1440-dark-desktop-keyboard.json"
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 380,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/chromium-1440-light-desktop-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2117,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2081,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2081,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 117,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 254,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.390625,
+          "width": 296,
+          "height": 48,
+          "top": 54.390625,
+          "right": 308,
+          "bottom": 102.390625,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 296,
+          "height": 110,
+          "top": 0,
+          "right": 308,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-320-dark-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2117,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2081,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2081,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 117,
+            "y": 56,
+            "width": 86,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 254,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.390625,
+          "width": 296,
+          "height": 48,
+          "top": 54.390625,
+          "right": 308,
+          "bottom": 102.390625,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 296,
+          "height": 110,
+          "top": 0,
+          "right": 308,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-320-light-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2111,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2075,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2075,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 130.328125,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 287.3203125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.484375,
+          "width": 336,
+          "height": 48,
+          "top": 54.484375,
+          "right": 348,
+          "bottom": 102.484375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 336,
+          "height": 110,
+          "top": 0,
+          "right": 348,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-360-dark-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2111,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2075,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2075,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 130.328125,
+            "y": 56,
+            "width": 99.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 287.3203125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.484375,
+          "width": 336,
+          "height": 48,
+          "top": 54.484375,
+          "right": 348,
+          "bottom": 102.484375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 336,
+          "height": 110,
+          "top": 0,
+          "right": 348,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-360-light-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2041,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2004,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2004,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 141.328125,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 314.8203125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.84375,
+          "width": 369,
+          "height": 48,
+          "top": 54.84375,
+          "right": 381,
+          "bottom": 102.84375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 369,
+          "height": 110,
+          "top": 0,
+          "right": 381,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-393-dark-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2041,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2004,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2004,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 141.328125,
+            "y": 56,
+            "width": 110.328125,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 314.8203125,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.84375,
+          "width": 369,
+          "height": 48,
+          "top": 54.84375,
+          "right": 381,
+          "bottom": 102.84375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 369,
+          "height": 110,
+          "top": 0,
+          "right": 381,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-393-light-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2026,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1989,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1989,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(28, 33, 33, 0.95)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 122.65625,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 153.65625,
+            "y": 56,
+            "width": 122.671875,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 345.6640625,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.984375,
+          "width": 406,
+          "height": 48,
+          "top": 54.984375,
+          "right": 418,
+          "bottom": 102.984375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 406,
+          "height": 110,
+          "top": 0,
+          "right": 418,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-430-dark-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "scene": "mobile-actions",
+      "before": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 2026,
+        "overflow": false
+      },
+      "beforeSkip": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1989,
+        "overflow": false
+      },
+      "after": {
+        "active": "202",
+        "weight": "42.5",
+        "reps": "9",
+        "rir": "2",
+        "previousCompleted": "true",
+        "focus": "Повторы, Жим штанги лёжа, подход 2",
+        "scrollY": 1989,
+        "overflow": false
+      },
+      "material": {
+        "background": "rgba(248, 250, 250, 0.96)",
+        "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+        "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        "pointerEvents": "auto",
+        "position": "sticky",
+        "top": "0px"
+      },
+      "targets": [
+        {
+          "action": 30,
+          "box": {
+            "x": 23,
+            "y": 56,
+            "width": 122.65625,
+            "height": 44
+          }
+        },
+        {
+          "action": 60,
+          "box": {
+            "x": 153.65625,
+            "y": 56,
+            "width": 122.671875,
+            "height": 44
+          }
+        }
+      ],
+      "point": {
+        "x": 345.6640625,
+        "y": 78,
+        "previous": {
+          "x": 12,
+          "y": 54.984375,
+          "width": 406,
+          "height": 48,
+          "top": 54.984375,
+          "right": 418,
+          "bottom": 102.984375,
+          "left": 12
+        },
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "width": 406,
+          "height": 110,
+          "top": 0,
+          "right": 418,
+          "bottom": 110,
+          "left": 12
+        }
+      },
+      "writes": [],
+      "errors": [],
+      "status": "PASS",
+      "native_event_count": 30,
+      "trace": "native-actions/webkit-430-light-mobile-actions.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 151.390625,
+        "width": 124,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-320-dark-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 296,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 151.390625,
+        "width": 124,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-320-light-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 150.84375,
+        "width": 160.5,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-393-dark-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "scene": "tma-safe-short-keyboard",
+      "safe": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "timerBox": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 110
+      },
+      "fieldBox": {
+        "x": 31,
+        "y": 150.84375,
+        "width": 160.5,
+        "height": 80
+      },
+      "writes": [],
+      "status": "PASS",
+      "physicalKeyboard": false,
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-393-light-tma-safe-short-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 768,
+      "theme": "dark",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 14,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-768-dark-desktop-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 768,
+      "theme": "light",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 14,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-768-light-desktop-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 380,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-1440-dark-desktop-keyboard.json"
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "scene": "desktop-keyboard",
+      "box": {
+        "x": 380,
+        "y": 0,
+        "width": 680,
+        "height": 64
+      },
+      "outline": "2px",
+      "writes": [],
+      "status": "PASS",
+      "native_event_count": 0,
+      "trace": "native-actions/webkit-1440-light-desktop-keyboard.json"
+    }
+  ]
+}

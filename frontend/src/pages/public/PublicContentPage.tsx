@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ExerciseGuideMedia } from '../../features/exercises/ExerciseGuideMedia';
 import {
   categoryForSlug,
   getPublicContentPage,
@@ -9,20 +10,31 @@ import {
   type PublicContentPage as PublicContentPageData,
 } from '../../content/publicContent';
 import { api } from '../../shared/api/client';
-import type { PublicExerciseDetail, PublicExerciseSummary } from '../../shared/api/types';
-import { appUrlForHostname } from '../../shared/navigation/appUrl';
+import type {
+  PublicExerciseDetail,
+  PublicExerciseSummary,
+  PublicProgram,
+} from '../../shared/api/types';
+import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
+import { trainerIntentLoginUrl } from '../../shared/auth/trainerIntent';
 import { AppLink, Redirect, useNavigation } from '../../shared/navigation/router';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
 import { Icon } from '../../shared/ui/Icon';
 import { useWebTheme } from '../../shared/useWebTheme';
 import { applyRouteMetadata } from '../../shared/seo/metadata';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import PublicBmiCalculator from './PublicBmiCalculator';
+import PublicNutritionCalculator from './PublicNutritionCalculator';
+import PublicOneRepMaxCalculator from './PublicOneRepMaxCalculator';
 import '../../shared/ui/public-shell.css';
 import '../landing/landing.css';
 import './public-content.css';
 import NotFoundPage from '../NotFoundPage';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 
-function PublicHeader({ theme }: { theme: 'light' | 'dark' }) {
+export function PublicHeader({ theme }: { theme: 'light' | 'dark' }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
@@ -64,6 +76,9 @@ function PublicHeader({ theme }: { theme: 'light' | 'dark' }) {
         </AppLink>
         <AppLink to="/knowledge" onClick={closeMenu}>
           База знаний
+        </AppLink>
+        <AppLink to="/articles" onClick={closeMenu}>
+          Статьи
         </AppLink>
         <AppLink to="/exercises" onClick={closeMenu}>
           Упражнения
@@ -176,6 +191,11 @@ function GuideContents({ page }: { page: PublicContentPageData }) {
             <a href={`#${sectionId(page, index)}`}>{section.heading}</a>
           </li>
         ))}
+        {page.interactive === 'bmi-calculator' && (
+          <li>
+            <a href="#public-bmi-calculator">Калькулятор ИМТ</a>
+          </li>
+        )}
         {page.sources && page.sources.length > 0 && (
           <li>
             <a href="#public-sources-title">Источники</a>
@@ -183,6 +203,28 @@ function GuideContents({ page }: { page: PublicContentPageData }) {
         )}
       </ol>
     </nav>
+  );
+}
+
+function PublicWorkflow({ page }: { page: PublicContentPageData }) {
+  if (!page.workflow) return null;
+  return (
+    <section className="public-workflow" aria-labelledby="public-workflow-title">
+      <div className="public-workflow__heading">
+        <p className="landing-kicker">Рабочий путь</p>
+        <h2 id="public-workflow-title">{page.workflow.heading}</h2>
+        {page.workflow.intro && <p>{page.workflow.intro}</p>}
+      </div>
+      <ol>
+        {page.workflow.steps.map((step) => (
+          <li key={step.title}>
+            <span className="public-workflow__label">{step.label}</span>
+            <h3>{step.title}</h3>
+            <p>{step.description}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -319,6 +361,14 @@ function PublicExerciseDetails({ page }: { page: PublicContentPageData }) {
             <dd>{exercise.primary_muscle}</dd>
           </div>
           <div>
+            <dt>Дополнительные мышцы</dt>
+            <dd>
+              {exercise.secondary_muscles.length > 0
+                ? exercise.secondary_muscles.join(', ')
+                : 'Не указаны'}
+            </dd>
+          </div>
+          <div>
             <dt>Оборудование</dt>
             <dd>{exercise.equipment}</dd>
           </div>
@@ -327,10 +377,17 @@ function PublicExerciseDetails({ page }: { page: PublicContentPageData }) {
             <dd>{difficultyLabels[exercise.difficulty_level]}</dd>
           </div>
         </dl>
-        {exercise.secondary_muscles.length > 0 && (
-          <p>Дополнительно работают: {exercise.secondary_muscles.join(', ')}.</p>
-        )}
       </section>
+      {exercise.media.length > 0 && (
+        <section className="public-exercise-media" aria-labelledby="public-exercise-media-title">
+          <h2 id="public-exercise-media-title">Положения в движении</h2>
+          <p>
+            Используйте изображения как визуальную подсказку к шагам, а не как замену
+            контролируемому выполнению.
+          </p>
+          <ExerciseGuideMedia items={exercise.media} />
+        </section>
+      )}
       <section>
         <h2>Техника выполнения</h2>
         <ol>
@@ -379,6 +436,120 @@ function PublicExerciseDetails({ page }: { page: PublicContentPageData }) {
   );
 }
 
+const programGoalLabels: Record<PublicProgram['goal'], string> = {
+  fat_loss: 'Снижение веса',
+  recomposition: 'Рекомпозиция',
+  maintenance: 'Поддержание',
+  muscle_gain: 'Набор мышц',
+  strength: 'Сила',
+};
+
+const programLevelLabels: Record<PublicProgram['level'], string> = {
+  beginner: 'Начальный',
+  intermediate: 'Средний',
+  advanced: 'Продвинутый',
+};
+
+const programSplitLabels: Record<PublicProgram['split_type'], string> = {
+  full_body: 'Всё тело',
+  upper_lower: 'Верх / низ',
+  push_pull_legs: 'Толкай / тяни / ноги',
+  body_part: 'По группам мышц',
+  hybrid: 'Гибридная схема',
+};
+
+function formatRest(seconds: number): string {
+  return seconds % 60 === 0 ? `${seconds / 60} мин` : `${seconds} сек`;
+}
+
+function PublicProgramDetails({ page }: { page: PublicContentPageData }) {
+  const slug = page.program?.slug;
+  const details = useQuery({
+    queryKey: ['public', 'programs', slug],
+    queryFn: () => api<PublicProgram>(`/api/v1/public/programs/${slug}`),
+    enabled: Boolean(slug),
+  });
+
+  if (!slug) return null;
+  if (details.isLoading) {
+    return (
+      <section className="public-program" aria-label="Структура публичной программы">
+        <p role="status">Загружаем структуру программы…</p>
+      </section>
+    );
+  }
+  if (details.error || !details.data) {
+    return (
+      <section className="public-program" aria-label="Структура публичной программы">
+        <div role="alert" className="public-inline-error">
+          <p>Структура программы временно недоступна. Попробуйте ещё раз.</p>
+          <button type="button" className="landing-button" onClick={() => void details.refetch()}>
+            Повторить
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const program = details.data;
+  const publishedExercisePaths = new Set(publicExercisePages().map((item) => item.path));
+  return (
+    <section className="public-program" aria-labelledby="public-program-title">
+      <div className="public-section-heading">
+        <p className="landing-kicker">Состав шаблона</p>
+        <h2 id="public-program-title">{program.title}</h2>
+      </div>
+      <dl className="public-program-facts">
+        <div>
+          <dt>Цель</dt>
+          <dd>{programGoalLabels[program.goal]}</dd>
+        </div>
+        <div>
+          <dt>Уровень</dt>
+          <dd>{programLevelLabels[program.level]}</dd>
+        </div>
+        <div>
+          <dt>Схема</dt>
+          <dd>{programSplitLabels[program.split_type]}</dd>
+        </div>
+      </dl>
+      <div className="public-program-days">
+        {program.days.map((day) => (
+          <article className="public-program-day" key={day.day_number}>
+            <header>
+              <p>День {String(day.day_number).padStart(2, '0')}</p>
+              <h3>{day.title}</h3>
+            </header>
+            <ol>
+              {day.exercises.map((exercise) => {
+                const exercisePath = `/exercises/${exercise.slug}`;
+                const name = publishedExercisePaths.has(exercisePath) ? (
+                  <AppLink to={exercisePath}>{exercise.title}</AppLink>
+                ) : (
+                  <strong>{exercise.title}</strong>
+                );
+                return (
+                  <li key={exercise.slug}>
+                    <div className="public-program-exercise__name">{name}</div>
+                    <div className="public-program-exercise__facts">
+                      <span>{exercise.prescribed_sets} подхода</span>
+                      <span>{exercise.prescribed_reps} повторений</span>
+                      <span>Отдых: {formatRest(exercise.rest_seconds)}</span>
+                    </div>
+                    <p>
+                      {exercise.primary_muscle} · {exercise.equipment}
+                    </p>
+                  </li>
+                );
+              })}
+            </ol>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function RelatedContent({ page }: { page: PublicContentPageData }) {
   return (
     <section className="public-related" aria-labelledby="public-related-title">
@@ -387,21 +558,47 @@ function RelatedContent({ page }: { page: PublicContentPageData }) {
         <h2 id="public-related-title">Связанные материалы и возможности</h2>
       </div>
       <div className="public-related-grid">
-        {page.related.map((item) => (
-          <AppLink className="public-related-card" to={item.path} key={item.path}>
-            <strong>{item.label}</strong>
-            {item.description && <span>{item.description}</span>}
-            <small>
-              Открыть <Icon name="arrow-right" size={16} />
-            </small>
-          </AppLink>
-        ))}
+        {page.related.map((item) => {
+          const isTrainerDemo = page.path === '/for-trainers' && item.path.startsWith('/demo?');
+          const href = isTrainerDemo
+            ? demoCabinetUrlForHostname(window.location.hostname, 'trainer', 'trainer')
+            : item.path;
+          const onClick = isTrainerDemo
+            ? () =>
+                trackProductEvent({
+                  name: 'trainer_landing_cta_clicked',
+                  surface: productEventSurface(),
+                  destination: 'demo',
+                })
+            : undefined;
+          const content = (
+            <>
+              <strong>{item.label}</strong>
+              {item.description && <span>{item.description}</span>}
+              <small className="public-card-action">
+                Открыть <Icon name="arrow-right" size={16} />
+              </small>
+            </>
+          );
+          if (href.startsWith('http')) {
+            return (
+              <a className="public-related-card" href={href} key={item.path} onClick={onClick}>
+                {content}
+              </a>
+            );
+          }
+          return (
+            <AppLink className="public-related-card" to={href} key={item.path} onClick={onClick}>
+              {content}
+            </AppLink>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function PublicFooter({ theme }: { theme: 'light' | 'dark' }) {
+export function PublicFooter({ theme }: { theme: 'light' | 'dark' }) {
   return (
     <footer className="landing-footer public-footer">
       <AppLink className="landing-brand" to="/" aria-label="Your Fitness Coach — на главную">
@@ -415,6 +612,7 @@ function PublicFooter({ theme }: { theme: 'light' | 'dark' }) {
         <AppLink to="/training">Тренировки</AppLink>
         <AppLink to="/nutrition">Питание</AppLink>
         <AppLink to="/knowledge">База знаний</AppLink>
+        <AppLink to="/articles">Статьи</AppLink>
         <AppLink to="/exercises">Упражнения</AppLink>
         <AppLink to="/for-trainers">Тренерам</AppLink>
       </nav>
@@ -433,6 +631,14 @@ export default function PublicContentPage() {
   }, [page, path]);
 
   useEffect(() => {
+    if (page?.path !== '/for-trainers') return;
+    trackProductEvent(
+      { name: 'trainer_landing_viewed', surface: productEventSurface() },
+      { dedupe: 'session' },
+    );
+  }, [page?.path]);
+
+  useEffect(() => {
     document.body.classList.add('public-shell-mode');
     document.body.classList.toggle('public-shell-dark-mode', theme === 'dark');
     return () => {
@@ -443,7 +649,13 @@ export default function PublicContentPage() {
   if (!page || page.kind === 'landing') return <NotFoundPage />;
   if (window.Telegram?.WebApp?.initData) return <Redirect to="/app" />;
 
-  const appUrl = appUrlForHostname(window.location.hostname);
+  const appUrlBase = appUrlForHostname(window.location.hostname);
+  const appUrl = page.kind === 'program' ? `${appUrlBase}?section=programs` : appUrlBase;
+  const trainerAppUrl = trainerIntentLoginUrl(window.location.hostname);
+  const primaryCtaUrl = page.path === '/for-trainers' ? trainerAppUrl : appUrl;
+  const articleClassName = `public-article public-article--${page.kind}${
+    page.path === '/training' ? ' public-article--training' : ''
+  }`;
 
   return (
     <div
@@ -459,12 +671,36 @@ export default function PublicContentPage() {
       <PublicHeader theme={theme} />
       <main id="public-content" className="public-main" tabIndex={-1}>
         <Breadcrumbs page={page} />
-        <article className={`public-article public-article--${page.kind}`}>
+        <article className={articleClassName}>
           <header className="public-hero">
             <div className="public-hero__copy">
               <p className="landing-kicker">{page.eyebrow}</p>
               <h1>{page.heading}</h1>
               <p className="public-hero__lead">{page.intro}</p>
+              {page.cta?.placement === 'hero-and-footer' && (
+                <div className="public-hero__action">
+                  <a
+                    className="landing-button landing-action"
+                    href={primaryCtaUrl}
+                    onClick={
+                      page.path === '/for-trainers'
+                        ? () =>
+                            trackProductEvent({
+                              name: 'trainer_landing_cta_clicked',
+                              surface: productEventSurface(),
+                              destination: 'onboarding',
+                            })
+                        : undefined
+                    }
+                  >
+                    {page.cta.label}
+                    <span className="landing-action__arrow" aria-hidden="true">
+                      <Icon name="external-link" size={16} />
+                    </span>
+                  </a>
+                  <span>{page.cta.description}</span>
+                </div>
+              )}
               <GuideMetadata page={page} />
             </div>
             <aside className="public-hero__summary" aria-label="Коротко о странице">
@@ -488,7 +724,13 @@ export default function PublicContentPage() {
 
           <GuideContents page={page} />
 
+          <PublicWorkflow page={page} />
+
+          {page.kind === 'program' && <PublicProgramDetails page={page} />}
+
           <div className="public-body">
+            {page.interactive === 'kbju-calculator' && <PublicNutritionCalculator />}
+            {page.interactive === 'one-rm-calculator' && <PublicOneRepMaxCalculator />}
             {page.sections.map((section, index) => (
               <section id={sectionId(page, index)} key={section.heading}>
                 <h2>{section.heading}</h2>
@@ -504,6 +746,7 @@ export default function PublicContentPage() {
                 )}
               </section>
             ))}
+            {page.interactive === 'bmi-calculator' && <PublicBmiCalculator />}
           </div>
 
           {page.kind === 'knowledge-index' && <KnowledgeDirectory />}
@@ -538,7 +781,20 @@ export default function PublicContentPage() {
                 <h2 id="public-cta-title">{page.cta.label}</h2>
                 <p>{page.cta.description}</p>
               </div>
-              <a className="landing-button landing-action" href={appUrl}>
+              <a
+                className="landing-button landing-action"
+                href={primaryCtaUrl}
+                onClick={
+                  page.path === '/for-trainers'
+                    ? () =>
+                        trackProductEvent({
+                          name: 'trainer_landing_cta_clicked',
+                          surface: productEventSurface(),
+                          destination: 'onboarding',
+                        })
+                    : undefined
+                }
+              >
                 {page.cta.label}
                 <span className="landing-action__arrow" aria-hidden="true">
                   <Icon name="external-link" size={16} />

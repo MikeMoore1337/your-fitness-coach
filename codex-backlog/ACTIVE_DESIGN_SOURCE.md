@@ -17,6 +17,26 @@ CURRENT_PILOT_TASK = 75C_COMPLETED_AND_ARCHIVED
 
 Baseline нужен для consistency обычных feature/fix tasks. Он не является вечной эстетической догмой.
 
+## App Experience v3 и approved trainer baseline
+
+App Experience v3 — это production evolution, а не permission на RETHINK. Текущий production YFC
+UI остаётся visual source of truth. Rejected Stage 0 prototype не является design source и не
+должен копироваться в authenticated product.
+
+После owner approval действуют следующие bounded interaction references:
+
+- #387: trainer-first entry, явный workspace switch `Для себя / Клиенты`, trainer context с
+  mobile dock/desktop sidebar и без duplicate global navigation;
+- #388: navigation-first trainer IA — короткий `Сегодня`, `Ещё` hub и focused destinations;
+  mobile primary card CTA full-width, secondary navigation имеет явную affordance, stacked actions
+  используют token-based gap;
+- client `Профиль` / `Прогресс` и trainer #388 — references для interaction intent, не literal
+  templates для копирования.
+
+Durable production rules находятся в `docs/design/YFC_PRODUCT_UI_CONTRACT.md`. Обычные tasks
+работают в EVOLVE; RETHINK требует отдельной owner-approved redesign/exploration task, bounded
+scope и owner selection направления до rollout.
+
 27.08.2026 владелец одобрил результат Rethink-аудита `75A`, выбрал
 `START_RETHINK_EXPLORATION`, затем завершил selection gate `75B` решением
 `SELECT_DIRECTION_PULSE`. Это решение не активирует отдельную новую дизайн-систему и не разрешает
@@ -37,6 +57,39 @@ Pilot использует canonical `TimeSeriesChart`, `AppShell`, production i
 Today/completion surfaces. Новые styles загружаются с authenticated `MiniAppPage`, не входят в
 initial public bundle и не создают новую runtime dependency. Browser/Mobile Web/mocked TMA
 evidence не является real Telegram, physical-device или field-performance подтверждением.
+
+## Согласованная мобильная компоновка #859
+
+10.10.2026 владелец утвердил финальный вариант B «Ритм YFC». Решением от 11.10.2026
+персональная нижняя панель уточнена до единой Liquid Glass поверхности:
+`Сегодня | План | Питание | Прогресс | Добавить`. Первые четыре элемента — ссылки,
+пятый — действие с существующей иконкой `plus` 24px, без постоянного selected state и отдельного круга.
+Уточнение владельца от 11.10.2026: материал нижней панели — плотный матовый Liquid Glass по
+принципу таймера отдыха. Отклонённая чрезмерная прозрачность не используется; хедер лендинга
+остаётся самостоятельным материалом. Геометрия пяти пунктов и капсула `9999px` сохраняются.
+Coach OS и специальные Demo-сценарии сохраняют собственные назначения. Сохраняются пять одинаковых строк быстрого добавления,
+горизонтальная навигация «Прогресса» и компактный мобильный отчёт. Печатный PDF использует
+последовательную структуру A с компактным логотипом и читаемым текстом. Это ограниченное
+развитие текущего интерфейса в рамках #860–#874; бизнес-логика и существующие возможности
+сохраняются. В таблицах, редакторах и длинных формах удобство важнее плотности.
+
+Последнее распоряжение владельца от 11.10.2026 отменяет автоматический выпуск PR #927.
+`OWNER_IMPLEMENTATION_APPROVAL=GRANTED`, `OWNER_VISUAL_APPROVAL=PENDING`,
+`OWNER_RELEASE_APPROVAL=PENDING`: после исправления P1, зелёного CI и публикации реальных
+скриншотов остановиться. Merge, production deploy и production mutations запрещены до нового
+явного разрешения владельца; прежнее conditional approval больше не действует.
+Вопрос времени напоминания в #871 и исходный XLSX в #872
+остаются отдельными owner gates. Production baseline меняется только после разрешённого релиза.
+
+### Единые selected/current states
+
+Решение владельца от 11.10.2026 в PR #927: `DESIGN_RULE=UNIFIED_YFC_SELECTED_STATES`.
+Это обязательная bounded evolution текущей системы, а не новый редизайн страниц.
+Канонический контракт — `docs/design/component-states-v2.1.md#unified-yfc-selected-states`:
+общие `--v2-selected-*`, явный opt-in `data-yfc-choice`, полная/компактная капсула с поверхностью,
+рельефом, внутренней световой гранью и лаймовым акцентом. Семантика выбора независима от
+focus/hover/pressed/disabled и статусов. После успешной доставки #927 контракт входит в production
+baseline; следующие задачи переиспользуют его без повторного решения владельца.
 
 ## Что является устойчивым
 

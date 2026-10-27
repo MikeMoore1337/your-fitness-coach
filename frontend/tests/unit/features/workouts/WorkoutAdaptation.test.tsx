@@ -24,6 +24,17 @@ const workout: Workout = {
       prescribed_reps: '8-10',
       rest_seconds: 90,
       has_guide: true,
+      media_state: 'approved_static',
+      media_thumbnail_url: '/static/exercise-guides/bench-press.jpg',
+      media_thumbnail_sources: [
+        {
+          url: '/static/exercise-guides/bench-press.jpg',
+          mime_type: 'image/jpeg',
+          width: 180,
+          height: 180,
+          byte_size: 1000,
+        },
+      ],
       sets: [{ id: 201, set_number: 1, is_completed: false, version: 1 }],
     },
     {
@@ -64,14 +75,22 @@ const preview = {
   preview_token: 'a'.repeat(64),
 };
 
-function renderAdaptation(safetyOnly = false) {
+function renderAdaptation(
+  safetyOnly = false,
+  options: { workout?: Workout; initialTargetId?: number; entryLabel?: string } = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <WorkoutAdaptation workout={workout} safetyOnly={safetyOnly} />
+        <WorkoutAdaptation
+          entryLabel={options.entryLabel}
+          initialTargetId={options.initialTargetId}
+          safetyOnly={safetyOnly}
+          workout={options.workout ?? workout}
+        />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
@@ -98,6 +117,8 @@ describe('WorkoutAdaptation', () => {
     renderAdaptation();
 
     await openTimePreview(user);
+
+    expect(screen.getByRole('heading', { name: 'Что изменится' })).toHaveFocus();
 
     const comparison = screen.getByRole('list', { name: 'Сравнение тренировки' });
     expect(within(comparison).getByText('32 мин')).toBeInTheDocument();
@@ -172,9 +193,9 @@ describe('WorkoutAdaptation', () => {
   });
 
   it('показывает честный missing-alternative state', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify([]), { status: 200 }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     const user = userEvent.setup();
     renderAdaptation();
 
@@ -186,6 +207,11 @@ describe('WorkoutAdaptation', () => {
     expect(
       await screen.findByText(/Для выбранного оборудования нет проверенной замены/),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Показать изменения' }));
+    const error = screen.getByRole('alert');
+    expect(error).toHaveTextContent('Для выбранного оборудования нет проверенной замены.');
+    expect(error).toHaveFocus();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/adaptations/'))).toBe(false);
   });
 
   it('во время тренировки оставляет только controlled safety boundary', async () => {
@@ -211,5 +237,211 @@ describe('WorkoutAdaptation', () => {
     await user.click(screen.getByRole('button', { name: 'Показать рекомендации' }));
     expect(await screen.findByText('Безопасность прежде всего')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Применить' })).not.toBeInTheDocument();
+  });
+
+  it('показывает замену для незапущенного упражнения в активной тренировке', async () => {
+    const activeWorkout: Workout = {
+      ...workout,
+      status: 'in_progress',
+      started_at: '2030-01-10T10:00:00',
+      exercises: workout.exercises.map((exercise) => ({
+        ...exercise,
+        sets: exercise.sets.map((set) => ({
+          ...set,
+          actual_reps: null,
+          actual_weight: null,
+          duration_minutes: null,
+          distance_km: null,
+          average_heart_rate_bpm: null,
+          heart_rate_zone: null,
+          rir: null,
+          reached_failure: null,
+          is_completed: false,
+        })),
+      })),
+    };
+    const activePreview = {
+      ...preview,
+      reason: 'replace_exercise',
+      changes: [
+        {
+          kind: 'replaced',
+          workout_exercise_id: 101,
+          from_exercise_id: 11,
+          from_title: 'Жим штанги лежа',
+          to_exercise_id: 13,
+          to_title: 'Жим гантелей лежа',
+          transfer: 'compatible_with_load_reset',
+          load_reset_required: true,
+        },
+      ],
+      adapted_exercises: [],
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.includes('/alternatives?')) {
+        return new Response(
+          JSON.stringify([
+            {
+              exercise_id: 13,
+              title: 'Жим гантелей лежа',
+              equipment_ids: ['dumbbell', 'bench'],
+              score: 100,
+              reason_keys: ['curated_pair'],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      if (path.endsWith('/adaptations/preview')) {
+        return new Response(JSON.stringify(activePreview), { status: 200 });
+      }
+      if (path.endsWith('/adaptations/apply')) {
+        return new Response(
+          JSON.stringify({
+            adaptation_id: 9,
+            applied_at: '2030-01-10T10:00:00',
+            workout: activeWorkout,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    const user = userEvent.setup();
+    renderAdaptation(false, {
+      workout: activeWorkout,
+      initialTargetId: 101,
+      entryLabel: 'Заменить только в этой тренировке',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Заменить только в этой тренировке' }));
+    expect(
+      screen.getByRole('heading', { name: 'Заменить только в этой тренировке' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'Гантели' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Скамья' }));
+    await user.click(await screen.findByRole('radio', { name: /Жим гантелей лежа/ }));
+    await user.click(screen.getByRole('button', { name: 'Показать изменения' }));
+    expect(await screen.findByRole('heading', { name: 'Что изменится' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Применить только сегодня' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/adaptations/apply'),
+        expect.anything(),
+      ),
+    );
+  });
+
+  it('показывает каталоговые изображения и фильтрует только полный ответ сервера', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input).includes('/alternatives?')) {
+        return new Response(
+          JSON.stringify([
+            {
+              exercise_id: 13,
+              title: 'Жим гантелей лежа',
+              equipment_ids: ['dumbbell', 'bench'],
+              media_thumbnail_url: '/static/exercise-guides/dumbbell-bench-press.jpg',
+              media_thumbnail_sources: [],
+            },
+            {
+              exercise_id: 14,
+              title: 'Жим в тренажере от груди',
+              equipment_ids: ['machine'],
+              media_thumbnail_url: null,
+              media_thumbnail_sources: [],
+            },
+            {
+              exercise_id: 15,
+              title: 'Отжимания от пола',
+              equipment_ids: ['bodyweight'],
+              media_thumbnail_url: '/static/exercise-guides/push-up.jpg',
+              media_thumbnail_sources: [],
+            },
+            {
+              exercise_id: 16,
+              title: 'Жим в тренажере Смита',
+              equipment_ids: ['machine', 'bench'],
+              media_thumbnail_url: '/static/exercise-guides/smith-press.jpg',
+              media_thumbnail_sources: [],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    const user = userEvent.setup();
+    renderAdaptation(false, {
+      initialTargetId: 101,
+      entryLabel: 'Заменить только в этой тренировке',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Заменить только в этой тренировке' }));
+    expect(
+      screen.getByRole('img', { name: 'Жим штанги лежа: изображение упражнения' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'Гантели' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Скамья' }));
+    expect(await screen.findByRole('radio', { name: /Жим гантелей лежа/ })).toBeChecked();
+    expect(screen.getByText('Нет фото')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Все подходящие' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Все подходящие' }));
+    const search = screen.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+    await user.type(search, 'Смита');
+    expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeInTheDocument();
+    await user.clear(search);
+    await user.click(screen.getByRole('button', { name: 'Тренажёры' }));
+    expect(screen.getByRole('radio', { name: /Жим в тренажере от груди/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeInTheDocument();
+  });
+
+  it('не предлагает замену для уже начатого target', () => {
+    const startedWorkout: Workout = {
+      ...workout,
+      status: 'in_progress',
+      exercises: workout.exercises.map((exercise, index) =>
+        index === 0
+          ? {
+              ...exercise,
+              sets: [{ ...exercise.sets[0]!, actual_reps: 1 }],
+            }
+          : exercise,
+      ),
+    };
+    renderAdaptation(false, {
+      workout: startedWorkout,
+      initialTargetId: 101,
+      entryLabel: 'Заменить только в этой тренировке',
+    });
+
+    expect(
+      screen.getByText('Замена недоступна: в этом упражнении уже есть фактические данные.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Заменить только в этой тренировке' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('отключает server-confirmed replacement offline', () => {
+    const originalOnline = navigator.onLine;
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    try {
+      renderAdaptation(false, {
+        workout: { ...workout, status: 'in_progress' },
+        initialTargetId: 101,
+        entryLabel: 'Заменить только в этой тренировке',
+      });
+      expect(
+        screen.getByRole('button', { name: 'Заменить только в этой тренировке' }),
+      ).toBeDisabled();
+      expect(screen.getByText(/Замена требует подключения к интернету/)).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: originalOnline });
+    }
   });
 });

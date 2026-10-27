@@ -20,18 +20,20 @@ import type { PublicConfig, User } from '../shared/api/types';
 import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../shared/sync';
 import type { TelegramWebApp } from '../shared/telegram/types';
 import { useQueryClient } from '@tanstack/react-query';
-import { loadCurrentActiveWorkoutSnapshot } from '../features/workouts/activeWorkoutQueue';
 import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   clearSensitiveUserScopedStorage,
 } from '../shared/userScopedStorage';
-import { trackProductLoginCompletedIfStarted } from '../shared/analytics/productEvents';
+import { syncFirstTouchAttribution } from '../shared/analytics/attribution';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../shared/telegram/layout';
+import { revokeWebPushSubscription } from '../shared/notifications/webPush';
 
-function offlineWorkoutUser(): User | null {
+async function offlineWorkoutUser(): Promise<User | null> {
   if (!getAccessToken()) return null;
   const userId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
   if (!Number.isInteger(userId) || userId <= 0) return null;
+  const { loadCurrentActiveWorkoutSnapshot } =
+    await import('../features/workouts/activeWorkoutQueue');
   if (!loadCurrentActiveWorkoutSnapshot(userId)) return null;
   return {
     id: userId,
@@ -40,13 +42,14 @@ function offlineWorkoutUser(): User | null {
     is_root: false,
     has_active_program: true,
     has_workout_history: false,
+    has_food_history: false,
     onboarding: { status: 'complete', required_fields: [], missing_fields: [] },
     profile: null,
     trainer: null,
   };
 }
 
-interface DevLoginInput {
+export interface DevLoginInput {
   telegram_user_id: number;
   username?: string;
   full_name?: string;
@@ -59,7 +62,7 @@ interface EmailRegistrationResult {
   verification_token?: string | null;
 }
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: User | null;
   config: PublicConfig | null;
   loading: boolean;
@@ -82,6 +85,16 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthContextProvider({
+  children,
+  value,
+}: {
+  children: React.ReactNode;
+  value: AuthContextValue;
+}) {
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -114,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return current;
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 0) {
-        const cached = offlineWorkoutUser();
+        const cached = await offlineWorkoutUser();
         if (cached) {
           userIdRef.current = cached.id;
           setUser(cached);
@@ -150,7 +163,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const userId = user?.id;
   useEffect(() => {
-    if (userId) trackProductLoginCompletedIfStarted();
+    if (!userId) return;
+    void import('../shared/analytics/productEvents').then(
+      ({ trackProductLoginCompletedIfStarted }) => {
+        trackProductLoginCompletedIfStarted();
+      },
+    );
+    void syncFirstTouchAttribution(userId);
   }, [userId]);
 
   useEffect(() => {
@@ -177,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (telegram: TelegramWebApp | null = window.Telegram?.WebApp ?? null) => {
       const initData = telegram?.initData?.trim();
       if (!initData) throw new Error('Telegram не передал данные авторизации');
+      await revokeWebPushSubscription().catch(() => undefined);
       const token = await api<{ access_token: string }>('/api/v1/auth/telegram/init', {
         method: 'POST',
         body: { init_data: initData },
@@ -194,6 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const devLogin = useCallback(
     async (input: DevLoginInput) => {
+      await revokeWebPushSubscription().catch(() => undefined);
       const token = await api<{ access_token: string }>('/api/v1/auth/dev-login', {
         method: 'POST',
         body: input,
@@ -211,6 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const acceptToken = useCallback(
     async (token: { access_token: string }) => {
+      await revokeWebPushSubscription().catch(() => undefined);
       clearCurrentUserData();
       setUser(null);
       setError(null);
@@ -272,6 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const revoke = revokeWebPushSubscription().catch(() => undefined);
     const serverLogout = api('/api/v1/auth/logout', {
       method: 'POST',
       body: {},
@@ -282,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearAccessToken();
     setUser(null);
     queryClient.clear();
-    await serverLogout;
+    await Promise.all([serverLogout, revoke]);
   }, [clearCurrentUserData, queryClient]);
 
   useEffect(() => {
@@ -307,6 +330,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const tg = window.Telegram?.WebApp;
         if (tg?.initData?.trim()) {
+          await revokeWebPushSubscription().catch(() => undefined);
           clearCurrentUserData();
           clearAccessToken();
           setUser(null);
@@ -337,7 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (reason) {
         if (!cancelled) {
           const cached =
-            reason instanceof ApiError && reason.status === 0 ? offlineWorkoutUser() : null;
+            reason instanceof ApiError && reason.status === 0 ? await offlineWorkoutUser() : null;
           if (cached) {
             setUser(cached);
             setError(null);
@@ -388,7 +412,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
     ],
   );
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContextProvider value={value}>{children}</AuthContextProvider>;
 }
 
 export function useAuth(): AuthContextValue {

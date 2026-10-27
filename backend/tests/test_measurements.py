@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from threading import Barrier, Event
 
 import pytest
@@ -8,7 +8,13 @@ from fitminiapp_api.core import timezone as timezone_module
 from fitminiapp_api.core.timezone import today_for_user
 from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
 from fitminiapp_api.models.nutrition import NutritionTarget
-from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User
+from fitminiapp_api.models.user import (
+    BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
+    CoachClient,
+    User,
+)
 from fitminiapp_api.services.measurements import _upsert_measurement
 
 
@@ -184,6 +190,183 @@ def test_measurement_chronology_reconciles_current_state_and_preserves_future_hi
         targets = db.query(NutritionTarget).filter(NutritionTarget.user_id == owner_id).all()
         assert len(targets) == 4
         assert sum(target.effective_to is None for target in targets) == 1
+
+
+def test_custom_measurements_are_owner_scoped_factual_and_archivable(client) -> None:
+    owner_headers = _auth(client, 46_230, is_coach=False)
+    other_headers = _auth(client, 46_231, is_coach=False)
+    today = date.today()
+
+    blank = client.post(
+        "/api/v1/workouts/diary",
+        json={"measured_on": today.isoformat(), "note": "только текст"},
+        headers=owner_headers,
+    )
+    assert blank.status_code == 400
+    assert "числовой" in blank.json()["detail"]
+
+    created_definition = client.post(
+        "/api/v1/workouts/diary/custom-definitions",
+        json={"label": "  Живот  "},
+        headers=owner_headers,
+    )
+    assert created_definition.status_code == 201
+    definition = created_definition.json()
+    assert definition["label"] == "Живот"
+    assert definition["unit"] == "cm"
+    assert definition["archived"] is False
+
+    duplicate_definition = client.post(
+        "/api/v1/workouts/diary/custom-definitions",
+        json={"label": " живот "},
+        headers=owner_headers,
+    )
+    blank_definition = client.post(
+        "/api/v1/workouts/diary/custom-definitions",
+        json={"label": "   "},
+        headers=owner_headers,
+    )
+    oversized_definition = client.post(
+        "/api/v1/workouts/diary/custom-definitions",
+        json={"label": "x" * 65},
+        headers=owner_headers,
+    )
+    assert duplicate_definition.status_code == 409
+    assert blank_definition.status_code == 422
+    assert oversized_definition.status_code == 422
+    assert (
+        client.get(
+            "/api/v1/workouts/diary/custom-definitions",
+            headers=other_headers,
+        ).json()
+        == []
+    )
+
+    foreign_write = client.post(
+        "/api/v1/workouts/diary",
+        json={
+            "measured_on": today.isoformat(),
+            "custom_values": [{"definition_id": definition["id"], "value": 88}],
+        },
+        headers=other_headers,
+    )
+    assert foreign_write.status_code == 400
+
+    for offset, value in ((14, 88), (7, 87), (0, 86)):
+        saved = client.post(
+            "/api/v1/workouts/diary",
+            json={
+                "measured_on": (today - timedelta(days=offset)).isoformat(),
+                "custom_values": [{"definition_id": definition["id"], "value": value}],
+            },
+            headers=owner_headers,
+        )
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["custom_values"][0]["label"] == "Живот"
+
+    summary = client.get(
+        "/api/v1/workouts/progress/summary?period_days=30",
+        headers=owner_headers,
+    )
+    assert summary.status_code == 200
+    custom_trend = next(
+        trend
+        for trend in summary.json()["body"]["trends"]
+        if trend["definition_id"] == definition["id"]
+    )
+    assert custom_trend["metric"] == f"custom:{definition['id']}"
+    assert custom_trend["label"] == "Живот"
+    assert custom_trend["unit"] == "cm"
+    assert custom_trend["interpretation_status"] == "available"
+    assert custom_trend["change"] == -2.0
+
+    mixed = client.post(
+        "/api/v1/workouts/diary",
+        json={
+            "measured_on": today.isoformat(),
+            "weight_kg": 77,
+            "waist_cm": 82,
+            "custom_values": [{"definition_id": definition["id"], "value": 86}],
+        },
+        headers=owner_headers,
+    )
+    assert mixed.status_code == 200, mixed.text
+    edited_custom_only = client.post(
+        "/api/v1/workouts/diary",
+        json={
+            "measured_on": today.isoformat(),
+            "custom_values": [{"definition_id": definition["id"], "value": 85}],
+        },
+        headers=owner_headers,
+    )
+    assert edited_custom_only.status_code == 200, edited_custom_only.text
+    assert edited_custom_only.json()["weight_kg"] == 77
+    assert edited_custom_only.json()["waist_cm"] == 82
+    assert edited_custom_only.json()["custom_values"][0]["value"] == 85
+
+    renamed = client.patch(
+        f"/api/v1/workouts/diary/custom-definitions/{definition['id']}",
+        json={"label": "Талия нижняя"},
+        headers=owner_headers,
+    )
+    assert renamed.status_code == 200
+    history = client.get("/api/v1/workouts/diary", headers=owner_headers)
+    assert history.status_code == 200
+    assert history.json()[0]["custom_values"][0]["definition_id"] == definition["id"]
+    assert history.json()[0]["custom_values"][0]["label"] == "Талия нижняя"
+
+    archived = client.delete(
+        f"/api/v1/workouts/diary/custom-definitions/{definition['id']}",
+        headers=owner_headers,
+    )
+    assert archived.status_code == 200
+    assert archived.json()["archived"] is True
+    historical_report = client.get(
+        "/api/v1/workouts/progress/report?period=days_30",
+        headers=owner_headers,
+    )
+    assert historical_report.status_code == 200, historical_report.text
+    assert any(
+        trend["label"] == "Талия нижняя"
+        for trend in historical_report.json()["body"]["trends"]
+        if trend["definition_id"] == definition["id"]
+    )
+    blocked_new_value = client.post(
+        "/api/v1/workouts/diary",
+        json={
+            "measured_on": (today - timedelta(days=1)).isoformat(),
+            "custom_values": [{"definition_id": definition["id"], "value": 85}],
+        },
+        headers=owner_headers,
+    )
+    assert blocked_new_value.status_code == 400
+
+    restored = client.post(
+        f"/api/v1/workouts/diary/custom-definitions/{definition['id']}/restore",
+        headers=owner_headers,
+    )
+    assert restored.status_code == 200
+    allowed_after_restore = client.post(
+        "/api/v1/workouts/diary",
+        json={
+            "measured_on": (today - timedelta(days=1)).isoformat(),
+            "custom_values": [{"definition_id": definition["id"], "value": 85}],
+        },
+        headers=owner_headers,
+    )
+    assert allowed_after_restore.status_code == 200
+
+    with get_session_context() as db:
+        assert db.query(BodyMeasurementDefinition).filter_by(id=definition["id"]).one().label == (
+            "Талия нижняя"
+        )
+        assert (
+            db.query(BodyMeasurementCustomValue)
+            .join(BodyMeasurement)
+            .filter(BodyMeasurement.user_id == _user_id(46_230))
+            .count()
+            == 4
+        )
 
 
 @pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL concurrency")

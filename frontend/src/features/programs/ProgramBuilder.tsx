@@ -1,25 +1,27 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../../shared/api/client';
+import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
-import { difficultyLabels, orderExercisesForLevel } from './exerciseOrdering';
+import { DisclosureIcon, Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
+import { orderExercisesForLevel } from './exerciseOrdering';
 import { buildStrengthPreset, resolveStrengthRule, type StrengthSplit } from './strengthPresets';
 import { usePersistentState } from '../../shared/storage';
 import { programDraftStorageKey } from '../../shared/userScopedStorage';
 import { useAuth } from '../../app/AuthProvider';
 import { AppLink } from '../../shared/navigation/router';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
+import { ContextualHelp } from '../../shared/ui/ContextualHelp';
 import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
-import { normalizeExerciseSearchText, rankExercisesForSearch } from '../exercises/exerciseSearch';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
+import { SearchableExercisePicker } from './SearchableExercisePicker';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
 import {
   productEventSurface,
   trackCoreProductEvent,
+  trackGrowthEvent,
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { isPairedWithPrevious, moveItem, removeExercise, toggleSuperset } from './programDraft';
@@ -70,143 +72,6 @@ function scheduleForDays(dayCount: number, startDate: string): number[] {
   return Array.from({ length: dayCount }, (_, index) => (firstWeekday + index) % 7);
 }
 
-function ExercisePicker({
-  exercises,
-  level,
-  value,
-  onChange,
-  onOpenGuide,
-}: {
-  exercises: Exercise[];
-  level: ProgramTemplateCreate['level'];
-  value: number;
-  onChange: (id: number) => void;
-  onOpenGuide: (exercise: Exercise) => void;
-}) {
-  const selected = exercises.find((exercise) => exercise.id === value);
-  const resultsId = useId();
-  const [query, setQuery] = useState(selected?.title ?? '');
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const results = useMemo(() => {
-    const ranked = rankExercisesForSearch(exercises, query);
-    return normalizeExerciseSearchText(query) ? ranked : orderExercisesForLevel(ranked, level);
-  }, [exercises, level, query]);
-
-  const currentActiveIndex = Math.min(activeIndex, Math.max(0, results.length - 1));
-  const chooseExercise = (exercise: Exercise) => {
-    onChange(exercise.id);
-    setQuery(exercise.title);
-    setOpen(false);
-  };
-
-  return (
-    <div
-      className="exercise-picker"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
-      }}
-    >
-      <input
-        type="search"
-        role="combobox"
-        aria-label="Поиск упражнения"
-        aria-expanded={open}
-        aria-controls={resultsId}
-        aria-activedescendant={
-          open && results[currentActiveIndex]
-            ? `${resultsId}-${results[currentActiveIndex].id}`
-            : undefined
-        }
-        autoComplete="off"
-        enterKeyHint="search"
-        value={query}
-        placeholder="Начните вводить название"
-        onFocus={() => setOpen(true)}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setActiveIndex(0);
-          setOpen(true);
-          if (value) onChange(0);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            setOpen(true);
-            setActiveIndex((index) => Math.min(results.length - 1, index + 1));
-          } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            setOpen(true);
-            setActiveIndex((index) => Math.max(0, index - 1));
-          } else if (event.key === 'Enter' && open && results[currentActiveIndex]) {
-            event.preventDefault();
-            chooseExercise(results[currentActiveIndex]);
-          } else if (event.key === 'Escape') {
-            setOpen(false);
-          }
-        }}
-      />
-      {open && (
-        <div className="exercise-picker__results">
-          {results.length ? (
-            <>
-              <div className="exercise-picker__options" id={resultsId} role="listbox">
-                {results.map((exercise) => (
-                  <button
-                    type="button"
-                    role="option"
-                    id={`${resultsId}-${exercise.id}`}
-                    tabIndex={-1}
-                    aria-selected={exercise.id === value}
-                    className="exercise-picker__option"
-                    key={exercise.id}
-                    onClick={() => chooseExercise(exercise)}
-                  >
-                    <span className="exercise-picker__option-copy">
-                      <strong>{exercise.title}</strong>
-                      <span className="exercise-picker__meta">
-                        <small>
-                          {exercise.primary_muscle || 'Все мышцы'} ·{' '}
-                          {exercise.equipment || 'Без оборудования'}
-                        </small>
-                        <span className="badge">{difficultyLabels[exercise.difficulty_level]}</span>
-                        {exercise.is_custom && <span className="badge">Своё</span>}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="exercise-picker__guides" aria-label="Техника упражнений" role="group">
-                {results.map((exercise) => (
-                  <button
-                    type="button"
-                    className="text-button exercise-picker__guide"
-                    aria-label={`${exercise.has_guide ? 'Техника' : 'Подробнее'}: ${exercise.title}`}
-                    key={exercise.id}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      onOpenGuide(exercise);
-                    }}
-                    onClick={(event) => {
-                      if (event.detail === 0) onOpenGuide(exercise);
-                    }}
-                  >
-                    {exercise.has_guide ? 'Техника' : 'Подробнее'}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <span className="exercise-picker__empty" id={resultsId} role="status">
-              Ничего не найдено
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function ProgramBuilder({
   targetTelegramId,
   targetName,
@@ -214,6 +79,7 @@ export function ProgramBuilder({
   saveAsCopy = false,
   defaultOpen = false,
   onSaved,
+  onDirtyChange,
 }: {
   targetTelegramId?: number | null;
   targetName?: string | null;
@@ -221,7 +87,9 @@ export function ProgramBuilder({
   saveAsCopy?: boolean;
   defaultOpen?: boolean;
   onSaved?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const sectionId = useId();
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
   const queryClient = useQueryClient();
@@ -273,23 +141,48 @@ export function ProgramBuilder({
   );
   const [startDate, setStartDate, clearStartDateDraft] = usePersistentState(
     programDraftStorageKey('start', draftScope),
-    defaultStartDate,
+    editingTemplate?.assigned_program_start_date ?? defaultStartDate,
   );
   const [durationWeeks, setDurationWeeks, clearDurationDraft] = usePersistentState<number>(
     programDraftStorageKey('duration', draftScope),
-    SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+    editingTemplate?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
   );
   const [scheduleWeekdays, setScheduleWeekdays, clearScheduleDraft] = usePersistentState<number[]>(
     programDraftStorageKey('weekdays', draftScope),
-    [],
+    editingTemplate?.assigned_program_schedule_weekdays ?? [],
+  );
+  const activeProgramEdit = Boolean(
+    editingTemplate &&
+    !saveAsCopy &&
+    editingTemplate.is_active_for_current_user &&
+    editingTemplate.assigned_program_id != null &&
+    editingTemplate.current_revision_number != null,
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
+  const snapshot = JSON.stringify([
+    title,
+    goal,
+    level,
+    days,
+    defaultRestSeconds,
+    startDate,
+    durationWeeks,
+    scheduleWeekdays,
+  ]);
+  const originalSnapshot = useRef(snapshot);
+  useEffect(() => {
+    onDirtyChange?.(snapshot !== originalSnapshot.current);
+  }, [onDirtyChange, snapshot]);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [creationSuccess, setCreationSuccess] = useState<{ canStartToday: boolean } | null>(null);
   const exercises = useQuery({
     queryKey: ['exercises'],
     queryFn: () => api<Exercise[]>('/api/v1/programs/exercises'),
   });
+  const orderedExercises = useMemo(
+    () => orderExercisesForLevel(exercises.data ?? [], level),
+    [exercises.data, level],
+  );
 
   const effectiveScheduleWeekdays =
     scheduleWeekdays.length === days.length
@@ -311,7 +204,7 @@ export function ProgramBuilder({
 
   const mutation = useMutation({
     mutationFn: ({ replaceActive }: { replaceActive: boolean }) =>
-      api(updateTemplatePath ?? '/api/v1/programs/templates', {
+      api<ProgramTemplate>(updateTemplatePath ?? '/api/v1/programs/templates', {
         method: updateTemplatePath ? 'PATCH' : 'POST',
         body: {
           title,
@@ -324,6 +217,9 @@ export function ProgramBuilder({
           start_date: startDate,
           duration_weeks: durationWeeks,
           schedule_weekdays: scheduleWeekdaysForSave(days.length, effectiveScheduleWeekdays),
+          expected_revision_number: activeProgramEdit
+            ? editingTemplate?.current_revision_number
+            : undefined,
           replace_active: replaceActive,
           days: days.map((day) => ({
             ...day,
@@ -331,8 +227,9 @@ export function ProgramBuilder({
           })),
         } satisfies ProgramTemplateAssignmentCreate,
       }),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       if (!editingTemplate) {
+        trackGrowthEvent('program_added');
         if (targetTelegramId) {
           trackProductEvent({
             name: 'trainer_program_assigned',
@@ -346,13 +243,15 @@ export function ProgramBuilder({
         }
       }
       toast(
-        saveAsCopy
-          ? 'Личная копия программы создана'
-          : editingTemplate
-            ? 'Изменения программы сохранены'
-            : targetTelegramId
-              ? 'Программа создана и назначена'
-              : 'Программа создана',
+        result?.assigned_program_updated
+          ? 'Программа сохранена. Будущие тренировки обновлены'
+          : saveAsCopy
+            ? 'Личная копия программы создана'
+            : editingTemplate
+              ? 'Изменения программы сохранены'
+              : targetTelegramId
+                ? 'Программа создана и назначена'
+                : 'Программа создана',
       );
       if (!editingTemplate && !targetTelegramId) {
         setCreationSuccess({
@@ -376,12 +275,15 @@ export function ProgramBuilder({
       );
       clearDaysDraft([blankDay(1)]);
       clearDefaultRestDraft(SIMPLE_PROGRAM_DEFAULTS.restSeconds);
-      clearStartDateDraft(defaultStartDate);
-      clearDurationDraft(SIMPLE_PROGRAM_DEFAULTS.durationWeeks);
-      clearScheduleDraft([]);
+      clearStartDateDraft(result?.assigned_program_start_date ?? defaultStartDate);
+      clearDurationDraft(
+        result?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+      );
+      clearScheduleDraft(result?.assigned_program_schedule_weekdays ?? []);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['templates'] }),
         queryClient.invalidateQueries({ queryKey: ['workout'] }),
+        queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
         queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
         reloadUser(),
       ]);
@@ -392,7 +294,7 @@ export function ProgramBuilder({
         reason instanceof ApiError &&
         reason.status === 409 &&
         !variables.replaceActive &&
-        reason.message.toLowerCase().includes('confirmation')
+        apiErrorDetailIncludes(reason, 'confirmation')
       ) {
         if (
           await confirm({
@@ -407,9 +309,11 @@ export function ProgramBuilder({
         return;
       }
       toast(
-        reason instanceof ApiError && reason.message.toLowerCase().includes('in progress')
-          ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
-          : (reason as Error).message,
+        reason instanceof ApiError && reason.status === 409
+          ? 'Программа уже изменилась на другом устройстве. Обновите список и повторите сохранение.'
+          : apiErrorDetailIncludes(reason, 'in progress')
+            ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
+            : (reason as Error).message,
         'error',
       );
     },
@@ -448,7 +352,7 @@ export function ProgramBuilder({
       ),
     );
     setTitle(
-      `${{ fullbody: 'Фуллбади', upper_lower: 'Верх/Низ', push_pull_legs: 'Тяни/Толкай/Ноги', split: 'Сплит' }[split]} · ${normalizedDays} дн.`,
+      `${{ fullbody: 'Всё тело', upper_lower: 'Верх/низ', push_pull_legs: 'Толкай/тяни/ноги (PPL)', split: 'Сплит' }[split]} · ${normalizedDays} дн.`,
     );
     if (nextRule.warning) toast(nextRule.warning, 'error');
     else toast('Силовой шаблон загружен');
@@ -505,7 +409,7 @@ export function ProgramBuilder({
               ? 'Первая тренировка уже запланирована на сегодня. Она начнётся только после вашего действия.'
               : 'Откройте «Сегодня» в дату первой тренировки, чтобы начать её.'}
           </p>
-          <div className="program-builder-success__actions">
+          <div className="program-builder-success__actions app-action-group">
             <AppLink className="button-link" to="/app?section=today">
               {creationSuccess.canStartToday ? 'Перейти к тренировке' : 'Открыть «Сегодня»'}
             </AppLink>
@@ -541,10 +445,13 @@ export function ProgramBuilder({
               копия, в которой можно использовать свои упражнения.
             </p>
           )}
-          <section className="program-builder-basics stack" aria-labelledby="program-basics-title">
+          <section
+            className="program-builder-basics stack"
+            aria-labelledby={`${sectionId}-program-basics-title`}
+          >
             <div>
               <span className="eyebrow">Шаг 1</span>
-              <h3 id="program-basics-title">Основа программы</h3>
+              <h3 id={`${sectionId}-program-basics-title`}>Основа программы</h3>
             </div>
             <div className="form-grid">
               <label className="field">
@@ -679,17 +586,18 @@ export function ProgramBuilder({
                         </button>
                       </span>
                     </span>
-                    <ExercisePicker
-                      key={`${exerciseIndex}-${item.exercise_id}`}
-                      exercises={exercises.data ?? []}
-                      level={level}
+                    <SearchableExercisePicker
+                      mobileSheet
+                      exercises={orderedExercises}
                       value={item.exercise_id}
+                      clearValue={0}
                       onOpenGuide={(exercise) =>
                         setGuide({ id: exercise.id, title: exercise.title })
                       }
                       onChange={(exerciseId) => {
+                        const nextExerciseId = typeof exerciseId === 'number' ? exerciseId : 0;
                         const selected = exercises.data?.find(
-                          (exercise) => exercise.id === exerciseId,
+                          (exercise) => exercise.id === nextExerciseId,
                         );
                         updateDay(dayIndex, {
                           ...day,
@@ -698,7 +606,7 @@ export function ProgramBuilder({
                             if (selected?.metric_type === 'cardio') {
                               return {
                                 ...row,
-                                exercise_id: exerciseId,
+                                exercise_id: nextExerciseId,
                                 prescribed_sets: null,
                                 prescribed_reps: null,
                                 prescribed_duration_minutes: row.prescribed_duration_minutes ?? 30,
@@ -708,7 +616,7 @@ export function ProgramBuilder({
                             }
                             return {
                               ...row,
-                              exercise_id: exerciseId,
+                              exercise_id: nextExerciseId,
                               prescribed_sets: row.prescribed_sets ?? 3,
                               prescribed_reps: row.prescribed_reps || '8-12',
                               prescribed_duration_minutes: null,
@@ -814,7 +722,7 @@ export function ProgramBuilder({
                     )}
                   </div>
                   <details className="program-exercise-advanced compact-disclosure">
-                    <summary>
+                    <summary className="yfc-disclosure-summary">
                       <span>
                         <strong>
                           {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
@@ -824,7 +732,7 @@ export function ProgramBuilder({
                         </strong>
                         <small>Необязательные настройки упражнения</small>
                       </span>
-                      <Icon name="plus" size={16} />
+                      <DisclosureIcon />
                     </summary>
                     <div className="program-exercise-advanced__body">
                       <label className="field exercise-notes">
@@ -930,19 +838,19 @@ export function ProgramBuilder({
             </div>
           ))}
           <details className="program-builder-settings compact-disclosure">
-            <summary>
+            <summary className="yfc-disclosure-summary">
               <span>
                 <strong>Настройки программы</strong>
                 <small>Цель, уровень, расписание, шаблон и общий отдых</small>
               </span>
-              <Icon name="plus" size={16} />
+              <DisclosureIcon />
             </summary>
             <div className="program-builder-settings__body stack">
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-profile-title"
+                aria-labelledby={`${sectionId}-program-profile-title`}
               >
-                <h3 id="program-profile-title">Цель и уровень</h3>
+                <h3 id={`${sectionId}-program-profile-title`}>Цель и уровень</h3>
                 <p className="muted">
                   По умолчанию программа подходит для поддержания формы и начального уровня.
                 </p>
@@ -978,16 +886,19 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-schedule-title"
+                aria-labelledby={`${sectionId}-program-schedule-title`}
               >
-                <h3 id="program-schedule-title">Расписание</h3>
+                <h3 id={`${sectionId}-program-schedule-title`}>Расписание</h3>
                 <p className="muted">
-                  По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.
+                  {activeProgramEdit
+                    ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
+                    : 'По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.'}
                 </p>
                 <div className="form-grid">
                   <label className="field">
                     <span>Начать не раньше</span>
                     <DateInput
+                      disabled={activeProgramEdit}
                       min={defaultStartDate}
                       value={startDate}
                       onChange={(event) => {
@@ -1002,6 +913,7 @@ export function ProgramBuilder({
                     <input
                       type="number"
                       inputMode="numeric"
+                      disabled={activeProgramEdit}
                       min="1"
                       max="24"
                       value={durationWeeks}
@@ -1011,10 +923,12 @@ export function ProgramBuilder({
                   </label>
                 </div>
                 {usesSequentialCycle ? (
-                  <p className="muted">
-                    Восьмидневный цикл планируется последовательно и автоматически повторяется после
-                    восьмой тренировки.
-                  </p>
+                  <ContextualHelp summary="Как устроен цикл?">
+                    <p>
+                      Восьмидневный цикл планируется последовательно и автоматически повторяется
+                      после восьмой тренировки.
+                    </p>
+                  </ContextualHelp>
                 ) : (
                   <div className="form-grid">
                     {days.map((day, dayIndex) => (
@@ -1049,9 +963,9 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="strength-template-title"
+                aria-labelledby={`${sectionId}-strength-template-title`}
               >
-                <h3 id="strength-template-title">Быстрое заполнение</h3>
+                <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
                 <div className="form-grid">
                   <label className="field">
                     <span>Схема</span>
@@ -1063,7 +977,7 @@ export function ProgramBuilder({
                         setPresetDays(resolveStrengthRule(level, next).recommended);
                       }}
                     >
-                      <option value="fullbody">Фуллбади</option>
+                      <option value="fullbody">Всё тело</option>
                       <option value="upper_lower">Верх/Низ</option>
                       <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
                       <option value="split">Сплит</option>
@@ -1090,13 +1004,13 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-rest-title"
+                aria-labelledby={`${sectionId}-program-rest-title`}
               >
-                <h3 id="program-rest-title">Отдых между подходами</h3>
+                <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
                 <p className="muted">
                   Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
                 </p>
-                <div className="toolbar wrap">
+                <div className="toolbar wrap program-builder-rest-actions">
                   <label className="field">
                     <span>Общий отдых, сек</span>
                     <input

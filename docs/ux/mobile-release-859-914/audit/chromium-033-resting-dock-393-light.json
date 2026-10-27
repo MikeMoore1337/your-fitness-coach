@@ -1,0 +1,86 @@
+{
+  "geometry": {
+    "viewport": {
+      "width": 393,
+      "height": 844
+    },
+    "scrollY": 2528,
+    "nav": {
+      "x": 10,
+      "y": 766,
+      "width": 373,
+      "height": 66,
+      "top": 766,
+      "right": 383,
+      "bottom": 832,
+      "left": 10
+    },
+    "rest": {
+      "x": 12,
+      "y": 0,
+      "width": 369,
+      "height": 110,
+      "top": 0,
+      "right": 381,
+      "bottom": 110,
+      "left": 12
+    },
+    "currentSet": {
+      "x": 12,
+      "y": -342.921875,
+      "width": 369,
+      "height": 506,
+      "top": -342.921875,
+      "right": 381,
+      "bottom": 163.078125,
+      "left": 12
+    },
+    "currentInput": {
+      "x": 31,
+      "y": -115.921875,
+      "width": 160.5,
+      "height": 80,
+      "top": -115.921875,
+      "right": 191.5,
+      "bottom": -35.921875,
+      "left": 31
+    },
+    "nextSet": {
+      "x": 12,
+      "y": 171.078125,
+      "width": 369,
+      "height": 252,
+      "top": 171.078125,
+      "right": 381,
+      "bottom": 423.078125,
+      "left": 12
+    },
+    "nextDone": {
+      "x": 12,
+      "y": 305.078125,
+      "width": 369,
+      "height": 48,
+      "top": 305.078125,
+      "right": 381,
+      "bottom": 353.078125,
+      "left": 12
+    },
+    "nextInteractiveBottom": 353.078125,
+    "overlap": 0,
+    "inputRestOverlap": 0,
+    "hit": "done",
+    "navHit": true,
+    "activeNav": {
+      "x": 17,
+      "y": 773,
+      "width": 70.1875,
+      "height": 52,
+      "top": 773,
+      "right": 87.1875,
+      "bottom": 825,
+      "left": 17
+    },
+    "current": "202"
+  },
+  "writes": []
+}

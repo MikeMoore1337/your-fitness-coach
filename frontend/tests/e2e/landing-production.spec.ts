@@ -1,674 +1,334 @@
 import { expect, test, type Page } from '@playwright/test';
-
-const captureTask109 =
-  (
-    globalThis as typeof globalThis & {
-      process?: { env?: Record<string, string | undefined> };
-    }
-  ).process?.env?.YFC_CAPTURE_TASK_109 === '1';
-const captureTelegramAccess =
-  (
-    globalThis as typeof globalThis & {
-      process?: { env?: Record<string, string | undefined> };
-    }
-  ).process?.env?.YFC_CAPTURE_TELEGRAM_ACCESS === '1';
-const captureEvidence =
-  captureTask109 ||
-  captureTelegramAccess ||
-  (
-    globalThis as typeof globalThis & {
-      process?: { env?: Record<string, string | undefined> };
-    }
-  ).process?.env?.YFC_CAPTURE_TASK_73A === '1';
-const screenshotRoot = captureTask109
-  ? '../.artifacts/screenshots/task-109/final'
-  : captureTelegramAccess
-    ? '../.artifacts/screenshots/landing-telegram-access'
-    : '../.artifacts/screenshots/task-73a/final';
-
-async function openLanding(page: Page, theme: 'light' | 'dark') {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.evaluate((value) => localStorage.setItem('app-theme', value), theme);
-  await page.reload({ waitUntil: 'domcontentloaded' });
+async function open(page: Page, route: string, theme: 'light' | 'dark', width: number) {
+  await page.setViewportSize({ width, height: width < 700 ? 844 : 1100 });
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+  await page.addInitScript((v) => localStorage.setItem('app-theme', v), theme);
+  await page.goto(route, { waitUntil: 'networkidle' });
+  await expect(page.locator('.ref-hero h1')).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
 }
-
-async function expectNoHorizontalOverflow(page: Page, width: number) {
-  expect(
-    await page.evaluate(() => ({
-      content: document.documentElement.scrollWidth,
-      viewport: window.innerWidth,
-    })),
-  ).toEqual({ content: width, viewport: width });
-}
-
-async function expectLandingReady(page: Page) {
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Знайте, что делать сегодня.' }),
-  ).toBeVisible();
-  for (const image of await page.locator('.landing-hero-scene img').all()) {
-    await expect(image).toHaveJSProperty('complete', true);
-    expect(
-      await image.evaluate((element) => (element as HTMLImageElement).naturalWidth),
-    ).toBeGreaterThan(0);
-    await image.evaluate((element) => (element as HTMLImageElement).decode());
-  }
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-}
-
-async function loadAllProductProofs(page: Page) {
-  for (const image of await page.locator('.landing-product-image img').all()) {
-    await image.scrollIntoViewIfNeeded();
-    await expect(image).toHaveJSProperty('complete', true);
-    expect(
-      await image.evaluate((element) => (element as HTMLImageElement).naturalWidth),
-    ).toBeGreaterThan(0);
-    await image.evaluate((element) => (element as HTMLImageElement).decode());
-  }
-  await page.evaluate(() => window.scrollTo(0, 0));
-}
-
-async function settleForScreenshot(page: Page) {
-  await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    window.getSelection()?.removeAllRanges();
-    window.scrollTo(0, 0);
-  });
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-}
-
-test('landing keeps a minimal premium product story across themes and viewports', async ({
-  page,
-}) => {
-  const browserErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') browserErrors.push(message.text());
-  });
-  page.on('pageerror', (error) => browserErrors.push(error.message));
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-
-  for (const theme of ['light', 'dark'] as const) {
-    for (const viewport of [
-      { width: 1440, height: 1000 },
-      { width: 1280, height: 900 },
-      { width: 1024, height: 900 },
-      { width: 768, height: 900 },
-      // Layout viewport equivalent for the 1440px composition at 200% zoom.
-      { width: 720, height: 900 },
-      { width: 430, height: 932 },
-      { width: 390, height: 844 },
-      { width: 360, height: 800 },
-    ]) {
-      await page.setViewportSize(viewport);
-      await openLanding(page, theme);
-      await expectLandingReady(page);
-
-      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
-      await expect(page.locator('h1')).toHaveCount(1);
-      await expect(page.locator('.landing-hero-signals')).toHaveCount(0);
-      await expect(
-        page.getByRole('heading', { name: 'Один цикл — от плана до следующего шага.' }),
-      ).toBeVisible();
-      await expect(page.locator('.landing-core__features article')).toHaveCount(3);
-      await expect(page.locator('.landing-trainer')).toBeVisible();
-      await expect(page.locator('.landing-bento-card, .landing-system__card')).toHaveCount(0);
-      await expect(page.getByRole('link', { name: 'Открыть приложение' }).first()).toHaveAttribute(
-        'href',
-        '/app',
-      );
-      await expect(
-        page.locator('.landing-hero__actions').getByRole('link', { name: 'Попробовать демо' }),
-      ).toHaveAttribute('href', '/demo?cabinet=1&scenario=self_training&section=today');
-      await expect(
-        page.locator('.landing-contact').getByRole('link', { name: 'Попробовать демо' }),
-      ).toHaveAttribute('href', '/demo?cabinet=1&scenario=self_training&section=today');
-      await expect(
-        page.locator('.landing-continuity__copy').getByRole('link', {
-          name: 'Открыть приложение в Telegram',
-        }),
-      ).toHaveAttribute('href', 'https://t.me/your_fitness_coach_bot?startapp');
-      await expect(
-        page.locator('.landing-hero').getByRole('link', { name: 'Открыть в Telegram' }),
-      ).toHaveAttribute('href', 'https://t.me/your_fitness_coach_bot?startapp');
-
-      const footerLinks = page.locator('.landing-footer');
-      await expect(footerLinks.getByRole('link', { name: 'Открыть в Telegram' })).toHaveAttribute(
-        'href',
-        'https://t.me/your_fitness_coach_bot?startapp',
-      );
-      await expect(
-        footerLinks.getByRole('link', { name: 'Telegram-канал о фитнесе и здоровье' }),
-      ).toHaveAttribute('href', 'https://t.me/your_fitness_news');
-      await expect(
-        footerLinks.getByRole('link', { name: 'Приложение в Telegram', exact: true }),
-      ).toHaveCount(0);
-      await expect(footerLinks.getByRole('link', { name: 'Поддержка', exact: true })).toHaveCount(
-        0,
-      );
-      await expect(footerLinks.getByRole('link', { name: 'Поддержка в Telegram' })).toHaveAttribute(
-        'href',
-        'https://t.me/your_fitness_coach_bot?start=support',
-      );
-      await expect(
-        page.locator('.landing-header').getByRole('link', { name: /Telegram/i }),
-      ).toHaveCount(0);
-      await expect(page.locator('.landing-hero-scene img')).toHaveCount(2);
-      await expectNoHorizontalOverflow(page, viewport.width);
-
-      const bounds = await page.evaluate(() => {
-        const rectangle = (selector: string) => {
-          const value = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-          return { top: value.top, bottom: value.bottom, left: value.left, right: value.right };
-        };
-        return {
-          header: rectangle('.landing-header'),
-          hero: rectangle('.landing-hero'),
-          primary: rectangle('.landing-hero__actions .landing-button'),
-          secondary: rectangle('.landing-hero__actions .landing-button--secondary'),
-          scene: rectangle('.landing-hero-scene'),
-          device: rectangle('.landing-hero-device'),
-          core: rectangle('.landing-core'),
-          brand: rectangle('.public-shell__brand'),
-          actions: rectangle('.public-shell__header-actions'),
-          documentHeight: document.documentElement.scrollHeight,
-        };
-      });
-      expect(bounds.header.left).toBeGreaterThanOrEqual(0);
-      expect(bounds.header.right).toBeLessThanOrEqual(viewport.width);
-      expect(bounds.core.top).toBeGreaterThanOrEqual(bounds.hero.bottom - 1);
-      expect(bounds.core.top).toBeLessThanOrEqual(bounds.hero.bottom + 1);
-      expect(bounds.primary.right).toBeLessThanOrEqual(viewport.width);
-      expect(bounds.secondary.right).toBeLessThanOrEqual(viewport.width);
-      expect(bounds.brand.right).toBeLessThanOrEqual(bounds.actions.left);
-      await expect(page.locator('.landing-header .yfc-lockup__wordmark')).toBeVisible();
-
-      if (viewport.width <= 680) {
-        expect(bounds.primary.bottom).toBeLessThanOrEqual(bounds.scene.top);
-        expect(bounds.secondary.bottom).toBeLessThanOrEqual(bounds.scene.top);
-        expect(bounds.scene.top).toBeLessThan(viewport.height * 0.8);
-        expect(bounds.documentHeight).toBeLessThanOrEqual(7200);
-      } else if (viewport.width >= 1280) {
-        expect(bounds.documentHeight).toBeLessThanOrEqual(5200);
-      }
-
-      const athlete = page.locator('.landing-athlete-image img');
-      await expect(athlete).toHaveAttribute('width', '1280');
-      await expect(athlete).toHaveAttribute('height', '1171');
-      expect(await athlete.evaluate((image) => (image as HTMLImageElement).currentSrc)).toMatch(
-        /landing-athlete-deadlift-cutout-(640|960|1280)\.webp$/,
-      );
-
-      expect(
-        await page.evaluate(() =>
-          performance
-            .getEntriesByType('resource')
-            .every(
-              (entry) =>
-                !/telegram.*(sdk|web-app)/i.test(entry.name) &&
-                !/\/api\/v1\/public\/config(?:\?|$)/i.test(entry.name) &&
-                !/candidate-a-deadlift.*\.png/i.test(entry.name),
-            ),
-        ),
-      ).toBe(true);
-
-      if (viewport.width === 1440) {
-        const directionStyles = await page.evaluate(() => {
-          const hero = document.querySelector<HTMLElement>('.landing-hero')!;
-          const heading = document.querySelector<HTMLElement>('.landing-hero h1')!;
-          const primary = document.querySelector<HTMLElement>(
-            '.landing-hero__actions .landing-button',
-          )!;
-          const secondary = document.querySelector<HTMLElement>(
-            '.landing-hero__actions .landing-button--secondary',
-          )!;
-          const themeToggle = document.querySelector<HTMLElement>('.landing-theme-toggle')!;
-          const themeIcon = themeToggle.querySelector<SVGElement>('svg')!;
-          const header = document.querySelector<HTMLElement>('.public-shell__header')!;
-          const device = document.querySelector<HTMLElement>('.landing-hero-device')!;
-          const energy = document.querySelector<HTMLElement>('.landing-energy-path')!;
-          const desktopFlow = energy.querySelector<SVGGElement>('.energy-flow__scene--desktop')!;
-          const filament = desktopFlow.querySelector<SVGPathElement>(
-            '.energy-flow__filament--primary-a',
-          )!;
-          const secondaryFilament = desktopFlow.querySelector<SVGPathElement>(
-            '.energy-flow__filament--support-d',
-          )!;
-          const filaments = Array.from(
-            desktopFlow.querySelectorAll<SVGPathElement>('.energy-flow__filament'),
-          );
-          const volume = energy.querySelector<SVGGElement>('.energy-flow__volume')!;
-          const athleteFrame = document.querySelector<HTMLElement>('.landing-athlete-frame')!;
-          const coreMobile = document.querySelector<HTMLElement>('.landing-core__mobile')!;
-          const trainerProof = document.querySelector<HTMLElement>('.landing-trainer__proof')!;
-          const core = document.querySelector<HTMLElement>('.landing-core')!;
-          const pathLength = filament.getTotalLength();
-          const pathMatrix = filament.getScreenCTM()!;
-          const primaryBounds = primary.getBoundingClientRect();
-          const secondaryBounds = secondary.getBoundingClientRect();
-          const themeToggleBounds = themeToggle.getBoundingClientRect();
-          const themeIconBounds = themeIcon.getBoundingClientRect();
-          const pathSamples = Array.from({ length: 161 }, (_, index) => {
-            const point = filament.getPointAtLength((pathLength * index) / 160);
-            return new DOMPoint(point.x, point.y).matrixTransform(pathMatrix);
-          });
-          const endpoint = pathSamples.at(-1)!;
-          return {
-            heroHeight: hero.getBoundingClientRect().height,
-            headingLineHeight: Number.parseFloat(getComputedStyle(heading).lineHeight),
-            headingFontSize: Number.parseFloat(getComputedStyle(heading).fontSize),
-            headingFontFamily: getComputedStyle(heading).fontFamily,
-            primaryBackground: getComputedStyle(primary).backgroundColor,
-            primaryWidth: primaryBounds.width,
-            secondaryBackground: getComputedStyle(secondary).backgroundColor,
-            secondaryWidth: secondaryBounds.width,
-            secondaryBorderWidth: Number.parseFloat(getComputedStyle(secondary).borderLeftWidth),
-            themeIconOffsetX:
-              themeIconBounds.left +
-              themeIconBounds.width / 2 -
-              (themeToggleBounds.left + themeToggleBounds.width / 2),
-            themeIconCenterDeltaY: Math.abs(
-              themeIconBounds.top +
-                themeIconBounds.height / 2 -
-                (themeToggleBounds.top + themeToggleBounds.height / 2),
-            ),
-            headerBackground: getComputedStyle(header).backgroundColor,
-            deviceWidth: device.getBoundingClientRect().width,
-            devicePadding: Number.parseFloat(getComputedStyle(device).paddingLeft),
-            energyLayer: Number.parseFloat(getComputedStyle(energy).zIndex),
-            athleteLayer: Number.parseFloat(getComputedStyle(athleteFrame).zIndex),
-            deviceLayer: Number.parseFloat(getComputedStyle(device).zIndex),
-            energyPointerEvents: getComputedStyle(energy).pointerEvents,
-            energyAriaHidden: energy.getAttribute('aria-hidden'),
-            filamentCount: filaments.length,
-            uniqueTrajectoryCount: new Set(filaments.map((path) => path.getAttribute('d'))).size,
-            filamentsHaveNoFill: filaments.every((path) => path.getAttribute('fill') === 'none'),
-            fadeMask: volume.getAttribute('mask'),
-            filterCount: energy.querySelectorAll('filter').length,
-            primaryFilamentWidth: Number.parseFloat(getComputedStyle(filament).strokeWidth),
-            secondaryFilamentWidth: Number.parseFloat(
-              getComputedStyle(secondaryFilament).strokeWidth,
-            ),
-            trajectoryCrossesDemo: pathSamples.some(
-              (point) =>
-                point.x >= secondaryBounds.left &&
-                point.x <= secondaryBounds.right &&
-                point.y >= secondaryBounds.top &&
-                point.y <= secondaryBounds.bottom,
-            ),
-            trajectoryEndX: endpoint.x,
-            deviceRight: device.getBoundingClientRect().right,
-            athleteLift: new DOMMatrix(getComputedStyle(athleteFrame).transform).m42,
-            coreMobilePadding: Number.parseFloat(getComputedStyle(coreMobile).paddingLeft),
-            trainerBorder: Number.parseFloat(getComputedStyle(trainerProof).borderLeftWidth),
-            corePaddingTop: Number.parseFloat(getComputedStyle(core).paddingTop),
-            coreHeight: core.getBoundingClientRect().height,
-          };
-        });
-        expect(directionStyles.heroHeight).toBeLessThanOrEqual(740);
-        expect(directionStyles.headingLineHeight).toBeGreaterThanOrEqual(
-          directionStyles.headingFontSize * 0.92,
+for (const width of [320, 360, 390, 430, 768, 1280, 1366, 1440, 1498, 1600, 1920])
+  for (const theme of ['light', 'dark'] as const)
+    for (const audience of ['athlete', 'coach'] as const) {
+      test(`${audience} ${theme} ${width}: geometry, labels and destinations`, async ({ page }) => {
+        await open(page, audience === 'coach' ? '/for-trainers' : '/', theme, width);
+        await expect(page.locator('#faq h2')).toHaveText(
+          audience === 'coach' ? 'Понятные правила.' : 'Понятные границы.',
         );
-        expect(directionStyles.headingFontFamily).toMatch(/^Inter,/i);
-        expect(directionStyles.headingFontFamily).not.toMatch(/Georgia|Times New Roman/i);
-        expect(directionStyles.primaryBackground).not.toBe(directionStyles.secondaryBackground);
-        expect(
-          Math.abs(directionStyles.primaryWidth - directionStyles.secondaryWidth),
-        ).toBeLessThanOrEqual(1);
-        expect(directionStyles.secondaryBorderWidth).toBeGreaterThanOrEqual(1);
-        if (theme === 'light') {
-          expect(directionStyles.themeIconOffsetX).toBeGreaterThanOrEqual(1.5);
-          expect(directionStyles.themeIconOffsetX).toBeLessThanOrEqual(2.5);
-        } else {
-          expect(Math.abs(directionStyles.themeIconOffsetX)).toBeLessThanOrEqual(1);
-        }
-        expect(directionStyles.themeIconCenterDeltaY).toBeLessThanOrEqual(1);
-        expect(directionStyles.headerBackground).toBe('rgba(0, 0, 0, 0)');
-        expect(directionStyles.deviceWidth).toBeGreaterThanOrEqual(200);
-        expect(directionStyles.devicePadding).toBeLessThanOrEqual(3);
-        expect(directionStyles.energyLayer).toBeLessThan(directionStyles.athleteLayer);
-        expect(directionStyles.energyLayer).toBeLessThan(directionStyles.deviceLayer);
-        expect(directionStyles.energyPointerEvents).toBe('none');
-        expect(directionStyles.energyAriaHidden).toBe('true');
-        expect(directionStyles.filamentCount).toBeGreaterThanOrEqual(7);
-        expect(directionStyles.filamentCount).toBeLessThanOrEqual(14);
-        expect(directionStyles.uniqueTrajectoryCount).toBe(directionStyles.filamentCount);
-        expect(directionStyles.filamentsHaveNoFill).toBe(true);
-        expect(directionStyles.fadeMask).toMatch(/^url\(#energy-flow-fade-/);
-        expect(directionStyles.filterCount).toBeLessThanOrEqual(2);
-        expect(directionStyles.primaryFilamentWidth).toBeGreaterThanOrEqual(1.5);
-        expect(directionStyles.primaryFilamentWidth).toBeLessThanOrEqual(2.5);
-        expect(directionStyles.secondaryFilamentWidth).toBeGreaterThanOrEqual(0.5);
-        expect(directionStyles.secondaryFilamentWidth).toBeLessThanOrEqual(1.5);
-        expect(directionStyles.trajectoryCrossesDemo).toBe(true);
-        expect(directionStyles.trajectoryEndX).toBeGreaterThan(directionStyles.deviceRight);
-        expect(directionStyles.athleteLift).toBeLessThanOrEqual(-40);
-        expect(directionStyles.coreMobilePadding).toBeLessThanOrEqual(3);
-        expect(directionStyles.trainerBorder).toBeLessThanOrEqual(2);
-        expect(directionStyles.corePaddingTop).toBeLessThanOrEqual(48);
-        expect(directionStyles.coreHeight).toBeGreaterThanOrEqual(800);
-      }
-
-      if (viewport.width <= 430) {
-        const mobileFlow = await page.evaluate(() => {
-          const energy = document.querySelector<HTMLElement>('.landing-energy-path')!;
-          const athlete = document.querySelector<HTMLImageElement>('.landing-athlete-frame img')!;
-          const device = document.querySelector<HTMLElement>('.landing-hero-device')!;
-          const core = document.querySelector<HTMLElement>('.landing-core')!;
-          const mobileScene = energy.querySelector<SVGGElement>('.energy-flow__scene--mobile')!;
-          const filaments = Array.from(
-            mobileScene.querySelectorAll<SVGPathElement>('.energy-flow__filament'),
-          );
-          const widths = filaments.map((filament) =>
-            Number.parseFloat(getComputedStyle(filament).strokeWidth),
-          );
+        const hero = page.locator('.ref-hero');
+        for (const label of ['Для себя', 'Для тренера'])
+          await expect(hero.getByRole('link', { name: label, exact: true })).toBeVisible();
+        await expect(hero.locator('[aria-current="page"]')).toHaveText(
+          audience === 'coach' ? 'Для тренера' : 'Для себя',
+        );
+        await expect(
+          hero.getByRole('link', {
+            name: audience === 'coach' ? 'Как работает Coach OS' : 'Посмотреть пример тренировки',
+          }),
+        ).toHaveAttribute('href', audience === 'coach' ? '#coach-work' : '#training');
+        await expect(
+          hero.getByRole('link', {
+            name: audience === 'coach' ? 'Начать как тренер' : 'Начать со своими данными',
+          }),
+        ).toHaveAttribute(
+          'href',
+          audience === 'coach' ? '/login?next=%2Fapp%3Ftrainer_intent%3D1' : '/app',
+        );
+        await expect(
+          hero.getByRole('link', {
+            name:
+              audience === 'coach' ? 'Попробовать демо для тренера' : 'Попробовать демо тренировки',
+          }),
+        ).toHaveAttribute(
+          'href',
+          audience === 'coach'
+            ? '/demo?cabinet=1&scenario=trainer&section=trainer'
+            : '/demo?cabinet=1&scenario=self_training&section=today',
+        );
+        await expect(hero.locator('.landing-hero__actions a').first()).toHaveAttribute(
+          'href',
+          audience === 'coach' ? '/login?next=%2Fapp%3Ftrainer_intent%3D1' : '/app',
+        );
+        await expect(hero.locator('.landing-hero__actions a').nth(1)).toHaveAttribute(
+          'href',
+          audience === 'coach'
+            ? '/demo?cabinet=1&scenario=trainer&section=trainer'
+            : '/demo?cabinet=1&scenario=self_training&section=today',
+        );
+        await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible();
+        await expect(
+          page.locator('.public-shell__header .landing-v10-audience-switch'),
+        ).toHaveCount(0);
+        await expect(page.locator('.public-shell__header')).not.toContainText('Сценарий');
+        await expect(hero.locator('.landing-v10-audience-switch')).toHaveCount(1);
+        const headerMaterial = await page.locator('.public-shell__header').evaluate((element) => {
+          const style = getComputedStyle(element);
+          const headerRect = element.getBoundingClientRect();
+          const heroRect = document.querySelector('.ref-hero')?.getBoundingClientRect();
           return {
-            visibleCount: filaments.length,
-            maxWidth: Math.max(...widths),
-            ambientOpacity: Number.parseFloat(
-              getComputedStyle(mobileScene.querySelector<SVGPathElement>('.energy-flow__ambient')!)
-                .opacity,
-            ),
-            glowCount: Array.from(
-              mobileScene.querySelectorAll<SVGPathElement>('.energy-flow__glow'),
-            ).filter((path) => getComputedStyle(path).display !== 'none').length,
-            visualGap:
-              core.getBoundingClientRect().top -
-              Math.max(
-                athlete.getBoundingClientRect().bottom,
-                device.getBoundingClientRect().bottom,
-              ),
+            backgroundColor: style.backgroundColor,
+            backgroundImage: style.backgroundImage,
+            position: style.position,
+            width: headerRect.width,
+            heroTop: heroRect?.top ?? null,
+            backdropFilter:
+              style.backdropFilter ||
+              (style as CSSStyleDeclaration & { webkitBackdropFilter?: string })
+                .webkitBackdropFilter ||
+              '',
           };
         });
-        expect(mobileFlow.visibleCount).toBeGreaterThanOrEqual(7);
-        expect(mobileFlow.visibleCount).toBeLessThanOrEqual(10);
-        expect(mobileFlow.maxWidth).toBeLessThanOrEqual(1.5);
-        expect(mobileFlow.ambientOpacity).toBeLessThanOrEqual(0.04);
-        expect(mobileFlow.glowCount).toBeLessThanOrEqual(1);
-        expect(mobileFlow.visualGap).toBeGreaterThanOrEqual(16);
-        expect(mobileFlow.visualGap).toBeLessThanOrEqual(90);
-      }
-
-      const footer = page.locator('.landing-footer');
-      await footer.scrollIntoViewIfNeeded();
-      const footerBounds = await footer.boundingBox();
-      expect(footerBounds?.x).toBeGreaterThanOrEqual(0);
-      expect((footerBounds?.x ?? 0) + (footerBounds?.width ?? 0)).toBeLessThanOrEqual(
-        viewport.width,
-      );
+        expect(headerMaterial.backgroundColor).toMatch(/rgba?\(/);
+        expect(headerMaterial.backgroundColor).not.toMatch(/rgba?\([^)]*,\s*1\s*\)/);
+        expect(headerMaterial.backgroundImage).not.toBe('none');
+        expect(headerMaterial.backdropFilter).toContain('blur');
+        if (width >= 681) {
+          expect(headerMaterial.position).toBe('sticky');
+          expect(headerMaterial.width).toBeGreaterThanOrEqual(width - 1);
+          expect(headerMaterial.heroTop).toBeLessThanOrEqual(1);
+        }
+        const tertiary = hero.locator('.landing-v10-hero-tertiary');
+        await expect(tertiary).toBeVisible();
+        await expect(tertiary).toHaveAttribute('data-glass');
+        await expect(tertiary).toHaveAttribute('data-glass-variant', 'clear');
+        const ctaOrder = await hero.evaluate((element) => {
+          const actions = element.querySelector('.landing-hero__actions')!;
+          const tertiary = element.querySelector('.landing-v10-hero-tertiary')!;
+          const platform = element.querySelector('.landing-hero__platform')!;
+          return {
+            actionsBeforeTertiary: Boolean(
+              actions.compareDocumentPosition(tertiary) & Node.DOCUMENT_POSITION_FOLLOWING,
+            ),
+            tertiaryBeforePlatform: Boolean(
+              tertiary.compareDocumentPosition(platform) & Node.DOCUMENT_POSITION_FOLLOWING,
+            ),
+          };
+        });
+        expect(ctaOrder.actionsBeforeTertiary).toBe(true);
+        expect(ctaOrder.tertiaryBeforePlatform).toBe(true);
+        const geometry = await page.evaluate(() => ({
+          overflow: document.documentElement.scrollWidth - innerWidth,
+          boxes: [
+            ...document.querySelectorAll<HTMLElement>(
+              '.ref-hero h1 span, .ref-hero .landing-button, .landing-header__actions > *, .landing-v10-hero-audience a',
+            ),
+          ]
+            .filter((e) => e.offsetWidth)
+            .map((e) => ({
+              text: e.textContent,
+              rect: e.getBoundingClientRect().toJSON(),
+              scroll: e.scrollWidth,
+              width: e.clientWidth,
+            })),
+          overlap:
+            document.querySelector('.landing-v10-hero-audience')!.getBoundingClientRect().bottom >
+            document.querySelector('h1')!.getBoundingClientRect().top,
+        }));
+        expect(geometry.overflow).toBe(0);
+        expect(geometry.overlap).toBe(false);
+        for (const box of geometry.boxes) {
+          expect(box.rect.left, box.text ?? '').toBeGreaterThanOrEqual(0);
+          expect(box.rect.right, box.text ?? '').toBeLessThanOrEqual(width + 1);
+          expect(box.scroll).toBeLessThanOrEqual(box.width + 1);
+        }
+        expect(
+          await hero
+            .locator('h1 span')
+            .last()
+            .evaluate((e) => {
+              const r = document.createRange();
+              r.selectNodeContents(e);
+              return r.getClientRects().length;
+            }),
+        ).toBe(1);
+        for (const target of await hero
+          .locator('.landing-button, .landing-v10-audience-switch__link')
+          .all())
+          expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        await expect(page.locator('.strength-scene')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#coach-work')).toHaveCount(audience === 'coach' ? 1 : 0);
+        await expect(page.locator('#coach-promo')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#training')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#nutrition')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#progress')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        const cycleHeading = page.locator('#product h2');
+        await expect(cycleHeading).toHaveText(
+          audience === 'coach' ? 'Сопровождение. С продолжением.' : 'Продолжение имеет значение.',
+        );
+        expect(
+          await cycleHeading.evaluate((element) => (element as HTMLElement).innerText),
+        ).not.toMatch(/Продолжениеимеет|Сопровождение\.С/);
+        for (const section of await page.locator('main > section').all()) {
+          await section.scrollIntoViewIfNeeded();
+          if ((await section.getAttribute('id')) === 'progress') {
+            await expect(section.getByRole('heading', { name: 'Объём тренировок' })).toBeVisible();
+            await expect(section.locator('.data-viz-chart')).toBeVisible();
+            await expect(section.getByText('Загружаем пример прогресса…')).toHaveCount(0);
+            await expect(section.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false');
+          }
+          expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(
+            0,
+          );
+        }
+      });
     }
-  }
-  expect(browserErrors).toEqual([]);
+test.describe('cold progress loading', () => {
+  // The PWA can serve its cached chunk without hitting the test's network gate.
+  test.use({ serviceWorkers: 'block' });
+  for (const theme of ['light', 'dark'] as const)
+    for (const width of [320, 390, 430, 1440])
+      test(`progress waits for its real lazy chunk ${theme} ${width}`, async ({ page }) => {
+        let release!: () => void;
+        const responseGate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        let requested = false;
+        await page.route('**/assets/LandingProgressContent-*.js', async (route) => {
+          requested = true;
+          await responseGate;
+          await route.continue();
+        });
+        try {
+          await open(page, '/', theme, width);
+          const progress = page.locator('#progress');
+          await progress.scrollIntoViewIfNeeded();
+          await expect(progress.getByText('Загружаем пример прогресса…')).toBeVisible();
+          await expect.poll(() => requested).toBe(true);
+          await expect(progress.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true');
+          await expect(progress.getByRole('heading', { name: 'Объём тренировок' })).toHaveCount(0);
+          release();
+          await expect(progress.getByRole('heading', { name: 'Объём тренировок' })).toBeVisible();
+          await expect(progress.locator('.data-viz-chart')).toBeVisible();
+          await expect(progress.getByText('Загружаем пример прогресса…')).toHaveCount(0);
+          await expect(progress.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false');
+          await expect(progress.getByRole('link', { name: 'Открыть прогресс' })).toHaveAttribute(
+            'href',
+            '/demo?cabinet=1&scenario=self_training&section=progress',
+          );
+        } finally {
+          release();
+        }
+      });
 });
 
-test('media failures preserve the story and product proofs reserve their layout', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  let releaseDesktop: (() => void) | undefined;
-  const desktopGate = new Promise<void>((resolve) => {
-    releaseDesktop = resolve;
-  });
-  await page.route('**/assets/marketing/landing-athlete-deadlift-*', (route) => route.abort());
-  await page.route('**/assets/product/landing-today-desktop-light.png', async (route) => {
-    await desktopGate;
-    await route.continue();
-  });
-  await page.route('**/assets/product/landing-trainer-desktop-light.png', (route) => route.abort());
-  await openLanding(page, 'light');
-
-  await expect(page.getByText(/силовая тренировка остаётся контекстом страницы/i)).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Открыть приложение' }).first()).toHaveAttribute(
-    'href',
-    '/app',
-  );
-
-  const desktopFrame = page.locator('.landing-core__desktop');
-  const reserved = await desktopFrame.boundingBox();
-  await desktopFrame.scrollIntoViewIfNeeded();
-  const desktopImage = desktopFrame.locator('img');
-  await expect(desktopImage).not.toHaveClass(/is-loaded/);
-  await expect(desktopFrame.getByText('Desktop proof временно недоступен.')).toBeVisible();
-  releaseDesktop?.();
-  await expect(desktopImage).toHaveJSProperty('complete', true);
-  await expect(desktopImage).toHaveClass(/is-loaded/);
-  await expect(desktopFrame.getByText('Desktop proof временно недоступен.')).toBeHidden();
-  const loaded = await desktopFrame.boundingBox();
-  expect(loaded?.width).toBeCloseTo(reserved?.width ?? 0, 0);
-  expect(loaded?.height).toBeCloseTo(reserved?.height ?? 0, 0);
-
-  const trainerFrame = page.locator('.landing-trainer__proof');
-  await trainerFrame.scrollIntoViewIfNeeded();
-  await expect(trainerFrame.getByText('Экран кабинета тренера временно недоступен.')).toBeVisible();
-  await expectNoHorizontalOverflow(page, 1280);
-});
-
-test('keyboard, menu, FAQ and canonical public actions stay operable', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await openLanding(page, 'light');
-
-  const skipLink = page.getByRole('link', { name: 'К содержимому' });
-  await skipLink.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#landing-content')).toBeFocused();
-
-  for (const telegramAction of [
-    page.locator('.landing-hero__telegram-link'),
-    page.locator('.landing-continuity__action'),
-    page.locator('.landing-footer__telegram-app'),
-  ]) {
-    await telegramAction.focus();
-    await expect(telegramAction).toBeFocused();
-    expect(
-      await telegramAction.evaluate((element) => {
-        const style = getComputedStyle(element);
-        return style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) >= 2;
-      }),
-    ).toBe(true);
-  }
-
-  const menu = page.getByRole('button', { name: 'Открыть меню' });
-  await menu.click();
-  await expect(page.getByRole('navigation', { name: 'Навигация по странице' })).toBeVisible();
+test('mobile menu focus, theme, audience, Escape and resize', async ({ page }) => {
+  await open(page, '/', 'light', 320);
+  const trigger = page.getByRole('button', { name: 'Открыть меню' });
+  await trigger.click();
+  const nav = page.getByRole('navigation', { name: 'Навигация по странице' });
+  await expect(nav.getByRole('link', { name: 'Продукт' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  const toggle = page.locator('.app-theme-toggle--nav');
+  await expect(toggle).toBeFocused();
+  await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await page.keyboard.press('Escape');
-  await expect(menu).toBeFocused();
-  await expect(menu).toHaveAttribute('aria-expanded', 'false');
-
-  await page.locator('#faq').scrollIntoViewIfNeeded();
-  const question = page.getByText('Telegram обязателен?', { exact: true });
-  await question.click();
-  await expect(page.getByText(/доступны в браузере/i)).toBeVisible();
-
-  const knowledgeDetails = page.locator('.landing-assurance__details > details').first();
-  await knowledgeDetails.locator('summary').click();
-  await expect(
-    knowledgeDetails.getByRole('link', { name: 'Тренировки и программы' }),
-  ).toBeVisible();
-
-  const mobileReadability = await page.evaluate(() => {
-    const linkSelectors = [
-      '.landing-hero__telegram-link',
-      '.landing-continuity__action',
-      '.landing-core__features a',
-      '.landing-core__self-link',
-      '.landing-assurance__details nav a',
-      '.landing-footer nav a',
-    ];
-    const textSelectors = [
-      '.landing-core__features p',
-      '.landing-trainer__copy > p:not(.landing-kicker)',
-      '.landing-start__steps p',
-      '.landing-faq-list details > p',
-      '.landing-assurance__details details > div > p',
-      '.landing-contact > div > p:not(.landing-kicker)',
-      '.landing-footer__brand p',
-      '.landing-footer__privacy p',
-    ];
-    const numberSelectors = [
-      '.landing-core__feature-label > span',
-      '.landing-start__steps small',
-      '.landing-start__demo nav > a > span',
-    ];
-    return {
-      linkHeights: linkSelectors.flatMap((selector) =>
-        [...document.querySelectorAll<HTMLElement>(selector)].map(
-          (element) => element.getBoundingClientRect().height,
-        ),
-      ),
-      textSizes: textSelectors.flatMap((selector) =>
-        [...document.querySelectorAll<HTMLElement>(selector)].map((element) =>
-          Number.parseFloat(getComputedStyle(element).fontSize),
-        ),
-      ),
-      numberSizes: numberSelectors.flatMap((selector) =>
-        [...document.querySelectorAll<HTMLElement>(selector)].map((element) =>
-          Number.parseFloat(getComputedStyle(element).fontSize),
-        ),
-      ),
-    };
-  });
-  expect(mobileReadability.linkHeights.length).toBeGreaterThan(0);
-  expect(Math.min(...mobileReadability.linkHeights)).toBeGreaterThanOrEqual(44);
-  expect(Math.min(...mobileReadability.textSizes)).toBeGreaterThanOrEqual(13);
-  expect(Math.min(...mobileReadability.numberSizes)).toBeGreaterThanOrEqual(15);
-
-  await expect(page.getByRole('link', { name: /пройдите тренировку/i })).toHaveAttribute(
-    'href',
-    '/demo?cabinet=1&scenario=self_training&section=today',
+  await expect(trigger).toBeFocused();
+  await expect(nav).toBeHidden();
+  await trigger.click();
+  await expect(nav.getByRole('link', { name: 'Для тренера', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(nav).toBeHidden();
+  await page
+    .locator('.landing-v10-hero-audience')
+    .getByRole('link', { name: 'Для тренера', exact: true })
+    .click();
+  await expect(page).toHaveURL('/for-trainers');
+  await expect(page.locator('.landing-v10-hero-audience [aria-current="page"]')).toHaveText(
+    'Для тренера',
   );
-  await expect(page.getByRole('link', { name: /добавьте питание/i })).toHaveAttribute(
-    'href',
-    '/demo?cabinet=1&scenario=nutrition&section=nutrition',
-  );
-  await expect(page.getByRole('link', { name: /посмотрите кабинет тренера/i })).toHaveAttribute(
-    'href',
-    '/demo?cabinet=1&scenario=trainer&section=trainer',
-  );
-  await page.getByRole('link', { name: 'Приватность и данные' }).click();
-  await expect(page).toHaveURL(/#privacy$/);
-  await expect(page.locator('#privacy')).toBeInViewport();
-});
-
-test('motion has an immediate reduced-motion final state', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openLanding(page, 'dark');
-  await expectLandingReady(page);
-
-  const motionState = await page.evaluate(() => {
-    const path = document.querySelector<SVGPathElement>('.landing-energy-path path')!;
-    const proof = document.querySelector<HTMLElement>('.landing-core__desktop')!;
-    const athlete = document.querySelector<HTMLElement>('.landing-athlete-frame')!;
-    const product = document.querySelector<HTMLElement>('.landing-hero-device')!;
-    return {
-      pathOffset: getComputedStyle(path).strokeDashoffset,
-      pathAnimation: getComputedStyle(path).animationName,
-      proofOpacity: getComputedStyle(proof).opacity,
-      proofTransform: getComputedStyle(proof).transform,
-      athleteAnimation: getComputedStyle(athlete).animationName,
-      productAnimation: getComputedStyle(product).animationName,
-    };
-  });
-  expect(motionState.pathOffset).toMatch(/^0(px)?$/);
-  expect(motionState.pathAnimation).toBe('none');
-  expect(motionState.proofOpacity).toBe('1');
-  expect(motionState.proofTransform).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
-  expect(motionState.athleteAnimation).toBe('none');
-  expect(motionState.productAnimation).toBe('none');
+  await expect(nav).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'К содержимому' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('main')).toBeFocused();
 });
-
-test('captures the owner-review packet when requested', async ({ page, browser }) => {
-  if (!captureEvidence) return;
-
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  for (const theme of ['light', 'dark'] as const) {
-    await page.setViewportSize({ width: 1440, height: 1000 });
-    await openLanding(page, theme);
-    await expectLandingReady(page);
-    await settleForScreenshot(page);
-    await page.screenshot({ path: `${screenshotRoot}/desktop-1440-${theme}-hero.png` });
-    if (captureTelegramAccess) {
-      await page.locator('.landing-assurance__platform').screenshot({
-        path: `${screenshotRoot}/desktop-1440-${theme}-telegram-platform.png`,
-      });
-      await page.locator('.landing-footer').screenshot({
-        path: `${screenshotRoot}/desktop-1440-${theme}-footer.png`,
-      });
-    }
-    await loadAllProductProofs(page);
-    await page.locator('#product').screenshot({
-      path: `${screenshotRoot}/desktop-1440-${theme}-product.png`,
-    });
-    await page.locator('.landing-trainer').screenshot({
-      path: `${screenshotRoot}/desktop-1440-${theme}-trainer.png`,
-    });
-    if (captureTask109) {
-      await page.locator('.landing-contact').screenshot({
-        path: `${screenshotRoot}/desktop-1440-${theme}-final-cta.png`,
-      });
-    }
-    await settleForScreenshot(page);
-    await page.screenshot({
-      path: `${screenshotRoot}/desktop-1440-${theme}-full.png`,
-      fullPage: true,
-    });
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    await openLanding(page, theme);
-    await expectLandingReady(page);
-    await settleForScreenshot(page);
-    await page.screenshot({ path: `${screenshotRoot}/mobile-390-${theme}-hero.png` });
-    if (captureTelegramAccess) {
-      await page.locator('.landing-assurance__platform').screenshot({
-        path: `${screenshotRoot}/mobile-390-${theme}-telegram-platform.png`,
-      });
-      await page.locator('.landing-footer').screenshot({
-        path: `${screenshotRoot}/mobile-390-${theme}-footer.png`,
-      });
-    }
-    if (captureTask109) {
-      await page.locator('.landing-hero').screenshot({
-        path: `${screenshotRoot}/mobile-390-${theme}-hero-section.png`,
-      });
-    }
-    await loadAllProductProofs(page);
-    await page.addStyleTag({ content: '.public-shell__skip-link { display: none !important; }' });
-    await page.locator('#product').screenshot({
-      path: `${screenshotRoot}/mobile-390-${theme}-product.png`,
-    });
-    if (captureTask109) {
-      await page.locator('.landing-contact').screenshot({
-        path: `${screenshotRoot}/mobile-390-${theme}-final-cta.png`,
-      });
-    }
-    await settleForScreenshot(page);
-    await page.screenshot({
-      path: `${screenshotRoot}/mobile-390-${theme}-full.png`,
-      fullPage: true,
-    });
-  }
-
-  const mobile360Context = await browser.newContext({
-    viewport: { width: 360, height: 800 },
-    deviceScaleFactor: 2,
+test('canonical, alias indexation, campaign and hash history', async ({ page }) => {
+  await open(page, '/?utm_campaign=v10#coach-work', 'dark', 390);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    new URL('/', page.url()).href,
+  );
+  await expect(page.locator('#product')).toBeInViewport();
+  await page
+    .locator('.landing-v10-hero-audience')
+    .getByRole('link', { name: 'Для тренера', exact: true })
+    .click();
+  await expect(page).toHaveURL('/for-trainers?utm_campaign=v10#coach-work');
+  await expect(page.locator('#coach-work')).toBeInViewport();
+  await page.goBack();
+  await expect(page).toHaveURL('/?utm_campaign=v10#coach-work');
+  await expect(page.locator('#product')).toBeInViewport();
+  await page.goto('/for-athletes');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, follow');
+  await page.goto('/for-trainers#coach-promo');
+  await expect(page.locator('#coach-work')).toBeInViewport();
+});
+test('all archive interactive states remain explicit and local', async ({ page }) => {
+  await open(page, '/', 'dark', 1440);
+  const writes: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/api/') && r.method() !== 'GET') writes.push(r.url());
   });
-  const mobile360Page = await mobile360Context.newPage();
-  await mobile360Page.emulateMedia({ reducedMotion: 'reduce' });
-  await openLanding(mobile360Page, 'light');
-  await expectLandingReady(mobile360Page);
-  await expectNoHorizontalOverflow(mobile360Page, 360);
-  await settleForScreenshot(mobile360Page);
-  await mobile360Page.screenshot({
-    path: `${screenshotRoot}/mobile-360-light-overflow-crop.png`,
+  const training = page.locator('#training');
+  await training.getByRole('button', { name: 'Начать тренировку' }).click();
+  for (let i = 0; i < 3; i++)
+    await training.getByRole('button', { name: 'Завершить текущий подход' }).click();
+  await training.getByRole('button', { name: 'Завершить тренировку' }).click();
+  await expect(training.getByText('24 мин')).toBeVisible();
+  await training.getByRole('button', { name: 'Перейти к прогрессу' }).click();
+  await expect(training.getByText('+4.2%')).toBeVisible();
+  await page.getByRole('button', { name: 'Покупки', exact: true }).click();
+  await expect(page.getByText('60 г', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Дневник', exact: true }).click();
+  await expect(page.getByText('Записи пока нет')).toBeVisible();
+  await page.getByRole('button', { name: 'Отметить съеденное в примере' }).click();
+  await expect(page.getByRole('button', { name: 'Запись сохранена в примере' })).toBeDisabled();
+  await page.locator('#progress').scrollIntoViewIfNeeded();
+  await expect(page.locator('#progress [aria-busy="false"]')).toHaveCount(1);
+  await page.evaluate(() => document.fonts.ready);
+  await page.getByRole('button', { name: 'Открыть изменения' }).click();
+  await page.getByRole('button', { name: 'Посмотреть перед применением' }).click();
+  await page.getByRole('button', { name: 'Подтвердить в примере', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Подтверждено в примере' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Сообщение', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Текст черновика' }).fill('Локальный пример');
+  await page.getByRole('button', { name: 'Подтвердить черновик в примере' }).click();
+  await expect(page.getByRole('textbox')).toHaveValue('Локальный пример');
+  expect(writes).toEqual([]);
+});
+import { installTelegramHarness } from './fixtures/mobile-tma';
+for (const theme of ['light', 'dark'] as const)
+  test(`mocked TMA public surface, safe-area and resize ${theme}`, async ({ page }) => {
+    await installTelegramHarness(page, {
+      initData: '',
+      colorScheme: theme,
+      safeAreaInset: { top: 24, bottom: 34, left: 0, right: 0 },
+      contentSafeAreaInset: { top: 24, bottom: 0, left: 0, right: 0 },
+    });
+    for (const route of ['/', '/for-trainers']) {
+      await open(page, route, theme, 390);
+      await expect(page.locator('.ref-hero')).toBeVisible();
+      await page.getByRole('button', { name: 'Открыть меню' }).click();
+      await expect(page.getByRole('navigation', { name: 'Навигация по странице' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.setViewportSize({ width: 320, height: 640 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+      await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible();
+    }
   });
-  await mobile360Context.close();
+test('archive legal placeholder is explicit and returns keyboard focus', async ({ page }) => {
+  await open(page, '/', 'dark', 390);
+  const button = page.getByRole('button', { name: 'Условия использования', exact: true });
+  await button.click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(
+    page.getByText('Это предварительная версия лендинга. Юридический документ ещё не подключён.'),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(button).toBeFocused();
 });

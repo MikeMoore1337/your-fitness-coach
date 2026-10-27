@@ -16,12 +16,17 @@ describe('ContextualHelp', () => {
       </ContextualHelp>,
     );
 
-    const summary = screen.getByText('Что это?');
-    const details = summary.closest('details');
+    const summaryText = screen.getByText('Что это?');
+    const summary = summaryText.closest('summary') as HTMLElement;
+    const details = summary.closest('details') as HTMLDetailsElement;
+    expect(summary).toBeInTheDocument();
     expect(details).not.toHaveAttribute('open');
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
+    expect(summary?.querySelector('.disclosure-icon')).toBeInTheDocument();
 
     fireEvent.click(summary);
     expect(details).toHaveAttribute('open');
+    expect(summary).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Короткое объяснение')).toBeVisible();
     expect(screen.getByRole('link', { name: /подробнее на сайте/i })).toHaveAttribute(
       'href',
@@ -39,6 +44,7 @@ describe('ContextualHelp', () => {
     summary.focus();
     fireEvent.click(summary);
     expect(details).not.toHaveAttribute('open');
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
     expect(summary).toHaveFocus();
   });
 
@@ -89,5 +95,24 @@ describe('ContextualHelp', () => {
     expect(click.defaultPrevented).toBe(false);
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('closes with Escape and keeps a truthful fallback when no source exists', () => {
+    render(
+      <ContextualHelp summary="Как устроен цикл?">
+        <p>Восьмидневный цикл повторяется после восьмой тренировки.</p>
+      </ContextualHelp>,
+    );
+
+    const summary = screen.getByText('Как устроен цикл?');
+    const details = summary.closest('details') as HTMLDetailsElement;
+    fireEvent.click(summary);
+    expect(screen.getByText('Источник: нет ссылки.')).toBeVisible();
+    expect(details.querySelector('a')).not.toBeInTheDocument();
+
+    summary.focus();
+    fireEvent.keyDown(summary, { key: 'Escape' });
+    expect(details).not.toHaveAttribute('open');
+    expect(summary).toHaveFocus();
   });
 });

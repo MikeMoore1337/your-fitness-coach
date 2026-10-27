@@ -1,0 +1,140 @@
+{
+  "browser": "chromium",
+  "theme": "light",
+  "width": 360,
+  "height": 932,
+  "geometry": {
+    "viewport": 360,
+    "documentWidth": 360,
+    "rowGap": 12,
+    "headingToFirstCard": 12,
+    "cardRowGap": 12,
+    "firstToSecondCard": 12,
+    "listBorderWidths": [
+      "0px",
+      "0px",
+      "0px",
+      "0px"
+    ],
+    "cards": [
+      {
+        "left": 28,
+        "right": 332,
+        "width": 304,
+        "descendants": [
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          }
+        ]
+      },
+      {
+        "left": 28,
+        "right": 332,
+        "width": 304,
+        "descendants": [
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 319
+          },
+          {
+            "left": 41,
+            "right": 105
+          },
+          {
+            "left": 113,
+            "right": 319
+          }
+        ]
+      }
+    ]
+  }
+}

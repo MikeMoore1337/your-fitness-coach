@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_coach
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.core.timezone import now_for_user_naive
+from fitminiapp_api.core.timezone import (
+    get_user_timezone_name,
+    now_for_user_naive,
+    today_in_timezone,
+)
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.program import (
     UserProgram,
@@ -14,6 +18,72 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.check_in import WeeklyCheckInHistoryResponse
+from fitminiapp_api.schemas.check_in_templates import (
+    CheckInTemplateAssignmentCreate,
+    CheckInTemplateAssignmentResponse,
+    CheckInTemplateCreate,
+    CheckInTemplateListResponse,
+    CheckInTemplateResponse,
+    CheckInTemplateResponseHistory,
+    CheckInTemplateStateUpdate,
+    CheckInTemplateVersionCreate,
+    CheckInTemplateVersionResponse,
+)
+from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
+from fitminiapp_api.schemas.coach_capacity import CoachCapacityResponse
+from fitminiapp_api.schemas.coach_crm import (
+    CoachAgendaResponse,
+    CoachClientLabelsResponse,
+    CoachClientLabelsUpdate,
+    CoachClientOperationalStatusUpdate,
+    CoachClientOperationsResponse,
+    CoachOperationsTodayResponse,
+    CoachPackageCreate,
+    CoachPackageResponse,
+    CoachPackageStateUpdate,
+    CoachPaymentCreate,
+    CoachPaymentResponse,
+    CoachPaymentUpdate,
+    CoachSessionCreate,
+    CoachSessionResponse,
+    CoachSessionUpdate,
+    CoachTaskCreate,
+    CoachTaskResponse,
+    CoachTaskStateUpdate,
+)
+from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
+from fitminiapp_api.schemas.coach_program_rollout import (
+    CoachProgramRolloutApplyRequest,
+    CoachProgramRolloutApplyResponse,
+    CoachProgramRolloutPreviewRequest,
+    CoachProgramRolloutPreviewResponse,
+)
+from fitminiapp_api.schemas.coach_review_workspace import CoachReviewWorkspaceResponse
+from fitminiapp_api.schemas.coach_reviews import (
+    CoachCheckInReviewItem,
+    CoachCheckInReviewListResponse,
+    CoachCheckInReviewRequest,
+)
+from fitminiapp_api.schemas.coach_workflow_automation import (
+    CoachWorkflowAutomationResponse,
+)
+from fitminiapp_api.schemas.coach_workflow_templates import (
+    CommunicationDraftCreate,
+    CommunicationDraftResponse,
+    CommunicationDraftUpdate,
+    CommunicationTemplateCreate,
+    CommunicationTemplateListResponse,
+    CommunicationTemplateResponse,
+    CommunicationTemplateVersionCreate,
+    CommunicationTemplateVersionResponse,
+    OnboardingTemplateAssignmentCreate,
+    OnboardingTemplateCreate,
+    OnboardingTemplateListResponse,
+    OnboardingTemplateResponse,
+    OnboardingTemplateVersionCreate,
+    OnboardingTemplateVersionResponse,
+    WorkflowAssignmentResponse,
+)
 from fitminiapp_api.schemas.feedback import (
     WorkoutCommentCreate,
     WorkoutCommentResponse,
@@ -37,8 +107,10 @@ from fitminiapp_api.schemas.progress import (
     ProgressSummaryResponse,
     TrainerClientProgressListResponse,
 )
+from fitminiapp_api.schemas.report_handoff import ReportHandoffResponse
 from fitminiapp_api.schemas.user import UserProfileUpdate
 from fitminiapp_api.schemas.workout import (
+    BodyMeasurementDefinitionResponse,
     BodyMeasurementResponse,
     BodyMeasurementSave,
     TrainingAnalyticsResponse,
@@ -53,19 +125,78 @@ from fitminiapp_api.services.analytics import (
     build_workout_timeline,
 )
 from fitminiapp_api.services.audit import record_audit_event
+from fitminiapp_api.services.check_in_templates import (
+    CheckInTemplateError,
+    assign_template,
+    create_template,
+    create_template_version,
+    list_response_history,
+    list_templates,
+    set_template_active,
+)
+from fitminiapp_api.services.coach_attention import build_coach_attention
+from fitminiapp_api.services.coach_capacity import build_coach_capacity_snapshot
 from fitminiapp_api.services.coach_clients import (
     create_coach_invite_link,
     get_client_managed_by_coach,
     remove_client_for_coach,
     revoke_coach_invite,
+    update_client_labels,
+)
+from fitminiapp_api.services.coach_crm import (
+    CoachCrmError,
+    client_operations,
+    create_package,
+    create_payment,
+    create_sessions,
+    create_task,
+    list_packages,
+    list_payments,
+    list_sessions,
+    list_tasks,
+    operations_today,
+    update_client_operational_status,
+    update_package_state,
+    update_payment,
+    update_session,
+    update_task_state,
+)
+from fitminiapp_api.services.coach_inbox import build_coach_inbox
+from fitminiapp_api.services.coach_program_rollout import (
+    CoachProgramRolloutError,
+    apply_coach_program_rollout,
+    preview_coach_program_rollout,
+)
+from fitminiapp_api.services.coach_review_workspace import build_coach_review_workspace
+from fitminiapp_api.services.coach_reviews import (
+    CoachReviewError,
+    list_coach_check_in_reviews,
+    review_coach_check_in,
+)
+from fitminiapp_api.services.coach_workflow_automation import evaluate_coach_workflow
+from fitminiapp_api.services.coach_workflow_templates import (
+    CoachWorkflowTemplateError,
+    assign_onboarding_template,
+    confirm_communication_draft,
+    create_communication_draft,
+    create_communication_template,
+    create_communication_template_version,
+    create_onboarding_template,
+    create_onboarding_template_version,
+    get_communication_draft,
+    list_communication_templates,
+    list_onboarding_templates,
+    update_communication_draft,
 )
 from fitminiapp_api.services.exercise_catalog import _effective_exercise_id, list_exercises
 from fitminiapp_api.services.measurements import (
     MeasurementError,
     MeasurementNotFoundError,
     delete_measurement,
+    list_custom_measurement_definitions,
     list_measurements,
     save_measurement,
+    serialize_custom_measurement_definition,
     serialize_measurement,
 )
 from fitminiapp_api.services.notifications import cancel_workout_reminder, queue_notification
@@ -91,6 +222,10 @@ from fitminiapp_api.services.progress import (
 )
 from fitminiapp_api.services.progress_report_downloads import create_progress_report_download_token
 from fitminiapp_api.services.progress_reports import build_progress_report
+from fitminiapp_api.services.report_handoffs import (
+    ReportHandoffError,
+    list_trainer_report_handoffs,
+)
 from fitminiapp_api.services.weekly_check_ins import list_weekly_check_ins
 from fitminiapp_api.services.workout_comments import (
     WorkoutCommentError,
@@ -106,9 +241,41 @@ WorkoutCommentIdempotencyKey = Annotated[
     str | None,
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
 ]
+CoachCrmIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
+CheckInTemplateIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
+CoachProgramRolloutIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
+CoachWorkflowIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
+
+
+def _crm_error(exc: CoachCrmError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 def _comment_error(exc: WorkoutCommentError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+def _review_error(exc: CoachReviewError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+def _check_in_template_error(exc: CheckInTemplateError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+def _workflow_template_error(exc: CoachWorkflowTemplateError) -> HTTPException:
     return HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -206,6 +373,700 @@ def coach_clients(
     db: Session = Depends(get_db),
 ):
     return list_clients(db, current_user)
+
+
+@router.get("/attention", response_model=CoachAttentionResponse)
+def coach_attention(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachAttentionResponse:
+    return CoachAttentionResponse.model_validate(
+        build_coach_attention(db, current_user, limit=limit)
+    )
+
+
+@router.get("/inbox", response_model=CoachInboxResponse)
+def coach_inbox(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachInboxResponse:
+    return CoachInboxResponse.model_validate(build_coach_inbox(db, current_user, limit=limit))
+
+
+@router.get(
+    "/workflow-automation/preview",
+    response_model=CoachWorkflowAutomationResponse,
+)
+def coach_workflow_automation_preview(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachWorkflowAutomationResponse:
+    return CoachWorkflowAutomationResponse.model_validate(
+        evaluate_coach_workflow(db, current_user, apply=False)
+    )
+
+
+@router.post(
+    "/workflow-automation/evaluate",
+    response_model=CoachWorkflowAutomationResponse,
+)
+def coach_workflow_automation_evaluate(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachWorkflowAutomationResponse:
+    return CoachWorkflowAutomationResponse.model_validate(
+        evaluate_coach_workflow(db, current_user, apply=True)
+    )
+
+
+@router.post(
+    "/program-rollouts/preview",
+    response_model=CoachProgramRolloutPreviewResponse,
+)
+def coach_program_rollout_preview(
+    payload: CoachProgramRolloutPreviewRequest,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachProgramRolloutPreviewResponse:
+    try:
+        return CoachProgramRolloutPreviewResponse.model_validate(
+            preview_coach_program_rollout(db, current_user, payload)
+        )
+    except CoachProgramRolloutError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/program-rollouts/apply",
+    response_model=CoachProgramRolloutApplyResponse,
+)
+def coach_program_rollout_apply(
+    payload: CoachProgramRolloutApplyRequest,
+    idempotency_key: CoachProgramRolloutIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachProgramRolloutApplyResponse:
+    try:
+        return CoachProgramRolloutApplyResponse.model_validate(
+            apply_coach_program_rollout(
+                db,
+                current_user,
+                payload,
+                header_idempotency_key=idempotency_key,
+            )
+        )
+    except CoachProgramRolloutError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.get("/capacity", response_model=CoachCapacityResponse)
+def coach_capacity(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachCapacityResponse:
+    return CoachCapacityResponse.model_validate(build_coach_capacity_snapshot(db, current_user))
+
+
+@router.get(
+    "/check-ins/review",
+    response_model=CoachCheckInReviewListResponse,
+)
+def coach_check_in_reviews(
+    review_status: str | None = Query(default=None, alias="status", pattern="^(pending|reviewed)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachCheckInReviewListResponse:
+    return CoachCheckInReviewListResponse.model_validate(
+        list_coach_check_in_reviews(
+            db,
+            current_user,
+            status=review_status,
+            limit=limit,
+            offset=offset,
+        )
+    )
+
+
+@router.get(
+    "/clients/{client_id}/review-workspace",
+    response_model=CoachReviewWorkspaceResponse,
+)
+def coach_client_review_workspace(
+    client_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachReviewWorkspaceResponse:
+    client = _managed_client(db, current_user, client_id)
+    return build_coach_review_workspace(db, current_user, client)
+
+
+@router.post(
+    "/check-ins/{check_in_id}/review",
+    response_model=CoachCheckInReviewItem,
+)
+def review_coach_check_in_route(
+    check_in_id: int,
+    payload: CoachCheckInReviewRequest,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachCheckInReviewItem:
+    try:
+        return review_coach_check_in(db, current_user, check_in_id, payload)
+    except CoachReviewError as exc:
+        raise _review_error(exc) from exc
+
+
+@router.get("/check-in-templates", response_model=CheckInTemplateListResponse)
+def coach_check_in_templates(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateListResponse:
+    return CheckInTemplateListResponse.model_validate(list_templates(db, current_user))
+
+
+@router.post(
+    "/check-in-templates",
+    response_model=CheckInTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_check_in_template(
+    payload: CheckInTemplateCreate,
+    idempotency_key: CheckInTemplateIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateResponse:
+    try:
+        return CheckInTemplateResponse.model_validate(
+            create_template(db, current_user, payload, idempotency_key)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.post(
+    "/check-in-templates/{template_id}/versions",
+    response_model=CheckInTemplateVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_check_in_template_version(
+    template_id: int,
+    payload: CheckInTemplateVersionCreate,
+    idempotency_key: CheckInTemplateIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateVersionResponse:
+    try:
+        return CheckInTemplateVersionResponse.model_validate(
+            create_template_version(db, current_user, template_id, payload, idempotency_key)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.patch(
+    "/check-in-templates/{template_id}",
+    response_model=CheckInTemplateResponse,
+)
+def update_coach_check_in_template_state(
+    template_id: int,
+    payload: CheckInTemplateStateUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateResponse:
+    try:
+        return CheckInTemplateResponse.model_validate(
+            set_template_active(db, current_user, template_id, payload.is_active)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.post(
+    "/check-in-templates/{template_id}/assignments",
+    response_model=CheckInTemplateAssignmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def assign_coach_check_in_template(
+    template_id: int,
+    payload: CheckInTemplateAssignmentCreate,
+    idempotency_key: CheckInTemplateIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateAssignmentResponse:
+    try:
+        return CheckInTemplateAssignmentResponse.model_validate(
+            assign_template(db, current_user, template_id, payload, idempotency_key)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.get(
+    "/check-in-templates/{template_id}/responses",
+    response_model=CheckInTemplateResponseHistory,
+)
+def coach_check_in_template_responses(
+    template_id: int,
+    client_id: int | None = Query(default=None, gt=0),
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateResponseHistory:
+    try:
+        return CheckInTemplateResponseHistory.model_validate(
+            list_response_history(
+                db,
+                current_user,
+                template_id,
+                client_id,
+                limit=limit,
+            )
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.get(
+    "/workflow-templates/onboarding",
+    response_model=OnboardingTemplateListResponse,
+)
+def coach_onboarding_templates(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> OnboardingTemplateListResponse:
+    return OnboardingTemplateListResponse.model_validate(
+        list_onboarding_templates(db, current_user)
+    )
+
+
+@router.post(
+    "/workflow-templates/onboarding",
+    response_model=OnboardingTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_onboarding_template(
+    payload: OnboardingTemplateCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> OnboardingTemplateResponse:
+    try:
+        return OnboardingTemplateResponse.model_validate(
+            create_onboarding_template(db, current_user, payload, idempotency_key)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/onboarding/{template_id}/versions",
+    response_model=OnboardingTemplateVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_onboarding_template_version(
+    template_id: int,
+    payload: OnboardingTemplateVersionCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> OnboardingTemplateVersionResponse:
+    try:
+        return OnboardingTemplateVersionResponse.model_validate(
+            create_onboarding_template_version(
+                db,
+                current_user,
+                template_id,
+                payload,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/onboarding/{template_id}/assignments",
+    response_model=WorkflowAssignmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def assign_coach_onboarding_template(
+    template_id: int,
+    payload: OnboardingTemplateAssignmentCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> WorkflowAssignmentResponse:
+    try:
+        return WorkflowAssignmentResponse.model_validate(
+            assign_onboarding_template(
+                db,
+                current_user,
+                template_id,
+                payload.client_id,
+                payload.version,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.get(
+    "/workflow-templates/communication",
+    response_model=CommunicationTemplateListResponse,
+)
+def coach_communication_templates(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationTemplateListResponse:
+    return CommunicationTemplateListResponse.model_validate(
+        list_communication_templates(db, current_user)
+    )
+
+
+@router.post(
+    "/workflow-templates/communication",
+    response_model=CommunicationTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_communication_template(
+    payload: CommunicationTemplateCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationTemplateResponse:
+    try:
+        return CommunicationTemplateResponse.model_validate(
+            create_communication_template(db, current_user, payload, idempotency_key)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/communication/{template_id}/versions",
+    response_model=CommunicationTemplateVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_communication_template_version(
+    template_id: int,
+    payload: CommunicationTemplateVersionCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationTemplateVersionResponse:
+    try:
+        return CommunicationTemplateVersionResponse.model_validate(
+            create_communication_template_version(
+                db,
+                current_user,
+                template_id,
+                payload,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/communication/{template_id}/drafts",
+    response_model=CommunicationDraftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_communication_draft(
+    template_id: int,
+    payload: CommunicationDraftCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            create_communication_draft(
+                db,
+                current_user,
+                template_id,
+                payload,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.patch(
+    "/communication-drafts/{draft_id}",
+    response_model=CommunicationDraftResponse,
+)
+def update_coach_communication_draft(
+    draft_id: int,
+    payload: CommunicationDraftUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            update_communication_draft(db, current_user, draft_id, payload)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.get(
+    "/communication-drafts/{draft_id}",
+    response_model=CommunicationDraftResponse,
+)
+def get_coach_communication_draft(
+    draft_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            get_communication_draft(db, current_user, draft_id)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/communication-drafts/{draft_id}/confirm",
+    response_model=CommunicationDraftResponse,
+)
+def confirm_coach_communication_draft(
+    draft_id: int,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            confirm_communication_draft(db, current_user, draft_id, idempotency_key)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.get("/operations/today", response_model=CoachOperationsTodayResponse)
+def coach_operations_today(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    try:
+        return operations_today(db, current_user)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/agenda", response_model=CoachAgendaResponse)
+def coach_agenda(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachAgendaResponse:
+    resolved_from = date_from or today_in_timezone(get_user_timezone_name(current_user))
+    resolved_to = date_to or (resolved_from + timedelta(days=6))
+    try:
+        return CoachAgendaResponse(
+            date_from=resolved_from,
+            date_to=resolved_to,
+            timezone=get_user_timezone_name(current_user),
+            items=list_sessions(db, current_user, date_from=resolved_from, date_to=resolved_to),
+        )
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post(
+    "/sessions", response_model=list[CoachSessionResponse], status_code=status.HTTP_201_CREATED
+)
+def create_coach_sessions(
+    payload: CoachSessionCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachSessionResponse]:
+    try:
+        return create_sessions(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/sessions/{session_id}", response_model=CoachSessionResponse)
+def update_coach_session(
+    session_id: int,
+    payload: CoachSessionUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachSessionResponse:
+    try:
+        return update_session(db, current_user, session_id, payload)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/clients/{client_id}/operations", response_model=CoachClientOperationsResponse)
+def coach_client_operations(
+    client_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    try:
+        return client_operations(db, current_user, client_id)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/clients/{client_id}/operational-status")
+def update_coach_client_operational_status(
+    client_id: int,
+    payload: CoachClientOperationalStatusUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    try:
+        update_client_operational_status(db, current_user, client_id, payload.operational_status)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+    return {"operational_status": payload.operational_status}
+
+
+@router.patch(
+    "/clients/{client_id}/labels",
+    response_model=CoachClientLabelsResponse,
+)
+def update_coach_client_labels(
+    client_id: int,
+    payload: CoachClientLabelsUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachClientLabelsResponse:
+    try:
+        labels = update_client_labels(db, current_user, client_id, payload.labels)
+    except ProgramError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return CoachClientLabelsResponse(client_id=client_id, labels=labels)
+
+
+@router.get("/packages", response_model=list[CoachPackageResponse])
+def coach_packages(
+    client_id: int | None = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachPackageResponse]:
+    try:
+        return list_packages(db, current_user, client_id)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post("/packages", response_model=CoachPackageResponse, status_code=status.HTTP_201_CREATED)
+def create_coach_package(
+    payload: CoachPackageCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPackageResponse:
+    try:
+        return create_package(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/packages/{package_id}/state", response_model=CoachPackageResponse)
+def update_coach_package_state(
+    package_id: int,
+    payload: CoachPackageStateUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPackageResponse:
+    try:
+        return update_package_state(db, current_user, package_id, payload.state)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/payments", response_model=list[CoachPaymentResponse])
+def coach_payments(
+    client_id: int | None = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachPaymentResponse]:
+    try:
+        return list_payments(db, current_user, client_id)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post("/payments", response_model=CoachPaymentResponse, status_code=status.HTTP_201_CREATED)
+def create_coach_payment(
+    payload: CoachPaymentCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPaymentResponse:
+    try:
+        return create_payment(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/payments/{payment_id}", response_model=CoachPaymentResponse)
+def update_coach_payment(
+    payment_id: int,
+    payload: CoachPaymentUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPaymentResponse:
+    try:
+        return update_payment(db, current_user, payment_id, payload)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/tasks", response_model=list[CoachTaskResponse])
+def coach_tasks(
+    client_id: int | None = None,
+    state: str | None = Query(default=None, pattern="^(open|completed)$"),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachTaskResponse]:
+    try:
+        return list_tasks(db, current_user, client_id=client_id, state=state)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post("/tasks", response_model=CoachTaskResponse, status_code=status.HTTP_201_CREATED)
+def create_coach_task(
+    payload: CoachTaskCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachTaskResponse:
+    try:
+        return create_task(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/tasks/{task_id}/state", response_model=CoachTaskResponse)
+def update_coach_task_state(
+    task_id: int,
+    payload: CoachTaskStateUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachTaskResponse:
+    try:
+        return update_task_state(db, current_user, task_id, payload.state)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
 
 
 @router.get(
@@ -316,6 +1177,22 @@ def coach_client_progress_report(
         )
     except NutritionReportError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
+
+
+@router.get(
+    "/clients/{client_id}/report-handoffs",
+    response_model=list[ReportHandoffResponse],
+)
+def coach_client_report_handoffs(
+    client_id: int,
+    limit: int = Query(default=5, ge=1, le=20),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[ReportHandoffResponse]:
+    try:
+        return list_trainer_report_handoffs(db, current_user, client_id, limit=limit)
+    except ReportHandoffError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post(
@@ -666,6 +1543,27 @@ def coach_client_measurements(
 ):
     client = _managed_client(db, current_user, client_id)
     return [serialize_measurement(row) for row in list_measurements(db, client, limit=limit)]
+
+
+@router.get(
+    "/clients/{client_id}/measurements/custom-definitions",
+    response_model=list[BodyMeasurementDefinitionResponse],
+)
+def coach_client_measurement_definitions(
+    client_id: int,
+    include_archived: bool = Query(default=True),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+):
+    client = _managed_client(db, current_user, client_id)
+    return [
+        serialize_custom_measurement_definition(row)
+        for row in list_custom_measurement_definitions(
+            db,
+            client,
+            include_archived=include_archived,
+        )
+    ]
 
 
 @router.post(

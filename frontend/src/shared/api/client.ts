@@ -1,4 +1,5 @@
 import { crossContextCoordinator, type CrossContextCoordinator } from '../browser/crossContextLock';
+import { getApiRuntime } from '../runtime/runtime';
 
 const ACCESS_TOKEN_KEY = 'fit_access_token';
 const AUTH_CHANNEL_NAME = 'fit_auth_session';
@@ -105,6 +106,87 @@ export class ApiError extends Error {
   }
 }
 
+const DEFAULT_USER_FACING_ERROR = 'Не удалось выполнить запрос. Попробуйте ещё раз.';
+const SERVER_ERROR_MESSAGE = 'Сервис временно недоступен. Попробуйте ещё раз.';
+const STATUS_ERROR_MESSAGES: Record<number, string> = {
+  400: 'Не удалось выполнить запрос. Проверьте введённые данные.',
+  401: 'Сессия недействительна или истекла. Войдите снова.',
+  403: 'Недостаточно прав для выполнения этого действия.',
+  404: 'Запрошенные данные не найдены.',
+  409: 'Данные уже изменились. Обновите страницу и повторите попытку.',
+  422: 'Проверьте введённые данные.',
+  429: 'Слишком много запросов. Попробуйте позже.',
+};
+const UNSAFE_DETAIL_PATTERN =
+  /<[^>]*>|traceback|stack trace|exception|\berror\b|\b(?:select|insert|update|delete|drop|alter|create)\b|\bsql\b|postgres|psycopg|sqlalchemy|connection\s*string|\b(?:access\s+|refresh\s+)?token\b|bearer\s+|secret|password|authorization|https?:\/\/|file:\/\/|(?:[A-Za-z]:[\\/])|(?:^|[\s(["'])\/(?:app|usr|var|home|tmp|workspace|etc)(?:[\\/]|$)/i;
+
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+}
+
+function isSafeUserFacingDetail(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const detail = value.trim();
+  if (
+    !detail ||
+    detail.length > 500 ||
+    !/[А-Яа-яЁё]/u.test(detail) ||
+    hasControlCharacters(detail) ||
+    UNSAFE_DETAIL_PATTERN.test(detail) ||
+    /[A-Za-z0-9_-]{24,}/.test(detail)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function errorDetail(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  if (!Object.prototype.hasOwnProperty.call(body, 'detail')) return null;
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail === 'string') return detail;
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return null;
+  if (!Object.prototype.hasOwnProperty.call(detail, 'message')) return null;
+  return (detail as { message?: unknown }).message;
+}
+
+export function apiErrorDetailIncludes(error: unknown, phrase: string): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const normalizedPhrase = phrase.trim().toLowerCase();
+  const detail = errorDetail(error.body);
+  return Boolean(
+    normalizedPhrase &&
+    typeof detail === 'string' &&
+    detail.toLowerCase().includes(normalizedPhrase),
+  );
+}
+
+function statusErrorMessage(status: number): string {
+  if (status >= 500 && status <= 599) return SERVER_ERROR_MESSAGE;
+  return STATUS_ERROR_MESSAGES[status] ?? DEFAULT_USER_FACING_ERROR;
+}
+
+function userFacingResponseErrorMessage(status: number, body: unknown): string {
+  if (status >= 500 && status <= 599) return SERVER_ERROR_MESSAGE;
+  const detail = errorDetail(body);
+  return isSafeUserFacingDetail(detail) ? detail.trim() : statusErrorMessage(status);
+}
+
+export function getUserFacingErrorMessage(
+  error: unknown,
+  fallback = DEFAULT_USER_FACING_ERROR,
+): string {
+  if (!(error instanceof ApiError)) return fallback;
+  if (error.status >= 500 && error.status <= 599) return SERVER_ERROR_MESSAGE;
+  if (error.status === 0 || error.body === null) {
+    return isSafeUserFacingDetail(error.message) ? error.message.trim() : fallback;
+  }
+  return userFacingResponseErrorMessage(error.status, error.body);
+}
+
 function migrateLegacyToken(): void {
   const legacy = localStorage.getItem(ACCESS_TOKEN_KEY);
   if (legacy && !sessionStorage.getItem(ACCESS_TOKEN_KEY)) {
@@ -137,24 +219,12 @@ export function clearAccessToken(): void {
 async function responseError(response: Response): Promise<ApiError> {
   const text = await response.text();
   let body: unknown = text;
-  let message = text || `Ошибка ${response.status}`;
   try {
     body = JSON.parse(text);
-    if (body && typeof body === 'object' && 'detail' in body) {
-      const detail = (body as { detail: unknown }).detail;
-      if (typeof detail === 'string') message = detail;
-      if (Array.isArray(detail)) {
-        message = detail
-          .map((item) =>
-            item && typeof item === 'object' && 'msg' in item ? String(item.msg) : String(item),
-          )
-          .join(' ');
-      }
-    }
   } catch {
-    // Non-JSON error bodies remain readable.
+    // Keep the raw body for diagnostics, but do not show non-JSON responses to users.
   }
-  return new ApiError(message.slice(0, 500), response.status, body);
+  return new ApiError(userFacingResponseErrorMessage(response.status, body), response.status, body);
 }
 
 let refreshPromise: Promise<boolean> | null = null;
@@ -239,7 +309,33 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   else signal?.addEventListener('abort', abortFromCaller, { once: true });
   const token = getAccessToken();
   const formData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const runtime = getApiRuntime();
   try {
+    if (runtime.kind === 'demo') {
+      if (formData) {
+        throw new ApiError('Загрузка файлов недоступна в демо-режиме.', 403);
+      }
+      const method = (init.method ?? 'GET').toUpperCase();
+      const response = await fetch('/api/v1/demo/sessions/current/transport', {
+        method: 'POST',
+        credentials: 'omit',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Demo-Session': runtime.sessionToken,
+        },
+        body: JSON.stringify({
+          path,
+          method,
+          body: body === undefined ? null : typeof body === 'string' ? body : body,
+        }),
+      });
+      if (!response.ok) throw await responseError(response);
+      if (response.status === 204) return undefined as T;
+      const text = await response.text();
+      if (method !== 'GET' && method !== 'HEAD') void runtime.onMutation?.();
+      return (text ? JSON.parse(text) : null) as T;
+    }
     const response = await fetch(path, {
       ...init,
       credentials: 'same-origin',
@@ -292,6 +388,9 @@ export async function apiFile(
   path: string,
   { retryAuth = true }: { retryAuth?: boolean } = {},
 ): Promise<ApiFile> {
+  if (getApiRuntime().kind === 'demo') {
+    throw new ApiError('Скачивание файлов недоступно в демо-режиме.', 403);
+  }
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 15_000);
   const token = getAccessToken();

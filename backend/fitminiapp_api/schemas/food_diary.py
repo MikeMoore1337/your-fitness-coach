@@ -7,12 +7,15 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 MealType = Literal["breakfast", "lunch", "dinner", "snacks"]
-DiaryAmountUnit = Literal["g", "serving"]
+DiaryAmountUnit = Literal["g", "ml", "serving"]
 DiaryDayStatus = Literal["complete", "incomplete", "unlogged", "fasted"]
+NutritionSource = Literal["catalog", "recipe", "manual", "restaurant", "photo"]
+NutritionConfidence = Literal["exact", "approximate", "partial"]
 
 
 class FoodDiaryQuickAdd(BaseModel):
     name: str | None = Field(default=None, max_length=256)
+    nutrition_source: Literal["manual", "restaurant", "photo"] = "manual"
     energy_kcal: Decimal = Field(
         gt=0,
         le=10000,
@@ -50,15 +53,6 @@ class FoodDiaryQuickAdd(BaseModel):
     def normalize_name(cls, value: str | None) -> str | None:
         normalized = " ".join(value.split()) if value is not None else ""
         return normalized or None
-
-    @model_validator(mode="after")
-    def require_all_or_no_macros(self) -> FoodDiaryQuickAdd:
-        macros = (self.protein_g, self.fat_g, self.carbs_g)
-        if any(value is not None for value in macros) and not all(
-            value is not None for value in macros
-        ):
-            raise ValueError("protein, fat and carbs must be provided together")
-        return self
 
 
 class FoodDiaryEntryCreate(BaseModel):
@@ -126,12 +120,18 @@ class FoodDiaryEntryResponse(BaseModel):
     food_id: int | None
     recipe_id: int | None
     entry_kind: Literal["food", "recipe", "quick_add"]
+    # Optional so older cached/demo responses remain readable during additive rollout.
+    nutrition_source: NutritionSource | None = None
+    nutrition_confidence: NutritionConfidence | None = None
     logged_at: time | None
     food_name: str
     food_brand: str | None
     amount: Decimal
     amount_unit: DiaryAmountUnit
-    weight_g: Decimal
+    weight_g: Decimal | None
+    nutrition_basis_kind: Literal["per_100_g", "per_100_ml", "per_serving"] | None = None
+    nutrition_basis_amount: Decimal | None = None
+    nutrition_basis_unit: Literal["g", "ml", "serving"] | None = None
     serving_amount: Decimal | None
     serving_unit: str | None
     serving_weight_g: Decimal | None
@@ -153,6 +153,12 @@ class FoodDiaryTargets(BaseModel):
     carbs_g: Decimal | None
 
 
+class FoodDiaryRepeatCandidate(BaseModel):
+    source_date: date
+    source_meal_type: MealType
+    entry_count: int = Field(gt=0)
+
+
 class FoodDiaryDayResponse(BaseModel):
     diary_date: date
     timezone: str
@@ -162,6 +168,7 @@ class FoodDiaryDayResponse(BaseModel):
     remaining: FoodDiaryTargets | None
     status: DiaryDayStatus
     status_is_explicit: bool
+    repeat_candidate: FoodDiaryRepeatCandidate | None = None
 
 
 class FoodDiaryDayStatusUpdate(BaseModel):
@@ -169,7 +176,7 @@ class FoodDiaryDayStatusUpdate(BaseModel):
     status: DiaryDayStatus
 
 
-class FoodDiaryCopyProduct(BaseModel):
+class FoodDiaryCopyProductPreview(BaseModel):
     source_entry_id: int = Field(gt=0)
     source_date: date
     source_meal_type: MealType
@@ -177,16 +184,39 @@ class FoodDiaryCopyProduct(BaseModel):
     target_meal_type: MealType
 
 
-class FoodDiaryCopyMeal(BaseModel):
+class FoodDiaryCopyProduct(FoodDiaryCopyProductPreview):
+    preview_token: str = Field(min_length=16, max_length=256)
+
+
+class FoodDiaryCopyMealPreview(BaseModel):
     source_date: date
     source_meal_type: MealType
     target_date: date
     target_meal_type: MealType
 
 
-class FoodDiaryCopyDay(BaseModel):
+class FoodDiaryCopyMeal(FoodDiaryCopyMealPreview):
+    preview_token: str = Field(min_length=16, max_length=256)
+
+
+class FoodDiaryCopyDayPreview(BaseModel):
     source_date: date
     target_date: date
+
+
+class FoodDiaryCopyDay(FoodDiaryCopyDayPreview):
+    preview_token: str = Field(min_length=16, max_length=256)
+
+
+class FoodDiaryCopyPreviewResponse(BaseModel):
+    copy_scope: Literal["product", "meal", "day"]
+    source_date: date
+    source_meal_type: MealType | None
+    target_date: date
+    target_meal_type: MealType | None
+    entries: list[FoodDiaryEntryResponse]
+    preview_token: str
+    previewed_at: datetime
 
 
 class FoodDiaryCopyResponse(BaseModel):

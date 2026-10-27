@@ -9,19 +9,37 @@ from typing import Any
 
 URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
 SAFE_CODE_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,127}\Z")
+SAFE_IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9_.:/-]{1,128}\Z")
 SAFE_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
+SAFE_TIMESTAMP_PATTERN = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})\Z"
+)
+SAFE_REPORT_REVISION_PATTERN = re.compile(r"[0-9a-f]{64}\Z", re.IGNORECASE)
 SAFE_METHOD_PATTERN = re.compile(r"[A-Z]{3,10}\Z")
 SAFE_ROUTE_PATTERN = re.compile(r"(?:/[A-Za-z0-9_./{}:-]{0,255}|unmatched)\Z")
 SAFE_EVENT_NAMES = frozenset(
     {
         "application_started",
         "application_stopped",
+        "ai_coach_generation",
+        "ai_coach_chat_generation",
+        "ai_coach_adaptation_generation",
+        "ai_coach_quota_rate_limited",
+        "ai_coach_quota_consumed",
+        "ai_coach_quota_released",
+        "ai_coach_quota_finalize_failed",
+        "nutrition_scan_started",
+        "nutrition_scan_completed",
+        "nutrition_scan_failed",
+        "nutrition_scan_confirmed",
         "auth_email_delivery_failed",
         "food_provider_barcode_unavailable",
         "food_provider_search_unavailable",
         "http_request_completed",
         "http_request_rejected",
         "notification_delivery_failed",
+        "notification_delivery_completed",
+        "notification_delivery_cancelled",
         "news_draft_generation_failed",
         "news_draft_generation_succeeded",
         "news_candidate_evaluated",
@@ -42,6 +60,7 @@ SAFE_EVENT_NAMES = frozenset(
         "telegram_delivery_skipped",
         "unhandled_exception",
         "worker_drain_requested",
+        "worker_failed",
         "worker_started",
         "worker_stopped",
         "weekly_digest_delivery_batch_completed",
@@ -52,11 +71,15 @@ SAFE_PROVIDER_NAMES = frozenset(
         "apple",
         "deterministic",
         "google",
+        "groq",
+        "local_rapidocr",
+        "local_tesseract",
         "open_food_facts",
         "openai_compatible",
         "telegram",
         "vk",
         "yandex",
+        "web_push",
     }
 )
 STRUCTURED_FIELDS = (
@@ -71,12 +94,46 @@ STRUCTURED_FIELDS = (
     "db_pool_checked_out",
     "db_pool_overflow",
     "body_limit_bytes",
+    "job",
+    "request_type",
+    "data_class",
+    "actor_role",
+    "proposal_type",
+    "tool_name",
+    "context_kind",
+    "generation_success",
+    "repair_attempted",
+    "repair_success",
+    "validation_failure_reason",
+    "provider_failure_reason",
+    "failure_category",
+    "prompt_version",
+    "schema_version",
+    "policy_revision",
+    "policy_version",
     "notification_ref",
+    "notification_category",
     "delivery_error",
     "provider",
+    "configured_model",
+    "actual_model",
     "reason",
     "pipeline_stage",
     "outcome",
+    "catalog_quality",
+    "visibility",
+    "assessment_outcome",
+    "route_class",
+    "provider_class",
+    "provider_outcome",
+    "error_code",
+    "rate_limit_scope",
+    "rate_limit_retry_after_seconds",
+    "user_quota_remaining",
+    "user_quota_limit",
+    "quota_window_reset_at",
+    "user_quota_exhausted",
+    "safety_category",
     "source_ref",
     "candidate_ref",
     "topic",
@@ -86,7 +143,26 @@ STRUCTURED_FIELDS = (
     "candidate_count",
     "queue_age_seconds",
     "attempt_count",
+    "attempts",
+    "retry_count",
+    "history_count",
+    "context_count",
+    "reasoning_tokens",
+    "http_status",
+    "provider_response_bytes",
+    "choices_count",
+    "choices_item_type",
+    "response_payload_type",
+    "message_type",
+    "finish_reason",
+    "content_type",
     "latency_ms",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost_microunits",
+    "report_version",
+    "report_revision",
     "issue_count",
     "queued",
     "processing",
@@ -108,6 +184,13 @@ STRUCTURED_FIELDS = (
     "drafts_skipped_daily_limit",
     "llm_failures",
     "telegram_delivery_failures",
+    "review_awaiting_review",
+    "review_selected",
+    "review_delivered",
+    "review_backlog",
+    "message_present",
+    "refusal_present",
+    "content_present",
 )
 INTEGER_FIELDS = {
     "status_code",
@@ -116,6 +199,21 @@ INTEGER_FIELDS = {
     "db_pool_checked_out",
     "db_pool_overflow",
     "body_limit_bytes",
+    "history_count",
+    "context_count",
+    "rate_limit_retry_after_seconds",
+    "user_quota_remaining",
+    "user_quota_limit",
+    "attempts",
+    "retry_count",
+    "reasoning_tokens",
+    "http_status",
+    "provider_response_bytes",
+    "choices_count",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost_microunits",
     "items_count",
     "duplicate_count",
     "candidate_count",
@@ -143,17 +241,63 @@ INTEGER_FIELDS = {
     "drafts_skipped_daily_limit",
     "llm_failures",
     "telegram_delivery_failures",
+    "review_awaiting_review",
+    "review_selected",
+    "review_delivered",
+    "review_backlog",
 }
 FLOAT_FIELDS = {"duration_ms", "sql_duration_ms", "latency_ms"}
 CODE_FIELDS = {
     "notification_ref",
+    "notification_category",
     "delivery_error",
+    "job",
+    "request_type",
+    "data_class",
+    "actor_role",
+    "proposal_type",
+    "tool_name",
+    "context_kind",
+    "prompt_version",
+    "schema_version",
+    "policy_revision",
+    "policy_version",
     "reason",
     "pipeline_stage",
     "outcome",
+    "catalog_quality",
+    "visibility",
+    "assessment_outcome",
+    "route_class",
+    "provider_class",
+    "provider_outcome",
+    "error_code",
+    "provider_failure_reason",
+    "failure_category",
+    "safety_category",
+    "validation_failure_reason",
     "source_ref",
     "candidate_ref",
     "topic",
+    "report_version",
+    "report_revision",
+    "rate_limit_scope",
+    "choices_item_type",
+    "response_payload_type",
+    "message_type",
+    "finish_reason",
+    "content_type",
+}
+MODEL_FIELDS = {"configured_model", "actual_model"}
+TIMESTAMP_FIELDS = {"quota_window_reset_at"}
+BOOL_FIELDS = {
+    "generation_success",
+    "repair_attempted",
+    "repair_success",
+    "user_quota_exhausted",
+    "message_present",
+    "refusal_present",
+    "content_present",
 }
 
 
@@ -188,6 +332,8 @@ class JsonFormatter(logging.Formatter):
         return "application_log"
 
     def _structured_value(self, field: str, value: object) -> object | None:
+        if field in BOOL_FIELDS:
+            return value if isinstance(value, bool) else None
         if field in INTEGER_FIELDS:
             return (
                 value
@@ -204,12 +350,18 @@ class JsonFormatter(logging.Formatter):
             return None
         if field == "request_id":
             return value if SAFE_REQUEST_ID_PATTERN.fullmatch(value) else None
+        if field in TIMESTAMP_FIELDS:
+            return value if SAFE_TIMESTAMP_PATTERN.fullmatch(value) else None
         if field == "method":
             return value if SAFE_METHOD_PATTERN.fullmatch(value) else None
         if field == "path":
             return value if SAFE_ROUTE_PATTERN.fullmatch(value) else None
         if field == "provider":
             return value if value in SAFE_PROVIDER_NAMES else None
+        if field in MODEL_FIELDS:
+            return value if SAFE_IDENTIFIER_PATTERN.fullmatch(value) else None
+        if field == "report_revision":
+            return value if SAFE_REPORT_REVISION_PATTERN.fullmatch(value) else None
         if field in CODE_FIELDS:
             return value if SAFE_CODE_PATTERN.fullmatch(value) else None
         return None

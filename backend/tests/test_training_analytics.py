@@ -165,7 +165,13 @@ def test_training_analytics_reports_factual_progression_rir_and_muscle_exposure(
     assert payload["period_days"] == 7
     assert payload["period_start"] == (today - timedelta(days=6)).isoformat()
     assert payload["period_end"] == today.isoformat()
+    assert payload["previous_period_start"] == (today - timedelta(days=13)).isoformat()
+    assert payload["previous_period_end"] == (today - timedelta(days=7)).isoformat()
     assert payload["completed_set_count"] == 5
+    assert payload["completed_workout_count"] == 3
+    assert payload["frequency_per_week"] == 3.0
+    assert payload["previous_completed_workout_count"] == 1
+    assert payload["previous_frequency_per_week"] == 1.0
     assert payload["reps_total"] == 47
     assert payload["reps_recorded_sets"] == 5
     assert payload["external_load_volume_kg"] == 565.0
@@ -222,6 +228,27 @@ def test_training_analytics_reports_factual_progression_rir_and_muscle_exposure(
     assert primary["chest"] == 5
     assert secondary["triceps"] == 5
     assert payload["completed_sets_without_muscle_metadata"] == 0
+    workload = {item["muscle_id"]: item for item in payload["muscle_group_workload"]}
+    assert workload["chest"]["current"] == {
+        "completed_set_count": 5,
+        "primary_completed_set_count": 5,
+        "secondary_completed_set_count": 0,
+        "completed_session_count": 3,
+        "frequency_per_week": 3.0,
+    }
+    assert workload["chest"]["previous"] == {
+        "completed_set_count": 1,
+        "primary_completed_set_count": 1,
+        "secondary_completed_set_count": 0,
+        "completed_session_count": 1,
+        "frequency_per_week": 1.0,
+    }
+    assert workload["chest"]["completed_set_count_change"] == 4
+    assert workload["chest"]["trend"] == "increased"
+    assert workload["triceps"]["previous"]["completed_set_count"] == 1
+    assert workload["triceps"]["trend"] == "increased"
+    assert workload["chest"]["contributing_exercises"][0]["exercise_id"] == bench_id
+    assert workload["chest"]["contributing_exercises"][0]["performed_session_count"] == 2
     sufficiency = payload["data_sufficiency"]
     assert sufficiency["ruleset_version"] == "data-sufficiency-v1"
     assert sufficiency["workout_logging"]["status"] == "limited"
@@ -307,6 +334,7 @@ def test_training_analytics_handles_empty_data_and_trainer_isolation(client) -> 
     assert missing_metadata["reps_total"] is None
     assert missing_metadata["completed_sets_without_muscle_metadata"] == 1
     assert missing_metadata["primary_muscle_exposure"] == []
+    assert missing_metadata["muscle_group_workload"] == []
     assert missing_metadata["rir"]["missing_set_count"] == 1
     assert missing_metadata["data_sufficiency"]["workout_logging"]["status"] == "insufficient"
     assert missing_metadata["data_sufficiency"]["rir_coverage"]["status"] == "insufficient"
@@ -317,6 +345,8 @@ def test_training_analytics_handles_empty_data_and_trainer_isolation(client) -> 
     )
     assert detail.status_code == 200
     assert detail.json()["data_sufficiency"] == missing_metadata["data_sufficiency"]
+    assert detail.json()["muscle_group_workload"] == missing_metadata["muscle_group_workload"]
+    assert detail.json()["frequency_per_week"] == missing_metadata["frequency_per_week"]
     denied = client.get(
         f"/api/v1/coach/clients/{client_id}/training-analytics",
         headers=other_coach_headers,
@@ -367,4 +397,4 @@ def test_training_analytics_bounds_long_history_with_constant_query_count(client
     assert result["exercises"][0]["performed_session_count"] == 25
     assert result["exercises"][0]["history_truncated"] is True
     assert len(result["exercises"][0]["sessions"]) == 2
-    assert metrics.query_count == 4
+    assert metrics.query_count == 6

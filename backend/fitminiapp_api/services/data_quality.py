@@ -62,6 +62,9 @@ def build_nutrition_coverage_signal(
     logged_day_count: int,
     eligible_day_count: int,
     visible: bool,
+    exact_entry_count: int = 0,
+    approximate_entry_count: int = 0,
+    partial_entry_count: int = 0,
 ) -> dict:
     required = min(NUTRITION_SUFFICIENT_DAYS, eligible_day_count)
     counters = {
@@ -69,6 +72,9 @@ def build_nutrition_coverage_signal(
         "eligible_day_count": eligible_day_count,
         "required_logged_day_count": required,
         "coverage_percent": _coverage_percent(logged_day_count, eligible_day_count),
+        "exact_entry_count": exact_entry_count,
+        "approximate_entry_count": approximate_entry_count,
+        "partial_entry_count": partial_entry_count,
     }
     if not visible:
         return _signal("insufficient", counters, "nutrition_access_not_granted")

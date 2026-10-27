@@ -33,5 +33,5 @@ export function nutritionDaySummary(page: Page): Locator {
 }
 
 export function progressOverview(page: Page): Locator {
-  return page.getByRole('region', { name: 'Прогресс по фактам', exact: true });
+  return page.getByRole('region', { name: 'Что изменилось', exact: true });
 }

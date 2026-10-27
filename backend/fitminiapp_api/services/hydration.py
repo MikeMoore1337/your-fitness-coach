@@ -361,6 +361,10 @@ def save_hydration_preset(db: Session, user: User, payload: HydrationPresetSave)
     label = payload.label.strip()
     if not label:
         raise HydrationError("Название сосуда не может быть пустым")
+    # The unique (user_id, label) constraint protects the invariant, but a
+    # concurrent upsert would otherwise surface its IntegrityError as a 500.
+    # Serialize the small per-user preset namespace before the read/create step.
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
     existing = (
         db.query(HydrationPreset)
         .filter(HydrationPreset.user_id == user.id, HydrationPreset.label == label)

@@ -1,0 +1,324 @@
+{
+  "source": "owner-approved v10 landing screenshots",
+  "files": [
+    {
+      "group": "final-858",
+      "name": "athlete-desktop-dark-header.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-desktop-dark-header.png",
+      "bytes": 44943,
+      "sha256": "9de526b9a2b7149db95d95bd079a828cfa46478c9d81047e0124f077f18031ec",
+      "width": 1440,
+      "height": 82
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-desktop-dark.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-desktop-dark.png",
+      "bytes": 1029747,
+      "sha256": "915b4f56946b555b04b8243d12126ea83e37298699907a3f044f0d076fdad148",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-desktop-light-header.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-desktop-light-header.png",
+      "bytes": 44886,
+      "sha256": "a4543772183e18d23fb757498a0fe56f5a689dab244612be9d83ab1a3c893b90",
+      "width": 1440,
+      "height": 82
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-desktop-light.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-desktop-light.png",
+      "bytes": 1029808,
+      "sha256": "acb7163bc7c4c1586f0edc47df72d6022588a7d67053afa134db89c66f634cf7",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-320-dark-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-320-dark-menu-open.png",
+      "bytes": 171252,
+      "sha256": "3fa8dd1804697211fc946850580f818ce7ce37184760f16ca2f26833f6380ecb",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-320-dark.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-320-dark.png",
+      "bytes": 213330,
+      "sha256": "510c62e406ef3cf5cb51089e13d12fe9873c4f2ce9ebfad1fd46e0173c48416e",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-320-light-header.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-320-light-header.png",
+      "bytes": 13402,
+      "sha256": "7fb91e2832b38a291415e29b0992d74a1aad9e7c392843d3b7d3ec0150e3f570",
+      "width": 320,
+      "height": 70
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-320-light-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-320-light-menu-open.png",
+      "bytes": 171281,
+      "sha256": "09e5763bc68471a3ad19316b208ec91393f7cffbd07481536bc1dc456878057e",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-320-light.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-320-light.png",
+      "bytes": 213396,
+      "sha256": "b8fb19f9ed139b1cc7b24c23826bc88879ee5217c29f08d395e544f5767f43fc",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-dark-header.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-dark-header.png",
+      "bytes": 14465,
+      "sha256": "3ffb73bbe9e62f69d3a1d5777e9a6b1e981049a2c518945c17db1ea1607465ce",
+      "width": 390,
+      "height": 70
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-dark-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-dark-menu-open.png",
+      "bytes": 222244,
+      "sha256": "cb97a3b0f0865b12d95d453b6c86d868ae6a54c974ee95cb1940a46fa3a74d25",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-dark.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-dark.png",
+      "bytes": 272528,
+      "sha256": "b760b6073aa25a594d61e892f5cac63c16d38cf826aafcbd488bc37fa2483079",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-light-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-light-menu-open.png",
+      "bytes": 222284,
+      "sha256": "7717aee18a46217c4cb383c40745ec9709367fd0b68a4c9460e16705f06ec8c5",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "final-858",
+      "name": "athlete-mobile-light.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/athlete-mobile-light.png",
+      "bytes": 272607,
+      "sha256": "5853078f5cf0d9096cf59db50d69556c2046ac6828f8ca7a01178d447147c3ae",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-desktop-dark-header.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-desktop-dark-header.png",
+      "bytes": 58637,
+      "sha256": "915ecb89345fc14cfb580b30cc5f61027863c149a5658b5cefa45f801e4d2757",
+      "width": 1440,
+      "height": 82
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-desktop-dark.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-desktop-dark.png",
+      "bytes": 715491,
+      "sha256": "a52b1185bc42c71861cbcd40e1909459179f1354ccc617d94bc1a22a31405f4e",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-desktop-light-header.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-desktop-light-header.png",
+      "bytes": 58701,
+      "sha256": "6828aaced065f1799fec3e9c8d7b155c0d64178b3ad92fdf32baf756a81fe297",
+      "width": 1440,
+      "height": 82
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-desktop-light.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-desktop-light.png",
+      "bytes": 715648,
+      "sha256": "f838028e0f81a184297e80467a7b0a78ddc843e4095c96921bdd62b633874839",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-320-dark-header.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-320-dark-header.png",
+      "bytes": 13544,
+      "sha256": "9764611619c18091c21265e56e67d008554b38fc01b819f1b08ab3b126c166a1",
+      "width": 320,
+      "height": 70
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-320-dark-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-320-dark-menu-open.png",
+      "bytes": 128998,
+      "sha256": "65c11742254848c0d4896f0ce41bff09d93d348faeabb8a6aa76e1d97416513d",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-320-dark.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-320-dark.png",
+      "bytes": 161521,
+      "sha256": "cfd2ba143a549bf19db2155db36e14c9ec67a0032839265f2e5bcc1eb1392775",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-320-light-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-320-light-menu-open.png",
+      "bytes": 129054,
+      "sha256": "115cbe6e923640af1fc5269a0ddba27be00d0c80e81fc6c7c3883e622a1a457e",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-320-light.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-320-light.png",
+      "bytes": 161498,
+      "sha256": "a6873fde8226311ff0e3d8cf48608e5d98396a1d6bb9d60828a53e2bef096ba5",
+      "width": 320,
+      "height": 800
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-dark-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-dark-menu-open.png",
+      "bytes": 164905,
+      "sha256": "1c34366acb8026de1d17141e05d6118c0277554796db9960638f7bdfda1bb9d2",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-dark.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-dark.png",
+      "bytes": 206588,
+      "sha256": "a5a4ef99a8f49b93f2890277f8c2f6ddb8b12403d631706696fcc7161cf3ed42",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-light-menu-open.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-light-menu-open.png",
+      "bytes": 164922,
+      "sha256": "1bae6af90ed5c66296d46469145bcd694cc5038b914ac597721748541c5793c2",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "final-858",
+      "name": "trainer-mobile-light.png",
+      "path": "docs/design/references/product-v10-landing-approved/final-858/trainer-mobile-light.png",
+      "bytes": 205942,
+      "sha256": "7b391852fea6ddb78ea86503cc6491521a9f7fb53748b1421aeb8d2d96700f3a",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "group": "full-page-852",
+      "name": "coach-dark-1440-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/coach-dark-1440-full.png",
+      "bytes": 1835722,
+      "sha256": "0911e2c0cc624915290bd3bc519aaf83866721c2d2ebe8bc2fd3273c4d504590",
+      "width": 1440,
+      "height": 8471
+    },
+    {
+      "group": "full-page-852",
+      "name": "coach-dark-390-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/coach-dark-390-full.png",
+      "bytes": 952243,
+      "sha256": "8def797f052a1e2a07a12a5fe400558bda0c2b9f2de184328593671e4184660b",
+      "width": 390,
+      "height": 10923
+    },
+    {
+      "group": "full-page-852",
+      "name": "coach-light-1440-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/coach-light-1440-full.png",
+      "bytes": 1783757,
+      "sha256": "cc83ddc9303f10df81788da65e2ed2433f0e8cb42624a318863b46d2545b36b9",
+      "width": 1440,
+      "height": 8471
+    },
+    {
+      "group": "full-page-852",
+      "name": "coach-light-390-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/coach-light-390-full.png",
+      "bytes": 900633,
+      "sha256": "0512d17e969e04a0723c687006d9bd9c598bcbe117113c43c0577d51e23bf81e",
+      "width": 390,
+      "height": 10923
+    },
+    {
+      "group": "full-page-852",
+      "name": "self-dark-1440-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/self-dark-1440-full.png",
+      "bytes": 2289577,
+      "sha256": "f0aab6e0f209fe7facfd56807c720e9e294c36b2235ae168160ad2b17b35baf4",
+      "width": 1440,
+      "height": 7157
+    },
+    {
+      "group": "full-page-852",
+      "name": "self-dark-390-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/self-dark-390-full.png",
+      "bytes": 1005420,
+      "sha256": "ad7b5b92edfdc0f6fe96fe29cf77e3053313579e65ab9774b7017cd7a50fc04e",
+      "width": 390,
+      "height": 9432
+    },
+    {
+      "group": "full-page-852",
+      "name": "self-light-1440-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/self-light-1440-full.png",
+      "bytes": 2257384,
+      "sha256": "384f4df7b7aedbe237969971f970c4609e61071e10fe90bd834c719b89b62db0",
+      "width": 1440,
+      "height": 7157
+    },
+    {
+      "group": "full-page-852",
+      "name": "self-light-390-full.png",
+      "path": "docs/design/references/product-v10-landing-approved/full-page-852/self-light-390-full.png",
+      "bytes": 973415,
+      "sha256": "f9df21570fda33e39c49cda2af971cdf201f17ebd5d015897e195d706783c949",
+      "width": 390,
+      "height": 9432
+    }
+  ],
+  "counts": {
+    "final-858": 27,
+    "full-page-852": 8
+  }
+}

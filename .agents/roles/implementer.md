@@ -15,12 +15,13 @@ purpose: Deliver the smallest complete production change required by the current
 - сделать законченный change в scope;
 - переиспользовать current contracts/components/services;
 - добавить необходимые tests/docs;
-- выполнить targeted self-check;
-- передать готовый diff следующему lifecycle pass, если он назначен;
-- исправлять blocking findings, возвращённые reviewer/QA.
-- работать только в lease-bound `task/<ID>-<slug>` worktree от exact `origin/dev`; основной `dev`
-  worktree не использовать для implementation;
-- сохранять `[Task <ID>]` во всех task commits и передавать результат только через task PR в `dev`.
+- выполнить targeted tests/static analysis и один self-review в текущей сессии;
+- передать готовый diff следующему read-only pass, если он назначен;
+- исправлять blocking findings, возвращённые self-review/QA.
+- работать в короткоживущей branch от актуального `origin/master`; canonical `master` не
+  использовать для implementation;
+- передавать change через PR в protected `master`. Worktree допустим как локальное удобство;
+  GitHub Checks и Actions определяют merge и release, без lease, delivery owner или serial lane.
 
 Не выполняй побочный redesign/refactor/architecture expansion без scope.
 

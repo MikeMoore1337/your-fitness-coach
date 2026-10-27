@@ -55,6 +55,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/programs/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Program */
+        get: operations["get_public_program_api_v1_public_programs__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/shares/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Share */
+        get: operations["get_public_share_api_v1_public_shares__share_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Articles */
+        get: operations["get_public_articles_api_v1_public_articles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/articles/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Article */
+        get: operations["get_public_article_api_v1_public_articles__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/sessions": {
         parameters: {
             query?: never;
@@ -83,6 +151,23 @@ export interface paths {
         get: operations["get_demo_session_api_v1_demo_sessions_current_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/demo/sessions/current/transport": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transport Demo Request */
+        post: operations["transport_demo_request_api_v1_demo_sessions_current_transport_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -345,6 +430,268 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-coach/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Status */
+        get: operations["get_ai_coach_status_api_v1_ai_coach_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Quota */
+        get: operations["get_ai_coach_quota_api_v1_ai_coach_quota_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Conversations */
+        get: operations["get_ai_coach_conversations_api_v1_ai_coach_conversations_get"];
+        put?: never;
+        /** Create Ai Coach Conversation */
+        post: operations["create_ai_coach_conversation_api_v1_ai_coach_conversations_post"];
+        /** Delete Ai Coach Conversation History */
+        delete: operations["delete_ai_coach_conversation_history_api_v1_ai_coach_conversations_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Conversation */
+        get: operations["get_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Ai Coach Conversation */
+        delete: operations["delete_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Ai Coach Conversation Message */
+        post: operations["send_ai_coach_conversation_message_api_v1_ai_coach_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations/{conversation_id}/messages/{message_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry Ai Coach Conversation Message */
+        post: operations["retry_ai_coach_conversation_message_api_v1_ai_coach_conversations__conversation_id__messages__message_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations/{conversation_id}/messages/{message_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Ai Coach Conversation Feedback */
+        post: operations["submit_ai_coach_conversation_feedback_api_v1_ai_coach_conversations__conversation_id__messages__message_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Ai Coach Answer */
+        post: operations["generate_ai_coach_answer_api_v1_ai_coach_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/adaptations/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Ai Coach Adaptation Proposal */
+        post: operations["generate_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/adaptations/proposals/{proposal_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Ai Coach Adaptation Proposal */
+        post: operations["review_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals__proposal_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Personal Ai Coach Consent */
+        get: operations["get_personal_ai_coach_consent_api_v1_ai_coach_consent_get"];
+        /** Update Personal Ai Coach Consent */
+        put: operations["update_personal_ai_coach_consent_api_v1_ai_coach_consent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Memory */
+        get: operations["get_ai_coach_memory_api_v1_ai_coach_memory_get"];
+        put?: never;
+        /** Create Ai Coach Memory Item */
+        post: operations["create_ai_coach_memory_item_api_v1_ai_coach_memory_post"];
+        /** Clear Ai Coach Memory */
+        delete: operations["clear_ai_coach_memory_api_v1_ai_coach_memory_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/memory/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Ai Coach Memory Consent */
+        put: operations["update_ai_coach_memory_consent_api_v1_ai_coach_memory_consent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/memory/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Ai Coach Memory Item */
+        delete: operations["delete_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Ai Coach Memory Item */
+        patch: operations["update_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/ai-coach/personal/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Personal Ai Coach Answer */
+        post: operations["generate_personal_ai_coach_answer_api_v1_ai_coach_personal_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -356,6 +703,23 @@ export interface paths {
         get: operations["read_me_api_v1_me_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/acquisition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Acquisition */
+        post: operations["save_acquisition_api_v1_me_acquisition_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -497,6 +861,25 @@ export interface paths {
         /** Preview Heart Rates */
         post: operations["preview_heart_rates_api_v1_me_profile_heart_rates_preview_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/exercise-setup-memories/{exercise_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Own Exercise Setup Memory */
+        get: operations["get_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__get"];
+        /** Save Own Exercise Setup Memory */
+        put: operations["save_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__put"];
+        post?: never;
+        /** Delete Own Exercise Setup Memory */
+        delete: operations["delete_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -726,6 +1109,23 @@ export interface paths {
         patch: operations["edit_exercise_api_v1_programs_exercises__exercise_id__patch"];
         trace?: never;
     };
+    "/api/v1/programs/exercises/{exercise_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Exercise History */
+        get: operations["get_exercise_history_api_v1_programs_exercises__exercise_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/templates": {
         parameters: {
             query?: never;
@@ -754,6 +1154,40 @@ export interface paths {
         get: operations["my_templates_api_v1_programs_templates_mine_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/generator/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Program Generator Preview */
+        post: operations["generate_program_generator_preview_api_v1_programs_generator_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/generator/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Program Generator Preview */
+        post: operations["confirm_program_generator_preview_api_v1_programs_generator_confirm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -830,6 +1264,40 @@ export interface paths {
         patch: operations["edit_template_api_v1_programs_templates__template_id__patch"];
         trace?: never;
     };
+    "/api/v1/programs/templates/{template_id}/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clone Template */
+        post: operations["clone_template_api_v1_programs_templates__template_id__clone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/templates/{template_id}/exercises/{template_exercise_id}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace Template Exercise */
+        post: operations["replace_template_exercise_api_v1_programs_templates__template_id__exercises__template_exercise_id__replace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/templates/{template_id}/assign-to-me": {
         parameters: {
             query?: never;
@@ -847,6 +1315,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/assigned/{program_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Assigned Program */
+        delete: operations["delete_assigned_program_api_v1_programs_assigned__program_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/progression-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assigned Program Progression Proposals */
+        get: operations["assigned_program_progression_proposals_api_v1_programs_assigned__program_id__progression_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/progression-proposals/{proposal_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Assigned Program Progression Proposal Endpoint */
+        post: operations["review_assigned_program_progression_proposal_endpoint_api_v1_programs_assigned__program_id__progression_proposals__proposal_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/assigned/{program_id}/revisions": {
         parameters: {
             query?: never;
@@ -858,6 +1377,24 @@ export interface paths {
         get: operations["assigned_program_revisions_api_v1_programs_assigned__program_id__revisions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assigned Program Lifecycle */
+        get: operations["assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_get"];
+        put?: never;
+        /** Mutate Assigned Program Lifecycle */
+        post: operations["mutate_assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -899,6 +1436,40 @@ export interface paths {
         patch: operations["edit_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__patch"];
         trace?: never;
     };
+    "/api/v1/programs/assigned/{program_id}/blocks/{block_id}/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Advance Assigned Program Block */
+        post: operations["advance_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__advance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/blocks/{block_id}/repeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Repeat Assigned Program Block */
+        post: operations["repeat_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__repeat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/assigned/{program_id}/exercises": {
         parameters: {
             query?: never;
@@ -927,6 +1498,142 @@ export interface paths {
         get: operations["clients_api_v1_programs_clients_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/template.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Csv Template */
+        get: operations["download_csv_template_api_v1_programs_imports_template_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/template.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Xlsx Template */
+        get: operations["download_xlsx_template_api_v1_programs_imports_template_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Program Import */
+        post: operations["upload_program_import_api_v1_programs_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Import Targets */
+        get: operations["list_import_targets_api_v1_programs_imports_targets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import Preview */
+        get: operations["get_import_preview_api_v1_programs_imports__import_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Import Preview */
+        post: operations["resolve_import_preview_api_v1_programs_imports__import_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Import Preview */
+        post: operations["confirm_import_preview_api_v1_programs_imports__import_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Import Preview */
+        post: operations["cancel_import_preview_api_v1_programs_imports__import_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -983,6 +1690,625 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Attention */
+        get: operations["coach_attention_api_v1_coach_attention_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Inbox */
+        get: operations["coach_inbox_api_v1_coach_inbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-automation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Workflow Automation Preview */
+        get: operations["coach_workflow_automation_preview_api_v1_coach_workflow_automation_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-automation/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Coach Workflow Automation Evaluate */
+        post: operations["coach_workflow_automation_evaluate_api_v1_coach_workflow_automation_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/program-rollouts/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Coach Program Rollout Preview */
+        post: operations["coach_program_rollout_preview_api_v1_coach_program_rollouts_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/program-rollouts/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Coach Program Rollout Apply */
+        post: operations["coach_program_rollout_apply_api_v1_coach_program_rollouts_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Capacity */
+        get: operations["coach_capacity_api_v1_coach_capacity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-ins/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Check In Reviews */
+        get: operations["coach_check_in_reviews_api_v1_coach_check_ins_review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/clients/{client_id}/review-workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Client Review Workspace */
+        get: operations["coach_client_review_workspace_api_v1_coach_clients__client_id__review_workspace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-ins/{check_in_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Coach Check In Route */
+        post: operations["review_coach_check_in_route_api_v1_coach_check_ins__check_in_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Check In Templates */
+        get: operations["coach_check_in_templates_api_v1_coach_check_in_templates_get"];
+        put?: never;
+        /** Create Coach Check In Template */
+        post: operations["create_coach_check_in_template_api_v1_coach_check_in_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Check In Template Version */
+        post: operations["create_coach_check_in_template_version_api_v1_coach_check_in_templates__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Check In Template State */
+        patch: operations["update_coach_check_in_template_state_api_v1_coach_check_in_templates__template_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Coach Check In Template */
+        post: operations["assign_coach_check_in_template_api_v1_coach_check_in_templates__template_id__assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Check In Template Responses */
+        get: operations["coach_check_in_template_responses_api_v1_coach_check_in_templates__template_id__responses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Onboarding Templates */
+        get: operations["coach_onboarding_templates_api_v1_coach_workflow_templates_onboarding_get"];
+        put?: never;
+        /** Create Coach Onboarding Template */
+        post: operations["create_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/onboarding/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Onboarding Template Version */
+        post: operations["create_coach_onboarding_template_version_api_v1_coach_workflow_templates_onboarding__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/onboarding/{template_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Coach Onboarding Template */
+        post: operations["assign_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding__template_id__assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/communication": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Communication Templates */
+        get: operations["coach_communication_templates_api_v1_coach_workflow_templates_communication_get"];
+        put?: never;
+        /** Create Coach Communication Template */
+        post: operations["create_coach_communication_template_api_v1_coach_workflow_templates_communication_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/communication/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Communication Template Version */
+        post: operations["create_coach_communication_template_version_api_v1_coach_workflow_templates_communication__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/communication/{template_id}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Communication Draft */
+        post: operations["create_coach_communication_draft_api_v1_coach_workflow_templates_communication__template_id__drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/communication-drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Coach Communication Draft */
+        get: operations["get_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Communication Draft */
+        patch: operations["update_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/communication-drafts/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Coach Communication Draft */
+        post: operations["confirm_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/operations/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Operations Today */
+        get: operations["coach_operations_today_api_v1_coach_operations_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Agenda */
+        get: operations["coach_agenda_api_v1_coach_agenda_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Sessions */
+        post: operations["create_coach_sessions_api_v1_coach_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Session */
+        patch: operations["update_coach_session_api_v1_coach_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/clients/{client_id}/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Client Operations */
+        get: operations["coach_client_operations_api_v1_coach_clients__client_id__operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/clients/{client_id}/operational-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Client Operational Status */
+        patch: operations["update_coach_client_operational_status_api_v1_coach_clients__client_id__operational_status_patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/clients/{client_id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Client Labels */
+        patch: operations["update_coach_client_labels_api_v1_coach_clients__client_id__labels_patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Packages */
+        get: operations["coach_packages_api_v1_coach_packages_get"];
+        put?: never;
+        /** Create Coach Package */
+        post: operations["create_coach_package_api_v1_coach_packages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/packages/{package_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Package State */
+        patch: operations["update_coach_package_state_api_v1_coach_packages__package_id__state_patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Payments */
+        get: operations["coach_payments_api_v1_coach_payments_get"];
+        put?: never;
+        /** Create Coach Payment */
+        post: operations["create_coach_payment_api_v1_coach_payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/payments/{payment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Payment */
+        patch: operations["update_coach_payment_api_v1_coach_payments__payment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Tasks */
+        get: operations["coach_tasks_api_v1_coach_tasks_get"];
+        put?: never;
+        /** Create Coach Task */
+        post: operations["create_coach_task_api_v1_coach_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/tasks/{task_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Task State */
+        patch: operations["update_coach_task_state_api_v1_coach_tasks__task_id__state_patch"];
         trace?: never;
     };
     "/api/v1/coach/assigned-programs": {
@@ -1062,6 +2388,23 @@ export interface paths {
         };
         /** Coach Client Progress Report */
         get: operations["coach_client_progress_report_api_v1_coach_clients__client_id__progress_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/clients/{client_id}/report-handoffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Client Report Handoffs */
+        get: operations["coach_client_report_handoffs_api_v1_coach_clients__client_id__report_handoffs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1261,6 +2604,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/clients/{client_id}/measurements/custom-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Client Measurement Definitions */
+        get: operations["coach_client_measurement_definitions_api_v1_coach_clients__client_id__measurements_custom_definitions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/clients/{client_id}/measurements/{measurement_id}": {
         parameters: {
             query?: never;
@@ -1417,6 +2777,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Workout Recovery State */
+        get: operations["get_workout_recovery_state_api_v1_workouts_recovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/exercises/{workout_exercise_id}/alternatives": {
         parameters: {
             query?: never;
@@ -1428,6 +2805,40 @@ export interface paths {
         get: operations["workout_exercise_alternatives_api_v1_workouts__workout_id__exercises__workout_exercise_id__alternatives_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Warmup Proposal */
+        post: operations["preview_warmup_proposal_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Warmup Proposal Route */
+        post: operations["apply_warmup_proposal_route_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_apply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1462,6 +2873,40 @@ export interface paths {
         put?: never;
         /** Apply Workout Adaptation */
         post: operations["apply_workout_adaptation_api_v1_workouts__workout_id__adaptations_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/recovery/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Workout Recovery */
+        post: operations["preview_workout_recovery_api_v1_workouts__workout_id__recovery_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/recovery/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Workout Recovery */
+        post: operations["apply_workout_recovery_api_v1_workouts__workout_id__recovery_apply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1793,6 +3238,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/diary/custom-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Body Measurement Definitions */
+        get: operations["body_measurement_definitions_api_v1_workouts_diary_custom_definitions_get"];
+        put?: never;
+        /** Create Body Measurement Definition */
+        post: operations["create_body_measurement_definition_api_v1_workouts_diary_custom_definitions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/diary/custom-definitions/{definition_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Body Measurement Definition */
+        delete: operations["archive_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Body Measurement Definition */
+        patch: operations["update_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/workouts/diary/custom-definitions/{definition_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Body Measurement Definition */
+        post: operations["restore_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/diary/{measurement_id}": {
         parameters: {
             query?: never;
@@ -1805,6 +3303,58 @@ export interface paths {
         post?: never;
         /** Delete Body Measurement */
         delete: operations["delete_body_measurement_api_v1_workouts_diary__measurement_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/rest-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rest Sessions */
+        get: operations["list_rest_sessions_api_v1_workouts__workout_id__rest_sessions_get"];
+        put?: never;
+        /** Start Rest Session */
+        post: operations["start_rest_session_api_v1_workouts__workout_id__rest_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/rest-sessions/{predecessor_id}/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restart Rest Session */
+        post: operations["restart_rest_session_api_v1_workouts_rest_sessions__predecessor_id__restart_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/rest-sessions/{session_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mutate Rest Session */
+        post: operations["mutate_rest_session_api_v1_workouts_rest_sessions__session_id__actions_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1862,6 +3412,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/check-ins/weekly/planning-review/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Weekly Planning Review Action */
+        post: operations["confirm_weekly_planning_review_action_api_v1_check_ins_weekly_planning_review_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/check-ins/weekly": {
         parameters: {
             query?: never;
@@ -1874,6 +3441,176 @@ export interface paths {
         put?: never;
         /** Create Weekly Check In */
         post: operations["create_weekly_check_in_api_v1_check_ins_weekly_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/check-ins/templates/assigned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assigned Check In Templates */
+        get: operations["assigned_check_in_templates_api_v1_check_ins_templates_assigned_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/check-ins/templates/assignments/{assignment_id}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Assigned Check In Template */
+        post: operations["submit_assigned_check_in_template_api_v1_check_ins_templates_assignments__assignment_id__responses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/label-scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recognize Nutrition Label */
+        post: operations["recognize_nutrition_label_api_v1_nutrition_label_scans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/label-scans/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Nutrition Label Draft */
+        get: operations["read_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/label-scans/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Nutrition Label Draft */
+        post: operations["confirm_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/label-scans/{draft_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Nutrition Label Draft */
+        post: operations["cancel_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/photo-meals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recognize Photo Meal */
+        post: operations["recognize_photo_meal_api_v1_nutrition_photo_meals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/photo-meals/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Photo Meal Draft */
+        get: operations["read_photo_meal_draft_api_v1_nutrition_photo_meals__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/photo-meals/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Photo Meal */
+        post: operations["confirm_photo_meal_api_v1_nutrition_photo_meals__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/photo-meals/{draft_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Photo Meal */
+        post: operations["cancel_photo_meal_api_v1_nutrition_photo_meals__draft_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2102,6 +3839,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/foods/frequent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Frequent Foods */
+        get: operations["get_frequent_foods_api_v1_nutrition_foods_frequent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/foods/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Personal Foods */
+        get: operations["get_personal_foods_api_v1_nutrition_foods_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/foods/favorites": {
         parameters: {
             query?: never;
@@ -2193,6 +3964,286 @@ export interface paths {
         patch: operations["patch_recipe_api_v1_nutrition_recipes__recipe_id__patch"];
         trace?: never;
     };
+    "/api/v1/nutrition/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Nutrition Meal Templates */
+        get: operations["get_nutrition_meal_templates_api_v1_nutrition_templates_get"];
+        put?: never;
+        /** Create Nutrition Meal Template */
+        post: operations["create_nutrition_meal_template_api_v1_nutrition_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Nutrition Meal Template */
+        get: operations["get_nutrition_meal_template_api_v1_nutrition_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        /** Remove Nutrition Meal Template */
+        delete: operations["remove_nutrition_meal_template_api_v1_nutrition_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Nutrition Meal Template */
+        patch: operations["patch_nutrition_meal_template_api_v1_nutrition_templates__template_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nutrition/templates/{template_id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Nutrition Meal Template */
+        post: operations["add_nutrition_meal_template_api_v1_nutrition_templates__template_id__entries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/food-aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Food Search Aliases */
+        get: operations["get_food_search_aliases_api_v1_nutrition_food_aliases_get"];
+        put?: never;
+        /** Save Food Search Alias */
+        post: operations["save_food_search_alias_api_v1_nutrition_food_aliases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/food-aliases/{alias_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Food Search Alias */
+        delete: operations["remove_food_search_alias_api_v1_nutrition_food_aliases__alias_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Food Search Alias */
+        patch: operations["patch_food_search_alias_api_v1_nutrition_food_aliases__alias_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nutrition Plan Day */
+        get: operations["nutrition_plan_day_api_v1_nutrition_plans_day_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/grocery-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nutrition Grocery List */
+        get: operations["nutrition_grocery_list_api_v1_nutrition_grocery_list_get"];
+        /** Generate Nutrition Grocery List */
+        put: operations["generate_nutrition_grocery_list_api_v1_nutrition_grocery_list_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/grocery-list/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Nutrition Grocery Item */
+        post: operations["add_nutrition_grocery_item_api_v1_nutrition_grocery_list_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/grocery-list/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Nutrition Grocery Item */
+        delete: operations["remove_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Nutrition Grocery Item */
+        patch: operations["patch_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/week": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nutrition Plan Week */
+        get: operations["nutrition_plan_week_api_v1_nutrition_plans_week_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plan Suggestions */
+        get: operations["get_plan_suggestions_api_v1_nutrition_plans_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fill Nutrition Plan */
+        post: operations["fill_nutrition_plan_api_v1_nutrition_plans_fill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Nutrition Plan Item */
+        post: operations["create_nutrition_plan_item_api_v1_nutrition_plans_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Nutrition Plan Item */
+        delete: operations["remove_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Nutrition Plan Item */
+        patch: operations["patch_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/items/{item_id}/action": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Action Nutrition Plan Item */
+        post: operations["action_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__action_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Nutrition Plan Day */
+        post: operations["copy_nutrition_plan_day_api_v1_nutrition_plans_copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/diary": {
         parameters: {
             query?: never;
@@ -2204,6 +4255,74 @@ export interface paths {
         get: operations["get_diary_day_api_v1_nutrition_diary_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Diary Suggestions */
+        get: operations["get_diary_suggestions_api_v1_nutrition_diary_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/suggestions/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Commit Diary Suggestion */
+        post: operations["commit_diary_suggestion_api_v1_nutrition_diary_suggestions_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/natural-input/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Nutrition Natural Input */
+        post: operations["preview_nutrition_natural_input_api_v1_nutrition_diary_natural_input_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/natural-input/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Commit Nutrition Natural Input */
+        post: operations["commit_nutrition_natural_input_api_v1_nutrition_diary_natural_input_commit_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2260,6 +4379,57 @@ export interface paths {
         head?: never;
         /** Update Diary Entry */
         patch: operations["update_diary_entry_api_v1_nutrition_diary_entries__entry_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/copy/product/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Copy Product */
+        post: operations["preview_copy_product_api_v1_nutrition_diary_copy_product_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/copy/meal/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Copy Meal */
+        post: operations["preview_copy_meal_api_v1_nutrition_diary_copy_meal_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/copy/day/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Copy Day */
+        post: operations["preview_copy_day_api_v1_nutrition_diary_copy_day_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/nutrition/diary/copy/product": {
@@ -2381,6 +4551,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/web-push/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Web Push Config */
+        get: operations["get_web_push_config_api_v1_notifications_web_push_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/web-push/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Web Push Status */
+        get: operations["get_web_push_status_api_v1_notifications_web_push_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/web-push/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register Web Push Subscription */
+        post: operations["register_web_push_subscription_api_v1_notifications_web_push_subscription_post"];
+        /** Revoke Web Push Subscription */
+        delete: operations["revoke_web_push_subscription_api_v1_notifications_web_push_subscription_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications/settings": {
         parameters: {
             query?: never;
@@ -2397,6 +4619,40 @@ export interface paths {
         head?: never;
         /** Update Notification Settings */
         patch: operations["update_notification_settings_api_v1_notifications_settings_patch"];
+        trace?: never;
+    };
+    "/api/v1/notifications/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reminder Templates */
+        get: operations["get_reminder_templates_api_v1_notifications_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/templates/{template_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Reminder Template */
+        patch: operations["patch_reminder_template_api_v1_notifications_templates__template_key__patch"];
         trace?: never;
     };
     "/api/v1/notifications": {
@@ -2480,6 +4736,177 @@ export interface paths {
         post?: never;
         /** Delete Notification */
         delete: operations["delete_notification_api_v1_notifications__notification_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-handoffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get My Report Handoffs */
+        get: operations["get_my_report_handoffs_api_v1_report_handoffs_get"];
+        put?: never;
+        /** Create My Report Handoff */
+        post: operations["create_my_report_handoff_api_v1_report_handoffs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-handoffs/{handoff_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry My Report Handoff */
+        post: operations["retry_my_report_handoff_api_v1_report_handoffs__handoff_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-handoffs/{handoff_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report Handoff */
+        get: operations["get_report_handoff_api_v1_report_handoffs__handoff_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Shares */
+        get: operations["list_shares_api_v1_shares_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/progress/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Progress Share */
+        post: operations["preview_progress_share_api_v1_shares_progress_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Progress Public Share */
+        post: operations["create_progress_public_share_api_v1_shares_progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/program/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Program Share */
+        post: operations["preview_program_share_api_v1_shares_program_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/program": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Program Public Share */
+        post: operations["create_program_public_share_api_v1_shares_program_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/{share_id}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Shared Program */
+        post: operations["import_shared_program_api_v1_shares__share_id__import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Share */
+        delete: operations["revoke_share_api_v1_shares__share_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2621,6 +5048,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/trainer-capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Trainer Capacity */
+        get: operations["admin_trainer_capacity_api_v1_admin_trainer_capacity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -2632,6 +5076,86 @@ export interface paths {
         get: operations["admin_audit_api_v1_admin_audit_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/articles/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Article Drafts
+         * @description Root-only read: no approval or publication side effects.
+         */
+        get: operations["admin_article_drafts_api_v1_admin_articles_drafts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/articles/drafts/{article_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Article Draft Detail
+         * @description Owner inspection of exact draft evidence, including pending claims.
+         */
+        get: operations["admin_article_draft_detail_api_v1_admin_articles_drafts__article_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/articles/drafts/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Publish Existing Article
+         * @description Root-only explicit confirmation of an exact existing draft revision.
+         */
+        post: operations["admin_publish_existing_article_api_v1_admin_articles_drafts_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/articles/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Publish Web Article
+         * @description One explicit Root decision; Hermes intake and expert-review statuses remain untouched.
+         */
+        post: operations["admin_publish_web_article_api_v1_admin_articles_publish_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2910,6 +5434,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hermes/editorial/intake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Hermes Editorial Intake */
+        post: operations["receive_hermes_editorial_intake_api_v1_hermes_editorial_intake_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hermes/articles/intake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive Hermes Web Article Intake */
+        post: operations["receive_hermes_web_article_intake_api_v1_hermes_articles_intake_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -3005,6 +5563,57 @@ export interface paths {
         };
         /** Landing Page */
         get: operations["landing_page__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/for-athletes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Athlete Landing Alias Page */
+        get: operations["athlete_landing_alias_page_for_athletes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Articles Index Page */
+        get: operations["articles_index_page_articles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/articles/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Article Page */
+        get: operations["article_page_articles__slug__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3161,6 +5770,67 @@ export interface components {
             /** Error Code */
             error_code?: string | null;
         };
+        /**
+         * AdaptationPatch
+         * @description The only bounded change shape that can reach the domain service.
+         */
+        AdaptationPatch: {
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "replace_exercise" | "update_prescription" | "explanation_only";
+            /** Replacement Candidate Ref */
+            replacement_candidate_ref?: string | null;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+            /** Rest Seconds */
+            rest_seconds?: number | null;
+            /**
+             * Effective Scope
+             * @default next_workout
+             * @enum {string}
+             */
+            effective_scope: "next_workout" | "current_block" | "future_program";
+        };
+        /**
+         * AdaptationProposal
+         * @description Server-resolved proposal shown to the authenticated owner or trainer.
+         */
+        AdaptationProposal: {
+            /** Proposal Id */
+            proposal_id: string;
+            proposal_type: components["schemas"]["AiCoachAdaptationProposalType"];
+            /** Target Program Id */
+            target_program_id: number;
+            /** Target Revision Id */
+            target_revision_id: number;
+            /** Target Revision Number */
+            target_revision_number: number;
+            /** Target Block Id */
+            target_block_id?: number | null;
+            /** Target Exercise Id */
+            target_exercise_id?: number | null;
+            /** Explanation */
+            explanation: string;
+            suggested_change: components["schemas"]["AdaptationPatch"];
+            /** Evidence Ids */
+            evidence_ids: string[];
+            deterministic_rule_relationship: components["schemas"]["AiCoachDeterministicRelationship"];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /**
+             * Requires Confirmation
+             * @default true
+             * @constant
+             */
+            requires_confirmation: true;
+        };
         /** AdherenceComponent */
         AdherenceComponent: {
             /**
@@ -3230,26 +5900,54 @@ export interface components {
              */
             cohort_since: string;
             /**
+             * Cohort Until
+             * Format: date-time
+             */
+            cohort_until: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Milestone Retention Days */
+            milestone_retention_days: number;
+            /** Aggregate Retention Days */
+            aggregate_retention_days: number;
+            /** Cohort Size */
+            cohort_size: number;
+            /** Complete Weekly Cohorts */
+            complete_weekly_cohorts: number;
+            /**
+             * Sample Status
+             * @enum {string}
+             */
+            sample_status: "INSUFFICIENT_SAMPLE" | "READY_FOR_EFFECT_REVIEW";
+            /** Sample Note */
+            sample_note: string;
+            /** Eligible Real Account Count */
+            eligible_real_account_count: number;
+            /** Recovery Eligible Real Account Count */
+            recovery_eligible_real_account_count: number;
+            nutrition_repeat_metrics: components["schemas"]["AdminNutritionRepeatMetrics"];
+            /**
              * Analytics Provider Status
              * @constant
              */
             analytics_provider_status: "not_connected";
             /** Coverage Note */
             coverage_note: string;
-            /** Stages */
-            stages: components["schemas"]["AdminFunnelStage"][];
-        };
-        /** AdminFunnelStage */
-        AdminFunnelStage: {
             /**
-             * Key
+             * Effect Status
              * @enum {string}
              */
-            key: "registered" | "profile_ready" | "program_activated" | "core_value_reached";
-            /** Account Count */
-            account_count: number;
-            /** Cohort Rate Percent */
-            cohort_rate_percent: number;
+            effect_status: "NOT_YET_PROVEN" | "BASELINE_ONLY";
+            /** Effect Note */
+            effect_note: string;
+            /** Exclusions */
+            exclusions: string[];
+            data_quality: components["schemas"]["AdminLifecycleDataQuality"];
+            /** Kpis */
+            kpis: components["schemas"]["AdminLifecycleKpi"][];
         };
         /** AdminIdentityRow */
         AdminIdentityRow: {
@@ -3293,6 +5991,87 @@ export interface components {
             error_code?: string | null;
             /** Retry Allowed */
             retry_allowed: boolean;
+        };
+        /** AdminLifecycleDataQuality */
+        AdminLifecycleDataQuality: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "clean" | "attention";
+            /** Total Milestones */
+            total_milestones: number;
+            /** Authoritative Success Count */
+            authoritative_success_count: number;
+            /** Authoritative Success Rate Percent */
+            authoritative_success_rate_percent?: number | null;
+            /** Duplicate Milestones */
+            duplicate_milestones: number;
+            /** Duplicate Web Tma Outcomes */
+            duplicate_web_tma_outcomes: number;
+            /** Impossible Order */
+            impossible_order: number;
+            /** Demo Test Contamination */
+            demo_test_contamination: number;
+            /** Client Success Without Server */
+            client_success_without_server: number;
+            /** Post Deletion Milestones */
+            post_deletion_milestones: number;
+            /** Unauthorized Cross Account Outcomes */
+            unauthorized_cross_account_outcomes: number;
+            /** Malformed Schema Versions */
+            malformed_schema_versions: number;
+            /** Retention Expired Milestones */
+            retention_expired_milestones: number;
+            /** Invalid Milestones */
+            invalid_milestones: number;
+            /** Excluded Role Accounts */
+            excluded_role_accounts: number;
+            /** Timezone Fallback Accounts */
+            timezone_fallback_accounts: number;
+        };
+        /** AdminLifecycleKpi */
+        AdminLifecycleKpi: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "activation_rate" | "time_to_first_useful_action" | "first_workout_completion_rate" | "first_week_value_rate" | "d1_meaningful_return" | "d7_meaningful_return" | "d30_meaningful_return" | "missed_workout_recovery_conversion" | "recovery_to_completion_rate" | "time_to_recovery" | "nutrition_repeat_rate" | "progress_next_action_completion_rate" | "weekly_loop_completion";
+            /** Numerator */
+            numerator: number;
+            /** Denominator */
+            denominator: number;
+            /** Cohort Size */
+            cohort_size: number;
+            /** Rate Percent */
+            rate_percent?: number | null;
+            /** Median Seconds */
+            median_seconds?: number | null;
+            /** Window */
+            window: string;
+        };
+        /** AdminNutritionRepeatMetrics */
+        AdminNutritionRepeatMetrics: {
+            /** Eligible Opportunities */
+            eligible_opportunities: number;
+            /** Confirmed Repeats */
+            confirmed_repeats: number;
+            /** Repeat Rate Percent */
+            repeat_rate_percent?: number | null;
+            /** Preview Count */
+            preview_count: number;
+            /** Confirmed Preview Count */
+            confirmed_preview_count: number;
+            /** Preview To Confirmed Percent */
+            preview_to_confirmed_percent?: number | null;
+            /** Median Seconds */
+            median_seconds?: number | null;
+            /** Persistence Failures */
+            persistence_failures: number;
+            /** Persistence Failure Rate Percent */
+            persistence_failure_rate_percent?: number | null;
+            /** Duplicate Prevention Count */
+            duplicate_prevention_count: number;
         };
         /** AdminOperationRequest */
         AdminOperationRequest: {
@@ -3340,6 +6119,80 @@ export interface components {
             reason: "security_incident" | "abuse" | "account_recovery" | "support_request" | "relationship_safety";
             /** Is Active */
             is_active: boolean;
+        };
+        /** AdminTrainerCapacityBand */
+        AdminTrainerCapacityBand: {
+            /**
+             * Band
+             * @enum {string}
+             */
+            band: "0_9" | "10_29" | "30_99" | "100_plus";
+            /** Trainer Count */
+            trainer_count: number;
+            /** Active Client Count */
+            active_client_count: number;
+        };
+        /** AdminTrainerCapacityResponse */
+        AdminTrainerCapacityResponse: {
+            /** Period Days */
+            period_days: number;
+            /**
+             * Cohort Since
+             * Format: date-time
+             */
+            cohort_since: string;
+            /**
+             * Cohort Until
+             * Format: date-time
+             */
+            cohort_until: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Eligible Account Count */
+            eligible_account_count: number;
+            /** Activated Trainer Count */
+            activated_trainer_count: number;
+            /** Trainer Activation Rate Percent */
+            trainer_activation_rate_percent?: number | null;
+            /** Trainers With First Client Action */
+            trainers_with_first_client_action: number;
+            /** Time To First Client Action Median Seconds */
+            time_to_first_client_action_median_seconds?: number | null;
+            /** Active Trainer Count */
+            active_trainer_count: number;
+            /** Active Client Count */
+            active_client_count: number;
+            /** Pending Invite Count */
+            pending_invite_count: number;
+            /** Open Task Count */
+            open_task_count: number;
+            /** Authorized Client Action Success Count */
+            authorized_client_action_success_count: number;
+            /** Authorized Client Action Failure Count */
+            authorized_client_action_failure_count?: number | null;
+            /**
+             * Authorized Client Action Failure Status
+             * @constant
+             */
+            authorized_client_action_failure_status: "not_recorded";
+            /** Response Time P50 Ms */
+            response_time_p50_ms?: number | null;
+            /** Response Time P95 Ms */
+            response_time_p95_ms?: number | null;
+            /**
+             * Response Time Status
+             * @constant
+             */
+            response_time_status: "not_measured";
+            /** Capacity Bands */
+            capacity_bands: components["schemas"]["AdminTrainerCapacityBand"][];
+            /** Coverage Note */
+            coverage_note: string;
+            /** Exclusions */
+            exclusions: string[];
         };
         /** AdminUserDetail */
         AdminUserDetail: {
@@ -3407,6 +6260,709 @@ export interface components {
             /** Is Active */
             is_active: boolean;
         };
+        /**
+         * AiCoachAdaptationGenerateRequest
+         * @description A server-authorized program selector for one bounded adaptation draft.
+         */
+        AiCoachAdaptationGenerateRequest: {
+            /** Program Id */
+            program_id: number;
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Target Workout Id */
+            target_workout_id?: number | null;
+            /** Target Exercise Id */
+            target_exercise_id?: number | null;
+            /** Message */
+            message: string;
+            /**
+             * Locale
+             * @default ru
+             * @enum {string}
+             */
+            locale: "ru" | "en";
+        };
+        /** AiCoachAdaptationProposalResponse */
+        AiCoachAdaptationProposalResponse: {
+            outcome: components["schemas"]["AiCoachOutcome"];
+            proposal?: components["schemas"]["AdaptationProposal"] | null;
+            /** Proposal Token */
+            proposal_token?: string | null;
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /** Safety Category */
+            safety_category: string;
+            /**
+             * Prompt Version
+             * @default ai-coach-adaptation-v1
+             */
+            prompt_version: string;
+            /**
+             * Schema Version
+             * @default ai-coach-adaptation-output-v1
+             */
+            schema_version: string;
+            /**
+             * Policy Version
+             * @default ai-coach-adaptation-policy-v1
+             */
+            policy_version: string;
+            /** Request Id */
+            request_id?: string | null;
+            quota?: components["schemas"]["AiCoachQuotaSnapshot"] | null;
+        };
+        /**
+         * AiCoachAdaptationProposalType
+         * @enum {string}
+         */
+        AiCoachAdaptationProposalType: "progression_explanation" | "exercise_substitution" | "volume_or_frequency_adjustment" | "block_or_revision_edit" | "adherence_performance_summary";
+        /** AiCoachAdaptationReviewRequest */
+        AiCoachAdaptationReviewRequest: {
+            /** Proposal Id */
+            proposal_id: string;
+            /** Proposal Token */
+            proposal_token: string;
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject";
+        };
+        /** AiCoachAdaptationReviewResponse */
+        AiCoachAdaptationReviewResponse: {
+            outcome: components["schemas"]["AiCoachOutcome"];
+            /** Proposal Id */
+            proposal_id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject";
+            /** Applied */
+            applied: boolean;
+            /**
+             * Idempotent
+             * @default false
+             */
+            idempotent: boolean;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            quota?: components["schemas"]["AiCoachQuotaSnapshot"] | null;
+        };
+        /** AiCoachCitation */
+        AiCoachCitation: {
+            /** Title */
+            title: string;
+            /** Publisher */
+            publisher: string;
+            /** Url */
+            url: string;
+            /** Source Type */
+            source_type: string;
+        };
+        /** AiCoachConsentResponse */
+        AiCoachConsentResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "granted" | "revoked";
+            /** Scope */
+            scope: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Categories */
+            categories: string[];
+            /** Purpose */
+            purpose: string;
+            /** Provider Name */
+            provider_name: string;
+            /** Provider Policy Revision */
+            provider_policy_revision: string;
+            /** Retention Notice */
+            retention_notice: string;
+            /** Consent Source */
+            consent_source: string;
+            /** Granted At */
+            granted_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+        };
+        /** AiCoachConsentUpdateRequest */
+        AiCoachConsentUpdateRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
+         * AiCoachContextAttachment
+         * @description High-level context label returned to the composer, without resource data.
+         */
+        AiCoachContextAttachment: {
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "today" | "workout" | "nutrition" | "program" | "progress";
+            /** Label */
+            label: string;
+        };
+        /**
+         * AiCoachContextDescriptor
+         * @description A small client hint resolved against the authenticated user's data.
+         */
+        AiCoachContextDescriptor: {
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "today" | "workout" | "nutrition" | "program" | "progress";
+            /** Resource Id */
+            resource_id?: number | null;
+            /** Period Days */
+            period_days?: (7 | 30 | 90) | null;
+        };
+        /** AiCoachConversationClearResponse */
+        AiCoachConversationClearResponse: {
+            /** Deleted Count */
+            deleted_count: number;
+        };
+        /** AiCoachConversationFeedbackRequest */
+        AiCoachConversationFeedbackRequest: {
+            /**
+             * Value
+             * @enum {string}
+             */
+            value: "helpful" | "not_helpful";
+        };
+        /** AiCoachConversationListResponse */
+        AiCoachConversationListResponse: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["AiCoachConversationSummaryResponse"][];
+        };
+        /** AiCoachConversationMessageResponse */
+        AiCoachConversationMessageResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "processing" | "complete" | "failed";
+            outcome?: components["schemas"]["AiCoachOutcome"] | null;
+            /** Safety Category */
+            safety_category: string;
+            /** Failure Category */
+            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "rate_limit" | "repair_failed" | "presentation_validation_failed" | "internal_error" | "safety_rejection" | "context_failure" | "generation_failure" | "rate_limited") | null;
+            rate_limit_scope?: components["schemas"]["AiCoachRateLimitScope"] | null;
+            /** Rate Limit Retry After Seconds */
+            rate_limit_retry_after_seconds?: number | null;
+            /**
+             * Citations
+             * @default []
+             */
+            citations: components["schemas"]["AiCoachCitation"][];
+            /**
+             * Exercise References
+             * @default []
+             */
+            exercise_references: components["schemas"]["AiCoachExerciseReference"][];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AiCoachConversationResponse */
+        AiCoachConversationResponse: {
+            /** Id */
+            id: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Messages
+             * @default []
+             */
+            messages: components["schemas"]["AiCoachConversationMessageResponse"][];
+        };
+        /** AiCoachConversationRetryRequest */
+        AiCoachConversationRetryRequest: {
+            context?: components["schemas"]["AiCoachContextDescriptor"] | null;
+        };
+        /** AiCoachConversationSendRequest */
+        AiCoachConversationSendRequest: {
+            /** Message */
+            message: string;
+            context?: components["schemas"]["AiCoachContextDescriptor"] | null;
+        };
+        /** AiCoachConversationSendResponse */
+        AiCoachConversationSendResponse: {
+            /** Conversation Id */
+            conversation_id: number;
+            user_message: components["schemas"]["AiCoachConversationMessageResponse"];
+            assistant_message?: components["schemas"]["AiCoachConversationMessageResponse"] | null;
+            outcome: components["schemas"]["AiCoachOutcome"];
+            data_class: components["schemas"]["AiCoachDataClass"];
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Citations
+             * @default []
+             */
+            citations: components["schemas"]["AiCoachCitation"][];
+            /**
+             * Exercise References
+             * @default []
+             */
+            exercise_references: components["schemas"]["AiCoachExerciseReference"][];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /** Safety Category */
+            safety_category: string;
+            /** Failure Category */
+            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "rate_limit" | "repair_failed" | "presentation_validation_failed" | "internal_error" | "safety_rejection" | "context_failure" | "generation_failure" | "rate_limited") | null;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Request Id */
+            request_id?: string | null;
+            quota: components["schemas"]["AiCoachQuotaSnapshot"];
+            rate_limit_scope?: components["schemas"]["AiCoachRateLimitScope"] | null;
+            /** Rate Limit Retry After Seconds */
+            rate_limit_retry_after_seconds?: number | null;
+            context?: components["schemas"]["AiCoachContextAttachment"] | null;
+        };
+        /** AiCoachConversationSummaryResponse */
+        AiCoachConversationSummaryResponse: {
+            /** Id */
+            id: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Message Count */
+            message_count: number;
+        };
+        /**
+         * AiCoachDataClass
+         * @enum {string}
+         */
+        AiCoachDataClass: "generic" | "personalized" | "unknown";
+        /**
+         * AiCoachDeterministicRelationship
+         * @enum {string}
+         */
+        AiCoachDeterministicRelationship: "supports_deterministic_rule" | "supplements_no_rule" | "conflicts_with_deterministic_rule";
+        /**
+         * AiCoachExerciseReference
+         * @description Server-resolved canonical exercise reference safe for the client UI.
+         */
+        AiCoachExerciseReference: {
+            /** Exercise Slug */
+            exercise_slug: string;
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "technique" | "media";
+            /** Deep Link */
+            deep_link: string;
+            /** Media Reference */
+            media_reference?: string | null;
+        };
+        /**
+         * AiCoachGenerateRequest
+         * @description A bounded intent plus a server-known public context id.
+         *
+         *     The model intentionally has no provider, model, system prompt, URL, account
+         *     data, file or arbitrary context field.
+         */
+        AiCoachGenerateRequest: {
+            job: components["schemas"]["AiCoachJob"];
+            /** Context Id */
+            context_id: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * AiCoachInsight
+         * @description Stable user-facing representation of a grounded claim.
+         */
+        AiCoachInsight: {
+            kind: components["schemas"]["AiCoachInsightKind"];
+            /** Text */
+            text: string;
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /**
+             * Reason Keys
+             * @default []
+             */
+            reason_keys: string[];
+        };
+        /**
+         * AiCoachInsightKind
+         * @enum {string}
+         */
+        AiCoachInsightKind: "fact" | "inference" | "suggestion";
+        /**
+         * AiCoachJob
+         * @enum {string}
+         */
+        AiCoachJob: "app_help" | "public_knowledge" | "metric_explanation" | "fitness_knowledge" | "nutrition_knowledge" | "progression_explanation";
+        /** AiCoachMemoryClearResponse */
+        AiCoachMemoryClearResponse: {
+            /** Deleted Count */
+            deleted_count: number;
+        };
+        /** AiCoachMemoryConsentUpdateRequest */
+        AiCoachMemoryConsentUpdateRequest: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "enabled" | "paused" | "revoked";
+        };
+        /** AiCoachMemoryCreateRequest */
+        AiCoachMemoryCreateRequest: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "preferred_explanation_style" | "ai_interaction_preferences" | "stable_non_medical_preferences" | "explicit_ai_context";
+            /** Value */
+            value: string;
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: true;
+        };
+        /** AiCoachMemoryItemResponse */
+        AiCoachMemoryItemResponse: {
+            /** Id */
+            id: number;
+            /** Category */
+            category: string;
+            /** Category Label */
+            category_label: string;
+            /** Value */
+            value: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "explicit_user" | "confirmed_candidate";
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "explicit" | "confirmed";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "superseded" | "conflicted" | "deleted";
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /** AiCoachMemoryResponse */
+        AiCoachMemoryResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "enabled" | "paused" | "revoked";
+            /** Scope */
+            scope: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Categories */
+            categories: string[];
+            /** Category Labels */
+            category_labels: {
+                [key: string]: string;
+            };
+            /** Purpose */
+            purpose: string;
+            /** Retention Notice */
+            retention_notice: string;
+            /** Max Items */
+            max_items: number;
+            /** Consent Source */
+            consent_source: string;
+            /** Granted At */
+            granted_at?: string | null;
+            /** Paused At */
+            paused_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["AiCoachMemoryItemResponse"][];
+        };
+        /** AiCoachMemoryUpdateRequest */
+        AiCoachMemoryUpdateRequest: {
+            /** Value */
+            value: string;
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: true;
+        };
+        /**
+         * AiCoachOutcome
+         * @enum {string}
+         */
+        AiCoachOutcome: "answer" | "unavailable" | "rate_limited" | "safety_refusal" | "insufficient_data" | "invalid_output" | "consent_required";
+        /**
+         * AiCoachPersonalGenerateRequest
+         * @description A server-selected read-only tool and a bounded report period.
+         */
+        AiCoachPersonalGenerateRequest: {
+            tool: components["schemas"]["AiCoachPersonalTool"];
+            /**
+             * Period Days
+             * @default 30
+             * @enum {integer}
+             */
+            period_days: 7 | 30 | 90;
+            /** Period */
+            period?: ("days_7" | "days_30" | "days_90" | "custom") | null;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Message */
+            message: string;
+        };
+        /**
+         * AiCoachPersonalTool
+         * @enum {string}
+         */
+        AiCoachPersonalTool: "get_progress_summary" | "get_recent_training_summary" | "get_nutrition_summary" | "get_period_report_insights";
+        /**
+         * AiCoachQuotaSnapshot
+         * @description Server-owned user quota state; no prompt or answer data is included.
+         */
+        AiCoachQuotaSnapshot: {
+            /** Limit */
+            limit: number;
+            /** Used */
+            used: number;
+            /** Remaining */
+            remaining: number;
+            /**
+             * Reset At
+             * Format: date-time
+             */
+            reset_at: string;
+            /** Retry After Seconds */
+            retry_after_seconds: number;
+            /** Can Send */
+            can_send: boolean;
+        };
+        /**
+         * AiCoachRateLimitScope
+         * @description The boundary that blocked a generation request.
+         * @enum {string}
+         */
+        AiCoachRateLimitScope: "user" | "service" | "provider";
+        /**
+         * AiCoachResponse
+         * @description Stable user-facing response; provider topology is intentionally absent.
+         */
+        AiCoachResponse: {
+            outcome: components["schemas"]["AiCoachOutcome"];
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Citations
+             * @default []
+             */
+            citations: components["schemas"]["AiCoachCitation"][];
+            /**
+             * Insights
+             * @default []
+             */
+            insights: components["schemas"]["AiCoachInsight"][];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /** Safety Category */
+            safety_category: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Request Id */
+            request_id?: string | null;
+            /** Report Version */
+            report_version?: string | null;
+            /** Input Version */
+            input_version?: string | null;
+            /** Output Version */
+            output_version?: string | null;
+            /** Report Revision */
+            report_revision?: string | null;
+            /** Period Start */
+            period_start?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            quota?: components["schemas"]["AiCoachQuotaSnapshot"] | null;
+            rate_limit_scope?: components["schemas"]["AiCoachRateLimitScope"] | null;
+            /** Rate Limit Retry After Seconds */
+            rate_limit_retry_after_seconds?: number | null;
+        };
+        /**
+         * AiCoachStatusResponse
+         * @description Safe server-authoritative state for the AI Coach runtime and UI.
+         */
+        AiCoachStatusResponse: {
+            /** Ui Enabled */
+            ui_enabled: boolean;
+            /** Generic Available */
+            generic_available: boolean;
+            /** Personal Available */
+            personal_available: boolean;
+        };
+        /** ArticleBodySection */
+        ArticleBodySection: {
+            /** Heading */
+            heading: string;
+            /** Paragraphs */
+            paragraphs: string[];
+            /** Points */
+            points?: string[];
+        };
+        /** ArticleClaim */
+        ArticleClaim: {
+            /** Claim Id */
+            claim_id: string;
+            /** Claim Text */
+            claim_text: string;
+            /** Normalized Claim */
+            normalized_claim: string;
+        };
+        /** ArticleClaimSourceMatrixItem */
+        ArticleClaimSourceMatrixItem: {
+            /** Claim Id */
+            claim_id: string;
+            /** Source Ids */
+            source_ids: string[];
+            /**
+             * Support Level
+             * @enum {string}
+             */
+            support_level: "supports" | "partially_supports" | "does_not_support" | "unclear";
+            /**
+             * Limitations
+             * @default
+             */
+            limitations: string;
+            /**
+             * Review Status
+             * @default pending
+             * @enum {string}
+             */
+            review_status: "pending" | "verified" | "blocked";
+        };
+        /** ArticlePerson */
+        ArticlePerson: {
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "Organization" | "Person";
+        };
+        /** ArticleSource */
+        ArticleSource: {
+            /** Source Id */
+            source_id: string;
+            /** Title */
+            title: string;
+            /** Publisher */
+            publisher: string;
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+            /** Source Type */
+            source_type: string;
+            /** Published At */
+            published_at?: string | null;
+            /**
+             * Limitations
+             * @default
+             */
+            limitations: string;
+        };
         /** AssignTemplateSelfRequest */
         AssignTemplateSelfRequest: {
             /** Start Date */
@@ -3440,6 +6996,41 @@ export interface components {
              * @default false
              */
             replace_active: boolean;
+        };
+        /** AssignedCheckInTemplateListResponse */
+        AssignedCheckInTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["AssignedCheckInTemplateResponse"][];
+        };
+        /** AssignedCheckInTemplateResponse */
+        AssignedCheckInTemplateResponse: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Template Id */
+            template_id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Cadence
+             * @enum {string}
+             */
+            cadence: "weekly" | "biweekly" | "monthly";
+            /** Version */
+            version: number;
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldResponseDefinition"][];
+            /**
+             * Next Due On
+             * Format: date
+             */
+            next_due_on: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "active";
         };
         /** AuthTokenRequest */
         AuthTokenRequest: {
@@ -3477,6 +7068,68 @@ export interface components {
             exercise_id: number;
             /** Reason */
             reason?: ("not_enjoyable" | "uncomfortable" | "not_confident" | "other") | null;
+        };
+        /** BodyMeasurementCustomValueResponse */
+        BodyMeasurementCustomValueResponse: {
+            /** Definition Id */
+            definition_id: number;
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @default cm
+             * @constant
+             */
+            unit: "cm";
+            /** Value */
+            value: number;
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
+        };
+        /** BodyMeasurementCustomValueSave */
+        BodyMeasurementCustomValueSave: {
+            /** Definition Id */
+            definition_id: number;
+            /** Value */
+            value?: number | string | null;
+        };
+        /** BodyMeasurementDefinitionCreate */
+        BodyMeasurementDefinitionCreate: {
+            /** Label */
+            label: string;
+        };
+        /** BodyMeasurementDefinitionResponse */
+        BodyMeasurementDefinitionResponse: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @default cm
+             * @constant
+             */
+            unit: "cm";
+            /** Archived */
+            archived: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** BodyMeasurementDefinitionUpdate */
+        BodyMeasurementDefinitionUpdate: {
+            /** Label */
+            label: string;
         };
         /** BodyMeasurementGuidance */
         BodyMeasurementGuidance: {
@@ -3520,25 +7173,29 @@ export interface components {
             note?: string | null;
             /** Created At */
             created_at?: string | null;
+            /** Custom Values */
+            custom_values?: components["schemas"]["BodyMeasurementCustomValueResponse"][];
         };
         /** BodyMeasurementSave */
         BodyMeasurementSave: {
             /** Measured On */
             measured_on?: string | null;
             /** Weight Kg */
-            weight_kg?: number | null;
+            weight_kg?: number | string | null;
             /** Chest Cm */
-            chest_cm?: number | null;
+            chest_cm?: number | string | null;
             /** Waist Cm */
-            waist_cm?: number | null;
+            waist_cm?: number | string | null;
             /** Hips Cm */
-            hips_cm?: number | null;
+            hips_cm?: number | string | null;
             /** Biceps Cm */
-            biceps_cm?: number | null;
+            biceps_cm?: number | string | null;
             /** Thigh Cm */
-            thigh_cm?: number | null;
+            thigh_cm?: number | string | null;
             /** Note */
             note?: string | null;
+            /** Custom Values */
+            custom_values?: components["schemas"]["BodyMeasurementCustomValueSave"][];
         };
         /** BodyMetricPoint */
         BodyMetricPoint: {
@@ -3552,11 +7209,21 @@ export interface components {
         };
         /** BodyMetricTrend */
         BodyMetricTrend: {
+            /** Metric */
+            metric: string;
             /**
-             * Metric
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Unit
+             * @default cm
              * @enum {string}
              */
-            metric: "weight_kg" | "chest_cm" | "waist_cm" | "hips_cm" | "biceps_cm" | "thigh_cm";
+            unit: "kg" | "cm";
+            /** Definition Id */
+            definition_id?: number | null;
             /** First Value */
             first_value: number;
             /** Latest Value */
@@ -3615,8 +7282,23 @@ export interface components {
             /** Muscle Group Ids */
             muscle_group_ids?: string[];
         };
+        /** Body_recognize_nutrition_label_api_v1_nutrition_label_scans_post */
+        Body_recognize_nutrition_label_api_v1_nutrition_label_scans_post: {
+            /** Image */
+            image: string;
+        };
+        /** Body_recognize_photo_meal_api_v1_nutrition_photo_meals_post */
+        Body_recognize_photo_meal_api_v1_nutrition_photo_meals_post: {
+            /** Image */
+            image: string;
+        };
         /** Body_replace_avatar_api_v1_me_avatar_put */
         Body_replace_avatar_api_v1_me_avatar_put: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_program_import_api_v1_programs_imports_post */
+        Body_upload_program_import_api_v1_programs_imports_post: {
             /** File */
             file: string;
         };
@@ -3916,6 +7598,68 @@ export interface components {
             /** Timezone */
             timezone: string;
         };
+        /** CanonicalDraft */
+        CanonicalDraft: {
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "nutrition-label-draft-v1";
+            /**
+             * Source Language
+             * @enum {string}
+             */
+            source_language: "ru" | "en" | "mixed" | "unknown";
+            /**
+             * Label Format
+             * @enum {string}
+             */
+            label_format: "ru_standard" | "eu_uk" | "us_nutrition_facts" | "unknown";
+            /**
+             * Source Basis
+             * @enum {string}
+             */
+            source_basis: "per_100_g" | "per_100_ml" | "per_serving" | "ambiguous";
+            serving_size?: components["schemas"]["ServingSize-Output"] | null;
+            /** Servings Per Container */
+            servings_per_container?: string | null;
+            package_amount?: components["schemas"]["PackageAmount-Output"] | null;
+            source_facts: components["schemas"]["SourceNutrientFacts"];
+            normalized_facts: components["schemas"]["NutrientFacts"];
+            derived_fields: components["schemas"]["DerivedNutrientFacts"];
+            displayed_daily_value_percent: components["schemas"]["DailyValuePercent"];
+            field_evidence: components["schemas"]["FieldEvidence"];
+            /**
+             * Confidence Kind
+             * @enum {string}
+             */
+            confidence_kind: "provider_native" | "calibrated_eval" | "none";
+            confidence: components["schemas"]["FieldConfidence"];
+            /** Warnings */
+            warnings?: string[];
+            /**
+             * Requires User Review
+             * @default true
+             * @constant
+             */
+            requires_user_review: true;
+            metadata: components["schemas"]["DraftMetadata"];
+        };
+        /** CanonicalFact */
+        CanonicalFact: {
+            /** Value */
+            value: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "mg" | "kcal" | "kJ";
+            /**
+             * Basis Ref
+             * @enum {string}
+             */
+            basis_ref: "per_100_g" | "per_100_ml" | "per_serving";
+        };
         /** CardioPeriodSummary */
         CardioPeriodSummary: {
             /** Completed Sessions */
@@ -3941,7 +7685,7 @@ export interface components {
             /** Duration Minutes */
             duration_minutes: number;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -4020,7 +7764,7 @@ export interface components {
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -4056,6 +7800,249 @@ export interface components {
             /** Duration Minutes */
             duration_minutes: number;
         };
+        /** CheckInFieldCatalogItem */
+        CheckInFieldCatalogItem: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "recovery" | "hunger" | "training_load" | "adherence_difficulty";
+            /** Label */
+            label: string;
+            /**
+             * Value Type
+             * @constant
+             */
+            value_type: "score";
+            /** Min Value */
+            min_value: number;
+            /** Max Value */
+            max_value: number;
+        };
+        /** CheckInFieldDefinition */
+        CheckInFieldDefinition: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "recovery" | "hunger" | "training_load" | "adherence_difficulty";
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
+        };
+        /** CheckInFieldResponseDefinition */
+        CheckInFieldResponseDefinition: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "recovery" | "hunger" | "training_load" | "adherence_difficulty";
+            /** Label */
+            label: string;
+            /**
+             * Value Type
+             * @constant
+             */
+            value_type: "score";
+            /** Min Value */
+            min_value: number;
+            /** Max Value */
+            max_value: number;
+            /** Required */
+            required: boolean;
+        };
+        /** CheckInTemplateAssignmentCreate */
+        CheckInTemplateAssignmentCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Version */
+            version?: number | null;
+            /** Due On */
+            due_on?: string | null;
+        };
+        /** CheckInTemplateAssignmentResponse */
+        CheckInTemplateAssignmentResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Next Due On
+             * Format: date
+             */
+            next_due_on: string;
+            /** Last Response At */
+            last_response_at?: string | null;
+        };
+        /** CheckInTemplateCreate */
+        CheckInTemplateCreate: {
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldDefinition"][];
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Cadence
+             * @enum {string}
+             */
+            cadence: "weekly" | "biweekly" | "monthly";
+        };
+        /** CheckInTemplateListResponse */
+        CheckInTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["CheckInTemplateResponse"][];
+            /** Field Catalog */
+            field_catalog: components["schemas"]["CheckInFieldCatalogItem"][];
+        };
+        /** CheckInTemplateResponse */
+        CheckInTemplateResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Cadence
+             * @enum {string}
+             */
+            cadence: "weekly" | "biweekly" | "monthly";
+            /** Is Active */
+            is_active: boolean;
+            current_version?: components["schemas"]["CheckInTemplateVersionResponse"] | null;
+            /** Assignments */
+            assignments?: components["schemas"]["CheckInTemplateAssignmentResponse"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CheckInTemplateResponseHistory */
+        CheckInTemplateResponseHistory: {
+            /** Items */
+            items?: components["schemas"]["CheckInTemplateResponseHistoryItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+        };
+        /** CheckInTemplateResponseHistoryItem */
+        CheckInTemplateResponseHistoryItem: {
+            /** Id */
+            id: number;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Template Id */
+            template_id: number;
+            /** Template Name */
+            template_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Values */
+            values: {
+                [key: string]: number;
+            };
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+        };
+        /** CheckInTemplateResponseItem */
+        CheckInTemplateResponseItem: {
+            /** Id */
+            id: number;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Template Id */
+            template_id: number;
+            /** Template Name */
+            template_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Values */
+            values: {
+                [key: string]: number;
+            };
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
+        /** CheckInTemplateResponseSubmit */
+        CheckInTemplateResponseSubmit: {
+            /** Values */
+            values?: {
+                [key: string]: number;
+            };
+        };
+        /** CheckInTemplateStateUpdate */
+        CheckInTemplateStateUpdate: {
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** CheckInTemplateVersionCreate */
+        CheckInTemplateVersionCreate: {
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldDefinition"][];
+        };
+        /** CheckInTemplateVersionResponse */
+        CheckInTemplateVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldResponseDefinition"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** ClientResponse */
         ClientResponse: {
             /** Id */
@@ -4089,11 +8076,36 @@ export interface components {
             /** Timezone */
             timezone?: string | null;
             kbju?: components["schemas"]["NutritionTargetResponse"] | null;
+            /** Labels */
+            labels?: string[];
             /**
              * Status
              * @enum {string}
              */
             status: "active" | "pending";
+            /**
+             * Operational Status
+             * @default active
+             * @enum {string}
+             */
+            operational_status: "active" | "paused" | "archived";
+        };
+        /** CoachAgendaResponse */
+        CoachAgendaResponse: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Timezone */
+            timezone: string;
+            /** Items */
+            items: components["schemas"]["CoachSessionResponse"][];
         };
         /** CoachAssignedProgramResponse */
         CoachAssignedProgramResponse: {
@@ -4126,7 +8138,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "scheduled" | "active" | "completed" | "archived";
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
             /**
              * Start Date
              * Format: date
@@ -4148,6 +8160,331 @@ export interface components {
             next_workout_date?: string | null;
             /** Current Revision Number */
             current_revision_number: number;
+        };
+        /** CoachAttentionClient */
+        CoachAttentionClient: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** CoachAttentionEvidence */
+        CoachAttentionEvidence: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /** CoachAttentionItem */
+        CoachAttentionItem: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "workout_feedback" | "weekly_check_in" | "missed_workout" | "skipped_workout" | "without_program" | "program_ending_soon";
+            client: components["schemas"]["CoachAttentionClient"];
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "workout" | "weekly_check_in" | "client" | "program";
+            /** Source Id */
+            source_id: number;
+            /** Source State */
+            source_state: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "review_workout" | "review_check_in" | "assign_program" | "review_program";
+            /** Destination */
+            destination: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Priority
+             * @default normal
+             * @enum {string}
+             */
+            priority: "urgent" | "soon" | "normal";
+            /**
+             * Age Days
+             * @default 0
+             */
+            age_days: number;
+            /** Evidence */
+            evidence?: components["schemas"]["CoachAttentionEvidence"][];
+        };
+        /** CoachAttentionResponse */
+        CoachAttentionResponse: {
+            /** Items */
+            items?: components["schemas"]["CoachAttentionItem"][];
+            /** Total */
+            total: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CoachCapacityBottleneck */
+        CoachCapacityBottleneck: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "attention" | "open_tasks" | "without_program" | "pending_invites";
+            /** Count */
+            count: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "attention" | "tasks" | "without_program" | "pending";
+        };
+        /** CoachCapacityResponse */
+        CoachCapacityResponse: {
+            /** Active Client Count */
+            active_client_count: number;
+            /** Pending Invite Count */
+            pending_invite_count: number;
+            /** Open Task Count */
+            open_task_count: number;
+            /** Attention Item Count */
+            attention_item_count: number;
+            /** Attention Client Count */
+            attention_client_count: number;
+            /** Attention Items Returned */
+            attention_items_returned: number;
+            /** Attention Items Truncated */
+            attention_items_truncated: boolean;
+            /** Clients With Active Program Count */
+            clients_with_active_program_count: number;
+            /** Roster Coverage Percent */
+            roster_coverage_percent?: number | null;
+            /**
+             * Capacity Band
+             * @enum {string}
+             */
+            capacity_band: "0_9" | "10_29" | "30_99" | "100_plus";
+            /** Next Capacity Boundary */
+            next_capacity_boundary?: number | null;
+            /** Scale Boundaries */
+            scale_boundaries: [
+                number,
+                number,
+                number
+            ];
+            /** Bottlenecks */
+            bottlenecks: components["schemas"]["CoachCapacityBottleneck"][];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CoachCheckInReviewItem */
+        CoachCheckInReviewItem: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Check In Id */
+            check_in_id: number;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Submitted On
+             * Format: date
+             */
+            submitted_on: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "skipped";
+            /** Training Load */
+            training_load?: number | null;
+            /** Recovery */
+            recovery?: number | null;
+            /** Hunger */
+            hunger?: number | null;
+            /** Adherence Difficulty */
+            adherence_difficulty?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Summary */
+            summary: {
+                [key: string]: unknown;
+            };
+            /**
+             * Review Status
+             * @enum {string}
+             */
+            review_status: "pending" | "reviewed";
+            /** Review Response */
+            review_response?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            follow_up?: components["schemas"]["CoachTaskResponse"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CoachCheckInReviewListResponse */
+        CoachCheckInReviewListResponse: {
+            /** Items */
+            items?: components["schemas"]["CoachCheckInReviewItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** CoachCheckInReviewRequest */
+        CoachCheckInReviewRequest: {
+            /** Response */
+            response?: string | null;
+            /** Follow Up Title */
+            follow_up_title?: string | null;
+            /** Follow Up Due At */
+            follow_up_due_at?: string | null;
+            /** Follow Up Timezone */
+            follow_up_timezone?: string | null;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
+        };
+        /** CoachClientLabelsResponse */
+        CoachClientLabelsResponse: {
+            /** Client Id */
+            client_id: number;
+            /** Labels */
+            labels?: string[];
+        };
+        /** CoachClientLabelsUpdate */
+        CoachClientLabelsUpdate: {
+            /** Labels */
+            labels?: string[];
+        };
+        /** CoachClientOperationalStatusUpdate */
+        CoachClientOperationalStatusUpdate: {
+            /**
+             * Operational Status
+             * @enum {string}
+             */
+            operational_status: "active" | "paused" | "archived";
+        };
+        /** CoachClientOperationsResponse */
+        CoachClientOperationsResponse: {
+            /** Sessions */
+            sessions: components["schemas"]["CoachSessionResponse"][];
+            /** Packages */
+            packages: components["schemas"]["CoachPackageResponse"][];
+            /** Payments */
+            payments: components["schemas"]["CoachPaymentResponse"][];
+            /** Tasks */
+            tasks: components["schemas"]["CoachTaskResponse"][];
+        };
+        /** CoachInboxCounts */
+        CoachInboxCounts: {
+            /** Attention */
+            attention: number;
+            /** Pending Reviews */
+            pending_reviews: number;
+            /** Tasks */
+            tasks: number;
+            /** Sessions */
+            sessions: number;
+            /** Packages */
+            packages: number;
+            /** Payments */
+            payments: number;
+        };
+        /** CoachInboxItem */
+        CoachInboxItem: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "attention" | "check_in" | "task" | "session" | "package" | "payment";
+            client: components["schemas"]["CoachAttentionClient"];
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+            /** Source Kind */
+            source_kind?: string | null;
+            /** Source Id */
+            source_id?: number | null;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "review_workout" | "review_check_in" | "assign_program" | "review_program" | "open_task" | "open_schedule" | "open_finance";
+            /** Destination */
+            destination: string;
+            /**
+             * Priority
+             * @default normal
+             * @enum {string}
+             */
+            priority: "urgent" | "soon" | "normal";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Evidence */
+            evidence?: components["schemas"]["CoachAttentionEvidence"][];
+        };
+        /** CoachInboxResponse */
+        CoachInboxResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+            /** Items */
+            items?: components["schemas"]["CoachInboxItem"][];
+            /** Total */
+            total: number;
+            counts: components["schemas"]["CoachInboxCounts"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
         };
         /** CoachInviteLinkResponse */
         CoachInviteLinkResponse: {
@@ -4198,6 +8535,173 @@ export interface components {
             /** Token */
             token: string;
         };
+        /** CoachOperationsTodayResponse */
+        CoachOperationsTodayResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+            /** Sessions */
+            sessions: components["schemas"]["CoachSessionResponse"][];
+            /** Overdue Tasks */
+            overdue_tasks: components["schemas"]["CoachTaskResponse"][];
+            /** Due Tasks */
+            due_tasks: components["schemas"]["CoachTaskResponse"][];
+            /** Low Packages */
+            low_packages: components["schemas"]["CoachPackageResponse"][];
+            /** Payment Facts */
+            payment_facts: components["schemas"]["CoachPaymentResponse"][];
+        };
+        /** CoachPackageCreate */
+        CoachPackageCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Name */
+            name: string;
+            /**
+             * Counts Sessions
+             * @default true
+             */
+            counts_sessions: boolean;
+            /** Included Sessions */
+            included_sessions?: number | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Expires On */
+            expires_on?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** CoachPackageResponse */
+        CoachPackageResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Name */
+            name: string;
+            /** Counts Sessions */
+            counts_sessions: boolean;
+            /** Included Sessions */
+            included_sessions: number | null;
+            /** Charged Sessions */
+            charged_sessions: number;
+            /** Reversed Sessions */
+            reversed_sessions: number;
+            /** Balance */
+            balance: number | null;
+            /** Starts On */
+            starts_on: string | null;
+            /** Expires On */
+            expires_on: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "active" | "finished" | "cancelled";
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachPackageStateUpdate */
+        CoachPackageStateUpdate: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "active" | "finished" | "cancelled";
+        };
+        /** CoachPaymentCreate */
+        CoachPaymentCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Package Id */
+            package_id?: number | null;
+            /** Expected Amount Minor */
+            expected_amount_minor: number;
+            /**
+             * Paid Amount Minor
+             * @default 0
+             */
+            paid_amount_minor: number;
+            /** Currency */
+            currency: string;
+            /** Payment Date */
+            payment_date?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** CoachPaymentResponse */
+        CoachPaymentResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Package Id */
+            package_id: number | null;
+            /** Expected Amount Minor */
+            expected_amount_minor: number;
+            /** Paid Amount Minor */
+            paid_amount_minor: number;
+            /** Currency */
+            currency: string;
+            /** Payment Date */
+            payment_date: string | null;
+            /** Method */
+            method: string | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "expected" | "partial" | "paid" | "cancelled";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachPaymentUpdate */
+        CoachPaymentUpdate: {
+            /** Expected Amount Minor */
+            expected_amount_minor?: number | null;
+            /** Paid Amount Minor */
+            paid_amount_minor?: number | null;
+            /** Currency */
+            currency?: string | null;
+            /** Payment Date */
+            payment_date?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Status */
+            status?: ("expected" | "partial" | "paid" | "cancelled") | null;
+        };
         /** CoachProgramExerciseAssignmentResponse */
         CoachProgramExerciseAssignmentResponse: {
             /** Workouts Updated */
@@ -4209,6 +8713,13 @@ export interface components {
         CoachProgramExerciseCreate: {
             /** Expected Revision Number */
             expected_revision_number: number;
+            /**
+             * Effective Scope
+             * @enum {string}
+             */
+            effective_scope: "next_workout" | "current_block" | "future_program";
+            /** Effective Date */
+            effective_date?: string | null;
             /** Exercise Id */
             exercise_id: number;
             /** Day Number */
@@ -4230,8 +8741,808 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
+            /** Target Template Exercise Id */
+            target_template_exercise_id?: number | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** CoachProgramRolloutApplyRequest */
+        CoachProgramRolloutApplyRequest: {
+            /** Template Id */
+            template_id: number;
+            /** Template Fingerprint */
+            template_fingerprint: string;
+            /** Targets */
+            targets: components["schemas"]["CoachProgramRolloutTarget"][];
+            /**
+             * Confirmed
+             * @default false
+             */
+            confirmed: boolean;
+            /** Reason */
+            reason: string;
+            /** Idempotency Key */
+            idempotency_key?: string | null;
+        };
+        /** CoachProgramRolloutApplyResponse */
+        CoachProgramRolloutApplyResponse: {
+            /** Rollout Id */
+            rollout_id: string;
+            /** Template Id */
+            template_id: number;
+            /** Results */
+            results: components["schemas"]["CoachProgramRolloutResult"][];
+            /** Applied Count */
+            applied_count: number;
+            /** Already Applied Count */
+            already_applied_count: number;
+            /** Failed Count */
+            failed_count: number;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+        };
+        /** CoachProgramRolloutClientPreview */
+        CoachProgramRolloutClientPreview: {
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Program Id */
+            program_id?: number | null;
+            /** Current Revision Number */
+            current_revision_number?: number | null;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "compatible" | "personalization_required" | "manual_review_required";
+            /** Can Apply */
+            can_apply: boolean;
+            /** Reason Codes */
+            reason_codes?: string[];
+            /** Diff */
+            diff?: components["schemas"]["CoachProgramRolloutDiff"][];
+        };
+        /** CoachProgramRolloutDiff */
+        CoachProgramRolloutDiff: {
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "added" | "updated" | "removed";
+            /** Current */
+            current?: string | null;
+            /** Proposed */
+            proposed?: string | null;
+        };
+        /** CoachProgramRolloutPreviewRequest */
+        CoachProgramRolloutPreviewRequest: {
+            /** Template Id */
+            template_id: number;
+            /** Client Ids */
+            client_ids: number[];
+        };
+        /** CoachProgramRolloutPreviewResponse */
+        CoachProgramRolloutPreviewResponse: {
+            /** Template Id */
+            template_id: number;
+            /** Template Title */
+            template_title: string;
+            /** Template Fingerprint */
+            template_fingerprint: string;
+            /** Targets */
+            targets: components["schemas"]["CoachProgramRolloutClientPreview"][];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CoachProgramRolloutResult */
+        CoachProgramRolloutResult: {
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Program Id */
+            program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "already_applied" | "failed";
+            /** Code */
+            code: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Workouts Updated
+             * @default 0
+             */
+            workouts_updated: number;
+            /** Current Revision Number */
+            current_revision_number?: number | null;
+        };
+        /** CoachProgramRolloutTarget */
+        CoachProgramRolloutTarget: {
+            /** Client Id */
+            client_id: number;
+            /** Program Id */
+            program_id: number;
+            /** Expected Revision Number */
+            expected_revision_number: number;
+        };
+        /** CoachReviewActionState */
+        CoachReviewActionState: {
+            /**
+             * Review Status
+             * @enum {string}
+             */
+            review_status: "pending" | "reviewed" | "no_check_in";
+            /** Review Response */
+            review_response?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            follow_up?: components["schemas"]["CoachTaskResponse"] | null;
+            /** Program Proposals */
+            program_proposals?: components["schemas"]["CoachTaskResponse"][];
+            /** Next Reviews */
+            next_reviews?: components["schemas"]["CoachTaskResponse"][];
+        };
+        /** CoachReviewChange */
+        CoachReviewChange: {
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "training" | "progression" | "nutrition" | "measurements";
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Previous */
+            previous?: number | null;
+            /** Current */
+            current?: number | null;
+            /**
+             * Source
+             * @constant
+             */
+            source: "weekly_check_in";
+            /** Source Id */
+            source_id: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Occurred At
+             * Format: date
+             */
+            occurred_at: string;
+        };
+        /** CoachReviewCheckInSnapshot */
+        CoachReviewCheckInSnapshot: {
+            /** Id */
+            id: number;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Submitted On
+             * Format: date
+             */
+            submitted_on: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "skipped";
+            training: components["schemas"]["CoachReviewTrainingFacts"];
+            progression: components["schemas"]["CoachReviewProgressionFacts"];
+            nutrition: components["schemas"]["CoachReviewNutritionFacts"];
+            measurements: components["schemas"]["CoachReviewMeasurementFacts"];
+        };
+        /** CoachReviewMeasurementFacts */
+        CoachReviewMeasurementFacts: {
+            /** Weight Kg */
+            weight_kg?: number | null;
+            /** Weight Change Kg */
+            weight_change_kg?: number | null;
+            /** Waist Cm */
+            waist_cm?: number | null;
+            /** Latest Measured On */
+            latest_measured_on?: string | null;
+        };
+        /** CoachReviewNutritionFacts */
+        CoachReviewNutritionFacts: {
+            /** Logged Days */
+            logged_days?: number | null;
+            /** Complete Days */
+            complete_days?: number | null;
+            /** Average Calories */
+            average_calories?: number | null;
+            /** Target Calories */
+            target_calories?: number | null;
+            /** Average Protein G */
+            average_protein_g?: number | null;
+            /** Target Protein G */
+            target_protein_g?: number | null;
+        };
+        /** CoachReviewPrivateNote */
+        CoachReviewPrivateNote: {
+            /** Session Id */
+            session_id: number;
+            /**
+             * Starts At Utc
+             * Format: date-time
+             */
+            starts_at_utc: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "completed" | "cancelled" | "no_show";
+            /** Text */
+            text: string;
+        };
+        /** CoachReviewProgram */
+        CoachReviewProgram: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Workouts Total */
+            workouts_total: number;
+            /** Workouts Completed */
+            workouts_completed: number;
+            /** Next Workout Date */
+            next_workout_date?: string | null;
+        };
+        /** CoachReviewProgressionFacts */
+        CoachReviewProgressionFacts: {
+            /** Training Volume Kg */
+            training_volume_kg?: number | null;
+            /** New Personal Records */
+            new_personal_records?: number | null;
+        };
+        /** CoachReviewTrainingFacts */
+        CoachReviewTrainingFacts: {
+            /** Planned Workouts */
+            planned_workouts?: number | null;
+            /** Completed Workouts */
+            completed_workouts?: number | null;
+            /** Adherence Percent */
+            adherence_percent?: number | null;
+            /** Volume Kg */
+            volume_kg?: number | null;
+            /** Training Load */
+            training_load?: number | null;
+            /** Recovery */
+            recovery?: number | null;
+            /** Adherence Difficulty */
+            adherence_difficulty?: number | null;
+        };
+        /** CoachReviewWorkspaceResponse */
+        CoachReviewWorkspaceResponse: {
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "available" | "partial" | "no_data";
+            previous_check_in?: components["schemas"]["CoachReviewCheckInSnapshot"] | null;
+            current_check_in?: components["schemas"]["CoachReviewCheckInSnapshot"] | null;
+            training_actuals: components["schemas"]["CoachReviewTrainingFacts"];
+            progression_facts: components["schemas"]["CoachReviewProgressionFacts"];
+            nutrition: components["schemas"]["CoachReviewNutritionFacts"];
+            measurements: components["schemas"]["CoachReviewMeasurementFacts"];
+            current_program?: components["schemas"]["CoachReviewProgram"] | null;
+            /** Private Notes */
+            private_notes?: components["schemas"]["CoachReviewPrivateNote"][];
+            /** Meaningful Changes */
+            meaningful_changes?: components["schemas"]["CoachReviewChange"][];
+            actions: components["schemas"]["CoachReviewActionState"];
+        };
+        /** CoachSessionCreate */
+        CoachSessionCreate: {
+            /** Client Id */
+            client_id: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
+            /**
+             * Duration Minutes
+             * @default 60
+             */
+            duration_minutes: number;
+            /**
+             * Format
+             * @default other
+             * @enum {string}
+             */
+            format: "gym" | "online" | "other";
+            /** Location */
+            location?: string | null;
+            /** Private Note */
+            private_note?: string | null;
+            /** Package Id */
+            package_id?: number | null;
+            /** User Workout Id */
+            user_workout_id?: number | null;
+            recurrence?: components["schemas"]["CoachSessionRecurrence"] | null;
+        };
+        /** CoachSessionRecurrence */
+        CoachSessionRecurrence: {
+            /** Weekdays */
+            weekdays: number[];
+            /** Until */
+            until?: string | null;
+            /** Occurrence Count */
+            occurrence_count?: number | null;
+        };
+        /** CoachSessionResponse */
+        CoachSessionResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Starts At Utc
+             * Format: date-time
+             */
+            starts_at_utc: string;
+            /** Timezone */
+            timezone: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "gym" | "online" | "other";
+            /** Location */
+            location: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "completed" | "cancelled" | "no_show";
+            /** Private Note */
+            private_note: string | null;
+            /** Package Id */
+            package_id: number | null;
+            /** Package Balance */
+            package_balance: number | null;
+            /** User Workout Id */
+            user_workout_id: number | null;
+            /** Series Id */
+            series_id: number | null;
+            /** Occurrence Key */
+            occurrence_key: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachSessionUpdate */
+        CoachSessionUpdate: {
+            /** Starts At */
+            starts_at?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Format */
+            format?: ("gym" | "online" | "other") | null;
+            /** Location */
+            location?: string | null;
+            /** Private Note */
+            private_note?: string | null;
+            /** Status */
+            status?: ("scheduled" | "completed" | "cancelled" | "no_show") | null;
+            /**
+             * Apply To
+             * @default occurrence
+             * @enum {string}
+             */
+            apply_to: "occurrence" | "series";
+            /** Charge Package */
+            charge_package?: boolean | null;
+        };
+        /** CoachTaskCreate */
+        CoachTaskCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Title */
+            title: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
+            /**
+             * Kind
+             * @default other
+             * @enum {string}
+             */
+            kind: "review_check_in" | "update_program" | "contact_client" | "review_technique" | "schedule_follow_up" | "other";
+            /** Source Kind */
+            source_kind?: ("weekly_check_in" | "workout" | "program" | "client" | "manual") | null;
+            /** Source Id */
+            source_id?: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** CoachTaskResponse */
+        CoachTaskResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Title */
+            title: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Due At Utc
+             * Format: date-time
+             */
+            due_at_utc: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "review_check_in" | "update_program" | "contact_client" | "review_technique" | "schedule_follow_up" | "other";
+            /** Source Kind */
+            source_kind: ("weekly_check_in" | "workout" | "program" | "client" | "manual") | null;
+            /** Source Id */
+            source_id: number | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "completed";
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachTaskStateUpdate */
+        CoachTaskStateUpdate: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "completed";
+        };
+        /** CoachWorkflowAutomationResponse */
+        CoachWorkflowAutomationResponse: {
+            /**
+             * Ruleset Version
+             * @constant
+             */
+            ruleset_version: "coach-workflow-v1";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "preview" | "evaluated";
+            /** Events Evaluated */
+            events_evaluated: number;
+            /** Proposals */
+            proposals?: components["schemas"]["CoachWorkflowProposal"][];
+            /** Tasks Created */
+            tasks_created: number;
+            /** Tasks Reused */
+            tasks_reused: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CoachWorkflowProposal */
+        CoachWorkflowProposal: {
+            /** Key */
+            key: string;
+            /**
+             * Event Kind
+             * @enum {string}
+             */
+            event_kind: "check_in_submitted" | "missed_workout" | "review_due" | "program_revision_ready";
+            /** Rule Id */
+            rule_id: string;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "weekly_check_in" | "workout" | "program" | "client" | "manual";
+            /** Source Id */
+            source_id: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "urgent" | "soon";
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "draft" | "created" | "already_processed";
+            /** Task Id */
+            task_id?: number | null;
+            /** Task State */
+            task_state?: ("open" | "completed") | null;
+        };
+        /** CommunicationDraftCreate */
+        CommunicationDraftCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Version */
+            version?: number | null;
+            /** Subject */
+            subject?: string | null;
+            /** Body */
+            body?: string | null;
+        };
+        /** CommunicationDraftResponse */
+        CommunicationDraftResponse: {
+            /** Id */
+            id: number;
+            /** Template Id */
+            template_id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed";
+            /** Notification Id */
+            notification_id?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+        };
+        /** CommunicationDraftSummary */
+        CommunicationDraftSummary: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+        };
+        /** CommunicationDraftUpdate */
+        CommunicationDraftUpdate: {
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+        };
+        /** CommunicationTemplateCreate */
+        CommunicationTemplateCreate: {
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** CommunicationTemplateListResponse */
+        CommunicationTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["CommunicationTemplateResponse"][];
+        };
+        /** CommunicationTemplateResponse */
+        CommunicationTemplateResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            current_version?: components["schemas"]["CommunicationTemplateVersionResponse"] | null;
+            /** Drafts */
+            drafts?: components["schemas"]["CommunicationDraftSummary"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CommunicationTemplateVersionCreate */
+        CommunicationTemplateVersionCreate: {
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+        };
+        /** CommunicationTemplateVersionResponse */
+        CommunicationTemplateVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** DailyValuePercent */
+        DailyValuePercent: {
+            /** Energy Kcal */
+            energy_kcal?: string | null;
+            /** Protein G */
+            protein_g?: string | null;
+            /** Fat G */
+            fat_g?: string | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: string | null;
+            /** Trans Fat G */
+            trans_fat_g?: string | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: string | null;
+            /** Fiber G */
+            fiber_g?: string | null;
+            /** Sugars G */
+            sugars_g?: string | null;
+            /** Added Sugars G */
+            added_sugars_g?: string | null;
+            /** Salt G */
+            salt_g?: string | null;
+            /** Sodium Mg */
+            sodium_mg?: string | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: string | null;
         };
         /** DailyWellbeingCheckInResponse */
         DailyWellbeingCheckInResponse: {
@@ -4378,6 +9689,8 @@ export interface components {
             action: string;
             /** Comment */
             comment?: string | null;
+            /** Client Id */
+            client_id?: ("alexey" | "maria" | "ivan") | null;
         };
         /** DemoCabinetNutrition */
         DemoCabinetNutrition: {
@@ -4409,9 +9722,20 @@ export interface components {
             nutrition_completion_percent: number;
             /** Summary */
             summary: string;
+            /** Adherence Percent */
+            adherence_percent: number;
+            /** Training History */
+            training_history: components["schemas"]["DemoTrainingHistoryItem"][];
+            /** Volume History */
+            volume_history: components["schemas"]["DemoVolumeHistoryItem"][];
+            /** Nutrition History */
+            nutrition_history: components["schemas"]["DemoNutritionHistoryDay"][];
+            /** Measurements */
+            measurements: components["schemas"]["DemoMeasurement"][];
         };
         /** DemoCabinetState */
         DemoCabinetState: {
+            program: components["schemas"]["DemoProgramSummary"];
             today: components["schemas"]["DemoCabinetToday"];
             nutrition: components["schemas"]["DemoCabinetNutrition"];
             progress: components["schemas"]["DemoCabinetProgress"];
@@ -4445,6 +9769,29 @@ export interface components {
              * @enum {string}
              */
             status: "completed" | "current" | "next";
+        };
+        /** DemoMeasurement */
+        DemoMeasurement: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+            /** Date Label */
+            date_label: string;
+        };
+        /** DemoNutritionHistoryDay */
+        DemoNutritionHistoryDay: {
+            /** Date Label */
+            date_label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "incomplete" | "not_logged";
+            /** Calories */
+            calories?: number | null;
+            /** Protein G */
+            protein_g?: number | null;
         };
         /** DemoNutritionItem */
         DemoNutritionItem: {
@@ -4484,6 +9831,31 @@ export interface components {
             protein_target_g: number;
             /** Meals Logged */
             meals_logged: number;
+        };
+        /** DemoProgramScheduleDay */
+        DemoProgramScheduleDay: {
+            /** Day Label */
+            day_label: string;
+            /** Workout Title */
+            workout_title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "planned" | "rest";
+        };
+        /** DemoProgramSummary */
+        DemoProgramSummary: {
+            /** Name */
+            name: string;
+            /** Current Week */
+            current_week: number;
+            /** Total Weeks */
+            total_weeks: number;
+            /** Sessions Per Week */
+            sessions_per_week: number;
+            /** Schedule */
+            schedule: components["schemas"]["DemoProgramScheduleDay"][];
         };
         /** DemoSelfTrainingState */
         DemoSelfTrainingState: {
@@ -4537,10 +9909,10 @@ export interface components {
             scenario: "self_training" | "nutrition" | "trainer";
             /**
              * Fixture Version
-             * @default demo-curated-v1
+             * @default demo-curated-v2
              * @constant
              */
-            fixture_version: "demo-curated-v1";
+            fixture_version: "demo-curated-v2";
             /** Revision */
             revision: number;
             /**
@@ -4569,10 +9941,10 @@ export interface components {
             scenario: "self_training" | "nutrition" | "trainer";
             /**
              * Fixture Version
-             * @default demo-curated-v1
+             * @default demo-curated-v2
              * @constant
              */
-            fixture_version: "demo-curated-v1";
+            fixture_version: "demo-curated-v2";
             /** Revision */
             revision: number;
             /**
@@ -4583,6 +9955,26 @@ export interface components {
             /** State */
             state: components["schemas"]["DemoSelfTrainingState"] | components["schemas"]["DemoNutritionState"] | components["schemas"]["DemoTrainerState"];
             cabinet: components["schemas"]["DemoCabinetState"];
+        };
+        /** DemoTrainerClient */
+        DemoTrainerClient: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "alexey" | "maria" | "ivan";
+            /** Name */
+            name: string;
+            /** Status Label */
+            status_label: string;
+            /** Context Label */
+            context_label: string;
+            /** Workout Title */
+            workout_title: string;
+            /** Facts */
+            facts: components["schemas"]["DemoTrainerFact"][];
+            /** Comment */
+            comment?: string | null;
         };
         /** DemoTrainerFact */
         DemoTrainerFact: {
@@ -4604,16 +9996,74 @@ export interface components {
              * @constant
              */
             screen: "client";
-            /** Client Name */
-            client_name: string;
-            /** Context Label */
-            context_label: string;
+            /**
+             * Selected Client Id
+             * @enum {string}
+             */
+            selected_client_id: "alexey" | "maria" | "ivan";
+            /** Clients */
+            clients: components["schemas"]["DemoTrainerClient"][];
+        };
+        /** DemoTrainingHistoryItem */
+        DemoTrainingHistoryItem: {
+            /** Period Label */
+            period_label: string;
             /** Workout Title */
             workout_title: string;
-            /** Facts */
-            facts: components["schemas"]["DemoTrainerFact"][];
-            /** Comment */
-            comment?: string | null;
+            /** Completed Sets */
+            completed_sets: number;
+            /** Volume Kg */
+            volume_kg: number;
+        };
+        /** DemoTransportRequest */
+        DemoTransportRequest: {
+            /** Path */
+            path: string;
+            /**
+             * Method
+             * @default GET
+             * @enum {string}
+             */
+            method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+            /** Body */
+            body?: unknown;
+        };
+        /** DemoVolumeHistoryItem */
+        DemoVolumeHistoryItem: {
+            /** Period Label */
+            period_label: string;
+            /** Volume Kg */
+            volume_kg: number;
+        };
+        /** DerivedFact */
+        DerivedFact: {
+            /** Value */
+            value: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "mg" | "kcal" | "kJ";
+            /** Reason */
+            reason: string;
+            /** Source Fields */
+            source_fields: string[];
+        };
+        /** DerivedNutrientFacts */
+        DerivedNutrientFacts: {
+            energy_kcal?: components["schemas"]["DerivedFact"] | null;
+            energy_kj?: components["schemas"]["DerivedFact"] | null;
+            protein_g?: components["schemas"]["DerivedFact"] | null;
+            fat_g?: components["schemas"]["DerivedFact"] | null;
+            saturated_fat_g?: components["schemas"]["DerivedFact"] | null;
+            trans_fat_g?: components["schemas"]["DerivedFact"] | null;
+            carbohydrate_g?: components["schemas"]["DerivedFact"] | null;
+            sugars_g?: components["schemas"]["DerivedFact"] | null;
+            added_sugars_g?: components["schemas"]["DerivedFact"] | null;
+            fiber_g?: components["schemas"]["DerivedFact"] | null;
+            salt_g?: components["schemas"]["DerivedFact"] | null;
+            sodium_mg?: components["schemas"]["DerivedFact"] | null;
+            cholesterol_mg?: components["schemas"]["DerivedFact"] | null;
         };
         /** DevLoginRequest */
         DevLoginRequest: {
@@ -4633,6 +10083,22 @@ export interface components {
             username?: string | null;
             /** Full Name */
             full_name?: string | null;
+        };
+        /** DraftMetadata */
+        DraftMetadata: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "nutrition-label-draft-v1";
+            /** Policy Revision */
+            policy_revision: string;
         };
         /** EmailLoginRequest */
         EmailLoginRequest: {
@@ -4797,7 +10263,7 @@ export interface components {
             /** Aliases */
             aliases?: string[];
             /** Movement Pattern */
-            movement_pattern?: ("arm_curl" | "calf" | "cardio_row" | "chest_fly" | "chest_press" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "shoulder_press" | "squat" | "triceps" | "vertical_pull" | "wrist") | null;
+            movement_pattern?: ("anti_extension" | "anti_rotation" | "arm_curl" | "calf" | "cardio_row" | "carry" | "chest_fly" | "chest_press" | "conditioning" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "olympic_lift" | "shoulder_raise" | "shoulder_press" | "shoulder_rotation" | "squat" | "trunk_flexion" | "trunk_rotation" | "triceps" | "vertical_pull" | "wrist") | null;
             /** Machine Variant Tags */
             machine_variant_tags?: ("selectorized" | "plate_loaded" | "lever" | "independent" | "converging" | "diverging" | "smith")[];
             /** Execution Variant Tags */
@@ -4834,7 +10300,41 @@ export interface components {
              * @default false
              */
             has_guide: boolean;
+            /** Media State */
+            media_state?: ("approved_animated" | "approved_static" | "blocked") | null;
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Thumbnail Sources */
+            media_thumbnail_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Media Preferred Mode */
+            media_preferred_mode?: ("static" | "animation") | null;
+            /** Media Animation Url */
+            media_animation_url?: string | null;
+            /** Media Video Sources */
+            media_video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
             guide?: components["schemas"]["ExerciseGuide"] | null;
+        };
+        /** ExerciseEstimated1RM */
+        ExerciseEstimated1RM: {
+            /**
+             * Kind
+             * @default estimated
+             * @constant
+             */
+            kind: "estimated";
+            /**
+             * Formula
+             * @default brzycki
+             * @constant
+             */
+            formula: "brzycki";
+            /** Value Kg */
+            value_kg: number;
+            workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Reps */
+            reps: number;
+            /** Load Kg */
+            load_kg: number;
         };
         /** ExerciseGuide */
         ExerciseGuide: {
@@ -4880,9 +10380,9 @@ export interface components {
         ExerciseGuideMedia: {
             /**
              * Type
-             * @constant
+             * @enum {string}
              */
-            type: "image";
+            type: "image" | "animation";
             /** Url */
             url: string;
             /** Poster */
@@ -4917,6 +10417,16 @@ export interface components {
             sort_order: number;
             /** Sources */
             sources: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Poster Sources */
+            poster_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Poster Width */
+            poster_width?: number | null;
+            /** Poster Height */
+            poster_height?: number | null;
+            /** Poster Preferred */
+            poster_preferred?: boolean | null;
+            /** Video Sources */
+            video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
         };
         /** ExerciseGuideMediaSource */
         ExerciseGuideMediaSource: {
@@ -4947,6 +10457,151 @@ export interface components {
             /** Function */
             function: string;
         };
+        /** ExerciseHistoryMetric */
+        ExerciseHistoryMetric: {
+            /** Value Kg */
+            value_kg: number;
+            workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Reps */
+            reps?: number | null;
+        };
+        /** ExerciseHistoryResponse */
+        ExerciseHistoryResponse: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /** Metric Type */
+            metric_type: string;
+            /** Load Unit */
+            load_unit?: "kg" | null;
+            last_performed?: components["schemas"]["ExerciseHistoryWorkout"] | null;
+            best_authoritative_load?: components["schemas"]["ExerciseHistoryMetric"] | null;
+            estimated_1rm?: components["schemas"]["ExerciseEstimated1RM"] | null;
+            /** Rep Prs */
+            rep_prs: components["schemas"]["ExerciseRepPR"][];
+            /** Windows */
+            windows: components["schemas"]["ExerciseHistoryWindow"][];
+            /** Recent Sessions */
+            recent_sessions: components["schemas"]["ExerciseHistorySession"][];
+            /** Progression */
+            progression: components["schemas"]["ExerciseProgressionPoint"][];
+            /** Progression Events */
+            progression_events: components["schemas"]["ExerciseProgressionEvent"][];
+            /** History Truncated */
+            history_truncated: boolean;
+        };
+        /** ExerciseHistorySession */
+        ExerciseHistorySession: {
+            workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Authoritative Set Count */
+            authoritative_set_count: number;
+            /** Reps Total */
+            reps_total?: number | null;
+            /** Max Authoritative Load Kg */
+            max_authoritative_load_kg?: number | null;
+            /** Best Set Volume Kg */
+            best_set_volume_kg?: number | null;
+            /** Estimated 1Rm Kg */
+            estimated_1rm_kg?: number | null;
+            /** Sets */
+            sets: components["schemas"]["ExerciseHistorySet"][];
+        };
+        /** ExerciseHistorySet */
+        ExerciseHistorySet: {
+            /** Set Number */
+            set_number: number;
+            /** Reps */
+            reps?: number | null;
+            /** Load Kg */
+            load_kg?: number | null;
+            /** Volume Kg */
+            volume_kg?: number | null;
+            /**
+             * Rir
+             * @description Optional repetitions-in-reserve category after the set; 4+ means many repetitions remained, not an exact value of four
+             */
+            rir?: ("0" | "1" | "2" | "3" | "4+") | null;
+            /** Set Kind */
+            set_kind?: ("warmup" | "working" | "drop") | null;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /**
+             * Analytics Bucket
+             * @enum {string}
+             */
+            analytics_bucket: "working" | "preparation" | "intensifier";
+            /** Pr Eligible */
+            pr_eligible: boolean;
+        };
+        /** ExerciseHistoryWindow */
+        ExerciseHistoryWindow: {
+            /**
+             * Days
+             * @enum {integer}
+             */
+            days: 7 | 30 | 90;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Performed Session Count */
+            performed_session_count: number;
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Authoritative Set Count */
+            authoritative_set_count: number;
+            /** Reps Total */
+            reps_total?: number | null;
+            /** Best Authoritative Load Kg */
+            best_authoritative_load_kg?: number | null;
+            /** Estimated 1Rm Kg */
+            estimated_1rm_kg?: number | null;
+        };
+        /** ExerciseHistoryWorkout */
+        ExerciseHistoryWorkout: {
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Title */
+            workout_title: string;
+            /**
+             * Performed On
+             * Format: date
+             */
+            performed_on: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
+        /** ExercisePrescriptionPlan */
+        ExercisePrescriptionPlan: {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /** Segments */
+            segments: components["schemas"]["PrescriptionSegment"][];
+            /** Groups */
+            groups?: components["schemas"]["PrescriptionGroup"][];
+        };
         /** ExerciseProgressItem */
         ExerciseProgressItem: {
             /** Exercise Id */
@@ -4962,6 +10617,113 @@ export interface components {
              * Format: date
              */
             last_performed_on: string;
+        };
+        /** ExerciseProgressionEvent */
+        ExerciseProgressionEvent: {
+            /** Event Id */
+            event_id: number;
+            /**
+             * Event Kind
+             * @enum {string}
+             */
+            event_kind: "confirm" | "adjust" | "reject";
+            /** Proposal Id */
+            proposal_id: string;
+            /** Target Workout Id */
+            target_workout_id?: number | null;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Rule Id */
+            rule_id?: string | null;
+            /** Rule Kind */
+            rule_kind?: string | null;
+            /** Rule Snapshot */
+            rule_snapshot?: {
+                [key: string]: unknown;
+            };
+            /** Source Evidence Ids */
+            source_evidence_ids?: string[];
+            /** Reason Codes */
+            reason_codes?: string[];
+            /** Proposed Weight Kg */
+            proposed_weight_kg?: number | null;
+            /** Adjusted Weight Kg */
+            adjusted_weight_kg?: number | null;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ExerciseProgressionPoint */
+        ExerciseProgressionPoint: {
+            /**
+             * Performed On
+             * Format: date
+             */
+            performed_on: string;
+            /** Workout Id */
+            workout_id: number;
+            /** Max Reps */
+            max_reps?: number | null;
+            /** Max Authoritative Load Kg */
+            max_authoritative_load_kg?: number | null;
+            /** Estimated 1Rm Kg */
+            estimated_1rm_kg?: number | null;
+            /** Authoritative Set Count */
+            authoritative_set_count: number;
+        };
+        /** ExerciseRepPR */
+        ExerciseRepPR: {
+            /**
+             * Range Key
+             * @enum {string}
+             */
+            range_key: "1-5" | "6-10" | "11-15" | "16+";
+            /** Range Label */
+            range_label: string;
+            /** Min Reps */
+            min_reps: number;
+            /** Max Reps */
+            max_reps?: number | null;
+            /** Best Reps */
+            best_reps: number;
+            best_reps_workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Best Load Kg */
+            best_load_kg?: number | null;
+            best_load_workout?: components["schemas"]["ExerciseHistoryWorkout"] | null;
+        };
+        /** ExerciseSetupMemoryResponse */
+        ExerciseSetupMemoryResponse: {
+            /** Id */
+            id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Body */
+            body: string;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ExerciseSetupMemorySaveRequest */
+        ExerciseSetupMemorySaveRequest: {
+            /** Body */
+            body: string;
+            /** Expected Version */
+            expected_version?: number | null;
         };
         /** ExerciseTaxonomyItem */
         ExerciseTaxonomyItem: {
@@ -5103,6 +10865,147 @@ export interface components {
              */
             license_url: string;
         };
+        /** FieldConfidence */
+        FieldConfidence: {
+            /** Energy Kcal */
+            energy_kcal?: string | null;
+            /** Energy Kj */
+            energy_kj?: string | null;
+            /** Protein G */
+            protein_g?: string | null;
+            /** Fat G */
+            fat_g?: string | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: string | null;
+            /** Trans Fat G */
+            trans_fat_g?: string | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: string | null;
+            /** Sugars G */
+            sugars_g?: string | null;
+            /** Added Sugars G */
+            added_sugars_g?: string | null;
+            /** Fiber G */
+            fiber_g?: string | null;
+            /** Salt G */
+            salt_g?: string | null;
+            /** Sodium Mg */
+            sodium_mg?: string | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: string | null;
+        };
+        /** FieldEvidence */
+        FieldEvidence: {
+            /**
+             * Energy Kcal
+             * @default absent
+             * @enum {string}
+             */
+            energy_kcal: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Energy Kj
+             * @default absent
+             * @enum {string}
+             */
+            energy_kj: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Protein G
+             * @default absent
+             * @enum {string}
+             */
+            protein_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Fat G
+             * @default absent
+             * @enum {string}
+             */
+            fat_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Saturated Fat G
+             * @default absent
+             * @enum {string}
+             */
+            saturated_fat_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Trans Fat G
+             * @default absent
+             * @enum {string}
+             */
+            trans_fat_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Carbohydrate G
+             * @default absent
+             * @enum {string}
+             */
+            carbohydrate_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Sugars G
+             * @default absent
+             * @enum {string}
+             */
+            sugars_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Added Sugars G
+             * @default absent
+             * @enum {string}
+             */
+            added_sugars_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Fiber G
+             * @default absent
+             * @enum {string}
+             */
+            fiber_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Salt G
+             * @default absent
+             * @enum {string}
+             */
+            salt_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Sodium Mg
+             * @default absent
+             * @enum {string}
+             */
+            sodium_mg: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Cholesterol Mg
+             * @default absent
+             * @enum {string}
+             */
+            cholesterol_mg: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+        };
+        /** FirstTouchAttributionRequest */
+        FirstTouchAttributionRequest: {
+            /**
+             * First Touch Source
+             * @enum {string}
+             */
+            first_touch_source: "google" | "yandex" | "telegram" | "direct" | "referral" | "utm";
+            /** First Touch Medium */
+            first_touch_medium: string;
+            /** First Touch Campaign */
+            first_touch_campaign?: string | null;
+            /** First Landing Path */
+            first_landing_path: string;
+            /** First Referrer */
+            first_referrer?: string | null;
+            /**
+             * First Touch At
+             * Format: date-time
+             */
+            first_touch_at: string;
+            /** Utm Source */
+            utm_source?: string | null;
+            /** Utm Medium */
+            utm_medium?: string | null;
+            /** Utm Campaign */
+            utm_campaign?: string | null;
+            /** Utm Content */
+            utm_content?: string | null;
+            /** Utm Term */
+            utm_term?: string | null;
+        };
         /** FoodBarcodeLookupResponse */
         FoodBarcodeLookupResponse: {
             /** Barcode */
@@ -5124,8 +11027,60 @@ export interface components {
             /** Provider Statuses */
             provider_statuses?: components["schemas"]["FoodProviderStatusResponse"][];
         };
+        /** FoodDiaryBatchItem */
+        FoodDiaryBatchItem: {
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @default g
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** FoodDiaryBatchResponse */
+        FoodDiaryBatchResponse: {
+            /**
+             * Operation Kind
+             * @enum {string}
+             */
+            operation_kind: "meal_template" | "natural_input" | "suggestion" | "planned_item";
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Entries */
+            entries: components["schemas"]["FoodDiaryEntryResponse"][];
+            /** Replayed */
+            replayed: boolean;
+        };
         /** FoodDiaryCopyDay */
         FoodDiaryCopyDay: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** FoodDiaryCopyDayPreview */
+        FoodDiaryCopyDayPreview: {
             /**
              * Source Date
              * Format: date
@@ -5159,9 +11114,92 @@ export interface components {
              * @enum {string}
              */
             target_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** FoodDiaryCopyMealPreview */
+        FoodDiaryCopyMealPreview: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Source Meal Type
+             * @enum {string}
+             */
+            source_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /**
+             * Target Meal Type
+             * @enum {string}
+             */
+            target_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+        };
+        /** FoodDiaryCopyPreviewResponse */
+        FoodDiaryCopyPreviewResponse: {
+            /**
+             * Copy Scope
+             * @enum {string}
+             */
+            copy_scope: "product" | "meal" | "day";
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /** Source Meal Type */
+            source_meal_type: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Target Meal Type */
+            target_meal_type: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /** Entries */
+            entries: components["schemas"]["FoodDiaryEntryResponse"][];
+            /** Preview Token */
+            preview_token: string;
+            /**
+             * Previewed At
+             * Format: date-time
+             */
+            previewed_at: string;
         };
         /** FoodDiaryCopyProduct */
         FoodDiaryCopyProduct: {
+            /** Source Entry Id */
+            source_entry_id: number;
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Source Meal Type
+             * @enum {string}
+             */
+            source_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /**
+             * Target Meal Type
+             * @enum {string}
+             */
+            target_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** FoodDiaryCopyProductPreview */
+        FoodDiaryCopyProductPreview: {
             /** Source Entry Id */
             source_entry_id: number;
             /**
@@ -5232,6 +11270,7 @@ export interface components {
             status: "complete" | "incomplete" | "unlogged" | "fasted";
             /** Status Is Explicit */
             status_is_explicit: boolean;
+            repeat_candidate?: components["schemas"]["FoodDiaryRepeatCandidate"] | null;
         };
         /** FoodDiaryDayStatusUpdate */
         FoodDiaryDayStatusUpdate: {
@@ -5272,7 +11311,7 @@ export interface components {
              * @default g
              * @enum {string}
              */
-            amount_unit: "g" | "serving";
+            amount_unit: "g" | "ml" | "serving";
         };
         /** FoodDiaryEntryResponse */
         FoodDiaryEntryResponse: {
@@ -5297,6 +11336,10 @@ export interface components {
              * @enum {string}
              */
             entry_kind: "food" | "recipe" | "quick_add";
+            /** Nutrition Source */
+            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant" | "photo") | null;
+            /** Nutrition Confidence */
+            nutrition_confidence?: ("exact" | "approximate" | "partial") | null;
             /** Logged At */
             logged_at: string | null;
             /** Food Name */
@@ -5309,9 +11352,15 @@ export interface components {
              * Amount Unit
              * @enum {string}
              */
-            amount_unit: "g" | "serving";
+            amount_unit: "g" | "ml" | "serving";
             /** Weight G */
-            weight_g: string;
+            weight_g: string | null;
+            /** Nutrition Basis Kind */
+            nutrition_basis_kind?: ("per_100_g" | "per_100_ml" | "per_serving") | null;
+            /** Nutrition Basis Amount */
+            nutrition_basis_amount?: string | null;
+            /** Nutrition Basis Unit */
+            nutrition_basis_unit?: ("g" | "ml" | "serving") | null;
             /** Serving Amount */
             serving_amount: string | null;
             /** Serving Unit */
@@ -5345,7 +11394,7 @@ export interface components {
             /** Amount */
             amount?: number | string | null;
             /** Amount Unit */
-            amount_unit?: ("g" | "serving") | null;
+            amount_unit?: ("g" | "ml" | "serving") | null;
         };
         /** FoodDiaryMeal */
         FoodDiaryMeal: {
@@ -5375,6 +11424,12 @@ export interface components {
         FoodDiaryQuickAdd: {
             /** Name */
             name?: string | null;
+            /**
+             * Nutrition Source
+             * @default manual
+             * @enum {string}
+             */
+            nutrition_source: "manual" | "restaurant" | "photo";
             /** Energy Kcal */
             energy_kcal: number | string;
             /** Protein G */
@@ -5383,6 +11438,21 @@ export interface components {
             fat_g?: number | string | null;
             /** Carbs G */
             carbs_g?: number | string | null;
+        };
+        /** FoodDiaryRepeatCandidate */
+        FoodDiaryRepeatCandidate: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Source Meal Type
+             * @enum {string}
+             */
+            source_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Entry Count */
+            entry_count: number;
         };
         /** FoodDiaryTargets */
         FoodDiaryTargets: {
@@ -5432,15 +11502,65 @@ export interface components {
             /** Barcode */
             barcode: string | null;
             /** Energy Kcal Per 100G */
-            energy_kcal_per_100g: string;
+            energy_kcal_per_100g: string | null;
             /** Protein G Per 100G */
-            protein_g_per_100g: string;
+            protein_g_per_100g: string | null;
             /** Fat G Per 100G */
-            fat_g_per_100g: string;
+            fat_g_per_100g: string | null;
             /** Carbs G Per 100G */
-            carbs_g_per_100g: string;
+            carbs_g_per_100g: string | null;
             /** Fiber G Per 100G */
             fiber_g_per_100g: string | null;
+            /**
+             * Nutrition Basis Kind
+             * @default per_100_g
+             * @enum {string}
+             */
+            nutrition_basis_kind: "per_100_g" | "per_100_ml" | "per_serving";
+            /**
+             * Nutrition Basis Amount
+             * @default 100
+             */
+            nutrition_basis_amount: string;
+            /**
+             * Nutrition Basis Unit
+             * @default g
+             * @enum {string}
+             */
+            nutrition_basis_unit: "g" | "ml" | "serving";
+            /** Canonical Facts */
+            canonical_facts?: {
+                [key: string]: unknown;
+            } | null;
+            /** Nutrition Provenance */
+            nutrition_provenance?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Quality
+             * @default verified
+             * @enum {string}
+             */
+            catalog_quality: "private" | "verified" | "community_unverified";
+            /** Catalog Contribution State */
+            catalog_contribution_state?: ("private" | "accepted" | "duplicate" | "conflict") | null;
+            /** Catalog Contribution Outcome */
+            catalog_contribution_outcome?: ("created" | "reused" | "duplicate" | "conflict") | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "internal" | "external" | "user" | "user_confirmed_package";
+            /**
+             * Trust Level
+             * @enum {string}
+             */
+            trust_level: "verified" | "unverified";
+            /**
+             * Canonical Complete
+             * @default true
+             */
+            canonical_complete: boolean;
             /** Standard Serving Amount */
             standard_serving_amount: string | null;
             /** Standard Serving Unit */
@@ -5467,6 +11587,50 @@ export interface components {
              */
             updated_at: string;
         };
+        /** FoodSearchAliasCreate */
+        FoodSearchAliasCreate: {
+            /** Alias */
+            alias: string;
+            /** Food Id */
+            food_id: number;
+        };
+        /** FoodSearchAliasListResponse */
+        FoodSearchAliasListResponse: {
+            /** Items */
+            items: components["schemas"]["FoodSearchAliasResponse"][];
+        };
+        /** FoodSearchAliasResponse */
+        FoodSearchAliasResponse: {
+            /** Id */
+            id: number;
+            /** Alias */
+            alias: string;
+            /** Food Id */
+            food_id: number | null;
+            /** Food Name */
+            food_name: string | null;
+            /** Food Brand */
+            food_brand: string | null;
+            /** Available */
+            available: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** FoodSearchAliasUpdate */
+        FoodSearchAliasUpdate: {
+            /** Alias */
+            alias?: string | null;
+            /** Food Id */
+            food_id?: number | null;
+        };
         /** FoodSearchResponse */
         FoodSearchResponse: {
             /** Items */
@@ -5487,6 +11651,132 @@ export interface components {
             provider_status: "not_requested" | "not_needed" | "disabled" | "available" | "unavailable" | "rate_limited";
             /** Provider Statuses */
             provider_statuses?: components["schemas"]["FoodProviderStatusResponse"][];
+        };
+        /** GroceryListGenerateRequest */
+        GroceryListGenerateRequest: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+        };
+        /** GroceryListItemResponse */
+        GroceryListItemResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "generated" | "manual";
+            /** Food Id */
+            food_id: number | null;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Amount */
+            amount: string | null;
+            /** Amount Unit */
+            amount_unit: ("g" | "ml" | "piece" | "serving") | null;
+            /** Checked */
+            checked: boolean;
+            /** Owned */
+            owned: boolean;
+            /** Sources */
+            sources: components["schemas"]["GroceryListItemSourceResponse"][];
+        };
+        /** GroceryListItemSourceResponse */
+        GroceryListItemSourceResponse: {
+            /** Plan Item Id */
+            plan_item_id: number | null;
+            /** Recipe Id */
+            recipe_id: number | null;
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Recipe Name */
+            recipe_name: string;
+        };
+        /** GroceryListItemUpdate */
+        GroceryListItemUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Amount */
+            amount?: number | string | null;
+            /** Amount Unit */
+            amount_unit?: ("g" | "ml" | "piece" | "serving") | null;
+            /** Checked */
+            checked?: boolean | null;
+            /** Owned */
+            owned?: boolean | null;
+        };
+        /** GroceryListManualItemCreate */
+        GroceryListManualItemCreate: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Name */
+            name: string;
+            /** Amount */
+            amount?: number | string | null;
+            /** Amount Unit */
+            amount_unit?: ("g" | "ml" | "piece" | "serving") | null;
+        };
+        /** GroceryListResponse */
+        GroceryListResponse: {
+            /** Id */
+            id: number | null;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /** Generated */
+            generated: boolean;
+            /** Refresh Required */
+            refresh_required: boolean;
+            /** Updated At */
+            updated_at: string | null;
+            /** Items */
+            items: components["schemas"]["GroceryListItemResponse"][];
+            /** Stale Sources */
+            stale_sources: components["schemas"]["GroceryListStaleSourceResponse"][];
+        };
+        /** GroceryListStaleSourceResponse */
+        GroceryListStaleSourceResponse: {
+            /** Plan Item Id */
+            plan_item_id: number;
+            /** Recipe Id */
+            recipe_id: number | null;
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Source Name */
+            source_name: string;
+            /** Reason */
+            reason: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5537,6 +11827,112 @@ export interface components {
             min_bpm: number;
             /** Max Bpm */
             max_bpm: number;
+        };
+        /** HermesEditorialIntakeResponse */
+        HermesEditorialIntakeResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "accepted" | "duplicate";
+            /** Submission Id */
+            submission_id: string;
+            /** Cluster Id */
+            cluster_id: string;
+            /** Draft Id */
+            draft_id: string;
+            /**
+             * Publication Policy
+             * @enum {string}
+             */
+            publication_policy: "blocked" | "manual_required" | "auto_eligible";
+            /** Risk Reasons */
+            risk_reasons: string[];
+            /** Preview Text */
+            preview_text: string;
+        };
+        /** HermesWebArticleIntakeResponse */
+        HermesWebArticleIntakeResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "accepted" | "duplicate";
+            /** Submission Id */
+            submission_id: string;
+            /** Article Id */
+            article_id: string;
+            /**
+             * Article Status
+             * @enum {string}
+             */
+            article_status: "candidate" | "researching" | "draft" | "review" | "approved" | "published" | "update_required" | "archived" | "retracted";
+            /** Content Version */
+            content_version: number;
+            /** Review Blockers */
+            review_blockers: string[];
+        };
+        /** HermesWebArticleProposal */
+        HermesWebArticleProposal: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Lead */
+            lead: string;
+            /** Body Sections */
+            body_sections: components["schemas"]["ArticleBodySection"][];
+            /** Topics */
+            topics: string[];
+            /**
+             * Article Kind
+             * @enum {string}
+             */
+            article_kind: "evergreen_explainer" | "practical_guide" | "evidence_review" | "myth_busting" | "research_update" | "comparison" | "product_education";
+            /**
+             * Search Intent
+             * @enum {string}
+             */
+            search_intent: "informational" | "how_to" | "comparison" | "definition" | "evidence" | "mixed";
+            /** Primary Query */
+            primary_query: string;
+            /** Secondary Queries */
+            secondary_queries?: string[];
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "moderate" | "high" | "critical" | "unknown";
+            /**
+             * Evidence Level
+             * @enum {string}
+             */
+            evidence_level: "high" | "moderate" | "limited" | "preliminary" | "conflicting" | "unknown";
+            /** Claims */
+            claims: components["schemas"]["ArticleClaim"][];
+            /** Sources */
+            sources: components["schemas"]["ArticleSource"][];
+            /** Claim Source Matrix */
+            claim_source_matrix: components["schemas"]["ArticleClaimSourceMatrixItem"][];
+            author: components["schemas"]["ArticlePerson"];
+            editor: components["schemas"]["ArticlePerson"];
+            domain_reviewer?: components["schemas"]["ArticlePerson"] | null;
+            /** Related Slugs */
+            related_slugs?: string[];
+            /** Cta */
+            cta?: {
+                [key: string]: string;
+            };
+            /** Evergreen Score */
+            evergreen_score: number;
+            /** Product Relevance */
+            product_relevance: number;
+            /** Editorial Value */
+            editorial_value: number;
+            /** Web Article Potential Reasons */
+            web_article_potential_reasons?: string[];
         };
         /**
          * HydrationBeverageType
@@ -5746,6 +12142,33 @@ export interface components {
             biceps_cm?: number | null;
             /** Thigh Cm */
             thigh_cm?: number | null;
+            /** Custom Measurements */
+            custom_measurements?: components["schemas"]["LatestCustomBodyMeasurement"][];
+        };
+        /** LatestCustomBodyMeasurement */
+        LatestCustomBodyMeasurement: {
+            /** Definition Id */
+            definition_id: number;
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @default cm
+             * @constant
+             */
+            unit: "cm";
+            /** Value */
+            value: number;
+            /**
+             * Measured On
+             * Format: date
+             */
+            measured_on: string;
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
         };
         /** LoggedSetItem */
         LoggedSetItem: {
@@ -5784,6 +12207,16 @@ export interface components {
              * @default 1
              */
             version: number;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /** Planned Group Id */
+            planned_group_id?: number | null;
+            /** Planned Group Kind */
+            planned_group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Planned Position */
+            planned_position?: number | null;
+            /** Planned Round */
+            planned_round?: number | null;
         };
         /** MessageResponse */
         MessageResponse: {
@@ -5800,6 +12233,133 @@ export interface components {
             muscle_name: string;
             /** Completed Set Count */
             completed_set_count: number;
+        };
+        /** MuscleWorkloadExercise */
+        MuscleWorkloadExercise: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /** Contribution Roles */
+            contribution_roles: ("primary" | "secondary")[];
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Performed Session Count */
+            performed_session_count: number;
+            /** History Truncated */
+            history_truncated: boolean;
+            /** Sessions */
+            sessions: components["schemas"]["ExerciseTrainingSession"][];
+        };
+        /** MuscleWorkloadItem */
+        MuscleWorkloadItem: {
+            /** Muscle Id */
+            muscle_id: string;
+            /** Muscle Name */
+            muscle_name: string;
+            current: components["schemas"]["MuscleWorkloadPeriod"] | null;
+            previous: components["schemas"]["MuscleWorkloadPeriod"] | null;
+            /** Completed Set Count Change */
+            completed_set_count_change?: number | null;
+            /** Frequency Per Week Change */
+            frequency_per_week_change?: number | null;
+            /**
+             * Trend
+             * @enum {string}
+             */
+            trend: "increased" | "decreased" | "unchanged" | "no_comparable_data";
+            /** Contributing Exercises */
+            contributing_exercises: components["schemas"]["MuscleWorkloadExercise"][];
+        };
+        /** MuscleWorkloadPeriod */
+        MuscleWorkloadPeriod: {
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Primary Completed Set Count */
+            primary_completed_set_count: number;
+            /** Secondary Completed Set Count */
+            secondary_completed_set_count: number;
+            /** Completed Session Count */
+            completed_session_count: number;
+            /** Frequency Per Week */
+            frequency_per_week: number;
+        };
+        /** NaturalFoodCandidate */
+        NaturalFoodCandidate: {
+            food: components["schemas"]["FoodResponse"];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "alias" | "personal" | "favorite" | "frequent" | "recent" | "shared" | "local";
+        };
+        /** NaturalInputCommitItem */
+        NaturalInputCommitItem: {
+            /** Row Id */
+            row_id: string;
+            /** Food Id */
+            food_id: number;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @default g
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** NaturalInputCommitRequest */
+        NaturalInputCommitRequest: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["NaturalInputCommitItem"][];
+        };
+        /** NaturalInputPreviewRequest */
+        NaturalInputPreviewRequest: {
+            /** Text */
+            text: string;
+        };
+        /** NaturalInputPreviewResponse */
+        NaturalInputPreviewResponse: {
+            /** Rows */
+            rows: components["schemas"]["NaturalInputRowResponse"][];
+        };
+        /** NaturalInputRowResponse */
+        NaturalInputRowResponse: {
+            /** Row Id */
+            row_id: string;
+            /** Raw Text */
+            raw_text: string;
+            /** Name */
+            name: string;
+            /** Amount */
+            amount: string | null;
+            /** Amount Unit */
+            amount_unit: ("g" | "ml" | "serving") | null;
+            /** Unit Inferred */
+            unit_inferred: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "ambiguous" | "unresolved" | "excluded";
+            /** Selected Food Id */
+            selected_food_id: number | null;
+            selected_food: components["schemas"]["FoodResponse"] | null;
+            nutrition?: components["schemas"]["FoodDiaryNutrition"] | null;
+            /** Candidates */
+            candidates?: components["schemas"]["NaturalFoodCandidate"][];
+            /** Message */
+            message?: string | null;
         };
         /** NextWorkoutSummary */
         NextWorkoutSummary: {
@@ -5884,6 +12444,12 @@ export interface components {
             weekly_check_in_reminders_enabled: boolean;
             /** Measurement Reminders Enabled */
             measurement_reminders_enabled: boolean;
+            /** Meal Reminders Enabled */
+            meal_reminders_enabled: boolean;
+            /** Hydration Reminders Enabled */
+            hydration_reminders_enabled: boolean;
+            /** Movement Reminders Enabled */
+            movement_reminders_enabled: boolean;
             /** Telegram Enabled */
             telegram_enabled: boolean;
             /** Telegram Linked */
@@ -5903,6 +12469,12 @@ export interface components {
             weekly_check_in_reminders_enabled?: boolean | null;
             /** Measurement Reminders Enabled */
             measurement_reminders_enabled?: boolean | null;
+            /** Meal Reminders Enabled */
+            meal_reminders_enabled?: boolean | null;
+            /** Hydration Reminders Enabled */
+            hydration_reminders_enabled?: boolean | null;
+            /** Movement Reminders Enabled */
+            movement_reminders_enabled?: boolean | null;
             /** Telegram Enabled */
             telegram_enabled?: boolean | null;
             /** Reminder Hour */
@@ -5911,6 +12483,22 @@ export interface components {
             quiet_hours_start?: string | null;
             /** Quiet Hours End */
             quiet_hours_end?: string | null;
+        };
+        /** NutrientFacts */
+        NutrientFacts: {
+            energy_kcal?: components["schemas"]["CanonicalFact"] | null;
+            energy_kj?: components["schemas"]["CanonicalFact"] | null;
+            protein_g?: components["schemas"]["CanonicalFact"] | null;
+            fat_g?: components["schemas"]["CanonicalFact"] | null;
+            saturated_fat_g?: components["schemas"]["CanonicalFact"] | null;
+            trans_fat_g?: components["schemas"]["CanonicalFact"] | null;
+            carbohydrate_g?: components["schemas"]["CanonicalFact"] | null;
+            sugars_g?: components["schemas"]["CanonicalFact"] | null;
+            added_sugars_g?: components["schemas"]["CanonicalFact"] | null;
+            fiber_g?: components["schemas"]["CanonicalFact"] | null;
+            salt_g?: components["schemas"]["CanonicalFact"] | null;
+            sodium_mg?: components["schemas"]["CanonicalFact"] | null;
+            cholesterol_mg?: components["schemas"]["CanonicalFact"] | null;
         };
         /** NutritionAssignedByResponse */
         NutritionAssignedByResponse: {
@@ -5922,6 +12510,120 @@ export interface components {
             username?: string | null;
             /** Full Name */
             full_name?: string | null;
+        };
+        /** NutritionLabelConfirmRequest */
+        NutritionLabelConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand?: string | null;
+            /** Barcode */
+            barcode?: string | null;
+            /** Visibility */
+            visibility?: ("private" | "share_to_yfc_catalog") | null;
+            /** Classification */
+            classification?: ("personal" | "commercial") | null;
+            nutrition: components["schemas"]["NutritionLabelFactsEdit"];
+        };
+        /** NutritionLabelConfirmResponse */
+        NutritionLabelConfirmResponse: {
+            food: components["schemas"]["FoodResponse"];
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "private" | "share_to_yfc_catalog";
+            /**
+             * Contribution State
+             * @enum {string}
+             */
+            contribution_state: "private" | "accepted" | "duplicate" | "conflict";
+            /** Contribution Outcome */
+            contribution_outcome?: ("created" | "reused" | "duplicate" | "conflict") | null;
+            /**
+             * Catalog Quality
+             * @enum {string}
+             */
+            catalog_quality: "private" | "verified" | "community_unverified";
+            /** Provenance */
+            provenance: string;
+            /**
+             * Diary Entry Created
+             * @default false
+             * @constant
+             */
+            diary_entry_created: false;
+        };
+        /** NutritionLabelDraftResponse */
+        NutritionLabelDraftResponse: {
+            /** Draft Id */
+            draft_id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed" | "cancelled" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Product Name */
+            product_name: string | null;
+            /** Product Brand */
+            product_brand: string | null;
+            /** Product Barcode */
+            product_barcode: string | null;
+            nutrition: components["schemas"]["CanonicalDraft"];
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Requires User Review
+             * @constant
+             */
+            requires_user_review: true;
+        };
+        /** NutritionLabelFactsEdit */
+        NutritionLabelFactsEdit: {
+            /**
+             * Source Basis
+             * @enum {string}
+             */
+            source_basis: "per_100_g" | "per_100_ml" | "per_serving" | "ambiguous";
+            serving_size?: components["schemas"]["ServingSize-Input"] | null;
+            /** Servings Per Container */
+            servings_per_container?: number | string | null;
+            package_amount?: components["schemas"]["PackageAmount-Input"] | null;
+            /** Energy Kcal */
+            energy_kcal?: number | string | null;
+            /** Energy Kj */
+            energy_kj?: number | string | null;
+            /** Protein G */
+            protein_g?: number | string | null;
+            /** Fat G */
+            fat_g?: number | string | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: number | string | null;
+            /** Trans Fat G */
+            trans_fat_g?: number | string | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: number | string | null;
+            /** Sugars G */
+            sugars_g?: number | string | null;
+            /** Added Sugars G */
+            added_sugars_g?: number | string | null;
+            /** Fiber G */
+            fiber_g?: number | string | null;
+            /** Salt G */
+            salt_g?: number | string | null;
+            /** Sodium Mg */
+            sodium_mg?: number | string | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: number | string | null;
         };
         /** NutritionManualTargetSave */
         NutritionManualTargetSave: {
@@ -5944,6 +12646,115 @@ export interface components {
              * @default false
              */
             confirm_energy_mismatch: boolean;
+        };
+        /** NutritionMealTemplateCreate */
+        NutritionMealTemplateCreate: {
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["NutritionMealTemplateItemInput"][];
+        };
+        /** NutritionMealTemplateInsertRequest */
+        NutritionMealTemplateInsertRequest: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+        };
+        /** NutritionMealTemplateItemInput */
+        NutritionMealTemplateItemInput: {
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @default g
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** NutritionMealTemplateItemResponse */
+        NutritionMealTemplateItemResponse: {
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
+            /**
+             * Item Kind
+             * @enum {string}
+             */
+            item_kind: "food" | "recipe";
+            /** Food Id */
+            food_id: number | null;
+            /** Recipe Id */
+            recipe_id: number | null;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Amount */
+            amount: string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+            /** Weight G */
+            weight_g: string | null;
+            nutrition: components["schemas"]["FoodDiaryNutrition"] | null;
+            /** Available */
+            available: boolean;
+            /** Message */
+            message?: string | null;
+        };
+        /** NutritionMealTemplateListResponse */
+        NutritionMealTemplateListResponse: {
+            /** Items */
+            items: components["schemas"]["NutritionMealTemplateResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** NutritionMealTemplateResponse */
+        NutritionMealTemplateResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["NutritionMealTemplateItemResponse"][];
+            /** Total Weight G */
+            total_weight_g: string | null;
+            totals: components["schemas"]["FoodDiaryNutrition"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** NutritionMealTemplateUpdate */
+        NutritionMealTemplateUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Items */
+            items?: components["schemas"]["NutritionMealTemplateItemInput"][] | null;
         };
         /** NutritionPeriodSummary */
         NutritionPeriodSummary: {
@@ -5989,6 +12800,239 @@ export interface components {
             target_protein_g?: number | null;
             /** Target Effective On */
             target_effective_on?: string | null;
+            /**
+             * Exact Entry Count
+             * @default 0
+             */
+            exact_entry_count: number | null;
+            /**
+             * Approximate Entry Count
+             * @default 0
+             */
+            approximate_entry_count: number | null;
+            /**
+             * Partial Entry Count
+             * @default 0
+             */
+            partial_entry_count: number | null;
+        };
+        /** NutritionPlanCopyRequest */
+        NutritionPlanCopyRequest: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /** NutritionPlanDayResponse */
+        NutritionPlanDayResponse: {
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /** Timezone */
+            timezone: string;
+            /** Revision */
+            revision: number;
+            /** Slots */
+            slots: components["schemas"]["NutritionPlanSlotResponse"][];
+            planned: components["schemas"]["FoodDiaryNutrition"];
+            targets: components["schemas"]["FoodDiaryTargets"] | null;
+            remaining: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Nutrition Complete */
+            nutrition_complete: boolean;
+            /** Updated At */
+            updated_at: string | null;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
+        /** NutritionPlanFillItem */
+        NutritionPlanFillItem: {
+            /** Position */
+            position: number;
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @default g
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** NutritionPlanFillRequest */
+        NutritionPlanFillRequest: {
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Candidate Id */
+            candidate_id: string;
+            /** Items */
+            items: components["schemas"]["NutritionPlanFillItem"][];
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /** NutritionPlanItemActionRequest */
+        NutritionPlanItemActionRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "consume" | "edit_and_consume" | "skip";
+            /** Amount */
+            amount?: number | string | null;
+            /** Amount Unit */
+            amount_unit?: ("g" | "ml" | "serving") | null;
+            /** Meal Type */
+            meal_type?: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /** NutritionPlanItemActionResponse */
+        NutritionPlanItemActionResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "consume" | "edit_and_consume" | "skip";
+            item: components["schemas"]["NutritionPlanItemResponse"];
+            day: components["schemas"]["NutritionPlanDayResponse"];
+            /** Diary Entry Id */
+            diary_entry_id: number | null;
+            /** Replayed */
+            replayed: boolean;
+            /** Diagnostic */
+            diagnostic: string;
+        };
+        /** NutritionPlanItemCreate */
+        NutritionPlanItemCreate: {
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Template Id */
+            template_id?: number | null;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @default g
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** NutritionPlanItemResponse */
+        NutritionPlanItemResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Position */
+            position: number;
+            /**
+             * Item Kind
+             * @enum {string}
+             */
+            item_kind: "food" | "recipe";
+            /** Food Id */
+            food_id: number | null;
+            /** Recipe Id */
+            recipe_id: number | null;
+            /** Source Template Id */
+            source_template_id: number | null;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Amount */
+            amount: string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+            /** Weight G */
+            weight_g: string | null;
+            nutrition: components["schemas"]["FoodDiaryNutrition"] | null;
+            /** Available */
+            available: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "consumed" | "skipped";
+            /** Diary Entry Id */
+            diary_entry_id: number | null;
+            /** Message */
+            message?: string | null;
+        };
+        /** NutritionPlanItemUpdate */
+        NutritionPlanItemUpdate: {
+            /** Meal Type */
+            meal_type?: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /** Amount */
+            amount?: number | string | null;
+            /** Amount Unit */
+            amount_unit?: ("g" | "ml" | "serving") | null;
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /** NutritionPlanSlotResponse */
+        NutritionPlanSlotResponse: {
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["NutritionPlanItemResponse"][];
+            planned: components["schemas"]["FoodDiaryNutrition"];
+        };
+        /** NutritionPlanWeekResponse */
+        NutritionPlanWeekResponse: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /** Timezone */
+            timezone: string;
+            /** Days */
+            days: components["schemas"]["NutritionPlanDayResponse"][];
+            planned: components["schemas"]["FoodDiaryNutrition"];
+            targets: components["schemas"]["FoodDiaryTargets"] | null;
+            remaining: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Nutrition Complete */
+            nutrition_complete: boolean;
         };
         /** NutritionReportDailyPoint */
         NutritionReportDailyPoint: {
@@ -6012,6 +13056,8 @@ export interface components {
             fat_g?: number | null;
             /** Carbs G */
             carbs_g?: number | null;
+            /** Fiber G */
+            fiber_g?: number | null;
             /** Target Calories */
             target_calories?: number | null;
             /** Target Protein G */
@@ -6043,6 +13089,32 @@ export interface components {
             hydration_target_ml?: number | null;
             /** Hydration Progress Percent */
             hydration_progress_percent?: number | null;
+        };
+        /** NutritionReportInsight */
+        NutritionReportInsight: {
+            /**
+             * Metric
+             * @enum {string}
+             */
+            metric: "calories" | "protein_g" | "fat_g" | "carbs_g";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "above" | "below";
+            /** Evaluated Days */
+            evaluated_days: number;
+            /** Deviation Days */
+            deviation_days: number;
+            /** Average Deviation */
+            average_deviation: number;
+            /**
+             * Action Code
+             * @enum {string}
+             */
+            action_code: "review_portions" | "open_meal_suggestions";
+            /** Message */
+            message: string;
         };
         /** NutritionReportMetricSummary */
         NutritionReportMetricSummary: {
@@ -6081,6 +13153,8 @@ export interface components {
             /** Target Changes */
             target_changes: components["schemas"]["NutritionReportTargetChange"][];
             hydration?: components["schemas"]["HydrationReportSummary"] | null;
+            /** Insights */
+            insights?: components["schemas"]["NutritionReportInsight"][];
         };
         /** NutritionReportSummary */
         NutritionReportSummary: {
@@ -6104,6 +13178,7 @@ export interface components {
             protein_g: components["schemas"]["NutritionReportMetricSummary"];
             fat_g: components["schemas"]["NutritionReportMetricSummary"];
             carbs_g: components["schemas"]["NutritionReportMetricSummary"];
+            fiber_g?: components["schemas"]["NutritionReportMetricSummary"] | null;
             calorie_comparison: components["schemas"]["NutritionReportTargetComparison"];
             protein_comparison: components["schemas"]["NutritionReportTargetComparison"];
             fat_comparison: components["schemas"]["NutritionReportTargetComparison"];
@@ -6116,6 +13191,21 @@ export interface components {
             days_meeting_protein_target: number;
             /** Protein Target Evaluated Days */
             protein_target_evaluated_days: number;
+            /**
+             * Exact Entry Count
+             * @default 0
+             */
+            exact_entry_count: number | null;
+            /**
+             * Approximate Entry Count
+             * @default 0
+             */
+            approximate_entry_count: number | null;
+            /**
+             * Partial Entry Count
+             * @default 0
+             */
+            partial_entry_count: number | null;
         };
         /** NutritionReportTargetChange */
         NutritionReportTargetChange: {
@@ -6148,6 +13238,102 @@ export interface components {
             average_deviation?: number | null;
             /** Evaluated Days */
             evaluated_days: number;
+        };
+        /** NutritionSuggestionCandidate */
+        NutritionSuggestionCandidate: {
+            /** Candidate Id */
+            candidate_id: string;
+            /**
+             * Candidate Kind
+             * @enum {string}
+             */
+            candidate_kind: "food" | "recipe" | "template";
+            /** Identity Id */
+            identity_id: number;
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["NutritionSuggestionItem"][];
+            nutrition: components["schemas"]["FoodDiaryNutrition"];
+            /**
+             * Nutrition Confidence
+             * @enum {string}
+             */
+            nutrition_confidence: "exact" | "approximate" | "partial";
+            /** Sources */
+            sources: ("recent" | "frequent" | "favorite" | "used" | "saved_template" | "personal_recipe")[];
+            /** Reasons */
+            reasons: ("protein_fit" | "lower_known_fat" | "recent" | "frequent" | "favorite" | "used" | "saved_template" | "personal_recipe" | "partial_nutrition")[];
+        };
+        /** NutritionSuggestionCommitRequest */
+        NutritionSuggestionCommitRequest: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["FoodDiaryBatchItem"][];
+        };
+        /** NutritionSuggestionItem */
+        NutritionSuggestionItem: {
+            /** Position */
+            position: number;
+            /**
+             * Item Kind
+             * @enum {string}
+             */
+            item_kind: "food" | "recipe";
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Amount */
+            amount: string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+            nutrition: components["schemas"]["FoodDiaryNutrition"];
+            /**
+             * Nutrition Confidence
+             * @enum {string}
+             */
+            nutrition_confidence: "exact" | "approximate" | "partial";
+        };
+        /** NutritionSuggestionsResponse */
+        NutritionSuggestionsResponse: {
+            /**
+             * Mode
+             * @default deterministic
+             * @constant
+             */
+            mode: "deterministic";
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            targets: components["schemas"]["FoodDiaryTargets"] | null;
+            remaining: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Remaining Confidence */
+            remaining_confidence: ("exact" | "approximate" | "partial") | null;
+            /** Limitations */
+            limitations?: string[];
+            /** Candidates */
+            candidates?: components["schemas"]["NutritionSuggestionCandidate"][];
+            /** Max Candidates */
+            max_candidates: number;
         };
         /** NutritionTargetHistoryResponse */
         NutritionTargetHistoryResponse: {
@@ -6244,14 +13430,19 @@ export interface components {
             /** Note */
             note?: string | null;
             /**
+             * Record Weight Measurement
+             * @default false
+             */
+            record_weight_measurement: boolean;
+            /**
              * Sex
              * @enum {string}
              */
             sex: "male" | "female";
             /** Weight Kg */
-            weight_kg: number;
+            weight_kg: number | string;
             /** Height Cm */
-            height_cm: number;
+            height_cm: number | string;
             /** Age */
             age: number;
             /** Daily Routine */
@@ -6316,12 +13507,509 @@ export interface components {
             /** Missing Fields */
             missing_fields: "goal"[];
         };
+        /** OnboardingTemplateAssignmentCreate */
+        OnboardingTemplateAssignmentCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Version */
+            version?: number | null;
+        };
+        /** OnboardingTemplateCreate */
+        OnboardingTemplateCreate: {
+            /** Steps */
+            steps: ("invite" | "questionnaire" | "goals" | "equipment" | "restrictions" | "measurements" | "program" | "first_check_in" | "agenda")[];
+            /** Program Template Id */
+            program_template_id?: number | null;
+            /** Check In Template Id */
+            check_in_template_id?: number | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** OnboardingTemplateListResponse */
+        OnboardingTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["OnboardingTemplateResponse"][];
+        };
+        /** OnboardingTemplateResponse */
+        OnboardingTemplateResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            current_version?: components["schemas"]["OnboardingTemplateVersionResponse"] | null;
+            /** Assignments */
+            assignments?: components["schemas"]["WorkflowAssignmentResponse"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** OnboardingTemplateVersionCreate */
+        OnboardingTemplateVersionCreate: {
+            /** Steps */
+            steps: ("invite" | "questionnaire" | "goals" | "equipment" | "restrictions" | "measurements" | "program" | "first_check_in" | "agenda")[];
+            /** Program Template Id */
+            program_template_id?: number | null;
+            /** Check In Template Id */
+            check_in_template_id?: number | null;
+        };
+        /** OnboardingTemplateVersionResponse */
+        OnboardingTemplateVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /** Steps */
+            steps: ("invite" | "questionnaire" | "goals" | "equipment" | "restrictions" | "measurements" | "program" | "first_check_in" | "agenda")[];
+            /** Program Template Id */
+            program_template_id?: number | null;
+            /** Check In Template Id */
+            check_in_template_id?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * OwnerArticleReviewDetail
+         * @description Exact content and provenance for a human Root decision, never a GO.
+         */
+        OwnerArticleReviewDetail: {
+            /** Article Id */
+            article_id: string;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Article Status
+             * @enum {string}
+             */
+            article_status: "draft" | "review" | "update_required";
+            /** Content Version */
+            content_version: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Candidate Id */
+            candidate_id: string | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "moderate" | "high" | "critical" | "unknown";
+            /**
+             * Evidence Level
+             * @enum {string}
+             */
+            evidence_level: "high" | "moderate" | "limited" | "preliminary" | "conflicting" | "unknown";
+            /** Source Count */
+            source_count: number;
+            /** Claim Count */
+            claim_count: number;
+            /** Pending Claim Count */
+            pending_claim_count: number;
+            /** Review Blockers */
+            review_blockers: string[];
+            /** Generated With Ai */
+            generated_with_ai: boolean;
+            /** Research Version */
+            research_version: string;
+            /** Updated At */
+            updated_at: string | null;
+            /** Description */
+            description: string;
+            /** Lead */
+            lead: string;
+            /** Body Sections */
+            body_sections: components["schemas"]["ArticleBodySection"][];
+            /** Topics */
+            topics: string[];
+            /** Claims */
+            claims: components["schemas"]["ArticleClaim"][];
+            /** Sources */
+            sources: components["schemas"]["ArticleSource"][];
+            /** Claim Source Matrix */
+            claim_source_matrix: components["schemas"]["ArticleClaimSourceMatrixItem"][];
+            domain_reviewer: components["schemas"]["ArticlePerson"] | null;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Skill Version */
+            skill_version: string;
+        };
+        /**
+         * OwnerArticleReviewRow
+         * @description Authenticated Root-only read model; cannot authorize publication.
+         */
+        OwnerArticleReviewRow: {
+            /** Article Id */
+            article_id: string;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Article Status
+             * @enum {string}
+             */
+            article_status: "draft" | "review" | "update_required";
+            /** Content Version */
+            content_version: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Candidate Id */
+            candidate_id: string | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "moderate" | "high" | "critical" | "unknown";
+            /**
+             * Evidence Level
+             * @enum {string}
+             */
+            evidence_level: "high" | "moderate" | "limited" | "preliminary" | "conflicting" | "unknown";
+            /** Source Count */
+            source_count: number;
+            /** Claim Count */
+            claim_count: number;
+            /** Pending Claim Count */
+            pending_claim_count: number;
+            /** Review Blockers */
+            review_blockers: string[];
+            /** Generated With Ai */
+            generated_with_ai: boolean;
+            /** Research Version */
+            research_version: string;
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /**
+         * OwnerExistingDraftPublishRequest
+         * @description One owner-confirmed exact revision; never a Hermes or scheduled command.
+         */
+        OwnerExistingDraftPublishRequest: {
+            /** Article Id */
+            article_id: string;
+            /** Expected Content Hash */
+            expected_content_hash: string;
+            /** Expected Content Version */
+            expected_content_version: number;
+            /**
+             * Acknowledge Unverified Evidence
+             * @constant
+             */
+            acknowledge_unverified_evidence: true;
+            /**
+             * Confirm Exact Revision
+             * @constant
+             */
+            confirm_exact_revision: true;
+        };
+        /**
+         * OwnerWebArticlePublishRequest
+         * @description Explicit root-owner editorial release; does not attest scientific verification.
+         */
+        OwnerWebArticlePublishRequest: {
+            article: components["schemas"]["HermesWebArticleProposal"];
+            /**
+             * Acknowledge Unverified Evidence
+             * @constant
+             */
+            acknowledge_unverified_evidence: true;
+            /**
+             * Generated With Ai
+             * @default true
+             */
+            generated_with_ai: boolean;
+        };
+        /** OwnerWebArticlePublishResponse */
+        OwnerWebArticlePublishResponse: {
+            /** Article Id */
+            article_id: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Article Status
+             * @constant
+             */
+            article_status: "published";
+            /** Content Version */
+            content_version: number;
+            /** Canonical Url */
+            canonical_url: string;
+            /**
+             * Editorial Decision
+             * @constant
+             */
+            editorial_decision: "root_owner_publication";
+            /**
+             * Scientific Verification
+             * @constant
+             */
+            scientific_verification: "not_attested";
+        };
+        /** PackageAmount */
+        "PackageAmount-Input": {
+            /** Amount */
+            amount: number | string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
+        /** PackageAmount */
+        "PackageAmount-Output": {
+            /** Amount */
+            amount: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
         /** PasswordResetConfirmRequest */
         PasswordResetConfirmRequest: {
             /** Token */
             token: string;
             /** Password */
             password: string;
+        };
+        /** PhotoMealCandidate */
+        PhotoMealCandidate: {
+            /** Candidate Id */
+            candidate_id: string;
+            /** Name */
+            name: string;
+            /** Portion Amount */
+            portion_amount?: string | null;
+            /** Portion Unit */
+            portion_unit?: ("g" | "ml" | "serving") | null;
+            /**
+             * Portion Confidence
+             * @enum {string}
+             */
+            portion_confidence: "high" | "medium" | "low" | "unknown";
+            /**
+             * Identity Confidence
+             * @enum {string}
+             */
+            identity_confidence: "high" | "medium" | "low" | "unknown";
+            /**
+             * Nutrition Confidence
+             * @enum {string}
+             */
+            nutrition_confidence: "high" | "medium" | "low" | "unknown";
+            /** Uncertainty Codes */
+            uncertainty_codes?: ("identity_uncertain" | "portion_uncertain" | "nutrition_uncertain")[];
+            /** Energy Kcal */
+            energy_kcal?: string | null;
+            /** Protein G */
+            protein_g?: string | null;
+            /** Fat G */
+            fat_g?: string | null;
+            /** Carbs G */
+            carbs_g?: string | null;
+        };
+        /** PhotoMealConfirmItem */
+        PhotoMealConfirmItem: {
+            /** Candidate Id */
+            candidate_id: string;
+            /** Name */
+            name: string;
+            /** Portion Amount */
+            portion_amount?: number | string | null;
+            /** Portion Unit */
+            portion_unit?: ("g" | "ml" | "serving") | null;
+            /** Energy Kcal */
+            energy_kcal: number | string;
+            /** Protein G */
+            protein_g?: number | string | null;
+            /** Fat G */
+            fat_g?: number | string | null;
+            /** Carbs G */
+            carbs_g?: number | string | null;
+        };
+        /** PhotoMealConfirmRequest */
+        PhotoMealConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["PhotoMealConfirmItem"][];
+        };
+        /** PhotoMealConfirmResponse */
+        PhotoMealConfirmResponse: {
+            /** Draft Id */
+            draft_id: string;
+            entry: components["schemas"]["FoodDiaryEntryResponse"];
+            /**
+             * Replayed
+             * @default false
+             * @constant
+             */
+            replayed: false;
+        };
+        /** PhotoMealDraftResponse */
+        PhotoMealDraftResponse: {
+            /** Draft Id */
+            draft_id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed" | "cancelled" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Candidates */
+            candidates: components["schemas"]["PhotoMealCandidate"][];
+            /** Warnings */
+            warnings?: ("identity_uncertain" | "portion_uncertain" | "nutrition_uncertain" | "unsupported_image" | "manual_review_required")[];
+            /**
+             * Requires User Review
+             * @default true
+             * @constant
+             */
+            requires_user_review: true;
+            /**
+             * Source Photo Retained
+             * @default false
+             * @constant
+             */
+            source_photo_retained: false;
+        };
+        /** PrescriptionDurationTarget */
+        PrescriptionDurationTarget: {
+            /**
+             * Kind
+             * @default exact
+             * @enum {string}
+             */
+            kind: "exact" | "range";
+            /** Value Minutes */
+            value_minutes?: number | null;
+            /** Min Minutes */
+            min_minutes?: number | null;
+            /** Max Minutes */
+            max_minutes?: number | null;
+        };
+        /** PrescriptionEffortTarget */
+        PrescriptionEffortTarget: {
+            /**
+             * Kind
+             * @default none
+             * @enum {string}
+             */
+            kind: "none" | "rir" | "rpe" | "failure";
+            /** Value */
+            value?: number | "4+" | null;
+        };
+        /** PrescriptionGroup */
+        PrescriptionGroup: {
+            /** Group Id */
+            group_id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit";
+            /**
+             * Intra Group Rest Seconds
+             * @default 0
+             */
+            intra_group_rest_seconds: number;
+            /**
+             * Rest After Group Seconds
+             * @default 90
+             */
+            rest_after_group_seconds: number;
+            /** Rounds */
+            rounds?: number | null;
+            /** Exercise Slot */
+            exercise_slot?: number | null;
+        };
+        /** PrescriptionLoadTarget */
+        PrescriptionLoadTarget: {
+            /**
+             * Kind
+             * @default user_selected
+             * @enum {string}
+             */
+            kind: "user_selected" | "absolute" | "percent_1rm" | "percent_training_max" | "relative_to_top" | "relative_to_previous";
+            /** Value */
+            value?: number | null;
+        };
+        /** PrescriptionRepTarget */
+        PrescriptionRepTarget: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "exact" | "range" | "amrap";
+            /** Value */
+            value?: number | null;
+            /** Min Reps */
+            min_reps?: number | null;
+            /** Max Reps */
+            max_reps?: number | null;
+            /** Cap Reps */
+            cap_reps?: number | null;
+        };
+        /** PrescriptionSegment */
+        PrescriptionSegment: {
+            /** Position */
+            position: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member";
+            rep_target?: components["schemas"]["PrescriptionRepTarget"] | null;
+            duration_target?: components["schemas"]["PrescriptionDurationTarget"] | null;
+            load_target?: components["schemas"]["PrescriptionLoadTarget"];
+            effort_target?: components["schemas"]["PrescriptionEffortTarget"];
+            /**
+             * Rest After Seconds
+             * @default 90
+             */
+            rest_after_seconds: number;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Position */
+            group_position?: number | null;
+            /** Round Number */
+            round_number?: number | null;
         };
         /** ProgramAssignmentResponse */
         ProgramAssignmentResponse: {
@@ -6341,6 +14029,734 @@ export interface components {
             start_date: string;
             /** Duration Weeks */
             duration_weeks: number;
+        };
+        /**
+         * ProgramCoachingRule
+         * @description Validated, non-executable coaching guidance attached to an imported plan.
+         */
+        ProgramCoachingRule: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "fixed_prescription" | "double_progression" | "linear_load" | "percentage_training_max" | "rir_rpe" | "amrap_success_failure" | "deload";
+            /**
+             * Scope
+             * @default program
+             * @enum {string}
+             */
+            scope: "program" | "block" | "exercise";
+            /** Block Number */
+            block_number?: number | null;
+            /** Exercise Id */
+            exercise_id?: number | null;
+            /** Week Start */
+            week_start?: number | null;
+            /** Week End */
+            week_end?: number | null;
+            rep_target?: components["schemas"]["PrescriptionRepTarget"] | null;
+            load_target?: components["schemas"]["PrescriptionLoadTarget"] | null;
+            effort_target?: components["schemas"]["PrescriptionEffortTarget"] | null;
+            /** Increment Value */
+            increment_value?: number | null;
+            /** Increment Unit */
+            increment_unit?: ("kg" | "lb" | "percent") | null;
+            /** Reset On Failure */
+            reset_on_failure?: boolean | null;
+            /** Amrap Min Reps */
+            amrap_min_reps?: number | null;
+            /** Amrap Failure Action */
+            amrap_failure_action?: ("repeat" | "reduce_load" | "deload" | "manual_review") | null;
+            /** Deload Volume Percent */
+            deload_volume_percent?: number | null;
+            /** Deload Intensity Percent */
+            deload_intensity_percent?: number | null;
+        };
+        /** ProgramGeneratorActiveProgram */
+        ProgramGeneratorActiveProgram: {
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /** Assigned By User Id */
+            assigned_by_user_id?: number | null;
+            /**
+             * Trainer Owned
+             * @default false
+             */
+            trainer_owned: boolean;
+        };
+        /** ProgramGeneratorAdaptation */
+        ProgramGeneratorAdaptation: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "equipment_substitution" | "duration_accessory_reduction" | "schedule_representation";
+            /** Message */
+            message: string;
+            /** Day Number */
+            day_number?: number | null;
+            /** Source Exercise Id */
+            source_exercise_id?: number | null;
+            /** Replacement Exercise Id */
+            replacement_exercise_id?: number | null;
+        };
+        /** ProgramGeneratorConfirmRequest */
+        ProgramGeneratorConfirmRequest: {
+            /** Draft Token */
+            draft_token: string;
+            /** Start Date */
+            start_date?: string | null;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
+            /**
+             * Replace Active
+             * @default false
+             */
+            replace_active: boolean;
+        };
+        /** ProgramGeneratorConfirmResponse */
+        ProgramGeneratorConfirmResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "confirmed";
+            /**
+             * Idempotent
+             * @default false
+             */
+            idempotent: boolean;
+            /** Assigned Program Id */
+            assigned_program_id: number;
+            /** Workouts Created */
+            workouts_created: number;
+            template: components["schemas"]["ProgramTemplateResponse"];
+        };
+        /** ProgramGeneratorDay */
+        ProgramGeneratorDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Estimated Duration Minutes */
+            estimated_duration_minutes: number;
+            /** Exercises */
+            exercises: components["schemas"]["ProgramGeneratorExercise"][];
+        };
+        /** ProgramGeneratorExercise */
+        ProgramGeneratorExercise: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /** Movement Pattern */
+            movement_pattern?: ("anti_extension" | "anti_rotation" | "arm_curl" | "calf" | "cardio_row" | "carry" | "chest_fly" | "chest_press" | "conditioning" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "olympic_lift" | "shoulder_raise" | "shoulder_press" | "shoulder_rotation" | "squat" | "trunk_flexion" | "trunk_rotation" | "triceps" | "vertical_pull" | "wrist") | null;
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
+            /** Notes */
+            notes?: string | null;
+            /** Superset Group */
+            superset_group?: number | null;
+            /** Superset Order */
+            superset_order?: number | null;
+            /** Prescription */
+            prescription?: {
+                [key: string]: unknown;
+            } | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
+            /** Source Exercise Id */
+            source_exercise_id?: number | null;
+        };
+        /** ProgramGeneratorPreviewResponse */
+        ProgramGeneratorPreviewResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "preview" | "no_compatible";
+            /** Selection Policy Version */
+            selection_policy_version: string;
+            /** Input Fingerprint */
+            input_fingerprint: string;
+            /** Message */
+            message: string;
+            /** Draft Token */
+            draft_token?: string | null;
+            source?: components["schemas"]["ProgramGeneratorSource"] | null;
+            program?: components["schemas"]["ProgramGeneratorProgram"] | null;
+            /** Fit Reasons */
+            fit_reasons?: string[];
+            /** Tradeoffs */
+            tradeoffs?: string[];
+            /** Adaptations */
+            adaptations?: components["schemas"]["ProgramGeneratorAdaptation"][];
+            /** Unresolved Constraints */
+            unresolved_constraints?: string[];
+            /** Reason Codes */
+            reason_codes?: string[];
+            active_program?: components["schemas"]["ProgramGeneratorActiveProgram"] | null;
+        };
+        /** ProgramGeneratorProgram */
+        ProgramGeneratorProgram: {
+            /** Title */
+            title: string;
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "beginner" | "intermediate" | "advanced";
+            /** Split Type */
+            split_type?: ("full_body" | "upper_lower" | "push_pull_legs" | "body_part" | "hybrid") | null;
+            /** Days */
+            days: components["schemas"]["ProgramGeneratorDay"][];
+            /** Estimated Duration Minutes */
+            estimated_duration_minutes: number;
+        };
+        /** ProgramGeneratorRequest */
+        ProgramGeneratorRequest: {
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Experience
+             * @enum {string}
+             */
+            experience: "beginner" | "intermediate" | "advanced";
+            /** Days Per Week */
+            days_per_week: number;
+            /** Preferred Session Duration Minutes */
+            preferred_session_duration_minutes: number;
+            /**
+             * Training Location
+             * @enum {string}
+             */
+            training_location: "gym" | "home" | "other";
+            /** Available Equipment Ids */
+            available_equipment_ids?: ("bodyweight" | "dumbbell" | "barbell" | "bench" | "cable" | "machine" | "kettlebell" | "cardio" | "other")[];
+            /** Priority Muscle Ids */
+            priority_muscle_ids?: string[];
+            /** Preferred Exercise Ids */
+            preferred_exercise_ids?: number[];
+            /** Excluded Exercise Ids */
+            excluded_exercise_ids?: number[];
+        };
+        /** ProgramGeneratorSource */
+        ProgramGeneratorSource: {
+            /** Template Id */
+            template_id: number;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "beginner" | "intermediate" | "advanced";
+            /** Split Type */
+            split_type?: ("full_body" | "upper_lower" | "push_pull_legs" | "body_part" | "hybrid") | null;
+            /**
+             * Provenance Type
+             * @default CUSTOM
+             * @enum {string}
+             */
+            provenance_type: "YFC_GENERIC" | "SOURCE_ADAPTATION" | "CUSTOM";
+        };
+        /** ProgramImportAiInfo */
+        ProgramImportAiInfo: {
+            /** Contract Version */
+            contract_version: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disabled" | "policy_blocked" | "unavailable" | "no_change" | "proposed" | "invalid_output" | "not_needed";
+            /** Attempts */
+            attempts: number;
+            /** Proposal Count */
+            proposal_count: number;
+            /** Candidate Rerank Count */
+            candidate_rerank_count: number;
+            /** Conflict Count */
+            conflict_count: number;
+            /**
+             * Fallback
+             * @default deterministic_manual
+             * @constant
+             */
+            fallback: "deterministic_manual";
+        };
+        /** ProgramImportAiProposal */
+        ProgramImportAiProposal: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "program_title" | "goal" | "level" | "day_number" | "day_title" | "prescribed_sets" | "prescribed_reps" | "prescribed_duration_minutes" | "rest_seconds" | "notes" | "exercise_mapping";
+            /** Value */
+            value: string;
+            /** Evidence Id */
+            evidence_id: string;
+            /** Source Location */
+            source_location: string;
+            /** Source Text */
+            source_text: string;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
+            /**
+             * Applied
+             * @default false
+             */
+            applied: boolean;
+        };
+        /** ProgramImportBlock */
+        ProgramImportBlock: {
+            /** Block Number */
+            block_number: number;
+            /** Title */
+            title: string;
+            /** Week Start */
+            week_start: number;
+            /** Week End */
+            week_end: number;
+            /**
+             * Is Deload
+             * @default false
+             */
+            is_deload: boolean;
+        };
+        /** ProgramImportCandidate */
+        ProgramImportCandidate: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Title */
+            title: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /**
+             * Match Type
+             * @enum {string}
+             */
+            match_type: "id" | "slug" | "title" | "alias" | "transliteration" | "manual";
+        };
+        /** ProgramImportConfirmRequest */
+        ProgramImportConfirmRequest: {
+            /** Target Program Id */
+            target_program_id?: number | null;
+            /** Expected Revision Number */
+            expected_revision_number?: number | null;
+        };
+        /** ProgramImportConfirmResponse */
+        ProgramImportConfirmResponse: {
+            /** Import Id */
+            import_id: string;
+            template: components["schemas"]["ProgramTemplateResponse"];
+            /** Assigned Program Id */
+            assigned_program_id?: number | null;
+            /** Revision Number */
+            revision_number?: number | null;
+            /**
+             * Workouts Created
+             * @default 0
+             */
+            workouts_created: number;
+            /**
+             * Workouts Updated
+             * @default 0
+             */
+            workouts_updated: number;
+            target_user: components["schemas"]["ProgramTargetUserResponse"];
+        };
+        /** ProgramImportIssue */
+        ProgramImportIssue: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "blocking" | "warning";
+            /** Message */
+            message: string;
+            /** Location */
+            location?: string | null;
+            /** Field */
+            field?: string | null;
+            /** Source Sheet */
+            source_sheet?: string | null;
+            /** Source Row */
+            source_row?: number | null;
+            /** Source Cell */
+            source_cell?: string | null;
+        };
+        /** ProgramImportProvenance */
+        ProgramImportProvenance: {
+            /**
+             * Provenance Type
+             * @default CUSTOM
+             * @enum {string}
+             */
+            provenance_type: "CUSTOM" | "SOURCE_ADAPTATION";
+            /** Source Name */
+            source_name?: string | null;
+            /** Creator */
+            creator?: string | null;
+            /** Organization */
+            organization?: string | null;
+            /** Source Reference */
+            source_reference?: string | null;
+            /** Source Version */
+            source_version?: string | null;
+            /** Source Date */
+            source_date?: string | null;
+            /** Adaptation Notes */
+            adaptation_notes?: string | null;
+        };
+        /** ProgramImportResolveRequest */
+        ProgramImportResolveRequest: {
+            /** Title */
+            title?: string | null;
+            /** Goal */
+            goal?: ("muscle_gain" | "fat_loss" | "maintenance" | "recomposition") | null;
+            /** Level */
+            level?: ("beginner" | "intermediate" | "advanced") | null;
+            provenance?: components["schemas"]["ProgramImportProvenance"] | null;
+            /** Rows */
+            rows?: components["schemas"]["ProgramImportRowResolution"][];
+        };
+        /** ProgramImportResponse */
+        ProgramImportResponse: {
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "cancelled" | "expired";
+            /**
+             * Source Format
+             * @enum {string}
+             */
+            source_format: "csv" | "xlsx" | "txt" | "docx";
+            /** Schema Version */
+            schema_version: number;
+            /** Parser Version */
+            parser_version: string;
+            /** Layout Version */
+            layout_version?: string | null;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Program Title */
+            program_title?: string | null;
+            /** Goal */
+            goal?: ("muscle_gain" | "fat_loss" | "maintenance" | "recomposition") | null;
+            /** Level */
+            level?: ("beginner" | "intermediate" | "advanced") | null;
+            provenance?: components["schemas"]["ProgramImportProvenance"];
+            /** Blocks */
+            blocks?: components["schemas"]["ProgramImportBlock"][];
+            /** Coaching Rules */
+            coaching_rules?: components["schemas"]["ProgramCoachingRule"][];
+            /** Rows */
+            rows: components["schemas"]["ProgramImportRow"][];
+            /** Issues */
+            issues: components["schemas"]["ProgramImportIssue"][];
+            summary: components["schemas"]["ProgramImportSummary"];
+            ai?: components["schemas"]["ProgramImportAiInfo"] | null;
+        };
+        /** ProgramImportRow */
+        ProgramImportRow: {
+            /** Row Number */
+            row_number: number;
+            /** Source Sheet */
+            source_sheet?: string | null;
+            /** Source Range */
+            source_range?: string | null;
+            /** Source Cells */
+            source_cells?: {
+                [key: string]: string;
+            };
+            /** Week Number */
+            week_number?: number | null;
+            /** Day Number */
+            day_number?: number | null;
+            /** Day Title */
+            day_title?: string | null;
+            /** Exercise Name */
+            exercise_name?: string | null;
+            /** Exercise Id */
+            exercise_id?: number | null;
+            /** Exercise Slug */
+            exercise_slug?: string | null;
+            /** Metric Type */
+            metric_type?: ("strength" | "cardio") | null;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds?: number | null;
+            /** Notes */
+            notes?: string | null;
+            /** Source Auxiliary */
+            source_auxiliary?: string | null;
+            /** Superset Group */
+            superset_group?: number | null;
+            /** Superset Order */
+            superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Block Number */
+            block_number?: number | null;
+            /** Block Title */
+            block_title?: string | null;
+            /**
+             * Block Is Deload
+             * @default false
+             */
+            block_is_deload: boolean;
+            coaching_rule?: components["schemas"]["ProgramCoachingRule"] | null;
+            /** Resolved Exercise Id */
+            resolved_exercise_id?: number | null;
+            /** Resolved Exercise Title */
+            resolved_exercise_title?: string | null;
+            /**
+             * Match Status
+             * @enum {string}
+             */
+            match_status: "matched" | "needs_resolution" | "invalid";
+            /** Match Type */
+            match_type?: ("id" | "slug" | "title" | "alias" | "transliteration" | "manual") | null;
+            /** Candidates */
+            candidates?: components["schemas"]["ProgramImportCandidate"][];
+            /** Ai Proposals */
+            ai_proposals?: components["schemas"]["ProgramImportAiProposal"][];
+            /** Ai Rerank Reason */
+            ai_rerank_reason?: string | null;
+            /** Issues */
+            issues?: components["schemas"]["ProgramImportIssue"][];
+        };
+        /** ProgramImportRowResolution */
+        ProgramImportRowResolution: {
+            /** Row Number */
+            row_number: number;
+            /** Exercise Id */
+            exercise_id?: number | null;
+        };
+        /** ProgramImportSummary */
+        ProgramImportSummary: {
+            /** Row Count */
+            row_count: number;
+            /** Cell Count */
+            cell_count: number;
+            /** Matched Row Count */
+            matched_row_count: number;
+            /** Unresolved Row Count */
+            unresolved_row_count: number;
+            /** Blocking Issue Count */
+            blocking_issue_count: number;
+            /** Warning Count */
+            warning_count: number;
+        };
+        /** ProgramImportTarget */
+        ProgramImportTarget: {
+            /** Program Id */
+            program_id: number;
+            /** Title */
+            title: string;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active";
+            /** Day Numbers */
+            day_numbers: number[];
+        };
+        /** ProgramLifecycleActionRequest */
+        ProgramLifecycleActionRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "pause" | "resume" | "complete" | "terminate" | "restart";
+            /** Reason */
+            reason: string;
+        };
+        /** ProgramLifecycleBlockSummary */
+        ProgramLifecycleBlockSummary: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Week Start */
+            week_start?: number | null;
+            /** Week End */
+            week_end?: number | null;
+            /** Is Deload */
+            is_deload: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "active" | "completed" | "archived";
+        };
+        /** ProgramLifecycleMutationResponse */
+        ProgramLifecycleMutationResponse: {
+            /** Program Id */
+            program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /** Is Active */
+            is_active: boolean;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Restarted From Program Id */
+            restarted_from_program_id?: number | null;
+            /** New Program Id */
+            new_program_id?: number | null;
+        };
+        /** ProgramLifecycleResponse */
+        ProgramLifecycleResponse: {
+            /** Program Id */
+            program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Current Week Number */
+            current_week_number?: number | null;
+            current_block?: components["schemas"]["ProgramLifecycleBlockSummary"] | null;
+            next_block?: components["schemas"]["ProgramLifecycleBlockSummary"] | null;
+            next_workout?: components["schemas"]["ProgramLifecycleWorkoutSummary"] | null;
+            next_deload?: components["schemas"]["ProgramLifecycleBlockSummary"] | null;
+            /** Restarted From Program Id */
+            restarted_from_program_id?: number | null;
+        };
+        /** ProgramLifecycleWorkoutSummary */
+        ProgramLifecycleWorkoutSummary: {
+            /** Id */
+            id: number;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+        };
+        /** ProgramProgressionProposalExercise */
+        ProgramProgressionProposalExercise: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            guidance: components["schemas"]["ProgressionGuidance"];
+        };
+        /** ProgramProgressionProposalList */
+        ProgramProgressionProposalList: {
+            /** Target Program Id */
+            target_program_id: number;
+            /** Target Revision Number */
+            target_revision_number: number;
+            /** Target Workout Id */
+            target_workout_id: number;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Exercises */
+            exercises: components["schemas"]["ProgramProgressionProposalExercise"][];
         };
         /** ProgramRecommendationCriteria */
         ProgramRecommendationCriteria: {
@@ -6420,7 +14836,7 @@ export interface components {
              * Change Kind
              * @enum {string}
              */
-            change_kind: "assigned" | "program_archived" | "plan_updated" | "block_created" | "block_updated" | "block_status_changed";
+            change_kind: "assigned" | "program_archived" | "plan_updated" | "block_created" | "block_updated" | "block_status_changed" | "program_lifecycle" | "program_restarted";
             /** Reason */
             reason?: string | null;
             /** Changed Fields */
@@ -6454,7 +14870,7 @@ export interface components {
              * Goal
              * @enum {string}
              */
-            goal: "muscle_gain" | "fat_loss" | "maintenance" | "recomposition";
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
             /**
              * Level
              * @enum {string}
@@ -6472,6 +14888,8 @@ export interface components {
             target_full_name?: string | null;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayCreate"][];
+            /** Expected Revision Number */
+            expected_revision_number?: number | null;
             /**
              * Assign After Create
              * @default true
@@ -6543,6 +14961,13 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
         };
         /** ProgramTemplateExerciseResponse */
         ProgramTemplateExerciseResponse: {
@@ -6571,11 +14996,36 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
             /**
              * Has Guide
              * @default false
              */
             has_guide: boolean;
+            /** Weekly Prescriptions */
+            weekly_prescriptions?: components["schemas"]["ProgramTemplateExerciseWeekResponse"][];
+        };
+        /** ProgramTemplateExerciseWeekResponse */
+        ProgramTemplateExerciseWeekResponse: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Week Number */
+            week_number: number;
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
         };
         /** ProgramTemplateResponse */
         ProgramTemplateResponse: {
@@ -6631,13 +15081,46 @@ export interface components {
             /** Assigned Program Id */
             assigned_program_id?: number | null;
             /** Assigned Program Status */
-            assigned_program_status?: ("scheduled" | "active" | "completed" | "archived") | null;
+            assigned_program_status?: ("scheduled" | "active" | "paused" | "completed" | "terminated" | "archived") | null;
             /** Assigned Program Start Date */
             assigned_program_start_date?: string | null;
             /** Assigned Program Duration Weeks */
             assigned_program_duration_weeks?: number | null;
+            /** Assigned Program Schedule Weekdays */
+            assigned_program_schedule_weekdays?: number[] | null;
             /** Current Revision Number */
             current_revision_number?: number | null;
+            /**
+             * Assigned Program Updated
+             * @default false
+             */
+            assigned_program_updated: boolean;
+            /**
+             * Future Workouts Updated
+             * @default 0
+             */
+            future_workouts_updated: number;
+            /** Assigned Program Revision Number */
+            assigned_program_revision_number?: number | null;
+            /**
+             * Default Duration Weeks
+             * @default 1
+             */
+            default_duration_weeks: number;
+            /**
+             * Provenance Type
+             * @default CUSTOM
+             * @enum {string}
+             */
+            provenance_type: "YFC_GENERIC" | "SOURCE_ADAPTATION" | "CUSTOM";
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            } | null;
+            /** Program Metadata */
+            program_metadata?: {
+                [key: string]: unknown;
+            } | null;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayResponse"][];
         };
@@ -6691,8 +15174,6 @@ export interface components {
             hunger?: number | null;
             /** Adherence Difficulty */
             adherence_difficulty?: number | null;
-            /** Note */
-            note?: string | null;
         };
         /** ProgressReportDownloadLinkResponse */
         ProgressReportDownloadLinkResponse: {
@@ -6814,6 +15295,17 @@ export interface components {
             check_ins: components["schemas"]["ProgressReportCheckIn"][];
             wellbeing?: components["schemas"]["DailyWellbeingReport"] | null;
         };
+        /** ProgressReportRestSummary */
+        ProgressReportRestSummary: {
+            /** Observation Count */
+            observation_count: number;
+            /** Mean Seconds */
+            mean_seconds?: number | null;
+            /** Median Seconds */
+            median_seconds?: number | null;
+            /** Mean Difference Seconds */
+            mean_difference_seconds?: number | null;
+        };
         /** ProgressReportSubject */
         ProgressReportSubject: {
             /** Name */
@@ -6846,6 +15338,7 @@ export interface components {
             new_personal_records: number;
             /** Exercises */
             exercises: components["schemas"]["ProgressReportExerciseTrend"][];
+            rest?: components["schemas"]["ProgressReportRestSummary"] | null;
         };
         /** ProgressReportTrainingBlock */
         ProgressReportTrainingBlock: {
@@ -6906,6 +15399,35 @@ export interface components {
             /** Volume Kg */
             volume_kg: number;
         };
+        /** ProgressWeeklyActionResponse */
+        ProgressWeeklyActionResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "weekly_review" | "workout" | "nutrition" | "measurement" | "none";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "completed" | "unavailable";
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "today" | "nutrition" | "body" | "progress" | "weekly_review";
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "review_required" | "scheduled_training_gap" | "nutrition_coverage_gap" | "weight_trend_insufficient" | "no_supported_action";
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
         /** ProgressWeightPoint */
         ProgressWeightPoint: {
             /**
@@ -6943,7 +15465,7 @@ export interface components {
              * Ruleset Version
              * @constant
              */
-            ruleset_version: "progression-guidance-v1";
+            ruleset_version: "progression-guidance-v2";
             /**
              * Outcome
              * @enum {string}
@@ -6963,6 +15485,97 @@ export interface components {
              */
             load_unit: "kg" | "lb";
             evidence: components["schemas"]["ProgressionEvidence"];
+            proposal?: components["schemas"]["ProgressionProposal"] | null;
+        };
+        /** ProgressionProposal */
+        ProgressionProposal: {
+            /** Proposal Id */
+            proposal_id: string;
+            /** Rule Id */
+            rule_id: string;
+            /**
+             * Rule Kind
+             * @enum {string}
+             */
+            rule_kind: "legacy_progression_guidance" | "fixed_prescription" | "double_progression" | "linear_load" | "percentage_training_max" | "rir_rpe" | "amrap_success_failure" | "deload";
+            /** Rule Snapshot */
+            rule_snapshot: {
+                [key: string]: unknown;
+            };
+            /** Target Program Id */
+            target_program_id: number;
+            /** Target Revision Number */
+            target_revision_number: number;
+            /** Target Exercise Id */
+            target_exercise_id: number;
+            /** Target Workout Id */
+            target_workout_id: number;
+            /** Current Weight */
+            current_weight?: number | null;
+            /** Proposed Weight */
+            proposed_weight?: number | null;
+            /** Deload Volume Percent */
+            deload_volume_percent?: number | null;
+            /** Deload Intensity Percent */
+            deload_intensity_percent?: number | null;
+            /**
+             * Proposed Action
+             * @enum {string}
+             */
+            proposed_action: "set_load" | "hold" | "reset_recommended" | "deload";
+            /** Target Set Updates */
+            target_set_updates?: components["schemas"]["ProgressionTargetSetUpdate"][];
+            /** Source Evidence Ids */
+            source_evidence_ids: string[];
+            /** Comparable Session Count */
+            comparable_session_count: number;
+            /** Reason Codes */
+            reason_codes: string[];
+            /**
+             * Eligibility Status
+             * @enum {string}
+             */
+            eligibility_status: "eligible" | "no_change" | "review";
+            /**
+             * Requires Confirmation
+             * @default true
+             * @constant
+             */
+            requires_confirmation: true;
+        };
+        /** ProgressionProposalReviewRequest */
+        ProgressionProposalReviewRequest: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject" | "adjust";
+            /** Workout Id */
+            workout_id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Adjusted Weight */
+            adjusted_weight?: number | null;
+            /** Expected Set Versions */
+            expected_set_versions?: {
+                [key: string]: number;
+            };
+        };
+        /** ProgressionProposalReviewResponse */
+        ProgressionProposalReviewResponse: {
+            /** Proposal Id */
+            proposal_id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject" | "adjust";
+            /** Applied Set Ids */
+            applied_set_ids: number[];
+            /** Current Revision Number */
+            current_revision_number: number;
         };
         /** ProgressionSessionEvidence */
         ProgressionSessionEvidence: {
@@ -6995,6 +15608,23 @@ export interface components {
             /** Completion Feedback */
             completion_feedback?: ("easier_than_expected" | "as_expected" | "harder_than_expected") | null;
         };
+        /** ProgressionTargetSetUpdate */
+        ProgressionTargetSetUpdate: {
+            /** Set Id */
+            set_id: number;
+            /** Set Number */
+            set_number: number;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /** Current Weight */
+            current_weight?: number | null;
+            /** Set Version */
+            set_version: number;
+            /** Relative To Top */
+            relative_to_top?: number | null;
+            /** Proposed Weight */
+            proposed_weight: number;
+        };
         /** PublicExerciseDetail */
         PublicExerciseDetail: {
             /** Slug */
@@ -7020,6 +15650,8 @@ export interface components {
             common_mistakes: string[];
             /** Safety Notes */
             safety_notes: string[];
+            /** Media */
+            media: components["schemas"]["ExerciseGuideMedia"][];
             /** Source Name */
             source_name: string;
             /** Source Url */
@@ -7046,6 +15678,303 @@ export interface components {
              * @enum {string}
              */
             difficulty_level: "beginner" | "intermediate" | "advanced";
+        };
+        /** PublicProgramDay */
+        PublicProgramDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Exercises */
+            exercises: components["schemas"]["PublicProgramExercise"][];
+        };
+        /** PublicProgramExercise */
+        PublicProgramExercise: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Primary Muscle */
+            primary_muscle: string;
+            /** Equipment */
+            equipment: string;
+            /**
+             * Difficulty Level
+             * @enum {string}
+             */
+            difficulty_level: "beginner" | "intermediate" | "advanced";
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Rest Seconds */
+            rest_seconds: number;
+        };
+        /** PublicProgramResponse */
+        PublicProgramResponse: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "beginner" | "intermediate" | "advanced";
+            /**
+             * Split Type
+             * @enum {string}
+             */
+            split_type: "full_body" | "upper_lower" | "push_pull_legs" | "body_part" | "hybrid";
+            /** Days */
+            days: components["schemas"]["PublicProgramDay"][];
+        };
+        /** PublicShareImportRequest */
+        PublicShareImportRequest: {
+            /** Preview Hash */
+            preview_hash: string;
+            /**
+             * Replace Active
+             * @default false
+             */
+            replace_active: boolean;
+        };
+        /** PublicShareImportResponse */
+        PublicShareImportResponse: {
+            /** Share Id */
+            share_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "imported" | "already_imported";
+            /** Template Id */
+            template_id: number;
+            /** User Program Id */
+            user_program_id: number;
+            /** Workouts Created */
+            workouts_created: number;
+        };
+        /** PublicShareOwnerResponse */
+        PublicShareOwnerResponse: {
+            /** Share Id */
+            share_id: string;
+            /**
+             * Share Type
+             * @enum {string}
+             */
+            share_type: "progress" | "program";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /** Public Url */
+            public_url: string;
+        };
+        /** PublicSharePeriodRequest */
+        PublicSharePeriodRequest: {
+            period: components["schemas"]["NutritionReportPeriod"];
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+        };
+        /** PublicSharePreviewResponse */
+        PublicSharePreviewResponse: {
+            /**
+             * Share Type
+             * @enum {string}
+             */
+            share_type: "progress" | "program";
+            /** Preview Hash */
+            preview_hash: string;
+            /** Snapshot */
+            snapshot: components["schemas"]["PublicShareProgressSnapshot"] | components["schemas"]["PublicShareProgramSnapshot"];
+        };
+        /** PublicShareProgramCreateRequest */
+        PublicShareProgramCreateRequest: {
+            /** Template Id */
+            template_id: number;
+            /** Preview Hash */
+            preview_hash: string;
+        };
+        /** PublicShareProgramDay */
+        PublicShareProgramDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Exercises */
+            exercises: components["schemas"]["PublicShareProgramExercise"][];
+        };
+        /** PublicShareProgramExercise */
+        PublicShareProgramExercise: {
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
+            /** Weekly Prescriptions */
+            weekly_prescriptions: components["schemas"]["PublicShareProgramWeeklyPrescription"][];
+        };
+        /** PublicShareProgramPreviewRequest */
+        PublicShareProgramPreviewRequest: {
+            /** Template Id */
+            template_id: number;
+        };
+        /** PublicShareProgramSnapshot */
+        PublicShareProgramSnapshot: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "program";
+            /** Title */
+            title: string;
+            /** Goal */
+            goal: string;
+            /** Level */
+            level: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Days */
+            days: components["schemas"]["PublicShareProgramDay"][];
+        };
+        /** PublicShareProgramWeeklyPrescription */
+        PublicShareProgramWeeklyPrescription: {
+            /** Week Number */
+            week_number: number;
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
+        };
+        /** PublicShareProgressCreateRequest */
+        PublicShareProgressCreateRequest: {
+            period: components["schemas"]["NutritionReportPeriod"];
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Preview Hash */
+            preview_hash: string;
+        };
+        /** PublicShareProgressExercise */
+        PublicShareProgressExercise: {
+            /** Exercise Title */
+            exercise_title: string;
+            /** Performed Session Count */
+            performed_session_count: number;
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Max External Load Kg */
+            max_external_load_kg?: number | null;
+            /** External Load Volume Kg */
+            external_load_volume_kg?: number | null;
+        };
+        /** PublicShareProgressQuality */
+        PublicShareProgressQuality: {
+            /**
+             * Workout Logging
+             * @enum {string}
+             */
+            workout_logging: "sufficient" | "limited" | "insufficient";
+            /**
+             * Working Sets
+             * @enum {string}
+             */
+            working_sets: "sufficient" | "limited" | "insufficient";
+            /** Notes */
+            notes: string[];
+        };
+        /** PublicShareProgressSnapshot */
+        PublicShareProgressSnapshot: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "progress";
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Planned Workouts */
+            planned_workouts: number;
+            /** Completed Workouts */
+            completed_workouts: number;
+            /** Frequency Per Week */
+            frequency_per_week: number;
+            /** Completed Working Sets */
+            completed_working_sets: number;
+            /** New Personal Records */
+            new_personal_records: number;
+            /** External Load Volume Kg */
+            external_load_volume_kg?: number | null;
+            /** Volume Recorded Sets */
+            volume_recorded_sets: number;
+            /** Exercises */
+            exercises: components["schemas"]["PublicShareProgressExercise"][];
+            data_quality: components["schemas"]["PublicShareProgressQuality"];
+        };
+        /** PublicShareResponse */
+        PublicShareResponse: {
+            /** Share Id */
+            share_id: string;
+            /**
+             * Share Type
+             * @enum {string}
+             */
+            share_type: "progress" | "program";
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Public Url */
+            public_url: string;
+            /** Preview Hash */
+            preview_hash: string;
+            /** Snapshot */
+            snapshot: components["schemas"]["PublicShareProgressSnapshot"] | components["schemas"]["PublicShareProgramSnapshot"];
         };
         /** RecipeCreate */
         RecipeCreate: {
@@ -7173,6 +16102,290 @@ export interface components {
             /** Verification Token */
             verification_token?: string | null;
         };
+        /** ReminderTemplateResponse */
+        ReminderTemplateResponse: {
+            /**
+             * Template Key
+             * @enum {string}
+             */
+            template_key: "meal_logging" | "hydration" | "movement_break";
+            /** Version */
+            version: string;
+            /** Label */
+            label: string;
+            /** Purpose */
+            purpose: string;
+            /**
+             * Schedule Kind
+             * @enum {string}
+             */
+            schedule_kind: "times" | "interval";
+            /** Allowed Schedule */
+            allowed_schedule: string;
+            /** Quiet Hours Behavior */
+            quiet_hours_behavior: string;
+            /** Deep Link */
+            deep_link: string;
+            /** Suppression */
+            suppression: string;
+            /** Neutral Copy */
+            neutral_copy: string;
+            /** Default Enabled */
+            default_enabled: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Weekdays */
+            weekdays: number[];
+            /** Times */
+            times: string[];
+            /** Window Start */
+            window_start?: string | null;
+            /** Window End */
+            window_end?: string | null;
+            /** Interval Minutes */
+            interval_minutes?: number | null;
+            /** Max Per Day */
+            max_per_day: number;
+            /** Minimum Spacing Minutes */
+            minimum_spacing_minutes: number;
+            /** Telegram Linked */
+            telegram_linked: boolean;
+            /** Telegram Enabled */
+            telegram_enabled: boolean;
+            /** Channel Note */
+            channel_note: string;
+        };
+        /** ReminderTemplateUpdate */
+        ReminderTemplateUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Weekdays */
+            weekdays?: number[] | null;
+            /** Times */
+            times?: string[] | null;
+            /** Window Start */
+            window_start?: string | null;
+            /** Window End */
+            window_end?: string | null;
+            /** Interval Minutes */
+            interval_minutes?: number | null;
+            /** Max Per Day */
+            max_per_day?: number | null;
+            /** Minimum Spacing Minutes */
+            minimum_spacing_minutes?: number | null;
+        };
+        /** ReportHandoffCheckIn */
+        ReportHandoffCheckIn: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Submitted On
+             * Format: date
+             */
+            submitted_on: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "skipped";
+            /** Training Load */
+            training_load?: number | null;
+            /** Recovery */
+            recovery?: number | null;
+            /** Hunger */
+            hunger?: number | null;
+            /** Adherence Difficulty */
+            adherence_difficulty?: number | null;
+        };
+        /** ReportHandoffCreateRequest */
+        ReportHandoffCreateRequest: {
+            period: components["schemas"]["NutritionReportPeriod"];
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Client Comment */
+            client_comment?: string | null;
+        };
+        /** ReportHandoffProgressReport */
+        ReportHandoffProgressReport: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            period: components["schemas"]["NutritionReportPeriod"];
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Timezone */
+            timezone: string;
+            subject: components["schemas"]["ProgressReportSubject"];
+            training: components["schemas"]["ProgressReportTraining"];
+            cardio: components["schemas"]["CardioPeriodSummary"];
+            body: components["schemas"]["BodyPeriodSummary"];
+            nutrition: components["schemas"]["NutritionReportResponse"];
+            adherence: components["schemas"]["AdherenceSummary"];
+            data_sufficiency: components["schemas"]["ProgressDataSufficiency"];
+            program?: components["schemas"]["ProgressReportProgram"] | null;
+            /** Check Ins */
+            check_ins: components["schemas"]["ReportHandoffCheckIn"][];
+            wellbeing?: components["schemas"]["DailyWellbeingReport"] | null;
+        };
+        /** ReportHandoffResponse */
+        ReportHandoffResponse: {
+            /** Id */
+            id: number;
+            trainer: components["schemas"]["ReportHandoffTrainer"];
+            period: components["schemas"]["NutritionReportPeriod"];
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Timezone */
+            timezone: string;
+            /** Report Contract Version */
+            report_contract_version: string;
+            /** Included Section Ids */
+            included_section_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Delivery Status
+             * @enum {string}
+             */
+            delivery_status: "delivered" | "pending" | "failed";
+            /** Delivery Attempt */
+            delivery_attempt: number;
+            /** Client Comment */
+            client_comment?: string | null;
+            /**
+             * Live
+             * @default true
+             * @constant
+             */
+            live: true;
+        };
+        /** ReportHandoffTrainer */
+        ReportHandoffTrainer: {
+            /** Id */
+            id: number;
+            /** Full Name */
+            full_name?: string | null;
+            /** Username */
+            username?: string | null;
+        };
+        /** ReportHandoffViewResponse */
+        ReportHandoffViewResponse: {
+            handoff: components["schemas"]["ReportHandoffResponse"];
+            report: components["schemas"]["ReportHandoffProgressReport"];
+            /** Data Changed Since Send */
+            data_changed_since_send: boolean;
+        };
+        /** RestActionRequest */
+        RestActionRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add30" | "add60" | "complete" | "skip" | "interrupt" | "unknown";
+            /** Mutation Id */
+            mutation_id: string;
+            /** Expected Version */
+            expected_version: number;
+            /** Ended At */
+            ended_at?: string | null;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /**
+             * Corrected
+             * @default false
+             */
+            corrected: boolean;
+            /** Corrected Seconds */
+            corrected_seconds?: number | null;
+        };
+        /** RestRestartRequest */
+        RestRestartRequest: {
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Mutation Id */
+            mutation_id: string;
+        };
+        /** RestSessionResponse */
+        RestSessionResponse: {
+            /** Id */
+            id: number;
+            /** Workout Id */
+            workout_id: number;
+            /** Source Set Id */
+            source_set_id: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Planned Seconds */
+            planned_seconds: number;
+            /** Adjusted Seconds */
+            adjusted_seconds: number;
+            /** Measured Seconds */
+            measured_seconds: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "completed" | "skipped" | "interrupted" | "unknown";
+            /** Source */
+            source: string | null;
+            /** Quality */
+            quality: string;
+            /** Version */
+            version: number;
+            /** Start Mutation Id */
+            start_mutation_id?: string | null;
+        };
+        /** RestStartRequest */
+        RestStartRequest: {
+            /** Source Set Id */
+            source_set_id: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Mutation Id */
+            mutation_id: string;
+        };
         /** RirDistributionBucket */
         RirDistributionBucket: {
             /**
@@ -7194,6 +16407,77 @@ export interface components {
             /** Distribution */
             distribution: components["schemas"]["RirDistributionBucket"][];
         };
+        /** ServingSize */
+        "ServingSize-Input": {
+            /** Amount */
+            amount: number | string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
+        /** ServingSize */
+        "ServingSize-Output": {
+            /** Amount */
+            amount: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
+        /** SourceFact */
+        SourceFact: {
+            /** Value */
+            value?: string | null;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "mg" | "kcal" | "kJ";
+            /**
+             * Basis Ref
+             * @enum {string}
+             */
+            basis_ref: "per_100_g" | "per_100_ml" | "per_serving" | "ambiguous";
+            /** Column Ref */
+            column_ref: string;
+            /**
+             * Evidence
+             * @enum {string}
+             */
+            evidence: "read" | "ambiguous" | "unreadable";
+        };
+        /** SourceNutrientFacts */
+        SourceNutrientFacts: {
+            /** Energy Kcal */
+            energy_kcal?: components["schemas"]["SourceFact"][] | null;
+            /** Energy Kj */
+            energy_kj?: components["schemas"]["SourceFact"][] | null;
+            /** Protein G */
+            protein_g?: components["schemas"]["SourceFact"][] | null;
+            /** Fat G */
+            fat_g?: components["schemas"]["SourceFact"][] | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: components["schemas"]["SourceFact"][] | null;
+            /** Trans Fat G */
+            trans_fat_g?: components["schemas"]["SourceFact"][] | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: components["schemas"]["SourceFact"][] | null;
+            /** Sugars G */
+            sugars_g?: components["schemas"]["SourceFact"][] | null;
+            /** Added Sugars G */
+            added_sugars_g?: components["schemas"]["SourceFact"][] | null;
+            /** Fiber G */
+            fiber_g?: components["schemas"]["SourceFact"][] | null;
+            /** Salt G */
+            salt_g?: components["schemas"]["SourceFact"][] | null;
+            /** Sodium Mg */
+            sodium_mg?: components["schemas"]["SourceFact"][] | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: components["schemas"]["SourceFact"][] | null;
+        };
         /** TelegramInitRequest */
         TelegramInitRequest: {
             /** Init Data */
@@ -7205,6 +16489,13 @@ export interface components {
             telegram_url: string;
             /** Expires In Seconds */
             expires_in_seconds: number;
+        };
+        /** TemplateExerciseReplacementRequest */
+        TemplateExerciseReplacementRequest: {
+            /** Replacement Exercise Id */
+            replacement_exercise_id: number;
+            /** Reason */
+            reason?: string | null;
         };
         /** TokenPairResponse */
         TokenPairResponse: {
@@ -7312,10 +16603,28 @@ export interface components {
              * Format: date
              */
             period_end: string;
+            /**
+             * Previous Period Start
+             * Format: date
+             */
+            previous_period_start: string;
+            /**
+             * Previous Period End
+             * Format: date
+             */
+            previous_period_end: string;
             /** Exercise History Limit */
             exercise_history_limit: number;
             /** Completed Set Count */
             completed_set_count: number;
+            /** Completed Workout Count */
+            completed_workout_count: number;
+            /** Frequency Per Week */
+            frequency_per_week: number;
+            /** Previous Completed Workout Count */
+            previous_completed_workout_count: number;
+            /** Previous Frequency Per Week */
+            previous_frequency_per_week: number;
             /** Reps Total */
             reps_total?: number | null;
             /** Reps Recorded Sets */
@@ -7331,6 +16640,8 @@ export interface components {
             primary_muscle_exposure: components["schemas"]["MuscleSetExposure"][];
             /** Secondary Muscle Exposure */
             secondary_muscle_exposure: components["schemas"]["MuscleSetExposure"][];
+            /** Muscle Group Workload */
+            muscle_group_workload: components["schemas"]["MuscleWorkloadItem"][];
             /** Completed Sets Without Muscle Metadata */
             completed_sets_without_muscle_metadata: number;
             data_sufficiency: components["schemas"]["TrainingDataSufficiency"];
@@ -7354,6 +16665,23 @@ export interface components {
             set_kind?: ("warmup" | "working" | "drop") | null;
             /** Reached Failure */
             reached_failure?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** TrainingBlockActionRequest */
+        TrainingBlockActionRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Reason */
+            reason: string;
+        };
+        /** TrainingBlockAdvanceResponse */
+        TrainingBlockAdvanceResponse: {
+            /** Completed Block Id */
+            completed_block_id: number;
+            block: components["schemas"]["TrainingBlockResponse"];
+            /** Current Revision Number */
+            current_revision_number: number;
         };
         /** TrainingBlockCreate */
         TrainingBlockCreate: {
@@ -7388,6 +16716,16 @@ export interface components {
         /** TrainingBlockMutationResponse */
         TrainingBlockMutationResponse: {
             block: components["schemas"]["TrainingBlockResponse"];
+            /** Current Revision Number */
+            current_revision_number: number;
+        };
+        /** TrainingBlockRepeatResponse */
+        TrainingBlockRepeatResponse: {
+            /** Source Block Id */
+            source_block_id: number;
+            block: components["schemas"]["TrainingBlockResponse"];
+            /** Duration Weeks */
+            duration_weeks: number;
             /** Current Revision Number */
             current_revision_number: number;
         };
@@ -7588,6 +16926,29 @@ export interface components {
             /** Standard Serving Weight G */
             standard_serving_weight_g?: number | string | null;
             external_source?: components["schemas"]["ExternalFoodImportSource"] | null;
+            /**
+             * Classification
+             * @default personal
+             * @enum {string}
+             */
+            classification: "personal" | "commercial";
+            /**
+             * Nutrition Basis Kind
+             * @default per_100_g
+             * @enum {string}
+             */
+            nutrition_basis_kind: "per_100_g" | "per_100_ml" | "per_serving";
+            /**
+             * Nutrition Basis Amount
+             * @default 100
+             */
+            nutrition_basis_amount: number | string;
+            /**
+             * Nutrition Basis Unit
+             * @default g
+             * @enum {string}
+             */
+            nutrition_basis_unit: "g" | "ml" | "serving";
         };
         /** UserFoodUpdate */
         UserFoodUpdate: {
@@ -7613,6 +16974,12 @@ export interface components {
             standard_serving_unit?: ("g" | "ml" | "piece" | "serving") | null;
             /** Standard Serving Weight G */
             standard_serving_weight_g?: number | string | null;
+            /** Nutrition Basis Kind */
+            nutrition_basis_kind?: ("per_100_g" | "per_100_ml" | "per_serving") | null;
+            /** Nutrition Basis Amount */
+            nutrition_basis_amount?: number | string | null;
+            /** Nutrition Basis Unit */
+            nutrition_basis_unit?: ("g" | "ml" | "serving") | null;
         };
         /** UserProfileResponse */
         UserProfileResponse: {
@@ -7667,9 +17034,9 @@ export interface components {
             /** Level */
             level?: ("beginner" | "intermediate" | "advanced") | null;
             /** Height Cm */
-            height_cm?: number | null;
+            height_cm?: number | string | null;
             /** Weight Kg */
-            weight_kg?: number | null;
+            weight_kg?: number | string | null;
             /** Workouts Per Week */
             workouts_per_week?: number | null;
             /** Cardio Trainings Per Week */
@@ -7721,6 +17088,8 @@ export interface components {
              * @default false
              */
             has_workout_history: boolean;
+            /** Has Food History */
+            has_food_history?: boolean | null;
             /** Auth Providers */
             auth_providers?: string[];
             onboarding: components["schemas"]["OnboardingStateResponse"];
@@ -7739,6 +17108,224 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WarmupProposalApplyRequest */
+        WarmupProposalApplyRequest: {
+            /** Target Set Id */
+            target_set_id: number;
+            /** Working Weight Kg */
+            working_weight_kg: number | string;
+            /** Rows */
+            rows: components["schemas"]["WarmupProposalRow"][];
+            /** State Token */
+            state_token: string;
+            /** Proposal Token */
+            proposal_token: string;
+            /** Mutation Id */
+            mutation_id: string;
+        };
+        /** WarmupProposalApplyResponse */
+        WarmupProposalApplyResponse: {
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Ruleset Version */
+            ruleset_version: string;
+            /** Idempotent */
+            idempotent: boolean;
+            /** Materialized Set Ids */
+            materialized_set_ids: number[];
+            workout: components["schemas"]["WorkoutTodayResponse"];
+        };
+        /** WarmupProposalPreviewRequest */
+        WarmupProposalPreviewRequest: {
+            /** Target Set Id */
+            target_set_id: number;
+            /** Working Weight Kg */
+            working_weight_kg: number | string;
+        };
+        /** WarmupProposalPreviewResponse */
+        WarmupProposalPreviewResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "proposal" | "unavailable";
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Ruleset Version */
+            ruleset_version: string;
+            /** Working Weight Kg */
+            working_weight_kg: number;
+            /** Rows */
+            rows: components["schemas"]["WarmupProposalRowResponse"][];
+            /** Max Rows */
+            max_rows: number;
+            /** State Token */
+            state_token?: string | null;
+            /** Proposal Token */
+            proposal_token?: string | null;
+            /** Message */
+            message: string;
+        };
+        /** WarmupProposalRow */
+        WarmupProposalRow: {
+            /** Weight Kg */
+            weight_kg: number | string;
+            /** Reps */
+            reps: number;
+        };
+        /** WarmupProposalRowResponse */
+        WarmupProposalRowResponse: {
+            /** Weight Kg */
+            weight_kg: number;
+            /** Reps */
+            reps: number;
+        };
+        /** WebArticleCard */
+        WebArticleCard: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Lead */
+            lead: string;
+            /** Topics */
+            topics: string[];
+            /**
+             * Article Kind
+             * @enum {string}
+             */
+            article_kind: "evergreen_explainer" | "practical_guide" | "evidence_review" | "myth_busting" | "research_update" | "comparison" | "product_education";
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Canonical Url */
+            canonical_url: string;
+        };
+        /** WebArticleResponse */
+        WebArticleResponse: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Lead */
+            lead: string;
+            /** Topics */
+            topics: string[];
+            /**
+             * Article Kind
+             * @enum {string}
+             */
+            article_kind: "evergreen_explainer" | "practical_guide" | "evidence_review" | "myth_busting" | "research_update" | "comparison" | "product_education";
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Canonical Url */
+            canonical_url: string;
+            /** Body Sections */
+            body_sections: components["schemas"]["ArticleBodySection"][];
+            /**
+             * Search Intent
+             * @enum {string}
+             */
+            search_intent: "informational" | "how_to" | "comparison" | "definition" | "evidence" | "mixed";
+            /** Primary Query */
+            primary_query: string;
+            /** Secondary Queries */
+            secondary_queries: string[];
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "moderate" | "high" | "critical" | "unknown";
+            /**
+             * Evidence Level
+             * @enum {string}
+             */
+            evidence_level: "high" | "moderate" | "limited" | "preliminary" | "conflicting" | "unknown";
+            /** Claims */
+            claims: components["schemas"]["ArticleClaim"][];
+            /** Sources */
+            sources: components["schemas"]["ArticleSource"][];
+            /** Claim Source Matrix */
+            claim_source_matrix: components["schemas"]["ArticleClaimSourceMatrixItem"][];
+            author: components["schemas"]["ArticlePerson"];
+            editor: components["schemas"]["ArticlePerson"];
+            domain_reviewer: components["schemas"]["ArticlePerson"] | null;
+            /** Related Slugs */
+            related_slugs: string[];
+            /** Cta */
+            cta: {
+                [key: string]: string;
+            };
+            /** Content Version */
+            content_version: number;
+            /** Generated With Ai */
+            generated_with_ai: boolean;
+            /** Research Assistance */
+            research_assistance: boolean;
+        };
+        /** WebPushConfigResponse */
+        WebPushConfigResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Application Server Key */
+            application_server_key?: string | null;
+        };
+        /** WebPushStatusResponse */
+        WebPushStatusResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** Registered */
+            registered: boolean;
+        };
+        /** WebPushSubscriptionDeleteRequest */
+        WebPushSubscriptionDeleteRequest: {
+            /** Endpoint */
+            endpoint: string;
+        };
+        /** WebPushSubscriptionKeys */
+        WebPushSubscriptionKeys: {
+            /** P256Dh */
+            p256dh: string;
+            /** Auth */
+            auth: string;
+        };
+        /** WebPushSubscriptionRequest */
+        WebPushSubscriptionRequest: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["WebPushSubscriptionKeys"];
+        };
+        /** WebPushSubscriptionResponse */
+        WebPushSubscriptionResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "registered";
         };
         /** WeeklyCheckInAdaptiveSummary */
         WeeklyCheckInAdaptiveSummary: {
@@ -7770,6 +17357,7 @@ export interface components {
             timezone: string;
             existing?: components["schemas"]["WeeklyCheckInResponse"] | null;
             summary: components["schemas"]["WeeklyCheckInSummary"];
+            progress_action: components["schemas"]["ProgressWeeklyActionResponse"];
         };
         /** WeeklyCheckInHistoryResponse */
         WeeklyCheckInHistoryResponse: {
@@ -7819,6 +17407,22 @@ export interface components {
             current_target?: components["schemas"]["WeeklyCheckInTargetSummary"] | null;
             /** Suspicious Low Days */
             suspicious_low_days?: components["schemas"]["WeeklyCheckInSuspiciousNutritionDay"][];
+            /**
+             * Exact Entry Count
+             * @default 0
+             */
+            exact_entry_count: number | null;
+            /**
+             * Approximate Entry Count
+             * @default 0
+             */
+            approximate_entry_count: number | null;
+            /**
+             * Partial Entry Count
+             * @default 0
+             */
+            partial_entry_count: number | null;
+            planning_review?: components["schemas"]["WeeklyPlanningReviewSummary"] | null;
         };
         /** WeeklyCheckInProgressionSummary */
         WeeklyCheckInProgressionSummary: {
@@ -7871,6 +17475,10 @@ export interface components {
             adherence_difficulty?: number | null;
             /** Note */
             note?: string | null;
+            /** Progress Action Kind */
+            progress_action_kind?: ("workout" | "nutrition" | "measurement" | "none") | null;
+            /** Progress Action Completed At */
+            progress_action_completed_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -7968,6 +17576,154 @@ export interface components {
             completed_workouts: number;
             adherence: components["schemas"]["AdherenceComponent"];
         };
+        /** WeeklyPlanningAdjustment */
+        WeeklyPlanningAdjustment: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Source Revision */
+            source_revision: number;
+            /** Target Revision */
+            target_revision: number;
+        };
+        /** WeeklyPlanningDaySummary */
+        WeeklyPlanningDaySummary: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /** Observed */
+            observed: boolean;
+            /**
+             * Plan Status
+             * @enum {string}
+             */
+            plan_status: "no_plan" | "planned" | "partial" | "complete";
+            /** Plan Revision */
+            plan_revision: number;
+            /** Planned Items */
+            planned_items: number;
+            /** Consumed Items */
+            consumed_items: number;
+            /** Pending Items */
+            pending_items: number;
+            /** Skipped Items */
+            skipped_items: number;
+            planned: components["schemas"]["FoodDiaryNutrition"];
+            consumed?: components["schemas"]["FoodDiaryNutrition"] | null;
+            target?: components["schemas"]["FoodDiaryTargets"] | null;
+        };
+        /** WeeklyPlanningProposal */
+        WeeklyPlanningProposal: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Source Revision */
+            source_revision: number;
+            /** Target Revision */
+            target_revision: number;
+            /** Pending Item Count */
+            pending_item_count: number;
+            /** Target Item Count */
+            target_item_count: number;
+        };
+        /** WeeklyPlanningReviewConfirmRequest */
+        WeeklyPlanningReviewConfirmRequest: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Adjustments */
+            adjustments: components["schemas"]["WeeklyPlanningAdjustment"][];
+        };
+        /** WeeklyPlanningReviewConfirmResponse */
+        WeeklyPlanningReviewConfirmResponse: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /** Replayed */
+            replayed: boolean;
+            planning_review: components["schemas"]["WeeklyPlanningReviewSummary"];
+        };
+        /** WeeklyPlanningReviewSummary */
+        WeeklyPlanningReviewSummary: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Availability
+             * @enum {string}
+             */
+            availability: "available" | "no_plan" | "no_target" | "no_data";
+            /** Days */
+            days: components["schemas"]["WeeklyPlanningDaySummary"][];
+            /** Planned Days */
+            planned_days: number;
+            /** Target Days */
+            target_days: number;
+            /** Consumed Days */
+            consumed_days: number;
+            /** Pending Days */
+            pending_days: number;
+            /** Repeated Miss Dates */
+            repeated_miss_dates?: string[];
+            planned_total: components["schemas"]["FoodDiaryNutrition"];
+            consumed_total?: components["schemas"]["FoodDiaryNutrition"] | null;
+            target_total?: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Proposals */
+            proposals?: components["schemas"]["WeeklyPlanningProposal"][];
+        };
+        /** WorkflowAssignmentResponse */
+        WorkflowAssignmentResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "assigned" | "completed" | "revoked";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** WorkoutAdaptationApplyRequest */
         WorkoutAdaptationApplyRequest: {
             /**
@@ -8014,6 +17770,15 @@ export interface components {
             to_exercise_id?: number | null;
             /** To Title */
             to_title?: string | null;
+            /** Transfer */
+            transfer?: ("compatible_with_load_reset" | "blocked") | null;
+            /**
+             * Load Reset Required
+             * @default false
+             */
+            load_reset_required: boolean;
+            /** Reason Keys */
+            reason_keys?: string[];
         };
         /** WorkoutAdaptationExercise */
         WorkoutAdaptationExercise: {
@@ -8035,6 +17800,7 @@ export interface components {
             sort_order: number;
             /** Superset Group */
             superset_group?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
             /**
              * Priority
              * @enum {string}
@@ -8119,6 +17885,14 @@ export interface components {
             title: string;
             /** Equipment Ids */
             equipment_ids: string[];
+            /** Score */
+            score?: number | null;
+            /** Reason Keys */
+            reason_keys?: string[];
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Thumbnail Sources */
+            media_thumbnail_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
         };
         /** WorkoutCommentCreate */
         WorkoutCommentCreate: {
@@ -8282,15 +18056,39 @@ export interface components {
             rest_seconds: number;
             /** Notes */
             notes?: string | null;
+            setup_memory?: components["schemas"]["ExerciseSetupMemoryResponse"] | null;
             /** Superset Group */
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Source Template Exercise Id */
+            source_template_exercise_id?: number | null;
+            /** Source Weekly Prescription Id */
+            source_weekly_prescription_id?: number | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
             /**
              * Has Guide
              * @default false
              */
             has_guide: boolean;
+            /** Media State */
+            media_state?: ("approved_animated" | "approved_static" | "blocked") | null;
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Thumbnail Sources */
+            media_thumbnail_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Media Preferred Mode */
+            media_preferred_mode?: ("static" | "animation") | null;
+            /** Media Animation Url */
+            media_animation_url?: string | null;
+            /** Media Video Sources */
+            media_video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
             progression_guidance?: components["schemas"]["ProgressionGuidance"] | null;
             /** Sets */
             sets: components["schemas"]["LoggedSetItem"][];
@@ -8349,6 +18147,8 @@ export interface components {
             exercises: components["schemas"]["WorkoutHistoryExerciseItem"][];
             /** Adaptations */
             adaptations: components["schemas"]["WorkoutAdaptationHistoryItem"][];
+            /** Rest Sessions */
+            rest_sessions?: components["schemas"]["RestSessionResponse"][];
         };
         /** WorkoutHistorySummary */
         WorkoutHistorySummary: {
@@ -8395,6 +18195,118 @@ export interface components {
             /** Personal Records */
             personal_records: components["schemas"]["ExerciseProgressItem"][];
         };
+        /** WorkoutRecoveryApplyRequest */
+        WorkoutRecoveryApplyRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "skip";
+            /**
+             * Expected Scheduled Date
+             * Format: date
+             */
+            expected_scheduled_date: string;
+            /** Expected Scheduled Time */
+            expected_scheduled_time?: string | null;
+            /** Scheduled Date */
+            scheduled_date?: string | null;
+            /** Scheduled Time */
+            scheduled_time?: string | null;
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** WorkoutRecoveryApplyResponse */
+        WorkoutRecoveryApplyResponse: {
+            /**
+             * Applied At
+             * Format: date-time
+             */
+            applied_at: string;
+            workout: components["schemas"]["WorkoutScheduleItem"];
+            /** Remaining Workouts */
+            remaining_workouts: components["schemas"]["WorkoutScheduleItem"][];
+            next_workout?: components["schemas"]["WorkoutScheduleItem"] | null;
+        };
+        /** WorkoutRecoveryChange */
+        WorkoutRecoveryChange: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "moved" | "skipped";
+            /**
+             * From Scheduled Date
+             * Format: date
+             */
+            from_scheduled_date: string;
+            /** From Scheduled Time */
+            from_scheduled_time?: string | null;
+            /** To Scheduled Date */
+            to_scheduled_date?: string | null;
+            /** To Scheduled Time */
+            to_scheduled_time?: string | null;
+        };
+        /** WorkoutRecoveryPreviewResponse */
+        WorkoutRecoveryPreviewResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "preview" | "no_changes";
+            workout: components["schemas"]["WorkoutScheduleItem"];
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "skip";
+            /** Ruleset Version */
+            ruleset_version: string;
+            /** Changes */
+            changes: components["schemas"]["WorkoutRecoveryChange"][];
+            /** Remaining Workouts */
+            remaining_workouts: components["schemas"]["WorkoutScheduleItem"][];
+            /** Warnings */
+            warnings: string[];
+            /** Message */
+            message: string;
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** WorkoutRecoveryRequest */
+        WorkoutRecoveryRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "skip";
+            /**
+             * Expected Scheduled Date
+             * Format: date
+             */
+            expected_scheduled_date: string;
+            /** Expected Scheduled Time */
+            expected_scheduled_time?: string | null;
+            /** Scheduled Date */
+            scheduled_date?: string | null;
+            /** Scheduled Time */
+            scheduled_time?: string | null;
+        };
+        /** WorkoutRecoveryStateResponse */
+        WorkoutRecoveryStateResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "clear" | "missed" | "paused" | "no_active_program";
+            /** Missed Workouts */
+            missed_workouts: components["schemas"]["WorkoutScheduleItem"][];
+            next_workout?: components["schemas"]["WorkoutScheduleItem"] | null;
+            /** Paused Program Id */
+            paused_program_id?: number | null;
+            /** Paused Program Title */
+            paused_program_title?: string | null;
+        };
         /** WorkoutRescheduleRequest */
         WorkoutRescheduleRequest: {
             /**
@@ -8433,11 +18345,11 @@ export interface components {
             /** Actual Reps */
             actual_reps?: number | null;
             /** Actual Weight */
-            actual_weight?: number | null;
+            actual_weight?: number | string | null;
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -8489,6 +18401,16 @@ export interface components {
             is_completed: boolean;
             /** Version */
             version: number;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /** Planned Group Id */
+            planned_group_id?: number | null;
+            /** Planned Group Kind */
+            planned_group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Planned Position */
+            planned_position?: number | null;
+            /** Planned Round */
+            planned_round?: number | null;
         };
         /** WorkoutTimelineExercise */
         WorkoutTimelineExercise: {
@@ -8554,6 +18476,8 @@ export interface components {
             reached_failure?: boolean | null;
             /** Is Completed */
             is_completed: boolean;
+        } & {
+            [key: string]: unknown;
         };
         /** WorkoutTodayResponse */
         WorkoutTodayResponse: {
@@ -8667,6 +18591,119 @@ export interface operations {
             };
         };
     };
+    get_public_program_api_v1_public_programs__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicProgramResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_share_api_v1_public_shares__share_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_articles_api_v1_public_articles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebArticleCard"][];
+                };
+            };
+        };
+    };
+    get_public_article_api_v1_public_articles__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebArticleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_demo_session_api_v1_demo_sessions_post: {
         parameters: {
             query?: never;
@@ -8718,6 +18755,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemoSessionSnapshot"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transport_demo_request_api_v1_demo_sessions_current_transport_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-session"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DemoTransportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -9255,6 +19327,630 @@ export interface operations {
             };
         };
     };
+    get_ai_coach_status_api_v1_ai_coach_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachStatusResponse"];
+                };
+            };
+        };
+    };
+    get_ai_coach_quota_api_v1_ai_coach_quota_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachQuotaSnapshot"];
+                };
+            };
+        };
+    };
+    get_ai_coach_conversations_api_v1_ai_coach_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationListResponse"];
+                };
+            };
+        };
+    };
+    create_ai_coach_conversation_api_v1_ai_coach_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationResponse"];
+                };
+            };
+        };
+    };
+    delete_ai_coach_conversation_history_api_v1_ai_coach_conversations_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationClearResponse"];
+                };
+            };
+        };
+    };
+    get_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_ai_coach_conversation_message_api_v1_ai_coach_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConversationSendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_ai_coach_conversation_message_api_v1_ai_coach_conversations__conversation_id__messages__message_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConversationRetryRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_ai_coach_conversation_feedback_api_v1_ai_coach_conversations__conversation_id__messages__message_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConversationFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_ai_coach_answer_api_v1_ai_coach_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachAdaptationGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachAdaptationProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals__proposal_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachAdaptationReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachAdaptationReviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_personal_ai_coach_consent_api_v1_ai_coach_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConsentResponse"];
+                };
+            };
+        };
+    };
+    update_personal_ai_coach_consent_api_v1_ai_coach_consent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConsentUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConsentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_coach_memory_api_v1_ai_coach_memory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryResponse"];
+                };
+            };
+        };
+    };
+    create_ai_coach_memory_item_api_v1_ai_coach_memory_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachMemoryCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_ai_coach_memory_api_v1_ai_coach_memory_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryClearResponse"];
+                };
+            };
+        };
+    };
+    update_ai_coach_memory_consent_api_v1_ai_coach_memory_consent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachMemoryConsentUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryClearResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachMemoryUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_personal_ai_coach_answer_api_v1_ai_coach_personal_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachPersonalGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_me_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -9271,6 +19967,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    save_acquisition_api_v1_me_acquisition_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirstTouchAttributionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -9577,6 +20304,103 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HeartRatePreviewResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseSetupMemoryResponse"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExerciseSetupMemorySaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseSetupMemoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__delete: {
+        parameters: {
+            query?: {
+                expected_version?: number | null;
+            };
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -10036,6 +20860,37 @@ export interface operations {
             };
         };
     };
+    get_exercise_history_api_v1_programs_exercises__exercise_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_template_api_v1_programs_templates_post: {
         parameters: {
             query?: never;
@@ -10085,6 +20940,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgramTemplateResponse"][];
+                };
+            };
+        };
+    };
+    generate_program_generator_preview_api_v1_programs_generator_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramGeneratorRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramGeneratorPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_program_generator_preview_api_v1_programs_generator_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramGeneratorConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramGeneratorConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -10266,6 +21187,73 @@ export interface operations {
             };
         };
     };
+    clone_template_api_v1_programs_templates__template_id__clone_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_template_exercise_api_v1_programs_templates__template_id__exercises__template_exercise_id__replace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+                template_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateExerciseReplacementRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     assign_template_me_api_v1_programs_templates__template_id__assign_to_me_post: {
         parameters: {
             query?: never;
@@ -10301,6 +21289,102 @@ export interface operations {
             };
         };
     };
+    delete_assigned_program_api_v1_programs_assigned__program_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assigned_program_progression_proposals_api_v1_programs_assigned__program_id__progression_proposals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramProgressionProposalList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_assigned_program_progression_proposal_endpoint_api_v1_programs_assigned__program_id__progression_proposals__proposal_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgressionProposalReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressionProposalReviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     assigned_program_revisions_api_v1_programs_assigned__program_id__revisions_get: {
         parameters: {
             query?: never;
@@ -10319,6 +21403,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgramRevisionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramLifecycleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mutate_assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramLifecycleActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramLifecycleMutationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -10434,6 +21584,78 @@ export interface operations {
             };
         };
     };
+    advance_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__advance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+                block_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainingBlockActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingBlockAdvanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    repeat_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__repeat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+                block_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainingBlockActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingBlockRepeatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_assigned_program_exercise_api_v1_programs_assigned__program_id__exercises_post: {
         parameters: {
             query?: never;
@@ -10485,6 +21707,225 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClientResponse"][];
+                };
+            };
+        };
+    };
+    download_csv_template_api_v1_programs_imports_template_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    download_xlsx_template_api_v1_programs_imports_template_xlsx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upload_program_import_api_v1_programs_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_program_import_api_v1_programs_imports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_import_targets_api_v1_programs_imports_targets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportTarget"][];
+                };
+            };
+        };
+    };
+    get_import_preview_api_v1_programs_imports__import_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_import_preview_api_v1_programs_imports__import_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramImportResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_import_preview_api_v1_programs_imports__import_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ProgramImportConfirmRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_import_preview_api_v1_programs_imports__import_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -10612,6 +22053,1379 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClientResponse"][];
+                };
+            };
+        };
+    };
+    coach_attention_api_v1_coach_attention_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachAttentionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_inbox_api_v1_coach_inbox_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachInboxResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_workflow_automation_preview_api_v1_coach_workflow_automation_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachWorkflowAutomationResponse"];
+                };
+            };
+        };
+    };
+    coach_workflow_automation_evaluate_api_v1_coach_workflow_automation_evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachWorkflowAutomationResponse"];
+                };
+            };
+        };
+    };
+    coach_program_rollout_preview_api_v1_coach_program_rollouts_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachProgramRolloutPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachProgramRolloutPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_program_rollout_apply_api_v1_coach_program_rollouts_apply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachProgramRolloutApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachProgramRolloutApplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_capacity_api_v1_coach_capacity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachCapacityResponse"];
+                };
+            };
+        };
+    };
+    coach_check_in_reviews_api_v1_coach_check_ins_review_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachCheckInReviewListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_client_review_workspace_api_v1_coach_clients__client_id__review_workspace_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachReviewWorkspaceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_coach_check_in_route_api_v1_coach_check_ins__check_in_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                check_in_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachCheckInReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachCheckInReviewItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_check_in_templates_api_v1_coach_check_in_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateListResponse"];
+                };
+            };
+        };
+    };
+    create_coach_check_in_template_api_v1_coach_check_in_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_check_in_template_version_api_v1_coach_check_in_templates__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_check_in_template_state_api_v1_coach_check_in_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateStateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_coach_check_in_template_api_v1_coach_check_in_templates__template_id__assignments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateAssignmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateAssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_check_in_template_responses_api_v1_coach_check_in_templates__template_id__responses_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponseHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_onboarding_templates_api_v1_coach_workflow_templates_onboarding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingTemplateListResponse"];
+                };
+            };
+        };
+    };
+    create_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_onboarding_template_version_api_v1_coach_workflow_templates_onboarding__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingTemplateVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingTemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding__template_id__assignments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingTemplateAssignmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowAssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_communication_templates_api_v1_coach_workflow_templates_communication_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationTemplateListResponse"];
+                };
+            };
+        };
+    };
+    create_coach_communication_template_api_v1_coach_workflow_templates_communication_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_communication_template_version_api_v1_coach_workflow_templates_communication__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationTemplateVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationTemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_communication_draft_api_v1_coach_workflow_templates_communication__template_id__drafts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationDraftCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationDraftUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_operations_today_api_v1_coach_operations_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachOperationsTodayResponse"];
+                };
+            };
+        };
+    };
+    coach_agenda_api_v1_coach_agenda_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachAgendaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_sessions_api_v1_coach_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachSessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_session_api_v1_coach_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachSessionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_client_operations_api_v1_coach_clients__client_id__operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachClientOperationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_client_operational_status_api_v1_coach_clients__client_id__operational_status_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachClientOperationalStatusUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_client_labels_api_v1_coach_clients__client_id__labels_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachClientLabelsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachClientLabelsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_packages_api_v1_coach_packages_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPackageResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_package_api_v1_coach_packages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPackageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPackageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_package_state_api_v1_coach_packages__package_id__state_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                package_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPackageStateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPackageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_payments_api_v1_coach_payments_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPaymentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_payment_api_v1_coach_payments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPaymentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPaymentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_payment_api_v1_coach_payments__payment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPaymentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPaymentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_tasks_api_v1_coach_tasks_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+                state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachTaskResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_task_api_v1_coach_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachTaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachTaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_task_state_api_v1_coach_tasks__task_id__state_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachTaskStateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachTaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -10759,6 +23573,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgressReportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_client_report_handoffs_api_v1_coach_clients__client_id__report_handoffs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportHandoffResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -11175,6 +24022,39 @@ export interface operations {
             };
         };
     };
+    coach_client_measurement_definitions_api_v1_coach_clients__client_id__measurements_custom_definitions_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_coach_client_measurement_api_v1_coach_clients__client_id__measurements__measurement_id__delete: {
         parameters: {
             query?: never;
@@ -11531,6 +24411,26 @@ export interface operations {
             };
         };
     };
+    get_workout_recovery_state_api_v1_workouts_recovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutRecoveryStateResponse"];
+                };
+            };
+        };
+    };
     workout_exercise_alternatives_api_v1_workouts__workout_id__exercises__workout_exercise_id__alternatives_get: {
         parameters: {
             query?: {
@@ -11552,6 +24452,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutAlternativeItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_warmup_proposal_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+                workout_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarmupProposalPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarmupProposalPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_warmup_proposal_route_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+                workout_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarmupProposalApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarmupProposalApplyResponse"];
                 };
             };
             /** @description Validation Error */
@@ -11622,6 +24594,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutAdaptationApplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_workout_recovery_api_v1_workouts__workout_id__recovery_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkoutRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutRecoveryPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_workout_recovery_api_v1_workouts__workout_id__recovery_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkoutRecoveryApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutRecoveryApplyResponse"];
                 };
             };
             /** @description Validation Error */
@@ -12273,6 +25315,167 @@ export interface operations {
             };
         };
     };
+    body_measurement_definitions_api_v1_workouts_diary_custom_definitions_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_body_measurement_definition_api_v1_workouts_diary_custom_definitions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BodyMeasurementDefinitionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BodyMeasurementDefinitionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_body_measurement_api_v1_workouts_diary__measurement_id__delete: {
         parameters: {
             query?: never;
@@ -12290,6 +25493,142 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rest_sessions_api_v1_workouts__workout_id__rest_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_rest_session_api_v1_workouts__workout_id__rest_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_rest_session_api_v1_workouts_rest_sessions__predecessor_id__restart_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                predecessor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestRestartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mutate_rest_session_api_v1_workouts_rest_sessions__session_id__actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -12417,6 +25756,41 @@ export interface operations {
             };
         };
     };
+    confirm_weekly_planning_review_action_api_v1_check_ins_weekly_planning_review_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyPlanningReviewConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyPlanningReviewConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     weekly_check_in_history_api_v1_check_ins_weekly_get: {
         parameters: {
             query?: {
@@ -12470,6 +25844,327 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WeeklyCheckInResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assigned_check_in_templates_api_v1_check_ins_templates_assigned_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignedCheckInTemplateListResponse"];
+                };
+            };
+        };
+    };
+    submit_assigned_check_in_template_api_v1_check_ins_templates_assignments__assignment_id__responses_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateResponseSubmit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponseItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recognize_nutrition_label_api_v1_nutrition_label_scans_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_recognize_nutrition_label_api_v1_nutrition_label_scans_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionLabelDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionLabelDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionLabelConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionLabelConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__cancel_post: {
+        parameters: {
+            query: {
+                revision: number;
+            };
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recognize_photo_meal_api_v1_nutrition_photo_meals_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_recognize_photo_meal_api_v1_nutrition_photo_meals_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoMealDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_photo_meal_draft_api_v1_nutrition_photo_meals__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoMealDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_photo_meal_api_v1_nutrition_photo_meals__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoMealConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoMealConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_photo_meal_api_v1_nutrition_photo_meals__draft_id__cancel_post: {
+        parameters: {
+            query: {
+                revision: number;
+            };
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -12914,6 +26609,70 @@ export interface operations {
             };
         };
     };
+    get_frequent_foods_api_v1_nutrition_foods_frequent_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_personal_foods_api_v1_nutrition_foods_mine_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_favorite_foods_api_v1_nutrition_foods_favorites_get: {
         parameters: {
             query?: {
@@ -13261,6 +27020,790 @@ export interface operations {
             };
         };
     };
+    get_nutrition_meal_templates_api_v1_nutrition_templates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionMealTemplateListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_nutrition_meal_template_api_v1_nutrition_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionMealTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionMealTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_nutrition_meal_template_api_v1_nutrition_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionMealTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_nutrition_meal_template_api_v1_nutrition_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_nutrition_meal_template_api_v1_nutrition_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionMealTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionMealTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_nutrition_meal_template_api_v1_nutrition_templates__template_id__entries_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionMealTemplateInsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryBatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_food_search_aliases_api_v1_nutrition_food_aliases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodSearchAliasListResponse"];
+                };
+            };
+        };
+    };
+    save_food_search_alias_api_v1_nutrition_food_aliases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodSearchAliasCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodSearchAliasResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_food_search_alias_api_v1_nutrition_food_aliases__alias_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alias_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_food_search_alias_api_v1_nutrition_food_aliases__alias_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alias_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodSearchAliasUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodSearchAliasResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nutrition_plan_day_api_v1_nutrition_plans_day_get: {
+        parameters: {
+            query?: {
+                plan_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nutrition_grocery_list_api_v1_nutrition_grocery_list_get: {
+        parameters: {
+            query: {
+                week_start: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_nutrition_grocery_list_api_v1_nutrition_grocery_list_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryListGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_nutrition_grocery_item_api_v1_nutrition_grocery_list_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryListManualItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryListItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nutrition_plan_week_api_v1_nutrition_plans_week_get: {
+        parameters: {
+            query?: {
+                week_start?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanWeekResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_plan_suggestions_api_v1_nutrition_plans_suggestions_get: {
+        parameters: {
+            query?: {
+                plan_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fill_nutrition_plan_api_v1_nutrition_plans_fill_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanFillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_nutrition_plan_item_api_v1_nutrition_plans_items_post: {
+        parameters: {
+            query: {
+                plan_date: string;
+                meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+                expected_revision: number;
+            };
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__delete: {
+        parameters: {
+            query: {
+                expected_revision: number;
+            };
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    action_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__action_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanItemActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanItemActionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_nutrition_plan_day_api_v1_nutrition_plans_copy_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanCopyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_diary_day_api_v1_nutrition_diary_get: {
         parameters: {
             query?: {
@@ -13279,6 +27822,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodDiaryDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_diary_suggestions_api_v1_nutrition_diary_suggestions_get: {
+        parameters: {
+            query?: {
+                diary_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_diary_suggestion_api_v1_nutrition_diary_suggestions_commit_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionSuggestionCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryBatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_nutrition_natural_input_api_v1_nutrition_diary_natural_input_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NaturalInputPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NaturalInputPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_nutrition_natural_input_api_v1_nutrition_diary_natural_input_commit_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NaturalInputCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryBatchResponse"];
                 };
             };
             /** @description Validation Error */
@@ -13411,6 +28088,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodDiaryEntryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_copy_product_api_v1_nutrition_diary_copy_product_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodDiaryCopyProductPreview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryCopyPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_copy_meal_api_v1_nutrition_diary_copy_meal_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodDiaryCopyMealPreview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryCopyPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_copy_day_api_v1_nutrition_diary_copy_day_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodDiaryCopyDayPreview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryCopyPreviewResponse"];
                 };
             };
             /** @description Validation Error */
@@ -13646,6 +28422,117 @@ export interface operations {
             };
         };
     };
+    get_web_push_config_api_v1_notifications_web_push_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebPushConfigResponse"];
+                };
+            };
+        };
+    };
+    get_web_push_status_api_v1_notifications_web_push_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebPushStatusResponse"];
+                };
+            };
+        };
+    };
+    register_web_push_subscription_api_v1_notifications_web_push_subscription_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebPushSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebPushSubscriptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Web Push is disabled or not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    revoke_web_push_subscription_api_v1_notifications_web_push_subscription_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebPushSubscriptionDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_notification_settings_api_v1_notifications_settings_get: {
         parameters: {
             query?: never;
@@ -13686,6 +28573,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationSettingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reminder_templates_api_v1_notifications_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderTemplateResponse"][];
+                };
+            };
+        };
+    };
+    patch_reminder_template_api_v1_notifications_templates__template_key__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReminderTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderTemplateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -13840,6 +28782,341 @@ export interface operations {
             header?: never;
             path: {
                 notification_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_report_handoffs_api_v1_report_handoffs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportHandoffResponse"][];
+                };
+            };
+        };
+    };
+    create_my_report_handoff_api_v1_report_handoffs_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportHandoffCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportHandoffResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_my_report_handoff_api_v1_report_handoffs__handoff_id__retry_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                handoff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportHandoffResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_handoff_api_v1_report_handoffs__handoff_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                handoff_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportHandoffViewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shares_api_v1_shares_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareOwnerResponse"][];
+                };
+            };
+        };
+    };
+    preview_progress_share_api_v1_shares_progress_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicSharePeriodRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSharePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_progress_public_share_api_v1_shares_progress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareProgressCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_program_share_api_v1_shares_program_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareProgramPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSharePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_program_public_share_api_v1_shares_program_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareProgramCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_shared_program_api_v1_shares__share_id__import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_share_api_v1_shares__share_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
             };
             cookie?: never;
         };
@@ -14123,6 +29400,37 @@ export interface operations {
             };
         };
     };
+    admin_trainer_capacity_api_v1_admin_trainer_capacity_get: {
+        parameters: {
+            query?: {
+                period_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrainerCapacityResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admin_audit_api_v1_admin_audit_get: {
         parameters: {
             query?: {
@@ -14141,6 +29449,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminAuditRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_article_drafts_api_v1_admin_articles_drafts_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerArticleReviewRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_article_draft_detail_api_v1_admin_articles_drafts__article_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerArticleReviewDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_publish_existing_article_api_v1_admin_articles_drafts_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerExistingDraftPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerWebArticlePublishResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_publish_web_article_api_v1_admin_articles_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerWebArticlePublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerWebArticlePublishResponse"];
                 };
             };
             /** @description Validation Error */
@@ -14736,6 +30173,74 @@ export interface operations {
             };
         };
     };
+    receive_hermes_editorial_intake_api_v1_hermes_editorial_intake_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Hermes-Key-Id"?: string | null;
+                "X-Hermes-Timestamp"?: string | null;
+                "X-Hermes-Nonce"?: string | null;
+                "X-Hermes-Signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HermesEditorialIntakeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_hermes_web_article_intake_api_v1_hermes_articles_intake_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Hermes-Key-Id"?: string | null;
+                "X-Hermes-Timestamp"?: string | null;
+                "X-Hermes-Nonce"?: string | null;
+                "X-Hermes-Signature"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HermesWebArticleIntakeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -14878,6 +30383,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    athlete_landing_alias_page_for_athletes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    articles_index_page_articles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    article_page_articles__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

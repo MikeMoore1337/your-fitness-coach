@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 from time import monotonic
@@ -17,14 +17,19 @@ from fitminiapp_api.models.program import ProgramTemplate, UserProgram, UserWork
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.services import notifications as notification_service
 from fitminiapp_api.services import worker
+from fitminiapp_api.services.news_review_schedule import current_news_review_slot
 from fitminiapp_api.services.notifications import (
+    MAX_DELIVERY_ATTEMPTS,
     NOTIFICATION_FALLBACK,
+    PROCESSING_TIMEOUT,
     NotificationDeliveryError,
     cancel_workout_reminder,
+    claim_due_notifications,
     mark_delivery_failed,
     safe_delivery_error,
 )
 from fitminiapp_api.services.worker import (
+    TelegramPublicationError,
     TelegramRateLimiter,
     _log_delivery_failure,
     send_telegram_message,
@@ -117,7 +122,11 @@ def test_telegram_delivery_classifies_retryable_http_errors(
 
 @pytest.mark.parametrize(
     ("status_code", "description"),
-    [(403, "Forbidden: bot was blocked by the user"), (400, "Bad Request: chat not found")],
+    [
+        (403, "Forbidden: bot was blocked by the user"),
+        (400, "Bad Request: chat not found"),
+        (400, "Bad Request: user is deactivated"),
+    ],
 )
 def test_telegram_delivery_classifies_unavailable_private_chat_as_terminal(
     status_code: int,
@@ -139,6 +148,89 @@ def test_telegram_delivery_classifies_unavailable_private_chat_as_terminal(
         assert exc_info.value.terminal_status == "cancelled"
 
     asyncio.run(deliver())
+
+
+@pytest.mark.parametrize(
+    ("status_code", "description"),
+    [
+        (403, "Forbidden: bot was blocked by the user"),
+        (400, "Bad Request: chat not found"),
+        (400, "Bad Request: user is deactivated"),
+    ],
+)
+def test_worker_terminal_telegram_outcomes_are_not_retried(
+    status_code: int,
+    description: str,
+    monkeypatch,
+    caplog,
+) -> None:
+    fixed_now = datetime(2026, 8, 24, 6)
+    monkeypatch.setattr(notification_service, "utcnow", lambda: fixed_now)
+    request = httpx.Request("POST", f"https://api.telegram.org/bot{SECRET_TOKEN}/sendMessage")
+    error = worker._telegram_delivery_error(
+        httpx.Response(
+            status_code,
+            request=request,
+            json={"ok": False, "error_code": status_code, "description": description},
+        )
+    )
+    send = AsyncMock(side_effect=error)
+    monkeypatch.setattr(worker, "send_telegram_message", send)
+
+    with get_session_context() as session:
+        user = User(telegram_user_id=123456, is_coach=False)
+        session.add(user)
+        session.flush()
+        session.add(UserProfile(user_id=user.id, timezone="Europe/Moscow"))
+        session.add(NotificationSetting(user_id=user.id))
+        event = Notification(
+            user_id=user.id,
+            channel="telegram",
+            category="workout_reminder",
+            event_kind="reminder",
+            title="Скоро тренировка",
+            body="Private body",
+            scheduled_for=fixed_now,
+            scheduled_for_utc=fixed_now,
+            status="queued",
+            dedupe_key=f"workout:{user.id}:reminder",
+            action_url="/app?section=today",
+        )
+        session.add(event)
+        session.commit()
+        event_id = event.id
+
+    with caplog.at_level(logging.WARNING, logger="fitminiapp_api.services.worker"):
+        asyncio.run(worker.run_once(sync_reminders=False))
+        asyncio.run(worker.run_once(sync_reminders=False))
+
+    send.assert_awaited_once()
+    terminal_logs = [
+        record
+        for record in caplog.records
+        if record.getMessage() == "notification_delivery_cancelled"
+    ]
+    assert len(terminal_logs) == 1
+    assert terminal_logs[0].provider == "telegram"
+    assert terminal_logs[0].notification_category == "workout_reminder"
+    assert terminal_logs[0].outcome == "cancelled"
+    structured_log = json.loads(
+        JsonFormatter(service="notification-worker").format(terminal_logs[0])
+    )
+    assert structured_log["message"] == "notification_delivery_cancelled"
+    assert structured_log["provider"] == "telegram"
+    assert structured_log["outcome"] == "cancelled"
+    assert SECRET_TOKEN not in caplog.text
+    assert "123456" not in caplog.text
+
+    with get_session_context() as session:
+        stored = session.get(Notification, event_id)
+        assert stored is not None
+        assert stored.status == "cancelled"
+        assert stored.attempt_count == 1
+        assert stored.last_error == "telegram_chat_unavailable"
+        assert stored.next_attempt_at is None
+        assert stored.processing_started_at is None
 
 
 def test_telegram_delivery_propagates_timeout() -> None:
@@ -315,6 +407,7 @@ def test_worker_rate_limits_send_starts_after_waiting_for_delivery_slot(monkeypa
             NotificationDeliveryError("telegram_chat_unavailable", terminal_status="cancelled"),
             "telegram_chat_unavailable",
         ),
+        (TelegramPublicationError("telegram_network_error"), "telegram_network_error"),
         (RuntimeError("secret unexpected details"), "unexpected:RuntimeError"),
     ],
 )
@@ -425,6 +518,54 @@ def test_retry_after_and_terminal_chat_outcomes_update_canonical_status(monkeypa
         assert blocked.status == "cancelled"
         assert blocked.next_attempt_at is None
         assert blocked.last_error == "telegram_chat_unavailable"
+
+
+def test_max_delivery_attempts_stops_retry() -> None:
+    with get_session_context() as session:
+        user = session.query(User).first()
+        assert user is not None
+        notification = Notification(
+            user_id=user.id,
+            title="Retry limit",
+            body="Body",
+            scheduled_for=datetime(2026, 8, 24, 6),
+            scheduled_for_utc=datetime(2026, 8, 24, 6),
+            status="processing",
+            attempt_count=MAX_DELIVERY_ATTEMPTS - 1,
+        )
+        session.add(notification)
+        session.flush()
+        mark_delivery_failed(session, notification, httpx.ConnectError("network"))
+
+        assert notification.status == "failed"
+        assert notification.attempt_count == MAX_DELIVERY_ATTEMPTS
+        assert notification.next_attempt_at is None
+
+
+def test_stale_processing_recovery_requeues_before_claim(monkeypatch) -> None:
+    fixed_now = datetime(2026, 8, 24, 6)
+    monkeypatch.setattr(notification_service, "utcnow", lambda: fixed_now)
+
+    with get_session_context() as session:
+        user = session.query(User).first()
+        assert user is not None
+        notification = Notification(
+            user_id=user.id,
+            title="Stale",
+            body="Body",
+            scheduled_for=fixed_now,
+            scheduled_for_utc=fixed_now,
+            status="processing",
+            processing_started_at=fixed_now - PROCESSING_TIMEOUT - timedelta(seconds=1),
+        )
+        session.add(notification)
+        session.commit()
+
+        claimed = claim_due_notifications(session)
+
+        assert [row.id for row in claimed] == [notification.id]
+        assert claimed[0].status == "processing"
+        assert claimed[0].processing_started_at == fixed_now
 
 
 def test_worker_resolves_wrong_or_stale_target_to_safe_fallback(monkeypatch) -> None:
@@ -657,6 +798,46 @@ def test_worker_finishes_current_cycle_before_graceful_stop(
     asyncio.run(scenario())
 
     assert events == ["cycle:True"]
+
+
+def test_worker_dispatches_news_review_once_per_active_slot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    events: list[dict[str, object]] = []
+
+    async def scenario() -> None:
+        stop_requested = asyncio.Event()
+        iterations = 0
+        slot = current_news_review_slot(datetime(2026, 9, 8, 5, 5, tzinfo=UTC))
+        assert slot is not None
+
+        async def run_once(*, sync_reminders: bool) -> None:
+            del sync_reminders
+            nonlocal iterations
+            iterations += 1
+            if iterations == 2:
+                stop_requested.set()
+
+        async def run_news_pipeline_once(**kwargs) -> None:
+            events.append(kwargs)
+
+        monkeypatch.setattr(worker, "run_once", run_once)
+        monkeypatch.setattr(worker, "run_news_pipeline_once", run_news_pipeline_once)
+        monkeypatch.setattr(worker, "current_news_review_slot", lambda _now: slot)
+        monkeypatch.setattr(worker, "WORKER_HEARTBEAT_PATH", tmp_path / "worker-heartbeat")
+        monkeypatch.setattr(worker.settings, "weekly_digest_enabled", False)
+        monkeypatch.setattr(worker.settings, "news_ingestion_enabled", True)
+
+        await worker.run_until_stopped(
+            stop_requested,
+            news_publication_ready=False,
+        )
+
+    asyncio.run(scenario())
+
+    assert len(events) == 2
+    assert [event["review_delivery_due"] for event in events] == [True, False]
+    assert events[0]["review_slot"] is events[1]["review_slot"]
 
 
 def test_worker_heartbeat_refreshes_during_long_async_cycle(

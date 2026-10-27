@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProgressReportPage from '../../../src/pages/reports/ProgressReportPage';
 import { NavigationProvider } from '../../../src/shared/navigation/router';
+import { FeedbackProvider } from '../../../src/shared/ui/FeedbackProvider';
 import { makeProgressReportFixture } from '../../fixtures/progress-report';
 
 function renderPage() {
@@ -10,13 +11,15 @@ function renderPage() {
   return render(
     <NavigationProvider>
       <QueryClientProvider client={queryClient}>
-        <ProgressReportPage />
+        <FeedbackProvider>
+          <ProgressReportPage />
+        </FeedbackProvider>
       </QueryClientProvider>
     </NavigationProvider>,
   );
 }
 
-function installApi() {
+function installApi(report = makeProgressReportFixture()) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     if (String(input).includes('/download-link')) {
       return new Response(
@@ -28,8 +31,21 @@ function installApi() {
         { status: 200 },
       );
     }
-    return new Response(JSON.stringify(makeProgressReportFixture()), { status: 200 });
+    return new Response(JSON.stringify(report), { status: 200 });
   });
+}
+
+function makeBodyOnlyReport(summaryLineCount: 0 | 1 | 2) {
+  const report = makeProgressReportFixture('empty');
+  const populated = makeProgressReportFixture('full');
+  const bodyTrend = populated.body.trends[0];
+  if (summaryLineCount >= 1) {
+    report.body = { ...report.body, trends: bodyTrend ? [bodyTrend] : [] };
+  }
+  if (summaryLineCount >= 2) {
+    report.training = { ...report.training, planned_workouts: 1, completed_workouts: 1 };
+  }
+  return report;
 }
 
 afterEach(() => {
@@ -40,13 +56,37 @@ afterEach(() => {
 });
 
 describe('ProgressReportPage', () => {
+  it.each([0, 1, 2] as const)(
+    'renders exactly the factual summary items for the %s-line state',
+    async (summaryLineCount) => {
+      installApi(makeBodyOnlyReport(summaryLineCount));
+      renderPage();
+
+      await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
+      const summary = document.querySelector('.progress-report-factual-summary');
+      expect(summary).not.toBeNull();
+      expect(summary?.querySelectorAll('dl > div')).toHaveLength(summaryLineCount);
+      expect(summary?.textContent).not.toContain('custom:');
+    },
+  );
+
   it('shows factual report sections and invokes browser print outside TMA', async () => {
     installApi();
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     renderPage();
 
-    expect(await screen.findByRole('heading', { name: /Александр Константинович/ })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Отчёт о прогрессе' })).toBeVisible();
     expect(screen.getByText('84')).toBeVisible();
+    expect(screen.getByText(/Москв/)).toBeVisible();
+    expect(document.querySelector('.progress-report-document')).not.toHaveTextContent(
+      'Europe/Moscow',
+    );
+    expect(screen.getByRole('heading', { name: 'Фактическая сводка' })).toBeVisible();
+    expect(screen.getByText('Тренировки — Данных достаточно для оценки')).toBeVisible();
+    expect(screen.getByText('Питание — Данных достаточно для оценки')).toBeVisible();
+    expect(screen.getByText('Замеры тела — Данных достаточно для оценки')).toBeVisible();
+    expect(screen.getAllByText('Живот').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Живот: 84 см/)).toBeVisible();
     expect(screen.getByRole('table', { name: 'Таблица замеров массы' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Сон и настроение' })).toBeVisible();
     expect(screen.getByText(/заметки не включены в агрегаты, PDF и доступ тренера/)).toBeVisible();
@@ -67,7 +107,7 @@ describe('ProgressReportPage', () => {
     window.history.replaceState(null, '', '/app/report?period=days_30&client_id=73');
     installApi();
     renderPage();
-    await screen.findByRole('heading', { name: /Александр Константинович/ });
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Свой период' }));
     fireEvent.change(screen.getByLabelText('Начало'), { target: { value: '2026-08-01' } });
@@ -82,6 +122,58 @@ describe('ProgressReportPage', () => {
       expect(window.location.search).toContain('client_id=73');
       expect(window.location.search).toContain('date_from=2026-08-01');
     });
+  });
+
+  it.each([
+    ['days_7', '7 дней'],
+    ['days_30', '30 дней'],
+    ['days_90', '90 дней'],
+    ['current_month', 'Этот месяц'],
+    ['previous_month', 'Прошлый месяц'],
+  ] as const)('requests the canonical API range for %s', async (period, label) => {
+    installApi();
+    renderPage();
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
+    if (period !== 'days_30') {
+      vi.mocked(globalThis.fetch).mockClear();
+      fireEvent.click(screen.getByRole('tab', { name: label }));
+    }
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        `/api/v1/workouts/progress/report?period=${period}`,
+        expect.anything(),
+      ),
+    );
+    expect(window.location.search).toContain(`period=${period}`);
+  });
+
+  it('keeps canonical numbers and distinguishes missing values from zero', async () => {
+    installApi();
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
+    expect(document.querySelector('[aria-labelledby="report-training-title"]')).toHaveTextContent(
+      /9.*1.*48\s?620 кг/s,
+    );
+    expect(document.querySelector('.progress-report-cardio')).toHaveTextContent(
+      '5 завершено · 178 мин',
+    );
+    expect(document.querySelector('.progress-report-section--nutrition')).toHaveTextContent(
+      /24 из 30.*2\s?184 ккал.*158 г.*72 г.*226 г/s,
+    );
+
+    cleanup();
+    vi.restoreAllMocks();
+    installApi(makeProgressReportFixture('empty'));
+    renderPage();
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
+    expect(document.querySelector('[aria-labelledby="report-training-title"]')).toHaveTextContent(
+      'Нет данных кг',
+    );
+    expect(document.querySelector('.progress-report-cardio')).toHaveTextContent(
+      '0 завершено · 0 мин',
+    );
   });
 
   it('hands a short-lived PDF file to native Telegram download', async () => {
@@ -101,7 +193,7 @@ describe('ProgressReportPage', () => {
     installApi();
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     renderPage();
-    await screen.findByRole('heading', { name: /Александр Константинович/ });
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Скачать PDF' }));
 
@@ -129,7 +221,7 @@ describe('ProgressReportPage', () => {
     });
     installApi();
     renderPage();
-    await screen.findByRole('heading', { name: /Александр Константинович/ });
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Скачать PDF' }));
 

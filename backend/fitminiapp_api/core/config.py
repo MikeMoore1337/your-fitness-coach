@@ -1,9 +1,13 @@
+import base64
+import binascii
 import re
 from typing import Literal
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +16,34 @@ def _is_placeholder_secret(value: str) -> bool:
     return normalized in {"", "change-me", "replace-me", "secret", "test-secret"} or (
         normalized.startswith(("change-", "replace-"))
     )
+
+
+def _decode_base64url(value: str) -> bytes:
+    normalized = value.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]+={0,2}", normalized):
+        raise ValueError
+    unpadded = normalized.rstrip("=")
+    if len(unpadded) % 4 == 1:
+        raise ValueError
+    try:
+        return base64.urlsafe_b64decode(unpadded + "=" * (-len(unpadded) % 4))
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError from exc
+
+
+def _load_vapid_private_key(value: str) -> ec.EllipticCurvePrivateKey:
+    normalized = value.strip().replace("\\n", "\n")
+    if "-----BEGIN" in normalized:
+        key = serialization.load_pem_private_key(normalized.encode("utf-8"), password=None)
+    else:
+        raw = _decode_base64url(normalized)
+        if len(raw) == 32:
+            key = ec.derive_private_key(int.from_bytes(raw, "big"), ec.SECP256R1())
+        else:
+            key = serialization.load_der_private_key(raw, password=None)
+    if not isinstance(key, ec.EllipticCurvePrivateKey) or key.curve.name != "secp256r1":
+        raise ValueError
+    return key
 
 
 class Settings(BaseSettings):
@@ -39,6 +71,12 @@ class Settings(BaseSettings):
     db_max_overflow: int = Field(default=20, ge=0, le=200)
     db_pool_timeout_seconds: int = Field(default=30, ge=1, le=300)
     db_pool_recycle_seconds: int = Field(default=1800, ge=60, le=86400)
+    db_application_name: Literal["yfc-backend", "yfc-worker", "yfc-setup", "yfc-migration"] = Field(
+        default="yfc-backend",
+        validation_alias=AliasChoices(
+            "YFC_DB_APPLICATION_NAME", "DB_APPLICATION_NAME", "db_application_name"
+        ),
+    )
     enable_dev_auth: bool = False
     enable_web_auth: bool = False
     enable_email_auth: bool = False
@@ -47,8 +85,6 @@ class Settings(BaseSettings):
     app_domain: str = ""
     landing_domain: str = ""
     frontend_base_url: str = "https://app.your-fitness-coach.ru"
-    google_site_verification: str = ""
-    yandex_verification: str = ""
     telegram_bot_token: str
     telegram_bot_username: str = ""
     telegram_init_data_max_age_seconds: int = Field(default=300, ge=60, le=3600)
@@ -81,12 +117,80 @@ class Settings(BaseSettings):
     open_food_facts_user_agent: str = ""
     food_usda_enabled: bool = False
     usda_fdc_api_key: SecretStr = SecretStr("")
+    usda_fdc_proxy_url: str = ""
     food_provider_timeout_seconds: float = Field(default=4, ge=1, le=15)
+
+    # Nutrition label recognition remains local-first. Task 283 adds a separately gated
+    # Groq Vision fallback for deterministic vision_candidate cases only. The internal
+    # user list remains accepted for backwards-compatible configuration parsing, but
+    # it no longer limits access when the scan feature is enabled.
+    nutrition_label_scan_enabled: bool = False
+    nutrition_label_scan_kill_switch: bool = False
+    nutrition_label_vision_enabled: bool = False
+    nutrition_label_vision_kill_switch: bool = False
+    nutrition_label_vision_provider: Literal["disabled", "groq"] = "disabled"
+    nutrition_label_vision_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
+    nutrition_label_vision_model: Literal["qwen/qwen3.8-27b"] = "qwen/qwen3.8-27b"
+    nutrition_label_vision_allow_preview: bool = False
+    nutrition_label_vision_proxy_url: str = ""
+    nutrition_label_vision_data_policy: Literal["disabled", "zdr_verified"] = "disabled"
+    nutrition_label_vision_timeout_seconds: float = Field(default=8, ge=1, le=8)
+    nutrition_label_vision_max_output_tokens: int = Field(default=900, ge=512, le=4096)
+    nutrition_label_scan_internal_user_ids: str = ""
+    nutrition_label_scan_ocr_engine: Literal["rapidocr", "tesseract"] = "rapidocr"
+    nutrition_label_scan_ocr_languages: str = "rus+eng"
+    nutrition_label_scan_ocr_model_dir: str = "/opt/rapidocr/models"
+    nutrition_label_scan_max_image_bytes: int = Field(default=8_388_608, ge=256_000, le=8_388_608)
+    nutrition_label_scan_max_request_bytes: int = Field(default=8_650_000, ge=300_000, le=9_000_000)
+    nutrition_label_scan_max_pixels: int = Field(default=20_000_000, ge=1_000_000, le=40_000_000)
+    nutrition_label_scan_ocr_timeout_seconds: float = Field(default=8, ge=1, le=15)
+    nutrition_label_scan_ocr_max_output_chars: int = Field(default=50_000, ge=4_096, le=100_000)
+    nutrition_label_scan_draft_ttl_minutes: int = Field(default=15, ge=5, le=60)
 
     worker_poll_seconds: int = Field(default=10, ge=1, le=3600)
     reminder_sync_seconds: int = Field(default=60, ge=10, le=3600)
     notification_delivery_concurrency: int = Field(default=8, ge=1, le=30)
+    program_import_max_file_bytes: int = Field(default=2_000_000, ge=256_000, le=8_000_000)
+    program_import_max_request_bytes: int = Field(default=2_400_000, ge=300_000, le=10_000_000)
+    program_import_max_rows: int = Field(default=500, ge=20, le=2_000)
+    program_import_max_columns: int = Field(default=64, ge=8, le=128)
+    program_import_max_cells: int = Field(default=8_000, ge=100, le=100_000)
+    program_import_max_cell_chars: int = Field(default=512, ge=64, le=4_096)
+    program_import_max_xlsx_entries: int = Field(default=32, ge=8, le=128)
+    program_import_max_xlsx_physical_rows: int = Field(default=2_000, ge=100, le=10_000)
+    program_import_max_xlsx_physical_cells: int = Field(default=20_000, ge=1_000, le=200_000)
+    program_import_max_xlsx_expanded_bytes: int = Field(
+        default=4_000_000, ge=512_000, le=20_000_000
+    )
+    program_import_max_xlsx_compression_ratio: int = Field(default=100, ge=10, le=1_000)
+    program_import_parse_timeout_seconds: float = Field(default=5, ge=1, le=30)
+    program_import_draft_ttl_minutes: int = Field(default=60, ge=15, le=24 * 60)
+    program_import_cleanup_batch_size: int = Field(default=100, ge=10, le=1_000)
+    program_import_max_txt_lines: int = Field(default=2_000, ge=20, le=10_000)
+    program_import_max_docx_entries: int = Field(default=32, ge=8, le=128)
+    program_import_max_docx_paragraphs: int = Field(default=2_000, ge=20, le=10_000)
+    program_import_max_docx_table_cells: int = Field(default=4_000, ge=20, le=20_000)
+    program_import_max_docx_expanded_bytes: int = Field(
+        default=4_000_000, ge=512_000, le=20_000_000
+    )
+    program_import_max_docx_compression_ratio: int = Field(default=100, ge=10, le=1_000)
+    # The port is deliberately disabled for user-uploaded documents.  A future
+    # synthetic-only adapter can be exercised without adding provider settings here.
+    program_import_ai_enabled: bool = False
+    program_import_ai_data_policy: Literal["disabled", "synthetic_only"] = "disabled"
+    web_push_enabled: bool = False
+    web_push_vapid_subject: str = ""
+    web_push_vapid_public_key: str = ""
+    web_push_vapid_private_key: SecretStr = SecretStr("")
+    web_push_endpoint_hosts: str = (
+        "fcm.googleapis.com,*.push.services.mozilla.com,*.push.apple.com,*.notify.windows.com"
+    )
+    web_push_delivery_timeout_seconds: float = Field(default=10, ge=3, le=30)
     audit_event_retention_days: int = Field(default=365, ge=90, le=3650)
+    lifecycle_milestone_retention_days: int = Field(default=180, ge=180, le=3650)
+    # Derived lifecycle reports are computed on demand and never retain account
+    # identifiers.  Keep their maximum report window bounded to 24 months.
+    lifecycle_aggregate_retention_days: int = Field(default=730, ge=180, le=730)
     news_ingestion_enabled: bool = False
     news_channel_id: int | None = None
     news_channel_username: str = ""
@@ -99,13 +203,53 @@ class Settings(BaseSettings):
     news_defer_hours: int = Field(default=24, ge=1, le=168)
     news_max_regenerations: int = Field(default=3, ge=0, le=10)
     news_draft_max_chars: int = Field(default=2600, ge=800, le=3200)
-    news_daily_draft_limit: int = Field(default=3, ge=1, le=20)
-    news_llm_provider: Literal["disabled", "openai_compatible"] = "disabled"
-    news_llm_endpoint: str = ""
-    news_llm_api_key: str = ""
-    news_llm_model: str = ""
-    news_llm_timeout_seconds: float = Field(default=20, ge=5, le=60)
-    news_llm_prompt_version: str = "news-draft-v4"
+    # Legacy env name retained for compatibility; this value is the per-slot owner-review cap.
+    news_review_batch_size: int = Field(default=20, ge=1, le=20)
+    news_review_wave_size: int = Field(default=10, ge=1, le=20)
+    news_review_wave_pause_seconds: float = Field(default=10.0, ge=0, le=60)
+    news_draft_profile: Literal["standard", "extended"] = "standard"
+    news_auto_publish_low_risk: bool = False
+    hermes_intake_enabled: bool = False
+    hermes_intake_key_id: str = "hermes-local"
+    hermes_intake_shared_secret: SecretStr = SecretStr("")
+    hermes_intake_max_body_bytes: int = Field(default=262_144, ge=16_384, le=1_048_576)
+    hermes_intake_max_source_count: int = Field(default=20, ge=1, le=20)
+    hermes_intake_clock_skew_seconds: int = Field(default=300, ge=30, le=900)
+    hermes_intake_replay_ttl_seconds: int = Field(default=900, ge=60, le=86400)
+    hermes_intake_rate_limit_per_minute: int = Field(default=30, ge=1, le=600)
+    # AI Coach is a separate authenticated product capability. Local defaults remain safe-off.
+    ai_coach_enabled: bool = False
+    ai_coach_kill_switch: bool = False
+    # Stage 4 is independently fail-closed so deterministic programming remains available.
+    ai_coach_adaptation_enabled: bool = False
+    ai_coach_adaptation_kill_switch: bool = False
+    # Deprecated compatibility settings for older bundles. Current AI Coach access is
+    # authenticated-user scoped; these values no longer gate the UI or API routes.
+    ai_coach_ui_enabled: bool = False
+    ai_coach_internal_user_ids: str = ""
+    ai_coach_provider: Literal["disabled", "groq"] = "disabled"
+    groq_api_key: SecretStr = SecretStr("")
+    ai_coach_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
+    ai_coach_proxy_url: str = ""
+    ai_coach_model: Literal["openai/gpt-oss-120b"] = "openai/gpt-oss-120b"
+    ai_coach_cost_policy: Literal["free_only"] = "free_only"
+    ai_coach_cost_class: Literal["free", "developer", "paid", "promo", "trial", "unknown"] = (
+        "unknown"
+    )
+    ai_coach_data_policy: Literal["verified_generic_only", "unknown"] = "unknown"
+    ai_coach_personal_enabled: bool = False
+    ai_coach_personal_data_policy: Literal["verified_personal_user", "disabled"] = "disabled"
+    ai_coach_structured_output: bool = True
+    ai_coach_policy_revision: str = "unverified"
+    ai_coach_timeout_seconds: float = Field(default=20, ge=1, le=60)
+    ai_coach_max_attempts: int = Field(default=2, ge=1, le=2)
+    ai_coach_max_output_tokens: int = Field(default=2048, ge=256, le=2048)
+    ai_coach_max_context_chars: int = Field(default=8_000, ge=1_000, le=16_000)
+    ai_coach_content_max_age_days: int = Field(default=365, ge=1, le=1_095)
+    ai_coach_quota_window_seconds: int = Field(default=86_400, ge=60, le=604_800)
+    ai_coach_per_user_request_limit: int = Field(default=20, ge=1, le=100)
+    ai_coach_global_request_limit: int = Field(default=100, ge=1, le=10_000)
+    ai_coach_cooldown_seconds: int = Field(default=30, ge=1, le=3_600)
     news_image_provider: Literal["disabled", "cloudflare_workers_ai"] = "disabled"
     news_image_cloudflare_account_id: str = ""
     news_image_cloudflare_api_token: str = ""
@@ -189,6 +333,177 @@ class Settings(BaseSettings):
                 )
         if self.food_usda_enabled and not self.usda_fdc_api_key.get_secret_value().strip():
             raise ValueError("USDA_FDC_API_KEY must be configured when FOOD_USDA_ENABLED is true")
+        proxy_url = self.usda_fdc_proxy_url.strip()
+        if proxy_url:
+            try:
+                parsed_proxy = urlparse(proxy_url)
+                proxy_port = parsed_proxy.port
+            except ValueError as exc:
+                raise ValueError(
+                    "USDA_FDC_PROXY_URL must be a credential-free local SOCKS URL"
+                ) from exc
+            if (
+                parsed_proxy.scheme not in {"socks5", "socks5h"}
+                or parsed_proxy.hostname not in {"host.docker.internal", "127.0.0.1", "localhost"}
+                or proxy_port is None
+                or not 1 <= proxy_port <= 65535
+                or parsed_proxy.username is not None
+                or parsed_proxy.password is not None
+                or parsed_proxy.path not in {"", "/"}
+                or parsed_proxy.query
+                or parsed_proxy.fragment
+            ):
+                raise ValueError("USDA_FDC_PROXY_URL must be a credential-free local SOCKS URL")
+        self.usda_fdc_proxy_url = proxy_url
+        return self
+
+    @model_validator(mode="after")
+    def validate_nutrition_label_scan(self) -> Settings:
+        languages = self.nutrition_label_scan_ocr_languages.strip()
+        if not re.fullmatch(r"[a-z]{2,4}(?:\+[a-z]{2,4}){0,2}", languages):
+            raise ValueError("NUTRITION_LABEL_SCAN_OCR_LANGUAGES is invalid")
+        self.nutrition_label_scan_ocr_languages = languages
+
+        proxy_url = self.nutrition_label_vision_proxy_url.strip()
+        if proxy_url:
+            try:
+                parsed_proxy = urlparse(proxy_url)
+                proxy_port = parsed_proxy.port
+            except ValueError as exc:
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_PROXY_URL must be an absolute credential-free "
+                    "HTTP(S) or SOCKS5 URL"
+                ) from exc
+            if (
+                parsed_proxy.scheme not in {"http", "https", "socks5", "socks5h"}
+                or not parsed_proxy.hostname
+                or parsed_proxy.username
+                or parsed_proxy.password
+                or parsed_proxy.query
+                or parsed_proxy.fragment
+                or parsed_proxy.path not in {"", "/"}
+                or (proxy_port is not None and not 1 <= proxy_port <= 65535)
+            ):
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_PROXY_URL must be an absolute credential-free "
+                    "HTTP(S) or SOCKS5 URL"
+                )
+        self.nutrition_label_vision_proxy_url = proxy_url
+
+        if self.nutrition_label_vision_enabled and not self.nutrition_label_vision_kill_switch:
+            if self.nutrition_label_vision_provider != "groq":
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_PROVIDER must be groq when Vision is enabled"
+                )
+            if not self.groq_api_key.get_secret_value().strip():
+                raise ValueError(
+                    "GROQ_API_KEY must be configured when Nutrition Label Vision is enabled"
+                )
+            if self.nutrition_label_vision_data_policy != "zdr_verified":
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_DATA_POLICY must be zdr_verified before Vision "
+                    "is enabled"
+                )
+            if (
+                self.nutrition_label_vision_model == "qwen/qwen3.8-27b"
+                and not self.nutrition_label_vision_allow_preview
+            ):
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_ALLOW_PREVIEW must be true for the selected "
+                    "Groq Preview Vision model"
+                )
+            parsed_endpoint = urlparse(self.nutrition_label_vision_endpoint)
+            if (
+                parsed_endpoint.scheme != "https"
+                or parsed_endpoint.hostname != "api.groq.com"
+                or parsed_endpoint.path != "/openai/v1/chat/completions"
+                or parsed_endpoint.username
+                or parsed_endpoint.password
+                or parsed_endpoint.query
+                or parsed_endpoint.fragment
+            ):
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_ENDPOINT must be the credential-free Groq HTTPS "
+                    "chat completions URL"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def validate_web_push(self) -> Settings:
+        hosts = self.web_push_endpoint_host_allowlist
+        if not hosts:
+            raise ValueError("WEB_PUSH_ENDPOINT_HOSTS must contain at least one host")
+        for host in hosts:
+            if not re.fullmatch(
+                r"(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*",
+                host,
+            ):
+                raise ValueError("WEB_PUSH_ENDPOINT_HOSTS contains an invalid host")
+
+        if not self.web_push_enabled:
+            return self
+
+        subject = self.web_push_vapid_subject.strip()
+        try:
+            parsed_subject = urlparse(subject)
+            subject_hostname = parsed_subject.hostname
+            subject_port = parsed_subject.port
+        except ValueError as exc:
+            raise ValueError(
+                "WEB_PUSH_VAPID_SUBJECT must be an absolute credential-free mailto or HTTPS URL"
+            ) from exc
+        valid_mailto = (
+            parsed_subject.scheme == "mailto"
+            and bool(
+                re.fullmatch(
+                    r"[^@\s]+@(?:localhost|[a-z0-9%_-]+(?:\.[a-z0-9%_-]+)+)",
+                    parsed_subject.path,
+                    re.IGNORECASE,
+                )
+            )
+            and not parsed_subject.netloc
+            and not parsed_subject.query
+            and not parsed_subject.fragment
+        )
+        valid_https = (
+            parsed_subject.scheme == "https"
+            and isinstance(subject_hostname, str)
+            and (
+                subject_hostname == "localhost"
+                or "." in subject_hostname
+                or ":" in subject_hostname
+            )
+            and not parsed_subject.username
+            and not parsed_subject.password
+            and not parsed_subject.path
+            and not parsed_subject.query
+            and not parsed_subject.fragment
+            and (subject_port is None or 1 <= subject_port <= 65535)
+        )
+        if not (valid_mailto or valid_https):
+            raise ValueError(
+                "WEB_PUSH_VAPID_SUBJECT must be an absolute credential-free mailto or HTTPS URL"
+            )
+
+        try:
+            public_key = _decode_base64url(self.web_push_vapid_public_key)
+        except ValueError as exc:
+            raise ValueError("WEB_PUSH_VAPID_PUBLIC_KEY must be a base64url P-256 key") from exc
+        if len(public_key) != 65 or public_key[0] != 4:
+            raise ValueError("WEB_PUSH_VAPID_PUBLIC_KEY must be an uncompressed P-256 key")
+
+        try:
+            private_key = _load_vapid_private_key(
+                self.web_push_vapid_private_key.get_secret_value()
+            )
+            derived_public_key = private_key.public_key().public_bytes(
+                serialization.Encoding.X962,
+                serialization.PublicFormat.UncompressedPoint,
+            )
+        except Exception as exc:
+            raise ValueError("WEB_PUSH_VAPID_PRIVATE_KEY must be a valid P-256 key") from exc
+        if derived_public_key != public_key:
+            raise ValueError("WEB_PUSH_VAPID_PUBLIC_KEY does not match the private key")
         return self
 
     @model_validator(mode="after")
@@ -212,19 +527,6 @@ class Settings(BaseSettings):
         if username and not re.fullmatch(r"[a-z][a-z0-9_]{4,31}", username):
             raise ValueError("NEWS_CHANNEL_USERNAME is invalid")
         self.news_channel_username = username
-        if self.news_llm_provider != "disabled":
-            parsed = urlparse(self.news_llm_endpoint)
-            if (
-                parsed.scheme != "https"
-                or not parsed.hostname
-                or parsed.username
-                or parsed.password
-            ):
-                raise ValueError("NEWS_LLM_ENDPOINT must be an absolute credential-free HTTPS URL")
-            if not self.news_llm_api_key.strip() or not self.news_llm_model.strip():
-                raise ValueError(
-                    "NEWS_LLM_API_KEY and NEWS_LLM_MODEL are required for openai_compatible drafts"
-                )
         if self.news_image_provider == "cloudflare_workers_ai":
             if not self.news_image_cloudflare_account_id.strip() or not (
                 self.news_image_cloudflare_api_token.strip()
@@ -248,6 +550,13 @@ class Settings(BaseSettings):
             )
         if self.weekly_digest_enabled and not self.news_channel_username:
             raise ValueError("NEWS_CHANNEL_USERNAME is required when WEEKLY_DIGEST_ENABLED=true")
+        if self.hermes_intake_enabled:
+            if not re.fullmatch(r"[a-z][a-z0-9_-]{2,63}", self.hermes_intake_key_id.strip()):
+                raise ValueError("HERMES_INTAKE_KEY_ID is invalid")
+            if len(self.hermes_intake_shared_secret.get_secret_value().strip()) < 32:
+                raise ValueError(
+                    "HERMES_INTAKE_SHARED_SECRET must be at least 32 characters when intake is enabled"
+                )
         if (
             self.app_env == "prod"
             and self.news_publication_enabled
@@ -270,6 +579,77 @@ class Settings(BaseSettings):
         except ZoneInfoNotFoundError as exc:
             raise ValueError("NEWS_PUBLICATION_TIMEZONE must be a valid IANA timezone") from exc
         return self
+
+    @model_validator(mode="after")
+    def validate_ai_coach(self) -> Settings:
+        if not self.ai_coach_enabled:
+            if self.ai_coach_adaptation_enabled and not self.ai_coach_adaptation_kill_switch:
+                raise ValueError("AI_COACH_ENABLED is required when adaptation is enabled")
+            return self
+        if self.ai_coach_kill_switch:
+            if self.ai_coach_adaptation_enabled and not self.ai_coach_adaptation_kill_switch:
+                raise ValueError("AI_COACH_KILL_SWITCH must be false when adaptation is enabled")
+            return self
+        if self.ai_coach_provider != "groq":
+            raise ValueError("AI_COACH_PROVIDER must be groq when AI_COACH_ENABLED is true")
+        if not self.groq_api_key.get_secret_value().strip():
+            raise ValueError("GROQ_API_KEY must be configured when AI Coach is enabled")
+        if self.ai_coach_cost_policy != "free_only" or self.ai_coach_cost_class != "free":
+            raise ValueError(
+                "AI Coach requires a verified free provider under the free_only cost policy"
+            )
+        if self.ai_coach_data_policy != "verified_generic_only":
+            raise ValueError("AI_COACH_DATA_POLICY must verify generic-only processing")
+        if not self.ai_coach_structured_output:
+            raise ValueError("AI_COACH_STRUCTURED_OUTPUT must remain true")
+        parsed = urlparse(self.ai_coach_endpoint)
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "api.groq.com"
+            or parsed.path != "/openai/v1/chat/completions"
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                "AI_COACH_ENDPOINT must be the credential-free Groq HTTPS chat completions URL"
+            )
+        if (
+            self.ai_coach_adaptation_enabled
+            and not self.ai_coach_adaptation_kill_switch
+            and not self.ai_coach_structured_output
+        ):
+            raise ValueError("AI_COACH_STRUCTURED_OUTPUT must remain true for adaptation")
+        return self
+
+    @field_validator("ai_coach_proxy_url")
+    @classmethod
+    def validate_ai_coach_proxy_url(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            return ""
+        try:
+            parsed = urlparse(normalized)
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError(
+                "AI_COACH_PROXY_URL must be an absolute credential-free HTTP(S) or SOCKS5 URL"
+            ) from exc
+        if (
+            parsed.scheme not in {"http", "https", "socks5", "socks5h"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+            or (port is not None and not 1 <= port <= 65535)
+        ):
+            raise ValueError(
+                "AI_COACH_PROXY_URL must be an absolute credential-free HTTP(S) or SOCKS5 URL"
+            )
+        return normalized
 
     @field_validator("weekly_digest_consent_version")
     @classmethod
@@ -314,6 +694,12 @@ class Settings(BaseSettings):
         return self.telegram_bot_proxy_url
 
     @property
+    def web_push_endpoint_host_allowlist(self) -> tuple[str, ...]:
+        return tuple(
+            host.strip().lower() for host in self.web_push_endpoint_hosts.split(",") if host.strip()
+        )
+
+    @property
     def admin_telegram_id_set(self) -> set[int]:
         result: set[int] = set()
         for item in self.admin_telegram_user_ids.replace(";", ",").split(","):
@@ -324,6 +710,34 @@ class Settings(BaseSettings):
                 result.add(int(value))
             except ValueError as exc:
                 raise ValueError(f"Invalid ADMIN_TELEGRAM_USER_IDS value: {value}") from exc
+        return result
+
+    @property
+    def ai_coach_internal_user_id_set(self) -> set[int]:
+        result: set[int] = set()
+        for item in self.ai_coach_internal_user_ids.replace(";", ",").split(","):
+            value = item.strip()
+            if not value:
+                continue
+            try:
+                result.add(int(value))
+            except ValueError as exc:
+                raise ValueError(f"Invalid AI_COACH_INTERNAL_USER_IDS value: {value}") from exc
+        return result
+
+    @property
+    def nutrition_label_scan_internal_user_id_set(self) -> set[int]:
+        result: set[int] = set()
+        for item in self.nutrition_label_scan_internal_user_ids.replace(";", ",").split(","):
+            value = item.strip()
+            if not value:
+                continue
+            try:
+                result.add(int(value))
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid NUTRITION_LABEL_SCAN_INTERNAL_USER_IDS value: {value}"
+                ) from exc
         return result
 
     @property

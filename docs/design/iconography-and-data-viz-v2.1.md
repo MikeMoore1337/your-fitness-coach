@@ -2,28 +2,85 @@
 
 ## Статус решения
 
-Этот документ расширяет активный `DESIGN_V2_1 Quiet Pace`. Владелец выбрал единую compact/mobile
-геометрию графиков v2 и гибридный набор пиктограмм v1/v2. Логотип YFC и официальные provider marks
-не входят в эту систему и не перерисовываются.
+Task 239 унифицирует функциональную иконографику поверх текущего Liquid Glass, сохраняя IA и
+геометрию графиков. До явного owner visual approval новый набор является кандидатом для выпуска.
+Логотип YFC, официальные provider marks и аватары не входят в функциональное семейство.
 
 ## Иконографика
 
 - Канонический renderer: `frontend/src/shared/ui/Icon.tsx`.
+- Статическая JSX-геометрия: `frontend/src/shared/ui/iconGlyphs.tsx`. HTML/SVG из внешних
+  источников не интерпретируется. Основной набор — Lucide; общая гантель — Phosphor Regular, без npm dependency.
 - Сетка: `24×24`; поддерживаемые optical sizes: `16`, `20`, `24`.
-- Все функциональные glyphs используют `currentColor`, round cap/join и общий stroke `1.8`.
+- Иллюстративные экземпляры того же glyph на landing сохраняют размеры `56`, `80`, `110`;
+  функциональные controls не используют эти размеры. Произвольное масштабирование отдельных nav icons запрещено.
+- Food entry использует `nav-nutrition`, workout — общую гантель `exercise`/`nav-plan`/`week-strength`.
+  `calendar` и `nav-today`, disclosure/chevron, more и rest/moon используют общую геометрию.
+- Select сохраняет native поведение и CSS background adapter с той же геометрией chevron;
+  unit check предотвращает расхождение. Touch date использует декоративный `Icon` с
+  `pointer-events: none`; desktop date/time и нативные popup pickers остаются browser controls.
+- Default/active/hover/focus/disabled/destructive/unavailable наследуют цвет и состояние control.
+  Иконка не меняет accessible name, tab order, обработчики, permissions или hit area.
+  Сплошная заливка допустима для `star-filled`; контур гантели Phosphor также описан залитым path с внутренними просветами.
+- Все функциональные glyphs используют `currentColor`. Lucide использует round cap/join и общий stroke `1.8`; гантель сохраняет оригинальную толщину Phosphor Regular.
 - Базовые actions, navigation, confidence, statuses, product и `WeekStrip` имеют уникальные
   семантические имена. Одинаковая семантика не получает page-local SVG, Unicode или CSS substitute.
-- `nav-exercise-catalog` использует выбранный владельцем разреженный силуэт открытой папки с одной
-  гантелью: внешний контур означает каталог, внутренний — упражнения; повторяющаяся grid-геометрия
-  не используется.
+- `nav-exercise-catalog` использует `library-big`: каталог отделён от гантели плана и тренировок.
+  `body-weight` использует циферблат `gauge`, объём тренировки — гирю `weight`.
 - `AppNavigationIcon`, `CloseIcon`, `TrashIcon`, `ChevronIcon`, `CheckIcon`, `DisclosureIcon`,
   `ThemeIcon`, `DataConfidence` и `WeekStrip` являются адаптерами над тем же renderer.
 - Icon-only action всегда получает accessible name от control и touch target не меньше `44px`.
   Декоративная иконка скрыта от accessibility tree; самостоятельная смысловая иконка передаёт
   `label`.
-- Active state использует neutral surface, усиленный label и lime boundary. Цвет не заменяет форму
-  или подпись.
+- Selected/current интерактивного control использует shared YFC поверхность с мягким рельефом,
+  внутренней световой гранью, скруглением и лаймовым акцентом по
+  `component-states-v2.1.md#unified-yfc-selected-states`. Иконка наследует контрастный цвет control;
+  focus/hover/pressed и смысловые статусы остаются отдельными. Цвет не заменяет форму или подпись.
+  Маркеры графиков и статусы WeekStrip не превращаются в капсулы выбора.
+  Нижняя активная вкладка охватывает иконку 24px и подпись общей капсулой `9999px` на всех
+  мобильных ширинах. Кнопка «Добавить» использует существующий `plus` 24px без постоянного выбора.
 - YFC brand assets и Google/Yandex/Telegram/VK/Apple marks остаются защищёнными исключениями.
+
+### Единый набор Lucide — owner visual revision 3
+
+По обратной связи владельца AI Coach сохраняет образ искр, mini-app — телефона. По следующему
+запросу владельца весь набор переведён на Lucide: 74 семантических имени, 65 исходных SVG.
+Семь ранее показанных вариантов сохранены:
+
+| Semantic name            | Lucide source     | Образ                                                      |
+| ------------------------ | ----------------- | ---------------------------------------------------------- |
+| `ai-coach`               | `sparkles`        | Искры, без диалогового облака                              |
+| `mini-app`               | `smartphone`      | Телефон                                                    |
+| `body-measurement`       | `ruler`           | Диагональная измерительная линейка                         |
+| `workout-volume`         | `weight`          | Гиря — накопленная тренировочная нагрузка                  |
+| `confidence-limited`     | `circle-dashed`   | Неполный контур — ограниченные данные, без числового score |
+| `nav-nutrition`          | `utensils`        | Вилка и нож                                                |
+| `week-nutrition-missing` | `clipboard-minus` | Журнал без записи; не голодание и не нулевое питание       |
+
+SVG взяты из [Lucide](https://github.com/lucide-icons/lucide/tree/a79b2d131dab2bf20cb224bd0937b439a9c4fa99/icons),
+revision `a79b2d131dab2bf20cb224bd0937b439a9c4fa99`, и преобразованы в статический JSX.
+Исходная геометрия сохранена; у `sparkles` удалён дополнительный круг внизу слева, чтобы оставить
+выбранную владельцем композицию из основной искры и маленькой искры справа сверху.
+Renderer применяет общий stroke 1.8 вместо исходного 2.
+Новые npm dependencies отсутствуют. Исходный ISC/MIT notice сохранён без перевода в
+`frontend/public/licenses/lucide-LICENSE.txt` и копируется в production bundle как статический файл.
+SF Symbols не включены. Визуальный ориентир iOS выражен простыми монохромными формами,
+общим весом, round cap/join и оптическими размерами; это не копия системного набора Apple.
+Revision 3 требует owner visual approval до merge/release. Статусы питания используют
+`clipboard-check`, `clipboard-pen-line`, `clipboard-minus`; намеренное голодание — `circle-pause`.
+Уверенность в данных: `circle-question-mark`, `circle-dashed`, `rotate-ccw-clock`, `shield-check`.
+Названия и подписи статусов остаются прежними; цвет не является единственным различием.
+
+### Выбранная гантель Phosphor Regular
+
+После проверки production владелец выбрал вариант B из сравнения: горизонтальный
+[Phosphor barbell Regular](https://github.com/phosphor-icons/core/blob/main/assets/regular/barbell.svg).
+Он заменяет общий glyph `exercise` и aliases `nav-plan` / `week-strength`.
+Исходная сетка 256×256 масштабируется ровно в 24×24 (24/256), без дополнительного уменьшения.
+Внешние размеры Icon, цвета, подписи и accessibility сохраняются. Исходный path описывает контур
+через fill; stroke отключён внутри glyph, чтобы не утолщать выбранный вариант.
+Лицензия MIT сохранена в `frontend/public/licenses/phosphor-LICENSE.txt`.
+Новая npm dependency не добавляется. Локальная правка не означает разрешение на production.
 
 ## `WeekStrip`
 
@@ -100,3 +157,8 @@ dashed и ring geometry и не зависит от tooltip или выбран�
 - Не вставлять reference SVG графиков из design package: в них текст переведён в outlines.
 - Не создавать page-local `line/polyline/circle` chart grammar или новый CSS progress meter.
 - Не использовать emoji, Unicode arrows/stars/plus/minus и CSS-generated functional glyphs.
+
+### Финальная правка владельца
+
+12.09.2026 владелец разрешил выпуск с горизонтальной гантелью. Общий exercise и его aliases
+повёрнуты на 45° и вписаны в canvas масштабом 0.72; stroke группы 2.5 даёт итоговые 1.8.

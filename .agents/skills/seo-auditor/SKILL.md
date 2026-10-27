@@ -117,8 +117,10 @@ If a problem exists across a template or route family, report the root cause onc
 Store large audit artifacts, crawls, screenshots, traces, exported reports, and temporary files under the repository's configured artifacts directory. If the project follows the common `.artifacts/` convention, prefer:
 
 ```text
-.artifacts/seo-audit/
+.artifacts/tasks/<TASK_ID>/evidence/seo-audit/
 ```
+
+Allocate the task path and record its purpose/retention with `scripts/artifact_manager.py`.
 
 Do not commit bulky audit output unless repository instructions explicitly require it.
 

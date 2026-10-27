@@ -1,14 +1,266 @@
+import path from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { nutritionDaySummary, openDetailsByHeading as openCard } from './fixtures/locators';
-import { emptyHydrationDay } from './fixtures/platform-api';
+import { openDetailsByHeading as openCard } from './fixtures/locators';
+import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
+import { expectSelectedChoice } from './fixtures/selected-state';
+import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
+import { installTelegramHarness } from './fixtures/mobile-tma';
 
-type AppDestination = 'Сегодня' | 'Программа' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
+test.use({ serviceWorkers: 'block' });
+
+test.describe('универсальная геометрия предпросмотра #1185', () => {
+  test.use({ hasTouch: true });
+  for (const width of [320, 360, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      for (const surface of width === 393 && theme === 'dark'
+        ? ['browser', 'pwa', 'telegram']
+        : ['browser']) {
+        test(`${width}px ${theme} ${surface}: шаблоны, свои, активные и тренерские программы`, async ({
+          context,
+          browserName,
+        }, testInfo) => {
+          test.setTimeout(120_000);
+          const templates = previewTemplates();
+          const evidence = process.env.PREVIEW_EVIDENCE_DIR;
+          const directory =
+            evidence &&
+            path.join(
+              evidence,
+              browserName,
+              `${width}-${theme}${surface === 'browser' ? '' : `-${surface}`}`,
+            );
+          if (directory) mkdirSync(directory, { recursive: true });
+          for (const template of templates) {
+            const page = await context.newPage();
+            await page.setViewportSize({ width, height: 900 });
+            await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+            await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+            if (surface === 'pwa')
+              await page.addInitScript(() => {
+                Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+              });
+            if (surface === 'telegram')
+              await installTelegramHarness(page, {
+                colorScheme: theme,
+                platform: 'ios',
+                viewportHeight: 900,
+                viewportStableHeight: 900,
+                safeAreaInset: { top: 28, right: 0, bottom: 20, left: 0 },
+                contentSafeAreaInset: { top: 44, right: 0, bottom: 16, left: 0 },
+              });
+            await mockApi(page);
+            await page.route('**/api/v1/programs/templates/mine', (route) =>
+              route.fulfill({ json: [template] }),
+            );
+            await page.goto('/app?section=programs&view=manage');
+            if (surface !== 'telegram') await page.getByRole('button', { name: 'Клиент' }).click();
+            if (!template.is_active_for_current_user) await openCard(page, 'Программы и шаблоны');
+            await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+            const trigger = template.is_active_for_current_user
+              ? page.getByRole('button', { name: 'Посмотреть план', exact: true })
+              : page.getByRole('button', {
+                  name: `Посмотреть ${template.is_example ? 'шаблон' : 'программу'} «${template.title}»`,
+                  exact: true,
+                });
+            await trigger.click();
+            const dialog = page.getByRole('dialog', { name: template.title, exact: true });
+            const content = dialog.locator('.program-example-modal__content');
+            const summaries = dialog.locator('.program-example-day > summary');
+            await expect(dialog).toBeVisible();
+            if (template.key === 'nsuns') {
+              const equipmentFact = dialog
+                .locator('.program-preview-fact')
+                .filter({ hasText: 'Оборудование' });
+              await expect(equipmentFact).toContainText('Штанга · Скамья · Стойка/силовая рама');
+              await expect(equipmentFact).not.toContainText(/barbell|bench|rack/);
+            }
+            await dialog.evaluate((node) =>
+              Promise.all(
+                node
+                  .getAnimations({ subtree: true })
+                  .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+                  .map((animation) => animation.finished),
+              ),
+            );
+            await expect(summaries).toHaveCount(template.days.length);
+            const backgroundY = await page.evaluate(() => window.scrollY);
+            const measurements: Array<{
+              state: string;
+              metrics: Awaited<ReturnType<typeof measurePreview>>;
+            }> = [];
+            const capture = async (state: string, screenshot = true) => {
+              await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+              const metrics = await measurePreview(page);
+              measurements.push({ state, metrics });
+              expect
+                .soft(metrics.horizontalOverflow, `${template.key}/${state}: overflow`)
+                .toEqual([]);
+              expect.soft(metrics.horizontalDrift, `${template.key}/${state}: drift`).toEqual([]);
+              expect
+                .soft(metrics.clippedText, `${template.key}/${state}: text clipping`)
+                .toEqual([]);
+              expect
+                .soft(metrics.clippedControls, `${template.key}/${state}: control clipping`)
+                .toEqual([]);
+              expect
+                .soft(metrics.verticalScrollers, `${template.key}/${state}: scroll ownership`)
+                .toEqual(['div.program-example-modal__content']);
+              expect.soft(metrics.documentX).toBe(0);
+              expect
+                .soft(Math.abs(metrics.headerGap), `${template.key}/${state}: header edge`)
+                .toBeLessThanOrEqual(1);
+              expect.soft(metrics.documentY).toBe(backgroundY);
+              if (directory && screenshot)
+                await page.screenshot({
+                  path: path.join(directory, `${template.key}-${state}.png`),
+                  animations: 'disabled',
+                  scale: 'css',
+                });
+            };
+            await summaries.first().focus();
+            await page.keyboard.press('Enter');
+            await expect(dialog.locator('.program-example-day[open]')).toHaveCount(0);
+            await content.evaluate((node) => node.scrollTo({ top: 0, behavior: 'instant' }));
+            await capture('collapsed');
+            await summaries.first().focus();
+            await page.keyboard.press('Enter');
+            await content.evaluate((node) => node.scrollTo({ top: 0, behavior: 'instant' }));
+            await capture('top');
+            await summaries.first().evaluate((node) => node.scrollIntoView({ block: 'center' }));
+            await capture('first');
+            for (let day = 1; day < template.days.length; day++) {
+              await summaries.nth(day).focus();
+              await page.keyboard.press('Enter');
+              expect.soft((await measurePreview(page)).horizontalOverflow).toEqual([]);
+            }
+            await expect(dialog.locator('.program-example-day[open]')).toHaveCount(
+              template.days.length,
+            );
+            await content.evaluate((node) =>
+              node.scrollTo({
+                top: (node.scrollHeight - node.clientHeight) / 2,
+                behavior: 'instant',
+              }),
+            );
+            await capture('middle');
+            const startY = await content.evaluate((node) => node.scrollTop);
+            await previewGesture(page, browserName, -100, 0);
+            await capture('horizontal');
+            await previewGesture(page, browserName, 100, -100);
+            await capture('diagonal', false);
+            await previewGesture(page, browserName, 0, -150);
+            expect.soft(await content.evaluate((node) => node.scrollTop)).toBeGreaterThan(startY);
+            await capture('gestures');
+            await content.evaluate((node) =>
+              node.scrollTo({ top: node.scrollHeight, behavior: 'instant' }),
+            );
+            await expect
+              .poll(() =>
+                content.evaluate((node) => node.scrollHeight - node.clientHeight - node.scrollTop),
+              )
+              .toBeLessThanOrEqual(1);
+            await capture('bottom');
+            await expect(
+              dialog.locator('.program-example-day').last().locator('li').last(),
+            ).toBeVisible();
+            const actions = dialog.locator('.program-example-modal__actions');
+            await expect(actions).toBeInViewport({ ratio: 1 });
+            if (template.key === 'coach') {
+              await expect(actions).toContainText('Эта программа назначена тренером');
+              await expect(actions.locator('button')).toHaveCount(0);
+            } else {
+              await expect(
+                actions.getByRole('button', { name: 'Создать копию', exact: true }),
+              ).toBeVisible();
+              await actions.getByRole('button', { name: 'Выбрать', exact: true }).click();
+              await expect(
+                actions.getByRole('button', { name: 'Выбрана', exact: true }),
+              ).toBeVisible();
+              await expect(
+                actions.getByRole('button', {
+                  name:
+                    template.key === 'phul' ? 'Уже запущена' : 'Настроить расписание и запустить',
+                  exact: true,
+                }),
+              ).toBeVisible();
+            }
+            if (directory)
+              writeFileSync(
+                path.join(directory, `${template.key}-metrics.json`),
+                JSON.stringify(measurements, null, 2),
+              );
+            await dialog.locator('.program-example-modal__close').click();
+            await expect(dialog).toHaveCount(0);
+            await expect(trigger).toBeFocused();
+            await page.close();
+          }
+          testInfo.annotations.push({
+            type: 'gesture evidence',
+            description:
+              browserName === 'chromium'
+                ? 'CDP native touch input; synthetic device'
+                : 'Native wheel input; WebKit touch-drag unavailable',
+          });
+        });
+      }
+    }
+  }
+});
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
+});
+
+type AppDestination = 'Сегодня' | 'План' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
+const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
+const STAGE4_THUMBNAIL_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
+const STAGE4_ANIMATION_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
+
+function fullBodyThreeDayDays() {
+  const exercise = (id: number, title: string) => ({
+    id,
+    exercise_id: 1,
+    exercise_title: title,
+    prescribed_sets: 3,
+    prescribed_reps: '10–12',
+    rest_seconds: 90,
+    notes: null,
+    has_guide: true,
+  });
+  return [
+    {
+      id: 100,
+      day_number: 1,
+      title: 'Всё тело',
+      exercises: [exercise(1000, 'Тяга блока')],
+    },
+    {
+      id: 101,
+      day_number: 2,
+      title: 'Всё тело B',
+      exercises: [exercise(1001, 'Жим гантелей')],
+    },
+    {
+      id: 102,
+      day_number: 3,
+      title: 'Всё тело C',
+      exercises: [exercise(1002, 'Приседания')],
+    },
+  ];
+}
+
+async function captureTask293Evidence(page: Page, fileName: string): Promise<void> {
+  if (!TASK_293_EVIDENCE_DIR) return;
+  await page.screenshot({ path: path.resolve(TASK_293_EVIDENCE_DIR, fileName), fullPage: true });
+}
 
 async function openAppDestination(page: Page, destination: AppDestination) {
-  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+  const mainNavigation = page.getByRole('navigation', { name: 'Основная навигация' });
+  await expect(mainNavigation).toBeVisible();
   const desktopLabel = destination === 'Профиль' ? 'Профиль и настройки' : destination;
   const mobileLabel = destination === 'Профиль' ? 'Профиль и настройки' : destination;
-  const directLink = page.getByRole('link', { name: desktopLabel, exact: true });
+  const directLink = mainNavigation.getByRole('link', { name: desktopLabel, exact: true });
   for (let index = 0; index < (await directLink.count()); index += 1) {
     const candidate = directLink.nth(index);
     if (await candidate.isVisible()) {
@@ -20,335 +272,42 @@ async function openAppDestination(page: Page, destination: AppDestination) {
   await page.locator('#appMorePanel').getByRole('link', { name: mobileLabel, exact: true }).click();
 }
 
-test('логотип и кнопки в шапке имеют одинаковую высоту', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 390, height: 844 },
+test('Product v10 public routes expose the approved audience compositions', async ({ page }) => {
+  for (const state of [
+    { path: '/', audience: 'athlete', heading: 'СИЛА В ДЕЙСТВИИ.' },
+    { path: '/for-trainers', audience: 'coach', heading: 'ВАШ МЕТОД В ДЕЙСТВИИ.' },
   ]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
-
-    const brandTarget = await page.locator('.landing-header .landing-brand').boundingBox();
-    const logo = await page.locator('.landing-header .landing-brand__mark').boundingBox();
-    const themeButton = await page.locator('.landing-theme-toggle').boundingBox();
-    const loginButton = page.locator('.landing-button--compact');
-
-    expect(logo).not.toBeNull();
-    expect(brandTarget).not.toBeNull();
-    expect(themeButton).not.toBeNull();
-    expect(Math.min(brandTarget!.width, brandTarget!.height)).toBeGreaterThanOrEqual(44);
-    expect(themeButton?.height).toBeGreaterThanOrEqual(44);
-    await expect(loginButton).toBeVisible();
-    expect((await loginButton.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-
-    const themeControl = page.getByRole('button', { name: /Включить .* тему/ });
-    await themeControl.hover();
-    const themeHoverStyles = await themeControl.evaluate((element) => {
-      const styles = getComputedStyle(element);
-      return {
-        boxShadow: styles.boxShadow,
-        transform: styles.transform,
-      };
-    });
-    expect(themeHoverStyles).toEqual({ boxShadow: 'none', transform: 'none' });
-
-    const menuButton = page.getByRole('button', { name: 'Открыть меню' });
-    if (viewport.width < 980) {
-      await expect(menuButton).toBeVisible();
-      expect((await menuButton.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-      await menuButton.hover();
-      await expect(menuButton).toHaveCSS('box-shadow', 'none');
-      await expect(menuButton).toHaveCSS('transform', 'none');
-      await menuButton.click();
-      await expect(page.getByRole('navigation', { name: 'Навигация по странице' })).toHaveClass(
-        /is-open/,
-      );
-      await expect(page.getByRole('link', { name: 'Продукт', exact: true })).toBeVisible();
-      await page.getByRole('link', { name: 'Продукт', exact: true }).click();
-      await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
-    } else {
-      await expect(menuButton).toBeHidden();
-    }
-  }
-});
-
-test('описания самостоятельного и тренерского сценариев сохраняют читаемый цвет', async ({
-  page,
-}) => {
-  for (const scheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
-
-    const selfDescription = page.locator('.landing-core__self > p:not(.landing-kicker)');
-    const coachDescription = page.locator('.landing-trainer__copy > p:not(.landing-kicker)');
-
-    const expectedColor = scheme === 'light' ? 'rgb(89, 96, 91)' : 'rgb(175, 181, 173)';
-    await expect(selfDescription).toHaveCSS('color', expectedColor);
-    await expect(coachDescription).toHaveCSS('color', 'rgb(174, 185, 176)');
+    await page.goto(state.path);
+    await expect(page.locator(`[data-landing-audience="${state.audience}"]`)).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: state.heading })).toBeVisible();
+    await expect(page.locator('.landing-header')).toHaveCSS('backdrop-filter', /blur/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
   }
 });
 
-test('мобильное меню не сохраняет активную заливку после касания', async ({ browser }) => {
-  const context = await browser.newContext({
-    baseURL: 'http://127.0.0.1:4173',
-    hasTouch: true,
-    isMobile: true,
-    viewport: { width: 390, height: 844 },
-  });
-  const page = await context.newPage();
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await page.goto('/');
-
-  expect(await page.evaluate(() => matchMedia('(hover: none)').matches)).toBe(true);
-  const menuButton = page.getByRole('button', { name: 'Открыть меню' });
-  const restStyles = await menuButton.evaluate((element) => {
-    const styles = getComputedStyle(element);
-    return {
-      backgroundColor: styles.backgroundColor,
-      borderColor: styles.borderColor,
-      boxShadow: styles.boxShadow,
-      color: styles.color,
-    };
-  });
-
-  await menuButton.tap();
-  const closeMenuButton = page.getByRole('button', { name: 'Закрыть меню' });
-  await expect
-    .poll(() =>
-      closeMenuButton.evaluate((element) => {
-        const styles = getComputedStyle(element);
-        return {
-          backgroundColor: styles.backgroundColor,
-          borderColor: styles.borderColor,
-          boxShadow: styles.boxShadow,
-          color: styles.color,
-        };
-      }),
-    )
-    .toEqual(restStyles);
-
-  await context.close();
-});
-
-test('первый экран лендинга объясняет продукт и не создаёт горизонтальный скролл', async ({
+test('Product v10 public routes preserve responsive controls and keyboard access', async ({
   page,
 }) => {
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 390, height: 844 },
+  for (const state of [
+    { path: '/', width: 390, audience: 'athlete' },
+    { path: '/for-trainers', width: 390, audience: 'coach' },
   ]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
+    await page.setViewportSize({ width: state.width, height: 844 });
+    await page.goto(state.path);
+    await expect(page.locator(`[data-landing-audience="${state.audience}"]`)).toBeVisible();
+    await expect(
+      page.locator('.landing-v10-hero-audience .landing-v10-audience-switch'),
+    ).toBeVisible();
+    await expect(page.locator('.landing-button--compact')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(state.width);
 
-    await expect(page.getByRole('heading', { name: /знайте, что делать сегодня/i })).toBeVisible();
-    await expect(
-      page.locator('.landing-hero__actions').getByRole('link', { name: /открыть приложение/i }),
-    ).toBeVisible();
-    const heroProof = page.locator('.landing-hero-device');
-    await expect(
-      heroProof.getByRole('img', { name: /актуальный экран сегодня.*силовой тренировки/i }),
-    ).toBeVisible();
-    await expect(heroProof.getByText(/актуальный интерфейс/i)).toBeVisible();
-    if (viewport.width === 390) {
-      const mobileProof = await heroProof.evaluate((element) => {
-        const styles = getComputedStyle(element);
-        return { marginInline: styles.marginInline };
-      });
-      expect(mobileProof.marginInline).toBe('0px');
-    }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+    const skipLink = page.getByRole('link', { name: 'К содержимому' });
+    await skipLink.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#landing-v10-content')).toBeFocused();
   }
 });
-
-test('вторичный hero CTA сохраняет контрастный текст при наведении в обеих темах', async ({
-  page,
-}) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
-
-  for (const scheme of ['light', 'dark'] as const) {
-    await page.evaluate(() => window.localStorage.removeItem('app-theme'));
-    await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
-    await page.reload();
-
-    const expectedBackground = scheme === 'light' ? 'rgb(236, 237, 233)' : 'rgb(30, 34, 30)';
-    const expectedText = scheme === 'light' ? 'rgb(22, 26, 23)' : 'rgb(238, 240, 234)';
-    for (const link of [
-      page.locator('.landing-hero__actions').getByRole('link', { name: /Попробовать демо/ }),
-    ]) {
-      await link.hover();
-      await expect(link).toHaveCSS('background-color', expectedBackground);
-      await expect(link).toHaveCSS('color', expectedText);
-      await expect(link.locator('.yfc-icon')).toHaveCSS('color', expectedText);
-    }
-  }
-});
-
-test('лендинг остаётся адаптивным на контрольных ширинах', async ({ page }) => {
-  for (const width of [360, 390, 430, 768, 1024, 1280, 1440]) {
-    await page.setViewportSize({ width, height: width < 768 ? 844 : 900 });
-    await page.goto('/');
-
-    const pageMetrics = await page.evaluate(() => ({
-      viewport: window.innerWidth,
-      documentWidth: document.documentElement.scrollWidth,
-      bodyWidth: document.body.scrollWidth,
-    }));
-    expect(pageMetrics.documentWidth).toBeLessThanOrEqual(pageMetrics.viewport);
-    expect(pageMetrics.bodyWidth).toBeLessThanOrEqual(pageMetrics.viewport);
-    await expect(
-      page.locator('.landing-hero__actions').getByRole('link', { name: /открыть приложение/i }),
-    ).toBeVisible();
-    await expect(page.getByRole('button', { name: /Включить .* тему/ })).toBeInViewport();
-    await expect(page.locator('.landing-continuity__rail')).toBeVisible();
-  }
-});
-
-test('лендинг доступен с клавиатуры и содержит метаданные', async ({ page }) => {
-  await page.goto('/');
-
-  const skipLink = page.getByRole('link', { name: 'К содержимому' });
-  await skipLink.focus();
-  await expect(skipLink).toBeFocused();
-  await expect(skipLink).toBeVisible();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#landing-content')).toBeFocused();
-
-  await expect(page).toHaveTitle(/тренировки, питание и прогресс в браузере и telegram/i);
-  expect(await page.locator('meta[name="description"]').getAttribute('content')).toMatch(
-    /фиксировать результаты.*ориентиры кбжу/i,
-  );
-  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
-    'content',
-    /в браузере и telegram/i,
-  );
-  await expect(page.locator('meta[property="og:type"]')).toHaveAttribute('content', 'website');
-});
-
-test('блок возможностей показывает пользу спортсмену и инструменты тренеру', async ({ page }) => {
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 768, height: 900 },
-    { width: 390, height: 844 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
-
-    await expect(
-      page.getByRole('heading', { name: /один цикл — от плана до следующего шага/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: /сначала — одно понятное действие/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: /у каждого клиента — видимый контекст/i }),
-    ).toBeVisible();
-    await expect(page.locator('.landing-core__features article')).toHaveCount(3);
-    if (viewport.width <= 430) {
-      const compactTextLinks = page.locator('.landing-brand, .landing-footer a');
-      for (const link of await compactTextLinks.all()) {
-        expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-      }
-    }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
-  }
-});
-
-test('сценарий и платформы остаются понятными на разных экранах', async ({ page }) => {
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 768, height: 900 },
-    { width: 390, height: 844 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
-
-    await expect(page.locator('.landing-start__steps li')).toHaveCount(3);
-    await expect(
-      page.getByRole('heading', { name: /от настройки — к повторяемому ритму/i }),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: /web для полного контекста/i })).toBeVisible();
-    await expect(
-      page.getByText(/telegram mini app не является отдельным приложением/i),
-    ).toBeVisible();
-
-    const platformRail = page.locator('.landing-continuity__rail');
-    await expect(platformRail).toBeVisible();
-    await expect(platformRail).toContainText('Web');
-    await expect(platformRail).toContainText('Telegram Mini App');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
-  }
-});
-
-test('сценарии спортсмена и тренера ведут в веб-приложение', async ({ page }) => {
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 768, height: 900 },
-    { width: 390, height: 844 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/');
-
-    await expect(page.locator('.landing-core__self')).toBeVisible();
-    await expect(page.locator('.landing-trainer')).toBeVisible();
-    await expect(page.getByText(/занимаетесь самостоятельно/i)).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: /у каждого клиента — видимый контекст/i }),
-    ).toBeVisible();
-    await expect(page.getByRole('link', { name: /начать с тренировок/i })).toHaveAttribute(
-      'href',
-      '/training',
-    );
-    await expect(page.getByRole('link', { name: /посмотреть кабинет тренера/i })).toHaveAttribute(
-      'href',
-      '/for-trainers',
-    );
-    await expect(
-      page.locator('.landing-core__self').getByText(/тренера (можно )?подключи(ть|те) позже/i),
-    ).toBeVisible();
-    await expect(
-      page.locator('.landing-contact__actions').getByRole('link', { name: /открыть приложение/i }),
-    ).toHaveAttribute('href', '/app');
-    await expect(
-      page.locator('.landing-contact').getByRole('link', { name: /попробовать демо/i }),
-    ).toHaveAttribute('href', '/demo?cabinet=1&scenario=self_training&section=today');
-    await expect(page.getByRole('link', { name: /поддержка в telegram/i })).toHaveAttribute(
-      'href',
-      'https://t.me/your_fitness_coach_bot?start=support',
-    );
-    const heroButtons = page.locator('.landing-hero__actions .landing-button');
-    const contactButtons = page.locator('.landing-contact__actions .landing-button');
-    for (const buttons of [heroButtons, contactButtons]) {
-      await expect(buttons).toHaveCount(2);
-      const boxes = await Promise.all((await buttons.all()).map((button) => button.boundingBox()));
-      expect(boxes).toHaveLength(2);
-      expect(boxes[0]).not.toBeNull();
-      expect(boxes[1]).not.toBeNull();
-      expect(boxes[0]!.height).toBe(boxes[1]!.height);
-      if (viewport.width === 390) expect(boxes[0]!.width).toBeCloseTo(boxes[1]!.width, 0);
-    }
-    const featureCards = page.locator('.landing-core__features article');
-    await expect(featureCards).toHaveCount(3);
-    await expect(featureCards.getByRole('link')).toHaveCount(3);
-    if (viewport.width === 390) {
-      const brand = page.locator('.landing-header .landing-brand');
-      const brandWordmark = brand.locator('.yfc-lockup__wordmark');
-      await expect(brandWordmark).toBeVisible();
-      const brandBox = await brand.boundingBox();
-      expect(brandBox).not.toBeNull();
-      expect(brandBox!.height).toBeGreaterThanOrEqual(44);
-    }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
-    if (viewport.width === 390) {
-      const footerTagline = page.locator('.landing-footer__brand > p');
-      await expect(footerTagline).toHaveCount(1);
-      await expect(footerTagline).toBeVisible();
-    }
-  }
-});
-
 async function mockApi(
   page: Page,
   {
@@ -420,6 +379,18 @@ async function mockApi(
     weekly_volume: [],
     personal_records: [],
   };
+  await page.route(`**${STAGE4_THUMBNAIL_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg',
+      contentType: 'image/jpeg',
+    }),
+  );
+  await page.route(`**${STAGE4_ANIMATION_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif',
+      contentType: 'image/gif',
+    }),
+  );
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -437,6 +408,8 @@ async function mockApi(
       role = body.is_admin ? 'admin' : body.is_coach ? 'coach' : 'client';
       return route.fulfill({ json: { access_token: 'test-token', token_type: 'bearer' } });
     }
+    if (path.endsWith('/public/articles') && request.method() === 'GET')
+      return route.fulfill({ json: [] });
     if (path.endsWith('/me/profile/heart-rates/preview')) {
       const body = request.postDataJSON() as {
         resting_heart_rate: number | null;
@@ -736,6 +709,9 @@ async function mockApi(
           workout_reminders_enabled: true,
           weekly_check_in_reminders_enabled: true,
           measurement_reminders_enabled: false,
+          meal_reminders_enabled: false,
+          hydration_reminders_enabled: false,
+          movement_reminders_enabled: false,
           telegram_enabled: true,
           telegram_linked: telegramLinked,
           reminder_hour: 9,
@@ -743,6 +719,23 @@ async function mockApi(
           quiet_hours_end: null,
         },
       });
+    if (path.endsWith('/notifications/templates'))
+      return route.fulfill({
+        json: contextualReminderTemplates.map((template) => ({
+          ...template,
+          telegram_linked: telegramLinked,
+          channel_note: telegramLinked
+            ? template.channel_note
+            : 'В приложении доступно всегда; Telegram появится после связывания аккаунта.',
+        })),
+      });
+    if (/\/notifications\/templates\/(meal_logging|hydration|movement_break)$/.test(path)) {
+      const templateKey = path.split('/').pop();
+      const template = contextualReminderTemplates.find(
+        (item) => item.template_key === templateKey,
+      );
+      return route.fulfill({ json: { ...template, ...request.postDataJSON() } });
+    }
     if (path.endsWith('/notifications/read-all'))
       return route.fulfill({ json: { updated: notificationItems.length } });
     const notificationOpenMatch = path.match(/\/notifications\/(\d+)\/open$/);
@@ -775,6 +768,9 @@ async function mockApi(
           is_custom: false,
           is_personalized: false,
           has_guide: true,
+          media_state: 'approved_animated',
+          media_thumbnail_url: STAGE4_THUMBNAIL_URL,
+          media_animation_url: STAGE4_ANIMATION_URL,
           guide: {
             technique_steps: ['Зафиксируйте корпус', 'Выполните движение под контролем'],
             breathing: 'Выдох в фазе усилия, вдох при возврате.',
@@ -878,6 +874,34 @@ async function mockApi(
           },
         },
       });
+    if (path.endsWith('/programs/exercises/1/history'))
+      return route.fulfill({
+        json: {
+          exercise_id: 1,
+          exercise_title: 'Тяга блока',
+          metric_type: 'strength',
+          load_unit: 'kg',
+          last_performed: null,
+          best_authoritative_load: null,
+          estimated_1rm: null,
+          rep_prs: [],
+          windows: [7, 30, 90].map((days) => ({
+            days,
+            period_start: '2030-01-01',
+            period_end: '2030-01-10',
+            performed_session_count: 0,
+            completed_set_count: 0,
+            authoritative_set_count: 0,
+            reps_total: 0,
+            best_authoritative_load_kg: null,
+            estimated_1rm_kg: null,
+          })),
+          recent_sessions: [],
+          progression: [],
+          progression_events: [],
+          history_truncated: false,
+        },
+      });
     if (path.endsWith('/programs/exercises'))
       return route.fulfill({
         json: [
@@ -894,6 +918,9 @@ async function mockApi(
             is_custom: false,
             is_personalized: false,
             has_guide: true,
+            media_state: 'approved_animated',
+            media_thumbnail_url: STAGE4_THUMBNAIL_URL,
+            media_animation_url: STAGE4_ANIMATION_URL,
             guide: null,
           },
         ],
@@ -917,25 +944,7 @@ async function mockApi(
             is_active_for_current_user: false,
             assigned_by_user_id: null,
             assigned_by_full_name: null,
-            days: [
-              {
-                id: 100,
-                day_number: 1,
-                title: 'Всё тело',
-                exercises: [
-                  {
-                    id: 1000,
-                    exercise_id: 1,
-                    exercise_title: 'Тяга блока',
-                    prescribed_sets: 3,
-                    prescribed_reps: '10–12',
-                    rest_seconds: 90,
-                    notes: null,
-                    has_guide: true,
-                  },
-                ],
-              },
-            ],
+            days: fullBodyThreeDayDays(),
           },
           {
             id: 11,
@@ -981,6 +990,126 @@ async function mockApi(
               },
             ],
           },
+          {
+            id: 12,
+            title: 'Моя программа — длинное название для проверки переноса строк и действий',
+            slug: 'my-long-program-title',
+            goal: 'muscle_gain',
+            level: 'advanced',
+            split_type: 'upper_lower',
+            owner_user_id: 1,
+            owner_telegram_user_id: 2001,
+            owner_full_name: 'Демо пользователь',
+            created_by_user_id: 1,
+            is_public: false,
+            is_example: false,
+            is_assigned_to_current_user: false,
+            is_active_for_current_user: false,
+            can_edit: true,
+            assigned_by_user_id: null,
+            assigned_by_full_name: null,
+            assigned_program_id: null,
+            assigned_program_status: null,
+            assigned_program_start_date: null,
+            assigned_program_duration_weeks: null,
+            assigned_program_schedule_weekdays: null,
+            current_revision_number: 2,
+            assigned_program_updated: false,
+            future_workouts_updated: 0,
+            assigned_program_revision_number: null,
+            default_duration_weeks: 4,
+            provenance_type: 'CUSTOM',
+            provenance: null,
+            program_metadata: {
+              days_per_week: 2,
+              equipment: ['Гантели', 'Скамья'],
+              level: 'advanced',
+            },
+            days: [
+              {
+                id: 120,
+                day_number: 1,
+                title: 'Верх тела',
+                exercises: [
+                  {
+                    id: 1200,
+                    exercise_id: 1,
+                    exercise_title: 'Тяга блока',
+                    metric_type: 'strength',
+                    prescribed_sets: 4,
+                    prescribed_reps: '6–8',
+                    prescribed_duration_minutes: null,
+                    rest_seconds: 120,
+                    notes: 'Контрольная серия',
+                    superset_group: null,
+                    superset_order: null,
+                    has_guide: true,
+                  },
+                ],
+              },
+              {
+                id: 121,
+                day_number: 2,
+                title: 'Низ тела',
+                exercises: [],
+              },
+            ],
+          },
+          {
+            id: 13,
+            title: 'Импортированная программа без метаданных',
+            slug: 'legacy-without-metadata',
+            goal: 'maintenance',
+            level: 'legacy',
+            split_type: null,
+            owner_user_id: 77,
+            owner_telegram_user_id: null,
+            owner_full_name: 'Архивный автор',
+            created_by_user_id: 77,
+            is_public: false,
+            is_example: false,
+            is_assigned_to_current_user: false,
+            is_active_for_current_user: false,
+            can_edit: false,
+            assigned_by_user_id: null,
+            assigned_by_full_name: null,
+            assigned_program_id: null,
+            assigned_program_status: null,
+            assigned_program_start_date: null,
+            assigned_program_duration_weeks: null,
+            assigned_program_schedule_weekdays: null,
+            current_revision_number: null,
+            assigned_program_updated: false,
+            future_workouts_updated: 0,
+            assigned_program_revision_number: null,
+            default_duration_weeks: 1,
+            provenance_type: 'CUSTOM',
+            provenance: null,
+            program_metadata: null,
+            days: [
+              {
+                id: 130,
+                day_number: 1,
+                title: 'День без описания',
+                exercises: [
+                  {
+                    id: 1300,
+                    exercise_id: 1,
+                    exercise_title: 'Приседания',
+                    metric_type: 'strength',
+                    prescribed_sets: 3,
+                    prescribed_reps: '8',
+                    prescribed_duration_minutes: null,
+                    rest_seconds: 90,
+                    notes: null,
+                    superset_group: null,
+                    superset_order: null,
+                    has_guide: false,
+                  },
+                ],
+              },
+            ],
+          },
         ],
       });
     if (path.endsWith('/programs/templates/recommendation')) {
@@ -1016,37 +1145,7 @@ async function mockApi(
               can_edit: false,
               assigned_by_user_id: null,
               assigned_by_full_name: null,
-              days: [
-                {
-                  id: 100,
-                  day_number: 1,
-                  title: 'Всё тело',
-                  exercises: [
-                    {
-                      id: 1000,
-                      exercise_id: 1,
-                      exercise_title: 'Тяга блока',
-                      prescribed_sets: 3,
-                      prescribed_reps: '10–12',
-                      rest_seconds: 90,
-                      notes: null,
-                      has_guide: true,
-                    },
-                  ],
-                },
-                {
-                  id: 101,
-                  day_number: 2,
-                  title: 'Всё тело B',
-                  exercises: [],
-                },
-                {
-                  id: 102,
-                  day_number: 3,
-                  title: 'Всё тело C',
-                  exercises: [],
-                },
-              ],
+              days: fullBodyThreeDayDays(),
             },
             reason: 'Совпадает с выбранной целью, уровнем и ритмом.',
             fit_facts: [
@@ -1078,7 +1177,41 @@ async function mockApi(
           },
         ],
       });
+    if (path.endsWith('/programs/assigned/501/lifecycle'))
+      return route.fulfill({
+        json: {
+          program_id: 501,
+          status: 'active',
+          is_active: true,
+          start_date: '2030-01-01',
+          duration_weeks: 4,
+          current_revision_number: 1,
+          current_week_number: 1,
+          current_block: null,
+          next_block: null,
+          next_workout: {
+            id: 1,
+            scheduled_date: '2030-01-01',
+            week_number: 1,
+            day_number: 1,
+            title: 'Всё тело A',
+            status: 'planned',
+          },
+          next_deload: null,
+          restarted_from_program_id: null,
+        },
+      });
     if (path.endsWith('/programs/assigned/501/blocks')) return route.fulfill({ json: [] });
+    if (path.endsWith('/programs/assigned/501/progression-proposals'))
+      return route.fulfill({
+        json: {
+          target_program_id: 501,
+          target_revision_number: 1,
+          target_workout_id: 1,
+          scheduled_date: '2030-01-01',
+          exercises: [],
+        },
+      });
     if (path.endsWith('/programs/templates/hidden')) return route.fulfill({ json: [] });
     if (path.endsWith('/admin/users')) return route.fulfill({ json: [] });
     if (/\/coach\/clients\/\d+\/analytics$/.test(path))
@@ -1115,7 +1248,59 @@ async function mockApi(
           : [],
       });
     if (path.endsWith('/programs/assigned/701/revisions')) return route.fulfill({ json: [] });
+    if (path.endsWith('/programs/assigned/701/lifecycle'))
+      return route.fulfill({
+        json: {
+          program_id: 701,
+          status: 'active',
+          is_active: true,
+          start_date: '2030-01-01',
+          duration_weeks: 4,
+          current_revision_number: 2,
+          current_week_number: 2,
+          current_block: null,
+          next_block: null,
+          next_workout: {
+            id: 1,
+            scheduled_date: '2030-01-08',
+            week_number: 2,
+            day_number: 1,
+            title: 'Силовая A',
+            status: 'planned',
+          },
+          next_deload: null,
+          restarted_from_program_id: null,
+        },
+      });
     if (path.endsWith('/programs/assigned/701/blocks')) return route.fulfill({ json: [] });
+    if (path.endsWith('/programs/assigned/701/progression-proposals'))
+      return route.fulfill({
+        json: {
+          target_program_id: 701,
+          target_revision_number: 2,
+          target_workout_id: 1,
+          scheduled_date: '2030-01-01',
+          exercises: [],
+        },
+      });
+    if (path.endsWith('/coach/inbox'))
+      return route.fulfill({
+        json: {
+          date: '2030-01-01',
+          timezone: 'Europe/Moscow',
+          items: [],
+          total: 0,
+          counts: {
+            attention: 0,
+            pending_reviews: 0,
+            tasks: 0,
+            sessions: 0,
+            packages: 0,
+            payments: 0,
+          },
+          generated_at: '2030-01-01T10:00:00Z',
+        },
+      });
     if (path.endsWith('/coach/client-summaries'))
       return route.fulfill({
         json: {
@@ -1176,6 +1361,25 @@ async function mockApi(
           offset: 0,
         },
       });
+    if (path.endsWith('/coach/capacity'))
+      return route.fulfill({
+        json: {
+          active_client_count: withCoachClient ? 1 : 0,
+          pending_invite_count: 0,
+          open_task_count: 0,
+          attention_item_count: 0,
+          attention_client_count: 0,
+          attention_items_returned: 0,
+          attention_items_truncated: false,
+          clients_with_active_program_count: withCoachClient ? 1 : 0,
+          roster_coverage_percent: withCoachClient ? 100 : null,
+          capacity_band: '0_9',
+          next_capacity_boundary: 10,
+          scale_boundaries: [10, 30, 100],
+          bottlenecks: [],
+          generated_at: '2030-01-01T10:00:00Z',
+        },
+      });
     if (path.endsWith('/coach/clients'))
       return route.fulfill({
         json: withCoachClient
@@ -1210,7 +1414,9 @@ test('клиент входит и видит экран тренировки', 
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'С чего начнём?' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
 });
 
 test('цветовая система сохраняет иерархию в светлой и тёмной темах', async ({ page }) => {
@@ -1220,19 +1426,17 @@ test('цветовая система сохраняет иерархию в с�
 
   const authPanel = page.locator('.login-card');
   await expect(page.getByRole('heading', { name: 'Вернитесь к своему плану.' })).toBeVisible();
-  await expect(authPanel).toHaveCSS('background-color', 'rgb(244, 245, 242)');
-  await expect(authPanel).toHaveCSS('border-left-color', 'rgb(201, 205, 200)');
+  await expect(authPanel).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 
   const clientButton = page.getByRole('button', { name: 'Клиент' });
-  await expect(clientButton).toHaveCSS('border-radius', '12px');
-  await expect(clientButton).toHaveCSS('background-color', 'rgb(236, 237, 233)');
-  await expect(clientButton).toHaveCSS('color', 'rgb(22, 26, 23)');
+  await expect(clientButton).toHaveCSS('border-radius', '14px');
+  await expect(clientButton).toHaveCSS('background-color', 'rgb(240, 240, 240)');
+  await expect(clientButton).toHaveCSS('color', 'rgb(21, 21, 21)');
 
   await page.emulateMedia({ colorScheme: 'dark' });
-  await expect(authPanel).toHaveCSS('background-color', 'rgb(16, 19, 16)');
-  await expect(authPanel).toHaveCSS('border-left-color', 'rgb(58, 65, 58)');
-  await expect(clientButton).toHaveCSS('background-color', 'rgb(30, 34, 30)');
-  await expect(clientButton).toHaveCSS('color', 'rgb(238, 240, 234)');
+  await expect(authPanel).toHaveCSS('background-color', 'rgb(9, 11, 11)');
+  await expect(clientButton).toHaveCSS('background-color', 'rgb(27, 31, 31)');
+  await expect(clientButton).toHaveCSS('color', 'rgb(245, 245, 245)');
 
   await clientButton.click();
   const selectedDestination = page.getByRole('link', { name: 'Сегодня', exact: true });
@@ -1241,17 +1445,17 @@ test('цветовая система сохраняет иерархию в с�
     .getByRole('link', { name: 'Питание', exact: true })
     .locator('.app-bottom-nav__icon');
   await expect(selectedDestination).toHaveAttribute('aria-current', 'page');
-  await expect(selectedDestination).toHaveCSS('border-radius', '8px');
-  await expect(selectedDestination).toHaveCSS('background-color', 'rgb(30, 34, 30)');
+  const darkSelection = await expectSelectedChoice(selectedDestination);
   await expect(selectedDestinationIcon).toBeVisible();
   await expect(nutritionDestinationIcon).toBeVisible();
-  await expect(nutritionDestinationIcon.locator('svg')).toBeVisible();
+  await expect(nutritionDestinationIcon.locator('.yfc-icon')).toBeVisible();
   await expect(page.locator('.app-bottom-nav__sequence')).toHaveCount(0);
   await expect(selectedDestinationIcon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(selectedDestinationIcon).toHaveCSS('color', 'rgb(185, 234, 114)');
+  await expect(selectedDestinationIcon).toHaveCSS('color', darkSelection.color);
   await page.getByRole('button', { name: 'Включить светлую тему' }).click();
   await expect(selectedDestinationIcon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(selectedDestinationIcon).toHaveCSS('color', 'rgb(72, 100, 20)');
+  const lightSelection = await expectSelectedChoice(selectedDestination);
+  await expect(selectedDestinationIcon).toHaveCSS('color', lightSelection.color);
 });
 
 test('Web theme preference следует системе и сохраняет ручной выбор', async ({ page }) => {
@@ -1396,21 +1600,21 @@ test('Mobile Web и Telegram используют одну YFC palette и гео
 test('primary CTA лендинга и Войти остаются lime в обеих темах', async ({ page }) => {
   await page.goto('/');
   await page.mouse.move(0, 700);
-  const primary = page.locator('.landing-hero__actions').getByRole('link', {
-    name: 'Открыть приложение',
+  const primary = page.locator('.ref-hero .landing-hero__actions').getByRole('link', {
+    name: 'Начать со своими данными',
     exact: true,
   });
   const login = page.getByRole('link', { name: 'Войти' });
 
-  await expect(primary).toHaveCSS('background-color', 'rgb(182, 242, 56)');
-  await expect(primary).toHaveCSS('color', 'rgb(23, 32, 24)');
-  await expect(login).toHaveCSS('background-color', 'rgb(158, 224, 43)');
-  await expect(login).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(primary).toHaveCSS('color', 'rgb(9, 11, 11)');
+  await expect(login).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(login).toHaveCSS('color', 'rgb(9, 11, 11)');
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
-  await expect(primary).toHaveCSS('background-color', 'rgb(182, 242, 56)');
-  await expect(primary).toHaveCSS('color', 'rgb(23, 32, 24)');
-  await expect(login).toHaveCSS('background-color', 'rgb(168, 232, 58)');
-  await expect(login).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(primary).toHaveCSS('color', 'rgb(9, 11, 11)');
+  await expect(login).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(login).toHaveCSS('color', 'rgb(9, 11, 11)');
 });
 
 test('deep link показывает тренера до явного подтверждения', async ({ page }) => {
@@ -1496,7 +1700,7 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
         themeContentOffset: themeButton
           ? groupCenterOffset(
               Array.from(
-                themeButton.querySelectorAll('.app-bottom-nav__icon svg, .app-bottom-nav__label'),
+                themeButton.querySelectorAll('.app-bottom-nav__icon, .app-bottom-nav__label'),
               ),
               themeButton.getBoundingClientRect(),
             )
@@ -1570,7 +1774,7 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
   await expect(page.locator('.app-bottom-nav__brand')).not.toBeVisible();
   await expect(
     page.locator('.app-bottom-nav__primary a:visible, .app-bottom-nav__primary button:visible'),
-  ).toHaveCount(4);
+  ).toHaveCount(5);
 });
 
 test('app shell сохраняет композицию и доступность на целевых viewport', async ({ page }) => {
@@ -1590,7 +1794,7 @@ test('app shell сохраняет композицию и доступност�
     await page.setViewportSize(viewport);
     const primaryNavigation = page.locator('.app-bottom-nav__primary');
     const visibleDestinations = primaryNavigation.locator('a:visible, button:visible');
-    await expect(visibleDestinations).toHaveCount(4);
+    await expect(visibleDestinations).toHaveCount(viewport.width < 900 ? 5 : 4);
     for (const destination of await visibleDestinations.all()) {
       await expect(destination).toBeInViewport();
     }
@@ -1720,7 +1924,7 @@ test('desktop sidebar keeps trainer workspaces reachable at a short viewport', a
   await expect(
     page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }),
   ).not.toBeVisible();
-  await expect(page.getByRole('link', { name: 'Тренер', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Сегодня', exact: true })).toBeVisible();
   expect(await navigation.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
     true,
   );
@@ -1752,12 +1956,12 @@ test('профиль содержит уведомления, а карточк�
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Уведомления' }).click();
+  await page.goto('/app?section=profile#profile-notifications');
   await expect(page.getByRole('heading', { name: 'Каналы' })).toBeVisible();
   await expect(page.getByText('Личное напоминание', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Подписка' })).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.goto('/app?section=profile#profile-personal');
   const birthDate = page.getByLabel('Дата рождения');
   const birthDateControl = page.locator('.profile-birth-date-control');
   const [birthDateBox, birthDateControlBox] = await Promise.all([
@@ -1872,7 +2076,38 @@ test('notification settings explain unavailable Telegram and stale targets recov
   await page.goto('/app?section=profile#profile-notifications');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Уведомления' }).click();
+  await page.goto('/app?section=profile#profile-notifications');
+  const templatesDisclosure = page.locator('details.notification-templates');
+  await expect(templatesDisclosure).not.toHaveAttribute('open');
+  await templatesDisclosure.locator(':scope > summary').click();
+  await expect(templatesDisclosure).toHaveAttribute('open');
+  const reminderTemplates = page.locator('.notification-template-card');
+  await expect(reminderTemplates).toHaveCount(3);
+  const mealTemplate = reminderTemplates.filter({ hasText: 'Записать приём пищи' });
+  await expect(
+    mealTemplate.getByRole('button', { name: 'Сохранить шаблон «Записать приём пищи»' }),
+  ).toBeDisabled();
+  await mealTemplate.getByRole('checkbox', { name: 'Включить: Записать приём пищи' }).check();
+  await expect(mealTemplate.getByText('Окно 1')).toBeVisible();
+  await expect(
+    mealTemplate.getByRole('button', { name: 'Сохранить шаблон «Записать приём пищи»' }),
+  ).toBeEnabled();
+  for (const visualState of [
+    { scheme: 'light' as const, width: 1280, height: 900, name: 'desktop-light' },
+    { scheme: 'dark' as const, width: 1280, height: 900, name: 'desktop-dark' },
+    { scheme: 'light' as const, width: 390, height: 844, name: 'mobile-light' },
+    { scheme: 'dark' as const, width: 390, height: 844, name: 'mobile-dark' },
+  ]) {
+    await page.emulateMedia({ colorScheme: visualState.scheme, reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: visualState.width, height: visualState.height });
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', visualState.scheme);
+    const sectionBox = await page.locator('#profile-notifications').boundingBox();
+    expect(sectionBox).not.toBeNull();
+    expect(sectionBox!.width).toBeLessThanOrEqual(visualState.width);
+    await page.locator('#profile-notifications').screenshot({
+      path: `../.artifacts/tasks/84/evidence/visual/${visualState.name}.png`,
+    });
+  }
   const notificationCenter = page.locator('details.notification-center');
   await notificationCenter.locator(':scope > summary').click();
   await expect(notificationCenter).toHaveAttribute('open');
@@ -1919,6 +2154,27 @@ test('notification settings explain unavailable Telegram and stale targets recov
   await expect(page.getByText(/Связанный объект больше недоступен/)).toBeVisible();
 });
 
+test('notification nutrition deep links open the intended quick entry context', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page);
+  await page.addInitScript(() => sessionStorage.setItem('fit_access_token', 'test-token'));
+  await page.goto('/app?section=nutrition&date=2030-01-10&meal=lunch');
+  await expect(page.getByRole('dialog', { name: 'Быстрый ввод' })).toBeVisible();
+  await expect(
+    page.getByText(
+      'Обед · 2030-01-10. Это приблизительная запись: неизвестные БЖУ останутся без значения, а не станут нулём.',
+    ),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Закрыть добавление' }).click();
+
+  await page.goto('/app?section=nutrition&date=2030-01-10&hydration=quick');
+  await expect(
+    page.getByRole('region', { name: 'Другой объём' }).getByLabel('Объём, мл'),
+  ).toBeVisible();
+});
+
 test('notification empty and error states keep compact profile rhythm', async ({ page }) => {
   await mockApi(page, { notificationItems: [] });
   await page.route('**/api/v1/notifications/settings', (route) =>
@@ -1928,8 +2184,8 @@ test('notification empty and error states keep compact profile rhythm', async ({
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Уведомления' }).click();
-  await expect(page.getByText('Настройки временно недоступны')).toBeVisible();
+  await page.goto('/app?section=profile#profile-notifications');
+  await expect(page.getByText('Сервис временно недоступен. Попробуйте ещё раз.')).toBeVisible();
   const notificationCenter = page.locator('details.notification-center');
   await expect(
     notificationCenter.locator('summary').getByText('Уведомлений пока нет'),
@@ -2010,7 +2266,7 @@ test('профиль сохраняет иерархию Design V2 в light/dark
     await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
     await expect(page.getByText('Профиль стоит дополнить')).toBeVisible();
     await expect(page.getByText('1 из 3')).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Разделы профиля' })).toBeVisible();
+    await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'Личные данные и фитнес-профиль' }),
     ).toBeVisible();
@@ -2020,18 +2276,19 @@ test('профиль сохраняет иерархию Design V2 в light/dark
     ).toBe(true);
 
     if (current.width <= 390) {
-      const navTargets = await page
-        .getByRole('navigation', { name: 'Разделы профиля' })
-        .getByRole('link')
-        .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
-      expect(navTargets.every((height) => height >= 44)).toBe(true);
+      const summaryHeights = await page
+        .locator('.profile-settings > details.card-disclosure > summary')
+        .evaluateAll((summaries) =>
+          summaries.map((summary) => summary.getBoundingClientRect().height),
+        );
+      expect(summaryHeights.every((height) => height >= 44)).toBe(true);
     }
     await page.screenshot({
       path: `../.artifacts/screenshots/task-113A/profile-${current.width}x${current.height}-${current.theme}.png`,
     });
   }
 
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.locator('#profile-personal > summary').click();
   await page.getByLabel('Имя').fill('Черновик профиля');
   const saveProfile = page.getByRole('button', { name: 'Сохранить изменения' });
   await expect(saveProfile).toBeDisabled();
@@ -2044,7 +2301,7 @@ test('профиль сохраняет иерархию Design V2 в light/dark
   await expect(saveProfile).toBeEnabled();
   await expect(page.getByLabel('Имя')).toHaveValue('Черновик профиля');
 
-  await page.getByRole('link', { name: 'Доступ и безопасность' }).click();
+  await page.goto('/app?section=profile#profile-security');
   await expect(page.getByRole('heading', { name: 'Доступ и безопасность' })).toBeInViewport();
   const [securityHeading, dangerZone] = await Promise.all([
     page.getByRole('heading', { name: 'Доступ и безопасность' }).boundingBox(),
@@ -2066,7 +2323,7 @@ test('профиль не показывает completion prompt после за
   await expect(page.getByText('Настройки программы заполнены')).toHaveCount(0);
   await expect(page.getByText('3 из 3')).toHaveCount(0);
   await expect(page.locator('.profile-status-shell')).toHaveCount(0);
-  await expect(page.getByRole('navigation', { name: 'Разделы профиля' })).toBeVisible();
+  await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Личные данные и фитнес-профиль' })).toBeVisible();
   await page.screenshot({
     path: '../.artifacts/screenshots/task-113A/profile-complete-390x844-light.png',
@@ -2224,7 +2481,14 @@ test('training preferences сохраняют Mobile Web/TMA композици�
     await page.screenshot({
       path: `../.artifacts/task-54-training-preferences/${current.surface}-${current.width}x${current.height}-${current.theme}.png`,
     });
-    await openAppDestination(page, 'Программа');
+    await openAppDestination(page, 'План');
+    const planManagementLink = page.getByRole('link', {
+      name: 'Управление программой',
+      exact: true,
+    });
+    await expect(planManagementLink).toBeVisible();
+    await planManagementLink.click();
+    await expect(page).toHaveURL('/app?section=programs&view=manage');
     await page.getByRole('button', { name: 'Подобрать другую' }).click();
     const wizard = page.getByRole('dialog', { name: 'Цель' });
     await expect(wizard).toBeVisible();
@@ -2236,6 +2500,31 @@ test('training preferences сохраняют Mobile Web/TMA композици�
     ).toBe(true);
     await page.close();
   }
+});
+
+test('Task 293 trainer onboarding offers invite-or-skip after activation', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 1050 });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await mockApi(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await openAppDestination(page, 'Профиль');
+  await openCard(page, 'Тренер и приглашения');
+
+  const trainerCard = page
+    .getByRole('heading', { name: 'Режим тренера', exact: true })
+    .locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " card ")][1]');
+  const terms = page.getByRole('checkbox', { name: /принимаю условия/i });
+  await terms.check();
+  await page.getByRole('button', { name: 'Включить режим тренера' }).click();
+  await expect(trainerCard.getByText('Режим тренера включён')).toBeVisible();
+  await expect(
+    trainerCard.getByRole('link', { name: 'Пропустить и открыть Coach Today' }),
+  ).toHaveAttribute('href', '/coach');
+  await captureTask293Evidence(page, 'trainer-onboarding-mobile.png');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await captureTask293Evidence(page, 'trainer-onboarding-desktop.png');
 });
 
 test('пользователь напрямую включает режим тренера из профиля', async ({ browser }) => {
@@ -2283,7 +2572,7 @@ test('пользователь напрямую включает режим тр
   });
   expect(repeatedActivation).toMatchObject({ activated_now: false, is_active: true });
   const modeSwitch = page.getByRole('navigation', { name: 'Режим работы' });
-  await expect(modeSwitch.getByRole('link', { name: 'Для себя' })).toHaveAttribute(
+  await expect(modeSwitch.getByRole('link', { name: 'Для себя' }).first()).toHaveAttribute(
     'aria-current',
     'page',
   );
@@ -2314,13 +2603,21 @@ test('пользователь напрямую включает режим тр
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await openAppDestination(page, 'Профиль');
   await openCard(page, 'Тренер и приглашения');
-  await modeSwitch.getByRole('link', { name: 'Клиенты' }).click();
+  await modeSwitch.getByRole('link', { name: 'В кабинет тренера', exact: true }).first().click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Клиенты', exact: true }).first()).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .locator('.app-bottom-nav__primary')
+      .getByRole('link', { name: 'Клиенты', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();
   const modeCopyPadding = await page
     .locator('.trainer-mode-context__copy')
@@ -2368,10 +2665,10 @@ test('активные клиенты блокируют отключение р
   await mockApi(page, { coachClientName: longClientName, withCoachClient: true });
   await page.goto('/app');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page
-    .locator('#appMorePanel')
-    .getByRole('link', { name: 'Кабинет тренера', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
     .click();
   await page.getByText(longClientName, { exact: true }).first().click();
   const clientContext = page.locator('.trainer-mode-context__copy small');
@@ -2419,7 +2716,7 @@ test('рекомендация кардио меняется с целью, а �
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.locator('#profile-personal > summary').click();
   await page.getByText('Пульс и кардио-ориентиры').click();
 
   await page.getByLabel('Дата рождения').fill('1992-08-12');
@@ -2451,7 +2748,7 @@ test('поля профиля и питания выровнены на деск
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.locator('#profile-personal > summary').click();
   const profileControlTops = await page.locator('.profile-form-grid--fitness').evaluate((grid) =>
     Array.from(grid.querySelectorAll<HTMLElement>(':scope > .field'))
       .slice(0, 3)
@@ -2478,7 +2775,30 @@ test('поля профиля и питания выровнены на деск
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAppDestination(page, 'Питание');
-  await openCard(page, 'КБЖУ');
+  const nutritionSettings = page.locator('details.nutrition-target-settings');
+  await expect(nutritionSettings).toHaveCount(1);
+  await expect(nutritionSettings.locator(':scope > summary')).toHaveText('Настройки КБЖУ');
+  const nutritionSectionOrder = await page
+    .locator('.nutrition-experience > *')
+    .evaluateAll((nodes) => nodes.map((node) => String(node.className)));
+  const settingsIndex = nutritionSectionOrder.findIndex((name) =>
+    name.includes('nutrition-target-settings'),
+  );
+  const mealPlannerIndex = nutritionSectionOrder.findIndex((name) => name.includes('meal-planner'));
+  const groceryListIndex = nutritionSectionOrder.findIndex((name) => name.includes('grocery-list'));
+  expect(settingsIndex).toBeGreaterThanOrEqual(0);
+  expect(settingsIndex).toBeLessThan(mealPlannerIndex);
+  expect(settingsIndex).toBeLessThan(groceryListIndex);
+  await nutritionSettings.locator(':scope > summary').click();
+  await expect(nutritionSettings).toHaveAttribute('open', '');
+  await expect(nutritionSettings.locator(':scope > summary')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(nutritionSettings.locator('details.card-disclosure')).toHaveCount(0);
+  await expect(
+    nutritionSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
+  ).toBeVisible();
   const nutritionControlTops = await page
     .locator('.nutrition-form-grid')
     .first()
@@ -2512,10 +2832,58 @@ test('поля профиля и питания выровнены на деск
 test('поля адаптируются к разным iPhone, а пример программы открывает состав', async ({ page }) => {
   await page.setViewportSize({ width: 440, height: 956 });
   await mockApi(page);
+  let staleAssignmentSent = false;
+  await page.route('**/api/v1/programs/templates/10', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    return route.fulfill({
+      json: {
+        id: 10,
+        title: 'Программа обновлена после предпросмотра',
+        slug: 'full-body-3-days',
+        goal: 'recomposition',
+        level: 'beginner',
+        split_type: 'full_body',
+        owner_user_id: null,
+        owner_telegram_user_id: null,
+        owner_full_name: null,
+        created_by_user_id: null,
+        is_public: true,
+        is_example: true,
+        is_assigned_to_current_user: false,
+        is_active_for_current_user: false,
+        can_edit: false,
+        assigned_by_user_id: null,
+        assigned_by_full_name: null,
+        assigned_program_id: null,
+        assigned_program_status: null,
+        assigned_program_start_date: null,
+        assigned_program_duration_weeks: null,
+        assigned_program_schedule_weekdays: null,
+        current_revision_number: 2,
+        assigned_program_updated: false,
+        future_workouts_updated: 0,
+        assigned_program_revision_number: null,
+        default_duration_weeks: 1,
+        provenance_type: 'YFC_GENERIC',
+        provenance: null,
+        program_metadata: null,
+        days: fullBodyThreeDayDays(),
+      },
+    });
+  });
+  await page.route('**/api/v1/programs/templates/10/assign-to-me', async (route) => {
+    staleAssignmentSent = true;
+    return route.fulfill({ status: 204, body: '' });
+  });
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Прогресс');
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Тело$/ })
+    .click();
+  await page.locator('.progress-measurement-editor > summary').click();
   const measurementForm = page.locator('.measurement-diary__form');
   const dateField = measurementForm.locator('input[type="date"]');
   const weightField = measurementForm.getByLabel('Вес, кг');
@@ -2542,8 +2910,9 @@ test('поля адаптируются к разным iPhone, а пример 
   );
 
   await openAppDestination(page, 'Питание');
-  await expect(nutritionDaySummary(page)).toHaveCount(1);
-  await expect(nutritionDaySummary(page)).toBeVisible();
+  const nutritionDiary = page.locator('.nutrition-day-summary');
+  await expect(nutritionDiary).toHaveCount(1);
+  await expect(nutritionDiary).toBeVisible();
   expect(
     await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
@@ -2581,9 +2950,16 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(search).toHaveValue('Тяга');
   await expect(page.getByText('Тяга блока', { exact: true })).toBeVisible();
 
-  await openAppDestination(page, 'Программа');
+  await openAppDestination(page, 'План');
   await expect(page.getByRole('heading', { name: 'Текущий план от тренера' })).toBeVisible();
-  await expect(page.getByText('Назначил тренер Тренер Анна')).toBeVisible();
+  const planManagementLink = page.getByRole('link', {
+    name: 'Управление программой',
+    exact: true,
+  });
+  await expect(planManagementLink).toBeVisible();
+  await planManagementLink.click();
+  await expect(page).toHaveURL('/app?section=programs&view=manage');
+  await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
   await page.getByText('Все этапы и изменения', { exact: true }).click();
   await expect(page.getByText('Тренировочные блоки ещё не настроены')).toBeVisible();
   await expect(page.getByText('Программа назначена')).toBeVisible();
@@ -2592,15 +2968,268 @@ test('поля адаптируются к разным iPhone, а пример 
   const example = page.getByRole('button', {
     name: 'Посмотреть шаблон «Программа на всё тело — 3 дня»',
   });
-  await expect(example).toContainText('Рекомпозиция · Начальный уровень · 1 тренировка в цикле');
+  await expect(example).toContainText('Рекомпозиция · Начальный уровень · 3 тренировки в цикле');
   await expect(example).toContainText('Готовый шаблон');
   await expect(example).not.toContainText('recomposition');
   await expect(example).not.toContainText('beginner');
+  const previewEvidenceDir = path.resolve(
+    '..',
+    '.artifacts/runtime/tests/playwright/issue-1185-program-preview',
+  );
+  mkdirSync(previewEvidenceDir, { recursive: true });
+  const originalViewport = page.viewportSize();
+  const originalTheme = await page.locator('html').getAttribute('data-color-scheme');
+  const setTheme = async (theme: 'dark' | 'light') => {
+    await page.locator('html').evaluate((element, colorScheme) => {
+      element.setAttribute('data-color-scheme', colorScheme);
+    }, theme);
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+  };
+
+  // Real-browser evidence of the implementation (API fixtures, not production data).
+  await page.setViewportSize({ width: 393, height: 900 });
+  const sourceCard = example.locator('xpath=ancestor::article');
+  for (const theme of ['dark', 'light'] as const) {
+    await setTheme(theme);
+    await sourceCard.screenshot({
+      path: path.join(previewEvidenceDir, `card-${theme}-393.png`),
+      animations: 'disabled',
+    });
+  }
+
   await example.click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  const previewDialog = page.locator('.program-example-modal');
+  const previewPanel = page.locator('.program-example-modal__panel');
+  const previewContent = page.locator('.program-example-modal__content');
+  await expect(previewDialog).toBeVisible();
+  for (const width of [320, 360, 393, 430, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(previewPanel).toBeVisible();
+    const panelBox = await previewPanel.boundingBox();
+    expect(panelBox).not.toBeNull();
+    expect(panelBox!.x).toBeGreaterThanOrEqual(-1);
+    expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(width + 1);
+    if (width <= 600) {
+      expect(Math.abs(panelBox!.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(panelBox!.width - width)).toBeLessThanOrEqual(1);
+    } else {
+      expect(Math.abs(panelBox!.x + panelBox!.width - width)).toBeLessThanOrEqual(1);
+      expect(panelBox!.width).toBeLessThanOrEqual(651);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    if (width <= 600) {
+      const actions = page.locator('.program-example-modal__actions');
+      const primaryAction = actions.getByRole('button', {
+        name: 'Настроить расписание и запустить',
+      });
+      const [actionsBox, primaryBox] = await Promise.all([
+        actions.boundingBox(),
+        primaryAction.boundingBox(),
+      ]);
+      expect(actionsBox).not.toBeNull();
+      expect(primaryBox).not.toBeNull();
+      const actionPadding = await actions.evaluate((element) => {
+        const styles = getComputedStyle(element);
+        return Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+      });
+      expect(primaryBox!.width).toBeGreaterThanOrEqual(actionsBox!.width - actionPadding - 2);
+      expect(primaryBox!.height).toBeLessThanOrEqual(50);
+      expect(
+        await primaryAction.evaluate((element) => element.scrollHeight <= element.clientHeight),
+      ).toBe(true);
+    }
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(theme);
+      await page.screenshot({
+        path: path.join(previewEvidenceDir, `preview-${theme}-${width}.png`),
+        animations: 'disabled',
+      });
+    }
+  }
+
+  await page.setViewportSize({ width: 320, height: 900 });
+  const lastDay = previewPanel.locator('.program-example-day').last();
+  await lastDay.locator('summary').click();
+  const lastExercise = lastDay.locator('li').last();
+  await lastExercise.scrollIntoViewIfNeeded();
+  const [lastExerciseBox, exerciseActionsBox] = await Promise.all([
+    lastExercise.boundingBox(),
+    page.locator('.program-example-modal__actions').boundingBox(),
+  ]);
+  expect(lastExerciseBox).not.toBeNull();
+  expect(exerciseActionsBox).not.toBeNull();
+  expect(lastExerciseBox!.y + lastExerciseBox!.height).toBeLessThanOrEqual(
+    exerciseActionsBox!.y + 1,
+  );
+  await previewContent.evaluate((panel) =>
+    panel.scrollTo({ top: panel.scrollHeight, behavior: 'instant' }),
+  );
+  await expect
+    .poll(() =>
+      previewContent.evaluate(
+        (panel) => panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1,
+      ),
+    )
+    .toBe(true);
+  const sourceNote = page.locator('.program-preview-source');
+  await expect(sourceNote).toBeVisible();
+  const [sourceNoteBox, bottomActionsBox] = await Promise.all([
+    sourceNote.boundingBox(),
+    page.locator('.program-example-modal__actions').boundingBox(),
+  ]);
+  expect(sourceNoteBox).not.toBeNull();
+  expect(bottomActionsBox).not.toBeNull();
+  expect(sourceNoteBox!.y + sourceNoteBox!.height).toBeLessThanOrEqual(bottomActionsBox!.y + 1);
+  for (const theme of ['dark', 'light'] as const) {
+    await setTheme(theme);
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, `preview-scroll-bottom-${theme}-320.png`),
+      animations: 'disabled',
+    });
+  }
+
+  await page.setViewportSize({ width: 393, height: 900 });
+  await page.getByRole('button', { name: 'Настроить расписание и запустить' }).click();
+  await expect(page.locator('.program-preview-stale')).toHaveText(
+    'Данные обновились. Проверьте сведения выше и повторите назначение.',
+  );
+  await setTheme('light');
+  await page.screenshot({
+    path: path.join(previewEvidenceDir, 'stale-light-393.png'),
+    animations: 'disabled',
+  });
+  expect(staleAssignmentSent).toBe(false);
+  await page.getByRole('button', { name: 'Закрыть сообщение' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(previewDialog).toHaveCount(0);
+  await expect(example).toBeFocused();
+
+  const ownProgram = page.getByRole('button', {
+    name: 'Посмотреть программу «Моя программа — длинное название для проверки переноса строк и действий»',
+  });
+  await ownProgram.click();
+  await expect(previewDialog).toBeVisible();
+  await expect(
+    page.getByText('Владелец: вы. Вы можете редактировать свою программу.'),
+  ).toBeVisible();
+  for (const theme of ['dark', 'light'] as const) {
+    await setTheme(theme);
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, `own-${theme}-393.png`),
+      animations: 'disabled',
+    });
+  }
+  await page.locator('.program-example-modal__close').click();
+  await expect(previewDialog).toHaveCount(0);
+
+  const legacyProgram = page.getByRole('button', {
+    name: 'Посмотреть программу «Импортированная программа без метаданных»',
+  });
+  await legacyProgram.click();
+  await expect(previewDialog).toBeVisible();
+  await expect(page.getByText('Владелец: Архивный автор.')).toBeVisible();
+  await expect(page.getByText('Нет данных').first()).toBeVisible();
+  for (const theme of ['dark', 'light'] as const) {
+    await setTheme(theme);
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, `legacy-${theme}-393.png`),
+      animations: 'disabled',
+    });
+  }
+  await page.locator('.program-example-modal__close').click();
+  await expect(previewDialog).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Посмотреть план' }).click();
+  await expect(previewDialog).toBeVisible();
+  await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Эта программа назначена тренером. Изменение недоступно.'),
+  ).toBeVisible();
+  const trainerActions = page.locator('.program-example-modal__actions');
+  const trainerNotice = trainerActions.locator('.program-example-modal__readonly');
+  await expect(trainerActions.locator('button')).toHaveCount(0);
+  await trainerNotice.scrollIntoViewIfNeeded();
+  const [trainerNoticeBox, trainerActionsBox] = await Promise.all([
+    trainerNotice.boundingBox(),
+    trainerActions.boundingBox(),
+  ]);
+  const trainerPanelBox = await previewPanel.boundingBox();
+  expect(trainerNoticeBox).not.toBeNull();
+  expect(trainerActionsBox).not.toBeNull();
+  expect(trainerPanelBox).not.toBeNull();
+  const trainerActionsPadding = await trainerActions.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      left: Number.parseFloat(styles.paddingLeft),
+      right: Number.parseFloat(styles.paddingRight),
+    };
+  });
+  const trainerContentLeft = trainerActionsBox!.x + trainerActionsPadding.left;
+  const trainerContentRight =
+    trainerActionsBox!.x + trainerActionsBox!.width - trainerActionsPadding.right;
+  expect(trainerNoticeBox!.x).toBeGreaterThanOrEqual(trainerContentLeft - 1);
+  expect(trainerNoticeBox!.x + trainerNoticeBox!.width).toBeLessThanOrEqual(
+    trainerContentRight + 1,
+  );
+  expect(trainerNoticeBox!.width).toBeGreaterThanOrEqual(
+    trainerContentRight - trainerContentLeft - 2,
+  );
+  expect(trainerNoticeBox!.y).toBeGreaterThanOrEqual(trainerPanelBox!.y - 1);
+  expect(trainerNoticeBox!.y + trainerNoticeBox!.height).toBeLessThanOrEqual(
+    trainerPanelBox!.y + trainerPanelBox!.height + 1,
+  );
+  for (const theme of ['dark', 'light'] as const) {
+    await setTheme(theme);
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, `trainer-${theme}-393.png`),
+      animations: 'disabled',
+    });
+  }
+  await page.locator('.program-example-modal__close').click();
+  await expect(previewDialog).toHaveCount(0);
+
+  await sourceCard.getByRole('button', { name: 'Запустить' }).click();
+  const assignmentDialog = page.locator('.assignment-modal');
+  await expect(assignmentDialog).toBeVisible();
+  await assignmentDialog.getByRole('button', { name: 'Назначить по расписанию' }).click();
+  const replacementDialog = page.getByRole('dialog', { name: 'Заменить активную программу?' });
+  await expect(replacementDialog).toBeVisible();
+  await setTheme('dark');
+  await page.screenshot({
+    path: path.join(previewEvidenceDir, 'confirmation-dark-393.png'),
+    animations: 'disabled',
+  });
+  await setTheme('light');
+  await page.screenshot({
+    path: path.join(previewEvidenceDir, 'confirmation-light-393.png'),
+    animations: 'disabled',
+  });
+  await replacementDialog.getByRole('button', { name: 'Отмена' }).click();
+  await assignmentDialog.getByRole('button', { name: 'Закрыть настройку расписания' }).click();
+  await expect(assignmentDialog).toHaveCount(0);
+  await example.click();
+  await expect(previewDialog).toBeVisible();
+
+  if (originalViewport) await page.setViewportSize(originalViewport);
+  await page.locator('html').evaluate((element, colorScheme) => {
+    if (colorScheme == null) element.removeAttribute('data-color-scheme');
+    else element.setAttribute('data-color-scheme', colorScheme);
+  }, originalTheme);
+
   await expect(page.getByRole('heading', { name: 'День 1. Всё тело' })).toBeVisible();
-  await expect(page.getByRole('dialog').getByText('Тяга блока')).toBeVisible();
-  await expect(page.getByRole('dialog').getByText('3 подх. × 10–12 · отдых 90 сек.')).toBeVisible();
+  const firstExercise = page.getByRole('listitem').filter({ hasText: 'Тяга блока' });
+  await expect(firstExercise).toHaveCount(1);
+  await expect(firstExercise.getByText('Тяга блока')).toBeVisible();
+  await expect(firstExercise.getByText('3 подх. × 10–12 · отдых 90 сек.')).toBeVisible();
   const [programPanelBox, programHeadBox] = await Promise.all([
     page.locator('.program-example-modal__panel').boundingBox(),
     page.locator('.program-example-modal__head').boundingBox(),
@@ -2631,21 +3260,136 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(page.locator('.exercise-lightbox')).toHaveCount(0);
 });
 
-test('мастер подбора сохраняет ответы и ведёт к явному запуску на mobile и desktop', async ({
+test('детерминированный подбор проходит preview, no-compatible и explicit confirm', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
+  let noCompatiblePreview = false;
+  let confirmPayload: Record<string, unknown> | null = null;
+  await page.route('**/api/v1/programs/generator/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/preview')) {
+      if (noCompatiblePreview) {
+        return route.fulfill({
+          json: {
+            status: 'no_compatible',
+            selection_policy_version: 'program_generator_v1',
+            input_fingerprint: 'preview-no-compatible',
+            message: 'Не удалось подобрать программу под все выбранные ограничения.',
+            reason_codes: ['duration_incompatible', 'equipment_no_canonical_substitution'],
+            fit_reasons: [],
+            tradeoffs: [],
+            adaptations: [],
+            unresolved_constraints: [],
+            active_program: null,
+          },
+        });
+      }
+      return route.fulfill({
+        json: {
+          status: 'preview',
+          selection_policy_version: 'program_generator_v1',
+          input_fingerprint: 'preview-1',
+          message:
+            'Предпросмотр готов. Программа будет сохранена только после явного подтверждения.',
+          draft_token: 'signed-draft-token',
+          source: {
+            template_id: 10,
+            slug: 'full-body-3-days',
+            title: 'Каноническая программа на всё тело',
+            goal: 'recomposition',
+            level: 'beginner',
+            split_type: 'full_body',
+            provenance_type: 'YFC_GENERIC',
+          },
+          program: {
+            title: 'Подобранная программа · Каноническая программа на всё тело',
+            goal: 'recomposition',
+            level: 'beginner',
+            split_type: 'full_body',
+            estimated_duration_minutes: 52,
+            days: [
+              {
+                day_number: 1,
+                title: 'Всё тело',
+                estimated_duration_minutes: 52,
+                exercises: [
+                  {
+                    exercise_id: 1,
+                    source_exercise_id: 2,
+                    exercise_title: 'Тяга блока',
+                    metric_type: 'strength',
+                    movement_pattern: 'horizontal_pull',
+                    prescribed_sets: 3,
+                    prescribed_reps: '10–12',
+                    prescribed_duration_minutes: null,
+                    rest_seconds: 90,
+                    notes: null,
+                    superset_group: null,
+                    superset_order: null,
+                    prescription: { segments: [{ sets: 3, reps: '10–12' }] },
+                    group_id: null,
+                    group_kind: null,
+                    group_order: null,
+                  },
+                ],
+              },
+            ],
+          },
+          fit_reasons: [
+            'Цель и явный уровень опыта совпадают с source-backed структурой.',
+            'Оборудование проверено по каноническим упражнениям.',
+          ],
+          tradeoffs: ['Предпочтительная длительность остаётся планировочным ориентиром.'],
+          adaptations: [
+            {
+              code: 'equipment_substitution',
+              message: 'Упражнение заменено на каноническую вариацию.',
+              day_number: 1,
+              source_exercise_id: 2,
+              replacement_exercise_id: 1,
+            },
+          ],
+          unresolved_constraints: [],
+          reason_codes: [],
+          active_program: null,
+        },
+      });
+    }
+    if (path.endsWith('/confirm')) {
+      confirmPayload = request.postDataJSON() as Record<string, unknown>;
+      return route.fulfill({
+        json: {
+          status: 'confirmed',
+          idempotent: false,
+          assigned_program_id: 88,
+          workouts_created: 3,
+          template: { title: 'Подобранная программа · Каноническая программа на всё тело' },
+        },
+      });
+    }
+    return route.continue();
+  });
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
-  await openAppDestination(page, 'Программа');
+  await openAppDestination(page, 'План');
 
-  const launcher = page.getByRole('button', { name: 'Подобрать другую' });
+  const planManagementLink = page.getByRole('link', {
+    name: 'Управление программой',
+    exact: true,
+  });
+  await expect(planManagementLink).toBeVisible();
+  await planManagementLink.click();
+  await expect(page).toHaveURL('/app?section=programs&view=manage');
+
+  const launcher = page.getByRole('button', { name: 'Подобрать программу' });
   await launcher.click();
   const wizard = page.getByRole('dialog', { name: 'Цель' });
   await expect(wizard).toBeVisible();
-  await expect(wizard.getByText(/профиль от этого не обновится/i)).toBeVisible();
+  await expect(wizard.getByText(/профиль не обновится/i)).toBeVisible();
   const progressBounds = await wizard.locator('.program-wizard__progress').boundingBox();
   const prefillBounds = await wizard.locator('.program-wizard__prefill').boundingBox();
   expect(progressBounds).not.toBeNull();
@@ -2658,79 +3402,112 @@ test('мастер подбора сохраняет ответы и ведёт 
     })),
   ).toEqual({ client: 360, scroll: 360 });
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-113A/program-stepper-360x800-light.png',
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-input-mobile-light.png',
   });
+
+  await page.evaluate(() => {
+    localStorage.setItem('app-theme', 'dark');
+    window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await expect(wizard.locator('.program-wizard__panel')).toHaveCSS('color', 'rgb(245, 245, 245)');
+  await expect(wizard.locator('.program-wizard-choice').first()).toHaveCSS(
+    'color',
+    'rgb(245, 245, 245)',
+  );
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-input-mobile-dark.png',
+  });
+  await page.evaluate(() => {
+    localStorage.setItem('app-theme', 'light');
+    window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
 
   await wizard.getByRole('radio', { name: /Рекомпозиция/ }).check();
   await wizard.getByRole('button', { name: 'Далее' }).click();
   await page.getByRole('radio', { name: /Начинаю или возвращаюсь/ }).check();
   await page.getByRole('button', { name: 'Далее' }).click();
-  const threeWorkouts = page.locator('input[name="recommendation-frequency"][value="3"]');
+  const threeWorkouts = page.locator('input[name="generator-frequency"][value="3"]');
   await threeWorkouts.check();
   await page.getByRole('button', { name: 'Назад' }).click();
   await expect(page.getByRole('radio', { name: /Начинаю или возвращаюсь/ })).toBeChecked();
   await page.getByRole('button', { name: 'Далее' }).click();
   await expect(threeWorkouts).toBeChecked();
   await page.getByRole('button', { name: 'Далее' }).click();
-  await page.getByRole('radio', { name: /Тренажёрный зал/ }).check();
+  await page.getByRole('radio', { name: /60 минут/ }).check();
   await page.getByRole('button', { name: 'Далее' }).click();
-  await page.getByRole('radio', { name: /Учесть только доступное/ }).check();
-  await page.getByRole('checkbox', { name: 'Только собственный вес' }).check();
-  await page.getByRole('button', { name: 'Показать рекомендацию' }).click();
+  await page.getByRole('radio', { name: /Тренажёрный зал/ }).check();
+  await page.getByRole('checkbox', { name: 'Гантели' }).check();
+  await page.getByRole('button', { name: 'Показать preview' }).click();
 
-  const result = page.getByRole('dialog', { name: 'Ваш результат' });
-  await expect(
-    result.getByRole('heading', { name: 'Программа на всё тело — 3 дня' }),
-  ).toBeVisible();
-  await expect(result.getByText(/Всё тело — основные мышечные группы/)).toBeVisible();
-  await expect(result.getByText(/не является медицинской рекомендацией/i)).toBeVisible();
+  const result = page.getByRole('dialog', { name: 'Предпросмотр программы' });
+  await expect(result.getByRole('heading', { name: /Подобранная программа/ })).toBeVisible();
+  await expect(result.getByText('Почему выбрано')).toBeVisible();
+  await expect(result.getByText('Адаптации')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await result
       .locator('.program-wizard__panel')
       .evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
-  await expect(result.getByText('Рекомпозиция', { exact: true })).toBeVisible();
-  const frequencySummary = result
-    .getByText('Частота', { exact: true })
-    .locator('xpath=following-sibling::dd');
-  await expect(frequencySummary).toContainText('3 тренировки в неделю');
-  await expect(frequencySummary).toContainText('В программе: 3 тренировки в цикле');
-  const mobileSummary = await result.locator('.program-wizard-result__summary').boundingBox();
-  expect(mobileSummary).not.toBeNull();
-  expect(mobileSummary!.height).toBeGreaterThan(150);
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-113A/program-result-390x844-light.png',
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-preview-mobile-light.png',
   });
 
-  await result.getByRole('button', { name: 'Посмотреть план' }).click();
-  const preview = page.getByRole('dialog', { name: /Программа на всё тело — 3 дня/ });
-  await expect(
-    preview.getByRole('button', { name: 'Настроить расписание и запустить' }),
-  ).toBeVisible();
-  await preview.locator('.program-example-modal__close').click();
-
   await page.setViewportSize({ width: 1440, height: 900 });
-  await launcher.click();
-  const desktopPanel = page
-    .getByRole('dialog', { name: 'Ваш результат' })
-    .locator('.program-wizard__panel');
+  const desktopPanel = result.locator('.program-wizard__panel');
   const desktopBox = await desktopPanel.boundingBox();
   expect(desktopBox).not.toBeNull();
   expect(desktopBox!.width).toBeLessThanOrEqual(760);
   expect(Math.abs(desktopBox!.x + desktopBox!.width / 2 - 720)).toBeLessThanOrEqual(1);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Ваш результат' })).toHaveCount(0);
-  await expect(launcher).toBeFocused();
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-preview-desktop.png',
+  });
+
+  await result.getByRole('button', { name: 'Изменить параметры' }).click();
+  noCompatiblePreview = true;
+  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await expect(page.getByText('Совместимый вариант не найден')).toBeVisible();
+  await expect(page.getByText(/длительность несовместима/i)).toBeVisible();
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-no-compatible.png',
+  });
+
+  noCompatiblePreview = false;
+  await page.getByRole('button', { name: 'Изменить параметры' }).click();
+  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Подтвердить программу' }).click();
+  await expect(page.getByRole('heading', { name: 'Программа подтверждена' })).toBeVisible();
+  expect(confirmPayload).toMatchObject({
+    draft_token: 'signed-draft-token',
+    replace_active: false,
+  });
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-confirmed.png',
+  });
 });
 
 test('клиент собирает и переупорядочивает личную программу', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
+  await page.route(`**${STAGE4_THUMBNAIL_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg',
+      contentType: 'image/jpeg',
+    }),
+  );
+  await page.route(`**${STAGE4_ANIMATION_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif',
+      contentType: 'image/gif',
+    }),
+  );
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
-  await openAppDestination(page, 'Программа');
+  await openAppDestination(page, 'План');
+  await page.goto('/app?section=programs&view=manage');
 
   const builder = page.locator('#program-builder');
   await expect(builder.getByRole('heading', { name: 'Создать свою программу' })).toBeVisible();
@@ -2756,23 +3533,33 @@ test('клиент собирает и переупорядочивает лич
   await settings.locator('summary').click();
   await expect(goal).toBeHidden();
 
-  const exercisePicker = builder.getByRole('combobox', { name: 'Поиск упражнения' }).first();
-  await exercisePicker.fill('Тяга');
-  await builder.getByRole('button', { name: 'Техника: Тяга блока' }).click();
+  const exercisePicker = builder.getByRole('button', { name: 'Поиск упражнения' }).first();
+  await exercisePicker.click();
+  const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
+  const exerciseSearch = pickerSheet.getByRole('searchbox', { name: 'Поиск упражнения' });
+  await exerciseSearch.fill('Тяга');
+  await pickerSheet.getByRole('button', { name: 'Техника: Тяга блока' }).click();
   await expect(page.getByRole('dialog', { name: /Тяга блока/ })).toBeVisible();
   const closeGuide = page.getByRole('button', { name: 'Закрыть карточку упражнения' });
   await expect(closeGuide).toBeInViewport();
   await closeGuide.click();
-  await expect(exercisePicker).toHaveValue('Тяга');
-  await exercisePicker.focus();
-  await builder.getByRole('option', { name: /Тяга блока/ }).click();
-  await expect(exercisePicker).toHaveValue('Тяга блока');
+  await exercisePicker.click();
+  await expect(exerciseSearch).toHaveValue('Тяга');
+  await expect(
+    pickerSheet.locator('.exercise-picker__option img[data-media-mode="static-poster"]'),
+  ).toHaveCount(1);
+  await page.screenshot({
+    path: '../.artifacts/tasks/390/evidence/screenshots/program-builder-mobile-390x844-picker.png',
+    fullPage: true,
+  });
+  await pickerSheet.getByRole('button', { name: /^Тяга блока/ }).click();
+  await expect(exercisePicker).toContainText('Тяга блока');
   await expect(builder.getByText('1 тренировка · 1 упр.', { exact: true })).toBeVisible();
 
   await builder.getByRole('button', { name: 'Добавить упражнение' }).first().click();
-  const exercisePickers = builder.getByRole('combobox', { name: 'Поиск упражнения' });
-  await expect(exercisePickers.nth(0)).toHaveValue('Тяга блока');
-  await expect(exercisePickers.nth(1)).toHaveValue('');
+  const exercisePickers = builder.getByRole('button', { name: 'Поиск упражнения' });
+  await expect(exercisePickers.nth(0)).toContainText('Тяга блока');
+  await expect(exercisePickers.nth(1)).toContainText('Выбрать упражнение');
   const moveExerciseDown = builder.getByRole('button', {
     name: 'Переместить упражнение 1 ниже',
   });
@@ -2783,8 +3570,8 @@ test('клиент собирает и переупорядочивает лич
     0,
   );
   await expect(exerciseRows.nth(1).getByRole('button', { name: 'Техника и детали' })).toBeVisible();
-  await expect(exercisePickers.nth(0)).toHaveValue('');
-  await expect(exercisePickers.nth(1)).toHaveValue('Тяга блока');
+  await expect(exercisePickers.nth(0)).toContainText('Выбрать упражнение');
+  await expect(exercisePickers.nth(1)).toContainText('Тяга блока');
   await builder.getByRole('button', { name: 'Удалить упражнение 1 из дня 1' }).click();
 
   await builder.getByRole('button', { name: 'Добавить день' }).click();
@@ -2826,7 +3613,7 @@ test('сенсорное поле даты сохраняет нативный �
   browser,
 }) => {
   const context = await browser.newContext({
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
     viewport: { width: 390, height: 844 },
     hasTouch: true,
     isMobile: true,
@@ -2838,26 +3625,31 @@ test('сенсорное поле даты сохраняет нативный �
     await page.goto('/app');
     await page.getByRole('button', { name: 'Клиент' }).click();
     await openAppDestination(page, 'Прогресс');
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Тело$/ })
+      .click();
+    await page.locator('.progress-measurement-editor > summary').click();
     const dateField = page.getByLabel('Дата');
     const dateControl = page.locator('.diary-date-control');
     await expect(dateField).toHaveAttribute('type', 'date');
-    const fallbackIcon = await dateControl.evaluate((element) => {
-      const style = getComputedStyle(element, '::after');
+    const calendarIcon = dateControl.locator('svg[data-icon="calendar"]');
+    await expect(calendarIcon).toBeVisible();
+    await expect(calendarIcon).toHaveAttribute('viewBox', '0 0 24 24');
+    await expect(calendarIcon).toHaveAttribute('aria-hidden', 'true');
+    const fallbackIcon = await calendarIcon.evaluate((element) => {
+      const style = getComputedStyle(element);
       return {
-        content: style.content,
         height: style.height,
-        mask: style.maskImage || style.getPropertyValue('-webkit-mask-image'),
         pointerEvents: style.pointerEvents,
         width: style.width,
       };
     });
     expect(fallbackIcon).toMatchObject({
-      content: '""',
-      height: '18px',
+      height: '20px',
       pointerEvents: 'none',
-      width: '18px',
+      width: '20px',
     });
-    expect(fallbackIcon.mask).toContain('svg');
 
     await dateControl.scrollIntoViewIfNeeded();
     const dateControlBox = await dateControl.boundingBox();
@@ -2898,6 +3690,11 @@ test('поля даты остаются внутри анкеты клиент�
   await mockApi(page, { withCoachClient: true });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .click();
   await page.getByRole('button', { name: /Тестовый клиент/ }).click();
   await page.getByText('Профиль клиента', { exact: true }).click();
 
@@ -2912,6 +3709,7 @@ test('поля даты остаются внутри анкеты клиент�
   );
 
   await page.getByText('Тренировки, прогресс и замеры', { exact: true }).click();
+  await page.locator('#measurement-diary > summary').click();
 
   const dateField = page.getByLabel('Дата', { exact: true });
   const dateBox = await dateField.boundingBox();
@@ -2936,11 +3734,19 @@ test('тренер открывает кабинет', async ({ page }) => {
   await mockApi(page);
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
+  await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Тренер', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .locator('.app-bottom-nav__primary')
+      .getByRole('link', { name: 'Клиенты', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'Админ-панель' })).toHaveCount(0);
   await expect(page.getByText('Клиентов пока нет')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();
@@ -2953,9 +3759,13 @@ test('тренер быстро переходит между программо
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
 
-  await page.getByRole('tab', { name: 'Назначенные программы' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Программы', exact: true })
+    .click();
   await openCard(page, 'Программы клиентов');
-  await expect(page.getByText('План клиента на четыре недели')).toBeVisible();
+  await expect(page.getByText('План клиента на четыре недели', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Открыть клиента' }).click();
 
   await expect(page.getByText('Текущая программа клиента')).toBeVisible();
@@ -2971,4 +3781,210 @@ test('тренер быстро переходит между программо
   await expect(assignmentContext.nth(0)).toHaveValue('2');
   await expect(assignmentContext.nth(1)).toHaveValue('701');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+function issue1229Template(source: 'own' | 'trainer' | 'foreign' | 'none') {
+  const assigned = source !== 'none';
+  return {
+    ...previewTemplates()[0],
+    title: source === 'own' ? 'Моя активная программа' : 'Активная программа',
+    is_example: false,
+    is_public: false,
+    owner_user_id: source === 'own' ? 1 : source === 'foreign' ? 77 : null,
+    created_by_user_id: source === 'own' ? 1 : 99,
+    is_assigned_to_current_user: assigned,
+    is_active_for_current_user: assigned,
+    assigned_by_user_id: source === 'trainer' ? 99 : null,
+    assigned_by_full_name: source === 'trainer' ? 'Тренер Анна' : null,
+    assigned_program_id: assigned ? 501 : null,
+    assigned_program_status: assigned ? 'active' : null,
+    assigned_program_start_date: assigned ? '2030-01-01' : null,
+    assigned_program_duration_weeks: assigned ? 4 : null,
+    current_revision_number: assigned ? 1 : null,
+    can_edit: source === 'own',
+  };
+}
+
+test('Issue #1229 keeps active deletion full-width, confirmable and single-submit', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const activeTemplate = issue1229Template('own');
+  let deleted = false;
+  let deleteRequests = 0;
+  let releaseDelete!: () => void;
+
+  await mockApi(page);
+  await page.route('**/api/v1/programs/templates/mine', (route) =>
+    route.fulfill({ json: deleted ? [] : [activeTemplate] }),
+  );
+  await page.route('**/api/v1/shares', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/programs/assigned/501', (route) => {
+    deleteRequests += 1;
+    return new Promise<void>((resolve) => {
+      releaseDelete = () => {
+        deleted = true;
+        void route.fulfill({ status: 204, body: '' }).then(() => resolve());
+      };
+    });
+  });
+  await page.goto('/app?section=programs&view=manage');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const activeSection = page.locator('section.program-active');
+  const deleteButton = activeSection.getByRole('button', {
+    name: 'Удалить программу',
+    exact: true,
+  });
+  const sharePanel = activeSection.getByRole('region', { name: 'Поделиться программой' });
+  await expect(activeSection).toBeVisible();
+  await expect(sharePanel).toBeVisible();
+  await expect(activeSection.locator('details.program-danger-menu')).toHaveCount(0);
+  await expect(deleteButton).toHaveAttribute('type', 'button');
+
+  const setTheme = async (theme: 'dark' | 'light') => {
+    await page.locator('html').evaluate((element, value) => {
+      element.setAttribute('data-color-scheme', value);
+    }, theme);
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+  };
+  const evidenceDir = process.env.ISSUE_1229_EVIDENCE_DIR;
+  if (evidenceDir) mkdirSync(evidenceDir, { recursive: true });
+  for (const width of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(theme);
+      await expect(deleteButton).toBeVisible();
+      const [deleteBox, shareButtonBox, sectionBox] = await Promise.all([
+        deleteButton.boundingBox(),
+        sharePanel.getByRole('button', { name: 'Поделиться программой' }).boundingBox(),
+        activeSection.boundingBox(),
+      ]);
+      expect(deleteBox).not.toBeNull();
+      expect(shareButtonBox).not.toBeNull();
+      expect(sectionBox).not.toBeNull();
+      expect(Math.abs(deleteBox!.x - shareButtonBox!.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(deleteBox!.width - shareButtonBox!.width)).toBeLessThanOrEqual(1);
+      const contentWidth = await activeSection.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return (
+          element.clientWidth -
+          Number.parseFloat(style.paddingLeft) -
+          Number.parseFloat(style.paddingRight)
+        );
+      });
+      expect(Math.abs(deleteBox!.width - contentWidth)).toBeLessThanOrEqual(1);
+      expect(deleteBox!.height).toBeGreaterThanOrEqual(44);
+      if (evidenceDir) {
+        await page.screenshot({
+          path: path.join(evidenceDir, `after-${theme}-${width}.png`),
+          animations: 'disabled',
+          fullPage: true,
+        });
+      }
+    }
+  }
+
+  await deleteButton.scrollIntoViewIfNeeded();
+  const dockGeometry = await page.evaluate(() => {
+    const target = document.querySelector<HTMLElement>('.program-active__delete-action');
+    const dock = document.querySelector<HTMLElement>('#appBottomNav');
+    const targetBox = target?.getBoundingClientRect();
+    const dockBox = dock?.getBoundingClientRect();
+    const dockStyle = dock ? getComputedStyle(dock) : null;
+    return {
+      targetBottom: targetBox?.bottom ?? null,
+      dockTop: dockBox?.top ?? null,
+      dockVisible: Boolean(
+        dockBox &&
+        dockBox.width > 0 &&
+        dockBox.height > 0 &&
+        dockStyle?.display !== 'none' &&
+        dockStyle?.visibility !== 'hidden',
+      ),
+    };
+  });
+  if (dockGeometry.dockVisible) {
+    expect(dockGeometry.targetBottom).toBeLessThanOrEqual((dockGeometry.dockTop ?? 0) + 1);
+  }
+  await deleteButton.click();
+  const confirmation = page.getByRole('dialog', { name: 'Удалить текущую программу?' });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText(
+    'История выполненных тренировок и сам шаблон программы сохранятся.',
+  );
+  await confirmation.getByRole('button', { name: 'Отмена' }).click();
+  await expect(confirmation).toHaveCount(0);
+  expect(deleteRequests).toBe(0);
+
+  await deleteButton.click();
+  await confirmation.getByRole('button', { name: 'Удалить программу' }).click();
+  await expect(deleteButton).toBeDisabled();
+  await deleteButton.dispatchEvent('click');
+  await expect.poll(() => deleteRequests).toBe(1);
+  releaseDelete();
+  await expect(page.getByRole('heading', { name: 'План ещё не выбран' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Программа удалена');
+});
+
+test('Issue #1229 keeps the active delete action after a server error', async ({ page }) => {
+  await mockApi(page);
+  const activeTemplate = issue1229Template('trainer');
+  await page.route('**/api/v1/programs/templates/mine', (route) =>
+    route.fulfill({ json: [activeTemplate] }),
+  );
+  await page.route('**/api/v1/shares', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/programs/assigned/501', (route) =>
+    route.fulfill({ status: 500, json: { detail: 'Не удалось удалить программу' } }),
+  );
+  await page.goto('/app?section=programs&view=manage');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const activeSection = page.locator('section.program-active');
+  await activeSection.getByRole('button', { name: 'Удалить программу', exact: true }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Удалить текущую программу?' });
+  await confirmation.getByRole('button', { name: 'Удалить программу' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Сервис временно недоступен. Попробуйте ещё раз.',
+  );
+  await expect(activeSection.getByRole('button', { name: 'Удалить программу' })).toBeEnabled();
+});
+
+test('Issue #1229 preserves share permissions and the no-assignment state', async ({ browser }) => {
+  const assertSource = async (source: 'trainer' | 'foreign' | 'none') => {
+    const page = await browser.newPage();
+    await mockApi(page);
+    await page.route('**/api/v1/programs/templates/mine', (route) =>
+      route.fulfill({ json: [issue1229Template(source)] }),
+    );
+    await page.route('**/api/v1/shares', (route) => route.fulfill({ json: [] }));
+
+    await page.goto('/app?section=programs&view=manage');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    const activeSection = page.locator('section.program-active');
+    await expect(activeSection).toBeVisible();
+    if (source === 'none') {
+      await expect(
+        activeSection.getByRole('heading', { name: 'План ещё не выбран' }),
+      ).toBeVisible();
+      await expect(
+        activeSection.getByRole('button', { name: 'Удалить программу', exact: true }),
+      ).toHaveCount(0);
+    } else {
+      await expect(
+        activeSection.getByRole('heading', { name: 'Активная программа' }),
+      ).toBeVisible();
+      await expect(
+        activeSection.getByRole('region', { name: 'Поделиться программой' }),
+      ).toHaveCount(0);
+      await expect(
+        activeSection.getByRole('button', { name: 'Удалить программу', exact: true }),
+      ).toBeVisible();
+    }
+    await page.close();
+  };
+
+  await assertSource('trainer');
+  await assertSource('foreign');
+  await assertSource('none');
 });

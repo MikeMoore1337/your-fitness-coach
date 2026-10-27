@@ -1,16 +1,25 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../src/shared/api/client';
-import type { FoodDiaryDay, ProgressSummary, Workout } from '../../../../src/shared/api/types';
+import type {
+  CardioSession,
+  FoodDiaryDay,
+  FoodDiaryEntry,
+  ProgressSummary,
+  Workout,
+} from '../../../../src/shared/api/types';
 import { calendarWeek, dateInputValue } from '../../../../src/shared/dateTime';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 import {
+  formatNutritionDateLabel,
   formatTodayHeading,
   TodayDashboard,
 } from '../../../../src/features/dashboard/TodayDashboard';
 
 const apiMock = vi.hoisted(() => vi.fn());
+const navigateMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
   user: {
     id: 7,
@@ -56,11 +65,17 @@ vi.mock('../../../../src/shared/navigation/router', () => ({
       {children}
     </a>
   ),
+  useNavigation: () => ({ navigate: navigateMock, search: window.location.search }),
 }));
 
 vi.mock('../../../../src/features/workouts/TodayWorkout', () => ({
   TodayWorkout: () => <div>Активная тренировка открыта</div>,
 }));
+
+Object.defineProperty(Element.prototype, 'scrollIntoView', {
+  configurable: true,
+  value: vi.fn(),
+});
 
 const plannedWorkout = {
   id: 42,
@@ -154,12 +169,17 @@ const progressSummary = {
     average_protein_g: 130,
     target_protein_g: 140,
     target_effective_on: '2029-12-01',
+    exact_entry_count: 0,
+    approximate_entry_count: 0,
+    partial_entry_count: 0,
   },
   body: {
     latest_measurement: { measured_on: '2030-01-09', weight_kg: 68.4 },
     trends: [
       {
         metric: 'weight_kg',
+        label: 'Вес',
+        unit: 'kg',
         first_value: 69.1,
         latest_value: 68.4,
         change: -0.7,
@@ -235,6 +255,53 @@ const diary = {
   status_is_explicit: false,
 } as FoodDiaryDay;
 
+const loggedEntry = {
+  id: 1,
+  diary_date: '2030-01-10',
+  meal_type: 'breakfast',
+  food_id: null,
+  recipe_id: null,
+  entry_kind: 'quick_add',
+  logged_at: null,
+  food_name: 'Овсяная каша',
+  food_brand: null,
+  amount: '1',
+  amount_unit: 'serving',
+  weight_g: null,
+  nutrition_basis_kind: null,
+  nutrition_basis_amount: null,
+  nutrition_basis_unit: null,
+  serving_amount: null,
+  serving_unit: null,
+  serving_weight_g: null,
+  nutrition: diary.totals,
+  created_at: '2030-01-10T08:00:00Z',
+  updated_at: '2030-01-10T08:00:00Z',
+} satisfies FoodDiaryEntry;
+
+const loggedDiary = {
+  ...diary,
+  meals: [
+    { meal_type: 'breakfast', entries: [loggedEntry], totals: diary.totals },
+    { meal_type: 'lunch', entries: [], totals: diary.totals },
+    { meal_type: 'dinner', entries: [], totals: diary.totals },
+    { meal_type: 'snacks', entries: [], totals: diary.totals },
+  ],
+} satisfies FoodDiaryDay;
+
+const diaryWithoutTargets = {
+  ...loggedDiary,
+  targets: null,
+  remaining: null,
+} satisfies FoodDiaryDay;
+
+const partialDiary = {
+  ...loggedDiary,
+  totals: { ...diary.totals, protein_g: null },
+  targets: { ...diary.targets!, protein_g: null },
+  remaining: { ...diary.remaining!, protein_g: null },
+} satisfies FoodDiaryDay;
+
 function renderDashboard() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -245,6 +312,18 @@ function renderDashboard() {
         <TodayDashboard />
       </FeedbackProvider>
     </QueryClientProvider>,
+  );
+}
+
+function CardioRequestHarness() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Открыть cardio request
+      </button>
+      <TodayDashboard initialCardioOpen={open} />
+    </>
   );
 }
 
@@ -259,6 +338,20 @@ function auxiliaryResponse(
 ) {
   if (path === '/api/v1/workouts/week') return Promise.resolve(options.week ?? []);
   if (path.startsWith('/api/v1/workouts/cardio?')) return Promise.resolve(options.cardio ?? []);
+  if (path.startsWith('/api/v1/nutrition/hydration')) {
+    return Promise.resolve({
+      diary_date: '2030-01-10',
+      timezone: 'Europe/Moscow',
+      total_ml: 0,
+      goal: null,
+      progress_percent: null,
+      entries: [],
+      presets: [],
+      last_logged_at: null,
+      reminder_suppression_key: null,
+      action_url: '/app?section=nutrition&date=2030-01-10&hydration=quick',
+    });
+  }
   if (path === '/api/v1/check-ins/weekly/current') {
     return Promise.resolve({
       week_start: '2030-01-07',
@@ -283,17 +376,21 @@ function auxiliaryResponse(
   return undefined;
 }
 
-function useAvailableData() {
+function useAvailableData({
+  cardio = [],
+  diaryDay = diary,
+}: { cardio?: CardioSession[]; diaryDay?: FoodDiaryDay } = {}) {
   apiMock.mockImplementation((path: string) => {
     if (path === '/api/v1/workouts/today') return Promise.resolve(plannedWorkout);
     if (path.startsWith('/api/v1/workouts/progress/summary')) {
       return Promise.resolve(progressSummary);
     }
-    if (path.startsWith('/api/v1/nutrition/diary')) return Promise.resolve(diary);
+    if (path.startsWith('/api/v1/nutrition/diary')) return Promise.resolve(diaryDay);
     if (path === '/api/v1/workouts/42/start') {
       return Promise.resolve({ ...plannedWorkout, status: 'in_progress' });
     }
     const auxiliary = auxiliaryResponse(path, {
+      cardio,
       week: [plannedWorkout],
     });
     if (auxiliary) return auxiliary;
@@ -319,6 +416,8 @@ describe('TodayDashboard', () => {
     expect(formatTodayHeading('2030-01-10')).toEqual({
       title: 'Сегодня · четверг, 10 января',
     });
+    expect(formatNutritionDateLabel('2030-01-10', '2030-01-10')).toBe('сегодня');
+    expect(formatNutritionDateLabel('2030-01-09', '2030-01-10')).toMatch(/9 января 2030/);
     expect(calendarWeek('2029-12-31')).toEqual([
       '2029-12-31',
       '2030-01-01',
@@ -337,8 +436,11 @@ describe('TodayDashboard', () => {
     expect(await screen.findByRole('heading', { name: 'Силовая база' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Начать тренировку' })).toBeInTheDocument();
     expect(screen.getByText('Записей за день пока нет')).toBeInTheDocument();
+    expect(screen.getByText('Вода пока не записана')).toBeInTheDocument();
     expect(screen.getByText(/последний вес 68,4 кг/)).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Добавить отметку' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Добавить отметку' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Активность за сегодня' })).not.toBeInTheDocument();
     expect(screen.queryByText('84%')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Начать тренировку' }));
@@ -347,6 +449,88 @@ describe('TodayDashboard', () => {
       expect(apiMock).toHaveBeenCalledWith('/api/v1/workouts/42/start', { method: 'POST' }),
     );
     expect(await screen.findByText('Активная тренировка открыта')).toBeInTheDocument();
+  });
+
+  it('shows recorded calories, macro targets and a mathematically valid remainder', async () => {
+    useAvailableData({ diaryDay: loggedDiary });
+    renderDashboard();
+
+    const nutrition = await screen.findByRole('region', { name: 'Питание на сегодня' });
+    expect(nutrition).toHaveTextContent('1450 / 2100 ккал');
+    expect(nutrition).toHaveTextContent('Осталось 650 ккал');
+    expect(nutrition).toHaveTextContent('Белок');
+    expect(nutrition).toHaveTextContent('96 / 140 г');
+    expect(nutrition).toHaveTextContent('48 / 70 г');
+    expect(nutrition).toHaveTextContent('160 / 230 г');
+    expect(nutrition).not.toHaveTextContent('Записей за день пока нет');
+  });
+
+  it('does not turn missing targets or macro values into zeros', async () => {
+    useAvailableData({ diaryDay: diaryWithoutTargets });
+    renderDashboard();
+
+    const withoutTargets = await screen.findByRole('region', { name: 'Питание на сегодня' });
+    expect(withoutTargets).toHaveTextContent('1450 ккал');
+    expect(withoutTargets).not.toHaveTextContent('/ 2100 ккал');
+    expect(withoutTargets).not.toHaveTextContent('Осталось');
+
+    cleanup();
+    useAvailableData({ diaryDay: partialDiary });
+    renderDashboard();
+
+    const partial = await screen.findByRole('region', { name: 'Питание на сегодня' });
+    expect(partial).toHaveTextContent('Белок');
+    expect(partial).toHaveTextContent('— г');
+    expect(partial).not.toHaveTextContent('0 / 0 г');
+  });
+
+  it('shows only completed cardio as a compact activity fact', async () => {
+    const today = dateInputValue(new Date(), 'Europe/Moscow');
+    const completedCardio: CardioSession = {
+      activity_type: 'walking',
+      duration_minutes: 30,
+      distance_km: null,
+      average_heart_rate_bpm: null,
+      heart_rate_zone: null,
+      note: 'Фактический результат',
+      scheduled_at: `${today}T09:00:00+03:00`,
+      status: 'completed',
+      id: 659,
+      source: 'manual',
+      completed_at: `${today}T09:30:00+03:00`,
+      created_at: `${today}T08:00:00+03:00`,
+      updated_at: `${today}T09:30:00+03:00`,
+    };
+    useAvailableData({ cardio: [completedCardio] });
+    renderDashboard();
+
+    const activity = await screen.findByRole('region', { name: 'Активность за сегодня' });
+    expect(activity).toHaveTextContent('Кардио · ходьба · 30 мин');
+    expect(activity).toHaveTextContent('Открыть кардио');
+    expect(screen.getByRole('link', { name: 'Открыть прогресс' })).toHaveAttribute(
+      'href',
+      '/app?section=progress',
+    );
+  });
+
+  it('opens cardio when the quick-action intent arrives while Today is already mounted', async () => {
+    useAvailableData();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <CardioRequestHarness />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Силовая база' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть cardio request' }));
+
+    expect(await screen.findByRole('heading', { name: /^Кардио$/ })).toBeInTheDocument();
   });
 
   it('announces the nutrition loading state from the live status element', async () => {
@@ -456,16 +640,49 @@ describe('TodayDashboard', () => {
     expect(
       await screen.findByRole('heading', { name: 'Сегодня без тренировки' }),
     ).toBeInTheDocument();
-    expect(document.querySelector('.ui-semantic-artwork--current-action')).toBeInTheDocument();
+    expect(document.querySelector('.ui-semantic-artwork--current-action')).not.toBeInTheDocument();
     expect(screen.getByText(/Ближайшая .*Верх тела/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Добавить питание' })).toHaveAttribute(
       'href',
       '/app?section=nutrition',
     );
+    expect(screen.queryByRole('link', { name: 'Открыть дневник питания' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Добавить активность' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Сон и настроение' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
   });
 
-  it('guides a new user to a program and keeps incomplete profile secondary', async () => {
+  it('does not repeat the progress destination when the result is the next action', async () => {
+    const today = dateInputValue(new Date(), 'Europe/Moscow');
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/workouts/today') {
+        return Promise.reject(new ApiError('На сегодня тренировка не назначена', 404));
+      }
+      if (path.startsWith('/api/v1/workouts/progress/summary')) {
+        return Promise.resolve({
+          ...progressSummary,
+          period_end: today,
+          training: {
+            ...progressSummary.training,
+            last_completed_workout_on: today,
+            next_workout: null,
+          },
+        });
+      }
+      if (path.startsWith('/api/v1/nutrition/diary')) return Promise.resolve(loggedDiary);
+      const auxiliary = auxiliaryResponse(path, {
+        week: [{ ...plannedWorkout, scheduled_date: today, status: 'completed' }],
+      });
+      if (auxiliary) return auxiliary;
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    renderDashboard();
+
+    expect(await screen.findByRole('link', { name: 'Посмотреть итог' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Открыть прогресс' })).not.toBeInTheDocument();
+  });
+
+  it('guides a new user to the profile prerequisite before a program', async () => {
     authState.user.has_active_program = false;
     authState.user.profile.level = null;
     authState.user.profile.height_cm = null;
@@ -499,20 +716,17 @@ describe('TodayDashboard', () => {
     });
     renderDashboard();
 
-    expect(await screen.findByRole('heading', { name: 'С чего начнём?' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Создать свою программу' })).toHaveAttribute(
-      'href',
-      '/app?section=programs&start=create',
-    );
-    expect(screen.getByRole('link', { name: 'Выбрать готовую' })).toHaveAttribute(
-      'href',
-      '/app?section=programs&start=templates',
-    );
-    expect(screen.getByText('Сделайте рекомендации точнее')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Дополните профиль' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Заполнить профиль' })).toHaveAttribute(
       'href',
       '/app?section=profile#profile-fitness',
     );
+    expect(screen.getByRole('link', { name: 'Заполнить профиль' })).toHaveClass('button-link');
+    expect(
+      screen.queryByRole('link', { name: 'Выбрать готовую программу' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Создать свою программу' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Сделайте рекомендации точнее')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Записать питание' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Добавить активность' })).not.toBeInTheDocument();
     expect(screen.getByText('Появится после первых тренировок и замеров')).toBeInTheDocument();
@@ -639,9 +853,9 @@ describe('TodayDashboard', () => {
       'href',
       '/app?section=progress&workout_id=42&comment_id=9',
     );
-    expect(
-      screen.queryByRole('link', { name: 'Пройти короткую проверку' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Пройти короткую проверку' })).toHaveClass(
+      'secondary-link',
+    );
   });
 
   it('refreshes date-sensitive context after returning across the local midnight', async () => {

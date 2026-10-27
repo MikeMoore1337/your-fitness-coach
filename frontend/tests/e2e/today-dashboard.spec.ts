@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { namedArticle } from './fixtures/locators';
+import { emptyHydrationDay, installPlatformApi } from './fixtures/platform-api';
+import { expectNoHorizontalOverflow } from './fixtures/mobile-tma';
 
 const captureLandingProductProofs =
   (
@@ -16,6 +17,7 @@ const captureTask116Proofs =
 
 type DashboardState = {
   workout?: 'planned' | 'in_progress' | 'completed' | 'none';
+  missedWorkout?: boolean;
   activeProgram?: boolean;
   incompleteProfile?: boolean;
   failNutrition?: boolean;
@@ -141,6 +143,35 @@ async function mockDashboard(page: Page, state: DashboardState = {}) {
       }
       return route.fulfill({ json: [{ ...workout(), status: workoutStatus }] });
     }
+    if (path.endsWith('/workouts/recovery')) {
+      return route.fulfill({
+        json: state.missedWorkout
+          ? {
+              status: 'missed',
+              missed_workouts: [
+                {
+                  id: 77,
+                  scheduled_date: addDays(today, -1),
+                  scheduled_time: '18:30:00',
+                  title: 'Силовая база',
+                  status: 'missed',
+                  day_number: 2,
+                  week_number: 1,
+                },
+              ],
+              next_workout: null,
+              paused_program_id: null,
+              paused_program_title: null,
+            }
+          : {
+              status: 'clear',
+              missed_workouts: [],
+              next_workout: null,
+              paused_program_id: null,
+              paused_program_title: null,
+            },
+      });
+    }
     if (path.endsWith('/workouts/42/start')) {
       workoutStatus = 'in_progress';
       return route.fulfill({ json: workout() });
@@ -248,6 +279,9 @@ async function mockDashboard(page: Page, state: DashboardState = {}) {
           : [],
       });
     }
+    if (path.endsWith('/nutrition/hydration')) {
+      return route.fulfill({ json: emptyHydrationDay(today) });
+    }
     if (path.endsWith('/nutrition/diary')) {
       if (state.failNutrition) return route.abort('failed');
       return route.fulfill({
@@ -287,6 +321,148 @@ async function openDashboard(page: Page) {
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
 }
 
+test('Today Cardio keeps a uniform frame and validation guard after the top rail removal', async ({
+  page,
+}, testInfo) => {
+  await installPlatformApi(page, { browserSession: true, cardioState: 'completed' });
+
+  for (const width of [320, 360, 390, 393, 430, 1440]) {
+    for (const theme of ['dark', 'light'] as const) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.goto('/app?section=today&cardio=1');
+      await page.evaluate(
+        (selectedTheme) => localStorage.setItem('app-theme', selectedTheme),
+        theme,
+      );
+      await page.reload();
+
+      const cardio = page.locator('.cardio-log');
+      await expect(cardio).toBeVisible();
+      const edges = await cardio.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          top: {
+            width: style.borderTopWidth,
+            style: style.borderTopStyle,
+            color: style.borderTopColor,
+          },
+          right: {
+            width: style.borderRightWidth,
+            style: style.borderRightStyle,
+            color: style.borderRightColor,
+          },
+          bottom: {
+            width: style.borderBottomWidth,
+            style: style.borderBottomStyle,
+            color: style.borderBottomColor,
+          },
+          left: {
+            width: style.borderLeftWidth,
+            style: style.borderLeftStyle,
+            color: style.borderLeftColor,
+          },
+        };
+      });
+      for (const side of Object.values(edges)) {
+        expect(side).toMatchObject({ width: '1px', style: 'solid' });
+      }
+      expect(edges.top.color).toBe(edges.right.color);
+      expect(edges.top.color).toBe(edges.bottom.color);
+      expect(edges.top.color).toBe(edges.left.color);
+
+      const duration = cardio.getByLabel('Длительность, мин');
+      await duration.focus();
+      await expect(duration).toBeFocused();
+      await expect(cardio.getByRole('button', { name: 'Сохранить кардио' })).toBeDisabled();
+      await expectNoHorizontalOverflow(page);
+      if (width === 390 || width === 1440) {
+        await page.screenshot({
+          path: testInfo.outputPath(`cardio-${width}-${theme}-after.png`),
+          fullPage: true,
+        });
+      }
+    }
+  }
+});
+
+test('shows the non-modal install option only after value on the authenticated Today surface', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    localStorage.setItem('app-theme', 'light');
+    localStorage.setItem(
+      'fit_pwa_install_v1',
+      JSON.stringify({ appOpenCount: 2, qualified: true, dismissedUntil: 0 }),
+    );
+  });
+  await mockDashboard(page, { workout: 'planned' });
+  await openDashboard(page);
+
+  await expect(page.getByTestId('pwa-install-prompt')).not.toBeAttached();
+  await page.evaluate(() => {
+    const event = new Event('beforeinstallprompt', { cancelable: true });
+    Object.defineProperty(event, 'prompt', { value: () => Promise.resolve() });
+    Object.defineProperty(event, 'userChoice', {
+      value: Promise.resolve({ outcome: 'dismissed', platform: 'web' }),
+    });
+    window.dispatchEvent(event);
+  });
+
+  const prompt = page.getByTestId('pwa-install-prompt');
+  await expect(prompt).toBeVisible();
+  await expect(prompt.getByText('Быстрый возврат к тренировке')).toBeVisible();
+  const installButton = prompt.getByRole('button', { name: 'Установить' });
+  const installBounds = await installButton.boundingBox();
+  expect(installBounds?.height).toBeGreaterThanOrEqual(44);
+  await expect(installButton).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(installButton).toHaveCSS('color', 'rgb(9, 11, 11)');
+  await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
+    'color',
+    'rgb(21, 21, 21)',
+  );
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await expect(installButton).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(installButton).toHaveCSS('color', 'rgb(9, 11, 11)');
+  await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
+    'background-color',
+    'rgb(20, 23, 23)',
+  );
+  await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
+    'color',
+    'rgb(245, 245, 245)',
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await prompt.getByRole('button', { name: 'Не сейчас' }).click();
+  await expect(prompt).not.toBeAttached();
+});
+
+test('persists active workout on suspend and refreshes Today on return', async ({ page }) => {
+  let todayRequests = 0;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.endsWith('/workouts/today')) todayRequests += 1;
+  });
+  await mockDashboard(page, { workout: 'in_progress' });
+  await openDashboard(page);
+  await expect(page.getByRole('button', { name: 'Продолжить тренировку' })).toBeVisible();
+
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await expect
+    .poll(() =>
+      page.evaluate(() => localStorage.getItem('fit_active_workout_v1_user_7_workout_42')),
+    )
+    .not.toBeNull();
+
+  const requestsBeforeReturn = todayRequests;
+  await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+  await expect.poll(() => todayRequests).toBeGreaterThan(requestsBeforeReturn);
+});
+
 test('core navigation keeps the locked order, labels, active state and deep links', async ({
   page,
 }) => {
@@ -297,12 +473,7 @@ test('core navigation keeps the locked order, labels, active state and deep link
 
   const destinations = page.locator('#appBottomNav .app-bottom-nav__primary > a');
   await expect(destinations).toHaveCount(4);
-  expect(await destinations.allTextContents()).toEqual([
-    'Сегодня',
-    'Программа',
-    'Питание',
-    'Прогресс',
-  ]);
+  expect(await destinations.allTextContents()).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
   expect(
     await destinations.evaluateAll((links) => links.map((link) => link.getAttribute('href'))),
   ).toEqual([
@@ -321,17 +492,17 @@ test('core navigation keeps the locked order, labels, active state and deep link
   expect(profileButtonBox).not.toBeNull();
   expect(profileButtonBox!.width).toBeGreaterThanOrEqual(44);
   expect(profileButtonBox!.height).toBeGreaterThanOrEqual(44);
-  await expect(profileButton).toHaveCSS('border-color', 'rgb(158, 224, 43)');
+  await expect(profileButton).toHaveCSS('border-color', 'rgb(178, 245, 32)');
   await profileButton.click();
   await expect(page.getByRole('dialog', { name: 'Профиль и настройки' })).toBeVisible();
   await page.getByRole('button', { name: 'Закрыть меню' }).click();
 
-  await page.getByRole('link', { name: 'Программа', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Программа', exact: true })).toHaveAttribute(
+  await page.getByRole('link', { name: 'План', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'План', exact: true })).toHaveAttribute(
     'aria-current',
     'page',
   );
-  await expect(page.getByRole('heading', { name: 'Программа тренировок' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'План' })).toBeVisible();
 });
 
 test('planned workout starts from the primary Today CTA', async ({ page }) => {
@@ -345,15 +516,23 @@ test('planned workout starts from the primary Today CTA', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'Силовая база' })).toBeVisible();
   if (captureLandingProductProofs) {
-    await page.screenshot({ path: 'public/assets/product/landing-today-desktop-light.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-desktop-light.png',
+    });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: 'public/assets/product/landing-today-mobile-light.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-mobile-light.png',
+    });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-    await page.screenshot({ path: 'public/assets/product/landing-today-desktop-dark.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-desktop-dark.png',
+    });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: 'public/assets/product/landing-today-mobile-dark.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-mobile-dark.png',
+    });
     return;
   }
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
@@ -377,7 +556,18 @@ test('started workout finishes into a factual completed state', async ({ page })
   await expect(page.getByRole('heading', { name: 'Тренировка завершена' })).toBeVisible();
 });
 
-test('new and incomplete profile states keep program selection primary', async ({ page }) => {
+test('surfaces a factual recovery action for a server-derived missed workout', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDashboard(page, { workout: 'none', missedWorkout: true });
+  await openDashboard(page);
+
+  await expect(page.getByRole('button', { name: 'Вернуться к тренировке' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Тренировка осталась невыполненной' }),
+  ).toBeVisible();
+});
+
+test('new and incomplete profile states keep profile completion primary', async ({ page }) => {
   await mockDashboard(page, {
     workout: 'none',
     activeProgram: false,
@@ -385,29 +575,22 @@ test('new and incomplete profile states keep program selection primary', async (
   });
   await openDashboard(page);
 
-  await expect(page.getByRole('heading', { name: 'С чего начнём?' })).toBeVisible();
-  await expect(page.getByText('Сделайте рекомендации точнее')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
-  const chooseReady = page.getByRole('link', { name: 'Выбрать готовую' });
-  await expect(chooseReady).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
-  await expect(chooseReady).toHaveCSS('border-top-style', 'solid');
-  await expect(chooseReady).toHaveCSS('border-top-width', '1px');
-  const readyOutline = await chooseReady.evaluate((element) => {
-    const style = window.getComputedStyle(element);
-    return {
-      fontWeight: style.fontWeight,
-      height: element.getBoundingClientRect().height,
-      innerStroke: style.boxShadow,
-    };
-  });
-  expect(readyOutline.fontWeight).toBe('600');
-  expect(readyOutline.height).toBeGreaterThanOrEqual(44);
-  expect(readyOutline.innerStroke).toContain('0.5px');
+  await expect(page.getByRole('heading', { name: 'Дополните профиль' })).toBeVisible();
+  await expect(page.getByText('Основа рекомендаций')).toBeVisible();
+  const profileLink = page.getByRole('link', { name: 'Заполнить профиль', exact: true });
+  await expect(profileLink).toBeVisible();
+  await expect(profileLink).not.toHaveClass(/secondary-link/);
+  const profilePrimary = await profileLink.evaluate((element) => ({
+    fontWeight: window.getComputedStyle(element).fontWeight,
+    height: element.getBoundingClientRect().height,
+  }));
+  expect(profilePrimary.fontWeight).toBe('600');
+  expect(profilePrimary.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).not.toBeAttached();
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).not.toBeAttached();
   await expect(page.getByRole('link', { name: 'Записать питание' })).not.toBeAttached();
   await expect(page.getByRole('button', { name: 'Добавить активность' })).not.toBeAttached();
   await expect(page.locator('.today-dashboard__facts')).toHaveCSS('border-top-style', 'none');
-  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeAttached();
   await expect(page.locator('.today-dashboard details details')).toHaveCount(0);
 });
 
@@ -447,7 +630,7 @@ test('task 116 owner-checkpoint screenshots', async ({ browser }) => {
     await openDashboard(page);
     await expect(page.getByRole('heading', { name: capture.heading })).toBeVisible();
     await page.screenshot({
-      path: `../.artifacts/screenshots/task-116/${capture.name}`,
+      path: `../.artifacts/runtime/tests/screenshots/task-116/${capture.name}`,
       fullPage: true,
     });
     await context.close();
@@ -479,7 +662,9 @@ test('rest, completed, weekly review and trainer comment use one primary action'
   });
   await page.reload();
   await expect(page.getByRole('link', { name: 'Открыть комментарий' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Пройти короткую проверку' })).not.toBeAttached();
+  await expect(page.getByRole('link', { name: 'Пройти короткую проверку' })).toHaveClass(
+    /secondary-link/,
+  );
 });
 
 test('secondary API failure does not erase the dashboard', async ({ page }) => {
@@ -506,9 +691,9 @@ test('Today keeps hierarchy and has no horizontal overflow at required widths', 
   ]) {
     await page.setViewportSize(viewport);
     await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeInViewport();
-    await expect(page.getByRole('heading', { name: 'Питание' })).toBeVisible();
-    const nutritionCard = namedArticle(page, 'Питание');
-    const progressCard = namedArticle(page, 'Прогресс');
+    await expect(page.getByRole('heading', { name: 'Питание на сегодня' })).toBeVisible();
+    const nutritionCard = page.getByRole('region', { name: 'Питание на сегодня' });
+    const progressCard = page.getByRole('region', { name: 'Главное о прогрессе' });
     await expect(nutritionCard).toHaveCount(1);
     await expect(progressCard).toHaveCount(1);
     const [nutritionBox, progressBox] = await Promise.all([
@@ -518,6 +703,9 @@ test('Today keeps hierarchy and has no horizontal overflow at required widths', 
     expect(nutritionBox).not.toBeNull();
     expect(progressBox).not.toBeNull();
     const summaryGap = progressBox!.y - (nutritionBox!.y + nutritionBox!.height);
+    if (viewport.width >= 900) {
+      expect(Math.abs(progressBox!.x - nutritionBox!.x)).toBeLessThanOrEqual(1);
+    }
     expect(summaryGap).toBeGreaterThanOrEqual(11);
     expect(summaryGap).toBeLessThanOrEqual(13);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);

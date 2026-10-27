@@ -6,6 +6,7 @@ import { api } from '../../shared/api/client';
 import type { User } from '../../shared/api/types';
 import { safeAuthNextPath } from '../../shared/auth/redirects';
 import {
+  markProductOnboardingCompleted,
   productEventSurface,
   trackProductEvent,
   type ProductEvent,
@@ -15,27 +16,8 @@ import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
 import { StepProgress } from '../../shared/ui/DataViz';
 import { BrandLogo } from '../../shared/ui/BrandLogo';
 import { Button, CheckIcon, ChevronIcon, ErrorState } from '../../shared/ui/common';
-
-const nextActions = [
-  {
-    key: 'nutrition',
-    title: 'Настроить питание',
-    description: 'Рассчитать стартовый ориентир калорий, белков, жиров и углеводов.',
-    to: '/app?section=nutrition',
-  },
-  {
-    key: 'programs',
-    title: 'Подобрать программу',
-    description: 'Выбрать план тренировок под свою цель и доступный график.',
-    to: '/app?section=programs',
-  },
-  {
-    key: 'today',
-    title: 'Открыть «Сегодня»',
-    description: 'Посмотреть ближайшую тренировку и текущие задачи.',
-    to: '/app?section=today',
-  },
-] as const;
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 
 function trackNextAction(nextAction: ProductEvent & { name: 'onboarding_next_action_selected' }) {
   trackProductEvent(nextAction);
@@ -72,7 +54,9 @@ export default function OnboardingPage() {
     onSuccess: () => {
       setSaved(true);
       trackProductEvent({ name: 'onboarding_completed', surface });
+      markProductOnboardingCompleted();
       void reloadUser();
+      navigate(nextPath === '/app' ? '/app?section=today' : nextPath, true);
     },
   });
 
@@ -124,6 +108,7 @@ export default function OnboardingPage() {
                 {profileGoals.map((option) => (
                   <label
                     className={`onboarding-goal${goal === option.value ? ' is-selected' : ''}`}
+                    data-yfc-choice="compact"
                     key={option.value}
                   >
                     <input
@@ -184,22 +169,17 @@ export default function OnboardingPage() {
                 <ChevronIcon />
               </button>
             ) : (
-              <div className="onboarding-next-actions" aria-label="Следующий шаг">
-                {nextActions.map((action) => (
-                  <button
-                    type="button"
-                    className="onboarding-next-action"
-                    key={action.key}
-                    onClick={() => chooseNextAction(action.key, action.to)}
-                  >
-                    <span>
-                      <strong>{action.title}</strong>
-                      <small>{action.description}</small>
-                    </span>
-                    <ChevronIcon />
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                className="onboarding-next-action onboarding-next-action--primary"
+                onClick={() => chooseNextAction('today', '/app?section=today')}
+              >
+                <span>
+                  <strong>Открыть «Сегодня»</strong>
+                  <small>Посмотреть ближайшую тренировку и текущие задачи.</small>
+                </span>
+                <ChevronIcon />
+              </button>
             )}
           </div>
         )}

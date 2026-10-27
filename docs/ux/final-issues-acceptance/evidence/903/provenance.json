@@ -1,0 +1,39 @@
+{
+  "issue": 903,
+  "route": "/for-athletes",
+  "fixture": "public landing; weekly score example data",
+  "browser": "Chromium (Playwright)",
+  "device_scale_factor": 1,
+  "reduced_motion": "reduce",
+  "scroll": "weekly card top aligned 110 CSS px below the viewport top after fonts.ready",
+  "viewports": [
+    { "width": 390, "height": 844 },
+    { "width": 1440, "height": 900 }
+  ],
+  "themes": ["dark", "light"],
+  "before": {
+    "runtime_commit": "297ee2fd87f09ef6b5f7e2bd6753bd1ff7d38a55",
+    "build": "vite preview from the clean base worktree",
+    "states": {
+      "none": "open Проверка недели; no radio selected",
+      "pointer": "open Проверка недели; pointer click on score 5",
+      "keyboard": "open Проверка недели; Tab from summary to score 1"
+    }
+  },
+  "after": {
+    "runtime_commit": "733933a73a3bc27ca596b9efb00751105a539a86",
+    "build": "vite preview from the PR #936 worktree",
+    "states": {
+      "none": "open Проверка недели; no radio selected",
+      "pointer": "open Проверка недели; pointer click on score 5",
+      "keyboard": "open Проверка недели; Tab from summary to score 1"
+    }
+  },
+  "assertions": [
+    "Five native radio controls remain available with fieldset and legend semantics",
+    "All score labels are equal circular controls with 44px minimum touch targets",
+    "Pointer selection has one lime circular selected surface and no extra focus ring",
+    "Keyboard focus uses a distinct focus-visible ring on the same circular control",
+    "Chromium and WebKit targeted tests pass for both themes and both viewport classes"
+  ]
+}

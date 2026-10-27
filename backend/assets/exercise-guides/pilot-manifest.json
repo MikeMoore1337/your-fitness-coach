@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "purpose": "Issue 389 representative local pilot; not a catalog-wide migration",
+  "retrieved_at": "2026-09-20",
+  "source_revisions": {
+    "repdb": "9ed9357f09c7566ea0256c57ebd6374ebb8b575e",
+    "wger_api_snapshot_sha256": "c735b44484009d783f81a63b2dd9389a953c6783b2e6a4264d837875daf5d9c2"
+  },
+  "exercises": {
+    "bench-press": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/bench-press-start.webp",
+        "source_id": "bench-press",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/bench-press/bench-press-start.webp",
+          "poster_path": "pilot/bench-press/bench-press-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Жим лежа: начало",
+          "asset_id": "pilot:repdb:bench-press:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 21554,
+          "sort_order": 0,
+          "asset_sha256": "a14c6cf3187236330740d9a6ad3bc2cc5170d447f1ca657ad6ac5545d3cb1571"
+        },
+        {
+          "type": "image",
+          "path": "pilot/bench-press/bench-press-peak.webp",
+          "poster_path": "pilot/bench-press/bench-press-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Жим лежа: пик",
+          "asset_id": "pilot:repdb:bench-press:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 23314,
+          "sort_order": 1,
+          "asset_sha256": "8d1a88d3e497c87ee3d27840fa496c3e7a19a4f64c52521673073a5f99b8b77f"
+        }
+      ]
+    },
+    "dumbbell-bench-press": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/db-bench-press-start.webp",
+        "source_id": "db-bench-press",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/dumbbell-bench-press/dumbbell-bench-press-start.webp",
+          "poster_path": "pilot/dumbbell-bench-press/dumbbell-bench-press-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Жим гантелей лежа: начало",
+          "asset_id": "pilot:repdb:db-bench-press:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 12970,
+          "sort_order": 0,
+          "asset_sha256": "9cc699a60007158c7540cf6b24727be4c5abcaae8a47edfa4808025f7b6eacb0"
+        },
+        {
+          "type": "image",
+          "path": "pilot/dumbbell-bench-press/dumbbell-bench-press-peak.webp",
+          "poster_path": "pilot/dumbbell-bench-press/dumbbell-bench-press-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Жим гантелей лежа: пик",
+          "asset_id": "pilot:repdb:db-bench-press:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 14772,
+          "sort_order": 1,
+          "asset_sha256": "78b09b52d0232235dd317e4362a3743c06a057c74c555aa9e331c9292a05c62e"
+        }
+      ]
+    },
+    "cable-fly": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/cable-fly-start.webp",
+        "source_id": "cable-fly",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/cable-fly/cable-fly-start.webp",
+          "poster_path": "pilot/cable-fly/cable-fly-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Сведение рук в кроссовере: начало",
+          "asset_id": "pilot:repdb:cable-fly:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 18042,
+          "sort_order": 0,
+          "asset_sha256": "b578214528bbd0e185e1b4cfbbcbd480c919e0df5b08ef1f0b975db3f902ec9d"
+        },
+        {
+          "type": "image",
+          "path": "pilot/cable-fly/cable-fly-peak.webp",
+          "poster_path": "pilot/cable-fly/cable-fly-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Сведение рук в кроссовере: пик",
+          "asset_id": "pilot:repdb:cable-fly:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 19384,
+          "sort_order": 1,
+          "asset_sha256": "38506016c2938c335c749aa7b04f2cbe4a5dd9082db12f9d856f82cb5c677fa8"
+        }
+      ]
+    },
+    "machine-chest-press": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/chest-press-machine-start.webp",
+        "source_id": "chest-press-machine",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/machine-chest-press/machine-chest-press-start.webp",
+          "poster_path": "pilot/machine-chest-press/machine-chest-press-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Жим от груди в тренажере: начало",
+          "asset_id": "pilot:repdb:chest-press-machine:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 20142,
+          "sort_order": 0,
+          "asset_sha256": "a4a2f9bc5d9e101e94ebffd6e67c24bdc476daf8770c92645673374d8e6321a9"
+        },
+        {
+          "type": "image",
+          "path": "pilot/machine-chest-press/machine-chest-press-peak.webp",
+          "poster_path": "pilot/machine-chest-press/machine-chest-press-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Жим от груди в тренажере: пик",
+          "asset_id": "pilot:repdb:chest-press-machine:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 21038,
+          "sort_order": 1,
+          "asset_sha256": "8f3a2c93a9b0774325859ae76122f2302ab09f1f380a0d59f270073c97097477"
+        }
+      ]
+    },
+    "plate-loaded-leg-press": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/leg-press-start.webp",
+        "source_id": "leg-press",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/plate-loaded-leg-press/plate-loaded-leg-press-start.webp",
+          "poster_path": "pilot/plate-loaded-leg-press/plate-loaded-leg-press-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Жим ногами в тренажере с дисками: начало",
+          "asset_id": "pilot:repdb:leg-press:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 32620,
+          "sort_order": 0,
+          "asset_sha256": "68c7769b023cab2ffd3d5fd1877fc7d2b1d102f9a1b0412ae67f9cf412f38dd2"
+        },
+        {
+          "type": "image",
+          "path": "pilot/plate-loaded-leg-press/plate-loaded-leg-press-peak.webp",
+          "poster_path": "pilot/plate-loaded-leg-press/plate-loaded-leg-press-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Жим ногами в тренажере с дисками: пик",
+          "asset_id": "pilot:repdb:leg-press:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 38040,
+          "sort_order": 1,
+          "asset_sha256": "2115ffe5c1363ad8de2b4410ef20ce43aa4b4959dcd2fb77de1579772c9c49ae"
+        }
+      ]
+    },
+    "push-up": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/push-up-start.webp",
+        "source_id": "push-up",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/push-up/push-up-start.webp",
+          "poster_path": "pilot/push-up/push-up-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Отжимания: начало",
+          "asset_id": "pilot:repdb:push-up:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 14358,
+          "sort_order": 0,
+          "asset_sha256": "55e3ebf775129451c97ccfc191e50cfb2c0a51c016bcac401477f504624554e6"
+        },
+        {
+          "type": "image",
+          "path": "pilot/push-up/push-up-peak.webp",
+          "poster_path": "pilot/push-up/push-up-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Отжимания: пик",
+          "asset_id": "pilot:repdb:push-up:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 15476,
+          "sort_order": 1,
+          "asset_sha256": "c11e6746ea723d9e5699f149eb8903172118a44c7d435a0d30551a4732a87ef3"
+        }
+      ]
+    },
+    "ab-wheel": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/ab-wheel-rollout-start.webp",
+        "source_id": "ab-wheel-rollout",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/ab-wheel/ab-wheel-start.webp",
+          "poster_path": "pilot/ab-wheel/ab-wheel-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Ролик для пресса: начало",
+          "asset_id": "pilot:repdb:ab-wheel-rollout:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 16674,
+          "sort_order": 0,
+          "asset_sha256": "cc6976578c8a220bdfefb1d65116227ba4a8ff2eb6fffe82622a1d2ffcb1761b"
+        },
+        {
+          "type": "image",
+          "path": "pilot/ab-wheel/ab-wheel-peak.webp",
+          "poster_path": "pilot/ab-wheel/ab-wheel-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Ролик для пресса: пик",
+          "asset_id": "pilot:repdb:ab-wheel-rollout:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 17388,
+          "sort_order": 1,
+          "asset_sha256": "bfbdc823735bb889a3c14c40a384c2803a2d3759a3369803f3c89ff558566870"
+        }
+      ]
+    },
+    "rowing-machine": {
+      "source": {
+        "name": "Exercise data by RepDB (repdb.co)",
+        "url": "https://github.com/RepDB/exercise-dataset",
+        "raw_url": "https://raw.githubusercontent.com/RepDB/exercise-dataset/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/images/flat/rowing-machine-start.webp",
+        "source_id": "rowing-machine",
+        "author": "RepDB",
+        "license": "RepDB Free Tier License v1.0",
+        "license_url": "https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md",
+        "attribution": "Exercise data by RepDB (repdb.co)",
+        "commercial_use": "in-app commercial use with visible attribution",
+        "derivative_policy": "resize/crop/recolor in-app; no dataset redistribution or generative derivation",
+        "self_hosting": "local copy served from YFC static storage"
+      },
+      "media": [
+        {
+          "type": "image",
+          "path": "pilot/rowing-machine/rowing-machine-start.webp",
+          "poster_path": "pilot/rowing-machine/rowing-machine-start.webp",
+          "phase_id": "eccentric_end",
+          "phase": "Начало",
+          "alt": "Гребля на тренажере: начало",
+          "asset_id": "pilot:repdb:rowing-machine:start",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 17790,
+          "sort_order": 0,
+          "asset_sha256": "c0b18ba6cc7b0bb4c3a8f543622f350076d0781633369f9fb1133a5c9c566b51"
+        },
+        {
+          "type": "image",
+          "path": "pilot/rowing-machine/rowing-machine-peak.webp",
+          "poster_path": "pilot/rowing-machine/rowing-machine-peak.webp",
+          "phase_id": "concentric_end",
+          "phase": "Пик",
+          "alt": "Гребля на тренажере: пик",
+          "asset_id": "pilot:repdb:rowing-machine:peak",
+          "asset_version": "repdb-free-9ed9357",
+          "width": 512,
+          "height": 512,
+          "byte_size": 18804,
+          "sort_order": 1,
+          "asset_sha256": "aa45341305025d0e3aad84559eff71f6d25b91c2e3431b11e2d34a6384ad73d6"
+        }
+      ]
+    }
+  }
+}

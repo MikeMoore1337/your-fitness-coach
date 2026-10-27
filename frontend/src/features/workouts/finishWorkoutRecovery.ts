@@ -8,5 +8,6 @@ export async function reconcileFinishedWorkout(
 ): Promise<void> {
   await clearLocalState();
   await queryClient.invalidateQueries({ queryKey: ['workout'] });
+  await queryClient.invalidateQueries({ queryKey: ['weekly-check-ins'] });
   queryClient.setQueryData(['workout', 'today'], completedWorkout);
 }

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_
@@ -12,10 +11,8 @@ from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.models.account import AccountDataExport
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity
-from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.notification import Notification
-from fitminiapp_api.models.program import UserProgram, UserWorkout
-from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User, UserProfile
+from fitminiapp_api.models.user import CoachClient, User, UserProfile
 from fitminiapp_api.services.account_exports import (
     AccountExportError,
     build_account_export_archive,
@@ -26,8 +23,10 @@ from fitminiapp_api.services.account_exports import (
 )
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.coach_clients import close_user_coaching_relationships
+from fitminiapp_api.services.lifecycle_reporting import lifecycle_funnel_report
 from fitminiapp_api.services.root_admin import is_root_user
 from fitminiapp_api.services.token_service import revoke_all_user_refresh_tokens
+from fitminiapp_api.services.trainer_capacity_reporting import build_trainer_capacity_report
 
 logger = logging.getLogger(__name__)
 
@@ -523,63 +522,10 @@ def retry_account_export(
 
 
 def funnel_aggregates(db: Session, *, period_days: int) -> dict:
-    cohort_since = now_msk_naive() - timedelta(days=period_days)
-    cohort = User.created_at >= cohort_since
-    registered = db.query(func.count(User.id)).filter(cohort).scalar() or 0
-    profile_ready = (
-        db.query(func.count(User.id))
-        .join(UserProfile, UserProfile.user_id == User.id)
-        .filter(
-            cohort,
-            UserProfile.goal.is_not(None),
-            UserProfile.level.is_not(None),
-            UserProfile.workouts_per_week.is_not(None),
-        )
-        .scalar()
-        or 0
-    )
-    program_activated = (
-        db.query(func.count(func.distinct(UserProgram.user_id)))
-        .join(User, User.id == UserProgram.user_id)
-        .filter(cohort)
-        .scalar()
-        or 0
-    )
-    workout_users = (
-        db.query(UserProgram.user_id.label("user_id"))
-        .join(User, User.id == UserProgram.user_id)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
-        .filter(cohort, UserWorkout.status == "completed")
-    )
-    food_users = (
-        db.query(FoodDiaryEntry.user_id.label("user_id"))
-        .join(User, User.id == FoodDiaryEntry.user_id)
-        .filter(cohort)
-    )
-    measurement_users = (
-        db.query(BodyMeasurement.user_id.label("user_id"))
-        .join(User, User.id == BodyMeasurement.user_id)
-        .filter(cohort)
-    )
-    core_value_users = workout_users.union(food_users, measurement_users).subquery()
-    core_value_reached = db.query(func.count()).select_from(core_value_users).scalar() or 0
+    return lifecycle_funnel_report(db, period_days=period_days)
 
-    def stage(key: str, count: int) -> dict:
-        rate = round(count * 100 / registered, 1) if registered else 0.0
-        return {"key": key, "account_count": int(count), "cohort_rate_percent": rate}
 
-    return {
-        "period_days": period_days,
-        "cohort_since": cohort_since,
-        "analytics_provider_status": "not_connected",
-        "coverage_note": (
-            "Показаны только агрегаты подтверждённых данных аккаунта. "
-            "Анонимные landing/login/demo события не сохраняются без подключённого провайдера."
-        ),
-        "stages": [
-            stage("registered", int(registered)),
-            stage("profile_ready", int(profile_ready)),
-            stage("program_activated", int(program_activated)),
-            stage("core_value_reached", int(core_value_reached)),
-        ],
-    }
+def trainer_capacity_aggregates(db: Session, *, period_days: int) -> dict:
+    """Return trainer capacity metrics without changing the client KPI funnel."""
+
+    return build_trainer_capacity_report(db, period_days=period_days)

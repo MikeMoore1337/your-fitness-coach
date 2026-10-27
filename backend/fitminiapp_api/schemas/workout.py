@@ -1,10 +1,19 @@
 from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.data_quality import TrainingDataSufficiency
-from fitminiapp_api.schemas.program import EquipmentIdentifier
+from fitminiapp_api.schemas.exercise_setup import ExerciseSetupMemoryResponse
+from fitminiapp_api.schemas.program import (
+    EquipmentIdentifier,
+    ExerciseGuideMediaSource,
+    ExercisePrescriptionPlan,
+    PrescriptionGroupKind,
+    PrescriptionRole,
+)
+from fitminiapp_api.schemas.workout_rest import RestSessionResponse
 
 RirValue = Literal["0", "1", "2", "3", "4+"]
 SetKind = Literal["warmup", "working", "drop"]
@@ -21,6 +30,10 @@ WorkoutAdaptationReason = Literal[
 ]
 WorkoutCompletionFeedback = Literal["easier_than_expected", "as_expected", "harder_than_expected"]
 WorkoutPersonalRecordKind = Literal["max_load", "best_set_volume"]
+MuscleContributionRole = Literal["primary", "secondary"]
+MuscleWorkloadTrend = Literal["increased", "decreased", "unchanged", "no_comparable_data"]
+ExerciseRepRange = Literal["1-5", "6-10", "11-15", "16+"]
+ExerciseProgressionEventKind = Literal["confirm", "adjust", "reject"]
 WORKOUT_COMPLETION_NOTE_MAX_LENGTH = 500
 
 
@@ -71,6 +84,7 @@ class WorkoutAdaptationExercise(BaseModel):
     rest_seconds: int
     sort_order: int
     superset_group: int | None = None
+    prescription: ExercisePrescriptionPlan | None = None
     priority: Literal["core", "priority", "accessory"]
 
 
@@ -81,6 +95,9 @@ class WorkoutAdaptationChange(BaseModel):
     from_title: str
     to_exercise_id: int | None = None
     to_title: str | None = None
+    transfer: Literal["compatible_with_load_reset", "blocked"] | None = None
+    load_reset_required: bool = False
+    reason_keys: list[str] = Field(default_factory=list)
 
 
 class WorkoutAdaptationPreviewResponse(BaseModel):
@@ -103,13 +120,19 @@ class WorkoutAlternativeItem(BaseModel):
     exercise_id: int
     title: str
     equipment_ids: list[str]
+    score: int | None = None
+    reason_keys: list[str] = Field(default_factory=list)
+    media_thumbnail_url: str | None = None
+    media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
 
 
 class WorkoutSetCreate(BaseModel):
     workout_exercise_id: int
     set_number: int
     actual_reps: int | None = None
-    actual_weight: float | None = None
+    actual_weight: Decimal | None = Field(
+        default=None, ge=0, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
     set_kind: SetKind | None = "working"
     reached_failure: bool | None = None
@@ -118,9 +141,13 @@ class WorkoutSetCreate(BaseModel):
 
 class WorkoutSetUpdate(BaseModel):
     actual_reps: int | None = Field(default=None, ge=0)
-    actual_weight: float | None = Field(default=None, ge=0)
+    actual_weight: Decimal | None = Field(
+        default=None, ge=0, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
     duration_minutes: int | None = Field(default=None, ge=1, le=600)
-    distance_km: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    distance_km: Decimal | None = Field(
+        default=None, gt=0, le=1000, max_digits=7, decimal_places=2, allow_inf_nan=False
+    )
     average_heart_rate_bpm: int | None = Field(default=None, ge=30, le=250)
     heart_rate_zone: int | None = Field(default=None, ge=1, le=5)
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
@@ -151,6 +178,11 @@ class LoggedSetItem(BaseModel):
     reached_failure: bool | None = None
     is_completed: bool = True
     version: int = Field(default=1, ge=1)
+    planned_role: PrescriptionRole | None = None
+    planned_group_id: int | None = None
+    planned_group_kind: PrescriptionGroupKind | None = None
+    planned_position: int | None = None
+    planned_round: int | None = None
 
 
 class ProgressionSessionEvidence(BaseModel):
@@ -179,8 +211,71 @@ class ProgressionEvidence(BaseModel):
     sessions: list[ProgressionSessionEvidence]
 
 
+class ProgressionTargetSetUpdate(BaseModel):
+    set_id: int = Field(ge=1)
+    set_number: int = Field(ge=1)
+    planned_role: PrescriptionRole | None = None
+    current_weight: float | None = Field(default=None, ge=0)
+    set_version: int = Field(ge=1)
+    relative_to_top: float | None = Field(default=None, gt=0, le=1)
+    proposed_weight: float = Field(ge=0)
+
+
+class ProgressionProposal(BaseModel):
+    proposal_id: str = Field(min_length=64, max_length=64)
+    rule_id: str = Field(min_length=64, max_length=64)
+    rule_kind: Literal[
+        "legacy_progression_guidance",
+        "fixed_prescription",
+        "double_progression",
+        "linear_load",
+        "percentage_training_max",
+        "rir_rpe",
+        "amrap_success_failure",
+        "deload",
+    ]
+    rule_snapshot: dict[str, object]
+    target_program_id: int = Field(ge=1)
+    target_revision_number: int = Field(ge=0)
+    target_exercise_id: int = Field(ge=1)
+    target_workout_id: int = Field(ge=1)
+    current_weight: float | None = Field(default=None, ge=0)
+    proposed_weight: float | None = Field(default=None, ge=0)
+    deload_volume_percent: int | None = Field(default=None, ge=0, le=100)
+    deload_intensity_percent: int | None = Field(default=None, ge=0, le=100)
+    proposed_action: Literal["set_load", "hold", "reset_recommended", "deload"]
+    target_set_updates: list[ProgressionTargetSetUpdate] = Field(default_factory=list)
+    source_evidence_ids: list[str]
+    comparable_session_count: int = Field(ge=0)
+    reason_codes: list[str]
+    eligibility_status: Literal["eligible", "no_change", "review"]
+    requires_confirmation: Literal[True] = True
+
+
+class ProgressionProposalReviewRequest(BaseModel):
+    decision: Literal["confirm", "reject", "adjust"]
+    workout_id: int = Field(ge=1)
+    exercise_id: int = Field(ge=1)
+    expected_revision_number: int = Field(ge=0)
+    adjusted_weight: float | None = Field(default=None, gt=0, le=100_000)
+    expected_set_versions: dict[int, int] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_adjustment(self):
+        if (self.decision == "adjust") != (self.adjusted_weight is not None):
+            raise ValueError("An adjusted weight is required only for an adjusted decision")
+        return self
+
+
+class ProgressionProposalReviewResponse(BaseModel):
+    proposal_id: str
+    decision: Literal["confirm", "reject", "adjust"]
+    applied_set_ids: list[int]
+    current_revision_number: int = Field(ge=0)
+
+
 class ProgressionGuidance(BaseModel):
-    ruleset_version: Literal["progression-guidance-v1"]
+    ruleset_version: Literal["progression-guidance-v2"]
     outcome: Literal["consider_progressing", "hold", "review", "consider_reducing"]
     message: str
     detail: str
@@ -188,6 +283,21 @@ class ProgressionGuidance(BaseModel):
     suggested_weight: float | None = Field(default=None, ge=0)
     load_unit: Literal["kg", "lb"]
     evidence: ProgressionEvidence
+    proposal: ProgressionProposal | None = None
+
+
+class ProgramProgressionProposalExercise(BaseModel):
+    exercise_id: int = Field(ge=1)
+    exercise_title: str
+    guidance: ProgressionGuidance
+
+
+class ProgramProgressionProposalList(BaseModel):
+    target_program_id: int = Field(ge=1)
+    target_revision_number: int = Field(ge=0)
+    target_workout_id: int = Field(ge=1)
+    scheduled_date: date
+    exercises: list[ProgramProgressionProposalExercise]
 
 
 class WorkoutExerciseItem(BaseModel):
@@ -201,9 +311,22 @@ class WorkoutExerciseItem(BaseModel):
     prescribed_duration_minutes: int | None = None
     rest_seconds: int
     notes: str | None = None
+    setup_memory: ExerciseSetupMemoryResponse | None = None
     superset_group: int | None = None
     superset_order: int | None = None
+    prescription: ExercisePrescriptionPlan | None = None
+    source_template_exercise_id: int | None = None
+    source_weekly_prescription_id: int | None = None
+    group_id: int | None = None
+    group_kind: PrescriptionGroupKind | None = None
+    group_order: int | None = None
     has_guide: bool = False
+    media_state: Literal["approved_animated", "approved_static", "blocked"] | None = None
+    media_thumbnail_url: str | None = None
+    media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
+    media_preferred_mode: Literal["static", "animation"] | None = None
+    media_animation_url: str | None = None
+    media_video_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
     progression_guidance: ProgressionGuidance | None = None
     sets: list[LoggedSetItem]
 
@@ -274,6 +397,52 @@ class WorkoutAdaptationApplyResponse(BaseModel):
     workout: WorkoutTodayResponse
 
 
+class WarmupProposalRow(BaseModel):
+    weight_kg: Decimal = Field(gt=0, le=1000, max_digits=6, decimal_places=2, allow_inf_nan=False)
+    reps: int = Field(ge=1, le=30)
+
+
+class WarmupProposalRowResponse(BaseModel):
+    weight_kg: float
+    reps: int
+
+
+class WarmupProposalPreviewRequest(BaseModel):
+    target_set_id: int = Field(ge=1)
+    working_weight_kg: Decimal = Field(
+        gt=0, le=1000, max_digits=6, decimal_places=2, allow_inf_nan=False
+    )
+
+
+class WarmupProposalPreviewResponse(BaseModel):
+    status: Literal["proposal", "unavailable"]
+    workout_id: int
+    workout_exercise_id: int
+    ruleset_version: str
+    working_weight_kg: float
+    rows: list[WarmupProposalRowResponse]
+    max_rows: int = Field(ge=1)
+    state_token: str | None = Field(default=None, min_length=64, max_length=64)
+    proposal_token: str | None = Field(default=None, min_length=64, max_length=64)
+    message: str
+
+
+class WarmupProposalApplyRequest(WarmupProposalPreviewRequest):
+    rows: list[WarmupProposalRow] = Field(min_length=1, max_length=5)
+    state_token: str = Field(min_length=64, max_length=64)
+    proposal_token: str = Field(min_length=64, max_length=64)
+    mutation_id: str = Field(min_length=16, max_length=64)
+
+
+class WarmupProposalApplyResponse(BaseModel):
+    workout_id: int
+    workout_exercise_id: int
+    ruleset_version: str
+    idempotent: bool
+    materialized_set_ids: list[int]
+    workout: WorkoutTodayResponse
+
+
 class WorkoutStatusResponse(BaseModel):
     id: int
     set_number: int
@@ -288,6 +457,11 @@ class WorkoutStatusResponse(BaseModel):
     reached_failure: bool | None = None
     is_completed: bool
     version: int = Field(ge=1)
+    planned_role: PrescriptionRole | None = None
+    planned_group_id: int | None = None
+    planned_group_kind: PrescriptionGroupKind | None = None
+    planned_position: int | None = None
+    planned_round: int | None = None
 
 
 class WorkoutScheduleItem(BaseModel):
@@ -298,6 +472,66 @@ class WorkoutScheduleItem(BaseModel):
     status: str
     day_number: int
     week_number: int = 1
+
+
+WorkoutRecoveryAction = Literal["move", "skip"]
+
+
+class WorkoutRecoveryRequest(BaseModel):
+    action: WorkoutRecoveryAction
+    expected_scheduled_date: date
+    expected_scheduled_time: time | None = None
+    scheduled_date: date | None = None
+    scheduled_time: time | None = None
+
+    @model_validator(mode="after")
+    def validate_action_fields(self):
+        if self.action == "move" and self.scheduled_date is None:
+            raise ValueError("Для переноса укажите новую дату")
+        if self.action == "skip" and (
+            self.scheduled_date is not None or self.scheduled_time is not None
+        ):
+            raise ValueError("Для пропуска новая дата не нужна")
+        return self
+
+
+class WorkoutRecoveryApplyRequest(WorkoutRecoveryRequest):
+    preview_token: str = Field(min_length=64, max_length=64)
+
+
+class WorkoutRecoveryChange(BaseModel):
+    kind: Literal["moved", "skipped"]
+    from_scheduled_date: date
+    from_scheduled_time: time | None = None
+    to_scheduled_date: date | None = None
+    to_scheduled_time: time | None = None
+
+
+class WorkoutRecoveryStateResponse(BaseModel):
+    status: Literal["clear", "missed", "paused", "no_active_program"]
+    missed_workouts: list[WorkoutScheduleItem]
+    next_workout: WorkoutScheduleItem | None = None
+    paused_program_id: int | None = None
+    paused_program_title: str | None = None
+
+
+class WorkoutRecoveryPreviewResponse(BaseModel):
+    status: Literal["preview", "no_changes"]
+    workout: WorkoutScheduleItem
+    action: WorkoutRecoveryAction
+    ruleset_version: str
+    changes: list[WorkoutRecoveryChange]
+    remaining_workouts: list[WorkoutScheduleItem]
+    warnings: list[str]
+    message: str
+    preview_token: str | None = None
+
+
+class WorkoutRecoveryApplyResponse(BaseModel):
+    applied_at: datetime
+    workout: WorkoutScheduleItem
+    remaining_workouts: list[WorkoutScheduleItem]
+    next_workout: WorkoutScheduleItem | None = None
 
 
 class WorkoutRescheduleRequest(BaseModel):
@@ -326,6 +560,17 @@ class WorkoutCompletionFeedbackUpdate(BaseModel):
         return normalized
 
 
+class WorkoutRestHistoryItem(BaseModel):
+    source_set_id: int
+    planned_seconds: int = Field(ge=1)
+    adjusted_seconds: int = Field(ge=1)
+    measured_seconds: int | None = Field(default=None, ge=0)
+    delta_seconds: int | None = None
+    status: Literal["running", "completed", "skipped", "interrupted", "unknown"]
+    source: str | None = None
+    quality: str
+
+
 class WorkoutHistoryItem(BaseModel):
     id: int
     scheduled_date: date
@@ -340,6 +585,7 @@ class WorkoutHistoryItem(BaseModel):
     completion_note: str | None = None
     exercises: list[WorkoutHistoryExerciseItem]
     adaptations: list[WorkoutAdaptationHistoryItem]
+    rest_sessions: list[RestSessionResponse] = Field(default_factory=list)
 
 
 class WorkoutHistoryExerciseItem(BaseModel):
@@ -403,6 +649,8 @@ class WorkoutProgressResponse(BaseModel):
 
 
 class TrainingAnalyticsSet(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     set_number: int
     reps: int | None = None
     external_load_kg: float | None = None
@@ -443,6 +691,118 @@ class ExerciseTrainingProgression(BaseModel):
     sessions: list[ExerciseTrainingSession]
 
 
+class ExerciseHistoryWorkout(BaseModel):
+    workout_id: int = Field(ge=1)
+    workout_title: str
+    performed_on: date
+    completed_at: datetime | None = None
+
+
+class ExerciseHistorySet(BaseModel):
+    set_number: int = Field(ge=1)
+    reps: int | None = Field(default=None, ge=0)
+    load_kg: float | None = Field(default=None, ge=0)
+    volume_kg: float | None = Field(default=None, ge=0)
+    rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
+    set_kind: SetKind | None = None
+    planned_role: PrescriptionRole | None = None
+    analytics_bucket: Literal["working", "preparation", "intensifier"]
+    pr_eligible: bool
+
+
+class ExerciseHistorySession(BaseModel):
+    workout: ExerciseHistoryWorkout
+    workout_exercise_id: int = Field(ge=1)
+    prescribed_reps: str
+    completed_set_count: int = Field(ge=0)
+    authoritative_set_count: int = Field(ge=0)
+    reps_total: int | None = Field(default=None, ge=0)
+    max_authoritative_load_kg: float | None = Field(default=None, ge=0)
+    best_set_volume_kg: float | None = Field(default=None, ge=0)
+    estimated_1rm_kg: float | None = Field(default=None, ge=0)
+    sets: list[ExerciseHistorySet]
+
+
+class ExerciseHistoryMetric(BaseModel):
+    value_kg: float = Field(gt=0)
+    workout: ExerciseHistoryWorkout
+    reps: int | None = Field(default=None, ge=0)
+
+
+class ExerciseRepPR(BaseModel):
+    range_key: ExerciseRepRange
+    range_label: str
+    min_reps: int = Field(ge=1)
+    max_reps: int | None = Field(default=None, ge=1)
+    best_reps: int = Field(ge=1)
+    best_reps_workout: ExerciseHistoryWorkout
+    best_load_kg: float | None = Field(default=None, gt=0)
+    best_load_workout: ExerciseHistoryWorkout | None = None
+
+
+class ExerciseEstimated1RM(BaseModel):
+    kind: Literal["estimated"] = "estimated"
+    formula: Literal["brzycki"] = "brzycki"
+    value_kg: float = Field(gt=0)
+    workout: ExerciseHistoryWorkout
+    reps: int = Field(ge=1, le=10)
+    load_kg: float = Field(gt=0)
+
+
+class ExerciseProgressionPoint(BaseModel):
+    performed_on: date
+    workout_id: int = Field(ge=1)
+    max_reps: int | None = Field(default=None, ge=0)
+    max_authoritative_load_kg: float | None = Field(default=None, ge=0)
+    estimated_1rm_kg: float | None = Field(default=None, ge=0)
+    authoritative_set_count: int = Field(ge=0)
+
+
+class ExerciseProgressionEvent(BaseModel):
+    event_id: int = Field(ge=1)
+    event_kind: ExerciseProgressionEventKind
+    proposal_id: str
+    target_workout_id: int | None = Field(default=None, ge=1)
+    exercise_id: int = Field(ge=1)
+    rule_id: str | None = None
+    rule_kind: str | None = None
+    rule_snapshot: dict[str, object] = Field(default_factory=dict)
+    source_evidence_ids: list[str] = Field(default_factory=list)
+    reason_codes: list[str] = Field(default_factory=list)
+    proposed_weight_kg: float | None = Field(default=None, ge=0)
+    adjusted_weight_kg: float | None = Field(default=None, ge=0)
+    result: dict[str, object] | None = None
+    created_at: datetime
+
+
+class ExerciseHistoryWindow(BaseModel):
+    days: Literal[7, 30, 90]
+    period_start: date
+    period_end: date
+    performed_session_count: int = Field(ge=0)
+    completed_set_count: int = Field(ge=0)
+    authoritative_set_count: int = Field(ge=0)
+    reps_total: int | None = Field(default=None, ge=0)
+    best_authoritative_load_kg: float | None = Field(default=None, ge=0)
+    estimated_1rm_kg: float | None = Field(default=None, ge=0)
+
+
+class ExerciseHistoryResponse(BaseModel):
+    exercise_id: int = Field(ge=1)
+    exercise_title: str
+    metric_type: str
+    load_unit: Literal["kg"] | None = None
+    last_performed: ExerciseHistoryWorkout | None = None
+    best_authoritative_load: ExerciseHistoryMetric | None = None
+    estimated_1rm: ExerciseEstimated1RM | None = None
+    rep_prs: list[ExerciseRepPR]
+    windows: list[ExerciseHistoryWindow]
+    recent_sessions: list[ExerciseHistorySession]
+    progression: list[ExerciseProgressionPoint]
+    progression_events: list[ExerciseProgressionEvent]
+    history_truncated: bool
+
+
 class RirDistributionBucket(BaseModel):
     value: RirValue
     completed_set_count: int
@@ -461,12 +821,47 @@ class MuscleSetExposure(BaseModel):
     completed_set_count: int
 
 
+class MuscleWorkloadPeriod(BaseModel):
+    completed_set_count: int
+    primary_completed_set_count: int
+    secondary_completed_set_count: int
+    completed_session_count: int
+    frequency_per_week: float
+
+
+class MuscleWorkloadExercise(BaseModel):
+    exercise_id: int
+    exercise_title: str
+    contribution_roles: list[MuscleContributionRole]
+    completed_set_count: int
+    performed_session_count: int
+    history_truncated: bool
+    sessions: list[ExerciseTrainingSession]
+
+
+class MuscleWorkloadItem(BaseModel):
+    muscle_id: str
+    muscle_name: str
+    current: MuscleWorkloadPeriod | None
+    previous: MuscleWorkloadPeriod | None
+    completed_set_count_change: int | None = None
+    frequency_per_week_change: float | None = None
+    trend: MuscleWorkloadTrend
+    contributing_exercises: list[MuscleWorkloadExercise]
+
+
 class TrainingAnalyticsResponse(BaseModel):
     period_days: int
     period_start: date
     period_end: date
+    previous_period_start: date
+    previous_period_end: date
     exercise_history_limit: int
     completed_set_count: int
+    completed_workout_count: int
+    frequency_per_week: float
+    previous_completed_workout_count: int
+    previous_frequency_per_week: float
     reps_total: int | None = None
     reps_recorded_sets: int
     external_load_volume_kg: float | None = None
@@ -475,11 +870,14 @@ class TrainingAnalyticsResponse(BaseModel):
     rir: RirTrainingAnalytics
     primary_muscle_exposure: list[MuscleSetExposure]
     secondary_muscle_exposure: list[MuscleSetExposure]
+    muscle_group_workload: list[MuscleWorkloadItem]
     completed_sets_without_muscle_metadata: int
     data_sufficiency: TrainingDataSufficiency
 
 
 class WorkoutTimelineSet(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     set_number: int
     actual_reps: int | None = None
     actual_weight: float | None = None
@@ -513,15 +911,68 @@ class WorkoutTimelineItem(BaseModel):
     exercises: list[WorkoutTimelineExercise]
 
 
+class BodyMeasurementCustomValueSave(BaseModel):
+    definition_id: int = Field(ge=1)
+    value: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+
+
+class BodyMeasurementDefinitionCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=64)
+
+    @field_validator("label")
+    @classmethod
+    def normalize_label(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("Название показателя не может быть пустым")
+        return normalized
+
+
+class BodyMeasurementDefinitionUpdate(BodyMeasurementDefinitionCreate):
+    pass
+
+
+class BodyMeasurementDefinitionResponse(BaseModel):
+    id: int
+    label: str
+    unit: Literal["cm"] = "cm"
+    archived: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class BodyMeasurementCustomValueResponse(BaseModel):
+    definition_id: int
+    label: str
+    unit: Literal["cm"] = "cm"
+    value: float
+    archived: bool = False
+
+
 class BodyMeasurementSave(BaseModel):
     measured_on: date | None = None
-    weight_kg: float | None = Field(default=None, ge=20, le=350, allow_inf_nan=False)
-    chest_cm: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
-    waist_cm: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
-    hips_cm: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
-    biceps_cm: float | None = Field(default=None, gt=0, le=150, allow_inf_nan=False)
-    thigh_cm: float | None = Field(default=None, gt=0, le=200, allow_inf_nan=False)
+    weight_kg: Decimal | None = Field(
+        default=None, ge=20, le=350, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    chest_cm: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    waist_cm: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    hips_cm: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    biceps_cm: Decimal | None = Field(
+        default=None, gt=0, le=150, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    thigh_cm: Decimal | None = Field(
+        default=None, gt=0, le=200, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
     note: str | None = Field(default=None, max_length=500)
+    custom_values: list[BodyMeasurementCustomValueSave] = Field(default_factory=list, max_length=32)
 
 
 class BodyMeasurementResponse(BaseModel):
@@ -535,3 +986,4 @@ class BodyMeasurementResponse(BaseModel):
     thigh_cm: float | None = None
     note: str | None = None
     created_at: datetime | None = None
+    custom_values: list[BodyMeasurementCustomValueResponse] = Field(default_factory=list)

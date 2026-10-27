@@ -1,10 +1,10 @@
 import { useId, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { handleTabKeyDown } from './tabs';
 import { Icon, type IconName } from './Icon';
+import { glassProps, type GlassVariant } from './Glass';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger';
-type SemanticArtworkVariant = 'current-action' | 'data-insight' | 'workout-completion';
 export type SemanticCardFamily = 'training' | 'nutrition' | 'progress' | 'wellbeing' | 'neutral';
 export type SemanticCardVariant = 'summary' | 'action' | 'section';
 
@@ -19,13 +19,16 @@ export function Button({
   className = '',
   fullWidth = false,
   variant = 'primary',
+  glass,
   ...props
 }: ComponentPropsWithoutRef<'button'> & {
   fullWidth?: boolean;
   variant?: ButtonVariant;
+  glass?: GlassVariant;
 }) {
   return (
     <button
+      {...(glass ? glassProps(glass, true) : {})}
       {...props}
       className={`ui-button ui-button--${variant}${fullWidth ? ' ui-button--full' : ''} ${className}`.trim()}
     />
@@ -36,7 +39,13 @@ export function IconButton({
   className = '',
   ...props
 }: ComponentPropsWithoutRef<'button'> & { 'aria-label': string }) {
-  return <button {...props} className={`ui-icon-button ${className}`.trim()} />;
+  return (
+    <button
+      {...glassProps('clear', true)}
+      {...props}
+      className={`ui-icon-button ${className}`.trim()}
+    />
+  );
 }
 
 export function Field({
@@ -74,7 +83,13 @@ export function Input({ className = '', ...props }: ComponentPropsWithoutRef<'in
 }
 
 export function Select({ className = '', ...props }: ComponentPropsWithoutRef<'select'>) {
-  return <select {...props} className={`ui-select ${className}`.trim()} />;
+  return (
+    <select
+      {...glassProps('tinted', true)}
+      {...props}
+      className={`ui-select ${className}`.trim()}
+    />
+  );
 }
 
 export function Surface({
@@ -89,16 +104,6 @@ export function Surface({
     <section {...props} className={`ui-surface${variants} ${className}`.trim()}>
       {children}
     </section>
-  );
-}
-
-export function SemanticArtwork({ variant }: { variant: SemanticArtworkVariant }) {
-  return (
-    <span aria-hidden="true" className={`ui-semantic-artwork ui-semantic-artwork--${variant}`}>
-      <i />
-      <i />
-      <i />
-    </span>
   );
 }
 
@@ -144,10 +149,11 @@ export function SegmentedControl({
   value: string;
 }) {
   return (
-    <div aria-label={ariaLabel} className="ui-tabs" role="tablist">
+    <div {...glassProps()} aria-label={ariaLabel} className="ui-tabs" role="tablist">
       {options.map((option) => (
         <button
           aria-selected={option.value === value}
+          data-yfc-choice="capsule"
           className="ui-tab"
           disabled={option.disabled}
           key={option.value}
@@ -289,6 +295,7 @@ export function ExpandableCard({
       open={disclosureOpen}
     >
       <summary
+        className="yfc-disclosure-summary"
         aria-controls={bodyId}
         aria-expanded={disclosureOpen}
         onClick={(event) => {
@@ -375,7 +382,15 @@ export function EmptyState({ title, text }: { title: string; text?: string }) {
   );
 }
 
-export function ErrorState({ message, retry }: { message: string; retry?: () => void }) {
+export function ErrorState({
+  message,
+  retry,
+  retryLabel = 'Повторить',
+}: {
+  message: string;
+  retry?: () => void;
+  retryLabel?: string;
+}) {
   return (
     <div className="empty-state error-state ui-state ui-state--error" role="alert">
       <Icon className="ui-state__icon" name="error" size={24} />
@@ -383,7 +398,7 @@ export function ErrorState({ message, retry }: { message: string; retry?: () => 
       <p className="muted ui-state__text">{message}</p>
       {retry && (
         <Button onClick={retry} type="button" variant="secondary">
-          Повторить
+          {retryLabel}
         </Button>
       )}
     </div>

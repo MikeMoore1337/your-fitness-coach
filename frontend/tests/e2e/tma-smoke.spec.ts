@@ -13,6 +13,7 @@ import {
 import { installPlatformApi } from './fixtures/platform-api';
 import { makeProgressReportFixture } from '../fixtures/progress-report';
 import { namedArticle, notificationArticle } from './fixtures/locators';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 const todayStates = [
   { name: 'planned', options: { workoutStatus: 'planned' as const }, action: 'Начать тренировку' },
@@ -39,6 +40,15 @@ const TASK_74_CAPTURE_PHASE = (
 ).process?.env?.YFC_CAPTURE_TASK_74_PHASE;
 const TASK_74_SCREENSHOT_DIR = '../.artifacts/screenshots/task-74';
 
+async function waitForVisualStability(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+  });
+}
+
 async function expectLimeStartBoundary(locator: Locator) {
   const colors = await locator.evaluate((element) => {
     const sample = document.createElement('span');
@@ -54,24 +64,17 @@ async function expectLimeStartBoundary(locator: Locator) {
   expect(colors.boundary).toBe(colors.lime);
 }
 
-async function installBarcodeCameraCapability(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(globalThis, 'BarcodeDetector', {
-      configurable: true,
-      value: undefined,
-    });
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: async () => {
-          throw new DOMException(
-            'Evidence harness does not open a real camera.',
-            'NotAllowedError',
-          );
-        },
-      },
-    });
+async function expectNeutralStartBoundary(locator: Locator) {
+  const boundary = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      width: style.borderInlineStartWidth,
+      start: style.borderInlineStartColor,
+      top: style.borderTopColor,
+    };
   });
+  expect(boundary.width).toBe('1px');
+  expect(boundary.start).toBe(boundary.top);
 }
 
 test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on one platform contract', async ({
@@ -147,18 +150,27 @@ test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on on
   );
   expect(contextualDayIndex).toBeGreaterThanOrEqual(0);
   const contextualWorkoutDay = workoutDays.nth(contextualDayIndex);
+  const contextualDayLabel = await contextualWorkoutDay.getAttribute('aria-label');
+  expect(contextualDayLabel).toMatch(/(?:Запланировано|Предстоит тренировка|Выполнено)/i);
+  const contextIsCompleted = /Выполнено/i.test(contextualDayLabel ?? '');
   await contextualWorkoutDay.click();
   const weekLink = tmaPage.getByRole('link', { name: 'Открыть тренировку' });
   await weekLink.focus();
   await expect(weekLink).toBeFocused();
   await weekLink.press('Enter');
-  await expect(tmaPage).toHaveURL(/section=progress&workout_id=43/);
+  await expect(tmaPage).toHaveURL(
+    contextIsCompleted ? /section=progress&workout_id=43/ : /section=programs&workout_id=43/,
+  );
   await expect(
-    tmaPage.locator('#workout-schedule-43').or(tmaPage.locator('#workout-history-43')),
+    contextIsCompleted
+      ? tmaPage.locator('#workout-history-43')
+      : tmaPage.locator('#workout-schedule-43'),
   ).toBeVisible();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=progress');
+  await expect(tmaPage).toHaveURL(
+    contextIsCompleted ? '/app?section=progress' : '/app?section=today',
+  );
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(false);
 });
 
@@ -186,7 +198,8 @@ test('progress report starts native PDF download and keeps BackButton contract',
   );
   await tmaPage.goto('/app/report?period=days_90');
 
-  await expect(tmaPage.getByRole('heading', { name: 'Александр Петров' })).toBeVisible();
+  await expect(tmaPage.getByRole('heading', { name: 'Отчёт о прогрессе', level: 1 })).toBeVisible();
+  await expect(tmaPage.getByText('Александр Петров', { exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(tmaPage);
   await tmaPage.getByRole('button', { name: 'Скачать PDF' }).click();
   await expect(tmaPage.getByText('Telegram открыл сохранение PDF.')).toBeVisible();
@@ -200,7 +213,7 @@ test('progress report starts native PDF download and keeps BackButton contract',
     ]);
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=progress');
+  await expect(tmaPage).toHaveURL('/app?section=progress&progress_period=90');
 });
 
 test('an unplanned day keeps the first factual cardio entry compact but available in Today', async ({
@@ -212,20 +225,19 @@ test('an unplanned day keeps the first factual cardio entry compact but availabl
     const url = new URL(response.url());
     return url.pathname.endsWith('/api/v1/workouts/cardio') && url.searchParams.has('date_from');
   });
-  await tmaPage.goto('/app?section=today');
+  await tmaPage.goto('/app?section=today&cardio=1');
   await cardioRequest;
 
   const cardio = tmaPage.locator('.cardio-log--quick');
   await expect(cardio).toHaveClass(/cardio-log--empty/);
   await expect(cardio.getByRole('heading', { name: 'Кардио', exact: true })).toBeVisible();
-  await expect(cardio.getByRole('button', { name: 'Добавить' })).toBeVisible();
-  await expect(cardio.getByLabel('Длительность, мин')).toHaveCount(0);
+  await expect(cardio.getByRole('button', { name: 'Отмена' })).toBeVisible();
+  await expect(cardio.getByLabel('Длительность, мин')).toHaveCount(1);
   await cardio.scrollIntoViewIfNeeded();
   await cardio.screenshot({
     path: '../.artifacts/screenshots/task-113A-round-5/tma-cardio-empty-entry-390x844.png',
   });
 
-  await cardio.getByRole('button', { name: 'Добавить' }).click();
   const duration = cardio.getByLabel('Длительность, мин');
   await duration.focus();
   await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
@@ -234,6 +246,73 @@ test('an unplanned day keeps the first factual cardio entry compact but availabl
   await tma.setActive(false);
   await tma.setActive(true);
   await expect(duration).toBeVisible();
+});
+
+test('cardio date and time stays inside its card on narrow Mobile Web and TMA screens', async ({
+  mobilePage,
+  tma,
+  tmaPage,
+}) => {
+  await Promise.all([
+    installPlatformApi(mobilePage, { browserSession: true, cardioState: 'empty' }),
+    installPlatformApi(tmaPage, { cardioState: 'empty' }),
+  ]);
+  await Promise.all([
+    mobilePage.goto('/app?section=today&cardio=1'),
+    tmaPage.goto('/app?section=today&cardio=1'),
+  ]);
+
+  for (const page of [mobilePage, tmaPage]) {
+    const card = page.locator('.cardio-log--quick');
+    const date = card.getByLabel('Дата и время');
+    await expect(date).toHaveAttribute('type', 'datetime-local');
+    await date.fill('2026-10-26T14:00');
+    await expect(date).toHaveValue('2026-10-26T14:00');
+
+    for (const theme of ['light', 'dark'] as const) {
+      if (page === tmaPage) {
+        await tma.setTheme(theme);
+      } else {
+        await page.evaluate((value) => {
+          localStorage.setItem('app-theme', value);
+          window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+        }, theme);
+      }
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+
+      for (const width of [320, 360, 390, 430]) {
+        await page.setViewportSize({ width, height: 844 });
+        if (page === tmaPage) await tma.setViewport(844, 844);
+
+        const geometry = await date.evaluate((input) => {
+          const field = input.closest('.ui-field');
+          const card = input.closest('.cardio-log');
+          if (!field || !card) throw new Error('Cardio date field or card is missing');
+          const control = input.getBoundingClientRect();
+          const fieldBox = field.getBoundingClientRect();
+          const cardBox = card.getBoundingClientRect();
+          return {
+            left: control.left,
+            right: control.right,
+            fieldLeft: fieldBox.left,
+            fieldRight: fieldBox.right,
+            cardRight: cardBox.right,
+            cardOverflow: card.scrollWidth - card.clientWidth,
+            pageOverflow:
+              document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          };
+        });
+
+        expect(geometry.left).toBeGreaterThanOrEqual(geometry.fieldLeft - 1);
+        expect(geometry.right).toBeLessThanOrEqual(geometry.fieldRight + 1);
+        expect(geometry.right).toBeLessThanOrEqual(geometry.cardRight + 1);
+        expect(geometry.right).toBeLessThanOrEqual(width + 1);
+        expect(geometry.cardOverflow).toBeLessThanOrEqual(1);
+        expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
+        await expect(date).toHaveValue('2026-10-26T14:00');
+      }
+    }
+  }
 });
 
 test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior', async ({
@@ -247,13 +326,19 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
     browserSession: true,
     cardioState: 'planned',
   });
-  await Promise.all([tmaPage.goto('/app'), mobilePage.goto('/app')]);
+  await Promise.all([
+    tmaPage.goto('/app?section=today&cardio=1'),
+    mobilePage.goto('/app?section=today&cardio=1'),
+  ]);
 
   for (const page of [tmaPage, mobilePage]) {
     const cardio = page.locator('.cardio-log--quick');
     await cardio.scrollIntoViewIfNeeded();
     await expect(cardio.getByRole('heading', { name: 'Кардио', exact: true })).toBeVisible();
     await expect(cardio.getByRole('heading', { name: 'План кардио' })).toBeVisible();
+    await expect(cardio.getByRole('button', { name: 'Отмена' })).toBeVisible();
+    await cardio.getByRole('button', { name: 'Отмена' }).click();
+    await expect(page).toHaveURL('/app?section=today');
     await expect(cardio.getByRole('button', { name: 'Добавить фактическое кардио' })).toBeVisible();
     await expect(cardio.getByRole('button', { name: 'Сохранить кардио' })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
@@ -272,7 +357,10 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(tmaPage.locator('#appBottomNav')).toBeHidden();
   await duration.fill('35');
-  await tmaCardio.getByText('Дистанция, пульс и заметка').click();
+  const optionalDetails = tmaCardio.locator('.cardio-form__optional');
+  const optionalSummary = tmaCardio.locator('.cardio-form__optional > summary');
+  await optionalSummary.click();
+  await expect(optionalDetails).toHaveAttribute('open', '');
   await tmaCardio.getByLabel('Дистанция, км').fill('5.2');
   await tmaCardio.getByLabel('Средний пульс, уд/мин').fill('142');
   await tmaCardio.getByLabel('Зона пульса').selectOption('3');
@@ -286,7 +374,9 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   tmaApi.failNextCardioSave();
   await saveCardio.click();
   await expect.poll(() => tmaApi.cardioSaveCalls()).toBe(1);
-  await expect(tmaCardio.getByRole('alert')).toContainText('Временная ошибка сохранения');
+  await expect(tmaCardio.getByRole('alert')).toContainText(
+    'Сервис временно недоступен. Попробуйте ещё раз.',
+  );
   await expect(duration).toHaveValue('35');
   await expect(tmaCardio.getByLabel('Заметка')).toHaveValue('Ровный темп, без часов');
 
@@ -302,13 +392,38 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   ]);
   await expect(tmaCardio.getByText('2 сегодня')).toBeVisible();
   await expect(tmaCardio.getByRole('button', { name: 'Добавить ещё кардио' })).toBeVisible();
+  await savedTmaRow.getByText('Действия с записью', { exact: true }).click();
   await savedTmaRow.getByRole('button', { name: 'Изменить' }).click();
   const editForm = tmaCardio.locator('.cardio-session-row--editing');
+  const editDate = editForm.getByLabel('Дата и время');
+  await expect(editDate).toHaveAttribute('type', 'datetime-local');
+  const originalDate = await editDate.inputValue();
+  await editDate.fill(originalDate);
+  for (const width of [320, 360, 390, 430]) {
+    await tmaPage.setViewportSize({ width, height: 844 });
+    await tma.setViewport(844, 844);
+    const geometry = await editDate.evaluate((input) => {
+      const field = input.closest('.ui-field');
+      const card = input.closest('.cardio-session-row');
+      if (!field || !card) throw new Error('Editing cardio date field/card missing');
+      return {
+        right: input.getBoundingClientRect().right,
+        fieldRight: field.getBoundingClientRect().right,
+        cardRight: card.getBoundingClientRect().right,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    expect(geometry.right).toBeLessThanOrEqual(geometry.fieldRight + 1);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.cardRight + 1);
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    await expect(editDate).toHaveValue(originalDate);
+  }
   await editForm.getByLabel('Длительность, мин').fill('40');
   await editForm.getByRole('button', { name: 'Сохранить изменения' }).click();
   await expect.poll(() => tmaApi.cardioSaveCalls()).toBe(3);
   const finalTmaRow = tmaCardio.locator('.cardio-session-row').filter({ hasText: '40 мин' });
   await expect(finalTmaRow).toBeVisible();
+  await finalTmaRow.getByText('Действия с записью', { exact: true }).click();
   await expect(finalTmaRow.getByText('Завершено')).toHaveCSS('white-space', 'nowrap');
   await tmaCardio.screenshot({
     path: '../.artifacts/screenshots/task-113A-round-2/tma-cardio-completed-result-first-390x844-light.png',
@@ -326,7 +441,11 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
     await expectNoHorizontalOverflow(tmaPage);
-    await expectTouchTargets(tmaCardio.locator('.cardio-session-row__actions .ui-button'));
+    await expectTouchTargets(
+      tmaCardio.locator(
+        '.cardio-session-row__actions > summary:visible, .cardio-session-row__actions .ui-button:visible',
+      ),
+    );
   }
   await tmaPage.setViewportSize(MOBILE_CONTEXTS.baseline);
   await tma.setViewport(MOBILE_CONTEXTS.baseline.height, MOBILE_CONTEXTS.baseline.height);
@@ -352,6 +471,10 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
 
   await mobilePage.setViewportSize({ width: 1440, height: 900 });
   await mobilePage.goto('/app?section=progress');
+  await mobilePage
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Кардио/ })
+    .click();
   const history = mobilePage.locator('#progress-cardio');
   await history.scrollIntoViewIfNeeded();
   await expect(history.getByText('1 завершено')).toBeVisible();
@@ -440,8 +563,8 @@ test('program history keeps current block, readable revisions and workout return
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs'),
-    mobilePage.goto('/app?section=programs'),
+    tmaPage.goto('/app?section=programs&view=manage'),
+    mobilePage.goto('/app?section=programs&view=manage'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -457,6 +580,15 @@ test('program history keeps current block, readable revisions and workout return
     );
     await history.getByText('Все этапы и изменения').click();
     await expect(history.getByRole('heading', { name: 'Тренировочные блоки' })).toBeVisible();
+    await expect(
+      history.locator('.program-history__disclosure > summary > .disclosure-icon'),
+    ).toBeVisible();
+    const historyBody = history.locator('.program-history__body');
+    await expect(historyBody).toHaveCSS('border-top-style', 'none');
+    await expect(historyBody.locator('.program-history__region').nth(1)).toHaveCSS(
+      'border-top-style',
+      'none',
+    );
     const blockTimeline = history.locator('.program-block-timeline');
     await expect(blockTimeline.getByText('Вводный этап')).toBeVisible();
     await expect(
@@ -525,13 +657,176 @@ test('program history keeps current block, readable revisions and workout return
   await expect(mobilePage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
 });
 
+test('AI adaptation stays bounded across confirm, reject and disabled core states', async ({
+  browser,
+  mobilePage,
+  tma,
+  tmaPage,
+}) => {
+  await installPlatformApi(mobilePage, {
+    browserSession: true,
+    programHistory: 'many',
+    aiAdaptation: 'available',
+  });
+  await installPlatformApi(tmaPage, { programHistory: 'many', aiAdaptation: 'available' });
+  await Promise.all([
+    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage'),
+  ]);
+  await tma.setTheme('dark');
+
+  const mobileAdaptation = mobilePage.getByTestId('ai-adaptation');
+  await expect(
+    mobileAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }),
+  ).toBeVisible();
+  await mobileAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
+  const mobileGenerate = mobilePage.waitForRequest(
+    (request) =>
+      request.method() === 'POST' &&
+      request.url().endsWith('/api/v1/ai-coach/adaptations/proposals'),
+  );
+  await mobileAdaptation.getByRole('button', { name: 'Сформировать предложение' }).click();
+  expect((await mobileGenerate).postDataJSON()).toEqual({
+    program_id: 77,
+    expected_revision_number: 4,
+    target_workout_id: 943,
+    message: 'Предложи безопасную адаптацию текущей программы с учётом ближайшей тренировки.',
+    locale: 'ru',
+  });
+  await expect(mobileAdaptation.getByText(/Текущая прогрессия допускает/)).toBeVisible();
+  await expect(mobileAdaptation.getByText(/результаты прогрессии/)).toBeVisible();
+  await expect(mobileAdaptation).not.toContainText('evidence:progression');
+  const mobileConfirm = mobileAdaptation.getByRole('button', { name: 'Подтвердить адаптацию' });
+  const mobileReject = mobileAdaptation.getByRole('button', { name: 'Отклонить' });
+  await mobileConfirm.scrollIntoViewIfNeeded();
+  await expectNoOverlap(mobileConfirm, mobilePage.locator('#appBottomNav'));
+  await expectNoOverlap(mobileReject, mobilePage.locator('#appBottomNav'));
+  await waitForVisualStability(mobilePage);
+  await mobileAdaptation.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/mobile-light-review.png',
+  });
+
+  const mobileReview = mobilePage.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/review'),
+  );
+  await mobileConfirm.click();
+  expect((await mobileReview).postDataJSON()).toEqual({
+    proposal_id: 'task-509-proposal',
+    proposal_token: 'task-509-proposal-token',
+    expected_revision_number: 4,
+    decision: 'confirm',
+  });
+  await expect(mobileAdaptation).toHaveAttribute('data-state', 'confirmed');
+  await expectNoHorizontalOverflow(mobilePage);
+  await mobileAdaptation.scrollIntoViewIfNeeded();
+  await expectNoOverlap(mobileAdaptation, mobilePage.locator('#appBottomNav'));
+  await waitForVisualStability(mobilePage);
+  await mobilePage.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/mobile-light-confirmed.png',
+  });
+
+  const tmaAdaptation = tmaPage.getByTestId('ai-adaptation');
+  await expect(
+    tmaAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }),
+  ).toBeVisible();
+  await tmaAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
+  const tmaGenerate = tmaPage.waitForRequest(
+    (request) =>
+      request.method() === 'POST' &&
+      request.url().endsWith('/api/v1/ai-coach/adaptations/proposals'),
+  );
+  await tmaAdaptation.getByRole('button', { name: 'Сформировать предложение' }).click();
+  expect((await tmaGenerate).postDataJSON()).toMatchObject({
+    program_id: 77,
+    expected_revision_number: 4,
+    target_workout_id: 943,
+    locale: 'ru',
+  });
+  await expect(tmaAdaptation.getByRole('button', { name: 'Отклонить' })).toBeVisible();
+  const tmaConfirm = tmaAdaptation.getByRole('button', { name: 'Подтвердить адаптацию' });
+  const tmaReject = tmaAdaptation.getByRole('button', { name: 'Отклонить' });
+  await tmaConfirm.scrollIntoViewIfNeeded();
+  await expectNoOverlap(tmaConfirm, tmaPage.locator('#appBottomNav'));
+  await expectNoOverlap(tmaReject, tmaPage.locator('#appBottomNav'));
+  await waitForVisualStability(tmaPage);
+  await tmaAdaptation.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/tma-dark-review.png',
+  });
+  const tmaReview = tmaPage.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/review'),
+  );
+  await tmaReject.click();
+  expect((await tmaReview).postDataJSON()).toEqual({
+    proposal_id: 'task-509-proposal',
+    proposal_token: 'task-509-proposal-token',
+    expected_revision_number: 4,
+    decision: 'reject',
+  });
+  await expect(tmaAdaptation).toHaveAttribute('data-state', 'rejected');
+  await expectNoHorizontalOverflow(tmaPage);
+  await tmaAdaptation.scrollIntoViewIfNeeded();
+  await expectNoOverlap(tmaAdaptation, tmaPage.locator('#appBottomNav'));
+  await waitForVisualStability(tmaPage);
+  await tmaPage.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/tma-dark-rejected.png',
+  });
+
+  const desktopReviewPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await installPlatformApi(desktopReviewPage, {
+    browserSession: true,
+    programHistory: 'many',
+    aiAdaptation: 'available',
+  });
+  await desktopReviewPage.goto('/app?section=programs&view=manage');
+  const desktopReview = desktopReviewPage.getByTestId('ai-adaptation');
+  await desktopReview.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
+  const desktopGenerate = desktopReviewPage.waitForRequest(
+    (request) =>
+      request.method() === 'POST' &&
+      request.url().endsWith('/api/v1/ai-coach/adaptations/proposals'),
+  );
+  await desktopReview.getByRole('button', { name: 'Сформировать предложение' }).click();
+  expect((await desktopGenerate).postDataJSON()).toMatchObject({
+    program_id: 77,
+    expected_revision_number: 4,
+    target_workout_id: 943,
+    locale: 'ru',
+  });
+  await expect(desktopReview.getByRole('button', { name: 'Подтвердить адаптацию' })).toBeVisible();
+  await desktopReview.scrollIntoViewIfNeeded();
+  await waitForVisualStability(desktopReviewPage);
+  await desktopReviewPage.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/desktop-light-review.png',
+  });
+  await desktopReviewPage.close();
+
+  const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const desktopProposalRequests: string[] = [];
+  desktop.on('request', (request) => {
+    if (request.url().includes('/api/v1/ai-coach/adaptations/proposals')) {
+      desktopProposalRequests.push(request.url());
+    }
+  });
+  await installPlatformApi(desktop, { browserSession: true, programHistory: 'many' });
+  await desktop.goto('/app?section=programs&view=manage');
+  const desktopAdaptation = desktop.getByTestId('ai-adaptation');
+  await expect(desktopAdaptation).toHaveCount(0);
+  await expect(desktop.getByText('Текущий тренировочный блок')).toBeVisible();
+  expect(desktopProposalRequests).toEqual([]);
+  await waitForVisualStability(desktop);
+  await desktop.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/desktop-light-disabled.png',
+  });
+  await desktop.close();
+});
+
 test('program history renders empty, one-block and full lifecycle states honestly', async ({
   browser,
 }) => {
   for (const state of ['empty', 'one', 'many'] as const) {
     const page = await browser.newPage({ viewport: MOBILE_CONTEXTS.baseline });
     await installPlatformApi(page, { browserSession: true, programHistory: state });
-    await page.goto('/app?section=programs');
+    await page.goto('/app?section=programs&view=manage');
     const history = page.locator('.program-history');
 
     if (state === 'empty') {
@@ -571,8 +866,8 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs'),
-    mobilePage.goto('/app?section=programs'),
+    tmaPage.goto('/app?section=programs&view=manage'),
+    mobilePage.goto('/app?section=programs&view=manage'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -611,9 +906,14 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
     path: '../.artifacts/screenshots/task-118/mobile-web-390x844-light.png',
     fullPage: true,
   });
-  const mobileSearch = mobilePage
+  await mobilePage
     .locator('#program-builder')
-    .getByRole('combobox', { name: 'Поиск упражнения' });
+    .getByRole('button', { name: 'Поиск упражнения' })
+    .first()
+    .click();
+  const mobileSearch = mobilePage
+    .getByRole('dialog', { name: 'Выбор упражнения' })
+    .getByRole('searchbox', { name: 'Поиск упражнения' });
   await mobileSearch.fill('Тяга');
   await expect(mobilePage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(mobilePage.locator('#appBottomNav')).toBeHidden();
@@ -622,6 +922,7 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   await expect(mobileSearch).toHaveValue('Тяга');
   await mobileSearch.fill('');
   await mobileSearch.evaluate((element) => element.blur());
+  await mobilePage.getByRole('button', { name: 'Закрыть выбор упражнения' }).click();
 
   await tma.setTheme('dark');
   await tmaPage.setViewportSize({ width: 430, height: 932 });
@@ -685,6 +986,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     const page = await browser.newPage({
       viewport: current.viewport,
       hasTouch: current.telegram,
+      reducedMotion: 'reduce',
     });
     if (current.telegram) {
       await installTelegramHarness(page, { colorScheme: current.theme });
@@ -695,10 +997,11 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       browserSession: !current.telegram,
       programHistory: 'many',
     });
-    await page.goto('/app?section=programs');
+    await page.goto('/app?section=programs&view=manage');
     const program = page.locator('.program-active');
     const history = program.locator('.program-history');
     await expect(history.getByText('Текущий тренировочный блок')).toBeVisible();
+    await waitForVisualStability(page);
     if (current.screenshot) {
       await history
         .locator('.program-current-block')
@@ -717,22 +1020,21 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       });
     }
     if (current.viewport.width < 900) {
+      await history.getByText('Действия с этапом', { exact: true }).click();
       const lastCurrentAction = history.getByRole('button', { name: 'В архив' });
-      await lastCurrentAction.evaluate((element) => {
-        const dock = document.querySelector<HTMLElement>('#appBottomNav');
-        if (!dock) return;
-        const actionBox = element.getBoundingClientRect();
-        const dockBox = dock.getBoundingClientRect();
-        const overlap = actionBox.bottom - dockBox.top;
-        if (overlap >= 0) window.scrollBy(0, overlap + 16);
-      });
       await expect
         .poll(async () => {
           const [actionBox, dockBox] = await Promise.all([
             lastCurrentAction.boundingBox(),
             page.locator('#appBottomNav').boundingBox(),
           ]);
-          return Boolean(actionBox && dockBox && actionBox.y + actionBox.height <= dockBox.y);
+          if (!actionBox || !dockBox) return false;
+          const overlap = actionBox.y + actionBox.height - dockBox.y;
+          if (overlap >= 0) {
+            await page.evaluate((distance) => window.scrollBy(0, distance), overlap + 16);
+            return false;
+          }
+          return true;
         })
         .toBe(true);
       await expect(lastCurrentAction).toBeInViewport();
@@ -741,6 +1043,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     await history.getByText('Все этапы и изменения').click();
     await history.locator('#program-revision-77-4 > summary').click();
     await expect(history.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
+    await waitForVisualStability(page);
     if (current.screenshot) {
       await history
         .locator('.program-current-block')
@@ -847,10 +1150,19 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
   ]);
 
   for (const currentPage of [tmaPage, mobilePage]) {
+    await currentPage
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Питание/ })
+      .click();
     const report = currentPage.locator('#nutrition-period-report');
     await expect(report.getByRole('heading', { name: 'Отчёт по питанию' })).toBeVisible();
     await expect(report.getByText('Заполнено 3 из 7 дней')).toBeVisible();
+    await report.getByText('История целей питания', { exact: true }).click();
     await expect(report.getByText('Изменения цели в периоде')).toBeVisible();
+    const days = report.locator('.nutrition-report-days');
+    await expect(days).not.toHaveAttribute('open', '');
+    await days.locator(':scope > summary').click();
+    await expect(days).toHaveAttribute('open', '');
     await expect(
       report.getByRole('table', {
         name: 'Дневные КБЖУ, статус заполнения и действовавшая цель',
@@ -881,6 +1193,11 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
     await expectNoHorizontalOverflow(tmaPage);
     await expectTouchTargets(tmaSelector.getByRole('tab'));
   }
+  // Changing the selected period resets the long day list to its compact state.
+  const selectedDays = tmaReport.locator('.nutrition-report-days');
+  await expect(selectedDays).not.toHaveAttribute('open', '');
+  await selectedDays.locator(':scope > summary').click();
+  await expect(selectedDays).toHaveAttribute('open', '');
   const diaryLink = tmaReport.getByRole('row').filter({ hasText: '· сегодня' }).getByRole('link');
   await expect(diaryLink).toHaveCount(1);
   await diaryLink.scrollIntoViewIfNeeded();
@@ -905,8 +1222,8 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
         }),
     )
     .toEqual({
-      fill: 'rgb(22, 25, 22)',
-      stroke: 'rgb(168, 232, 58)',
+      fill: 'rgb(20, 23, 23)',
+      stroke: 'rgb(178, 245, 32)',
       theme: 'dark',
     });
   await tmaReport.evaluate((element) => element.scrollIntoView({ block: 'start' }));
@@ -924,11 +1241,65 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
   await expect(tmaPage).toHaveURL(/section=nutrition&date=.*return_to=/);
   await expect(tmaPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
   await tmaPage.getByRole('link', { name: 'К отчёту по питанию' }).click();
-  await expect(tmaPage).toHaveURL(/section=progress&progress_period=days_7/);
+  await expect(tmaPage).toHaveURL(/section=progress/);
+  await expect(tmaPage).toHaveURL(/progress_view=nutrition/);
+  await expect(tmaPage).toHaveURL(/progress_period=days_7/);
   await expect(tmaSelector.getByRole('tab', { name: '7 дней' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
+});
+
+test('progress contextual help stays one line across Mobile Web/PWA and mocked TMA', async ({
+  mobilePage,
+  tma,
+  tmaPage,
+}) => {
+  await mobilePage.addInitScript(() => {
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+  });
+  await installPlatformApi(tmaPage);
+  await installPlatformApi(mobilePage, { browserSession: true });
+  await Promise.all([
+    tmaPage.goto('/app?section=progress'),
+    mobilePage.goto('/app?section=progress'),
+  ]);
+
+  for (const theme of ['light', 'dark'] as const) {
+    await tma.setTheme(theme);
+    await mobilePage.evaluate((value) => {
+      localStorage.setItem('app-theme', value);
+      window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+    }, theme);
+    for (const width of [320, 360, 393, 430]) {
+      await tmaPage.setViewportSize({ width, height: 844 });
+      await tma.setViewport(844, 844);
+      await mobilePage.setViewportSize({ width, height: 844 });
+      for (const page of [mobilePage, tmaPage]) {
+        const help = page.locator('.progress-hero__help summary');
+        await expect(help).toBeVisible();
+        const geometry = await help.evaluate((summary) => {
+          const textNode = Array.from(summary.childNodes).find(
+            (node) => node.nodeType === Node.TEXT_NODE,
+          );
+          const range = document.createRange();
+          if (textNode) range.selectNodeContents(textNode);
+          const box = summary.getBoundingClientRect();
+          return {
+            textRectCount: textNode ? range.getClientRects().length : 0,
+            height: box.height,
+            right: box.right,
+            viewportWidth: window.innerWidth,
+            documentWidth: document.documentElement.scrollWidth,
+          };
+        });
+        expect(geometry.textRectCount, `${theme} ${width}px`).toBe(1);
+        expect(geometry.height, `${theme} ${width}px`).toBeGreaterThanOrEqual(44);
+        expect(geometry.right, `${theme} ${width}px`).toBeLessThanOrEqual(width);
+        expect(geometry.documentWidth, `${theme} ${width}px`).toBeLessThanOrEqual(width);
+      }
+    }
+  }
 });
 
 test('measurement add, edit, history and insufficient trend keep Mobile Web and TMA parity', async ({
@@ -944,9 +1315,14 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   ]);
 
   for (const currentPage of [tmaPage, mobilePage]) {
+    await currentPage
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Тело/ })
+      .click();
     const body = currentPage.locator('#progress-body');
+    await body.locator('.progress-measurement-editor > summary').click();
     await expect(body.getByText('Сбалансированное развитие')).toBeVisible();
-    await expect(body.getByText('Замеров за этот период нет')).toBeVisible();
+    await expect(body.getByText('Мало данных для динамики')).toBeVisible();
     await expect(body.getByText('Замеров пока нет')).toBeVisible();
     await expect(body.getByLabel('Вес, кг')).toHaveAttribute('inputmode', 'decimal');
     await body.getByLabel('Вес, кг').fill('74.2');
@@ -958,7 +1334,8 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   await tmaBody.getByLabel('Вес, кг').focus();
   await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(tmaPage.locator('#appBottomNav')).toBeHidden();
-  await expect(tmaBody.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'sticky');
+  // #1189: avoid a sticky save bar overlapping focused input on the iOS keyboard.
+  await expect(tmaBody.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'static');
   await tma.setTheme('dark');
   await tma.setActive(false);
   await tma.setActive(true);
@@ -983,7 +1360,9 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
 
   for (const currentPage of [tmaPage, mobilePage]) {
     const body = currentPage.locator('#progress-body');
-    await expect(body.getByText(/Вес: 74\.2 кг · Окружность плеча: 31\.6 см/)).toBeVisible();
+    await expect(
+      body.locator('.measurement-diary').getByText(/Вес: 74,2 кг · Окружность плеча: 31,6 см/),
+    ).toBeVisible();
     const singlePointHints = body.getByText(
       'Одна точка сохраняет факт, но ещё не показывает направление изменений.',
     );
@@ -992,11 +1371,11 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
     const noTrendStates = body.getByText('Пока без динамики', { exact: true });
     await expect(noTrendStates).toHaveCount(2);
     for (const state of await noTrendStates.all()) await expect(state).toBeVisible();
-    const row = body.locator('.measurement-history__row').filter({ hasText: '74.2 кг' });
+    const row = body.locator('.measurement-history__row').filter({ hasText: '74,2 кг' });
     await row.getByRole('button', { name: 'Изменить' }).click();
     await body.getByLabel('Вес, кг').fill('74.6');
     await body.getByRole('button', { name: 'Сохранить изменения' }).click();
-    await expect(body.getByText(/Вес: 74\.6 кг · Окружность плеча: 31\.6 см/)).toBeVisible();
+    await expect(body.getByText(/Вес: 74,6 кг · Окружность плеча: 31,6 см/)).toBeVisible();
     await expectNoHorizontalOverflow(currentPage);
     await expectTouchTargets(body.locator('.measurement-history__actions .ui-button'));
   }
@@ -1014,7 +1393,7 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   await tma.setViewport(844, 844);
   const toastClose = tmaPage.getByRole('button', { name: 'Закрыть сообщение' });
   if (await toastClose.isVisible()) await toastClose.click();
-  const editedRow = tmaBody.locator('.measurement-history__row').filter({ hasText: '74.6 кг' });
+  const editedRow = tmaBody.locator('.measurement-history__row').filter({ hasText: '74,6 кг' });
   await editedRow.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await tmaPage.screenshot({
     path: '../.artifacts/screenshots/task-60/tma-390x844-dark.png',
@@ -1043,6 +1422,10 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Тренировки/ })
+      .click();
     const insufficient = page
       .getByRole('region', { name: 'Достаточно ли данных: Пока мало данных', exact: true })
       .filter({ hasText: '0 рабочих подходов' });
@@ -1050,9 +1433,11 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
     await expect(insufficient).toBeVisible();
     await expect(insufficient).toContainText('0 рабочих подходов');
     await expect(page.getByRole('link', { name: 'Открыть тренировку' })).toBeVisible();
-    await expectLimeStartBoundary(insufficient);
+    await expectNeutralStartBoundary(insufficient);
     await expectNoHorizontalOverflow(page);
-    await expectTouchTargets(page.locator('#progress-body details > summary:visible'));
+    await expectTouchTargets(
+      page.locator('#progress-training .data-confidence__details > summary:visible'),
+    );
   }
   expect(await sharedSurfaceSignature(tmaPage)).toEqual(await sharedSurfaceSignature(mobilePage));
 
@@ -1064,9 +1449,13 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
   }
   await tmaPage.setViewportSize(MOBILE_CONTEXTS.baseline);
   await tma.setViewport(MOBILE_CONTEXTS.baseline.height, MOBILE_CONTEXTS.baseline.height);
+  await tmaPage
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Тело/ })
+    .click();
   const bodyConfidence = tmaPage
     .locator('#progress-body')
-    .getByRole('region', { name: 'Достаточно ли данных: Пока мало данных', exact: true })
+    .getByRole('region', { name: 'Достаточно ли данных: Масса — Пока мало данных', exact: true })
     .filter({ hasText: 'Сейчас есть 0 замеров' });
   await expect(bodyConfidence).toHaveCount(1);
   await bodyConfidence.scrollIntoViewIfNeeded();
@@ -1116,6 +1505,10 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   });
 
   await tmaPage.goto('/app?section=progress');
+  await tmaPage
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Тренировки/ })
+    .click();
   await tma.setTheme('dark');
   await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   const training = tmaPage.locator('#progress-training');
@@ -1123,7 +1516,7 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(limited).toBeVisible();
   await expect(limited).toContainText('1 рабочий подход в 1 тренировке');
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toBeVisible();
-  await expectLimeStartBoundary(limited);
+  await expectNeutralStartBoundary(limited);
   await expectNoHorizontalOverflow(tmaPage);
   await expectTouchTargets(limited.locator('.data-confidence__details > summary'));
   await limited.screenshot({
@@ -1136,9 +1529,17 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(stale).toBeVisible();
   await expect(stale).toContainText('Новые данные загружаются');
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toHaveCount(0);
-  await expectLimeStartBoundary(stale);
+  await expectNeutralStartBoundary(stale);
   await expectNoHorizontalOverflow(tmaPage);
+  // Period changes move the card through the floating dock; verify its reachable reading position.
+  await stale.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  );
   await expectNoOverlap(stale, tmaPage.locator('#appBottomNav'));
+  await expect(stale).toBeInViewport({ ratio: 1 });
+  await expectTouchTargets(stale.locator('.data-confidence__details > summary'));
+  await stale.locator('.data-confidence__details > summary').click();
+  await expect(stale.locator('.data-confidence__details')).toHaveAttribute('open');
   await stale.screenshot({
     path: '../.artifacts/screenshots/task-61/tma-390x844-dark-stale.png',
   });
@@ -1176,6 +1577,34 @@ test('weekly review focus exposes a predictable TMA BackButton return path', asy
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(false);
 });
 
+test('late weekly review data preserves focus on the profile action', async ({ tmaPage }) => {
+  await installPlatformApi(tmaPage, {
+    workoutStatus: 'none',
+    weeklyReviewAvailable: true,
+  });
+  let releaseReview!: () => void;
+  const reviewGate = new Promise<void>((resolve) => {
+    releaseReview = resolve;
+  });
+  await tmaPage.route('**/api/v1/check-ins/weekly/current', async (route) => {
+    await reviewGate;
+    await route.fallback();
+  });
+  await tmaPage.goto('/app?section=progress&weekly_review=1');
+  await expect(tmaPage.getByText('Собираем итоги недели…', { exact: true })).toBeVisible();
+  await expect(tmaPage).toHaveURL('/app?section=progress&weekly_review=1');
+
+  const profile = tmaPage.getByRole('button', { name: 'Открыть профиль и настройки', exact: true });
+  await profile.focus();
+  const reviewResponse = tmaPage.waitForResponse('**/api/v1/check-ins/weekly/current');
+  releaseReview();
+  await reviewResponse;
+  await expect(tmaPage.getByRole('heading', { name: 'Итоги недели', exact: true })).toBeVisible();
+  await expect(profile).toBeFocused();
+  await profile.click();
+  await expect(tmaPage.getByRole('dialog')).toBeVisible();
+});
+
 test('direct Trainer activation keeps client context focused in mocked TMA', async ({
   tma,
   tmaPage,
@@ -1195,9 +1624,14 @@ test('direct Trainer activation keeps client context focused in mocked TMA', asy
   expect(api.trainerActivationCalls()).toBe(1);
 
   await tmaPage.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
-  await tmaPage.getByRole('link', { name: 'Кабинет тренера' }).click();
+  await tmaPage.getByRole('link', { name: 'Кабинет тренера', exact: true }).click();
   await expect(tmaPage).toHaveURL('/coach');
-  await expect(tmaPage.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
+  await expect(tmaPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await tmaPage
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .click();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
 
   await tmaPage.getByRole('button', { name: /Анна Петрова/ }).click();
@@ -1213,7 +1647,7 @@ test('direct Trainer activation keeps client context focused in mocked TMA', asy
   });
 
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/coach');
+  await expect(tmaPage).toHaveURL('/coach?tab=clients');
   await expect(tmaPage.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeHidden();
   await expect(tmaPage.getByLabel('Найти клиента')).toBeVisible();
   await tma.clickBack();
@@ -1300,14 +1734,11 @@ test('workout adaptation keeps preview, cancel, apply and conflict recovery in M
   const apply = mobilePage.getByRole('button', { name: 'Применить' });
   await expect(mobilePage.locator('.workout-adaptation-dialog__panel')).toHaveCSS(
     'border-radius',
-    '20px',
+    '24px',
   );
-  await expect(apply).toHaveCSS('background-color', 'rgb(158, 224, 43)');
-  await expect(apply).toHaveCSS('border-radius', '12px');
-  await expect(mobilePage.getByRole('button', { name: '20 мин' })).toHaveCSS(
-    'border-top-color',
-    'rgb(158, 224, 43)',
-  );
+  await expect(apply).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(apply).toHaveCSS('border-radius', '14px');
+  await expectSelectedChoice(mobilePage.getByRole('button', { name: '20 мин' }));
   await mobilePage.locator('.adaptation-preview').scrollIntoViewIfNeeded();
   await mobilePage.screenshot({
     path: '../.artifacts/screenshots/task-58/desktop-1440-light-preview.png',
@@ -1552,9 +1983,24 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
         primaryColor: primary ? getComputedStyle(primary).color : null,
         primaryRadius: primary ? getComputedStyle(primary).borderRadius : null,
         activeStepBoundary: activeStep ? getComputedStyle(activeStep).borderBottomColor : null,
-        boundaryBorder: boundary ? getComputedStyle(boundary).borderLeftColor : null,
+        boundaryBorder: boundary
+          ? {
+              leftColor: getComputedStyle(boundary).borderLeftColor,
+              topColor: getComputedStyle(boundary).borderTopColor,
+              leftWidth: getComputedStyle(boundary).borderLeftWidth,
+              topWidth: getComputedStyle(boundary).borderTopWidth,
+              radius: getComputedStyle(boundary).borderRadius,
+            }
+          : null,
         boundaryShadow: boundary ? getComputedStyle(boundary).boxShadow : null,
-        noteBorder: decisionNote ? getComputedStyle(decisionNote).borderLeftColor : null,
+        noteBorder: decisionNote
+          ? {
+              leftColor: getComputedStyle(decisionNote).borderLeftColor,
+              topColor: getComputedStyle(decisionNote).borderTopColor,
+              leftWidth: getComputedStyle(decisionNote).borderLeftWidth,
+              topWidth: getComputedStyle(decisionNote).borderTopWidth,
+            }
+          : null,
         disclosure: disclosureRect
           ? {
               width: disclosureRect.width,
@@ -1569,10 +2015,19 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
     expect(brandContract.primaryRadius).toBe(brandContract.actionRadius);
     expect(brandContract.activeStepBoundary).toBe(brandContract.lime);
     if (current.step === 'facts') {
-      expect(brandContract.boundaryBorder).toBe(brandContract.lime);
+      expect(brandContract.boundaryBorder).toMatchObject({
+        leftWidth: '1px',
+        topWidth: '1px',
+      });
+      expect(brandContract.boundaryBorder?.leftColor).toBe(brandContract.boundaryBorder?.topColor);
+      expect(brandContract.boundaryBorder?.radius).not.toBe('0px');
     } else {
-      expect(brandContract.boundaryShadow).toContain(brandContract.lime);
-      expect(brandContract.noteBorder).toBe(brandContract.lime);
+      expect(brandContract.boundaryShadow).toBe('none');
+    }
+    if (brandContract.noteBorder) {
+      expect(brandContract.noteBorder.leftWidth).toBe('1px');
+      expect(brandContract.noteBorder.topWidth).toBe('1px');
+      expect(brandContract.noteBorder.leftColor).toBe(brandContract.noteBorder.topColor);
     }
     expect(brandContract.disclosure).toEqual({ width: 28, height: 28, radius: '50%' });
 
@@ -1599,21 +2054,7 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
       const primaryAction = page.getByRole('button', { name: 'Всё верно, продолжить' });
       await primaryAction.scrollIntoViewIfNeeded();
       await expectNoOverlap(primaryAction, page.locator('#appBottomNav'));
-      const scheduleCard = page.locator('details.card').filter({
-        has: page.getByRole('heading', { name: 'Расписание', exact: true }),
-      });
-      const weekCard = page.locator('details.card').filter({
-        has: page.getByRole('heading', { name: 'Неделя', exact: true }),
-      });
-      const [scheduleBox, weekBox] = await Promise.all([
-        scheduleCard.boundingBox(),
-        weekCard.boundingBox(),
-      ]);
-      expect(scheduleBox).not.toBeNull();
-      expect(weekBox).not.toBeNull();
-      const adjacentGap = weekBox!.y - (scheduleBox!.y + scheduleBox!.height);
-      expect(adjacentGap).toBeGreaterThanOrEqual(8);
-      expect(adjacentGap).toBeLessThanOrEqual(16);
+      await expect(page.getByRole('heading', { name: 'Расписание', exact: true })).toHaveCount(0);
       await page.screenshot({
         path: `../.artifacts/screenshots/task-56/${current.surface}-${current.viewport.width}x${current.viewport.height}-${current.theme}-facts-actions.png`,
       });
@@ -1684,7 +2125,7 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   api.setOffline(true);
   await setNetworkOffline(tmaPage, true);
   const reps = tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' });
-  const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  const weight = tmaPage.getByLabel('Вес, Приседания, подход 1');
   await reps.fill('8');
   await weight.fill('40');
   await tma.setTheme('dark');
@@ -1694,7 +2135,9 @@ test('active workout starts, logs offline and resumes once after reconnect and r
     path: '../.artifacts/screenshots/task-72/mock-tma-390x844-dark-active-workout.png',
   });
   await tmaPage.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
-  await expect(tmaPage.getByText('Сохранено на устройстве')).toBeVisible();
+  await expect(
+    tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
+  ).toBeVisible();
   expect((await tma.state()).haptics.notifications).toContain('success');
 
   api.setOffline(false);
@@ -1709,9 +2152,7 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   await expect(
     tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }),
   ).toHaveValue('8');
-  await expect(tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' })).toHaveValue(
-    '40',
-  );
+  await expect(tmaPage.getByLabel('Вес, Приседания, подход 1')).toHaveValue('40');
   await expectNoHorizontalOverflow(tmaPage);
 });
 
@@ -1742,6 +2183,16 @@ test('progression guidance applies a configured step once, stays optional and ma
     tmaPage.getByRole('button', { name: 'Продолжить тренировку' }).click(),
     mobilePage.getByRole('button', { name: 'Продолжить тренировку' }).click(),
   ]);
+  await Promise.all([
+    tmaPage
+      .getByRole('region', { name: 'Что делать сейчас?' })
+      .getByRole('button', { name: 'Что делать сейчас?' })
+      .click(),
+    mobilePage
+      .getByRole('region', { name: 'Что делать сейчас?' })
+      .getByRole('button', { name: 'Что делать сейчас?' })
+      .click(),
+  ]);
   const tmaGuidance = tmaPage.getByRole('region', { name: 'Рекомендация по следующей нагрузке' });
   const mobileGuidance = mobilePage.getByRole('region', {
     name: 'Рекомендация по следующей нагрузке',
@@ -1751,7 +2202,7 @@ test('progression guidance applies a configured step once, stays optional and ma
   expect(await tmaGuidance.textContent()).toBe(await mobileGuidance.textContent());
   await expect(tmaGuidance.locator('.ui-button--primary')).not.toBeAttached();
 
-  await tmaGuidance.getByText('Почему?', { exact: true }).click();
+  await tmaGuidance.getByText('Почему такой вес?', { exact: true }).click();
   await expect(tmaGuidance.getByText('Цель: 1 × 8–10')).toBeVisible();
   await expect(tmaGuidance.getByText(/запас записан: 1/)).toBeVisible();
   const disclosureGeometry = await tmaGuidance.locator('.disclosure-icon').evaluate((element) => {
@@ -1768,10 +2219,12 @@ test('progression guidance applies a configured step once, stays optional and ma
 
   api.setOffline(true);
   await setNetworkOffline(tmaPage, true);
-  await tmaGuidance.getByRole('button', { name: 'Подставить 42,5 кг' }).dblclick();
-  const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  await tmaGuidance.getByRole('button', { name: 'Применить 42,5 кг' }).dblclick();
+  const weight = tmaPage.getByLabel('Вес, Приседания, подход 1');
   await expect(weight).toHaveValue('42.5');
-  await expect(tmaPage.getByText('Сохранено на устройстве')).toBeVisible();
+  await expect(
+    tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
+  ).toBeVisible();
 
   api.setOffline(false);
   await setNetworkOffline(tmaPage, false);
@@ -1784,13 +2237,15 @@ test('progression guidance applies a configured step once, stays optional and ma
   await tma.setActive(true);
   await tmaPage.reload();
   await tmaPage.getByRole('button', { name: 'Продолжить тренировку' }).click();
-  await expect(tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' })).toHaveValue(
-    '42.5',
-  );
+  await tmaPage
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
+  await expect(tmaPage.getByLabel('Вес, Приседания, подход 1')).toHaveValue('42.5');
   await expect(tmaPage.getByRole('button', { name: 'Вес подставлен' })).toBeDisabled();
   expect(api.setPatchCalls()).toBe(1);
 
-  await tmaPage.getByRole('button', { name: 'Скрыть подсказку' }).click();
+  await tmaPage.getByRole('button', { name: 'Оставить текущую нагрузку' }).click();
   await expect(
     tmaPage.getByRole('region', { name: 'Рекомендация по следующей нагрузке' }),
   ).not.toBeAttached();
@@ -1870,6 +2325,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
       isMobile: current.width <= 430,
       reducedMotion: 'reduce',
     });
+    await page.emulateMedia({ colorScheme: current.theme, reducedMotion: 'reduce' });
     if (current.surface === 'tma-mock') {
       await installTelegramHarness(page, {
         colorScheme: current.theme,
@@ -1892,6 +2348,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
     }
 
     await page.goto('/app');
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', current.theme);
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
     const exerciseTitle =
       'longExerciseName' in current && current.longExerciseName
@@ -1899,8 +2356,12 @@ test('progression guidance screenshots cover outcomes, long content and responsi
         : 'Приседания';
     const exercise = namedArticle(page, exerciseTitle);
     await expect(exercise).toHaveCount(1);
+    await exercise
+      .getByRole('region', { name: 'Что делать сейчас?' })
+      .getByRole('button', { name: 'Что делать сейчас?' })
+      .click();
     const guidance = exercise.getByRole('region', { name: 'Рекомендация по следующей нагрузке' });
-    await guidance.getByText('Почему?', { exact: true }).click();
+    await guidance.getByText('Почему такой вес?', { exact: true }).click();
     await expect(guidance).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', current.theme);
     await expectNoHorizontalOverflow(page);
@@ -1922,7 +2383,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
       };
     });
     expect(geometry.headBottom).toBeLessThanOrEqual(geometry.guidanceTop);
-    expect(geometry.guidanceBottom).toBeLessThanOrEqual(geometry.setsTop);
+    expect(geometry.guidanceBottom).toBeLessThanOrEqual(geometry.setsTop + 0.01);
 
     await exercise.screenshot({
       path: `../.artifacts/screenshots/task-63/${current.surface}-${current.width}x${current.height}-${current.theme}-${current.label}.png`,
@@ -1940,7 +2401,7 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   await tmaPage.goto('/app');
   await tmaPage.getByRole('button', { name: 'Начать тренировку' }).click();
   await tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await tmaPage.getByLabel('Вес, Приседания, подход 1').fill('40');
   await tmaPage.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
   await expect(tmaPage.getByText('Синхронизировано')).toBeVisible();
   await tmaPage.getByRole('button', { name: 'Завершить тренировку' }).click();
@@ -1949,6 +2410,83 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   await expect(tmaPage.getByText('1 ч')).toBeVisible();
   await expect(tmaPage.getByText(/максимальный вес 40 кг/)).toBeVisible();
   await expect(tmaPage.getByText(/Следующая тренировка/)).toBeVisible();
+  const completionCardStyles = await tmaPage.locator('.workout-completion').evaluate((root) => {
+    const expectedRadius = getComputedStyle(root).getPropertyValue('--v2-region-radius').trim();
+    const selectors = [
+      '.workout-completion__hero',
+      '.workout-completion__facts',
+      '.workout-completion__results',
+      '.workout-completion__records',
+      '.workout-completion__feedback',
+      '.workout-completion__next',
+    ];
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--v2-border)';
+    root.append(probe);
+    const expectedBorderColor = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      expectedRadius,
+      expectedBorderColor,
+      cards: selectors.map((selector) => {
+        const node = root.querySelector(selector);
+        if (!node) throw new Error(`Missing completion card: ${selector}`);
+        const style = getComputedStyle(node);
+        return {
+          selector,
+          radius: style.borderTopLeftRadius,
+          widths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          colors: [
+            style.borderTopColor,
+            style.borderRightColor,
+            style.borderBottomColor,
+            style.borderLeftColor,
+          ],
+        };
+      }),
+    };
+  });
+  expect(completionCardStyles.expectedRadius).toBe('20px');
+  for (const card of completionCardStyles.cards) {
+    expect(card.radius, card.selector).toBe(completionCardStyles.expectedRadius);
+    expect(card.widths, card.selector).toEqual(['1px', '1px', '1px', '1px']);
+    expect(card.colors, card.selector).toEqual(
+      Array(4).fill(completionCardStyles.expectedBorderColor),
+    );
+  }
+  const completionOrderCorrect = await tmaPage.locator('.workout-completion').evaluate((root) => {
+    const selectors = [
+      '.workout-completion__facts',
+      '.workout-completion__results',
+      '.workout-completion__records',
+      '.workout-completion__feedback',
+      '.workout-completion__next',
+    ];
+    const nodes = selectors.map((selector) => root.querySelector(selector));
+    if (nodes.some((node) => !node)) return false;
+    return nodes
+      .slice(1)
+      .every((node, index) =>
+        Boolean(nodes[index]!.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+  });
+  expect(completionOrderCorrect).toBe(true);
+  for (const theme of ['dark', 'light'] as const) {
+    await tma.setTheme(theme);
+    await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
+    await expectNeutralStartBoundary(tmaPage.locator('.workout-completion__hero'));
+    if (process.env.YFC_CAPTURE_871 === '1') {
+      await tmaPage.screenshot({
+        path: '../.artifacts/screenshots/issue-871/completion-390-' + theme + '-after.png',
+        fullPage: true,
+      });
+    }
+  }
   expect(api.finishCalls()).toBe(1);
   await expectNoHorizontalOverflow(tmaPage);
   const focusHeader = tmaPage.locator('.today-workout-focus__header');
@@ -1986,10 +2524,10 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   expect(
     (firstFeedbackBox?.y ?? 0) - ((legendBox?.y ?? 0) + (legendBox?.height ?? 0)),
   ).toBeGreaterThanOrEqual(11.99);
-  await expect(firstFeedback).toHaveCSS('border-radius', '12px');
+  await expect(firstFeedback).toHaveCSS('border-radius', '14px');
   await expect(tmaPage.getByRole('button', { name: 'Вернуться в Сегодня' })).toHaveCSS(
     'border-radius',
-    '12px',
+    '14px',
   );
 
   const duplicateStatus = await tmaPage.evaluate(async () => {
@@ -2042,11 +2580,12 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
     await expectNoHorizontalOverflow(tmaPage);
   }
 
+  await mobilePage.route('**/api/v1/public/articles*', (request) => request.fulfill({ json: [] }));
   await mobilePage.goto('/');
   const landingButtons = mobilePage.locator('.landing-button');
   await expect(landingButtons).not.toHaveCount(0);
   for (const button of await landingButtons.all()) {
-    await expect(button).toHaveCSS('border-radius', '12px');
+    await expect(button).toHaveCSS('border-radius', '14px');
   }
 });
 
@@ -2054,7 +2593,7 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   mobilePage,
   tma,
   tmaPage,
-}) => {
+}, testInfo) => {
   await tmaPage.addInitScript(() => {
     const events: unknown[] = [];
     Object.defineProperty(window, '__productAnalyticsEvents', { value: events, writable: false });
@@ -2095,17 +2634,41 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
 
   const breakfast = tmaPage.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
-  await tmaPage.getByRole('button', { name: 'Поиск по штрихкоду', exact: true }).click();
-  await tmaPage.getByRole('textbox', { name: 'Штрихкод' }).fill('3017620422003');
-  await tmaPage.getByRole('button', { name: 'Найти', exact: true }).click();
-  await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
-  await tmaPage.getByRole('button', { name: 'Выбрать продукт' }).click();
+  await expect(tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
+  await tma.setTheme('dark');
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  const tmaSearch = tmaPage.getByRole('searchbox', { name: 'Найти продукт' });
+  const localSearchResponse = tmaPage.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === '/api/v1/nutrition/foods/search' &&
+      url.searchParams.get('q') === 'овсянка' &&
+      url.searchParams.get('include_external') !== 'true'
+    );
+  });
+  await tmaSearch.fill('овсянка');
+  await localSearchResponse;
+  const tmaClearSearch = tmaPage.getByRole('button', {
+    name: 'Очистить поиск',
+    exact: true,
+  });
+  await expect(tmaClearSearch).toBeVisible();
+  await tmaClearSearch.click();
+  await expect(tmaSearch).toHaveValue('');
+  await expect(tmaSearch).toBeFocused();
+  await tmaSearch.fill('овсянка');
+  await expect(tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
+  await tmaPage.screenshot({ path: testInfo.outputPath('tma-nutrition-search-390x844-dark.png') });
+  await tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' }).click();
   await tmaPage.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
+  await expect(tmaPage.getByRole('button', { name: 'Избранное' })).not.toBeVisible();
+  await tmaPage.getByText('Каталог и фильтры', { exact: true }).click();
   await tmaPage.getByRole('button', { name: 'Избранное' }).click();
-  await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+  await expect(tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
+  await tmaPage.getByText('Другие способы добавления', { exact: true }).click();
   await tmaPage
     .getByRole('dialog')
     .getByRole('button', { name: 'Быстрый ввод', exact: true })
@@ -2114,7 +2677,9 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   await tma.setContentSafeArea({ top: 32, right: 0, bottom: 18, left: 0 });
   const calories = tmaPage.getByRole('spinbutton', { name: 'Калории' });
   await calories.fill('510');
-  await tmaPage.getByRole('textbox', { name: 'Название (необязательно)' }).fill('TMA перекус');
+  await tmaPage
+    .getByRole('textbox', { name: 'Название или контекст (необязательно)' })
+    .fill('TMA перекус');
   const quickAddAction = tmaPage.getByRole('button', {
     name: 'Сохранить Quick Add',
     exact: true,
@@ -2150,7 +2715,7 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
 
   api.setOffline(true);
   await tmaPage.getByRole('button', { name: 'Сохранить Quick Add' }).click();
-  await expect(tmaPage.getByRole('alert')).toBeVisible();
+  await expect(tmaPage.getByRole('dialog').getByRole('alert')).toBeVisible();
   await expect(calories).toHaveValue('510');
   api.setOffline(false);
   await tmaPage.getByRole('dialog').getByRole('button', { name: 'Повторить', exact: true }).click();
@@ -2192,8 +2757,8 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
 
   const entry = tmaPage.locator('.nutrition-entry').filter({ hasText: 'TMA перекус' });
   await entry.getByRole('button', { name: 'Повторить' }).click();
-  await tmaPage.getByRole('dialog').getByRole('button', { name: 'Повторить продукт' }).click();
-  await expect(tmaPage.getByText('Скопировано записей: 1')).toBeVisible();
+  await tmaPage.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
+  await expect(tmaPage.getByText('Добавлено записей: 1')).toBeVisible();
   await expectNoHorizontalOverflow(tmaPage);
 
   await tmaPage.getByRole('link', { name: 'Прогресс', exact: true }).click();
@@ -2225,10 +2790,16 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   ]);
 
   for (const currentPage of [tmaPage, mobilePage]) {
-    await currentPage
-      .locator('#nutrition-target-settings')
-      .getByRole('heading', { name: 'КБЖУ', exact: true })
-      .click();
+    await currentPage.locator('details.nutrition-target-settings > summary').click();
+    const targetSettings = currentPage.locator('details.nutrition-target-settings');
+    await expect(targetSettings.locator(':scope > summary')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await expect(targetSettings.locator('details.card-disclosure')).toHaveCount(0);
+    await expect(
+      targetSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
+    ).toBeVisible();
     if (currentPage === mobilePage) {
       await expect(currentPage.getByText('Назначено тренером', { exact: true })).toBeVisible();
       await expect(
@@ -2261,7 +2832,9 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   await fat.fill('100');
   await carbs.fill('200');
   const save = tmaPage.getByRole('button', { name: 'Сохранить ручные ориентиры' });
-  await expect(tmaPage.getByRole('alert')).toContainText('Проверьте разницу: 1300 ккал');
+  await expect(tmaPage.locator('.nutrition-energy-warning')).toContainText(
+    'Проверьте разницу: 1300 ккал',
+  );
   await expect(save).toBeDisabled();
   await tmaPage.getByRole('checkbox', { name: /Сохранить значения/ }).check();
 
@@ -2307,32 +2880,57 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   expect(api.manualTargetSaves()).toBe(2);
   expect(api.targetHistoryLength()).toBe(3);
 
-  const targetCard = tmaPage.locator('#nutrition-target-settings > details');
+  const targetCard = tmaPage.locator('details.nutrition-target-settings');
   if ((await targetCard.getAttribute('open')) === null) {
-    await tmaPage
-      .locator('#nutrition-target-settings')
-      .getByRole('heading', { name: 'КБЖУ', exact: true })
-      .click();
+    await targetCard.locator(':scope > summary').click();
   }
+  await targetCard.locator(':scope > summary').click();
+  await expect(targetCard).not.toHaveAttribute('open', '');
+  await targetCard.locator(':scope > summary').click();
+  await expect(targetCard).toHaveAttribute('open', '');
+  await expect(targetCard.getByRole('button', { name: 'Указать вручную' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(tmaPage.getByText('Калории 2100 → 1200 ккал')).toBeAttached();
   for (const viewport of Object.values(MOBILE_CONTEXTS)) {
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
+    if ((await targetCard.getAttribute('open')) === null) {
+      await targetCard.locator(':scope > summary').click();
+    }
+    await expect(targetCard).toHaveAttribute('open', '');
+    await expect(targetCard.locator('details.card-disclosure')).toHaveCount(0);
     await expectNoHorizontalOverflow(tmaPage);
-    await expectTouchTargets(tmaPage.locator('.nutrition-target-mode > button'));
+    await expectTouchTargets(targetCard.locator('.nutrition-target-mode > button'));
   }
+
+  await tma.setViewport(MOBILE_CONTEXTS.baseline.height, MOBILE_CONTEXTS.baseline.height);
+  await expect(tmaPage.locator('#appBottomNav')).toBeVisible();
+  await save.scrollIntoViewIfNeeded();
+  const saveAvoidsDock = await tmaPage.evaluate(() => {
+    const saveButton = document.querySelector<HTMLElement>('.nutrition-target-save');
+    const dock = document.querySelector<HTMLElement>('#appBottomNav');
+    if (!saveButton || !dock) return false;
+    return saveButton.getBoundingClientRect().bottom <= dock.getBoundingClientRect().top - 8;
+  });
+  expect(saveAvoidsDock).toBe(true);
 });
 
 test('manual nutrition target history screenshots cover all responsive surfaces and themes', async ({
   browser,
 }) => {
+  test.setTimeout(120_000);
   const cases = [
+    { surface: 'mobile-web', width: 320, height: 760, theme: 'light' },
     { surface: 'mobile-web', width: 360, height: 800, theme: 'light' },
-    { surface: 'mobile-web', width: 390, height: 844, theme: 'dark' },
+    { surface: 'mobile-web', width: 393, height: 852, theme: 'dark' },
     { surface: 'mobile-web', width: 430, height: 932, theme: 'light' },
-    { surface: 'mobile-web', width: 768, height: 900, theme: 'dark' },
+    { surface: 'desktop-web', width: 1280, height: 900, theme: 'dark' },
     { surface: 'desktop-web', width: 1440, height: 900, theme: 'light' },
+    { surface: 'tma-mock', width: 320, height: 760, theme: 'dark' },
     { surface: 'tma-mock', width: 360, height: 800, theme: 'dark' },
-    { surface: 'tma-mock', width: 390, height: 844, theme: 'light' },
+    { surface: 'tma-mock', width: 393, height: 852, theme: 'light' },
     { surface: 'tma-mock', width: 430, height: 932, theme: 'dark' },
   ] as const;
 
@@ -2356,10 +2954,17 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
     }
 
     await page.goto('/app?section=nutrition');
-    await page
-      .locator('#nutrition-target-settings')
-      .getByRole('heading', { name: 'КБЖУ', exact: true })
-      .click();
+    await page.locator('details.nutrition-target-settings > summary').click();
+    const targetSettings = page.locator('details.nutrition-target-settings');
+    await expect(targetSettings.locator(':scope > summary')).toHaveText('Настройки КБЖУ');
+    await expect(targetSettings.locator(':scope > summary')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await expect(targetSettings.locator('details.card-disclosure')).toHaveCount(0);
+    await expect(
+      targetSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
+    ).toBeVisible();
     if (current.surface === 'tma-mock') {
       await expect(page.getByText('Назначено тренером', { exact: true })).toBeVisible();
       await page.getByRole('button', { name: 'Указать вручную' }).click();
@@ -2378,9 +2983,6 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
         return color;
       };
       const save = document.querySelector<HTMLElement>('.nutrition-target-save');
-      const activeMode = document.querySelector<HTMLElement>(
-        '.nutrition-target-mode > button.is-active',
-      );
       const note = document.querySelector<HTMLElement>('.nutrition-target-note');
       const disclosureIcons = Array.from(
         document.querySelectorAll<HTMLElement>('.nutrition-target-history__list .disclosure-icon'),
@@ -2390,7 +2992,6 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
         onLime: tokenColor('--v2-on-lime'),
         saveBackground: save ? getComputedStyle(save).backgroundColor : null,
         saveColor: save ? getComputedStyle(save).color : null,
-        activeModeShadow: activeMode ? getComputedStyle(activeMode).boxShadow : null,
         noteBorder: note ? getComputedStyle(note).borderLeftColor : null,
         disclosureIcons: disclosureIcons.map((icon) => {
           const rect = icon.getBoundingClientRect();
@@ -2404,7 +3005,7 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
     });
     expect(brandContract.saveBackground).toBe(brandContract.lime);
     expect(brandContract.saveColor).toBe(brandContract.onLime);
-    expect(brandContract.activeModeShadow).toContain(brandContract.lime);
+    await expectSelectedChoice(page.locator('.nutrition-target-mode > button.is-active'));
     expect(brandContract.noteBorder).toBe(brandContract.lime);
     expect(brandContract.disclosureIcons.length).toBeGreaterThan(0);
     expect(
@@ -2413,9 +3014,8 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
       ),
     ).toBe(true);
 
-    const targetCard = page.locator('#nutrition-target-settings > details');
-    await targetCard.scrollIntoViewIfNeeded();
-    await targetCard.screenshot({
+    await targetSettings.scrollIntoViewIfNeeded();
+    await targetSettings.screenshot({
       path: `../.artifacts/screenshots/task-55/${current.surface}-${current.width}x${current.height}-${current.theme}.png`,
     });
     await page.close();
@@ -2423,6 +3023,7 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
 });
 
 test('contextual help covers workout, nutrition and Progress without a TMA library', async ({
+  browserName,
   tma,
   tmaPage,
 }) => {
@@ -2433,13 +3034,11 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await tmaPage.getByRole('button', { name: 'Начать тренировку' }).click();
   const currentSet = tmaPage.locator('[aria-current="step"]');
   await expect(currentSet).toHaveCount(1);
-  await currentSet.getByText('Дополнительно', { exact: true }).click();
-  const rirDetails = tmaPage.locator('.active-workout-rir .contextual-help');
-  const rirHelp = rirDetails.getByText('Что это?', { exact: true });
+  const rirDetails = currentSet.locator('.active-workout-set__contextual-help .contextual-help');
+  const rirHelp = rirDetails.getByText('Что такое RIR?', { exact: true });
+  await expect(rirHelp).toBeVisible();
   await rirHelp.click();
-  const rirArticleLink = tmaPage
-    .locator('.active-workout-rir')
-    .getByRole('link', { name: /Подробнее на сайте/ });
+  const rirArticleLink = rirDetails.getByRole('link', { name: /Подробнее на сайте/ });
   await expect(rirArticleLink).toHaveAttribute(
     'href',
     '/knowledge/training/repetitions-in-reserve',
@@ -2447,7 +3046,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await rirArticleLink.click();
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge/training/repetitions-in-reserve');
+    .toContain(new URL('/knowledge/training/repetitions-in-reserve', tmaPage.url()).href);
   await expect(tmaPage).toHaveURL(/\/app$/);
   await expect(rirDetails).toHaveAttribute('open', '');
   await tma.setTheme('dark');
@@ -2457,10 +3056,10 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await expect(rirDetails).not.toHaveAttribute('open', '');
 
   await tmaPage.getByRole('link', { name: 'Питание', exact: true }).click();
-  await tmaPage
-    .locator('#nutrition-target-settings')
-    .getByRole('heading', { name: 'КБЖУ', exact: true })
-    .click();
+  await tmaPage.locator('details.nutrition-target-settings > summary').click();
+  await expect(
+    tmaPage.locator('details.nutrition-target-settings').locator('details.card-disclosure'),
+  ).toHaveCount(0);
   await tmaPage.getByRole('button', { name: 'Рассчитать ориентиры' }).click();
   const nutritionHelp = tmaPage.locator('.contextual-help').getByText('Что это?', { exact: true });
   await nutritionHelp.click();
@@ -2469,7 +3068,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   ).toHaveAttribute('href', '/knowledge/nutrition/kbju-as-a-reference');
 
   await tmaPage.getByRole('link', { name: 'Прогресс', exact: true }).click();
-  await tmaPage.locator('.progress-hero').getByText('Что это?', { exact: true }).click();
+  await tmaPage.locator('.progress-hero').getByText('О показателях', { exact: true }).click();
   await expect(
     tmaPage.locator('.progress-hero').getByRole('link', { name: /Подробнее на сайте/ }),
   ).toHaveAttribute('href', '/knowledge/progress/how-to-read-progress');
@@ -2487,13 +3086,15 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   const publicHandoff = tmaPage.getByRole('link', { name: 'Открыть материал на сайте' });
   await expectTouchTargets(tmaPage.locator('.knowledge-handoff__actions a'));
   await expectNoHorizontalOverflow(tmaPage);
-  await tmaPage.keyboard.press('Tab');
+  // This mobile WebKit fixture has no desktop Tab cycle; verify focus and activation there.
+  if (browserName === 'webkit') await publicHandoff.focus();
+  else await tmaPage.keyboard.press('Tab');
   await expect(publicHandoff).toBeFocused();
-  await publicHandoff.click();
+  await tmaPage.keyboard.press('Enter');
   await expect(tmaPage).toHaveURL('/app');
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge');
+    .toContain(new URL('/knowledge', tmaPage.url()).href);
   await expect(tmaPage.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
   await expect(tmaPage.getByRole('heading', { name: /База знаний/i })).not.toBeAttached();
 
@@ -2503,7 +3104,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await expect(tmaPage).toHaveURL('/app');
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge/progress/how-to-read-progress');
+    .toContain(new URL('/knowledge/progress/how-to-read-progress', tmaPage.url()).href);
 });
 
 test('task 72 screenshot packet keeps shared composition across core surfaces', async ({
@@ -2518,7 +3119,7 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
       theme: 'dark' as const,
     },
     {
-      label: 'nutrition-barcode',
+      label: 'nutrition-search',
       viewport: MOBILE_CONTEXTS.large,
       path: '/app?section=nutrition',
       theme: 'dark' as const,
@@ -2529,7 +3130,6 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
     for (const surface of ['mobile-web', 'mock-tma'] as const) {
       const context = await browser.newContext({ viewport: scenario.viewport, hasTouch: true });
       const page = await context.newPage();
-      if (scenario.label === 'nutrition-barcode') await installBarcodeCameraCapability(page);
       if (surface === 'mock-tma') {
         await installTelegramHarness(page, {
           colorScheme: scenario.theme,
@@ -2547,6 +3147,12 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
         await installPlatformApi(page, { browserSession: true });
       }
       await page.goto(scenario.path);
+      if (scenario.label === 'progress') {
+        await page
+          .getByRole('navigation', { name: 'Разделы прогресса' })
+          .getByRole('tab', { name: /^Тело/ })
+          .click();
+      }
       if (scenario.label === 'today') {
         await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
       } else if (scenario.label === 'progress') {
@@ -2565,30 +3171,18 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
           .getByRole('region', { name: /^Достаточно ли данных:/ });
         for (const confidence of await confidences.all()) {
           await confidence.scrollIntoViewIfNeeded();
-          await expectLimeStartBoundary(confidence);
+          await expectNeutralStartBoundary(confidence);
         }
       }
-      if (scenario.label === 'nutrition-barcode') {
+      if (scenario.label === 'nutrition-search') {
         await page
           .getByRole('region', { name: 'Завтрак' })
           .getByRole('button', { name: /Добавить/ })
           .click();
-        await page.getByRole('button', { name: 'Поиск по штрихкоду', exact: true }).click();
-        const barcodeInput = page.getByRole('textbox', { name: 'Штрихкод' });
-        const manualSearch = page.getByRole('button', { name: 'Найти', exact: true });
-        await expect(barcodeInput).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Сканировать камерой' })).toHaveClass(
-          /ui-button--primary/,
-        );
-        await expect(manualSearch).toHaveClass(/ui-button--secondary/);
-        const [inputBox, searchBox] = await Promise.all([
-          barcodeInput.boundingBox(),
-          manualSearch.boundingBox(),
-        ]);
-        expect(inputBox).not.toBeNull();
-        expect(searchBox).not.toBeNull();
-        expect(Math.abs(inputBox!.y - searchBox!.y)).toBeLessThanOrEqual(1);
-        expect(Math.abs(inputBox!.height - searchBox!.height)).toBeLessThanOrEqual(1);
+        await expect(page.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+        await expect(page.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+        await expect(page.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
       }
       await expectNoHorizontalOverflow(page);
       await page.screenshot({
@@ -2605,6 +3199,12 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
     const page = await browser.newPage({ viewport });
     await installPlatformApi(page, { browserSession: true });
     await page.goto(viewport.width === 768 ? '/app?section=progress' : '/app');
+    if (viewport.width === 768) {
+      await page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('tab', { name: /^Тело/ })
+        .click();
+    }
     const progressConfidences = page
       .locator('#progress-body')
       .getByRole('region', { name: /^Достаточно ли данных:/ });
@@ -2622,24 +3222,20 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
     await page.close();
   }
 
-  const desktopBarcode = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await installBarcodeCameraCapability(desktopBarcode);
-  await installPlatformApi(desktopBarcode, { browserSession: true });
-  await desktopBarcode.goto('/app?section=nutrition');
-  await desktopBarcode
+  const desktopNutrition = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await installPlatformApi(desktopNutrition, { browserSession: true });
+  await desktopNutrition.goto('/app?section=nutrition');
+  await desktopNutrition
     .getByRole('region', { name: 'Завтрак' })
     .getByRole('button', { name: /Добавить/ })
     .click();
-  await desktopBarcode.getByRole('button', { name: 'Поиск по штрихкоду', exact: true }).click();
-  await expect(
-    desktopBarcode.getByRole('button', { name: 'Сканировать камерой' }),
-  ).not.toBeAttached();
-  await expect(desktopBarcode.getByRole('button', { name: 'Найти', exact: true })).toHaveClass(
-    /ui-button--primary/,
-  );
-  await expectNoHorizontalOverflow(desktopBarcode);
-  await desktopBarcode.screenshot({
-    path: '../.artifacts/screenshots/task-72/desktop-web-1280x900-light-nutrition-barcode.png',
+  await expect(desktopNutrition.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+  await expect(desktopNutrition.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+  await expect(desktopNutrition.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+  await expect(desktopNutrition.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
+  await expectNoHorizontalOverflow(desktopNutrition);
+  await desktopNutrition.screenshot({
+    path: '../.artifacts/screenshots/task-72/desktop-web-1280x900-light-nutrition-search.png',
   });
-  await desktopBarcode.close();
+  await desktopNutrition.close();
 });

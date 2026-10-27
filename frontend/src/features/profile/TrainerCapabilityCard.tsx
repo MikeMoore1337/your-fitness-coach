@@ -3,16 +3,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../shared/api/client';
 import type { TrainerCapability } from '../../shared/api/types';
-import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import {
+  productEventSurface,
+  trackGrowthEvent,
+  trackProductEvent,
+} from '../../shared/analytics/productEvents';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Card, ErrorState, LoadingState } from '../../shared/ui/common';
+import { AppLink } from '../../shared/navigation/router';
+import { TrainerCapabilityConsent } from '../trainer/TrainerCapabilityConsent';
 import { TrainerModeSwitch } from '../trainer/TrainerModeSwitch';
 
 export function TrainerCapabilityCard() {
   const { user, reloadUser } = useAuth();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const capability = useQuery({
     queryKey: ['me', 'trainer-capability'],
     queryFn: () => api<TrainerCapability>('/api/v1/me/trainer-capability'),
@@ -32,7 +38,13 @@ export function TrainerCapabilityCard() {
       }),
     onSuccess: async (result) => {
       if (result.activated_now) {
+        trackGrowthEvent('trainer_application_completed');
         trackProductEvent({ name: 'trainer_mode_activated', surface: productEventSurface() });
+        trackProductEvent(
+          { name: 'trainer_onboarding_started', surface: productEventSurface() },
+          { dedupe: 'session' },
+        );
+        setShowOnboarding(true);
       }
       await refresh();
       toast('Режим тренера включён');
@@ -43,7 +55,7 @@ export function TrainerCapabilityCard() {
     mutationFn: () => api<TrainerCapability>('/api/v1/me/trainer-capability', { method: 'DELETE' }),
     onSuccess: async () => {
       await refresh();
-      setAcceptedTerms(false);
+      setShowOnboarding(false);
       toast('Режим тренера выключен');
     },
     onError: async (reason) => {
@@ -87,6 +99,47 @@ export function TrainerCapabilityCard() {
             <p>Личный профиль и собственные тренировки остаются доступны.</p>
           </div>
           <TrainerModeSwitch mode="personal" />
+          {showOnboarding && (
+            <section
+              className="trainer-capability__onboarding"
+              aria-labelledby="trainer-onboarding-title"
+            >
+              <div>
+                <span className="eyebrow">Первый рабочий шаг</span>
+                <h3 id="trainer-onboarding-title">Откройте Coach Today</h3>
+                <p>
+                  Настройка минимальна: пригласите первого клиента из рабочего пространства или
+                  сразу пропустите этот шаг и посмотрите весь кабинет.
+                </p>
+              </div>
+              <div className="trainer-capability__onboarding-actions">
+                <AppLink
+                  className="trainer-capability__onboarding-primary"
+                  to="/coach"
+                  onClick={() =>
+                    trackProductEvent(
+                      { name: 'trainer_onboarding_completed', surface: productEventSurface() },
+                      { dedupe: 'session' },
+                    )
+                  }
+                >
+                  Пригласить первого клиента
+                </AppLink>
+                <AppLink
+                  className="trainer-capability__onboarding-secondary"
+                  to="/coach"
+                  onClick={() =>
+                    trackProductEvent(
+                      { name: 'trainer_onboarding_completed', surface: productEventSurface() },
+                      { dedupe: 'session' },
+                    )
+                  }
+                >
+                  Пропустить и открыть Coach Today
+                </AppLink>
+              </div>
+            </section>
+          )}
           <div className="trainer-capability__status">
             <strong>Следующий шаг</strong>
             <p>
@@ -129,40 +182,13 @@ export function TrainerCapabilityCard() {
           </div>
         </div>
       ) : (
-        <div className="trainer-capability top-gap">
-          <ul className="trainer-capability__facts" aria-label="Возможности режима тренера">
-            <li>Приглашать клиентов по персональной ссылке после их согласия.</li>
-            <li>Создавать или переиспользовать программы и назначать их клиенту.</li>
-            <li>Смотреть разрешённый прогресс и оставлять контекстные комментарии.</li>
-          </ul>
-          <ul className="trainer-capability__limits" aria-label="Ограничения режима тренера">
-            <li>Режим не создаёт публичный профиль, платежи или маркетплейс.</li>
-            <li>Сервис не проверяет образование, сертификацию или квалификацию тренера.</li>
-            <li>Доступ к данным появляется только после подтверждения связи клиентом.</li>
-          </ul>
-          <label className="trainer-capability__terms">
-            <input
-              type="checkbox"
-              checked={acceptedTerms}
-              onChange={(event) => setAcceptedTerms(event.target.checked)}
-            />
-            <span>
-              <strong>Принимаю условия использования режима тренера</strong>
-              <small>
-                Буду использовать доступ только для работы с подключёнными клиентами и не выдавать
-                включение режима за проверку квалификации.
-              </small>
-            </span>
-          </label>
-          <button
-            type="button"
-            className="trainer-capability__activate"
-            disabled={!acceptedTerms || activate.isPending}
-            onClick={() => activate.mutate()}
-          >
-            {activate.isPending ? 'Включаем…' : 'Включить режим тренера'}
-          </button>
-        </div>
+        <TrainerCapabilityConsent
+          pending={activate.isPending}
+          onConfirm={() => {
+            trackGrowthEvent('trainer_application_started');
+            activate.mutate();
+          }}
+        />
       )}
     </Card>
   );

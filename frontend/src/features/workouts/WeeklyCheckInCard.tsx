@@ -3,9 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
   EnergyCalibration,
+  ProgressWeeklyAction,
   WeeklyCheckInCurrent,
   WeeklyCheckInHistory,
   WeeklyCheckInSubmit,
+  WeeklyPlanningAdjustment,
+  WeeklyPlanningReview,
+  WeeklyPlanningReviewConfirmResponse,
 } from '../../shared/api/types';
 import { formatCalendarDate } from '../../shared/dateTime';
 import { invalidateNutritionSummaries } from '../../shared/queryKeys';
@@ -15,6 +19,7 @@ import { Badge, Card, DisclosureIcon, ErrorState, LoadingState } from '../../sha
 import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Icon } from '../../shared/ui/Icon';
+import { AppLink } from '../../shared/navigation/router';
 import {
   productEventSurface,
   trackCoreProductEvent,
@@ -80,6 +85,27 @@ function formatDate(value: string): string {
   return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+function formatKcal(value: { energy_kcal: string | number } | null | undefined): string {
+  return value ? `${Math.round(Number(value.energy_kcal))} ккал` : 'нет записей';
+}
+
+function planningAvailabilityLabel(value: WeeklyPlanningReview['availability']): string {
+  switch (value) {
+    case 'available':
+      return 'Факты доступны';
+    case 'no_plan':
+      return 'Плана нет';
+    case 'no_target':
+      return 'Цель не задана';
+    case 'no_data':
+      return 'Пока нет данных';
+  }
+}
+
+function planningRequestKey(weekStart: string, adjustments: WeeklyPlanningAdjustment[]): string {
+  return `weekly-review-plan-${weekStart}-${adjustments.map((item) => item.source_date).join('-')}`;
+}
+
 function optionalScore(value: string): number | null {
   return value ? Number(value) : null;
 }
@@ -96,6 +122,21 @@ function measurementCount(value: number): string {
           ? 'замера'
           : 'замеров';
   return `${value} ${word}`;
+}
+
+function progressWeeklyActionHref(action: ProgressWeeklyAction): string | null {
+  switch (action.target) {
+    case 'today':
+      return '/app?section=today';
+    case 'nutrition':
+      return '/app?section=nutrition';
+    case 'body':
+      return '/app?section=progress&progress_view=body';
+    case 'progress':
+      return '/app?section=progress';
+    case 'weekly_review':
+      return '/app?section=progress&progress_view=wellbeing';
+  }
 }
 
 function questionFields(current: WeeklyCheckInCurrent): Array<{
@@ -148,9 +189,11 @@ function macroLine(calibration: EnergyCalibration, proposed: boolean): string | 
 
 export function WeeklyCheckInCard({
   autoFocus = false,
+  compact = false,
   userId,
 }: {
   autoFocus?: boolean;
+  compact?: boolean;
   userId: number | 'anonymous';
 }) {
   const queryClient = useQueryClient();
@@ -249,6 +292,31 @@ export function WeeklyCheckInCard({
     },
     onError: (reason) => toast((reason as Error).message, 'error'),
   });
+  const planningConfirm = useMutation({
+    mutationFn: (adjustments: WeeklyPlanningAdjustment[]) =>
+      api<WeeklyPlanningReviewConfirmResponse>('/api/v1/check-ins/weekly/planning-review/confirm', {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': planningRequestKey(current.data?.week_start ?? 'unknown', adjustments),
+        },
+        body: {
+          week_start: current.data?.week_start,
+          adjustments,
+        },
+      }),
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['weekly-check-ins'] }),
+        queryClient.invalidateQueries({ queryKey: ['nutrition', 'plans'] }),
+      ]);
+      toast(
+        result.replayed
+          ? 'Перенос уже был подтверждён'
+          : 'Незавершённое добавлено в следующий план',
+      );
+    },
+    onError: (reason) => toast((reason as Error).message, 'error'),
+  });
 
   function finishReview(calibration: EnergyCalibration | null = draft.calibration): void {
     submit.mutate({
@@ -283,7 +351,8 @@ export function WeeklyCheckInCard({
       !autoFocus ||
       current.isLoading ||
       !current.data ||
-      draft.weekStart !== current.data.week_start
+      draft.weekStart !== current.data.week_start ||
+      document.activeElement !== document.body
     )
       return;
     cardRef.current?.focus({ preventScroll: true });
@@ -305,38 +374,69 @@ export function WeeklyCheckInCard({
   }
 
   const { summary, existing } = current.data;
+  const progressAction = current.data.progress_action;
   const target = summary.nutrition.current_target;
+  const planningReview = summary.nutrition.planning_review;
+  const planningProposals = planningReview?.proposals ?? [];
+  const repeatedPlanningMisses = planningReview?.repeated_miss_dates ?? [];
   const weightSignal = summary.data_sufficiency.weight_trend;
   const weightPoints = Number(weightSignal.counters.point_count ?? 0);
   const questions = questionFields(current.data);
   const calibration = draft.calibration;
   const suspiciousLowDays = summary.nutrition.suspicious_low_days ?? [];
-  const isBusy = submit.isPending || preview.isPending || decision.isPending;
+  const isBusy =
+    submit.isPending || preview.isPending || decision.isPending || planningConfirm.isPending;
 
   return (
     <Card
-      className="weekly-review-card"
+      className={`weekly-review-card${compact ? ' weekly-review-card--progress' : ''}`}
       title="Итоги недели"
       description={`${formatPeriod(summary.period_start, summary.period_end)} · ${current.data.timezone}`}
-      collapsible={!autoFocus}
+      collapsible={compact ? false : !autoFocus}
     >
       <div id="weekly-review" ref={cardRef} tabIndex={-1} className="weekly-review stack top-gap">
         {existing ? (
-          <div className="weekly-review__complete">
-            <Badge>{existing.status === 'skipped' ? 'Пропущено' : 'Готово'}</Badge>
-            <div>
-              <strong>
-                {existing.status === 'skipped' ? 'Обзор этой недели пропущен' : 'Обзор сохранён'}
-              </strong>
-              <p className="muted">
-                {existing.status === 'skipped'
-                  ? 'Цель питания не менялась.'
-                  : existing.summary.adaptive_energy?.decision === 'accepted'
-                    ? 'Новая цель была явно подтверждена.'
-                    : 'Автоматических изменений цели не было.'}
-              </p>
+          <>
+            <div className="weekly-review__complete">
+              <Badge>{existing.status === 'skipped' ? 'Пропущено' : 'Готово'}</Badge>
+              <div>
+                <strong>
+                  {existing.status === 'skipped' ? 'Обзор этой недели пропущен' : 'Обзор сохранён'}
+                </strong>
+                <p className="muted">
+                  {existing.status === 'skipped'
+                    ? 'Цель питания не менялась.'
+                    : existing.summary.adaptive_energy?.decision === 'accepted'
+                      ? 'Новая цель была явно подтверждена.'
+                      : 'Автоматических изменений цели не было.'}
+                </p>
+              </div>
             </div>
-          </div>
+            {progressAction && (
+              <div className="weekly-review__complete" aria-live="polite">
+                <Badge>
+                  {progressAction.status === 'completed'
+                    ? 'Шаг подтверждён'
+                    : progressAction.status === 'unavailable'
+                      ? 'Без отдельного шага'
+                      : 'Следующий шаг'}
+                </Badge>
+                <div>
+                  <strong>{progressAction.title}</strong>
+                  <p className="muted">{progressAction.detail}</p>
+                  {progressAction.status === 'available' &&
+                    progressWeeklyActionHref(progressAction) && (
+                      <AppLink
+                        className="button-link secondary-link"
+                        to={progressWeeklyActionHref(progressAction) ?? '/app?section=progress'}
+                      >
+                        Открыть действие
+                      </AppLink>
+                    )}
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <ol className="weekly-review__steps" aria-label="Шаги недельного обзора">
@@ -394,6 +494,101 @@ export function WeeklyCheckInCard({
                     <dd>{summary.nutrition.unlogged_days}</dd>
                   </div>
                 </dl>
+                {planningReview && planningReview.availability !== 'no_data' && (
+                  <section
+                    className="weekly-review__planning"
+                    aria-labelledby="weekly-planning-heading"
+                  >
+                    <div className="weekly-review__planning-heading">
+                      <div>
+                        <span className="eyebrow">План питания</span>
+                        <h3 id="weekly-planning-heading">План и факт</h3>
+                      </div>
+                      <Badge>{planningAvailabilityLabel(planningReview.availability)}</Badge>
+                    </div>
+                    <p className="muted">
+                      Плановые блюда и записи дневника показаны отдельно. Приложение не делает
+                      выводов о здоровье и не изменяет дневник автоматически.
+                    </p>
+                    <dl className="weekly-review__planning-stats" aria-label="Сводка плана питания">
+                      <div>
+                        <dt>План</dt>
+                        <dd>{formatKcal(planningReview.planned_total)}</dd>
+                      </div>
+                      <div>
+                        <dt>Факт</dt>
+                        <dd>{formatKcal(planningReview.consumed_total)}</dd>
+                      </div>
+                      <div>
+                        <dt>Цель</dt>
+                        <dd>{formatKcal(planningReview.target_total)}</dd>
+                      </div>
+                    </dl>
+                    <div className="weekly-review__planning-days" aria-label="План и факт по дням">
+                      {planningReview.days
+                        .filter((day) => day.observed)
+                        .map((day) => (
+                          <div className="weekly-review__planning-day" key={day.diary_date}>
+                            <strong>
+                              {formatCalendarDate(day.diary_date, {
+                                weekday: 'short',
+                                day: 'numeric',
+                                month: 'short',
+                              })}
+                            </strong>
+                            <span>
+                              План: {day.planned_items > 0 ? formatKcal(day.planned) : 'нет плана'}
+                            </span>
+                            <span>
+                              Факт: {formatKcal(day.consumed)}
+                              {day.target ? ` / ${formatKcal(day.target)}` : ''}
+                            </span>
+                            <small>
+                              {day.plan_status === 'partial'
+                                ? `Осталось позиций: ${day.pending_items}`
+                                : day.plan_status === 'complete'
+                                  ? 'План закрыт'
+                                  : 'Без плана'}
+                            </small>
+                          </div>
+                        ))}
+                    </div>
+                    {repeatedPlanningMisses.length > 0 && (
+                      <p className="weekly-review__notice">
+                        В нескольких днях остались незавершённые позиции. Это факт о плане, а не
+                        оценка состояния или готовности.
+                      </p>
+                    )}
+                    {planningProposals.length > 0 && (
+                      <div className="weekly-review__planning-proposal">
+                        <strong>Предпросмотр следующего плана</strong>
+                        <p className="muted">
+                          Можно перенести незавершённые позиции на те же дни следующей недели. До
+                          подтверждения ничего не меняется.
+                        </p>
+                        <ul>
+                          {planningProposals.map((proposal) => (
+                            <li key={proposal.source_date}>
+                              {formatDate(proposal.source_date)} →{' '}
+                              {formatDate(proposal.target_date)} · {proposal.pending_item_count}{' '}
+                              поз.
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          type="button"
+                          className="weekly-review__primary"
+                          disabled={isBusy}
+                          onClick={() => void confirmPlanningPlan(planningReview)}
+                        >
+                          {planningConfirm.isPending
+                            ? 'Добавляем в следующий план…'
+                            : 'Подтвердить перенос'}
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                )}
                 {target ? (
                   <div className="weekly-review__target">
                     <div>
@@ -685,7 +880,7 @@ export function WeeklyCheckInCard({
 
         {history.data?.items.length ? (
           <details className="weekly-review__history">
-            <summary>
+            <summary className="yfc-disclosure-summary">
               <span>Предыдущие недели</span>
               <DisclosureIcon />
             </summary>
@@ -711,6 +906,28 @@ export function WeeklyCheckInCard({
       </div>
     </Card>
   );
+
+  async function confirmPlanningPlan(review: WeeklyPlanningReview): Promise<void> {
+    const adjustments: WeeklyPlanningAdjustment[] = (review.proposals ?? []).map(
+      ({ source_date, target_date, source_revision, target_revision }) => ({
+        source_date,
+        target_date,
+        source_revision,
+        target_revision,
+      }),
+    );
+    if (
+      !(await confirm({
+        title: 'Перенести незавершённое?',
+        message:
+          'Позиции будут добавлены в план следующей недели. Записи дневника останутся без изменений.',
+        confirmText: 'Перенести',
+      }))
+    ) {
+      return;
+    }
+    planningConfirm.mutate(adjustments);
+  }
 
   async function skipEntireReview(): Promise<void> {
     if (

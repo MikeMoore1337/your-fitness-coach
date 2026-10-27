@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import jwt
 import pytest
-from fastapi import Response
+from fastapi import Request, Response
 from httpx import HTTPError
 from starlette.testclient import TestClient
 
@@ -27,8 +27,51 @@ from fitminiapp_api.services import oauth_login
 from fitminiapp_api.services.auth_redirects import auth_error_redirect, safe_auth_next_path
 from fitminiapp_api.services.jwt import ALGORITHM, decode_token, hash_token
 from fitminiapp_api.services.oauth_login import get_or_create_oauth_user
+from fitminiapp_api.services.oauth_transactions import transaction_hash_prefix
 from fitminiapp_api.services.password_auth import utcnow
 from fitminiapp_api.services.telegram_auth import get_or_create_user_from_init_data
+
+
+@pytest.mark.parametrize(
+    ("provider_error", "expected_category"),
+    [
+        ("access_denied", "denied"),
+        ("cancelled", "denied"),
+        ("user_cancelled", "denied"),
+        ("user_denied", "denied"),
+        ("invalid_state", "invalid_state"),
+        ("mismatching_state", "invalid_state"),
+        ("missing_state", "invalid_state"),
+        ("secret-provider-token\r\npassword=private", "provider_failure"),
+    ],
+)
+def test_oauth_log_contains_only_error_category_and_hashed_state(
+    provider_error, expected_category, caplog
+):
+    request = Request({"type": "http"})
+    request.state.request_id = "test-oauth-request"
+    state = "private-oauth-state-12345678"
+    category = auth_api._provider_error_category(provider_error)
+    assert category == expected_category
+
+    auth_api._log_oauth_event(
+        "oauth_login_failed",
+        request,
+        provider="google",
+        purpose="login",
+        reason=category,
+        state=state,
+    )
+
+    record = caplog.records[-1]
+    assert record.reason == expected_category
+    assert record.provider == "google"
+    assert record.purpose == "login"
+    assert record.request_id == "test-oauth-request"
+    assert record.transaction_hash_prefix == transaction_hash_prefix(state)
+    assert state not in repr(record.__dict__)
+    assert "secret-provider-token" not in repr(record.__dict__)
+    assert "password=private" not in repr(record.__dict__)
 
 
 def _login(client: TestClient, telegram_user_id: int) -> dict[str, str]:
@@ -481,6 +524,7 @@ def test_private_responses_and_auth_cookies_have_safe_policy(client, monkeypatch
     ("value", "expected"),
     [
         ("/app", "/app"),
+        ("/app?trainer_intent=1", "/app?trainer_intent=1"),
         ("/coach", "/coach"),
         ("/admin", "/admin"),
         ("/join/Abc_12345678901234567890", "/join/Abc_12345678901234567890"),
@@ -489,6 +533,7 @@ def test_private_responses_and_auth_cookies_have_safe_policy(client, monkeypatch
         ("/%2F%2Fevil.example", None),
         ("%2F%2Fevil.example", None),
         ("/app%3Fnext=https://evil.example", None),
+        ("/app?trainer_intent=1&next=https://evil.example", None),
         ("/unknown", None),
     ],
 )
@@ -499,6 +544,9 @@ def test_safe_auth_next_allowlist(value, expected):
 def test_auth_error_redirect_keeps_only_a_safe_continuation():
     assert auth_error_redirect("denied", next_path="/coach") == (
         "/login?next=%2Fcoach&auth_error=denied"
+    )
+    assert auth_error_redirect("denied", next_path="/app?trainer_intent=1") == (
+        "/login?next=%2Fapp%3Ftrainer_intent%3D1&auth_error=denied"
     )
     assert auth_error_redirect("provider-secret", next_path="https://evil.example") == (
         "/login?next=%2Fapp&auth_error=provider_failure"

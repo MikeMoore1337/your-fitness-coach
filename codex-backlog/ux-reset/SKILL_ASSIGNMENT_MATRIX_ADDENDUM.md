@@ -4,7 +4,7 @@ Task files являются canonical для конкретной задачи. 
 
 | Task | Primary role | Core skills |
 |---|---|---|
-| 113 | integration-release | platform-engineer, release-manager, qa-engineer |
+| 113 | qa-verifier | platform-engineer, release-manager, qa-engineer |
 | 114 | implementer | qa-engineer, frontend-engineer, backend-engineer, data-engineer |
 | 115A | researcher | product-discovery, product-designer, ui-audit, ui-prototyper |
 | 116 | implementer | product-designer, frontend-engineer, mobile-engineer, ui-audit |

@@ -1,0 +1,2 @@
+# Task 129 discovery runner has no third-party Python runtime dependencies.
+# It uses only the Python 3.13 standard library from the pinned base image.

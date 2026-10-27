@@ -1,4 +1,4 @@
-# YFC Design Guardrails v6
+# YFC Design Guardrails v7
 
 Этот файл определяет минимальные устойчивые рамки дизайна. Он намеренно не является подробной дизайн-системой.
 
@@ -13,7 +13,34 @@
 5. Accessibility и usable interaction являются обязательными.
 6. Визуальные эффекты не должны делать core flow неприемлемо медленным или нестабильным.
 
+### Запрет толстых односторонних лаймовых граней
+
+В пользовательских компонентах YFC запрещены декоративные лаймовые полосы, которые занимают
+одну сторону элемента. Нарушением считается физическая или логическая `border-*`, inset-тень,
+жёсткая граница градиента или позиционированный псевдоэлемент с цветом YFC lime/accent и
+толщиной от 3px. Разрешены равномерная тонкая рамка 1px, обычная обводка, keyboard focus,
+active/current/selected и CTA. Семантические предупреждения сохраняют текст, значки и
+тонкий контур, но не толстую лаймовую полосу. Это не глобальный запрет на
+border, box-shadow, outline или лаймовый цвет.
+
+Обязательная группа `frontend-checks` запускает это правило через `npm run lint:lime-edges`.
+Статический контроль проверяет изменённые CSS/CSS Modules, inline JSX/TSX и CSS-in-JS-похожие
+шаблоны; computed-style проверки Progress дополняют его. Динамические значения и исторический
+код без изменений не доказываются статическим контролем и требуют проверки при изменении.
+
 ## Current baseline vs redesign
+
+Before changing visible authenticated UI, read:
+
+1. `codex-backlog/ACTIVE_DESIGN_SOURCE.md`;
+2. this file;
+3. `docs/design/YFC_PRODUCT_UI_CONTRACT.md`.
+
+Ordinary product work is **EVOLVE**. Words such as "improve", "modernize", "app-like", "Stage",
+"v3" and "polish", App Experience naming, or an external reference do not imply **RETHINK** and
+do not authorize a parallel visual system. **RETHINK** requires a separate owner-approved
+redesign/exploration task, explicit bounded scope and owner selection of the direction before
+rollout.
 
 ### Ordinary feature/fix task
 
@@ -62,6 +89,17 @@
 - поддерживать ощущение энергии, прогресса и sport-tech precision.
 
 "Вау" допустим и в частых продуктовых сценариях - workout, nutrition, progress, logging - если он встроен в действие и не превращается в помеху.
+
+## Apple-style references
+
+Apple-like interaction/material principles и Liquid Glass могут использоваться как reference layer,
+но не как отдельная бренд-система. При таком direction:
+
+- YFC остаётся sport-tech, а не iOS clone;
+- lime/black/white brand core сохраняется;
+- Apple-like materials должны усиливать hierarchy/interaction, а не покрывать glass-эффектом каждый layer;
+- physical motion, sheets, gestures и springs должны быть interruptible, responsive и иметь reduced-motion alternative;
+- `$apple-design` используется условно вместе с YFC design skills, а не вместо них.
 
 ## Pattern neutrality
 

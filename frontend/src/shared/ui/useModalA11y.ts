@@ -5,6 +5,7 @@ let openModalCount = 0;
 let originalScrollPosition = { x: 0, y: 0 };
 let originalBodyStyles: Partial<CSSStyleDeclaration> = {};
 let originalHtmlOverflow = '';
+const modalStack: Array<RefObject<HTMLElement | null>> = [];
 
 function lockDocumentScroll() {
   if (openModalCount === 0) {
@@ -37,7 +38,11 @@ function unlockDocumentScroll() {
   document.body.style.left = originalBodyStyles.left ?? '';
   document.body.style.width = originalBodyStyles.width ?? '';
   if (originalScrollPosition.x !== 0 || originalScrollPosition.y !== 0) {
-    window.scrollTo(originalScrollPosition.x, originalScrollPosition.y);
+    window.scrollTo({
+      left: originalScrollPosition.x,
+      top: originalScrollPosition.y,
+      behavior: 'instant',
+    });
   }
 }
 
@@ -74,6 +79,7 @@ export function useModalA11y<T extends HTMLElement>(
 
   useEffect(() => {
     if (!open) return;
+    modalStack.push(panelRef);
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => {
@@ -85,6 +91,7 @@ export function useModalA11y<T extends HTMLElement>(
       (preferred ?? first ?? panel)?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
+      if (modalStack.at(-1) !== panelRef) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         closeRef.current();
@@ -99,21 +106,24 @@ export function useModalA11y<T extends HTMLElement>(
         panelRef.current.focus();
         return;
       }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
+      const activeIndex = focusable.indexOf(document.activeElement as HTMLElement);
+      const nextIndex = event.shiftKey
+        ? activeIndex <= 0
+          ? focusable.length - 1
+          : activeIndex - 1
+        : activeIndex < 0 || activeIndex === focusable.length - 1
+          ? 0
+          : activeIndex + 1;
+      event.preventDefault();
+      focusable[nextIndex]?.focus();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener('keydown', onKeyDown);
-      previousFocus?.focus();
+      const index = modalStack.indexOf(panelRef);
+      if (index >= 0) modalStack.splice(index, 1);
+      previousFocus?.focus({ preventScroll: true });
     };
   }, [initialFocusSelector, open]);
 

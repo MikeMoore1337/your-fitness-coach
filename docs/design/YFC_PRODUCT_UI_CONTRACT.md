@@ -1,0 +1,216 @@
+# YFC Product UI Contract
+
+Статус: active contract для authenticated Web/Mobile Web/TMA UI.
+
+Этот документ закрепляет production evolution после owner-approved #387/#388. Он не создаёт
+новую дизайн-систему и не заменяет `codex-backlog/ACTIVE_DESIGN_SOURCE.md`: active design source
+остаётся authoritative для текущей visual baseline.
+
+## Режим работы
+
+Обычная product/fix task работает в режиме **EVOLVE**:
+
+- production UI, существующие tokens и shared components являются baseline;
+- сначала переиспользуется существующий паттерн, затем добавляется только необходимое локальное
+  поведение;
+- слова «улучшить», «modernize», «app-like», «Stage», «v3» и «polish» сами по себе не являются
+  разрешением на redesign;
+- нельзя создавать параллельную typography, color, card или navigation system.
+
+Режим **RETHINK** возможен только в отдельной задаче, где явно указаны redesign/exploration scope,
+owner approval exploration и owner selection направления до rollout. В bounded design task
+допустимы новые решения, но они должны быть отдельно зафиксированы и не распространяются на
+обычные tasks автоматически.
+
+Перед изменением visible authenticated UI прочитай:
+
+1. `codex-backlog/ACTIVE_DESIGN_SOURCE.md`;
+2. `.agents/references/DESIGN_GUARDRAILS.md`;
+3. этот contract;
+4. фактические shared primitives и affected production flow.
+
+Bounded exception к contract записывается в task и получает explicit owner approval; молчание или
+ссылка на App Experience v3 исключением не являются.
+
+## Визуальный lifecycle
+
+Для новой или существенно изменённой visual composition действует последовательность:
+
+`concrete mockup -> publish в Issue -> explicit owner approval -> реализация approved version 1:1 -> real AFTER evidence -> owner visual acceptance -> separate release approval`.
+
+Одобрение макета разрешает реализацию согласованного scope, но не заменяет owner visual
+acceptance, release approval, merge или deploy. Технические исправления без изменения composition
+идут обычным workflow и не требуют этого visual gate.
+
+## Язык authenticated UI
+
+Authenticated product UI YFC является русскоязычным по умолчанию: весь user-facing текст должен
+быть на русском языке. Правило распространяется на headings, section eyebrows, labels, buttons,
+hints, empty states, validation/error messages, status text, menu/navigation labels, placeholders и
+user-visible badges. Новые английские literals в интерфейсе запрещены, если task или этот contract
+не фиксирует intentional documented exception.
+
+Допустимые исключения ограничены брендом `Your Fitness Coach`, официальными названиями внешних
+брендов/сервисов, общеупотребимыми техническими или фитнес-аббревиатурами, когда русская форма
+нецелесообразна, и данными, введёнными пользователем. Внутренние code identifiers, API fields,
+routes, analytics/event names, test names и developer documentation этим правилом не затрагиваются
+и не должны переводиться ради него.
+
+Для enforcement в новых изменениях frontend используется `frontend/scripts/russian_user_facing_ui.mjs`.
+Он разбирает TypeScript/TSX через установленный TypeScript AST, проверяет только новые или
+изменённые исходные строки пользовательского текста и запускается через `npm run lint`, поэтому
+входит в обязательную группу `frontend-checks` CI. Существующий legacy English UI не становится
+массовым migration scope: он не расширяется новыми нарушениями и исправляется отдельными задачами.
+Allowlist guard ограничен документированными брендами и техническими обозначениями; произвольные
+inline-исключения запрещены.
+
+## Source of truth и primitives
+
+- Текущая production implementation — source of truth для поведения, состояний и визуальных
+  токенов.
+- Используй существующие `Button`, `IconButton`, `Surface`, `SectionHeader`, `Card`,
+  `SemanticCard`, `SegmentedControl`, `Icon` и Glass helpers, когда их семантика подходит.
+- Для action controls сохраняй shared `--touch-target` (сейчас 44px), `--v2-space-*`, radius,
+  focus и color tokens.
+- Не копируй page-local button/card CSS, если shared primitive уже выражает нужный смысл.
+- Не создавай giant universal component. Новая primitive оправдана только повторяющимся stable
+  interaction pattern с одинаковой семантикой и доказанной повторной потребностью.
+
+## Information architecture
+
+Базовая последовательность:
+
+`overview -> navigation -> focused destination -> action/detail`
+
+Overview отвечает на «что требует внимания» и ведёт в destination; destination показывает
+детали и действие. Не дублируй большой detail module на overview и destination.
+
+Не используй endless aggregate pages, giant accordions вместо навигации или глубокие меню для
+частого действия. Secondary information раскрывается progressive disclosure.
+
+Approved #388 trainer pattern — короткий `Сегодня`, отдельный `Ещё` hub и focused destinations
+для operations/clients/programs; это guidance, а не literal template для каждого нового экрана.
+
+## Global и local navigation
+
+- В каждом context есть одна primary navigation system: mobile dock или desktop sidebar.
+- Не дублируй global destinations одновременно в dock + horizontal tabs или sidebar + horizontal
+  tabs.
+- Tabs/segmented controls используются только для реальной local subsection navigation.
+- Peer destinations in a local horizontal selector use the shared `SegmentedControl`: the
+  selector has text labels, keyboard tab semantics and no directional arrow/chevron controls.
+- Workspace/context switch не является destination tab.
+- В trainer context trainer dock/sidebar остаётся trainer navigation; personal dock остаётся
+  personal navigation; `Для себя / Клиенты` — отдельный workspace switch.
+
+Approved #387 trainer pattern сохраняет trainer-first entry, явный workspace switch и
+context-specific navigation.
+
+## CTA и action hierarchy
+
+### Единая система выбора
+
+Owner decision от 11.10.2026: `UNIFIED_YFC_SELECTED_STATES`. Канонические правила и исключения:
+[component-states-v2.1.md](component-states-v2.1.md#unified-yfc-selected-states).
+Используй shared `--v2-selected-*` и явный `data-yfc-choice` для семантических controls выбора.
+Полная либо компактная капсула содержит различимую поверхность, внутреннюю световую грань,
+мягкий рельеф и лаймовый акцент в обеих темах. Не ограничивай выбор цветом текста/подчёркиванием.
+Сохраняй ARIA/native semantics; focus, hover, pressed, disabled и смысловые статусы независимы.
+Новые компоненты переиспользуют этот контракт автоматически. Page-local selected-система,
+массовая стилизация `.is-active` и превращение обычных карточек/CTA в капсулы запрещены.
+Baseline активируется при успешной согласованной доставке общего релиза PR #927.
+До нового визуального и release approval PR #927 не сливается и не развёртывается.
+Нижняя вкладка использует полный `--v2-selected-radius-pill` независимо от breakpoint.
+Нижняя мобильная навигация использует матовый Liquid Glass по принципу панели таймера отдыха.
+Детали контента за ней не конкурируют с подписями и иконками. Плотность, blur и fallback заданы
+существующими glass-токенами по каноническому контракту состояний. Материал landing-v10 header
+остаётся самостоятельным; одинаковая прозрачность всех стеклянных поверхностей не требуется.
+
+Если у card/surface одно primary action:
+
+- на mobile primary CTA занимает доступную ширину внутри surface;
+- высота interactive control не меньше shared `--touch-target`;
+- card padding сохраняется;
+- используй shared `Button` и существующий variant; desktop может оставаться компактнее, если
+  это соответствует production layout.
+
+Если действий несколько:
+
+- primary и secondary различимы по hierarchy;
+- stacked mobile actions имеют явный token-based vertical gap (approved #388 finance pattern —
+  `--v2-space-3`, 12px), а не visually fused geometry;
+- secondary action не обязан становиться большой primary button.
+
+Navigation action обязан иметь affordance: semantic control, достаточный touch target и видимый
+row/button treatment. Text-only text, который фактически ведёт по navigation, запрещён.
+Chevron допустим для compact navigation row, который раскрывает конкретное destination; он не
+заменяет peer selector и не добавляется к каждой option горизонтального segmented control.
+
+Functional glyphs use `Icon` or its shared adapters and inherit `currentColor`. CSS-drawn shapes,
+Unicode arrows and page-local SVG substitutes are not functional iconography.
+
+## Typography, surfaces и responsive behavior
+
+- Сохраняй current production typography roles и scale.
+- Роли display/page/section/body/meta/data используют shared `--font-*` tokens и line-height
+  tokens; page-local font sizes/weights допускаются только для зафиксированной density-необходимости.
+- Измеримые значения, время, вес, повторы, КБЖУ и аналитические числа используют tabular
+  numerals; локаль и единицы следуют фактическому API/domain contract.
+- Не добавляй giant authenticated hero/marketing language в частые рабочие surfaces.
+- Cards/surfaces должны поддерживать task hierarchy, а не превращать страницу в декоративную
+  стопку одинаковых rectangles.
+- Каждое новое visible interaction проверяется в Light, Dark, representative mobile и desktop.
+- Mobile — отдельная composition: проверяй overflow, safe-area/dock overlap и touch spacing, а не
+  только shrink desktop.
+- Web и TMA используют одну product identity; platform-specific safe area/BackButton/viewport не
+  являются поводом для отдельной visual system.
+
+## Accessibility и deterministic guardrails
+
+Сохраняй semantic controls, visible keyboard focus, readable contrast, minimum touch target,
+reduced-motion behavior, safe-area awareness и отсутствие dock overlap.
+
+Текущий code-backed baseline после #387/#388:
+
+- shared primitives и tokens: `frontend/src/shared/ui/common.tsx`, `Icon.tsx`,
+  `frontend/src/styles/design-system.css`;
+- trainer navigation/CTA guardrails: `frontend/tests/e2e/coach-workspace.spec.ts`;
+- assertions покрывают mobile full-width primary CTA, minimum touch height, finance action gap,
+  secondary navigation affordance, dock overlap, no horizontal overflow и отсутствие duplicate
+  trainer navigation.
+
+Не кодируй subjective visual taste brittle lint rules. Добавляй deterministic assertion только
+для stable geometry, semantics, navigation или accessibility invariant, которую реально можно
+проверить без screenshot pixel guessing.
+
+## Concrete examples
+
+### DO
+
+- короткий overview и focused destination;
+- mobile full-width single primary card CTA;
+- neutral navigation row с chevron для secondary destination;
+- trainer mobile dock **или** desktop sidebar как primary navigation;
+- отдельный workspace switch;
+- существующие `Button`, `Card` и spacing/touch tokens.
+
+### DON'T
+
+- новый giant authenticated hero/dashboard visual language;
+- endless page из полных CRM modules;
+- duplicate global navigation;
+- text, который ведёт как link, но не имеет affordance;
+- две stacked buttons, визуально слипшиеся;
+- page-local custom button/card system при наличии shared primitive;
+- копирование rejected Stage 0 prototype styling.
+
+## Change checklist
+
+Перед commit visible UI task должна ответить:
+
+1. Это EVOLVE или explicit RETHINK?
+2. Какой текущий production component/token переиспользован?
+3. Как устроены overview → destination → action/detail?
+4. Есть ли одна primary navigation в каждом context?
+5. Как проверены mobile/desktop, Light/Dark, touch/focus и dock/overflow?
+6. Какой deterministic test защищает новый stable invariant?

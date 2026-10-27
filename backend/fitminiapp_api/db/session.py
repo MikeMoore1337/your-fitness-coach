@@ -7,7 +7,11 @@ from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.performance import install_sql_metrics
 
 is_sqlite = settings.database_url.startswith("sqlite")
-connect_args = {"check_same_thread": False} if is_sqlite else {}
+connect_args = (
+    {"check_same_thread": False}
+    if is_sqlite
+    else {"application_name": settings.db_application_name}
+)
 engine_options = (
     {}
     if is_sqlite

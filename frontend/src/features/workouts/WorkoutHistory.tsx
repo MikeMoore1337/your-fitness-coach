@@ -6,13 +6,69 @@ import type {
   WorkoutHistorySummary,
   WorkoutScheduleItem,
 } from '../../shared/api/types';
-import { Badge, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
+import {
+  Badge,
+  Card,
+  DisclosureIcon,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
+
+interface RestHistoryEntry {
+  id: number;
+  source_set_id: number;
+  status: string;
+  source: string | null;
+  planned_seconds: number;
+  adjusted_seconds: number;
+  measured_seconds: number | null;
+}
+
+function restDuration(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+function restHistoryLabel(row: RestHistoryEntry): string {
+  const original = `План ${restDuration(row.planned_seconds)}`;
+  const adjusted =
+    row.adjusted_seconds !== row.planned_seconds
+      ? ` · цель после +30/+60: ${restDuration(row.adjusted_seconds)}`
+      : '';
+  const measured = row.status === 'completed' ? row.measured_seconds : null;
+  if (measured === null) return `${original}${adjusted} · нет достоверного замера`;
+  const delta = measured - row.planned_seconds;
+  const corrected = row.source === 'USER_CORRECTED' ? ' · исправлено вручную' : '';
+  return `${original}${adjusted} · факт по отметке ${restDuration(measured)} · разница ${delta >= 0 ? '+' : ''}${delta} сек${corrected}`;
+}
+
+function RestHistory({ sessions }: { sessions?: RestHistoryEntry[] }) {
+  if (!sessions?.length) return <p className="muted">Отдых: нет достоверных замеров.</p>;
+  const confirmed = sessions.filter(
+    (row) => row.status === 'completed' && row.measured_seconds !== null,
+  ).length;
+  return (
+    <details className="workout-history__rest">
+      <summary className="yfc-disclosure-summary">
+        Отдых по подходам · {confirmed} замеров
+        <Icon name="chevron-down" size={16} />
+      </summary>
+      <ul>
+        {sessions.map((row) => (
+          <li key={row.id}>{restHistoryLabel(row)}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 const HISTORY_PAGE_SIZE = 10;
 const adaptationReasonLabels: Record<string, string> = {
@@ -24,16 +80,20 @@ const adaptationReasonLabels: Record<string, string> = {
 export type WorkoutNavigationTarget = 'schedule' | 'history';
 
 export function WorkoutHistory({
+  compact = false,
   focusedWorkoutId,
   focusedCommentId,
   focusedExerciseId,
   onWorkoutSelect,
+  readOnly = false,
   timeZone,
 }: {
+  compact?: boolean;
   focusedWorkoutId?: number | null;
   focusedCommentId?: number | null;
   focusedExerciseId?: number | null;
   onWorkoutSelect?: (workoutId: number, target: WorkoutNavigationTarget) => void;
+  readOnly?: boolean;
   timeZone?: string | null;
 }) {
   const queryClient = useQueryClient();
@@ -71,65 +131,90 @@ export function WorkoutHistory({
   useEffect(() => {
     if (!focusedWorkoutId || !rows.some((item) => item.id === focusedWorkoutId)) return;
     const row = document.getElementById(`workout-history-${focusedWorkoutId}`);
-    const disclosure = row?.closest<HTMLDetailsElement>('details.card-disclosure');
-    if (disclosure) disclosure.open = true;
     row?.focus({ preventScroll: true });
     row?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   }, [focusedWorkoutId, rows]);
 
-  return (
-    <div className="stack">
-      <Card title="Неделя">
-        {week.isLoading ? (
-          <LoadingState />
-        ) : week.error ? (
-          <ErrorState message={(week.error as Error).message} />
-        ) : !week.data?.length ? (
-          <EmptyState title="На этой неделе нет тренировок" />
-        ) : (
-          <div className="list-grid top-gap">
-            {week.data.map((item) => {
-              const target: WorkoutNavigationTarget | null =
-                item.status === 'completed'
-                  ? rows.some((row) => row.id === item.id)
-                    ? 'history'
-                    : null
-                  : item.scheduled_date >= today
-                    ? 'schedule'
-                    : null;
-              const content = (
-                <>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p className="muted">{item.scheduled_date}</p>
-                  </div>
-                  <Badge>{workoutStatusLabel(item.status)}</Badge>
-                </>
-              );
-              if (!target) {
-                return (
-                  <article className="list-row" key={item.id}>
-                    {content}
-                  </article>
-                );
-              }
-              const targetId = `workout-${target}-${item.id}`;
+  const weekCard = (
+    <Card
+      className={compact ? 'progress-history-week__card' : undefined}
+      collapsible={!compact}
+      title="Неделя"
+    >
+      {week.isLoading ? (
+        <LoadingState />
+      ) : week.error ? (
+        <ErrorState message={(week.error as Error).message} />
+      ) : !week.data?.length ? (
+        <EmptyState title="На этой неделе нет тренировок" />
+      ) : (
+        <div className="list-grid top-gap">
+          {week.data.map((item) => {
+            const target: WorkoutNavigationTarget | null =
+              item.status === 'completed'
+                ? rows.some((row) => row.id === item.id)
+                  ? 'history'
+                  : null
+                : item.scheduled_date >= today
+                  ? 'schedule'
+                  : null;
+            const content = (
+              <>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p className="muted">{item.scheduled_date}</p>
+                </div>
+                <Badge>{workoutStatusLabel(item.status)}</Badge>
+              </>
+            );
+            if (!target) {
               return (
-                <a
-                  className="list-row workout-day-link"
-                  href={`#${targetId}`}
-                  key={item.id}
-                  aria-label={`Открыть тренировочный день: ${item.title}`}
-                  onClick={() => onWorkoutSelect?.(item.id, target)}
-                >
+                <article className="list-row" key={item.id}>
                   {content}
-                </a>
+                </article>
               );
-            })}
-          </div>
-        )}
-      </Card>
-      <Card className="workout-history-card" title="История">
+            }
+            const targetId = `workout-${target}-${item.id}`;
+            return (
+              <a
+                className="list-row workout-day-link"
+                href={`#${targetId}`}
+                key={item.id}
+                aria-label={`Открыть тренировочный день: ${item.title}`}
+                onClick={() => onWorkoutSelect?.(item.id, target)}
+              >
+                {content}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+
+  return (
+    <div className={`stack${compact ? ' workout-history--progress' : ''}`}>
+      {compact ? (
+        <details className="progress-history-week">
+          <summary className="yfc-disclosure-summary">
+            <span>
+              <small>Контекст недели</small>
+              <strong>План и навигация</strong>
+            </span>
+            <DisclosureIcon />
+          </summary>
+          {weekCard}
+        </details>
+      ) : (
+        weekCard
+      )}
+      <Card
+        className="workout-history-card"
+        collapsible={!compact || Boolean(focusedWorkoutId)}
+        defaultOpen={Boolean(focusedWorkoutId)}
+        key={focusedWorkoutId ?? 'history'}
+        title="История"
+      >
         {history.isLoading || summary.isLoading ? (
           <LoadingState />
         ) : history.error || summary.error ? (
@@ -180,6 +265,12 @@ export function WorkoutHistory({
                         </button>
                       ))}
                     </div>
+                    <RestHistory
+                      sessions={
+                        (item as WorkoutHistoryItem & { rest_sessions?: RestHistoryEntry[] })
+                          .rest_sessions
+                      }
+                    />
                     {item.adaptations.map((adaptation) => (
                       <p className="workout-history__adaptation" key={adaptation.id}>
                         Изменено перед тренировкой: {adaptationReasonLabels[adaptation.reason]}
@@ -224,8 +315,8 @@ export function WorkoutHistory({
             )}
             <div className="workout-history__footer-actions">
               <button
-                className="btn-danger"
-                disabled={clearHistory.isPending}
+                className="secondary"
+                disabled={readOnly || clearHistory.isPending}
                 onClick={async () => {
                   if (
                     await confirm({
@@ -240,6 +331,12 @@ export function WorkoutHistory({
                 Очистить историю
               </button>
             </div>
+            {readOnly && (
+              <p className="muted demo-capability-notice" role="status">
+                Очистка истории доступна после входа. Просмотр и навигация по результатам доступны в
+                демо.
+              </p>
+            )}
           </>
         )}
       </Card>

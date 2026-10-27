@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { ApiError, api } from '../../shared/api/client';
@@ -10,27 +10,34 @@ import type {
   WeeklyCheckInCurrent,
   Workout,
   WorkoutComment,
+  WorkoutRecoveryState,
   WorkoutScheduleItem,
 } from '../../shared/api/types';
-import {
-  calendarWeek,
-  dateInputValue,
-  detectedTimeZone,
-  formatCalendarDate,
-} from '../../shared/dateTime';
-import { AppLink } from '../../shared/navigation/router';
+import { calendarWeek, dateInputValue, formatCalendarDate } from '../../shared/dateTime';
+import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { queryKeys } from '../../shared/queryKeys';
+import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
 import {
+  activeWorkoutLockName,
   loadActiveWorkoutQueue,
   loadCurrentActiveWorkoutSnapshot,
+  saveActiveWorkoutSnapshot,
 } from '../workouts/activeWorkoutQueue';
 import { WorkoutAdaptation } from '../workouts/WorkoutAdaptation';
+import { WorkoutRecovery } from '../workouts/WorkoutRecovery';
 import { TodayWorkout } from '../workouts/TodayWorkout';
-import { Badge, Button, SemanticArtwork, SemanticCard, Skeleton } from '../../shared/ui/common';
+import { Badge, Button, SemanticCard, Skeleton } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { CardioQuickLog } from '../cardio/CardioLogging';
 import { DailyWellbeingCheckIn } from '../wellbeing/DailyWellbeingCheckIn';
+import {
+  nextActionHref,
+  selectNextAction,
+  type NextAction,
+  type NextActionKind,
+  type NextActionPlan,
+} from './nextAction';
 import {
   TRAINING_WEEK_LEGEND,
   WeekStrip,
@@ -41,8 +48,12 @@ import {
 import {
   productEventSurface,
   trackCoreProductEvent,
+  trackGrowthEvent,
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
+import { isPwaStandalone } from '../../shared/pwa/pwaRuntime';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { programProfileReadiness } from '../profile/programReadiness';
 
 export function formatTodayHeading(value: string): { title: string } {
   const weekday = formatCalendarDate(value, { weekday: 'long' });
@@ -200,6 +211,51 @@ function formatAmount(value: string | number | null | undefined): string {
   return Number.isFinite(numeric) ? String(Math.round(numeric)) : '—';
 }
 
+function finiteAmount(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function validDiaryRemaining(
+  total: string | number | null | undefined,
+  target: string | number | null | undefined,
+  remaining: string | number | null | undefined,
+): number | null {
+  const totalAmount = finiteAmount(total);
+  const targetAmount = finiteAmount(target);
+  const remainingAmount = finiteAmount(remaining);
+  if (totalAmount === null || targetAmount === null || remainingAmount === null) return null;
+  return Math.abs(targetAmount - totalAmount - remainingAmount) <= 0.01 ? remainingAmount : null;
+}
+
+const nutritionMacroRows = [
+  { key: 'protein_g', label: 'Белок' },
+  { key: 'fat_g', label: 'Жиры' },
+  { key: 'carbs_g', label: 'Углеводы' },
+] as const;
+
+const cardioActivityLabels: Record<CardioSession['activity_type'], string> = {
+  walking: 'ходьба',
+  running: 'бег',
+  elliptical: 'эллиптический тренажёр',
+  stationary_bike: 'велотренажёр',
+  cycling: 'велосипед',
+  rowing: 'гребля',
+  stepper: 'степпер',
+  swimming: 'плавание',
+  other: 'активность',
+};
+
+function cardioSessionsCountLabel(value: number): string {
+  const lastTwo = value % 100;
+  if (lastTwo >= 11 && lastTwo <= 14) return `${value} сессий`;
+  const last = value % 10;
+  if (last === 1) return `${value} сессия`;
+  if (last >= 2 && last <= 4) return `${value} сессии`;
+  return `${value} сессий`;
+}
+
 function compactSignal(value: string, maxLength = 140): string {
   const normalized = value.replace(/\s+/g, ' ').trim();
   return normalized.length > maxLength
@@ -213,7 +269,12 @@ function workoutStatusLabel(status: string): string {
   return 'Запланирована';
 }
 
-function NutritionSummary({ date }: { date: string }) {
+export function formatNutritionDateLabel(value: string, today: string): string {
+  if (value === today) return 'сегодня';
+  return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function useNutritionDay(date: string) {
   const diary = useQuery({
     queryKey: ['nutrition', 'diary', date],
     queryFn: () => api<FoodDiaryDay>(`/api/v1/nutrition/diary?diary_date=${date}`),
@@ -222,6 +283,69 @@ function NutritionSummary({ date }: { date: string }) {
     queryKey: queryKeys.nutrition.hydrationDate(date),
     queryFn: () => api<HydrationDay>(`/api/v1/nutrition/hydration?diary_date=${date}`),
   });
+  return { diary, hydration };
+}
+
+function hasNutritionConfirmation(
+  diary: FoodDiaryDay | undefined,
+  hydration: HydrationDay | undefined,
+): boolean {
+  return Boolean(
+    diary?.status_is_explicit ||
+    diary?.meals.some((meal) => meal.entries.length > 0) ||
+    hydration?.entries.length,
+  );
+}
+
+type TodayActionDestination = 'nutrition' | 'progress';
+
+function actionUsesTodayDestination(
+  action: NextAction,
+  destination: TodayActionDestination,
+): boolean {
+  const target = action.target;
+  if (destination === 'nutrition') {
+    return (
+      target.type === 'nutrition' ||
+      (target.type === 'progress_weekly_action' && target.destination === 'nutrition')
+    );
+  }
+
+  if (
+    target.type === 'trainer_feedback' ||
+    target.type === 'progress_workout' ||
+    target.type === 'progress' ||
+    target.type === 'weekly_review'
+  ) {
+    return true;
+  }
+  return (
+    target.type === 'progress_weekly_action' &&
+    (target.destination === 'body' || target.destination === 'progress')
+  );
+}
+
+function planUsesTodayDestination(
+  plan: NextActionPlan,
+  destination: TodayActionDestination,
+): boolean {
+  return [plan.primary, ...plan.secondary].some((action) =>
+    actionUsesTodayDestination(action, destination),
+  );
+}
+
+function NutritionSummary({
+  date,
+  today,
+  nutrition,
+  showAction = true,
+}: {
+  date: string;
+  today: string;
+  nutrition: ReturnType<typeof useNutritionDay>;
+  showAction?: boolean;
+}) {
+  const { diary, hydration } = nutrition;
 
   if (diary.isLoading) {
     return (
@@ -244,39 +368,169 @@ function NutritionSummary({ date }: { date: string }) {
     );
   }
 
-  const foodSummary = diary.data.meals.some((meal) => meal.entries.length > 0)
-    ? diary.data.targets
-      ? `${formatAmount(diary.data.totals.energy_kcal)} из ${formatAmount(diary.data.targets.energy_kcal)} ккал · белок ${formatAmount(diary.data.totals.protein_g)} г`
-      : `${formatAmount(diary.data.totals.energy_kcal)} ккал записано`
-    : 'Записей за день пока нет';
+  const hasFoodEntries = diary.data.meals.some((meal) => meal.entries.length > 0);
+  const calorieTotal = finiteAmount(diary.data.totals.energy_kcal);
+  const calorieTarget = finiteAmount(diary.data.targets?.energy_kcal);
+  const calorieRemaining = hasFoodEntries
+    ? validDiaryRemaining(
+        diary.data.totals.energy_kcal,
+        diary.data.targets?.energy_kcal,
+        diary.data.remaining?.energy_kcal,
+      )
+    : null;
+  const foodSummary =
+    diary.data.status === 'fasted' ? 'День отмечен как постный' : 'Записей за день пока нет';
   const hydrationSummary = hydration.data
-    ? hydration.data.goal?.enabled && hydration.data.goal.target_ml
-      ? `вода ${hydration.data.total_ml} из ${hydration.data.goal.target_ml} мл`
-      : `вода ${hydration.data.total_ml} мл`
+    ? hydration.data.entries.length === 0
+      ? 'Вода пока не записана'
+      : hydration.data.goal?.enabled && hydration.data.goal.target_ml
+        ? `Вода ${hydration.data.total_ml} из ${hydration.data.goal.target_ml} мл`
+        : `Вода ${hydration.data.total_ml} мл`
     : hydration.isLoading
-      ? 'вода загружается…'
-      : 'вода недоступна';
-  const summary = (
-    <>
-      <span>{foodSummary}</span>
-      <span> · {hydrationSummary}</span>
-    </>
-  );
-
+      ? 'Вода загружается…'
+      : 'Вода недоступна';
+  const dateLabel = formatNutritionDateLabel(date, today);
+  const nutritionTitle = date === today ? 'Питание на сегодня' : `Питание за ${dateLabel}`;
+  const caloriesLabel = date === today ? 'Калории за сегодня' : `Калории за ${dateLabel}`;
+  const calorieValueLabel =
+    calorieTarget === null
+      ? `${formatAmount(diary.data.totals.energy_kcal)} ккал`
+      : `${formatAmount(diary.data.totals.energy_kcal)} из ${formatAmount(diary.data.targets?.energy_kcal)} ккал`;
   return (
-    <SemanticCard
-      action={<AppLink to={`/app?section=nutrition&date=${date}&hydration=quick`}>+ Вода</AppLink>}
-      className="today-panel today-summary-card today-summary-card--nutrition today-nutrition"
-      family="nutrition"
-      icon="nav-nutrition"
-      summary={summary}
-      title="Питание"
-      variant="action"
-    />
+    <section className="today-nutrition" aria-label={nutritionTitle}>
+      <h2>
+        <Icon name="nav-nutrition" size={16} />
+        {nutritionTitle}
+      </h2>
+      <div className="today-nutrition__content">
+        <div className="today-nutrition__food-group">
+          <div className="today-nutrition__values">
+            {hasFoodEntries ? (
+              <>
+                <p aria-label={`${caloriesLabel}: ${calorieValueLabel}`}>
+                  <strong>{formatAmount(diary.data.totals.energy_kcal)}</strong>
+                  {diary.data.targets
+                    ? ` / ${formatAmount(diary.data.targets.energy_kcal)}`
+                    : ''}{' '}
+                  ккал
+                </p>
+                {calorieRemaining !== null && (
+                  <small className="today-nutrition__remaining">
+                    {calorieRemaining >= 0
+                      ? `Осталось ${formatAmount(calorieRemaining)} ккал`
+                      : `Выше ориентира на ${formatAmount(Math.abs(calorieRemaining))} ккал`}
+                  </small>
+                )}
+                {diary.data.targets &&
+                  calorieTotal !== null &&
+                  calorieTarget !== null &&
+                  calorieTarget > 0 && (
+                    <progress aria-label={caloriesLabel} max={calorieTarget} value={calorieTotal} />
+                  )}
+                <dl className="today-nutrition__macros" aria-label="Белки, жиры и углеводы">
+                  {nutritionMacroRows.map(({ key, label }) => {
+                    const total = diary.data.totals[key];
+                    const target = diary.data.targets?.[key];
+                    const targetAmount = finiteAmount(target);
+                    return (
+                      <div key={key}>
+                        <dt>{label}</dt>
+                        <dd>
+                          {targetAmount === null
+                            ? `${formatAmount(total)} г`
+                            : `${formatAmount(total)} / ${formatAmount(target)} г`}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </>
+            ) : (
+              <p>{foodSummary}</p>
+            )}
+          </div>
+          {showAction && (
+            <AppLink
+              className="today-summary-card__action"
+              to={`/app?section=nutrition&date=${date}`}
+              aria-label="Открыть дневник питания"
+            >
+              <span className="today-nutrition__action-label-full">Открыть дневник питания</span>
+              <span className="today-nutrition__action-label-compact" aria-hidden="true">
+                Открыть дневник
+              </span>
+            </AppLink>
+          )}
+        </div>
+        <div className="today-nutrition__water">
+          <span>{hydrationSummary}</span>
+          <AppLink
+            className="today-summary-card__action"
+            to={`/app?section=nutrition&date=${date}&hydration=quick`}
+            aria-label="+ Вода"
+          >
+            <Icon name="plus" size={16} /> Вода
+          </AppLink>
+        </div>
+      </div>
+    </section>
   );
 }
 
-function ProgressSummaryPanel({ summary }: { summary: ReturnType<typeof useProgressSummary> }) {
+function ActivitySummary({
+  cardio,
+  date,
+  error,
+  loading,
+  timeZone,
+  today,
+}: {
+  cardio?: CardioSession[];
+  date: string;
+  error: boolean;
+  loading: boolean;
+  timeZone: string;
+  today: string;
+}) {
+  if (loading || error) return null;
+  const completedSessions = weekCardioForDate(cardio, date, timeZone).filter(
+    (session) =>
+      session.status === 'completed' && (finiteAmount(session.duration_minutes) ?? 0) > 0,
+  );
+  if (completedSessions.length === 0) return null;
+
+  const totalDuration = completedSessions.reduce(
+    (total, session) => total + (finiteAmount(session.duration_minutes) ?? 0),
+    0,
+  );
+  const summary =
+    completedSessions.length === 1
+      ? `Кардио · ${cardioActivityLabels[completedSessions[0]!.activity_type]} · ${formatAmount(totalDuration)} мин`
+      : `${cardioSessionsCountLabel(completedSessions.length)} · ${formatAmount(totalDuration)} мин`;
+  const dateLabel = date === today ? 'сегодня' : formatNutritionDateLabel(date, today);
+
+  return (
+    <section className="today-activity-grid" aria-label={`Активность за ${dateLabel}`}>
+      <SemanticCard
+        action={<AppLink to="/app?section=progress&view=cardio">Открыть кардио</AppLink>}
+        className="today-panel today-summary-card today-summary-card--activity"
+        family="training"
+        icon="nav-today"
+        summary={summary}
+        title="Активность"
+        variant="action"
+      />
+    </section>
+  );
+}
+
+function ProgressSummaryPanel({
+  summary,
+  showAction = true,
+}: {
+  summary: ReturnType<typeof useProgressSummary>;
+  showAction?: boolean;
+}) {
   if (summary.isLoading) {
     return (
       <section className="today-progress-grid" aria-label="Загружаем прогресс">
@@ -297,25 +551,23 @@ function ProgressSummaryPanel({ summary }: { summary: ReturnType<typeof useProgr
 
   const completedWorkouts = summary.data.training.completed_workouts;
   const latestWeight = summary.data.body.latest_measurement?.weight_kg;
-  const progressSignals = [
-    completedWorkouts > 0
-      ? `${completedWorkouts} ${completedWorkouts === 1 ? 'тренировка' : completedWorkouts < 5 ? 'тренировки' : 'тренировок'} за 30 дней`
-      : null,
-    latestWeight != null ? `последний вес ${latestWeight.toLocaleString('ru-RU')} кг` : null,
-  ].filter((value): value is string => Boolean(value));
+  const progressSignal =
+    latestWeight != null
+      ? `последний вес ${latestWeight.toLocaleString('ru-RU')} кг`
+      : completedWorkouts > 0
+        ? `${completedWorkouts} ${completedWorkouts === 1 ? 'тренировка' : completedWorkouts < 5 ? 'тренировки' : 'тренировок'} за 30 дней`
+        : null;
 
   return (
     <section className="today-progress-grid" aria-label="Главное о прогрессе">
       <SemanticCard
-        action={<AppLink to="/app?section=progress">Открыть</AppLink>}
+        action={
+          showAction ? <AppLink to="/app?section=progress">Открыть прогресс</AppLink> : undefined
+        }
         className="today-panel today-summary-card today-summary-card--progress"
         family="progress"
         icon="nav-progress"
-        summary={
-          progressSignals.length > 0
-            ? progressSignals.join(' · ')
-            : 'Появится после первых тренировок и замеров'
-        }
+        summary={progressSignal ?? 'Появится после первых тренировок и замеров'}
         title="Прогресс"
         variant="action"
       />
@@ -334,7 +586,6 @@ function WorkoutOverview({
   today,
   workout,
   todayScheduleItem,
-  weeklyReview,
   trainerComment,
   progress,
   detailsOpen,
@@ -342,28 +593,26 @@ function WorkoutOverview({
   onOpenDetails,
   onAddActivity,
   onStart,
+  onOpenRecovery,
+  canMutateProgress,
+  hasActiveProgram,
+  plan,
 }: {
   today: string;
   workout?: Workout;
   todayScheduleItem?: WorkoutScheduleItem;
-  weeklyReview?: WeeklyCheckInCurrent;
   trainerComment?: WorkoutComment;
   progress: ReturnType<typeof useProgressSummary>;
   detailsOpen: boolean;
   startPending: boolean;
   onOpenDetails(): void;
   onAddActivity(): void;
-  onStart(): void;
+  onStart(workoutId: number): void;
+  canMutateProgress: boolean;
+  hasActiveProgram: boolean;
+  plan: NextActionPlan;
+  onOpenRecovery(): void;
 }) {
-  const { user } = useAuth();
-  const trackPrimaryAction = (
-    destination: 'workout' | 'nutrition' | 'weekly_review' | 'programs' | 'progress',
-  ) =>
-    trackProductEvent({
-      name: 'today_primary_action_selected',
-      surface: productEventSurface(),
-      destination,
-    });
   const totalSets =
     workout?.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) ?? 0;
   const completedSets =
@@ -373,64 +622,179 @@ function WorkoutOverview({
     ) ?? 0;
   const completedToday = !workout && progress.data?.training.last_completed_workout_on === today;
   const nextWorkout = progress.data?.training.next_workout;
-  const weeklyReviewAvailable = Boolean(weeklyReview && !weeklyReview.existing);
-  const feedbackWorkoutId = workout?.id ?? todayScheduleItem?.id;
-  const trainerCommentLink =
-    trainerComment && feedbackWorkoutId
-      ? `/app?section=progress&workout_id=${feedbackWorkoutId}&comment_id=${trainerComment.id}`
-      : null;
+  const primaryActionKind = plan.primary.kind;
+  const secondaryActionKinds = plan.secondary.map((item) => item.kind).join('|');
 
-  const completedAction = () => {
-    if (trainerCommentLink) {
-      return (
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('progress')}
-          to={trainerCommentLink}
-        >
-          Открыть комментарий
-        </AppLink>
+  useEffect(() => {
+    trackProductEvent(
+      {
+        name: 'next_action_shown',
+        surface: productEventSurface(),
+        action_kind: primaryActionKind,
+        position: 'primary',
+      },
+      { dedupe: 'session', dedupeKey: `next-action:${primaryActionKind}:primary` },
+    );
+    for (const kind of secondaryActionKinds.split('|').filter(Boolean)) {
+      trackProductEvent(
+        {
+          name: 'next_action_shown',
+          surface: productEventSurface(),
+          action_kind: kind as NextActionKind,
+          position: 'secondary',
+        },
+        { dedupe: 'session', dedupeKey: `next-action:${kind}:secondary` },
       );
     }
-    if (weeklyReviewAvailable) {
+  }, [primaryActionKind, secondaryActionKinds]);
+
+  const trackNextActionClick = (item: NextAction, position: 'primary' | 'secondary') => {
+    trackProductEvent({
+      name: 'next_action_clicked',
+      surface: productEventSurface(),
+      action_kind: item.kind,
+      position,
+    });
+    const destination =
+      item.kind === 'active_workout' || item.kind === 'scheduled_workout'
+        ? 'workout'
+        : item.kind === 'weekly_review'
+          ? 'weekly_review'
+          : item.kind === 'ready_program' || item.kind === 'create_program'
+            ? 'programs'
+            : item.kind === 'resume_program'
+              ? 'programs'
+              : item.kind === 'workout_recovery'
+                ? 'workout'
+                : item.kind === 'nutrition'
+                  ? 'nutrition'
+                  : item.kind === 'progress_weekly_action'
+                    ? item.target.type === 'progress_weekly_action' &&
+                      item.target.destination === 'today'
+                      ? 'workout'
+                      : item.target.type === 'progress_weekly_action' &&
+                          item.target.destination === 'nutrition'
+                        ? 'nutrition'
+                        : 'progress'
+                    : item.kind === 'trainer_feedback' || item.kind === 'workout_result'
+                      ? 'progress'
+                      : null;
+    if (position === 'primary' && destination) {
+      trackProductEvent({
+        name: 'today_primary_action_selected',
+        surface: productEventSurface(),
+        destination,
+      });
+    }
+  };
+
+  const renderActionLink = (item: NextAction, position: 'primary' | 'secondary') => {
+    if (item.target.type === 'workout_recovery') {
       return (
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('weekly_review')}
-          to="/app?section=progress&weekly_review=1"
+        <Button
+          fullWidth
+          key={`${item.kind}-${position}`}
+          variant={position === 'primary' ? 'primary' : 'secondary'}
+          type="button"
+          onClick={() => {
+            trackNextActionClick(item, position);
+            onOpenRecovery();
+          }}
         >
-          Пройти короткую проверку
-        </AppLink>
+          {item.title}
+        </Button>
+      );
+    }
+    if (item.target.type === 'activity') {
+      return (
+        <Button
+          disabled={!canMutateProgress}
+          fullWidth
+          key={`${item.kind}-${position}`}
+          variant="secondary"
+          type="button"
+          onClick={() => {
+            trackNextActionClick(item, position);
+            onAddActivity();
+          }}
+        >
+          {item.title}
+        </Button>
       );
     }
     return (
       <AppLink
-        className="button-link"
-        onClick={() => trackPrimaryAction('progress')}
-        to={
-          feedbackWorkoutId
-            ? `/app?section=progress&workout_id=${feedbackWorkoutId}`
-            : '/app?section=progress'
-        }
+        className={position === 'primary' ? 'button-link' : 'button-link secondary-link'}
+        key={`${item.kind}-${position}`}
+        onClick={() => trackNextActionClick(item, position)}
+        to={nextActionHref(item.target)}
       >
-        Посмотреть итог
+        {item.title}
       </AppLink>
     );
   };
 
+  const renderPrimaryWorkoutAction = (item: NextAction) => {
+    const started = workout?.status === 'in_progress';
+    const workoutId = item.target.type === 'today_workout' ? item.target.workoutId : null;
+    return (
+      <Button
+        className="today-pulse-action"
+        fullWidth
+        disabled={startPending}
+        type="button"
+        onClick={() => {
+          trackNextActionClick(item, 'primary');
+          if (started) onOpenDetails();
+          else if (workoutId !== null) onStart(workoutId);
+        }}
+      >
+        {startPending ? 'Начинаем…' : started ? 'Продолжить тренировку' : 'Начать тренировку'}
+      </Button>
+    );
+  };
+
+  const renderActions = (className = 'today-workout-actions') => (
+    <div className={className}>
+      {plan.primary.kind === 'active_workout' || plan.primary.kind === 'scheduled_workout'
+        ? renderPrimaryWorkoutAction(plan.primary)
+        : renderActionLink(plan.primary, 'primary')}
+      {plan.secondary.map((item) => renderActionLink(item, 'secondary'))}
+      {workout?.status === 'planned' && !plan.secondary.length && !detailsOpen && (
+        <Button fullWidth variant="secondary" type="button" onClick={onOpenDetails}>
+          Посмотреть упражнения
+        </Button>
+      )}
+      {workout?.status === 'planned' &&
+        (canMutateProgress ? (
+          <WorkoutAdaptation workout={workout} entryContext="today" />
+        ) : (
+          <p className="muted demo-capability-notice" role="status">
+            Изменение плана тренировки доступно после входа.
+          </p>
+        ))}
+      {!canMutateProgress && plan.secondary.some((item) => item.target.type === 'activity') && (
+        <p className="muted demo-capability-notice" role="status">
+          Добавление активности доступно после входа.
+        </p>
+      )}
+    </div>
+  );
+
+  if (workout?.status === 'completed') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge tone="success">Готово</Badge>
+          <h2 id="today-workout-title">Тренировка завершена</h2>
+          <p>Результат сохранён. Следующее действие — восстановиться и продолжить план.</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
   if (workout) {
-    if (workout.status === 'completed') {
-      return (
-        <>
-          <div className="today-workout-copy">
-            <Badge tone="success">Готово</Badge>
-            <h2 id="today-workout-title">Тренировка завершена</h2>
-            <p>Результат сохранён. Следующее действие — восстановиться и продолжить план.</p>
-          </div>
-          {completedAction()}
-        </>
-      );
-    }
     const started = workout.status === 'in_progress';
     return (
       <>
@@ -444,6 +808,13 @@ function WorkoutOverview({
               День {workout.day_number}
             </span>
           </div>
+          <img
+            className="today-workout-photo"
+            src="/assets/marketing/strength-row.webp"
+            alt=""
+            width="1536"
+            height="1024"
+          />
           <h2 id="today-workout-title">{workout.title}</h2>
           <p>
             {started
@@ -451,31 +822,7 @@ function WorkoutOverview({
               : `${workout.exercises.length} упражнений · ${totalSets} подходов`}
           </p>
         </div>
-        <div className="today-workout-actions">
-          <Button
-            className="today-pulse-action"
-            fullWidth
-            disabled={startPending}
-            type="button"
-            onClick={() => {
-              trackPrimaryAction('workout');
-              if (started) onOpenDetails();
-              else onStart();
-            }}
-          >
-            {startPending ? 'Начинаем…' : started ? 'Продолжить тренировку' : 'Начать тренировку'}
-          </Button>
-          {trainerCommentLink ? (
-            <AppLink className="button-link secondary-link" to={trainerCommentLink}>
-              Открыть комментарий тренера
-            </AppLink>
-          ) : !detailsOpen ? (
-            <Button fullWidth variant="secondary" type="button" onClick={onOpenDetails}>
-              Посмотреть упражнения
-            </Button>
-          ) : null}
-          {!started && <WorkoutAdaptation workout={workout} entryContext="today" />}
-        </div>
+        {renderActions()}
       </>
     );
   }
@@ -492,12 +839,64 @@ function WorkoutOverview({
               : 'На сегодня главное действие выполнено.'}
           </p>
         </div>
-        {completedAction()}
+        {renderActions()}
       </>
     );
   }
 
-  if (!user?.has_active_program) {
+  if (todayScheduleItem?.status === 'planned') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge>План на сегодня</Badge>
+          <h2 id="today-workout-title">{todayScheduleItem.title}</h2>
+          <p>Тренировка запланирована на сегодня. Откройте её, чтобы начать.</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (plan.primary.kind === 'trainer_feedback') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge tone="warning">Комментарий тренера</Badge>
+          <h2 id="today-workout-title">Тренер оставил комментарий</h2>
+          <p>{trainerComment ? compactSignal(trainerComment.body) : ''}</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (plan.primary.kind === 'weekly_review') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge>Итоги недели</Badge>
+          <h2 id="today-workout-title">Неделя готова к проверке</h2>
+          <p>Коротко отметьте нагрузку, восстановление и то, насколько легко было держать план.</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (plan.primary.kind === 'profile') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge>Основа рекомендаций</Badge>
+          <h2 id="today-workout-title">Дополните профиль</h2>
+          <p>{plan.primary.context}.</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (!hasActiveProgram) {
     return (
       <>
         <div className="today-workout-copy">
@@ -507,59 +906,7 @@ function WorkoutOverview({
           <h2 id="today-workout-title">С чего начнём?</h2>
           <p>Настройки можно заполнить позже. Выберите полезное действие прямо сейчас.</p>
         </div>
-        <div className="today-workout-actions today-workout-actions--quick-start">
-          <AppLink
-            className="button-link"
-            onClick={() => trackPrimaryAction('programs')}
-            to="/app?section=programs&start=create"
-          >
-            Создать свою программу
-          </AppLink>
-          <AppLink
-            className="button-link secondary-link"
-            to="/app?section=programs&start=templates"
-          >
-            Выбрать готовую
-          </AppLink>
-        </div>
-      </>
-    );
-  }
-
-  if (trainerCommentLink) {
-    return (
-      <>
-        <div className="today-workout-copy">
-          <Badge tone="warning">Комментарий тренера</Badge>
-          <h2 id="today-workout-title">Тренер оставил комментарий</h2>
-          <p>{trainerComment ? compactSignal(trainerComment.body) : ''}</p>
-        </div>
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('progress')}
-          to={trainerCommentLink}
-        >
-          Открыть комментарий
-        </AppLink>
-      </>
-    );
-  }
-
-  if (weeklyReviewAvailable) {
-    return (
-      <>
-        <div className="today-workout-copy">
-          <Badge>Итоги недели</Badge>
-          <h2 id="today-workout-title">Неделя готова к проверке</h2>
-          <p>Коротко отметьте нагрузку, восстановление и то, насколько легко было держать план.</p>
-        </div>
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('weekly_review')}
-          to="/app?section=progress&weekly_review=1"
-        >
-          Пройти короткую проверку
-        </AppLink>
+        {renderActions('today-workout-actions today-workout-actions--quick-start')}
       </>
     );
   }
@@ -575,18 +922,7 @@ function WorkoutOverview({
             : 'В активном плане пока нет ближайшей тренировки.'}
         </p>
       </div>
-      <div className="today-workout-actions">
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('nutrition')}
-          to="/app?section=nutrition"
-        >
-          Добавить питание
-        </AppLink>
-        <Button fullWidth variant="secondary" type="button" onClick={onAddActivity}>
-          Добавить активность
-        </Button>
-      </div>
+      {renderActions()}
     </>
   );
 }
@@ -644,20 +980,44 @@ function useCalendarDay(timeZone: string): string {
 export function TodayDashboard({
   initialWellbeingDate,
   initialWellbeingOpen = false,
+  initialCardioOpen = false,
+  onWellbeingExit,
 }: {
   initialWellbeingDate?: string;
   initialWellbeingOpen?: boolean;
+  initialCardioOpen?: boolean;
+  onWellbeingExit?: () => void;
 } = {}) {
   const { user } = useAuth();
+  const capabilities = useRuntimeCapabilities();
   const { toast } = useFeedback();
+  const { navigate, search } = useNavigation();
   const queryClient = useQueryClient();
   const detailsRef = useRef<HTMLDivElement>(null);
   const autoOpenedCompletionRef = useRef<number | null>(null);
+  const previousCardioOpenRef = useRef(initialCardioOpen);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [cardioOpenRequest, setCardioOpenRequest] = useState(0);
-  const timeZone = user?.profile?.timezone || detectedTimeZone();
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [cardioOpenRequest, setCardioOpenRequest] = useState(initialCardioOpen ? 1 : 0);
+  const wellbeingRequested = Boolean(initialWellbeingOpen || initialWellbeingDate);
+  const timeZone = user?.profile?.timezone || 'UTC';
   const today = useCalendarDay(timeZone);
   const [selectedDate, setSelectedDate] = useState(today);
+
+  useEffect(() => {
+    if (initialCardioOpen && !previousCardioOpenRef.current) {
+      setCardioOpenRequest((current) => current + 1);
+    }
+    previousCardioOpenRef.current = initialCardioOpen;
+  }, [initialCardioOpen]);
+
+  const dismissCardioRequest = () => {
+    const params = new URLSearchParams(search);
+    if (params.get('cardio') !== '1') return;
+    params.delete('cardio');
+    const nextSearch = params.toString();
+    navigate(`/app${nextSearch ? `?${nextSearch}` : ''}`, true);
+  };
   const calendarContextRef = useRef(`${timeZone}:${today}`);
   const heading =
     selectedDate === today
@@ -670,12 +1030,21 @@ export function TodayDashboard({
           }),
         };
   const progress = useProgressSummary();
+  const nutrition = useNutritionDay(selectedDate);
+  const nutritionConfirmed =
+    selectedDate === today &&
+    hasNutritionConfirmation(nutrition.diary.data, nutrition.hydration.data);
   const weekDates = calendarWeek(today);
   const weekStart = weekDates[0] ?? today;
   const weekEnd = weekDates.at(-1) ?? today;
   const week = useQuery({
     queryKey: ['workout', 'week'],
     queryFn: () => api<WorkoutScheduleItem[]>('/api/v1/workouts/week'),
+  });
+  const recovery = useQuery({
+    queryKey: ['workout', 'recovery'],
+    queryFn: () => api<WorkoutRecoveryState>('/api/v1/workouts/recovery'),
+    enabled: Boolean(user),
   });
   const cardioWeek = useQuery({
     queryKey: queryKeys.cardio.range(weekStart, weekEnd),
@@ -693,6 +1062,7 @@ export function TodayDashboard({
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
     initialData: () => (user ? loadCurrentActiveWorkoutSnapshot(user.id) : undefined),
     initialDataUpdatedAt: 0,
+    refetchOnReconnect: false,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
   const noTodayWorkout = workout.error instanceof ApiError && workout.error.status === 404;
@@ -700,6 +1070,58 @@ export function TodayDashboard({
     user && workout.data && loadActiveWorkoutQueue(user.id, workout.data.id).queue.length > 0,
   );
   const visibleWorkout = noTodayWorkout && !hasPendingLocalChanges ? undefined : workout.data;
+
+  const persistSnapshotOnSuspend = useCallback(() => {
+    if (!user || !workout.data || workout.data.status !== 'in_progress') return;
+    void crossContextCoordinator
+      .run(activeWorkoutLockName(user.id, workout.data.id), () => {
+        saveActiveWorkoutSnapshot(user.id, workout.data!);
+      })
+      .catch(() => undefined);
+  }, [user, workout.data]);
+
+  useEffect(() => {
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      const queueLength =
+        user && workout.data ? loadActiveWorkoutQueue(user.id, workout.data.id).queue.length : 0;
+      if (queueLength > 0) return;
+      void queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') persistSnapshotOnSuspend();
+      else refreshOnReturn();
+    };
+    window.addEventListener('pagehide', persistSnapshotOnSuspend);
+    window.addEventListener('freeze', persistSnapshotOnSuspend);
+    window.addEventListener('pageshow', refreshOnReturn);
+    window.addEventListener('focus', refreshOnReturn);
+    window.addEventListener('online', refreshOnReturn);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', persistSnapshotOnSuspend);
+      window.removeEventListener('freeze', persistSnapshotOnSuspend);
+      window.removeEventListener('pageshow', refreshOnReturn);
+      window.removeEventListener('focus', refreshOnReturn);
+      window.removeEventListener('online', refreshOnReturn);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [persistSnapshotOnSuspend, queryClient, user, workout.data]);
+
+  useEffect(() => {
+    if (!user || !isPwaStandalone() || workout.fetchStatus !== 'idle') return;
+    const snapshot = loadCurrentActiveWorkoutSnapshot(user.id);
+    if (!snapshot || snapshot.status !== 'in_progress') return;
+    const resumed = visibleWorkout?.id === snapshot.id && visibleWorkout.status === 'in_progress';
+    trackProductEvent(
+      {
+        name: resumed ? 'pwa_workout_resume_success' : 'pwa_workout_resume_failure',
+        surface: productEventSurface(),
+      },
+      { dedupe: 'session', dedupeKey: `workout:${snapshot.id}` },
+    );
+  }, [user, visibleWorkout, workout.fetchStatus]);
+
   const todayScheduleItem =
     weekWorkoutForDate(week.data, today) ??
     (visibleWorkout
@@ -741,15 +1163,25 @@ export function TodayDashboard({
   const profileMissing = useMemo(
     () =>
       Boolean(
-        user &&
-        (!user.profile ||
-          !user.profile.goal ||
-          !user.profile.level ||
-          !user.profile.workouts_per_week ||
-          !user.profile.height_cm),
+        user && !user.has_active_program && !programProfileReadiness(user.profile).isComplete,
       ),
     [user],
   );
+  const hasActiveProgram =
+    Boolean(user?.has_active_program) && recovery.data?.status !== 'no_active_program';
+  const nextActionPlan = selectNextAction({
+    today,
+    hasActiveProgram,
+    workout: visibleWorkout,
+    todayScheduleItem,
+    trainerComment,
+    weeklyReview: weeklyReview.data,
+    lastCompletedWorkoutOn: progress.data?.training.last_completed_workout_on,
+    nextWorkout: progress.data?.training.next_workout,
+    recovery: recovery.data,
+    profileBlocksRecommendation: profileMissing,
+    hasNutritionConfirmation: nutritionConfirmed,
+  });
   const start = useMutation({
     mutationFn: (workoutId: number) =>
       api<Workout>(`/api/v1/workouts/${workoutId}/start`, { method: 'POST' }),
@@ -757,6 +1189,18 @@ export function TodayDashboard({
       trackCoreProductEvent(
         { name: 'workout_started', surface: productEventSurface() },
         'workout_started',
+      );
+      if (user?.has_workout_history === false) {
+        trackGrowthEvent('first_workout_started', { dedupe: 'session' });
+      }
+      trackProductEvent(
+        {
+          name: 'next_action_completed',
+          surface: productEventSurface(),
+          action_kind: 'scheduled_workout',
+          position: 'primary',
+        },
+        { dedupe: 'session', dedupeKey: `next-action:scheduled-workout:${startedWorkout.id}` },
       );
       queryClient.setQueryData(['workout', 'today'], startedWorkout);
       queryClient.setQueryData<WorkoutScheduleItem[]>(['workout', 'week'], (items) =>
@@ -775,8 +1219,70 @@ export function TodayDashboard({
 
   useEffect(() => {
     if (!detailsOpen) return;
-    detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    const details = detailsRef.current;
+    details?.scrollIntoView?.({ behavior: 'instant', block: 'start' });
+    if (!details) return;
+
+    // The current set can arrive after the panel opens. Correct dock clearance
+    // once when it mounts, without scrolling again on query refresh.
+    let frame: number | null = null;
+    let corrected = false;
+    const correctOnce = () => {
+      if (corrected || frame !== null) return;
+      const action = details.querySelector<HTMLElement>(
+        '.active-workout-set.is-current [data-workout-field="done"]',
+      );
+      const dock = document.getElementById('appBottomNav');
+      if (!action || !dock) return;
+
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (!details.isConnected || corrected) return;
+        const viewport = window.visualViewport;
+        const viewportTop = viewport?.offsetTop ?? 0;
+        const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+        const dockRect = dock.getBoundingClientRect();
+        if (dockRect.top > viewportTop && dockRect.height < viewportBottom) {
+          const actionRect = action.getBoundingClientRect();
+          // Keep a larger clearance than the dock edge: font metrics can shift
+          // the action down after initial mount, especially on narrow WebKit/Chromium.
+          const safeBottom = Math.min(viewportBottom, dockRect.top) - 56;
+          if (actionRect.top < viewportBottom && actionRect.bottom > safeBottom) {
+            window.scrollBy({
+              top: Math.ceil(actionRect.bottom - safeBottom),
+              behavior: 'instant',
+            });
+          }
+        }
+        corrected = true;
+        observer.disconnect();
+      });
+    };
+    const observer = new MutationObserver(correctOnce);
+    observer.observe(details, { childList: true, subtree: true });
+    correctOnce();
+
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [detailsOpen]);
+
+  const requestedRecoveryWorkoutId = Number(new URLSearchParams(search).get('recovery_workout_id'));
+  const recoveryDeepLinkOpen = Boolean(
+    Number.isInteger(requestedRecoveryWorkoutId) &&
+    requestedRecoveryWorkoutId > 0 &&
+    recovery.data?.status === 'missed' &&
+    recovery.data.missed_workouts.some((item) => item.id === requestedRecoveryWorkoutId),
+  );
+  const setRecoveryDialogOpen = (open: boolean) => {
+    setRecoveryOpen(open);
+    if (open || !new URLSearchParams(search).has('recovery_workout_id')) return;
+    const params = new URLSearchParams(search);
+    params.delete('recovery_workout_id');
+    const nextSearch = params.toString();
+    navigate(`/app${nextSearch ? `?${nextSearch}` : ''}`, true);
+  };
 
   useEffect(() => {
     const calendarContext = `${timeZone}:${today}`;
@@ -784,9 +1290,11 @@ export function TodayDashboard({
     calendarContextRef.current = calendarContext;
     setSelectedDate(today);
     setDetailsOpen(false);
+    setRecoveryOpen(false);
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true }),
       queryClient.invalidateQueries({ queryKey: ['workout', 'week'], exact: true }),
+      queryClient.invalidateQueries({ queryKey: ['workout', 'recovery'], exact: true }),
       queryClient.invalidateQueries({ queryKey: ['weekly-check-ins', 'current'], exact: true }),
       queryClient.invalidateQueries({ queryKey: queryKeys.progress.summaries }),
     ]);
@@ -796,7 +1304,10 @@ export function TodayDashboard({
   const priorityContextLoading = Boolean(
     !visibleWorkout &&
     user?.has_active_program &&
-    (week.isLoading || weeklyReview.isLoading || (todayScheduleItem && comments.isLoading)),
+    (week.isLoading ||
+      recovery.isLoading ||
+      weeklyReview.isLoading ||
+      (todayScheduleItem && comments.isLoading)),
   );
 
   if (detailsOpen && visibleWorkout) {
@@ -829,156 +1340,207 @@ export function TodayDashboard({
   return (
     <div className="today-dashboard today-dashboard--design-v2">
       <header className="today-dashboard__header">
-        <h1>{heading.title}</h1>
+        <p className="today-dashboard__date">{heading.title.replace(/^Сегодня · /, '')}</p>
+        <h1 aria-label={heading.title}>СЕГОДНЯ</h1>
       </header>
 
-      <WeekContext
-        cardio={cardioWeek.data}
-        selectedDate={selectedDate}
-        today={today}
-        timeZone={timeZone}
-        workouts={week.data}
-        loading={week.isLoading || cardioWeek.isLoading}
-        error={Boolean(week.error || cardioWeek.error)}
-        onRetry={() => void Promise.all([week.refetch(), cardioWeek.refetch()])}
-        onSelect={(date) => {
-          setSelectedDate(date);
-          setDetailsOpen(false);
-          if (date !== today) {
-            trackProductEvent({
-              name: 'today_week_navigated',
-              surface: productEventSurface(),
-              direction: 'workout_day',
-            });
-          }
-        }}
-      />
-
       <div className="today-dashboard__overview">
-        <section
-          className={`today-workout-spotlight semantic-card semantic-card--action semantic-card--training${noTodayWorkout ? ' today-workout-spotlight--rest-day' : ''}`}
-          data-card-variant="action"
-          data-semantic-family="training"
-          aria-labelledby="today-workout-title"
-        >
-          <span className="today-workout-spotlight__label">Тренировка</span>
-          <SemanticArtwork variant="current-action" />
-          {selectedDate !== today ? (
-            week.isLoading ? (
+        <div className="today-dashboard__training">
+          <section
+            className={`today-workout-spotlight semantic-card semantic-card--action semantic-card--training${noTodayWorkout ? ' today-workout-spotlight--rest-day' : ''}`}
+            data-card-variant="action"
+            data-semantic-family="training"
+            aria-labelledby="today-workout-title"
+          >
+            {selectedDate !== today ? (
+              week.isLoading ? (
+                <div
+                  className="today-summary-skeleton"
+                  aria-label="Загружаем выбранный день"
+                  role="status"
+                >
+                  <Skeleton height="34px" width="62%" />
+                  <Skeleton height="20px" width="44%" />
+                </div>
+              ) : week.error ? (
+                <div className="today-inline-state" role="alert">
+                  <strong id="today-workout-title">Не удалось загрузить выбранный день</strong>
+                  <button
+                    className="today-text-link"
+                    type="button"
+                    onClick={() => void week.refetch()}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              ) : selectedScheduleItem ? (
+                <div className="today-selected-day">
+                  <h2 id="today-workout-title">{selectedScheduleItem.title}</h2>
+                  <p>
+                    {workoutStatusLabel(selectedScheduleItem.status)} ·{' '}
+                    {formatWorkoutDate(selectedScheduleItem.scheduled_date, today)}
+                  </p>
+                  <AppLink
+                    className="today-text-link"
+                    to={
+                      selectedScheduleItem.status === 'completed'
+                        ? `/app?section=progress&workout_id=${selectedScheduleItem.id}`
+                        : `/app?section=programs&workout_id=${selectedScheduleItem.id}&return_to=${encodeURIComponent('/app?section=today')}`
+                    }
+                  >
+                    Открыть тренировку
+                  </AppLink>
+                </div>
+              ) : (
+                <div className="today-selected-day">
+                  <h2 id="today-workout-title">Силовая тренировка не запланирована</h2>
+                  <p>Выберите другой день или откройте программу тренировок.</p>
+                </div>
+              )
+            ) : workout.isLoading ||
+              priorityContextLoading ||
+              (noTodayWorkout && progress.isLoading && user?.has_active_program) ? (
               <div
                 className="today-summary-skeleton"
-                aria-label="Загружаем выбранный день"
+                aria-label="Проверяем план на сегодня"
                 role="status"
               >
                 <Skeleton height="34px" width="62%" />
                 <Skeleton height="20px" width="44%" />
+                <Skeleton height="48px" width="100%" />
               </div>
-            ) : week.error ? (
+            ) : workoutFailed ? (
               <div className="today-inline-state" role="alert">
-                <strong id="today-workout-title">Не удалось загрузить выбранный день</strong>
+                <strong id="today-workout-title">Не удалось проверить тренировку</strong>
+                <span>Остальные данные на экране доступны.</span>
                 <button
                   className="today-text-link"
                   type="button"
-                  onClick={() => void week.refetch()}
+                  onClick={() => void workout.refetch()}
                 >
                   Повторить
                 </button>
               </div>
-            ) : selectedScheduleItem ? (
-              <div className="today-selected-day">
-                <h2 id="today-workout-title">{selectedScheduleItem.title}</h2>
-                <p>
-                  {workoutStatusLabel(selectedScheduleItem.status)} ·{' '}
-                  {formatWorkoutDate(selectedScheduleItem.scheduled_date, today)}
-                </p>
-                <AppLink
-                  className="today-text-link"
-                  to={`/app?section=progress&workout_id=${selectedScheduleItem.id}`}
-                >
-                  Открыть тренировку
-                </AppLink>
-              </div>
             ) : (
-              <div className="today-selected-day">
-                <h2 id="today-workout-title">Силовая тренировка не запланирована</h2>
-                <p>Выберите другой день или откройте программу тренировок.</p>
-              </div>
-            )
-          ) : workout.isLoading ||
-            priorityContextLoading ||
-            (noTodayWorkout && progress.isLoading && user?.has_active_program) ? (
-            <div
-              className="today-summary-skeleton"
-              aria-label="Проверяем план на сегодня"
-              role="status"
-            >
-              <Skeleton height="34px" width="62%" />
-              <Skeleton height="20px" width="44%" />
-              <Skeleton height="48px" width="100%" />
-            </div>
-          ) : workoutFailed ? (
-            <div className="today-inline-state" role="alert">
-              <strong id="today-workout-title">Не удалось проверить тренировку</strong>
-              <span>Остальные данные на экране доступны.</span>
-              <button
-                className="today-text-link"
-                type="button"
-                onClick={() => void workout.refetch()}
-              >
-                Повторить
-              </button>
-            </div>
-          ) : (
-            <WorkoutOverview
-              today={today}
-              workout={visibleWorkout}
-              todayScheduleItem={todayScheduleItem}
-              weeklyReview={weeklyReview.data}
-              trainerComment={trainerComment}
-              progress={progress}
-              detailsOpen={detailsOpen}
-              startPending={start.isPending}
-              onOpenDetails={() => setDetailsOpen(true)}
-              onAddActivity={() => setCardioOpenRequest((request) => request + 1)}
-              onStart={() => visibleWorkout && start.mutate(visibleWorkout.id)}
-            />
-          )}
-        </section>
+              <WorkoutOverview
+                today={today}
+                workout={visibleWorkout}
+                todayScheduleItem={todayScheduleItem}
+                trainerComment={trainerComment}
+                progress={progress}
+                detailsOpen={detailsOpen}
+                startPending={start.isPending}
+                onOpenDetails={() => setDetailsOpen(true)}
+                onAddActivity={() => setCardioOpenRequest((request) => request + 1)}
+                onStart={(workoutId) => start.mutate(workoutId)}
+                canMutateProgress={capabilities.canMutateProgress}
+                hasActiveProgram={hasActiveProgram}
+                plan={nextActionPlan}
+                onOpenRecovery={() => setRecoveryDialogOpen(true)}
+              />
+            )}
+          </section>
 
+          {selectedDate === today &&
+            recovery.data?.status === 'missed' &&
+            recovery.data.missed_workouts[0] && (
+              <WorkoutRecovery
+                key={`${recovery.data.missed_workouts[0].id}:${recoveryOpen || recoveryDeepLinkOpen ? 'open' : 'closed'}`}
+                workout={recovery.data.missed_workouts[0]}
+                timeZone={timeZone}
+                open={recoveryOpen || recoveryDeepLinkOpen}
+                onOpenChange={setRecoveryDialogOpen}
+                hideTrigger
+                onApplied={() => setRecoveryDialogOpen(false)}
+              />
+            )}
+
+          <WeekContext
+            cardio={cardioWeek.data}
+            selectedDate={selectedDate}
+            today={today}
+            timeZone={timeZone}
+            workouts={week.data}
+            loading={week.isLoading || cardioWeek.isLoading}
+            error={Boolean(week.error || cardioWeek.error)}
+            onRetry={() => void Promise.all([week.refetch(), cardioWeek.refetch()])}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              setDetailsOpen(false);
+              setRecoveryDialogOpen(false);
+              if (date !== today) {
+                trackProductEvent({
+                  name: 'today_week_navigated',
+                  surface: productEventSurface(),
+                  direction: 'workout_day',
+                });
+              }
+            }}
+          />
+        </div>
         <div className="today-dashboard__facts">
-          <NutritionSummary date={selectedDate} />
-          <ProgressSummaryPanel summary={progress} />
-          {user && (
-            <DailyWellbeingCheckIn
-              autoFocus={initialWellbeingOpen}
-              initialDate={initialWellbeingDate || selectedDate}
-              key={`${user.id}:${initialWellbeingDate || selectedDate}:${
-                initialWellbeingOpen ? 'open' : 'closed'
-              }`}
-              timeZone={timeZone}
-              userId={user.id}
-            />
+          <NutritionSummary
+            date={selectedDate}
+            today={today}
+            nutrition={nutrition}
+            showAction={
+              selectedDate !== today || !planUsesTodayDestination(nextActionPlan, 'nutrition')
+            }
+          />
+          <ActivitySummary
+            cardio={cardioWeek.data}
+            date={selectedDate}
+            error={Boolean(cardioWeek.error)}
+            loading={cardioWeek.isLoading}
+            timeZone={timeZone}
+            today={today}
+          />
+          <ProgressSummaryPanel
+            summary={progress}
+            showAction={
+              selectedDate !== today || !planUsesTodayDestination(nextActionPlan, 'progress')
+            }
+          />
+          {user && wellbeingRequested && (
+            <>
+              {!capabilities.canMutateProgress && (
+                <p className="muted demo-capability-notice" role="status">
+                  Отметка самочувствия доступна после входа. В демо ответы не отправляются.
+                </p>
+              )}
+              <fieldset
+                className="demo-capability-fieldset"
+                disabled={!capabilities.canMutateProgress}
+              >
+                <DailyWellbeingCheckIn
+                  autoFocus={initialWellbeingOpen}
+                  initialDate={initialWellbeingDate || selectedDate}
+                  key={`${user.id}:${initialWellbeingDate || selectedDate}:${
+                    initialWellbeingOpen ? 'open' : 'closed'
+                  }`}
+                  onExit={initialWellbeingOpen ? onWellbeingExit : undefined}
+                  timeZone={timeZone}
+                  userId={user.id}
+                />
+              </fieldset>
+            </>
           )}
         </div>
       </div>
 
-      <CardioQuickLog
-        key={`${selectedDate}:${cardioOpenRequest}`}
-        startOpen={cardioOpenRequest > 0}
-        today={selectedDate}
-      />
-
-      {profileMissing && (
-        <aside className="today-profile-nudge">
-          <div>
-            <strong>Сделайте рекомендации точнее</strong>
-            <span>Дополните цель, уровень, рост и желаемую частоту тренировок в профиле.</span>
-          </div>
-          <AppLink className="today-text-link" to="/app?section=profile#profile-fitness">
-            Заполнить профиль
-          </AppLink>
-        </aside>
-      )}
+      {cardioOpenRequest > 0 &&
+        (capabilities.canMutateProgress ? (
+          <CardioQuickLog
+            key={`${selectedDate}:${cardioOpenRequest}`}
+            onDismiss={dismissCardioRequest}
+            startOpen
+            today={selectedDate}
+          />
+        ) : (
+          <p className="muted demo-capability-notice" role="status">
+            Добавление cardio-активности доступно после входа.
+          </p>
+        ))}
     </div>
   );
 }

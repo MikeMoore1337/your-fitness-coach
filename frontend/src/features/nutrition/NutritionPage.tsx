@@ -1,21 +1,49 @@
+import { DisclosureIcon } from '../../shared/ui/common';
+import { useEffect, useState } from 'react';
 import type { NutritionTarget } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
 import { NutritionDiary } from './NutritionDiary';
 import { NutritionForm } from './NutritionForm';
+import type { MealType } from './FoodPickerDialog';
+import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
+import { MealPlanner } from './MealPlanner';
+import { GroceryList } from './GroceryList';
 
 export function NutritionPage({
   initial,
   initialDate,
+  initialMealType,
+  initialFoodQuickAdd = false,
+  initialHydrationOpen = false,
   onSaved,
+  demoSafeMode = false,
+  readOnlyEntries = false,
+  readOnlyTargets = false,
   returnPath,
   timeZone,
 }: {
   initial?: NutritionTarget | null;
   initialDate?: string;
+  initialMealType?: MealType;
+  initialFoodQuickAdd?: boolean;
+  initialHydrationOpen?: boolean;
   onSaved?: () => void | Promise<void>;
+  demoSafeMode?: boolean;
+  readOnlyEntries?: boolean;
+  readOnlyTargets?: boolean;
   returnPath?: string;
   timeZone?: string | null;
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === '#nutrition-target-settings') setSettingsOpen(true);
+    };
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+    return () => window.removeEventListener('hashchange', openFromHash);
+  }, []);
+
   return (
     <div className="nutrition-experience">
       {returnPath && (
@@ -25,10 +53,49 @@ export function NutritionPage({
           </AppLink>
         </nav>
       )}
-      <NutritionDiary initialDate={initialDate} timeZone={timeZone} />
-      <div id="nutrition-target-settings" className="nutrition-target-settings">
-        <NutritionForm initial={initial} timeZone={timeZone} onSaved={onSaved} />
-      </div>
+      <NutritionDiary
+        initialDate={initialDate}
+        initialFoodQuickAdd={initialFoodQuickAdd}
+        initialMealType={initialMealType}
+        initialHydrationOpen={initialHydrationOpen}
+        demoSafeMode={demoSafeMode}
+        readOnlyEntries={readOnlyEntries}
+        timeZone={timeZone}
+      />
+      <details
+        id="nutrition-target-settings"
+        className="nutrition-target-settings"
+        open={settingsOpen}
+        onToggle={(event) => setSettingsOpen(event.currentTarget.open)}
+      >
+        <summary
+          className="yfc-disclosure-summary"
+          aria-controls="nutrition-target-settings-body"
+          aria-expanded={settingsOpen}
+        >
+          Настройки КБЖУ
+          <DisclosureIcon />
+        </summary>
+        <div id="nutrition-target-settings-body" className="nutrition-target-settings__body">
+          <NutritionForm
+            embedded
+            initial={initial}
+            readOnly={readOnlyTargets}
+            timeZone={timeZone}
+            onSaved={onSaved}
+          />
+        </div>
+      </details>
+      {!demoSafeMode && (
+        <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+      )}
+      {!demoSafeMode && (
+        <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+      )}
+      <AiCoachContextualEntry
+        context={{ surface: 'nutrition', periodDays: 7 }}
+        entryPoint="nutrition"
+      />
     </div>
   );
 }

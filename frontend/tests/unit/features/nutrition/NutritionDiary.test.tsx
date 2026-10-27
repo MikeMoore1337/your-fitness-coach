@@ -63,6 +63,13 @@ const food: Food = {
   fat_g_per_100g: '12.000',
   carbs_g_per_100g: '54.000',
   fiber_g_per_100g: '7.000',
+  nutrition_basis_kind: 'per_100_g',
+  nutrition_basis_amount: '100.000',
+  nutrition_basis_unit: 'g',
+  catalog_quality: 'verified',
+  provenance: 'internal',
+  trust_level: 'verified',
+  canonical_complete: true,
   standard_serving_amount: '1.000',
   standard_serving_unit: 'serving',
   standard_serving_weight_g: '50.000',
@@ -109,14 +116,18 @@ const zeroNutrition = {
   fiber_g: null,
 };
 
-function renderDiary() {
+function renderDiary({ initialFoodQuickAdd = false }: { initialFoodQuickAdd?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const view = render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <NutritionDiary initialDate="2026-08-19" timeZone="Europe/Moscow" />
+        <NutritionDiary
+          initialDate="2026-08-19"
+          initialFoodQuickAdd={initialFoodQuickAdd}
+          timeZone="Europe/Moscow"
+        />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
@@ -139,6 +150,23 @@ describe('NutritionDiary', () => {
     cleanup();
   });
 
+  it('opens the quick food entry requested by the global action', async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+      if (path.startsWith('/api/v1/nutrition/foods/recent')) {
+        return Promise.resolve({ items: [food], total: 1, limit: 12, offset: 0 });
+      }
+      if (path.startsWith('/api/v1/nutrition/foods/favorites')) {
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary({ initialFoodQuickAdd: true });
+
+    expect(await screen.findByRole('heading', { name: 'Быстрый ввод' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Быстрый ввод' })).toBeVisible();
+  });
+
   it('shows all meals, entry macros, targets and navigates by date', async () => {
     apiMock.mockResolvedValue(makeDay());
     renderDiary();
@@ -148,8 +176,7 @@ describe('NutritionDiary', () => {
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(
       expect.arrayContaining([
-        'Полнота данных',
-        'Баланс дня',
+        'Это всё за сегодня?',
         'Еда',
         'Завтрак',
         'Обед',
@@ -163,9 +190,9 @@ describe('NutritionDiary', () => {
       .getAllByRole('heading', { level: 2 })
       .map((heading) => heading.textContent)
       .filter((heading) =>
-        ['Полнота данных', 'Баланс дня', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''),
+        ['Это всё за сегодня?', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''),
       );
-    expect(sectionOrder).toEqual(['Полнота данных', 'Баланс дня', 'Еда', 'КБЖУ', 'Напитки']);
+    expect(sectionOrder).toEqual(['КБЖУ', 'Это всё за сегодня?', 'Еда', 'Напитки']);
     expect(screen.getByRole('progressbar', { name: /Калории: 420 из 2.+000 ккал/ })).toBeVisible();
     expect(screen.getByText('Б 18,5')).toBeVisible();
 
@@ -174,6 +201,44 @@ describe('NutritionDiary', () => {
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2026-08-18'),
     );
+  });
+
+  it('offers one deterministic prior-meal repeat as the Nutrition default', async () => {
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) {
+        return Promise.resolve({
+          ...makeDay([]),
+          repeat_candidate: {
+            source_date: '2026-08-18',
+            source_meal_type: 'breakfast',
+            entry_count: 1,
+          },
+        });
+      }
+      if (path.endsWith('/copy/meal/preview') && options?.method === 'POST') {
+        return Promise.resolve({
+          copy_scope: 'meal',
+          source_date: '2026-08-18',
+          source_meal_type: 'breakfast',
+          target_date: '2026-08-19',
+          target_meal_type: 'breakfast',
+          entries: [{ ...entry, diary_date: '2026-08-18' }],
+          preview_token: 'meal-preview-token-1234567890',
+          previewed_at: '2026-08-19T08:00:00Z',
+        });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+
+    const defaultRepeat = await screen.findByTestId('nutrition-repeat-default');
+    expect(screen.getByText('Повторить вчерашний завтрак')).toBeVisible();
+    expect(defaultRepeat).toHaveClass('ui-button--primary');
+    expect(screen.getByTestId('nutrition-add-product')).toHaveClass('ui-button--secondary');
+    fireEvent.click(defaultRepeat);
+    expect(await screen.findByRole('heading', { name: 'Повторить приём пищи' })).toBeVisible();
+    expect(await screen.findByText('Овсяная каша', { selector: 'strong' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled();
   });
 
   it('keeps empty meals compact and lets every meal be expanded or collapsed', async () => {
@@ -259,7 +324,7 @@ describe('NutritionDiary', () => {
     await screen.findAllByText('Пока без записей');
 
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить Овсяная каша' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' }));
     const amount = screen.getByRole('spinbutton', { name: 'Количество' });
     fireEvent.change(amount, { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить в дневник' }));
@@ -310,7 +375,7 @@ describe('NutritionDiary', () => {
     const draftAmount = within(breakfast).getByRole('spinbutton', { name: 'Количество' });
     fireEvent.change(draftAmount, { target: { value: '175' } });
     fireEvent.click(within(breakfast).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить Овсяная каша' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' }));
     fireEvent.click(screen.getByRole('button', { name: 'Добавить в дневник' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -363,6 +428,7 @@ describe('NutritionDiary', () => {
         body: expect.objectContaining({
           quick_add: {
             name: null,
+            nutrition_source: 'manual',
             energy_kcal: 530,
             protein_g: null,
             fat_g: null,
@@ -382,6 +448,70 @@ describe('NutritionDiary', () => {
     );
     expect(submissions[1]?.[1]?.headers?.['Idempotency-Key']).toBe(requestId);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('submits a restaurant estimate with partial macros without inventing zeros', async () => {
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { method?: string; body?: unknown; headers?: Record<string, string> },
+      ) => {
+        if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+        if (path.startsWith('/api/v1/nutrition/foods/recent'))
+          return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+        if (path.startsWith('/api/v1/nutrition/foods/favorites'))
+          return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+        if (path === '/api/v1/nutrition/diary/entries' && options?.method === 'POST') {
+          return Promise.resolve({
+            ...entry,
+            entry_kind: 'quick_add',
+            food_id: null,
+            food_name: 'Ресторанная оценка',
+            nutrition_source: 'restaurant',
+            nutrition_confidence: 'partial',
+            nutrition: {
+              energy_kcal: '680.00',
+              protein_g: '24.000',
+              fat_g: null,
+              carbs_g: null,
+              fiber_g: null,
+            },
+          });
+        }
+        throw new Error(`Unexpected API call: ${path}`);
+      },
+    );
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+
+    fireEvent.click(screen.getByRole('button', { name: /Быстрый ввод/ }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Калории' }), {
+      target: { value: '680' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Источник оценки' }), {
+      target: { value: 'restaurant' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Белки' }), {
+      target: { value: '24' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить Quick Add' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const submission = apiMock.mock.calls.find(
+      ([path, request]) => path === '/api/v1/nutrition/diary/entries' && request?.method === 'POST',
+    );
+    expect(submission?.[1]?.body).toEqual(
+      expect.objectContaining({
+        quick_add: {
+          name: null,
+          nutrition_source: 'restaurant',
+          energy_kcal: 680,
+          protein_g: 24,
+          fat_g: null,
+          carbs_g: null,
+        },
+      }),
+    );
   });
 
   it('marks a populated day complete only after explicit confirmation', async () => {
@@ -459,7 +589,7 @@ describe('NutritionDiary', () => {
     const first = renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить Овсяная каша' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Количество' }), {
       target: { value: '2.5' },
     });
@@ -479,7 +609,10 @@ describe('NutritionDiary', () => {
       protein_g_per_100g: '18.500',
       fat_g_per_100g: '12.000',
       carbs_g_per_100g: '54.000',
+      nutrition_basis_kind: 'per_100_g',
+      nutrition_basis_unit: 'g',
       standard_serving_weight_g: '50.000',
+      catalog_quality: 'verified',
     });
     expect(storedDraft.food).not.toHaveProperty('barcode');
     expect(storedDraft.food).not.toHaveProperty('last_used_at');
@@ -560,8 +693,9 @@ describe('NutritionDiary', () => {
     expect(
       await screen.findByText('Локальный каталог сейчас не ответил. Попробуйте снова.'),
     ).toBeVisible();
+    fireEvent.click(screen.getByText('Каталог и фильтры', { exact: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Избранное' }));
-    expect(await screen.findByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
   });
 
   it('ignores a stale local search and keeps an unavailable external provider optional', async () => {
@@ -603,7 +737,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    const search = screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
+    const search = screen.getByRole('searchbox', { name: 'Найти продукт' });
     fireEvent.change(search, { target: { value: 'ов' } });
     await act(() => vi.advanceTimersByTimeAsync(250));
     await waitFor(() => expect(staleSignal).toBeDefined());
@@ -688,11 +822,8 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    const barcodeEntry = screen.getByRole('button', { name: 'Поиск по штрихкоду' });
-    const nameSearch = screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
-    expect(
-      barcodeEntry.compareDocumentPosition(nameSearch) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    const nameSearch = screen.getByRole('searchbox', { name: 'Найти продукт' });
+    expect(screen.queryByRole('button', { name: /штрихкод/i })).not.toBeInTheDocument();
     fireEvent.change(nameSearch, {
       target: { value: 'нутелла' },
     });
@@ -798,12 +929,12 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Найти продукт' }), {
       target: { value: 'рис' },
     });
     await act(() => vi.advanceTimersByTimeAsync(250));
 
-    expect(await screen.findByRole('button', { name: 'Добавить Рис домашний' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Выбрать Рис домашний' })).toBeVisible();
     expect(await screen.findByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
     expect(
       screen.getByText(
@@ -835,6 +966,45 @@ describe('NutritionDiary', () => {
     ).toBeVisible();
   });
 
+  it('does not query an external provider for an exact complete local name match', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+      if (path.startsWith('/api/v1/nutrition/foods/recent'))
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      if (path.startsWith('/api/v1/nutrition/foods/favorites'))
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      const decoded = decodeURIComponent(path);
+      if (decoded.includes('q=овсяная каша') && decoded.includes('include_external=true')) {
+        throw new Error('External lookup must not run for an exact local hit');
+      }
+      if (decoded.includes('q=овсяная каша')) {
+        return Promise.resolve({
+          items: [food],
+          external_items: [],
+          total: 1,
+          limit: 20,
+          offset: 0,
+          provider_status: 'not_requested',
+          provider_statuses: [],
+        });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Найти продукт' }), {
+      target: { value: 'овсяная каша' },
+    });
+    await act(() => vi.advanceTimersByTimeAsync(250));
+
+    expect(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
+    expect(
+      apiMock.mock.calls.some(([path]) => String(path).includes('include_external=true')),
+    ).toBe(false);
+  });
+
   it('validates and creates an own food before selecting its serving', async () => {
     const ownFood = {
       ...food,
@@ -857,7 +1027,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Свой продукт/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ввести вручную/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Создать продукт' }));
     expect(await screen.findByText('Введите название продукта')).toBeVisible();
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/foods', expect.anything());
@@ -967,16 +1137,33 @@ describe('NutritionDiary', () => {
     const copyPromise = new Promise((resolve) => {
       resolveCopy = resolve;
     });
-    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
-      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay());
-      if (path.endsWith('/copy/product') && options?.method === 'POST') return copyPromise;
-      throw new Error(`Unexpected API call: ${path}`);
-    });
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { method?: string; body?: unknown; headers?: Record<string, string> },
+      ) => {
+        if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay());
+        if (path.endsWith('/copy/product/preview') && options?.method === 'POST') {
+          return Promise.resolve({
+            copy_scope: 'product',
+            source_date: '2026-08-19',
+            source_meal_type: 'breakfast',
+            target_date: targetDate,
+            target_meal_type: 'breakfast',
+            entries: [entry],
+            preview_token: 'preview-token-1234567890',
+            previewed_at: '2026-08-19T08:00:00Z',
+          });
+        }
+        if (path.endsWith('/copy/product') && options?.method === 'POST') return copyPromise;
+        throw new Error(`Unexpected API call: ${path}`);
+      },
+    );
     renderDiary();
     await screen.findByText('Овсяная каша');
     fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
     expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
-    const submit = screen.getByRole('button', { name: 'Повторить продукт' });
+    const submit = await screen.findByRole('button', { name: 'Подтвердить' });
     fireEvent.click(submit);
     fireEvent.click(submit);
     await waitFor(() =>
@@ -996,6 +1183,7 @@ describe('NutritionDiary', () => {
           source_entry_id: 41,
           source_meal_type: 'breakfast',
           target_meal_type: 'breakfast',
+          preview_token: 'preview-token-1234567890',
         },
       }),
     );
@@ -1011,144 +1199,67 @@ describe('NutritionDiary', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('handles barcode not found and continues with a prefilled manual product', async () => {
-    apiMock.mockImplementation((path: string) => {
-      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
-      if (path.startsWith('/api/v1/nutrition/foods/recent'))
-        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
-      if (path.startsWith('/api/v1/nutrition/foods/favorites'))
-        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
-      if (path.endsWith('/foods/barcode/3017620422003'))
-        return Promise.resolve({
-          barcode: '3017620422003',
-          status: 'not_found',
-          source: null,
-          local_item: null,
-          external_item: null,
-          provider_status: 'unavailable',
-        });
-      throw new Error(`Unexpected API call: ${path}`);
-    });
-    renderDiary();
-    await screen.findAllByText('Пока без записей');
-    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Поиск по штрихкоду' }));
-    expect(screen.queryByRole('button', { name: 'Сканировать камерой' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Найти' })).toHaveClass('ui-button--primary');
-    fireEvent.change(screen.getByRole('textbox', { name: 'Штрихкод' }), {
-      target: { value: '3017620422003' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
-    expect(await screen.findByText('Продукт не найден')).toBeVisible();
-    expect(screen.queryByText(/timeout|429/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Создать свой продукт' }));
-    expect(screen.getByRole('textbox', { name: 'Штрихкод' })).toHaveValue('3017620422003');
-  });
-
-  it('uses local barcode results and keeps external results read-only with attribution', async () => {
-    const externalFood = {
-      name: 'Шоколадная паста',
-      brand: 'Example',
-      barcode: '3017620422003',
-      energy_kcal_per_100g: '539.00',
-      protein_g_per_100g: '6.300',
-      fat_g_per_100g: '30.900',
-      carbs_g_per_100g: '57.500',
-      fiber_g_per_100g: null,
-      standard_serving_amount: null,
-      standard_serving_unit: null,
-      standard_serving_weight_g: null,
-      external_id: '3017620422003',
-      source: {
-        provider: 'open_food_facts',
-        attribution: 'Open Food Facts contributors',
-        source_url: 'https://world.openfoodfacts.org/product/3017620422003',
-        license: 'ODbL-1.0',
-        license_url: 'https://opendatacommons.org/licenses/odbl/1-0/',
-      },
-    };
-    apiMock.mockImplementation((path: string) => {
-      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
-      if (path.startsWith('/api/v1/nutrition/foods/recent'))
-        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
-      if (path.startsWith('/api/v1/nutrition/foods/favorites'))
-        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
-      if (path.endsWith('/foods/barcode/4006381333931'))
-        return Promise.resolve({
-          barcode: '4006381333931',
-          status: 'found',
-          source: 'local',
-          local_item: food,
-          external_item: null,
-          provider_status: 'not_needed',
-        });
-      if (path.endsWith('/foods/barcode/3017620422003'))
-        return Promise.resolve({
-          barcode: '3017620422003',
-          status: 'found',
-          source: 'external',
-          local_item: null,
-          external_item: externalFood,
-          provider_status: 'available',
-        });
-      throw new Error(`Unexpected API call: ${path}`);
-    });
-    renderDiary();
-    await screen.findAllByText('Пока без записей');
-    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Поиск по штрихкоду' }));
-    expect(screen.queryByRole('button', { name: 'Сканировать камерой' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Найти' })).toHaveClass('ui-button--primary');
-    const barcode = screen.getByRole('textbox', { name: 'Штрихкод' });
-    fireEvent.change(barcode, { target: { value: '4006381333931' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать продукт' }));
-    expect(await screen.findByRole('heading', { name: 'Овсяная каша' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: /Выбрать другое/ }));
-
-    fireEvent.change(screen.getByRole('textbox', { name: 'Штрихкод' }), {
-      target: { value: '3017620422003' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
-    expect(await screen.findByText('Шоколадная паста')).toBeVisible();
-    expect(screen.getByRole('link', { name: /Open Food Facts contributors/ })).toHaveAttribute(
-      'href',
-      'https://opendatacommons.org/licenses/odbl/1-0/',
-    );
-    expect(screen.queryByRole('button', { name: /Выбрать продукт/ })).not.toBeInTheDocument();
-  });
-
-  it('explains denied camera permission and preserves manual barcode input', async () => {
-    const originalMediaDevices = navigator.mediaDevices;
-    const originalDetector = (globalThis as typeof globalThis & { BarcodeDetector?: unknown })
-      .BarcodeDetector;
-    Object.defineProperty(globalThis, 'BarcodeDetector', {
-      configurable: true,
-      value: class {
-        detect() {
-          return Promise.resolve([]);
+  it('reuses the same repeat idempotency key after a recoverable network failure', async () => {
+    const targetDate = dateInputValue(new Date(), 'Europe/Moscow');
+    let attempts = 0;
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { method?: string; body?: unknown; headers?: Record<string, string> },
+      ) => {
+        if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay());
+        if (path.endsWith('/copy/product/preview') && options?.method === 'POST') {
+          return Promise.resolve({
+            copy_scope: 'product',
+            source_date: '2026-08-19',
+            source_meal_type: 'breakfast',
+            target_date: targetDate,
+            target_meal_type: 'breakfast',
+            entries: [entry],
+            preview_token: 'preview-token-1234567890',
+            previewed_at: '2026-08-19T08:00:00Z',
+          });
         }
+        if (path.endsWith('/copy/product') && options?.method === 'POST') {
+          attempts += 1;
+          if (attempts === 1) return Promise.reject(new Error('Соединение прервано'));
+          return Promise.resolve({
+            copy_scope: 'product',
+            source_date: '2026-08-19',
+            source_meal_type: 'breakfast',
+            target_date: targetDate,
+            target_meal_type: 'breakfast',
+            entries: [entry],
+            replayed: true,
+          });
+        }
+        throw new Error(`Unexpected API call: ${path}`);
       },
-    });
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError')),
-      },
-    });
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockImplementation((query: string) => ({
-        matches: query === '(hover: none) and (pointer: coarse)',
-        media: query,
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
     );
+
+    renderDiary();
+    await screen.findByText('Овсяная каша');
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
+    expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
+    await waitFor(() => expect(attempts).toBe(1));
+
+    const firstSubmission = apiMock.mock.calls.find(([path]) =>
+      String(path).endsWith('/copy/product'),
+    );
+    const requestId = firstSubmission?.[1]?.headers?.['Idempotency-Key'];
+    expect(requestId).toEqual(expect.any(String));
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Повторить$/ }));
+    await waitFor(() => expect(attempts).toBe(2));
+    const submissions = apiMock.mock.calls.filter(([path]) =>
+      String(path).endsWith('/copy/product'),
+    );
+    expect(submissions[1]?.[1]?.headers?.['Idempotency-Key']).toBe(requestId);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('keeps barcode lookup out of the primary add paths', async () => {
     apiMock.mockImplementation((path: string) => {
       if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
       if (path.startsWith('/api/v1/nutrition/foods/recent'))
@@ -1157,31 +1268,47 @@ describe('NutritionDiary', () => {
         return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
       throw new Error(`Unexpected API call: ${path}`);
     });
-    try {
-      renderDiary();
-      await screen.findAllByText('Пока без записей');
-      fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-      fireEvent.click(screen.getByRole('button', { name: 'Поиск по штрихкоду' }));
-      const scan = screen.getByRole('button', { name: 'Сканировать камерой' });
-      expect(scan).toHaveClass('ui-button--primary');
-      expect(screen.getByRole('button', { name: 'Найти' })).toHaveClass('ui-button--secondary');
-      fireEvent.click(scan);
-      expect(
-        await screen.findByText(
-          'Доступ к камере запрещён. Разрешите его в настройках браузера или введите код вручную.',
-        ),
-      ).toBeVisible();
-      expect(screen.getByRole('textbox', { name: 'Штрихкод' })).toBeEnabled();
-    } finally {
-      Object.defineProperty(navigator, 'mediaDevices', {
-        configurable: true,
-        value: originalMediaDevices,
-      });
-      Object.defineProperty(globalThis, 'BarcodeDetector', {
-        configurable: true,
-        value: originalDetector,
-      });
-      vi.unstubAllGlobals();
-    }
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
+    expect(screen.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+    expect(screen.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /штрихкод/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the manual and photo entry paths separate from catalog search', async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+      if (path.startsWith('/api/v1/nutrition/foods/recent'))
+        return Promise.resolve({ items: [food], total: 1, limit: 12, offset: 0 });
+      if (path.startsWith('/api/v1/nutrition/foods/favorites'))
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
+    expect(screen.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+    expect(screen.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /штрихкод/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps camera controls out of the primary add flow', async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+      if (path.startsWith('/api/v1/nutrition/foods/recent'))
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      if (path.startsWith('/api/v1/nutrition/foods/favorites'))
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
+    expect(screen.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /камера|штрихкод/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
   });
 });

@@ -102,7 +102,7 @@ const detail = {
   audit_history: audit,
 };
 
-async function mockAdminApi(page: Page, { root = true } = {}) {
+async function mockAdminApi(page: Page, { root = true, coach = false } = {}) {
   await page.addInitScript(() => {
     sessionStorage.setItem('fit_access_token', 'root-e2e-token');
   });
@@ -119,7 +119,9 @@ async function mockAdminApi(page: Page, { root = true } = {}) {
       return route.fulfill({ status: 401, json: { detail: 'No refresh cookie' } });
     }
     if (path.endsWith('/me')) {
-      return route.fulfill({ json: { ...rootUser, is_root: root, is_admin: root } });
+      return route.fulfill({
+        json: { ...rootUser, is_coach: coach, is_root: root, is_admin: root },
+      });
     }
     if (path.endsWith('/admin/users') && request.method() === 'GET') {
       return route.fulfill({ json: url.searchParams.get('q') ? [searchRow] : [] });
@@ -134,15 +136,171 @@ async function mockAdminApi(page: Page, { root = true } = {}) {
         json: {
           period_days: 30,
           cohort_since: '2030-01-01T00:00:00Z',
+          cohort_until: '2030-01-31T00:00:00Z',
+          as_of: '2030-01-31T00:00:00Z',
+          cohort_size: 120,
+          complete_weekly_cohorts: 4,
+          eligible_real_account_count: 120,
+          recovery_eligible_real_account_count: 132,
           analytics_provider_status: 'not_connected',
           coverage_note:
             'Только агрегаты подтверждённых данных аккаунта; anonymous landing, login и demo events не хранятся на сервере.',
-          stages: [
-            { key: 'registered', account_count: 120, cohort_rate_percent: 100 },
-            { key: 'profile_ready', account_count: 91, cohort_rate_percent: 75.8 },
-            { key: 'program_activated', account_count: 63, cohort_rate_percent: 52.5 },
-            { key: 'core_value_reached', account_count: 48, cohort_rate_percent: 40 },
+          effect_status: 'NOT_YET_PROVEN',
+          effect_note: 'Эффект пока не подтверждён.',
+          exclusions: [],
+          data_quality: {
+            status: 'clean',
+            duplicate_milestones: 0,
+            impossible_order: 0,
+            client_success_without_server: 0,
+            invalid_milestones: 0,
+            excluded_role_accounts: 0,
+            timezone_fallback_accounts: 0,
+          },
+          kpis: [
+            {
+              key: 'activation_rate',
+              numerator: 63,
+              denominator: 120,
+              cohort_size: 120,
+              rate_percent: 52.5,
+              median_seconds: null,
+              window: 'первые 24 часа',
+            },
+            {
+              key: 'time_to_first_useful_action',
+              numerator: 70,
+              denominator: 120,
+              cohort_size: 120,
+              rate_percent: 58.3,
+              median_seconds: 7200,
+              window: 'до первой тренировки',
+            },
+            {
+              key: 'first_workout_completion_rate',
+              numerator: 48,
+              denominator: 70,
+              cohort_size: 120,
+              rate_percent: 68.6,
+              median_seconds: null,
+              window: 'до 72 часов',
+            },
+            {
+              key: 'first_week_value_rate',
+              numerator: 48,
+              denominator: 100,
+              cohort_size: 120,
+              rate_percent: 48,
+              median_seconds: null,
+              window: 'первые 7 дней',
+            },
+            {
+              key: 'd1_meaningful_return',
+              numerator: 60,
+              denominator: 110,
+              cohort_size: 120,
+              rate_percent: 54.5,
+              median_seconds: null,
+              window: 'следующий день',
+            },
+            {
+              key: 'd7_meaningful_return',
+              numerator: 50,
+              denominator: 100,
+              cohort_size: 120,
+              rate_percent: 50,
+              median_seconds: null,
+              window: 'седьмой день',
+            },
+            {
+              key: 'd30_meaningful_return',
+              numerator: 30,
+              denominator: 60,
+              cohort_size: 120,
+              rate_percent: 50,
+              median_seconds: null,
+              window: 'тридцатый день',
+            },
+            {
+              key: 'missed_workout_recovery_conversion',
+              numerator: 20,
+              denominator: 30,
+              cohort_size: 120,
+              rate_percent: 66.7,
+              median_seconds: null,
+              window: 'после пропуска',
+            },
+            {
+              key: 'recovery_to_completion_rate',
+              numerator: 12,
+              denominator: 20,
+              cohort_size: 132,
+              rate_percent: 60,
+              median_seconds: null,
+              window: 'восстановление',
+            },
+            {
+              key: 'time_to_recovery',
+              numerator: 20,
+              denominator: 20,
+              cohort_size: 132,
+              rate_percent: null,
+              median_seconds: 5400,
+              window: 'до восстановления',
+            },
+            {
+              key: 'nutrition_repeat_rate',
+              numerator: 35,
+              denominator: 75,
+              cohort_size: 120,
+              rate_percent: 46.7,
+              median_seconds: null,
+              window: 'первые 7 дней',
+            },
+            {
+              key: 'weekly_loop_completion',
+              numerator: 40,
+              denominator: 100,
+              cohort_size: 120,
+              rate_percent: 40,
+              median_seconds: null,
+              window: 'первые 7 дней',
+            },
           ],
+        },
+      });
+    }
+    if (path.endsWith('/admin/trainer-capacity')) {
+      return route.fulfill({
+        json: {
+          period_days: 30,
+          cohort_since: '2030-01-01T00:00:00Z',
+          cohort_until: '2030-01-31T00:00:00Z',
+          as_of: '2030-01-31T00:00:00Z',
+          eligible_account_count: 120,
+          activated_trainer_count: 12,
+          trainer_activation_rate_percent: 10,
+          trainers_with_first_client_action: 9,
+          time_to_first_client_action_median_seconds: 3600,
+          active_trainer_count: 4,
+          active_client_count: 72,
+          pending_invite_count: 3,
+          open_task_count: 11,
+          authorized_client_action_success_count: 85,
+          authorized_client_action_failure_count: null,
+          authorized_client_action_failure_status: 'not_recorded',
+          response_time_p50_ms: null,
+          response_time_p95_ms: null,
+          response_time_status: 'not_measured',
+          capacity_bands: [
+            { band: '0_9', trainer_count: 1, active_client_count: 4 },
+            { band: '10_29', trainer_count: 1, active_client_count: 18 },
+            { band: '30_99', trainer_count: 2, active_client_count: 50 },
+            { band: '100_plus', trainer_count: 0, active_client_count: 0 },
+          ],
+          coverage_note:
+            'Отдельный trainer-capacity срез; клиентский funnel и его KPI в этот срез не входят.',
+          exclusions: ['Неуспешные запросы не записываются.', 'Request latency не измеряется.'],
         },
       });
     }
@@ -232,6 +390,21 @@ test('tablet dark state keeps job status readable and retry bounded to exports',
   });
 });
 
+test('root workspace keeps trainer capacity metrics outside the client funnel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockAdminApi(page);
+  await page.goto('/admin');
+  await page.getByRole('button', { name: 'Ёмкость тренеров' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Ёмкость тренеров' })).toBeVisible();
+  await expect(page.getByText('Не клиентский funnel')).toBeVisible();
+  await expect(page.getByText('До 10 клиентов')).toBeVisible();
+  await expect(page.getByText('Ошибки: не записываются · p50/p95: не измерены')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test('mobile destructive confirmation names the subject and preserves touch geometry', async ({
   page,
 }) => {
@@ -257,7 +430,10 @@ test('mobile destructive confirmation names the subject and preserves touch geom
     }),
   );
   expect(actionBoxes.every((box) => box.width >= 44 && box.height >= 44)).toBe(true);
-  await expect(dialog.locator('.modal__panel')).toHaveCSS('background-color', 'rgb(22, 25, 22)');
+  await expect(dialog.locator('.modal__panel')).toHaveCSS(
+    'background-color',
+    'rgba(28, 33, 33, 0.9)',
+  );
   await expect(dialog.locator('.modal__panel')).toHaveCSS('opacity', '1');
   const [cancelBox, confirmBox] = await Promise.all([
     dialog.getByRole('button', { name: 'Отмена' }).boundingBox(),
@@ -285,6 +461,36 @@ test('non-root web account receives a controlled permission state', async ({ pag
     path: '../.artifacts/screenshots/task-71/390-light-permission-denied.png',
     fullPage: true,
   });
+});
+
+test('Root and Trainer remain separate explicit workspaces for a dual-capability account', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAdminApi(page, { coach: true });
+  await page.goto('/admin');
+
+  await expect(
+    page.getByRole('heading', { name: 'Операции поддержки и безопасности' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Админ-панель' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  const trainerWorkspace = page.getByRole('link', { name: 'Тренер' });
+  await expect(trainerWorkspace).toHaveAttribute('href', '/coach');
+  await trainerWorkspace.click();
+  await expect(page).toHaveURL('/coach');
+
+  const adminWorkspace = page.getByRole('link', { name: 'Админ-панель' });
+  await expect(adminWorkspace).toBeVisible();
+  await adminWorkspace.click();
+  await expect(page).toHaveURL('/admin');
+  await expect(
+    page.getByRole('heading', { name: 'Операции поддержки и безопасности' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Админ-панель' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Тренер' })).toBeVisible();
 });
 
 for (const viewport of [

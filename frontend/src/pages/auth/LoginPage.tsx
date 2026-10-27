@@ -56,7 +56,25 @@ function AuthErrorNotice({ code }: { code: string | null }) {
   );
 }
 
-function DevLoginControls({ nextPath }: { nextPath: string }) {
+function authorizedPostAuthDestination(
+  nextPath: string,
+  { canCoach, canAdmin }: { canCoach: boolean; canAdmin: boolean },
+): string {
+  const pathname = nextPath.split(/[?#]/, 1)[0];
+  if (pathname === '/admin') return canAdmin ? nextPath : '/app';
+  if (pathname === '/coach') return canCoach ? nextPath : '/app';
+  return nextPath;
+}
+
+function DevLoginControls({
+  hasExplicitNext,
+  nextPath,
+  onDestinationChange,
+}: {
+  hasExplicitNext: boolean;
+  nextPath: string;
+  onDestinationChange: (path: string) => void;
+}) {
   const { devLogin } = useAuth();
   const { navigate } = useNavigation();
   const [busyRole, setBusyRole] = useState<string | null>(null);
@@ -64,6 +82,7 @@ function DevLoginControls({ nextPath }: { nextPath: string }) {
   const roles = [
     {
       label: 'Клиент',
+      defaultPath: '/app',
       telegram_user_id: 2001,
       username: 'demo_client',
       is_coach: false,
@@ -71,13 +90,15 @@ function DevLoginControls({ nextPath }: { nextPath: string }) {
     },
     {
       label: 'Тренер',
-      telegram_user_id: 1001,
+      defaultPath: '/coach',
+      telegram_user_id: 1002,
       username: 'demo_coach',
       is_coach: true,
       is_admin: false,
     },
     {
       label: 'Админ',
+      defaultPath: '/admin',
       telegram_user_id: 1001,
       username: 'demo_admin',
       is_coach: true,
@@ -90,18 +111,24 @@ function DevLoginControls({ nextPath }: { nextPath: string }) {
       <p>Локальный режим разработки</p>
       {error && <ErrorState message={error} />}
       <div className="auth-presets">
-        {roles.map(({ label, ...input }) => (
+        {roles.map(({ label, defaultPath, ...input }) => (
           <button
             key={label}
             type="button"
             className="secondary"
             disabled={busyRole !== null}
             onClick={() => {
+              const requestedDestination = hasExplicitNext ? nextPath : defaultPath;
+              const destination = authorizedPostAuthDestination(requestedDestination, {
+                canCoach: input.is_coach,
+                canAdmin: input.is_admin,
+              });
+              onDestinationChange(destination);
               setBusyRole(label);
               setError(null);
               markProductLoginStarted();
               void devLogin({ ...input, full_name: `Демо ${label.toLowerCase()}` })
-                .then(() => navigate(nextPath, true))
+                .then(() => navigate(destination, true))
                 .catch((reason: unknown) => {
                   clearProductLoginAttempt();
                   setError(reason instanceof Error ? reason.message : 'Не удалось войти');
@@ -121,7 +148,23 @@ export default function LoginPage() {
   const { user, config, loading, error } = useAuth();
   const { navigate } = useNavigation();
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const hasExplicitNext = params.has('next');
   const nextPath = safeAuthNextPath(params.get('next'));
+  const [devLoginDestination, setDevLoginDestination] = useState<string | null>(null);
+  const authenticatedDestination =
+    devLoginDestination ??
+    (user
+      ? hasExplicitNext
+        ? authorizedPostAuthDestination(nextPath, {
+            canCoach: Boolean(user.is_coach),
+            canAdmin: Boolean(user.is_root),
+          })
+        : user.is_root
+          ? '/admin'
+          : user.is_coach
+            ? '/coach'
+            : '/app'
+      : '/app');
   const demoReturnPath = demoReturnPathFromLogin(window.location.search);
   const authErrorCode = params.get('auth_error');
   const providers = configuredOAuthProviders(config?.enable_web_auth ? config.oauth_providers : []);
@@ -145,8 +188,8 @@ export default function LoginPage() {
   const loginMotionEnabled = !user && !authErrorCode;
 
   useEffect(() => {
-    if (!loading && user) navigate(nextPath, true);
-  }, [loading, navigate, nextPath, user]);
+    if (!loading && user) navigate(authenticatedDestination, true);
+  }, [authenticatedDestination, loading, navigate, user]);
 
   useEffect(() => {
     if (authErrorCode) clearProductLoginAttempt();
@@ -225,7 +268,13 @@ export default function LoginPage() {
                 </a>
               )}
               {config?.enable_email_auth && <EmailAuthPanel nextPath={nextPath} />}
-              {config?.enable_dev_auth && <DevLoginControls nextPath={nextPath} />}
+              {config?.enable_dev_auth && (
+                <DevLoginControls
+                  hasExplicitNext={hasExplicitNext}
+                  nextPath={nextPath}
+                  onDestinationChange={setDevLoginDestination}
+                />
+              )}
               {(error || authErrorCode) && retryHref && (
                 <a
                   className="login-retry"

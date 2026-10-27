@@ -1,3 +1,4 @@
+import { TimeInput } from '../../shared/ui/PickerInput';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
@@ -7,8 +8,11 @@ import type {
   Food,
   FoodBarcodeLookup,
   FoodDiaryEntry,
+  FoodDiaryBatchResponse,
   FoodList,
   FoodSearch,
+  NutritionLabelConfirmResponse,
+  PhotoMealConfirmResponse,
   Recipe,
   UserFoodCreate,
 } from '../../shared/api/types';
@@ -18,16 +22,22 @@ import { foodDraftStorageKey } from '../../shared/userScopedStorage';
 import { invalidateNutritionSummaries } from '../../shared/queryKeys';
 import {
   trackCoreProductEvent,
+  trackGrowthEvent,
   trackProductEvent,
   productEventSurface,
   type FoodEntryMethod,
+  type NutritionFoodAddPath,
+  type NutritionFoodSource,
+  type OnboardingLatencyBucket,
 } from '../../shared/analytics/productEvents';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   CloseIcon,
   ErrorState,
   Field,
+  IconButton,
   Input,
   LoadingState,
   Select,
@@ -36,6 +46,10 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { BarcodeLookup } from './BarcodeLookup';
 import { FoodEditor } from './FoodEditor';
+import { NutritionLabelScanner } from './NutritionLabelScanner';
+import { PhotoMealScanner } from './PhotoMealScanner';
+import { MealTemplateBrowser } from './MealTemplateBrowser';
+import { NaturalFoodInput } from './NaturalFoodInput';
 import { RecipeBrowser } from './RecipeBrowser';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -46,8 +60,40 @@ const mealLabels: Record<MealType, string> = {
   dinner: 'ужин',
   snacks: 'перекусы',
 };
-type PickerSource = 'recent' | 'favorites';
-type PickerView = 'browse' | 'quick-add' | 'food-editor' | 'recipes' | 'barcode';
+type PickerSource = 'mine' | 'recent' | 'frequent' | 'favorites';
+type PickerView =
+  | 'browse'
+  | 'quick-add'
+  | 'food-editor'
+  | 'recipes'
+  | 'templates'
+  | 'natural'
+  | 'barcode'
+  | 'label-scan'
+  | 'photo-meal';
+
+function nutritionFoodPath(entryMethod: FoodEntryMethod): NutritionFoodAddPath {
+  if (entryMethod === 'label_scan') return 'photo';
+  if (entryMethod === 'custom') return 'manual';
+  if (entryMethod === 'quick_add') return 'quick_add';
+  return 'search';
+}
+
+function nutritionFoodTimingBucket(durationMs: number): OnboardingLatencyBucket {
+  if (durationMs < 10_000) return 'under_10s';
+  if (durationMs < 30_000) return '10_30s';
+  if (durationMs < 60_000) return '30_60s';
+  if (durationMs < 5 * 60_000) return '1_5m';
+  if (durationMs < 15 * 60_000) return '5_15m';
+  return 'over_15m';
+}
+
+function pickerSourceAnalytics(source: PickerSource): NutritionFoodSource {
+  if (source === 'mine') return 'personal';
+  if (source === 'frequent') return 'frequent';
+  if (source === 'recent') return 'recent';
+  return 'favorite';
+}
 
 interface QuickAddDraft {
   name: string;
@@ -56,6 +102,7 @@ interface QuickAddDraft {
   fat: string;
   carbs: string;
   loggedAt: string;
+  nutritionSource: 'manual' | 'restaurant';
 }
 
 type FoodDraftSelection = Pick<
@@ -68,13 +115,19 @@ type FoodDraftSelection = Pick<
   | 'protein_g_per_100g'
   | 'fat_g_per_100g'
   | 'carbs_g_per_100g'
+  | 'nutrition_basis_kind'
+  | 'nutrition_basis_unit'
+  | 'canonical_facts'
   | 'standard_serving_weight_g'
+  | 'catalog_quality'
 >;
+
+type FoodAmountUnit = FoodDiaryEntry['amount_unit'];
 
 interface AddDraft {
   food: FoodDraftSelection | null;
   amount: string;
-  amountUnit: 'g' | 'serving';
+  amountUnit: FoodAmountUnit;
   quick?: QuickAddDraft;
   requestId?: string;
 }
@@ -86,6 +139,7 @@ const emptyQuickAdd: QuickAddDraft = {
   fat: '',
   carbs: '',
   loggedAt: '',
+  nutritionSource: 'manual',
 };
 
 function newEntryRequestId(): string {
@@ -95,10 +149,16 @@ function newEntryRequestId(): string {
   return `entry-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function foodSourceLabel(food: Pick<Food, 'food_type'>): string {
+function foodSourceLabel(food: Pick<Food, 'food_type' | 'catalog_quality'>): string {
+  if (food.catalog_quality === 'community_unverified') return 'Добавлено пользователем';
+  if (food.catalog_quality === 'verified') return 'Проверено YFC';
   if (food.food_type === 'user') return 'Мой продукт';
   if (food.food_type === 'branded') return 'Брендовый';
   return 'Каталог';
+}
+
+function isUserFood(food: Pick<Food, 'food_type'>): boolean {
+  return food.food_type === 'user';
 }
 
 function foodDraftSelection(food: Food): FoodDraftSelection {
@@ -111,12 +171,60 @@ function foodDraftSelection(food: Food): FoodDraftSelection {
     protein_g_per_100g: food.protein_g_per_100g,
     fat_g_per_100g: food.fat_g_per_100g,
     carbs_g_per_100g: food.carbs_g_per_100g,
+    nutrition_basis_kind: food.nutrition_basis_kind,
+    nutrition_basis_unit: food.nutrition_basis_unit,
+    canonical_facts: food.canonical_facts,
     standard_serving_weight_g: food.standard_serving_weight_g,
+    catalog_quality: food.catalog_quality,
   };
 }
 
-function formatNumber(value: string): string {
+function formatNumber(value: string | null): string {
+  if (value === null) return '—';
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(Number(value));
+}
+
+function normalizeFoodSearchValue(value: string): string {
+  return value.trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+}
+
+function hasExactLocalFoodHit(items: Food[], query: string): boolean {
+  const normalizedQuery = normalizeFoodSearchValue(query);
+  return items.some((item) => {
+    const searchableValues = [item.name, item.brand ?? ''];
+    if (item.brand) searchableValues.push(`${item.brand} ${item.name}`);
+    return searchableValues.some((value) => normalizeFoodSearchValue(value) === normalizedQuery);
+  });
+}
+
+function foodAmountUnit(
+  food: Pick<Food, 'nutrition_basis_kind' | 'standard_serving_weight_g'>,
+): FoodAmountUnit {
+  if (food.nutrition_basis_kind === 'per_100_ml') return 'ml';
+  if (food.nutrition_basis_kind === 'per_serving') return 'serving';
+  return food.standard_serving_weight_g ? 'serving' : 'g';
+}
+
+function foodEnergyValue(
+  food: Pick<Food, 'energy_kcal_per_100g' | 'canonical_facts'>,
+): string | null {
+  if (food.energy_kcal_per_100g !== null) return food.energy_kcal_per_100g;
+  const normalized = food.canonical_facts?.normalized_facts;
+  if (!normalized || typeof normalized !== 'object') return null;
+  const value = (normalized as { energy_kcal?: { value?: unknown } }).energy_kcal?.value;
+  return value === null || value === undefined ? null : String(value);
+}
+
+function foodBasisLabel(
+  food: Pick<Food, 'nutrition_basis_kind' | 'energy_kcal_per_100g' | 'canonical_facts'>,
+): string {
+  const basis =
+    food.nutrition_basis_kind === 'per_100_ml'
+      ? '100 мл'
+      : food.nutrition_basis_kind === 'per_serving'
+        ? 'порцию'
+        : '100 г';
+  return `${formatNumber(foodEnergyValue(food))} ккал / ${basis}`;
 }
 
 function providerMessage(status: FoodSearch['provider_status']): string | null {
@@ -137,65 +245,79 @@ function FoodResults({
   onFavorite,
   onSelect,
   pendingFavorite,
+  allowManage = true,
 }: {
   foods: Food[];
   onEdit: (food: Food) => void;
   onFavorite: (food: Food) => void;
   onSelect: (food: Food) => void;
   pendingFavorite: number | null;
+  allowManage?: boolean;
 }) {
   if (!foods.length)
     return (
       <p className="nutrition-picker__empty">
-        Здесь пока пусто. Найдите продукт по названию или создайте свой.
+        {allowManage
+          ? 'Здесь пока пусто. Найдите продукт по названию или создайте свой.'
+          : 'Подготовленных продуктов пока нет. Попробуйте поиск по названию.'}
       </p>
     );
   return (
-    <ul className="nutrition-food-results" aria-label="Продукты">
-      {foods.map((food) => (
-        <li className="nutrition-food-result" key={food.id}>
-          <button
-            className="nutrition-food-result__select"
-            type="button"
-            onClick={() => onSelect(food)}
-            aria-label={`Добавить ${food.name}`}
-          >
-            <span className="nutrition-food-result__main">
-              <strong>{food.name}</strong>
-              <span>
-                {food.brand ? `${food.brand} · ` : ''}
-                {formatNumber(food.energy_kcal_per_100g)} ккал на 100 г
-              </span>
-            </span>
-            <Badge>{foodSourceLabel(food)}</Badge>
-          </button>
-          <div className="nutrition-food-result__actions">
+    <>
+      <p id="nutrition-food-results-hint" className="nutrition-food-results__hint">
+        Нажмите на карточку, чтобы выбрать продукт
+      </p>
+      <ul className="nutrition-food-results" aria-label="Продукты">
+        {foods.map((food) => (
+          <li className="nutrition-food-result nutrition-food-result--picker" key={food.id}>
             <button
+              className="nutrition-food-result__select"
               type="button"
-              aria-label={
-                food.is_favorite
-                  ? `Убрать ${food.name} из избранного`
-                  : `Добавить ${food.name} в избранное`
-              }
-              aria-pressed={food.is_favorite}
-              disabled={pendingFavorite === food.id}
-              onClick={() => onFavorite(food)}
+              onClick={() => onSelect(food)}
+              aria-describedby="nutrition-food-results-hint"
+              aria-label={`Выбрать ${food.name}`}
             >
-              <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
+              <span className="nutrition-food-result__main">
+                <strong>{food.name}</strong>
+                <span>
+                  {food.brand ? `${food.brand} · ` : ''}
+                  {foodBasisLabel(food)}
+                </span>
+              </span>
             </button>
-            {food.food_type === 'user' && (
-              <button
-                type="button"
-                onClick={() => onEdit(food)}
-                aria-label={`Изменить ${food.name}`}
-              >
-                Изменить
-              </button>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
+            <div className="nutrition-food-result__meta">
+              <Badge>{foodSourceLabel(food)}</Badge>
+              {allowManage && (
+                <button
+                  type="button"
+                  className="nutrition-food-result__favorite"
+                  aria-label={
+                    food.is_favorite
+                      ? `Убрать ${food.name} из избранного`
+                      : `Добавить ${food.name} в избранное`
+                  }
+                  aria-pressed={food.is_favorite}
+                  disabled={pendingFavorite === food.id}
+                  onClick={() => onFavorite(food)}
+                >
+                  <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
+                </button>
+              )}
+              {isUserFood(food) && allowManage && (
+                <button
+                  type="button"
+                  className="nutrition-food-result__edit"
+                  onClick={() => onEdit(food)}
+                  aria-label={`Изменить ${food.name}`}
+                >
+                  Изменить
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -212,6 +334,10 @@ function externalFoodPayload(food: ExternalFood): UserFoodCreate {
     standard_serving_amount: food.standard_serving_amount,
     standard_serving_unit: food.standard_serving_unit,
     standard_serving_weight_g: food.standard_serving_weight_g,
+    classification: 'personal',
+    nutrition_basis_kind: 'per_100_g',
+    nutrition_basis_amount: 100,
+    nutrition_basis_unit: 'g',
     external_source: {
       external_id: food.external_id,
       ...food.source,
@@ -276,6 +402,7 @@ function ExternalResults({
             fullWidth
             type="button"
             disabled={pendingExternalKey !== null}
+            onPointerDown={(event) => event.preventDefault()}
             onClick={() => onSelect(food)}
           >
             {pendingExternalKey === `${food.source.provider}-${food.external_id}`
@@ -291,15 +418,19 @@ function ExternalResults({
 export function FoodPickerDialog({
   diaryDate,
   mealType,
+  mealEntries = [],
   initialView = 'browse',
   disabled = false,
+  demoSafeMode = false,
   onAdded,
   onClose,
 }: {
   diaryDate: string;
   mealType: MealType;
+  mealEntries?: FoodDiaryEntry[];
   initialView?: 'browse' | 'quick-add';
   disabled?: boolean;
+  demoSafeMode?: boolean;
   onAdded?: (entry: FoodDiaryEntry) => void;
   onClose: () => void;
 }) {
@@ -309,7 +440,11 @@ export function FoodPickerDialog({
   const panelRef = useModalA11y<HTMLDivElement>(
     true,
     onClose,
-    initialView === 'quick-add' ? '#nutrition-quick-calories' : '#nutrition-barcode-entry',
+    initialView === 'quick-add'
+      ? '#nutrition-quick-calories'
+      : demoSafeMode
+        ? '#nutrition-food-search'
+        : '#nutrition-food-search',
   );
   const [view, setView] = useState<PickerView>(initialView);
   const [source, setSource] = useState<PickerSource>('recent');
@@ -320,6 +455,8 @@ export function FoodPickerDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [editingFood, setEditingFood] = useState<Food | undefined>();
   const [editorBarcode, setEditorBarcode] = useState('');
+  const [scanBarcode, setScanBarcode] = useState('');
+  const [flowStartedAt, setFlowStartedAt] = useState(() => Date.now());
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [recipeAmount, setRecipeAmount] = useState('100');
   const [draft, setDraft, clearDraft] = usePersistentState<AddDraft>(
@@ -332,10 +469,10 @@ export function FoodPickerDialog({
       requestId: newEntryRequestId(),
     },
   );
-  const quick = draft.quick ?? emptyQuickAdd;
+  const quick = useMemo(() => ({ ...emptyQuickAdd, ...(draft.quick ?? {}) }), [draft.quick]);
 
   useEffect(() => {
-    if (draft.requestId && draft.quick) return;
+    if (draft.requestId && draft.quick?.nutritionSource) return;
     setDraft({
       ...draft,
       quick,
@@ -344,6 +481,11 @@ export function FoodPickerDialog({
   }, [draft, quick, setDraft]);
 
   const normalizedSearchInput = searchInput.trim().replace(/\s+/g, ' ');
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    document.getElementById('nutrition-food-search')?.focus();
+  };
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchQuery(normalizedSearchInput), 250);
     return () => window.clearTimeout(timer);
@@ -351,10 +493,22 @@ export function FoodPickerDialog({
   const recent = useQuery({
     queryKey: ['nutrition', 'foods', 'recent'],
     queryFn: () => api<FoodList>('/api/v1/nutrition/foods/recent?limit=12'),
+    enabled: source === 'recent',
+  });
+  const frequent = useQuery({
+    queryKey: ['nutrition', 'foods', 'frequent'],
+    queryFn: () => api<FoodList>('/api/v1/nutrition/foods/frequent?limit=12'),
+    enabled: source === 'frequent',
+  });
+  const mine = useQuery({
+    queryKey: ['nutrition', 'foods', 'mine'],
+    queryFn: () => api<FoodList>('/api/v1/nutrition/foods/mine?limit=12'),
+    enabled: source === 'mine',
   });
   const favorites = useQuery({
     queryKey: ['nutrition', 'foods', 'favorites'],
     queryFn: () => api<FoodList>('/api/v1/nutrition/foods/favorites?limit=12'),
+    enabled: source === 'favorites',
   });
   const search = useQuery({
     queryKey: ['nutrition', 'foods', 'search', searchQuery],
@@ -366,12 +520,15 @@ export function FoodPickerDialog({
     enabled: searchQuery.length >= 2,
   });
   const externalQuery =
+    !demoSafeMode &&
     searchQuery.length >= 2 &&
     searchQuery === normalizedSearchInput &&
     !search.isFetching &&
     !search.error &&
     search.data !== undefined &&
-    search.data.total < search.data.limit
+    (search.data.items.length === 0 ||
+      !hasExactLocalFoodHit(search.data.items, searchQuery) ||
+      search.data.items.some((item) => item.canonical_complete === false))
       ? searchQuery
       : '';
   const external = useQuery({
@@ -381,7 +538,7 @@ export function FoodPickerDialog({
         `/api/v1/nutrition/foods/search?q=${encodeURIComponent(externalQuery)}&limit=20&include_external=true`,
         { signal },
       ),
-    enabled: externalQuery.length >= 2 && externalQuery === searchQuery,
+    enabled: !demoSafeMode && externalQuery.length >= 2 && externalQuery === searchQuery,
   });
   const favorite = useMutation({
     mutationFn: (food: Food) =>
@@ -408,7 +565,14 @@ export function FoodPickerDialog({
       }
     },
   });
-  const activeCollection = source === 'recent' ? recent : favorites;
+  const activeCollection =
+    source === 'mine'
+      ? mine
+      : source === 'frequent'
+        ? frequent
+        : source === 'recent'
+          ? recent
+          : favorites;
   const shownFoods = useMemo(
     () => (searchQuery.length >= 2 ? search.data?.items : activeCollection.data?.items) ?? [],
     [activeCollection.data?.items, search.data?.items, searchQuery.length],
@@ -416,6 +580,34 @@ export function FoodPickerDialog({
   const activeError = searchQuery.length >= 2 ? search.error : activeCollection.error;
   const activeLoading = searchQuery.length >= 2 ? search.isFetching : activeCollection.isLoading;
   const quantityMode = Boolean(draft.food || selectedRecipe);
+
+  useEffect(() => {
+    if (!searchQuery || !search.data) return;
+    trackProductEvent(
+      {
+        name: 'nutrition_food_search_result',
+        surface: productEventSurface(),
+        outcome: search.data.total > 0 ? 'success' : 'no_result',
+      },
+      {
+        dedupe: 'session',
+        dedupeKey: `food-search-result:${searchQuery}:${search.data.total > 0}`,
+      },
+    );
+    if (search.data.total < 1) return;
+    trackProductEvent(
+      { name: 'yfc_food_catalog_local_hit', surface: productEventSurface() },
+      { dedupe: 'session', dedupeKey: `food-search-local:${searchQuery}` },
+    );
+  }, [search.data, searchQuery]);
+
+  useEffect(() => {
+    if (!externalQuery || !external.data) return;
+    trackProductEvent(
+      { name: 'yfc_food_catalog_external_fallback', surface: productEventSurface() },
+      { dedupe: 'session', dedupeKey: `food-search-external:${externalQuery}` },
+    );
+  }, [external.data, externalQuery]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -426,18 +618,26 @@ export function FoodPickerDialog({
       frame = window.requestAnimationFrame(() => {
         frame = null;
         const active = document.activeElement;
-        if (active instanceof HTMLElement && panel?.contains(active)) {
-          active.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+        if (!(active instanceof HTMLElement) || !panel?.contains(active)) return;
+        if (
+          !(active instanceof HTMLInputElement) &&
+          !(active instanceof HTMLSelectElement) &&
+          !(active instanceof HTMLTextAreaElement)
+        )
+          return;
+        const visibleTop = viewport?.offsetTop ?? 0;
+        const visibleBottom = visibleTop + (viewport?.height ?? window.innerHeight);
+        const bounds = active.getBoundingClientRect();
+        if (bounds.top < visibleTop || bounds.bottom > visibleBottom) {
+          active.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
         }
       });
     };
     viewport?.addEventListener('resize', keepActiveFieldVisible);
-    viewport?.addEventListener('scroll', keepActiveFieldVisible);
     panel?.addEventListener('focusin', keepActiveFieldVisible);
     return () => {
       if (frame !== null) window.cancelAnimationFrame(frame);
       viewport?.removeEventListener('resize', keepActiveFieldVisible);
-      viewport?.removeEventListener('scroll', keepActiveFieldVisible);
       panel?.removeEventListener('focusin', keepActiveFieldVisible);
     };
   }, [panelRef]);
@@ -465,23 +665,22 @@ export function FoodPickerDialog({
               if (!Number.isFinite(energy) || energy <= 0)
                 throw new Error('Введите калории больше нуля');
               const macroValues = [quick.protein, quick.fat, quick.carbs];
-              const filledMacros = macroValues.filter((value) => value.trim() !== '');
-              if (filledMacros.length > 0 && filledMacros.length < 3)
-                throw new Error('Укажите все три макронутриента или оставьте их пустыми');
-              const parsedMacros = macroValues.map((value) => Number(value.replace(',', '.')));
-              if (
-                filledMacros.length === 3 &&
-                parsedMacros.some((value) => !Number.isFinite(value) || value < 0)
-              ) {
-                throw new Error('Макронутриенты должны быть неотрицательными числами');
-              }
+              const parsedMacros = macroValues.map((value) => {
+                if (value.trim() === '') return null;
+                const parsed = Number(value.replace(',', '.'));
+                if (!Number.isFinite(parsed) || parsed < 0) {
+                  throw new Error('Макронутриенты должны быть неотрицательными числами');
+                }
+                return parsed;
+              });
               return {
                 quick_add: {
                   name: quick.name.trim() || null,
+                  nutrition_source: quick.nutritionSource,
                   energy_kcal: energy,
-                  protein_g: filledMacros.length === 3 ? parsedMacros[0] : null,
-                  fat_g: filledMacros.length === 3 ? parsedMacros[1] : null,
-                  carbs_g: filledMacros.length === 3 ? parsedMacros[2] : null,
+                  protein_g: parsedMacros[0],
+                  fat_g: parsedMacros[1],
+                  carbs_g: parsedMacros[2],
                 },
                 amount: 1,
                 amount_unit: 'serving' as const,
@@ -522,22 +721,42 @@ export function FoodPickerDialog({
         requestId: newEntryRequestId(),
       });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods', 'recent'] }),
+        queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] }),
         invalidateNutritionSummaries(queryClient),
       ]);
       trackCoreProductEvent(
         { name: 'food_logged', surface: productEventSurface(), entry_method: entryMethod },
         'food_logged',
       );
+      trackProductEvent({
+        name: 'nutrition_food_flow_timing',
+        surface: productEventSurface(),
+        path: nutritionFoodPath(entryMethod),
+        duration_bucket: nutritionFoodTimingBucket(Date.now() - flowStartedAt),
+      });
+      if (user?.has_food_history === false) {
+        trackGrowthEvent('first_food_entry_added', { dedupe: 'session' });
+      }
       toast(`Добавлено в ${mealLabels[mealType]}`);
       if (variables.closeAfter) onClose();
       else {
         setSelectedRecipe(null);
         setEntryMethod(initialView === 'quick-add' ? 'quick_add' : 'recent');
+        setFlowStartedAt(Date.now());
         setView(initialView);
       }
     },
   });
+  const handleBatchCompleted = async (response: FoodDiaryBatchResponse) => {
+    response.entries.forEach((entry) => onAdded?.(entry));
+    await invalidateNutritionSummaries(queryClient);
+    toast(
+      response.replayed
+        ? 'Эта запись уже была добавлена'
+        : `Добавлено в ${mealLabels[response.meal_type]}`,
+    );
+    onClose();
+  };
   const updateDraft = (changes: Partial<AddDraft>) => {
     addEntry.reset();
     setDraft({ ...draft, ...changes, requestId: newEntryRequestId() });
@@ -545,24 +764,50 @@ export function FoodPickerDialog({
   const updateQuick = (changes: Partial<QuickAddDraft>) => {
     updateDraft({ quick: { ...quick, ...changes } });
   };
-  const selectFood = (food: Food) => {
+  const selectFood = (
+    food: Food,
+    {
+      trackCommunityReuse = true,
+      sourceOverride,
+    }: { trackCommunityReuse?: boolean; sourceOverride?: NutritionFoodSource } = {},
+  ) => {
+    const source =
+      sourceOverride ??
+      (food.food_type === 'user'
+        ? 'personal'
+        : food.catalog_quality === 'community_unverified'
+          ? 'shared'
+          : 'local');
+    trackProductEvent({
+      name: 'nutrition_food_source_selected',
+      surface: productEventSurface(),
+      source,
+    });
+    if (trackCommunityReuse && food.catalog_quality === 'community_unverified') {
+      trackProductEvent({
+        name: 'nutrition_label_community_product_reused',
+        surface: productEventSurface(),
+      });
+    }
     trackProductEvent({
       name: 'food_log_started',
       surface: productEventSurface(),
       entry_method: entryMethod,
     });
     setSelectedRecipe(null);
+    const amountUnit = foodAmountUnit(food);
     updateDraft({
       food: foodDraftSelection(food),
-      amount: food.standard_serving_weight_g ? '1' : '100',
-      amountUnit: food.standard_serving_weight_g ? 'serving' : 'g',
+      amount: amountUnit === 'serving' ? '1' : '100',
+      amountUnit,
     });
   };
   const selectExternalFood = (food: ExternalFood) => {
+    if (demoSafeMode || importExternal.isPending) return;
     importExternal.mutate(food, {
       onSuccess: async (savedFood) => {
         await queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
-        selectFood(savedFood);
+        selectFood(savedFood, { sourceOverride: 'external' });
       },
     });
   };
@@ -585,7 +830,11 @@ export function FoodPickerDialog({
         'quick-add': 'Быстрый ввод',
         'food-editor': editingFood ? 'Изменить продукт' : 'Новый продукт',
         recipes: 'Рецепты',
+        templates: 'Шаблоны приёмов',
+        natural: 'Список продуктов',
         barcode: 'Штрихкод',
+        'label-scan': 'Сканирование этикетки',
+        'photo-meal': 'Фото блюда',
       } as const
     )[view];
   return (
@@ -597,7 +846,7 @@ export function FoodPickerDialog({
     >
       <div className="modal__backdrop" aria-hidden="true" onClick={onClose} />
       <div className="modal__panel nutrition-picker__panel" ref={panelRef} tabIndex={-1}>
-        <header className="nutrition-picker__header">
+        <header data-glass="" data-glass-variant="regular" className="nutrition-picker__header">
           <div>
             <span className="eyebrow">Добавить в {mealLabels[mealType]}</span>
             <h2 id="nutrition-picker-title">{title}</h2>
@@ -636,7 +885,7 @@ export function FoodPickerDialog({
               <>
                 <div className="nutrition-picker__selected">
                   <span>{draft.food.brand || foodSourceLabel(draft.food)}</span>
-                  <strong>{formatNumber(draft.food.energy_kcal_per_100g)} ккал / 100 г</strong>
+                  <strong>{foodBasisLabel(draft.food)}</strong>
                   <small>
                     Б {formatNumber(draft.food.protein_g_per_100g)} · Ж{' '}
                     {formatNumber(draft.food.fat_g_per_100g)} · У{' '}
@@ -662,11 +911,17 @@ export function FoodPickerDialog({
                       id="nutrition-food-unit"
                       value={draft.amountUnit}
                       onChange={(event) =>
-                        updateDraft({ amountUnit: event.target.value as 'g' | 'serving' })
+                        updateDraft({ amountUnit: event.target.value as FoodAmountUnit })
                       }
                     >
-                      <option value="g">граммы</option>
-                      {draft.food.standard_serving_weight_g && (
+                      {draft.food.nutrition_basis_kind === 'per_100_g' && (
+                        <option value="g">граммы</option>
+                      )}
+                      {draft.food.nutrition_basis_kind === 'per_100_ml' && (
+                        <option value="ml">миллилитры</option>
+                      )}
+                      {(draft.food.nutrition_basis_kind === 'per_serving' ||
+                        draft.food.standard_serving_weight_g) && (
                         <option value="serving">порции</option>
                       )}
                     </Select>
@@ -708,19 +963,19 @@ export function FoodPickerDialog({
                 </>
               )
             )}
-            {addEntry.error && (
-              <div className="nutrition-inline-error" role="alert">
-                <span>{(addEntry.error as Error).message}</span>
-                <button
-                  type="button"
-                  disabled={addEntry.isPending}
-                  onClick={() => addEntry.mutate({ closeAfter: true })}
-                >
-                  Повторить
-                </button>
-              </div>
-            )}
             <div className="nutrition-picker__submit">
+              {addEntry.error && (
+                <div className="nutrition-inline-error" role="alert">
+                  <span>{(addEntry.error as Error).message}</span>
+                  <button
+                    type="button"
+                    disabled={addEntry.isPending}
+                    onClick={() => addEntry.mutate({ closeAfter: true })}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
               <Button fullWidth disabled={addEntry.isPending} type="submit">
                 {addEntry.isPending ? 'Добавляем…' : 'Добавить в дневник'}
               </Button>
@@ -751,9 +1006,10 @@ export function FoodPickerDialog({
               <Icon name="arrow-left" size={16} /> К продуктам
             </button>
             <p className="nutrition-quick-add__context">
-              {mealLabels[mealType]} · {diaryDate}. Название и время можно не указывать.
+              {mealLabels[mealType]} · {diaryDate}. Это приблизительная запись: неизвестные БЖУ
+              останутся без значения, а не станут нулём.
             </p>
-            <Field label="Название (необязательно)" labelFor="nutrition-quick-name">
+            <Field label="Название или контекст (необязательно)" labelFor="nutrition-quick-name">
               <Input
                 id="nutrition-quick-name"
                 value={quick.name}
@@ -778,16 +1034,31 @@ export function FoodPickerDialog({
                 />
               </Field>
               <Field label="Время (необязательно)" labelFor="nutrition-quick-time">
-                <Input
+                <TimeInput
+                  className="ui-input"
                   id="nutrition-quick-time"
-                  type="time"
+
                   value={quick.loggedAt}
                   onChange={(event) => updateQuick({ loggedAt: event.target.value })}
                 />
               </Field>
             </div>
+            <Field label="Источник оценки" labelFor="nutrition-quick-source">
+              <Select
+                id="nutrition-quick-source"
+                value={quick.nutritionSource}
+                onChange={(event) =>
+                  updateQuick({
+                    nutritionSource: event.target.value as QuickAddDraft['nutritionSource'],
+                  })
+                }
+              >
+                <option value="manual">Своя оценка</option>
+                <option value="restaurant">Ресторан или кафе</option>
+              </Select>
+            </Field>
             <fieldset className="nutrition-quick-add__macros">
-              <legend>Макронутриенты (все три или ни одного)</legend>
+              <legend>Макронутриенты (необязательно)</legend>
               {(
                 [
                   ['Белки', 'protein'],
@@ -810,19 +1081,19 @@ export function FoodPickerDialog({
                 </Field>
               ))}
             </fieldset>
-            {addEntry.error && (
-              <div className="nutrition-inline-error" role="alert">
-                <span>{(addEntry.error as Error).message}</span>
-                <button
-                  type="button"
-                  disabled={addEntry.isPending}
-                  onClick={() => addEntry.mutate({ closeAfter: true })}
-                >
-                  Повторить
-                </button>
-              </div>
-            )}
             <div className="nutrition-picker__submit">
+              {addEntry.error && (
+                <div className="nutrition-inline-error" role="alert">
+                  <span>{(addEntry.error as Error).message}</span>
+                  <button
+                    type="button"
+                    disabled={addEntry.isPending}
+                    onClick={() => addEntry.mutate({ closeAfter: true })}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
               <Button fullWidth disabled={addEntry.isPending} type="submit">
                 {addEntry.isPending ? 'Сохраняем…' : 'Сохранить Quick Add'}
               </Button>
@@ -837,9 +1108,46 @@ export function FoodPickerDialog({
               </Button>
             </div>
           </form>
+        ) : view === 'natural' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К продуктам
+            </button>
+            <NaturalFoodInput
+              diaryDate={diaryDate}
+              mealType={mealType}
+              userId={user?.id ?? 'anonymous'}
+              demoSafeMode={demoSafeMode}
+              onCompleted={handleBatchCompleted}
+              onCancel={() => setView('browse')}
+            />
+          </div>
+        ) : view === 'templates' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К продуктам
+            </button>
+            <MealTemplateBrowser
+              diaryDate={diaryDate}
+              mealType={mealType}
+              mealEntries={mealEntries}
+              demoSafeMode={demoSafeMode}
+              onCompleted={handleBatchCompleted}
+              onCancel={() => setView('browse')}
+            />
+          </div>
         ) : view === 'food-editor' ? (
           <div className="nutrition-picker__browse">
             <FoodEditor
+              userId={user?.id ?? 'anonymous'}
               barcode={editorBarcode}
               food={editingFood}
               onCancel={() => setView('browse')}
@@ -848,6 +1156,75 @@ export function FoodPickerDialog({
                 setEditingFood(undefined);
                 setEditorBarcode('');
                 selectFood(food);
+              }}
+            />
+          </div>
+        ) : view === 'photo-meal' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К способам добавления
+            </button>
+            <PhotoMealScanner
+              userId={user?.id ?? 'anonymous'}
+              diaryDate={diaryDate}
+              mealType={mealType}
+              onCancel={() => setView('browse')}
+              onManualFallback={() => {
+                setEntryMethod('quick_add');
+                setView('quick-add');
+              }}
+              onCompleted={async (response: PhotoMealConfirmResponse) => {
+                onAdded?.(response.entry);
+                await invalidateNutritionSummaries(queryClient);
+                toast('Приблизительная запись добавлена в дневник');
+                onClose();
+              }}
+            />
+          </div>
+        ) : view === 'label-scan' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К способам добавления
+            </button>
+            <NutritionLabelScanner
+              userId={user?.id ?? 'anonymous'}
+              initialBarcode={scanBarcode}
+              onCancel={() => {
+                setScanBarcode('');
+                setView('browse');
+              }}
+              onManualFallback={() => {
+                setEditorBarcode(scanBarcode);
+                setEditingFood(undefined);
+                setScanBarcode('');
+                setEntryMethod('custom');
+                setView('food-editor');
+              }}
+              onSaved={async (food, response: NutritionLabelConfirmResponse) => {
+                await queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
+                if (response.contribution_outcome) {
+                  trackProductEvent({
+                    name: 'nutrition_food_catalog_contribution_outcome',
+                    surface: productEventSurface(),
+                    outcome: response.contribution_outcome,
+                  });
+                }
+                toast(
+                  response.visibility === 'share_to_yfc_catalog'
+                    ? 'Продукт добавлен в каталог YFC'
+                    : 'Продукт сохранён только для вас',
+                );
+                setEntryMethod('label_scan');
+                setScanBarcode('');
+                selectFood(food, { trackCommunityReuse: false });
               }}
             />
           </div>
@@ -878,151 +1255,309 @@ export function FoodPickerDialog({
                 setEditingFood(undefined);
                 setView('food-editor');
               }}
+              onScanLabel={(barcode) => {
+                setEntryMethod('label_scan');
+                setScanBarcode(barcode);
+                setView('label-scan');
+              }}
             />
           </div>
         ) : (
-          <div className="nutrition-picker__browse">
-            <Button
-              id="nutrition-barcode-entry"
-              fullWidth
-              type="button"
-              onClick={() => {
-                setEntryMethod('barcode');
-                setView('barcode');
-              }}
-            >
-              Поиск по штрихкоду
-            </Button>
-            <Field
-              label="Поиск по названию или бренду"
-              labelFor="nutrition-food-search"
-              hint="Локальный поиск начинается после двух символов"
-            >
-              <Input
-                id="nutrition-food-search"
-                type="search"
-                value={searchInput}
-                onChange={(event) => {
-                  if (event.target.value.trim()) setEntryMethod('search');
-                  setSearchInput(event.target.value);
-                }}
-                placeholder="Например, овсянка"
-              />
-            </Field>
-            <div className="nutrition-picker__tools" aria-label="Другие способы добавления">
-              <Button
-                type="button"
-                onClick={() => {
-                  setEntryMethod('quick_add');
-                  trackProductEvent({
-                    name: 'food_log_started',
-                    surface: productEventSurface(),
-                    entry_method: 'quick_add',
-                  });
-                  setView('quick-add');
-                }}
+          <div
+            className="nutrition-picker__browse"
+            data-search-active={searchQuery.length >= 2 ? 'true' : undefined}
+          >
+            <div className="nutrition-picker__search-field">
+              <Field
+                label="Найти продукт"
+                labelFor="nutrition-food-search"
+                hint="Локальный поиск начинается после двух символов"
               >
-                <Icon name="plus" size={16} /> Быстрый ввод
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setEntryMethod('custom');
-                  setEditingFood(undefined);
-                  setEditorBarcode('');
-                  setView('food-editor');
-                }}
-              >
-                <Icon name="plus" size={16} /> Свой продукт
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setEntryMethod('recipe');
-                  setView('recipes');
-                }}
-              >
-                Рецепты
-              </Button>
+                <div
+                  className={`nutrition-picker__search-control${
+                    searchInput ? ' nutrition-picker__search-control--has-clear' : ''
+                  }`}
+                >
+                  <Input
+                    id="nutrition-food-search"
+                    className={searchInput ? 'nutrition-picker__search-input--has-clear' : ''}
+                    type="search"
+                    value={searchInput}
+                    onFocus={() =>
+                      trackProductEvent(
+                        {
+                          name: 'nutrition_food_add_path_selected',
+                          surface: productEventSurface(),
+                          path: 'search',
+                        },
+                        { dedupe: 'session', dedupeKey: 'nutrition-food-add-path-search' },
+                      )
+                    }
+                    onChange={(event) => {
+                      if (event.target.value.trim()) setEntryMethod('search');
+                      setSearchInput(event.target.value);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && searchInput) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        clearSearch();
+                      }
+                    }}
+                    placeholder="Например, овсянка"
+                  />
+                  {searchInput && (
+                    <IconButton
+                      className="nutrition-picker__search-clear"
+                      type="button"
+                      aria-label="Очистить поиск"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={clearSearch}
+                    >
+                      <Icon name="close" size={16} />
+                    </IconButton>
+                  )}
+                </div>
+              </Field>
             </div>
-            {searchQuery.length < 2 && (
-              <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
-                <button
-                  type="button"
-                  className={source === 'recent' ? 'is-active' : ''}
-                  aria-pressed={source === 'recent'}
-                  onClick={() => {
-                    setEntryMethod('recent');
-                    setSource('recent');
-                  }}
-                >
-                  Недавние
-                </button>
-                <button
-                  type="button"
-                  className={source === 'favorites' ? 'is-active' : ''}
-                  aria-pressed={source === 'favorites'}
-                  onClick={() => {
-                    setEntryMethod('favorite');
-                    setSource('favorites');
-                  }}
-                >
-                  Избранное
-                </button>
+            <div className="nutrition-picker__search-flow">
+              {!demoSafeMode && (
+                <div className="nutrition-picker__primary-path-actions">
+                  <Button
+                    id="nutrition-label-scan-entry"
+                    fullWidth
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      trackProductEvent({
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'photo',
+                      });
+                      setEntryMethod('label_scan');
+                      setScanBarcode('');
+                      setView('label-scan');
+                    }}
+                  >
+                    По фото этикетки
+                  </Button>
+                  <Button
+                    fullWidth
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      trackProductEvent({
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'photo',
+                      });
+                      setEntryMethod('label_scan');
+                      setView('photo-meal');
+                    }}
+                  >
+                    По фото блюда
+                  </Button>
+                  <Button
+                    fullWidth
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      trackProductEvent({
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'manual',
+                      });
+                      setEntryMethod('custom');
+                      setEditingFood(undefined);
+                      setEditorBarcode('');
+                      setView('food-editor');
+                    }}
+                  >
+                    <Icon name="plus" size={16} /> Ввести вручную
+                  </Button>
+                </div>
+              )}
+              {demoSafeMode && (
+                <p className="muted demo-capability-notice" role="status">
+                  В демо доступны поиск, подготовленный каталог и быстрый ввод. Фото этикетки,
+                  ручное сохранение и внешние каталоги доступны после входа.
+                </p>
+              )}
+              <details className="nutrition-picker__secondary-tools">
+                <summary className="yfc-disclosure-summary">
+                  Другие способы добавления
+                  <DisclosureIcon />
+                </summary>
+                <div className="nutrition-picker__tools" aria-label="Другие способы добавления">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={demoSafeMode}
+                    title={demoSafeMode ? 'Доступно после входа' : undefined}
+                    onClick={() => setView('natural')}
+                  >
+                    Вставить список
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={demoSafeMode}
+                    title={demoSafeMode ? 'Доступно после входа' : undefined}
+                    onClick={() => setView('templates')}
+                  >
+                    Шаблоны приёмов
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      trackProductEvent({
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'quick_add',
+                      });
+                      setEntryMethod('quick_add');
+                      trackProductEvent({
+                        name: 'food_log_started',
+                        surface: productEventSurface(),
+                        entry_method: 'quick_add',
+                      });
+                      setView('quick-add');
+                    }}
+                  >
+                    <Icon name="plus" size={16} /> Быстрый ввод
+                  </Button>
+                  {!demoSafeMode && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setEntryMethod('recipe');
+                        setView('recipes');
+                      }}
+                    >
+                      Рецепты
+                    </Button>
+                  )}
+                </div>
+              </details>
+              {searchQuery.length < 2 && (
+                <details className="nutrition-picker__catalog-filters">
+                  <summary className="yfc-disclosure-summary">
+                    Каталог и фильтры
+                    <DisclosureIcon />
+                  </summary>
+                  <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
+                    <button
+                      type="button"
+                      className={source === 'mine' ? 'is-active' : ''}
+                      aria-pressed={source === 'mine'}
+                      data-yfc-choice="compact"
+                      onClick={() => {
+                        setEntryMethod('personal');
+                        setSource('mine');
+                      }}
+                    >
+                      Мои продукты
+                    </button>
+                    <button
+                      type="button"
+                      className={source === 'frequent' ? 'is-active' : ''}
+                      aria-pressed={source === 'frequent'}
+                      data-yfc-choice="compact"
+                      onClick={() => {
+                        setEntryMethod('frequent');
+                        setSource('frequent');
+                      }}
+                    >
+                      Частые
+                    </button>
+                    <button
+                      type="button"
+                      className={source === 'recent' ? 'is-active' : ''}
+                      aria-pressed={source === 'recent'}
+                      data-yfc-choice="compact"
+                      onClick={() => {
+                        setEntryMethod('recent');
+                        setSource('recent');
+                      }}
+                    >
+                      Недавние
+                    </button>
+                    <button
+                      type="button"
+                      className={source === 'favorites' ? 'is-active' : ''}
+                      aria-pressed={source === 'favorites'}
+                      data-yfc-choice="compact"
+                      onClick={() => {
+                        setEntryMethod('favorite');
+                        setSource('favorites');
+                      }}
+                    >
+                      Избранное
+                    </button>
+                  </div>
+                </details>
+              )}
+              <div className="nutrition-picker__result-content">
+                {activeLoading && <LoadingState label="Ищем продукты…" />}
+                {activeError && (
+                  <ErrorState
+                    message="Локальный каталог сейчас не ответил. Попробуйте снова."
+                    retry={() =>
+                      void (searchQuery.length >= 2 ? search.refetch() : activeCollection.refetch())
+                    }
+                  />
+                )}
+                {!activeLoading && !activeError && (
+                  <FoodResults
+                    foods={shownFoods}
+                    onSelect={(food) =>
+                      selectFood(food, {
+                        sourceOverride:
+                          searchQuery.length >= 2 ? undefined : pickerSourceAnalytics(source),
+                      })
+                    }
+                    onFavorite={(food) => favorite.mutate(food)}
+                    pendingFavorite={favorite.isPending ? (favorite.variables?.id ?? null) : null}
+                    allowManage={!demoSafeMode}
+                    onEdit={(food) => {
+                      setEditingFood(food);
+                      setEditorBarcode('');
+                      setView('food-editor');
+                    }}
+                  />
+                )}
+                {favorite.error && (
+                  <p className="nutrition-form-error" role="alert">
+                    Не удалось обновить избранное.
+                  </p>
+                )}
+                {external.isFetching && <LoadingState label="Проверяем внешний каталог…" />}
+                {external.error && (
+                  <div className="nutrition-provider-fallback" role="status">
+                    <strong>Внешний каталог временно недоступен</strong>
+                    <span>Можно использовать локальный поиск или создать свой продукт.</span>
+                  </div>
+                )}
+                {!demoSafeMode && external.data && externalQuery === searchQuery && (
+                  <ExternalResults
+                    response={external.data}
+                    onSelect={selectExternalFood}
+                    pendingExternalKey={
+                      importExternal.isPending && importExternal.variables
+                        ? `${importExternal.variables.source.provider}-${importExternal.variables.external_id}`
+                        : null
+                    }
+                  />
+                )}
+                {importExternal.error && (
+                  <p className="nutrition-form-error" role="alert">
+                    Не удалось сохранить продукт. Попробуйте снова.
+                  </p>
+                )}
               </div>
-            )}
-            {activeLoading && <LoadingState label="Ищем продукты…" />}
-            {activeError && (
-              <ErrorState
-                message="Локальный каталог сейчас не ответил. Попробуйте снова."
-                retry={() =>
-                  void (searchQuery.length >= 2 ? search.refetch() : activeCollection.refetch())
-                }
-              />
-            )}
-            {!activeLoading && !activeError && (
-              <FoodResults
-                foods={shownFoods}
-                onSelect={selectFood}
-                onFavorite={(food) => favorite.mutate(food)}
-                pendingFavorite={favorite.isPending ? (favorite.variables?.id ?? null) : null}
-                onEdit={(food) => {
-                  setEditingFood(food);
-                  setEditorBarcode('');
-                  setView('food-editor');
-                }}
-              />
-            )}
-            {favorite.error && (
-              <p className="nutrition-form-error" role="alert">
-                Не удалось обновить избранное.
-              </p>
-            )}
-            {external.isFetching && <LoadingState label="Проверяем внешний каталог…" />}
-            {external.error && (
-              <div className="nutrition-provider-fallback" role="status">
-                <strong>Внешний каталог временно недоступен</strong>
-                <span>Можно использовать локальный поиск или создать свой продукт.</span>
-              </div>
-            )}
-            {external.data && externalQuery === searchQuery && (
-              <ExternalResults
-                response={external.data}
-                onSelect={selectExternalFood}
-                pendingExternalKey={
-                  importExternal.isPending && importExternal.variables
-                    ? `${importExternal.variables.source.provider}-${importExternal.variables.external_id}`
-                    : null
-                }
-              />
-            )}
-            {importExternal.error && (
-              <p className="nutrition-form-error" role="alert">
-                Не удалось сохранить продукт. Попробуйте снова.
-              </p>
-            )}
+            </div>
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { HydrationDay, HydrationEntry, HydrationPreset, User } from '../../shared/api/types';
@@ -6,6 +6,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { haptic } from '../../shared/telegram/useTelegram';
 import {
   Button,
+  DisclosureIcon,
   EmptyState,
   ErrorState,
   Field,
@@ -14,6 +15,11 @@ import {
   Select,
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
+import { Icon } from '../../shared/ui/Icon';
+import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
+
+// Inter has no Unicode subscript ₂; its ordinary 2 is rendered below the baseline.
+const waterFormula = 'H₂O';
 
 const beverageLabels: Record<string, string> = {
   water: 'Вода',
@@ -42,6 +48,14 @@ function localDateTimeValue(value: string, timeZone: string): string {
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((item) => item.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
+}
+
+function hydrationEntryCountLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'запись';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'записи';
+  return 'записей';
 }
 
 function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChanged(): void }) {
@@ -164,11 +178,18 @@ function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChan
   );
 }
 
-export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
+export function HydrationTracker({
+  diaryDate,
+  initialExpanded = false,
+}: {
+  diaryDate: string;
+  initialExpanded?: boolean;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
-  const deepLinked = new URLSearchParams(window.location.search).get('hydration') === 'quick';
-  const [expanded, setExpanded] = useState(deepLinked);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const quickAddRef = useRef<HTMLDivElement>(null);
+  const addInFlightRef = useRef(false);
   const [customVolume, setCustomVolume] = useState('');
   const [beverageType, setBeverageType] = useState('water');
   const [undoEntry, setUndoEntry] = useState<HydrationEntry | null>(null);
@@ -187,6 +208,26 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
     queryKey: ['me'],
     queryFn: () => api<User>('/api/v1/me'),
   });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (
+      !initialExpanded ||
+      !hydration.data ||
+      !quickAddRef.current ||
+      url.searchParams.get('hydration') !== 'quick'
+    ) {
+      return;
+    }
+    quickAddRef.current.querySelector('button')?.focus({ preventScroll: true });
+    quickAddRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
+    url.searchParams.delete('hydration');
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, [initialExpanded, hydration.data]);
   const loadedGoal = hydration.data?.goal;
   const loadedGoalIsReference = loadedGoal?.source === 'national_academies_beverages';
   const goalMode = goalModeDraft ?? (loadedGoal && !loadedGoalIsReference ? 'manual' : 'reference');
@@ -232,10 +273,22 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
       setUndoEntry(entry);
       setCustomVolume('');
       await refresh();
+      trackCoreProductEvent(
+        { name: 'hydration_logged', surface: productEventSurface() },
+        'hydration_logged',
+      );
       haptic('success');
     },
     onError: (reason) => toast((reason as Error).message, 'error'),
+    onSettled: () => {
+      addInFlightRef.current = false;
+    },
   });
+  const submitAdd = (payload: Parameters<typeof add.mutate>[0]) => {
+    if (addInFlightRef.current || add.isPending) return;
+    addInFlightRef.current = true;
+    add.mutate(payload);
+  };
   const undo = useMutation({
     mutationFn: (entryId: number) =>
       api<void>(`/api/v1/nutrition/hydration/entries/${entryId}`, { method: 'DELETE' }),
@@ -255,7 +308,7 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
           enabled: true,
           source: goalMode === 'reference' ? 'national_academies_beverages' : 'manual',
           target_ml: goalMode === 'manual' ? Number(manualGoal) : null,
-          sex: goalMode === 'reference' ? (sex ?? currentSex ?? 'female') : null,
+          sex: goalMode === 'reference' ? sex : null,
           adult_confirmed: goalMode === 'reference' ? adultConfirmed : null,
           save_sex_to_profile: goalMode === 'reference' && saveSex,
         },
@@ -330,6 +383,12 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
   const data = hydration.data;
   const target = data.goal?.enabled ? data.goal.target_ml : null;
   const progress = Math.min(data.progress_percent ?? 0, 100);
+  const hasFullHistory = data.entries.length > 3;
+  const showFullHistory = hasFullHistory && historyExpanded;
+  const historyEntries = showFullHistory ? data.entries : data.entries.slice(0, 3);
+  const historyCount = hasFullHistory
+    ? `${showFullHistory ? 'Вся история' : 'Последние 3'} · всего ${data.entries.length}`
+    : `${data.entries.length} ${hydrationEntryCountLabel(data.entries.length)}`;
   return (
     <section className="hydration-card" aria-label="Гидратация">
       <header className="hydration-card__header">
@@ -340,7 +399,17 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
         </div>
         <div className="hydration-orb" aria-hidden="true">
           <span style={{ height: `${progress}%` }} />
-          <strong>{target ? `${Math.round(data.progress_percent ?? 0)}%` : 'H₂O'}</strong>
+          <strong>
+            {target ? (
+              `${Math.round(data.progress_percent ?? 0)}%`
+            ) : (
+              <>
+                {waterFormula[0]}
+                <sub>2</sub>
+                {waterFormula[2]}
+              </>
+            )}
+          </strong>
         </div>
       </header>
       <div
@@ -357,15 +426,16 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
       >
         <span style={{ width: `${progress}%` }} />
       </div>
-      <div className="hydration-presets" aria-label="Быстро добавить напиток">
+      <div ref={quickAddRef} className="hydration-presets" aria-label="Быстро добавить напиток">
         {data.presets.map((preset) => (
           <Button
             variant="secondary"
+            aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
             disabled={add.isPending}
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
-              add.mutate({
+              submitAdd({
                 volume: preset.volume_ml,
                 kind: preset.beverage_type,
                 source: 'quick_preset',
@@ -374,7 +444,9 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
             }
           >
             <span>{preset.label}</span>
-            <strong>+{preset.volume_ml} мл</strong>
+            <strong>
+              <Icon name="plus" size={16} /> {preset.volume_ml} мл
+            </strong>
           </Button>
         ))}
       </div>
@@ -389,71 +461,104 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
       {add.isError && add.variables && (
         <div className="hydration-mutation-error" role="alert">
           <span>{add.error.message}</span>
-          <Button variant="secondary" type="button" onClick={() => add.mutate(add.variables)}>
+          <Button variant="secondary" type="button" onClick={() => submitAdd(add.variables)}>
             Повторить без дубля
           </Button>
         </div>
       )}
-      <Button
-        aria-expanded={expanded}
-        className="hydration-expand"
-        variant="secondary"
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-      >
-        {expanded ? 'Скрыть детали' : 'Другой напиток, история и цель'}
-      </Button>
-      {expanded && (
-        <div className="hydration-details">
-          <section aria-labelledby="hydration-custom-title">
-            <h3 id="hydration-custom-title">Другой объём</h3>
-            <div className="hydration-form-row">
-              <Field label="Объём, мл" labelFor="hydration-custom-volume">
-                <Input
-                  id="hydration-custom-volume"
-                  inputMode="numeric"
-                  min="1"
-                  max="5000"
-                  type="number"
-                  value={customVolume}
-                  onChange={(event) => setCustomVolume(event.target.value)}
-                />
-              </Field>
-              <Field label="Напиток" labelFor="hydration-custom-kind">
-                <Select
-                  id="hydration-custom-kind"
-                  value={beverageType}
-                  onChange={(event) => setBeverageType(event.target.value)}
-                >
-                  {Object.entries(beverageLabels).map(([value, label]) => (
-                    <option value={value} key={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Button
-                disabled={add.isPending || !customVolume}
-                type="button"
-                onClick={() =>
-                  add.mutate({
-                    volume: Number(customVolume),
-                    kind: beverageType,
-                    source: 'manual',
-                    key: requestKey('hydration-entry'),
-                  })
-                }
-              >
-                {add.isPending ? 'Добавляем…' : 'Добавить'}
-              </Button>
-            </div>
-            <p className="hydration-note">
-              Запись напитка не изменяет калории и кофеин в дневнике питания.
-            </p>
-          </section>
+      <section className="hydration-card__section" aria-labelledby="hydration-custom-title">
+        <h3 id="hydration-custom-title">Другой объём</h3>
+        <div className="hydration-form-row">
+          <Field label="Объём, мл" labelFor="hydration-custom-volume">
+            <Input
+              id="hydration-custom-volume"
+              inputMode="numeric"
+              min="1"
+              max="5000"
+              type="number"
+              value={customVolume}
+              onChange={(event) => setCustomVolume(event.target.value)}
+            />
+          </Field>
+          <Field label="Напиток" labelFor="hydration-custom-kind">
+            <Select
+              id="hydration-custom-kind"
+              value={beverageType}
+              onChange={(event) => setBeverageType(event.target.value)}
+            >
+              {Object.entries(beverageLabels).map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button
+            disabled={add.isPending || !customVolume}
+            type="button"
+            onClick={() =>
+              submitAdd({
+                volume: Number(customVolume),
+                kind: beverageType,
+                source: 'manual',
+                key: requestKey('hydration-entry'),
+              })
+            }
+          >
+            {add.isPending ? 'Добавляем…' : 'Добавить'}
+          </Button>
+        </div>
+        <p className="hydration-note">
+          Запись напитка не изменяет калории и кофеин в дневнике питания.
+        </p>
+      </section>
 
-          <section aria-labelledby="hydration-goal-title">
-            <h3 id="hydration-goal-title">Личный ориентир</h3>
+      <section className="hydration-card__section" aria-labelledby="hydration-history-title">
+        <div className="hydration-section-head">
+          <div>
+            <h3 id="hydration-history-title">История за день</h3>
+            <p>Последние записи сразу после добавления воды</p>
+          </div>
+          <span className="eyebrow hydration-history__count">{historyCount}</span>
+        </div>
+        {data.entries.length === 0 ? (
+          <EmptyState
+            title="Напитков пока нет"
+            text="Быстро добавьте стакан или укажите другой объём."
+          />
+        ) : (
+          <ul id="hydration-history-list" className="hydration-history" aria-live="polite">
+            {historyEntries.map((entry) => (
+              <HydrationEntryRow entry={entry} key={entry.id} onChanged={() => void refresh()} />
+            ))}
+          </ul>
+        )}
+        {hasFullHistory && (
+          <div className="hydration-history__actions">
+            <Button
+              aria-controls="hydration-history-list"
+              aria-expanded={showFullHistory}
+              type="button"
+              onClick={() => setHistoryExpanded((value) => !value)}
+            >
+              {showFullHistory ? 'Свернуть историю' : 'Показать всю историю'}
+              <Icon
+                className={`hydration-history__toggle-icon${showFullHistory ? ' hydration-history__toggle-icon--expanded' : ''}`}
+                name="disclosure-closed"
+                size={16}
+              />
+            </Button>
+          </div>
+        )}
+      </section>
+
+      <div className="hydration-details">
+        <details>
+          <summary className="hydration-details__summary yfc-disclosure-summary">
+            <span id="hydration-goal-title">Личный ориентир</span>
+            <DisclosureIcon />
+          </summary>
+          <section className="hydration-details__body" aria-labelledby="hydration-goal-title">
             <div
               className="hydration-choice"
               role="radiogroup"
@@ -481,9 +586,12 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
                 <Field label="Пол для справочного ориентира" labelFor="hydration-sex">
                   <Select
                     id="hydration-sex"
-                    value={sex ?? currentSex ?? 'female'}
+                    value={sex ?? ''}
                     onChange={(event) => setSex(event.target.value as 'male' | 'female')}
                   >
+                    <option value="" disabled>
+                      Выберите пол для расчёта
+                    </option>
                     <option value="female">Женский — 2200 мл напитков</option>
                     <option value="male">Мужской — 3000 мл напитков</option>
                   </Select>
@@ -529,7 +637,9 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
             )}
             <div className="hydration-entry__actions">
               <Button
-                disabled={saveGoal.isPending || (goalMode === 'reference' && !adultConfirmed)}
+                disabled={
+                  saveGoal.isPending || (goalMode === 'reference' && (!adultConfirmed || !sex))
+                }
                 type="button"
                 onClick={() => saveGoal.mutate(requestKey('hydration-goal'))}
               >
@@ -554,9 +664,14 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
               </div>
             )}
           </section>
+        </details>
 
-          <section aria-labelledby="hydration-presets-title">
-            <h3 id="hydration-presets-title">Мои кружки и бутылки</h3>
+        <details>
+          <summary className="hydration-details__summary yfc-disclosure-summary">
+            <span id="hydration-presets-title">Мои кружки и бутылки</span>
+            <DisclosureIcon />
+          </summary>
+          <section className="hydration-details__body" aria-labelledby="hydration-presets-title">
             <div className="hydration-form-row">
               <Field label="Название" labelFor="hydration-preset-name">
                 <Input
@@ -608,28 +723,8 @@ export function HydrationTracker({ diaryDate }: { diaryDate: string }) {
               </ul>
             )}
           </section>
-
-          <section aria-labelledby="hydration-history-title">
-            <h3 id="hydration-history-title">История за день</h3>
-            {data.entries.length === 0 ? (
-              <EmptyState
-                title="Напитков пока нет"
-                text="Быстро добавьте стакан или укажите другой объём."
-              />
-            ) : (
-              <ul className="hydration-history">
-                {data.entries.map((entry) => (
-                  <HydrationEntryRow
-                    entry={entry}
-                    key={entry.id}
-                    onChanged={() => void refresh()}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-      )}
+        </details>
+      </div>
     </section>
   );
 }

@@ -1,0 +1,438 @@
+"""HTTP schemas for the authenticated, generic-only AI Coach endpoint."""
+
+from __future__ import annotations
+
+import unicodedata
+from datetime import date, datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from fitminiapp_api.ai_coach.contracts import (
+    AI_COACH_ADAPTATION_POLICY_VERSION,
+    AI_COACH_ADAPTATION_PROMPT_VERSION,
+    AI_COACH_ADAPTATION_SCHEMA_VERSION,
+    AI_COACH_CHAT_MAX_MESSAGE_LENGTH,
+    AdaptationProposal,
+    AiCoachCitation,
+    AiCoachDataClass,
+    AiCoachExerciseReference,
+    AiCoachJob,
+    AiCoachOutcome,
+    AiCoachPersonalTool,
+    AiCoachQuotaSnapshot,
+    AiCoachRateLimitScope,
+    AiCoachResponse,
+)
+
+
+class AiCoachAdaptationGenerateRequest(BaseModel):
+    """A server-authorized program selector for one bounded adaptation draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    program_id: int = Field(..., ge=1)
+    expected_revision_number: int = Field(..., ge=0)
+    target_workout_id: int | None = Field(default=None, ge=1)
+    target_exercise_id: int | None = Field(default=None, ge=1)
+    message: str = Field(..., min_length=1, max_length=600)
+    locale: Literal["ru", "en"] = "ru"
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t\n" for char in normalized):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachAdaptationProposalResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: AiCoachOutcome
+    proposal: AdaptationProposal | None = None
+    proposal_token: str | None = Field(default=None, min_length=1, max_length=8_192)
+    limitations: tuple[str, ...] = Field(default=(), max_length=6)
+    safety_category: str = Field(..., min_length=1, max_length=48)
+    prompt_version: str = AI_COACH_ADAPTATION_PROMPT_VERSION
+    schema_version: str = AI_COACH_ADAPTATION_SCHEMA_VERSION
+    policy_version: str = AI_COACH_ADAPTATION_POLICY_VERSION
+    request_id: str | None = Field(default=None, max_length=128)
+    quota: AiCoachQuotaSnapshot | None = None
+
+    @model_validator(mode="after")
+    def validate_proposal_token(self) -> AiCoachAdaptationProposalResponse:
+        if (self.proposal is None) != (self.proposal_token is None):
+            raise ValueError("proposal and proposal_token must be returned together")
+        return self
+
+
+class AiCoachAdaptationReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(..., min_length=64, max_length=64)
+    proposal_token: str = Field(..., min_length=1, max_length=8_192)
+    expected_revision_number: int = Field(..., ge=0)
+    decision: Literal["confirm", "reject"]
+
+
+class AiCoachAdaptationReviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: AiCoachOutcome
+    proposal_id: str = Field(..., min_length=64, max_length=64)
+    decision: Literal["confirm", "reject"]
+    applied: bool
+    idempotent: bool = False
+    current_revision_number: int = Field(..., ge=0)
+    limitations: tuple[str, ...] = Field(default=(), max_length=6)
+    quota: AiCoachQuotaSnapshot | None = None
+
+
+class AiCoachGenerateRequest(BaseModel):
+    """A bounded intent plus a server-known public context id.
+
+    The model intentionally has no provider, model, system prompt, URL, account
+    data, file or arbitrary context field.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    job: AiCoachJob
+    context_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_.:/-]+$",
+    )
+    message: str = Field(..., min_length=1, max_length=320)
+
+    @field_validator("context_id")
+    @classmethod
+    def validate_context_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if "://" in normalized or "?" in normalized or "#" in normalized:
+            raise ValueError("context_id must be a server-known public id, not a URL")
+        return normalized
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachPersonalGenerateRequest(BaseModel):
+    """A server-selected read-only tool and a bounded report period."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool: AiCoachPersonalTool
+    period_days: Literal[7, 30, 90] = 30
+    period: Literal["days_7", "days_30", "days_90", "custom"] | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    message: str = Field(..., min_length=1, max_length=320)
+
+    @model_validator(mode="after")
+    def validate_period(self) -> AiCoachPersonalGenerateRequest:
+        if self.period is None:
+            if self.date_from is not None or self.date_to is not None:
+                raise ValueError("Произвольные даты требуют period=custom")
+            return self
+        if self.period == "custom":
+            if self.date_from is None or self.date_to is None:
+                raise ValueError("Для произвольного периода укажите обе даты")
+            return self
+        if self.date_from is not None or self.date_to is not None:
+            raise ValueError("Даты можно передавать только для period=custom")
+        return self
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachConsentUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
+class AiCoachConsentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["granted", "revoked"]
+    scope: str
+    consent_version: str
+    categories: tuple[str, ...]
+    purpose: str
+    provider_name: str
+    provider_policy_revision: str
+    retention_notice: str
+    consent_source: str
+    granted_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+class AiCoachMemoryConsentUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["enabled", "paused", "revoked"]
+
+
+class AiCoachMemoryCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: Literal[
+        "preferred_explanation_style",
+        "ai_interaction_preferences",
+        "stable_non_medical_preferences",
+        "explicit_ai_context",
+    ]
+    value: str = Field(..., min_length=1, max_length=240)
+    confirmation: Literal[True]
+
+
+class AiCoachMemoryUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(..., min_length=1, max_length=240)
+    confirmation: Literal[True]
+
+
+class AiCoachMemoryItemResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    category: str
+    category_label: str
+    value: str
+    source_kind: Literal["explicit_user", "confirmed_candidate"]
+    confidence: Literal["explicit", "confirmed"]
+    status: Literal["active", "superseded", "conflicted", "deleted"]
+    version: int
+    created_at: datetime
+    updated_at: datetime
+    expires_at: datetime | None = None
+
+
+class AiCoachMemoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["enabled", "paused", "revoked"]
+    scope: str
+    consent_version: str
+    categories: tuple[str, ...]
+    category_labels: dict[str, str]
+    purpose: str
+    retention_notice: str
+    max_items: int
+    consent_source: str
+    granted_at: datetime | None = None
+    paused_at: datetime | None = None
+    revoked_at: datetime | None = None
+    items: tuple[AiCoachMemoryItemResponse, ...] = ()
+
+
+class AiCoachMemoryClearResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int
+
+
+class AiCoachStatusResponse(BaseModel):
+    """Safe server-authoritative state for the AI Coach runtime and UI."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ui_enabled: bool
+    generic_available: bool
+    personal_available: bool
+
+
+AiCoachContextSurface = Literal["today", "workout", "nutrition", "program", "progress"]
+
+
+class AiCoachContextDescriptor(BaseModel):
+    """A small client hint resolved against the authenticated user's data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface: AiCoachContextSurface
+    resource_id: int | None = Field(default=None, gt=0)
+    period_days: Literal[7, 30, 90] | None = None
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> AiCoachContextDescriptor:
+        if self.surface == "workout":
+            if self.resource_id is None or self.period_days is not None:
+                raise ValueError("Контекст тренировки требует только resource_id")
+        elif self.surface in {"nutrition", "progress"}:
+            if self.resource_id is not None or self.period_days is None:
+                raise ValueError("Контекст сводки требует только period_days")
+        elif self.resource_id is not None or self.period_days is not None:
+            raise ValueError("Этот экран не принимает resource_id или period_days")
+        return self
+
+
+class AiCoachContextAttachment(BaseModel):
+    """High-level context label returned to the composer, without resource data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface: AiCoachContextSurface
+    label: str = Field(..., min_length=1, max_length=80)
+
+
+ChatFailureCategory = Literal[
+    "provider_failure",
+    "structured_validation",
+    "timeout",
+    "rate_limit",
+    "repair_failed",
+    "presentation_validation_failed",
+    "internal_error",
+    "safety_rejection",
+    "context_failure",
+    "generation_failure",
+    # Kept for historical conversation rows created before the taxonomy update.
+    "rate_limited",
+]
+
+
+class AiCoachConversationSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = Field(..., ge=0)
+
+
+class AiCoachConversationMessageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
+    status: Literal["processing", "complete", "failed"]
+    outcome: AiCoachOutcome | None = None
+    safety_category: str = Field(..., min_length=1, max_length=48)
+    failure_category: ChatFailureCategory | None = None
+    rate_limit_scope: AiCoachRateLimitScope | None = None
+    rate_limit_retry_after_seconds: int | None = Field(default=None, ge=0)
+    citations: tuple[AiCoachCitation, ...] = ()
+    exercise_references: tuple[AiCoachExerciseReference, ...] = Field(default=(), max_length=4)
+    limitations: tuple[str, ...] = ()
+    created_at: datetime
+
+
+class AiCoachConversationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    messages: tuple[AiCoachConversationMessageResponse, ...] = ()
+
+
+class AiCoachConversationListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: tuple[AiCoachConversationSummaryResponse, ...] = ()
+
+
+class AiCoachConversationClearResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int = Field(..., ge=0)
+
+
+class AiCoachConversationSendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
+    context: AiCoachContextDescriptor | None = None
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachConversationRetryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    context: AiCoachContextDescriptor | None = None
+
+
+class AiCoachConversationFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: Literal["helpful", "not_helpful"]
+
+
+class AiCoachConversationSendResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: int
+    user_message: AiCoachConversationMessageResponse
+    assistant_message: AiCoachConversationMessageResponse | None = None
+    outcome: AiCoachOutcome
+    data_class: AiCoachDataClass
+    answer: str | None = Field(default=None, max_length=1_600)
+    citations: tuple[AiCoachCitation, ...] = ()
+    exercise_references: tuple[AiCoachExerciseReference, ...] = Field(default=(), max_length=4)
+    limitations: tuple[str, ...] = ()
+    safety_category: str = Field(..., min_length=1, max_length=48)
+    failure_category: ChatFailureCategory | None = None
+    prompt_version: str = Field(..., min_length=1, max_length=64)
+    request_id: str | None = Field(default=None, max_length=128)
+    quota: AiCoachQuotaSnapshot
+    rate_limit_scope: AiCoachRateLimitScope | None = None
+    rate_limit_retry_after_seconds: int | None = Field(default=None, ge=0)
+    context: AiCoachContextAttachment | None = None
+
+
+__all__ = [
+    "AiCoachAdaptationGenerateRequest",
+    "AiCoachAdaptationProposalResponse",
+    "AiCoachAdaptationReviewRequest",
+    "AiCoachAdaptationReviewResponse",
+    "AiCoachConsentResponse",
+    "AiCoachConsentUpdateRequest",
+    "AiCoachContextAttachment",
+    "AiCoachContextDescriptor",
+    "AiCoachConversationClearResponse",
+    "AiCoachConversationFeedbackRequest",
+    "AiCoachConversationListResponse",
+    "AiCoachConversationMessageResponse",
+    "AiCoachConversationResponse",
+    "AiCoachConversationRetryRequest",
+    "AiCoachConversationSendRequest",
+    "AiCoachConversationSendResponse",
+    "AiCoachConversationSummaryResponse",
+    "AiCoachGenerateRequest",
+    "AiCoachMemoryClearResponse",
+    "AiCoachMemoryConsentUpdateRequest",
+    "AiCoachMemoryCreateRequest",
+    "AiCoachMemoryItemResponse",
+    "AiCoachMemoryResponse",
+    "AiCoachMemoryUpdateRequest",
+    "AiCoachPersonalGenerateRequest",
+    "AiCoachResponse",
+    "AiCoachStatusResponse",
+]

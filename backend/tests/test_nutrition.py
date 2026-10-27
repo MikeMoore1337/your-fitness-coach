@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from fitminiapp_api.schemas.nutrition import NutritionTargetSave
-from fitminiapp_api.services.nutrition import calculate_nutrition
+from fitminiapp_api.services.nutrition import NutritionError, calculate_nutrition
 
 
 def nutrition_payload(**overrides) -> NutritionTargetSave:
@@ -42,11 +42,11 @@ def test_calculates_new_activity_inputs_and_net_training_calories() -> None:
         "strength_daily_calories": 187,
         "cardio_daily_calories": 123,
         "tdee": 2450,
-        "goal_multiplier": 1.0,
-        "calories": 2450,
+        "goal_multiplier": 0.95,
+        "calories": 2330,
         "protein_g": 156,
         "fat_g": 62,
-        "carbs_g": 317,
+        "carbs_g": 287,
         "macro_warning": False,
     }
 
@@ -103,7 +103,7 @@ def test_routine_and_steps_select_one_activity_coefficient(
     ("goal", "multiplier", "protein_per_kg", "fat_per_kg"),
     [
         ("fat_loss", 0.85, 2.2, 0.8),
-        ("recomposition", 1.0, 2.0, 0.8),
+        ("recomposition", 0.95, 2.0, 0.8),
         ("maintenance", 1.0, 1.8, 0.9),
         ("muscle_gain", 1.05, 1.8, 0.9),
     ],
@@ -198,23 +198,32 @@ def test_detailed_payload_requires_strength_type_and_cardio_list() -> None:
         NutritionTargetSave(**values)
 
 
-def test_negative_carbohydrate_result_is_clamped_and_warned() -> None:
-    result = calculate_nutrition(
-        nutrition_payload(
-            weight_kg=350,
-            height_cm=100,
-            age=100,
-            daily_routine="mostly_sitting",
-            steps_range="up_to_4000",
-            strength_trainings_per_week=0,
-            cardio_trainings=[],
-            goal="fat_loss",
+def test_infeasible_macros_do_not_silently_reverse_calorie_deficit() -> None:
+    with pytest.raises(NutritionError, match="превышают целевую калорийность"):
+        calculate_nutrition(
+            nutrition_payload(
+                sex="female",
+                weight_kg=350,
+                height_cm=100,
+                age=100,
+                daily_routine="mostly_sitting",
+                steps_range="up_to_4000",
+                strength_trainings_per_week=0,
+                cardio_trainings=[],
+                goal="fat_loss",
+            )
         )
-    )
 
-    assert result["carbs_g"] == 0
-    assert result["macro_warning"] is True
-    assert result["calories"] == result["protein_g"] * 4 + result["fat_g"] * 9
+
+@pytest.mark.parametrize("goal", ["fat_loss", "recomposition", "maintenance", "muscle_gain"])
+def test_calculated_macros_never_exceed_explicit_energy_budget(goal: str) -> None:
+    result = calculate_nutrition(nutrition_payload(goal=goal))
+    implied = 4 * result["protein_g"] + 9 * result["fat_g"] + 4 * result["carbs_g"]
+    assert abs(implied - result["calories"]) <= 2
+    assert result["carbs_g"] >= 0
+    assert result["macro_warning"] is False
+    if goal in {"fat_loss", "recomposition"}:
+        assert result["calories"] <= result["tdee"]
 
 
 @pytest.mark.parametrize(

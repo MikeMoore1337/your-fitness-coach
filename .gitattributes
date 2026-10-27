@@ -1,7 +1,13 @@
 * text=auto
 
+# Canonical news source provenance hashes raw bytes; keep the registry LF-only on every checkout.
+/backend/fitminiapp_api/resources/news_sources.json text eol=lf
+
 # Container entrypoints must remain executable POSIX shell text on Windows clones.
 *.sh text eol=lf
 
 # Generated exercise-guide vectors must hash identically on every platform.
 /backend/assets/exercise-guides/*.svg text eol=lf
+
+# Preserve the exact upstream license bytes used by the image compliance checksum.
+/deploy/hermes-editorial-worker/LICENSES/HERMES-LICENSE -text -diff

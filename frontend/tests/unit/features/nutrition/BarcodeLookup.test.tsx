@@ -31,14 +31,14 @@ const localFood = {
   updated_at: '2026-08-01T07:00:00Z',
 };
 
-function renderLookup(onSelect = vi.fn()) {
+function renderLookup(onSelect = vi.fn(), onScanLabel = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const result = render(
     <QueryClientProvider client={client}>
-      <BarcodeLookup onCreate={vi.fn()} onSelect={onSelect} />
+      <BarcodeLookup onCreate={vi.fn()} onScanLabel={onScanLabel} onSelect={onSelect} />
     </QueryClientProvider>,
   );
-  return { ...result, onSelect };
+  return { ...result, onSelect, onScanLabel };
 }
 
 function installTouchCamera(getUserMedia?: () => Promise<MediaStream>) {
@@ -238,5 +238,36 @@ describe('BarcodeLookup camera fallback', () => {
 
     expect(await screen.findByText('Продукт не найден')).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Штрихкод' })).toHaveValue('3017620422003');
+  });
+
+  it('offers the label scanner for an incomplete local product without another provider lookup', async () => {
+    const incompleteLocalFood = {
+      ...localFood,
+      canonical_complete: false,
+      catalog_quality: 'community_unverified' as const,
+    };
+    apiMock.mockResolvedValue({
+      barcode: incompleteLocalFood.barcode,
+      status: 'found',
+      source: 'local',
+      local_item: incompleteLocalFood,
+      external_item: null,
+      provider_status: 'not_needed',
+      provider_statuses: [],
+    });
+    const { onScanLabel } = renderLookup();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Штрихкод' }), {
+      target: { value: incompleteLocalFood.barcode },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
+
+    expect(await screen.findByText(/Карточка заполнена не полностью/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать по фото' }));
+    expect(onScanLabel).toHaveBeenCalledWith(incompleteLocalFood.barcode);
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith(
+      `/api/v1/nutrition/foods/barcode/${incompleteLocalFood.barcode}`,
+    );
   });
 });

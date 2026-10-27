@@ -1,0 +1,373 @@
+{
+  "kind": "owner-gated-local-proposal",
+  "runtimeSha": "733933a73a3bc27ca596b9efb00751105a539a86",
+  "server": "http://127.0.0.1:4173",
+  "browser": "Chromium headless",
+  "deviceScaleFactor": 1,
+  "variants": {
+    "a": "900px hero, 65% 34% focal position",
+    "b": "980px hero, 65% 27% focal position"
+  },
+  "records": [
+    {
+      "variant": "before",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "dark",
+      "file": "before-athletes-qhd-dark.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "dark",
+      "file": "a-athletes-qhd-dark.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "dark",
+      "file": "b-athletes-qhd-dark.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "light",
+      "file": "before-athletes-qhd-light.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "light",
+      "file": "a-athletes-qhd-light.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "light",
+      "file": "b-athletes-qhd-light.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "file": "before-athletes-hd-dark.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "file": "a-athletes-hd-dark.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "file": "b-athletes-hd-dark.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "file": "before-athletes-hd-light.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "file": "a-athletes-hd-light.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "file": "b-athletes-hd-light.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "file": "before-athletes-desktop-dark.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "file": "a-athletes-desktop-dark.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "file": "b-athletes-desktop-dark.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "file": "before-athletes-desktop-light.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "file": "a-athletes-desktop-light.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "athletes",
+      "path": "/for-athletes",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "file": "b-athletes-desktop-light.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "dark",
+      "file": "before-trainers-qhd-dark.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "dark",
+      "file": "a-trainers-qhd-dark.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "dark",
+      "file": "b-trainers-qhd-dark.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "light",
+      "file": "before-trainers-qhd-light.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "light",
+      "file": "a-trainers-qhd-light.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "qhd",
+      "width": 2560,
+      "height": 1440,
+      "theme": "light",
+      "file": "b-trainers-qhd-light.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "file": "before-trainers-hd-dark.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "file": "a-trainers-hd-dark.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "file": "b-trainers-hd-dark.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "file": "before-trainers-hd-light.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "file": "a-trainers-hd-light.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "hd",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "file": "b-trainers-hd-light.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "file": "before-trainers-desktop-dark.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "file": "a-trainers-desktop-dark.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "file": "b-trainers-desktop-dark.jpg"
+    },
+    {
+      "variant": "before",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "file": "before-trainers-desktop-light.jpg"
+    },
+    {
+      "variant": "a",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "file": "a-trainers-desktop-light.jpg"
+    },
+    {
+      "variant": "b",
+      "route": "trainers",
+      "path": "/for-trainers",
+      "size": "desktop",
+      "width": 1440,
+      "height": 900,
+      "theme": "light",
+      "file": "b-trainers-desktop-light.jpg"
+    }
+  ]
+}

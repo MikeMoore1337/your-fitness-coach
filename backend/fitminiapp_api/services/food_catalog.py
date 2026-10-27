@@ -171,15 +171,25 @@ def _weak_provider_duplicate(left: ProviderFood, right: ProviderFood) -> bool:
 
 
 def _weak_local_duplicate(local: FoodResponse, external: ProviderFood) -> bool:
+    local_energy = local.energy_kcal_per_100g
+    local_protein = local.protein_g_per_100g
+    local_fat = local.fat_g_per_100g
+    local_carbs = local.carbs_g_per_100g
+    if any(value is None for value in (local_energy, local_protein, local_fat, local_carbs)):
+        return False
     return (
         local.barcode is None
         and external.barcode is None
         and _normalized_identity(local.name) == _normalized_identity(external.name)
         and _normalized_identity(local.brand) == _normalized_identity(external.brand)
-        and abs(local.energy_kcal_per_100g - external.energy_kcal_per_100g) <= Decimal("0.5")
-        and abs(local.protein_g_per_100g - external.protein_g_per_100g) <= Decimal("0.1")
-        and abs(local.fat_g_per_100g - external.fat_g_per_100g) <= Decimal("0.1")
-        and abs(local.carbs_g_per_100g - external.carbs_g_per_100g) <= Decimal("0.1")
+        and local_energy is not None
+        and local_protein is not None
+        and local_fat is not None
+        and local_carbs is not None
+        and abs(local_energy - external.energy_kcal_per_100g) <= Decimal("0.5")
+        and abs(local_protein - external.protein_g_per_100g) <= Decimal("0.1")
+        and abs(local_fat - external.fat_g_per_100g) <= Decimal("0.1")
+        and abs(local_carbs - external.carbs_g_per_100g) <= Decimal("0.1")
     )
 
 

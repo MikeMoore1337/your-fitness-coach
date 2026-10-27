@@ -48,6 +48,13 @@ def test_deployment_smoke_separates_compatible_preflight_from_release_contract()
             final_url=f"{BASE_URL}/api/v1/me",
             headers={"cache-control": "no-store"},
         ),
+        "/api/v1/auth/refresh": HttpResponse(
+            status=401,
+            body=b'{"detail":"Not authenticated"}',
+            content_type="application/json",
+            final_url=f"{BASE_URL}/api/v1/auth/refresh",
+            headers={"cache-control": "no-store"},
+        ),
         "/app": _response("/app", body=HTML, content_type="text/html"),
         "/app/report?period=days_30": _response(
             "/app/report?period=days_30", body=HTML, content_type="text/html"
@@ -66,9 +73,25 @@ def test_deployment_smoke_separates_compatible_preflight_from_release_contract()
 
     requested_paths: list[str] = []
 
-    def read(_base_url: str, path: str, *, timeout: float) -> HttpResponse:
+    def read(
+        _base_url: str,
+        path: str,
+        *,
+        timeout: float,
+        method: str = "GET",
+        body: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> HttpResponse:
         assert timeout == 3
         requested_paths.append(path)
+        if path == "/api/v1/auth/refresh":
+            assert method == "POST"
+            assert body == b"{}"
+            assert headers == {"Accept": "application/json", "Content-Type": "application/json"}
+        else:
+            assert method == "GET"
+            assert body is None
+            assert headers is None
         return responses[path]
 
     assert (
@@ -156,9 +179,13 @@ def test_production_deploy_is_fail_closed_before_backup_and_runs_public_smoke() 
     )
 
     digest_gate = script.index("require_digest_ref POSTGRES_IMAGE")
+    capacity_mode = script.index("capacity_command=capacity-check")
+    sequential_mode = script.index("capacity_command=capacity-check-single-slot")
+    capacity_check = script.index('scripts/zero_downtime_deploy.py "$capacity_command"')
     compose_gate = script.index("docker compose config --quiet")
-    rollout = script.index("scripts/zero_downtime_deploy.py")
+    rollout = script.index('echo "Starting fail-closed blue/green rollout"')
 
-    assert digest_gate < compose_gate < rollout
+    assert digest_gate < capacity_mode < sequential_mode < capacity_check < compose_gate < rollout
+    assert 'if [[ "$ROLLOUT_MODE" == "single-slot" ]]; then' in script
     assert "--remove-orphans" not in script
     assert "docker compose up" not in script

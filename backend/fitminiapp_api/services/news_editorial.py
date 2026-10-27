@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
@@ -25,9 +26,13 @@ from fitminiapp_api.models.news import (
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_content import parse_editorial_content
 from fitminiapp_api.services.news_drafts import quality_warnings
-from fitminiapp_api.services.news_freshness import source_metadata_is_current_month
-from fitminiapp_api.services.news_images import create_uploaded_image_revision, current_image
+from fitminiapp_api.services.news_freshness import source_metadata_is_fresh
+from fitminiapp_api.services.news_images import (
+    create_uploaded_image_revision,
+    current_image,
+)
 from fitminiapp_api.services.news_ingestion import utcnow
+from fitminiapp_api.services.news_origin import is_hermes_origin_draft
 from fitminiapp_api.services.news_publication import (
     ARTIFACT_HASH_PREFIX_LENGTH,
     PUBLICATION_RENDERER_VERSION,
@@ -63,6 +68,19 @@ REVISION_EDITABLE_STATUSES = {
     "publication_scheduled",
     "publication_failed",
 }
+RETIRED_NON_HERMES_ACTIVE_STATUSES = frozenset(
+    {
+        "candidate",
+        "image_pending",
+        "draft_ready",
+        "awaiting_review",
+        "deferred",
+        "publication_approved",
+        "publication_scheduled",
+        "publication_failed",
+    }
+)
+
 OWNER_EDIT_REVALIDATED_WARNINGS = {
     "deterministic_fallback_requires_editor",
     "invalid_draft_schema",
@@ -90,6 +108,32 @@ class ReviewArtifact:
     transport: Literal["message", "photo"] | None
     visible_length: int | None
     limit: int | None
+
+
+NON_HERMES_REVIEW_DELIVERY_DISABLED = "non_hermes_news_pipeline_retired"
+
+
+def review_delivery_blockers(
+    draft: NewsDraftRevision,
+    review: ReviewArtifact,
+) -> tuple[str, ...]:
+    """Allow Telegram review only for an exact, immediately publishable state."""
+
+    if not is_hermes_origin_draft(draft):
+        return (NON_HERMES_REVIEW_DELIVERY_DISABLED,)
+    blockers = list(review.blockers)
+    blockers.extend(
+        f"unresolved_warning:{warning}"
+        for warning in draft.warnings
+        if isinstance(warning, str) and warning
+    )
+    if review.artifact is None:
+        blockers.append("preview_artifact_unavailable")
+    if review.artifact_hash is None:
+        blockers.append("preview_artifact_hash_missing")
+    if review.image is None or not review.image.image_data:
+        blockers.append("preview_image_missing")
+    return tuple(dict.fromkeys(blockers))
 
 
 def editorial_actor_ref(telegram_user_id: int) -> str:
@@ -157,6 +201,8 @@ def edit_text_revision(
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
         return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
+        return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
         cluster is None
@@ -181,6 +227,11 @@ def edit_text_revision(
         editorial_content.fields(),
         source_title=primary.title,
         source_summary=primary.summary,
+        source_context=" ".join(
+            value
+            for value in draft.evidence_metadata.get("source_number_tokens", [])
+            if isinstance(value, str)
+        ),
     )
     preserved_warnings = tuple(
         warning for warning in draft.warnings if warning not in OWNER_EDIT_REVALIDATED_WARNINGS
@@ -252,6 +303,8 @@ def queue_image_regeneration(
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
         return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
+        return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
         cluster is None
@@ -285,6 +338,8 @@ def remove_current_image(
 ) -> ModerationResult:
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
+        return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
         return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
@@ -322,6 +377,8 @@ def replace_current_image(
 ) -> ModerationResult:
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
+        return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
         return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
@@ -370,6 +427,8 @@ def moderate_draft(
 ) -> ModerationResult:
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
+        return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
         return ModerationResult(status="unavailable")
     cluster = (
         db.query(NewsCluster).filter(NewsCluster.id == draft.cluster_id).with_for_update().first()
@@ -421,21 +480,14 @@ def moderate_draft(
         cluster.deferred_until = utcnow() + timedelta(hours=settings.news_defer_hours)
         cluster.delivery_round += 1
         result_status = "deferred"
+    elif action == "regenerate":
+        # Hermes owns text generation. A YFC callback must never requeue the
+        # same immutable revision while pretending that new text exists.
+        result_status = "unavailable"
+        outcome = "generation_external"
     else:
-        if cluster.generation_attempt_count > settings.news_max_regenerations:
-            result_status = "limit_reached"
-            outcome = "limit_reached"
-        else:
-            revoke_active_decisions(db, cluster.id, reason="editorial_regenerate")
-            transition_news_cluster(
-                db,
-                cluster,
-                "candidate",
-                reason_code="owner_regenerate",
-                actor_ref=actor_ref,
-            )
-            cluster.deferred_until = None
-            result_status = "queued"
+        result_status = "unavailable"
+        outcome = "unsupported_action"
     db.add(
         NewsEditorialAction(
             cluster_id=cluster.id,
@@ -461,6 +513,9 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
     now = utcnow()
     image_pending = db.query(NewsCluster).filter(NewsCluster.status == "image_pending").all()
     for cluster in image_pending:
+        draft = latest_draft(db, cluster)
+        if draft is None or not is_hermes_origin_draft(draft):
+            continue
         transition_news_cluster(
             db,
             cluster,
@@ -477,6 +532,9 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
         .all()
     )
     for cluster in deferred:
+        draft = latest_draft(db, cluster)
+        if draft is None or not is_hermes_origin_draft(draft):
+            continue
         transition_news_cluster(
             db,
             cluster,
@@ -495,7 +553,10 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
         draft = latest_draft(db, cluster)
         if draft is None:
             continue
-        if not source_metadata_is_current_month(draft.evidence_metadata, now=now):
+        if not is_hermes_origin_draft(draft):
+            _cancel_pending_deliveries(db, draft.id)
+            continue
+        if not source_metadata_is_fresh(draft.evidence_metadata, now=now):
             _cancel_pending_deliveries(db, draft.id)
             transition_news_cluster(
                 db,
@@ -504,19 +565,22 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
                 reason_code="source_not_current_month",
             )
             continue
+        preview_recorded = (
+            db.query(AuditEvent.id)
+            .filter(
+                AuditEvent.action == "news.preview_created",
+                AuditEvent.resource_type == "news_draft_revision",
+                AuditEvent.resource_id == draft.id,
+            )
+            .first()
+            is not None
+        )
+        if cluster.status == "publication_failed" and preview_recorded:
+            continue
+
         created_for_cluster = 0
         is_preview_upgrade = False
         if cluster.status == "awaiting_review":
-            preview_recorded = (
-                db.query(AuditEvent.id)
-                .filter(
-                    AuditEvent.action == "news.preview_created",
-                    AuditEvent.resource_type == "news_draft_revision",
-                    AuditEvent.resource_id == draft.id,
-                )
-                .first()
-                is not None
-            )
             upgrade_queued = (
                 db.query(AuditEvent.id)
                 .filter(
@@ -532,7 +596,13 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
                 .filter(
                     NewsReviewDelivery.draft_id == draft.id,
                     NewsReviewDelivery.delivery_round == cluster.delivery_round,
-                    NewsReviewDelivery.status.in_({"queued", "processing"}),
+                    or_(
+                        NewsReviewDelivery.status.in_({"queued", "processing"}),
+                        and_(
+                            NewsReviewDelivery.status == "failed",
+                            NewsReviewDelivery.last_error_code == "preview_delivery_blocked",
+                        ),
+                    ),
                 )
                 .first()
                 is not None
@@ -586,6 +656,113 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
             )
     db.flush()
     return created
+
+
+def cancel_non_hermes_review_deliveries(db: Session) -> int:
+    """Cancel executable owner deliveries that do not originate from Hermes."""
+
+    rows = (
+        db.query(NewsReviewDelivery)
+        .filter(NewsReviewDelivery.status.in_({"queued", "processing"}))
+        .all()
+    )
+    if not rows:
+        return 0
+
+    draft_ids = {row.draft_id for row in rows}
+    drafts = {
+        draft.id: draft
+        for draft in db.query(NewsDraftRevision).filter(NewsDraftRevision.id.in_(draft_ids)).all()
+    }
+
+    cancelled = 0
+    for delivery in rows:
+        draft = drafts.get(delivery.draft_id)
+        if draft is not None and is_hermes_origin_draft(draft):
+            continue
+
+        delivery.status = "cancelled"
+        delivery.processing_started_at = None
+        delivery.next_attempt_at = None
+        delivery.last_error_code = NON_HERMES_REVIEW_DELIVERY_DISABLED
+        cancelled += 1
+
+    return cancelled
+
+
+def quarantine_non_hermes_news_work(db: Session) -> tuple[int, int]:
+    """Terminally quarantine active work left by the retired local news pipeline."""
+
+    cancelled_deliveries = cancel_non_hermes_review_deliveries(db)
+    clusters = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.status.in_(RETIRED_NON_HERMES_ACTIVE_STATUSES))
+        .with_for_update()
+        .all()
+    )
+
+    quarantined = 0
+    for cluster in clusters:
+        # SessionLocal uses autoflush=False. A caller may already have moved
+        # this identity to a terminal state in memory while the SELECT above
+        # still observed its previous persisted status.
+        if cluster.status not in RETIRED_NON_HERMES_ACTIVE_STATUSES:
+            continue
+
+        draft = latest_draft(db, cluster)
+        if draft is not None and is_hermes_origin_draft(draft):
+            continue
+
+        previous_status = cluster.status
+
+        revoke_active_decisions(
+            db,
+            cluster.id,
+            reason="non_hermes_news_pipeline_retired",
+        )
+
+        db.query(NewsPublicationSnapshot).filter(
+            NewsPublicationSnapshot.cluster_id == cluster.id,
+            NewsPublicationSnapshot.status.in_({"queued", "scheduled", "failed"}),
+        ).update(
+            {
+                NewsPublicationSnapshot.status: "cancelled",
+                NewsPublicationSnapshot.processing_started_at: None,
+                NewsPublicationSnapshot.last_error_code: "non_hermes_news_pipeline_retired",
+            },
+            synchronize_session=False,
+        )
+        db.query(NewsPublicationSnapshot).filter(
+            NewsPublicationSnapshot.cluster_id == cluster.id,
+            NewsPublicationSnapshot.status == "processing",
+        ).update(
+            {
+                NewsPublicationSnapshot.status: "uncertain",
+                NewsPublicationSnapshot.processing_started_at: None,
+                NewsPublicationSnapshot.last_error_code: "worker_interrupted_send_uncertain",
+            },
+            synchronize_session=False,
+        )
+
+        transition_news_cluster(
+            db,
+            cluster,
+            "rejected",
+            reason_code="non_hermes_news_pipeline_retired",
+        )
+        cluster.deferred_until = None
+
+        record_audit_event(
+            db,
+            action="news.non_hermes_work_quarantined",
+            resource_type="news_cluster",
+            resource_id=cluster.id,
+            details={"previous_status": previous_status},
+        )
+        quarantined += 1
+
+    db.flush()
+    return cancelled_deliveries, quarantined
 
 
 def compose_review_artifact(
@@ -651,12 +828,15 @@ def review_message(
     if primary is None or primary.id not in draft.evidence_item_ids:
         raise ValueError("primary_source_missing")
     review = compose_review_artifact(db, draft, channel_ready=channel_ready)
+    delivery_blockers = review_delivery_blockers(draft, review)
     metadata = draft.evidence_metadata
     warnings = ", ".join(draft.warnings) if draft.warnings else "нет автоматических флагов"
-    score_reasons = ", ".join(metadata.get("score_reasons", [])[:6])
-    supporting_count = metadata.get("supporting_source_count", 0)
-    if not isinstance(supporting_count, int):
-        supporting_count = 0
+    score_reasons = ", ".join(
+        reason for reason in (cluster.score_reasons or [])[:6] if isinstance(reason, str) and reason
+    )
+    evidence_ids = [item_id for item_id in draft.evidence_item_ids if isinstance(item_id, int)]
+    source_count = len(dict.fromkeys(evidence_ids))
+    supporting_count = max(0, source_count - 1)
     artifact_line = "Точный preview: недоступен до исправления блокеров"
     if review.artifact is not None:
         artifact_line = (
@@ -685,10 +865,10 @@ def review_message(
         f"{artifact_line}\n"
         f"Artifact: {artifact_hash}\n"
         f"Блокеры публикации: {blocker_text}\n"
-        f"Topic: {metadata.get('topic', 'other')} · score {metadata.get('score', 0)}/100 "
-        f"({metadata.get('score_version', 'unknown')})\n"
+        f"Topic: {cluster.topic} · score {cluster.score}/100 "
+        f"({cluster.score_version})\n"
         f"Причины: {score_reasons}\n"
-        f"Supporting sources: {max(0, supporting_count)}\n"
+        f"Sources: {source_count} total · supporting: {supporting_count}\n"
         f"Warnings: {warnings}"
     )
     failure = (
@@ -706,7 +886,7 @@ def review_message(
         primary.primary_url or primary.canonical_url
     )
     buttons = [[{"text": "Открыть источник", "url": source_url}]]
-    if not review.blockers and review.artifact_hash is not None:
+    if not delivery_blockers and review.artifact_hash is not None:
         buttons.append(
             [
                 {
@@ -738,10 +918,6 @@ def review_message(
                         "e", draft.id, cluster.current_image_revision
                     ),
                 },
-                {
-                    "text": "Перегенерировать текст",
-                    "callback_data": callback_data("regenerate", draft.id),
-                },
             ],
             [
                 {
@@ -771,10 +947,6 @@ def review_message(
                     "callback_data": publishing_callback_data(
                         "x", draft.id, cluster.current_image_revision
                     ),
-                },
-                {
-                    "text": "Отложить рассмотрение",
-                    "callback_data": callback_data("defer", draft.id),
                 },
             ],
         ]

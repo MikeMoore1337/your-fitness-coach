@@ -12,16 +12,35 @@ export interface PublicContentSection {
   points?: string[];
 }
 
+export interface PublicContentWorkflowStep {
+  label: string;
+  title: string;
+  description: string;
+}
+
+export interface PublicContentWorkflow {
+  heading: string;
+  intro?: string;
+  steps: PublicContentWorkflowStep[];
+}
+
 export interface PublicContentSource {
   title: string;
   publisher: string;
   url: string;
   published?: string;
-  sourceType?: 'guideline' | 'systematic-review' | 'meta-analysis' | 'review' | 'domain-source';
+  sourceType?:
+    | 'guideline'
+    | 'systematic-review'
+    | 'meta-analysis'
+    | 'review'
+    | 'primary-study'
+    | 'domain-source';
 }
 
 export interface PublicContentPage {
-  kind: 'landing' | 'product' | 'knowledge-index' | 'guide' | 'exercise-index' | 'exercise';
+  kind:
+    'landing' | 'product' | 'program' | 'knowledge-index' | 'guide' | 'exercise-index' | 'exercise';
   id?: string;
   slug?: string;
   status?: 'draft' | 'review' | 'published' | 'archived';
@@ -35,12 +54,18 @@ export interface PublicContentPage {
   eyebrow: string;
   heading: string;
   intro: string;
+  program?: {
+    slug: string;
+  };
   highlights?: string[];
+  workflow?: PublicContentWorkflow;
   sections: PublicContentSection[];
+  interactive?: 'bmi-calculator' | 'kbju-calculator' | 'one-rm-calculator';
   related: PublicContentLink[];
   cta?: {
     label: string;
     description: string;
+    placement?: 'footer' | 'hero-and-footer';
   };
   breadcrumbs: PublicContentLink[];
   updated?: string;

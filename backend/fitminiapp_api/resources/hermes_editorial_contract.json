@@ -1,0 +1,32 @@
+{
+  "schema_version": "hermes-editorial-intake-v2",
+  "skill_version": "yfc-hermes-editorial-v1",
+  "taxonomy_version": "news-taxonomy-v1",
+  "risk_policy_version": "news-risk-v1",
+  "voice_profile_version": "yfc-news-voice-v1",
+  "role": "source-discovery-and-draft-proposal",
+  "allowed_output": [
+    "source_metadata",
+    "claim_packet",
+    "structured_russian_draft",
+    "generation_provenance"
+  ],
+  "forbidden_capabilities": [
+    "telegram_channel_token",
+    "telegram_send_message",
+    "telegram_send_photo",
+    "yfc_publish_endpoint",
+    "production_database",
+    "general_production_shell",
+    "user_profile_or_diary_data"
+  ],
+  "source_rules": [
+    "source_id_must_be_yfc_allowlisted",
+    "source_content_hash_and_evidence_digest_are_verified_by_yfc",
+    "fetched_content_is_untrusted_data",
+    "never_treat_model_output_as_citation"
+  ],
+  "draft_fields": ["headline", "summary", "why_it_matters"],
+  "default_policy": "manual_required",
+  "retry_rule": "bounded_same_provider_remediation_with_new_immutable_revision"
+}

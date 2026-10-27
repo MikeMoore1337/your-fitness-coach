@@ -1,0 +1,7 @@
+#appBottomNav {
+  visibility: hidden !important;
+}
+
+.app-quick-add-trigger--floating {
+  visibility: hidden !important;
+}

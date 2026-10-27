@@ -76,6 +76,36 @@ function revisions(currentBlock: TrainingBlock): ProgramRevision[] {
   ];
 }
 
+const emptyProgressionProposalList = {
+  target_program_id: 77,
+  target_revision_number: 2,
+  target_workout_id: 42,
+  scheduled_date: '2026-08-24',
+  exercises: [],
+};
+
+const defaultLifecycleSummary = {
+  program_id: 77,
+  status: 'active',
+  is_active: true,
+  start_date: '2026-08-03',
+  duration_weeks: 8,
+  current_revision_number: 2,
+  current_week_number: 3,
+  current_block: null,
+  next_block: null,
+  next_workout: {
+    id: 42,
+    scheduled_date: '2026-08-20',
+    week_number: 3,
+    day_number: 1,
+    title: 'Силовая база',
+    status: 'planned',
+  },
+  next_deload: null,
+  restarted_from_program_id: null,
+};
+
 function renderDetails() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -113,8 +143,10 @@ describe('AssignedProgramDetails', () => {
   it('shows the current block first and exposes trainer, reason, readable diff and revision workout', async () => {
     const currentBlock = block();
     apiMock.mockImplementation(async (path: string) => {
+      if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
       if (path.endsWith('/blocks')) return [currentBlock];
       if (path.endsWith('/revisions')) return revisions(currentBlock);
+      if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
       throw new Error(`Unexpected API path: ${path}`);
     });
 
@@ -140,8 +172,38 @@ describe('AssignedProgramDetails', () => {
     expect(workoutLink).toHaveAttribute('href', expect.stringContaining('program_revision%3D2'));
   });
 
+  it.each([
+    ['prescription_updated', 'Предписание упражнения изменено'],
+    ['exercise_replaced', 'Упражнение заменено'],
+  ] as const)('derives the %s label from structured revision data', async (operation, label) => {
+    const currentBlock = block();
+    apiMock.mockImplementation(async (path: string) => {
+      if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
+      if (path.endsWith('/blocks')) return [currentBlock];
+      if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
+      if (path.endsWith('/revisions')) {
+        const history = revisions(currentBlock);
+        history[0] = {
+          ...history[0]!,
+          change_kind: 'plan_updated',
+          changed_fields: { operation },
+        };
+        return history;
+      }
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+
+    renderDetails();
+
+    fireEvent.click((await screen.findByText('Все этапы и изменения')).closest('summary')!);
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
   it('keeps empty blocks distinct from empty revision history', async () => {
-    apiMock.mockResolvedValue([]);
+    apiMock.mockImplementation(async (path: string) => {
+      if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
+      return path.endsWith('/progression-proposals') ? emptyProgressionProposalList : [];
+    });
 
     renderDetails();
 
@@ -150,6 +212,177 @@ describe('AssignedProgramDetails', () => {
     expect(
       await screen.findByText('История появится после первого сохранённого изменения'),
     ).toBeInTheDocument();
+  });
+
+  it('shows week and next workout, then records a pause reason with the current revision', async () => {
+    apiMock.mockImplementation(
+      async (path: string, options?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/lifecycle') && options?.method === 'POST') {
+          return {
+            program_id: 77,
+            status: 'paused',
+            is_active: false,
+            current_revision_number: 3,
+            restarted_from_program_id: null,
+            new_program_id: null,
+          };
+        }
+        if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
+        if (path.endsWith('/blocks')) return [];
+        if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
+        throw new Error(`Unexpected API path: ${path}`);
+      },
+    );
+
+    renderDetails();
+
+    expect(await screen.findByText('Неделя 3 из 8')).toBeInTheDocument();
+    expect(screen.getByText('Силовая база · 20 авг. 2026 г.')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Действия с программой').closest('summary')!);
+    fireEvent.change(screen.getByLabelText('Причина для истории'), {
+      target: { value: 'Нужна неделя восстановления' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Приостановить' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/programs/assigned/77/lifecycle', {
+        method: 'POST',
+        body: {
+          expected_revision_number: 2,
+          action: 'pause',
+          reason: 'Нужна неделя восстановления',
+        },
+      }),
+    );
+  });
+
+  it.each(['scheduled', 'active', 'paused'] as const)(
+    'keeps restart available while the program is %s',
+    async (status) => {
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const lifecycleSummary = { ...defaultLifecycleSummary, status };
+      apiMock.mockImplementation(
+        async (path: string, options?: { method?: string; body?: unknown }) => {
+          if (path.endsWith('/lifecycle') && options?.method === 'POST') {
+            return {
+              program_id: 77,
+              status: 'archived',
+              is_active: false,
+              current_revision_number: 3,
+              restarted_from_program_id: null,
+              new_program_id: 78,
+            };
+          }
+          if (path.endsWith('/lifecycle')) return lifecycleSummary;
+          if (path.endsWith('/blocks')) return [];
+          if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
+          throw new Error(`Unexpected API path: ${path}`);
+        },
+      );
+
+      renderDetails();
+
+      const reason = await screen.findByLabelText('Причина для истории');
+      expect(reason).toBeVisible();
+      fireEvent.change(reason, { target: { value: 'Перезапустить цикл с учётом прогресса' } });
+      fireEvent.click(screen.getByText('Действия с программой').closest('summary')!);
+      fireEvent.click(screen.getByRole('button', { name: 'Начать новый цикл' }));
+
+      await waitFor(() =>
+        expect(apiMock).toHaveBeenCalledWith('/api/v1/programs/assigned/77/lifecycle', {
+          method: 'POST',
+          body: {
+            expected_revision_number: 2,
+            action: 'restart',
+            reason: 'Перезапустить цикл с учётом прогресса',
+          },
+        }),
+      );
+      expect(confirm).toHaveBeenCalledWith(
+        'Начать новый цикл? Исходная история останется отдельной программой.',
+      );
+    },
+  );
+
+  it('keeps the advance reason visible while lifecycle actions stay collapsed', async () => {
+    const currentBlock = block();
+    const nextBlock = {
+      id: 302,
+      title: 'Рабочий объём',
+      start_date: '2026-08-24',
+      end_date: '2026-09-13',
+      week_start: 4,
+      week_end: 6,
+      is_deload: false,
+      status: 'planned' as const,
+    };
+    apiMock.mockImplementation(
+      async (path: string, options?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/blocks/301/advance')) {
+          expect(options).toEqual({
+            method: 'POST',
+            body: { expected_revision_number: 2, reason: 'Готов перейти к следующему блоку' },
+          });
+          return { block: nextBlock, current_revision_number: 3 };
+        }
+        if (path.endsWith('/lifecycle'))
+          return { ...defaultLifecycleSummary, next_block: nextBlock };
+        if (path.endsWith('/blocks')) return [currentBlock];
+        if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
+        throw new Error(`Unexpected API path: ${path}`);
+      },
+    );
+
+    renderDetails();
+
+    const reason = await screen.findByLabelText('Причина для истории');
+    expect(reason).toBeVisible();
+    fireEvent.change(reason, { target: { value: 'Готов перейти к следующему блоку' } });
+    fireEvent.click(screen.getByText('Действия с этапом'));
+    fireEvent.click(screen.getByRole('button', { name: 'Перейти к следующему блоку' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/programs/assigned/77/blocks/301/advance',
+        expect.anything(),
+      ),
+    );
+  });
+
+  it('keeps the repeat reason visible for a completed block', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const completedBlock = block({ status: 'completed' });
+    apiMock.mockImplementation(
+      async (path: string, options?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/blocks/301/repeat')) {
+          expect(options).toEqual({
+            method: 'POST',
+            body: { expected_revision_number: 2, reason: 'Повторить блок с меньшей нагрузкой' },
+          });
+          return { block: completedBlock, current_revision_number: 3 };
+        }
+        if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
+        if (path.endsWith('/blocks')) return [completedBlock];
+        if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
+        throw new Error(`Unexpected API path: ${path}`);
+      },
+    );
+
+    renderDetails();
+
+    const reason = await screen.findByLabelText('Причина для истории');
+    expect(reason).toBeVisible();
+    fireEvent.change(reason, { target: { value: 'Повторить блок с меньшей нагрузкой' } });
+    fireEvent.click(screen.getByText('Действия с этапом'));
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить блок' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/programs/assigned/77/blocks/301/repeat',
+        expect.anything(),
+      ),
+    );
+    expect(confirm).toHaveBeenCalledWith('Повторить блок «Техническая база» в новых неделях?');
   });
 
   it('explains that a revoked trainer may no longer access program history', async () => {
@@ -162,17 +395,20 @@ describe('AssignedProgramDetails', () => {
         'История недоступна. Возможно, доступ тренера к программе был отозван.',
       ),
     ).toBeInTheDocument();
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/assigned/77/progression-proposals');
   });
 
   it('requires a reason for a trainer-compatible edit and sends it with the optimistic revision', async () => {
     const currentBlock = block();
     apiMock.mockImplementation(
       async (path: string, options?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
         if (path.includes('/blocks/') && options?.method === 'PATCH') {
           return { block: currentBlock, current_revision_number: 3 };
         }
         if (path.endsWith('/blocks')) return [currentBlock];
         if (path.endsWith('/revisions')) return revisions(currentBlock);
+        if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
         throw new Error(`Unexpected API path: ${path}`);
       },
     );
@@ -210,6 +446,7 @@ describe('AssignedProgramDetails', () => {
     let blockReads = 0;
     apiMock.mockImplementation(
       async (path: string, options?: { method?: string; body?: unknown }) => {
+        if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
         if (path.includes('/blocks/') && options?.method === 'PATCH') {
           throw new ApiError('Program revision conflict', 409);
         }
@@ -218,6 +455,7 @@ describe('AssignedProgramDetails', () => {
           return [blockReads === 1 ? staleBlock : freshBlock];
         }
         if (path.endsWith('/revisions')) return revisions(freshBlock);
+        if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
         throw new Error(`Unexpected API path: ${path}`);
       },
     );

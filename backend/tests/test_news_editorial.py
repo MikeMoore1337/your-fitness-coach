@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import secrets
 from dataclasses import replace
 from datetime import datetime, timedelta
 
@@ -20,11 +21,12 @@ from fitminiapp_api.models.news import (
     NewsSource,
     NewsStateTransition,
 )
+from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_drafts import (
     DraftGenerationError,
     NewsEvidencePacket,
     _validated_fields,
-    create_draft_revision,
+    evidence_packet,
     render_draft,
 )
 from fitminiapp_api.services.news_editorial import (
@@ -35,12 +37,11 @@ from fitminiapp_api.services.news_editorial import (
     prune_news_editorial,
     review_message,
 )
-from fitminiapp_api.services.news_freshness import is_current_month_publication
+from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_ingestion import (
     ParsedNewsItem,
     SafeNewsFetcher,
     SourceFetchError,
-    SourceFetchResult,
     canonicalize_url,
     ingest_items,
     parse_json_feed,
@@ -48,17 +49,79 @@ from fitminiapp_api.services.news_ingestion import (
     utcnow,
     validate_public_source_url,
 )
+from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
 from fitminiapp_api.services.news_sources import (
     apply_source_allowlist,
     load_source_allowlist,
     parse_source_allowlist,
 )
-from fitminiapp_api.services.news_worker import (
-    NewsCycleStats,
-    fetch_due_sources,
-    generate_candidate_drafts,
-)
+from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.seed import seed_demo_data
+
+
+# Test-only stand-in for the state produced by the signed Hermes intake.
+# The production YFC-local create_draft_revision capability is intentionally retired.
+async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevision:
+    del client
+
+    packet = evidence_packet(db, cluster)
+    fields = _validated_fields(
+        {
+            "headline": "Исследование тренировок: результаты для изученной группы",
+            "summary": (
+                "Авторы описали результаты исследования тренировок и ограничения их интерпретации."
+            ),
+            "why_it_matters": ("Материал помогает оценивать применимость результатов на практике."),
+        }
+    )
+    revision = cluster.latest_draft_revision + 1
+    draft = NewsDraftRevision(
+        id=secrets.token_hex(16),
+        cluster_id=cluster.id,
+        primary_item_id=packet.primary_item_id,
+        revision=revision,
+        provider="groq-free-candidate",
+        model="test-hermes-model",
+        prompt_version="test-hermes-editorial-v1",
+        source_digest=packet.source_digest,
+        evidence_item_ids=list(packet.evidence_item_ids),
+        evidence_metadata={
+            "topic": packet.topic,
+            "score": packet.score,
+            "score_version": cluster.score_version,
+            "score_reasons": list(packet.score_reasons[:10]),
+            "risk_flags": list(packet.risk_flags[:10]),
+            "conflict_notes": list(cluster.conflict_notes[:10]),
+            "supporting_source_count": len(packet.supporting_sources),
+            "source_published_at": (
+                packet.published_at.isoformat() if packet.published_at is not None else None
+            ),
+            "source_publisher": packet.publisher or packet.source_name,
+            "image_context_headline": packet.title[:180],
+            "editorial_contract_version": "news-editorial-v2",
+            "editorial_fields": dict(fields),
+            "trusted_source_url": packet.primary_url or packet.canonical_url,
+            "publication_policy": "manual_required",
+            "submitted_by": HERMES_SUBMISSION_MARKER,
+        },
+        draft_text=render_draft(fields, packet),
+        warnings=[],
+        generation_latency_ms=0,
+    )
+    db.add(draft)
+
+    cluster.latest_draft_revision = revision
+    cluster.current_image_revision = 0
+    cluster.generation_attempt_count += 1
+
+    transition_news_cluster(
+        db,
+        cluster,
+        "image_pending",
+        reason_code="test_hermes_draft_received",
+    )
+    db.flush()
+    return draft
 
 
 def _definition(
@@ -191,30 +254,130 @@ def test_source_allowlist_is_explicit_validated_and_operator_managed() -> None:
         parse_source_allowlist([_definition(), _definition()])
 
 
-def test_default_source_allowlist_bootstraps_once_without_overwriting_operator_state(
+def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime_state(
     monkeypatch,
 ) -> None:
-    definitions = load_source_allowlist()
-    assert {item.id for item in definitions} == {
+    enabled_definitions = load_source_allowlist()
+    assert {item.id for item in enabled_definitions} == {
         "frontiers-nutrition",
         "frontiers-sports-active-living",
+        "frontiers-physiology",
+        "frontiers-endocrinology",
+        "frontiers-pharmacology",
+        "pubmed-fitness-health",
+        "sciencedaily-fitness",
+        "medicalxpress-sports-medicine",
+        "acsm-news",
+        "muscle-and-fitness",
+        "bjsm",
+        "bmj-open-sport-exercise-medicine",
+        "mens-health",
+        "fitness-volt",
     }
-    assert all(item.enabled and item.fetch_kind == "rss" for item in definitions)
+    all_definitions = load_source_allowlist(include_disabled=True)
+    assert len(all_definitions) == 26
+    pubmed = next(item for item in all_definitions if item.id == "pubmed-fitness-health")
+    assert pubmed.enabled is True
+    assert pubmed.fetch_kind == "json_feed"
+    assert pubmed.adapter == "pubmed_eutils"
+    assert set(pubmed.allowed_item_hosts) == {"pubmed.ncbi.nlm.nih.gov", "doi.org"}
+    disabled = next(item for item in all_definitions if not item.enabled)
 
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
+    operator_definition = parse_source_allowlist(
+        [
+            {
+                **_definition(source_id="operator-source"),
+                "trust_notes": "Operator-owned source",
+            }
+        ]
+    )
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 2
+        assert db.query(NewsSource).count() == 26
+        apply_source_allowlist(db, operator_definition)
+
+        db.delete(db.get(NewsSource, "frontiers-physiology"))
+
         source = db.get(NewsSource, "frontiers-nutrition")
         assert source is not None
         source.enabled = False
+        source.feed_url = "https://stale.example/feed"
+        source.fetch_interval_minutes = 720
+        source.trust_notes = "Stale canonical metadata"
+        source.fetch_options = {"operator": "stale"}
+        source.etag = '"runtime-etag"'
+        source.last_modified = "Wed, 23 Sep 2026 10:00:00 GMT"
+        source.last_success_at = datetime(2026, 9, 23, 10, 0)
+        source.last_error_code = "temporary_runtime_error"
+        source.last_error_at = datetime(2026, 9, 23, 11, 0)
+        source.consecutive_error_count = 4
+        source.next_fetch_at = datetime(2026, 9, 24, 12, 0)
+
+        pubmed_row = db.get(NewsSource, "pubmed-fitness-health")
+        assert pubmed_row is not None
+        pubmed_row.fetch_kind = "rss"
+        pubmed_row.feed_url = "https://pubmed.ncbi.nlm.nih.gov/rss/search/legacy/"
+        pubmed_row.fetch_options = {
+            "allowed_redirect_hosts": [],
+            "allowed_item_hosts": ["pubmed.ncbi.nlm.nih.gov"],
+            "topics": ["medicine", "health", "exercise"],
+        }
+        pubmed_row.last_error_code = "unexpected_content_type"
+        pubmed_row.consecutive_error_count = 7
+
+        disabled_row = db.get(NewsSource, disabled.id)
+        assert disabled_row is not None
+        disabled_row.enabled = True
 
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 2
+
+        assert db.query(NewsSource).count() == 27
+        restored = db.get(NewsSource, "frontiers-physiology")
+        assert restored is not None
+        assert restored.enabled is True
+
         source = db.get(NewsSource, "frontiers-nutrition")
+        expected = next(item for item in all_definitions if item.id == "frontiers-nutrition")
         assert source is not None
-        assert source.enabled is False
+        assert source.enabled is expected.enabled
+        assert source.feed_url == expected.url
+        assert source.fetch_interval_minutes == expected.fetch_interval_minutes
+        assert source.trust_notes == expected.trust_notes
+        assert source.fetch_options["topics"] == list(expected.topics)
+        assert source.etag == '"runtime-etag"'
+        assert source.last_modified == "Wed, 23 Sep 2026 10:00:00 GMT"
+        assert source.last_success_at == datetime(2026, 9, 23, 10, 0)
+        assert source.last_error_code == "temporary_runtime_error"
+        assert source.last_error_at == datetime(2026, 9, 23, 11, 0)
+        assert source.consecutive_error_count == 4
+        assert source.next_fetch_at == datetime(2026, 9, 24, 12, 0)
+
+        pubmed_row = db.get(NewsSource, "pubmed-fitness-health")
+        assert pubmed_row is not None
+        assert pubmed_row.fetch_kind == "json_feed"
+        assert pubmed_row.feed_url == pubmed.url
+        assert pubmed_row.fetch_options["adapter"] == "pubmed_eutils"
+        assert set(pubmed_row.fetch_options["allowed_item_hosts"]) == {
+            "pubmed.ncbi.nlm.nih.gov",
+            "doi.org",
+        }
+        assert pubmed_row.last_error_code == "unexpected_content_type"
+        assert pubmed_row.consecutive_error_count == 7
+
+        disabled_row = db.get(NewsSource, disabled.id)
+        assert disabled_row is not None
+        assert disabled_row.enabled is False
+
+        operator_row = db.get(NewsSource, "operator-source")
+        assert operator_row is not None
+        assert operator_row.trust_notes == "Operator-owned source"
+        assert operator_row.feed_url == "https://operator-source.example/feed"
+
+    with get_session_context() as db:
+        seed_demo_data(db)
+        assert db.query(NewsSource).count() == 27
 
 
 def test_news_activation_requires_owner_ids_and_confirmed_channel() -> None:
@@ -246,6 +409,7 @@ def test_news_activation_requires_owner_ids_and_confirmed_channel() -> None:
         news_channel_id=-1001234567890,
     )
     assert configured.news_ingestion_enabled is True
+    assert "news_legacy_source_fetch_enabled" not in Settings.model_fields
 
 
 def test_canonical_url_removes_tracking_but_preserves_semantic_query() -> None:
@@ -408,18 +572,18 @@ def test_json_feed_parser_accepts_documented_metadata() -> None:
 def test_freshness_window_rejects_older_missing_and_future_dates() -> None:
     now = datetime(2026, 8, 26, 12, 0, 0)
 
-    assert is_current_month_publication(datetime(2026, 7, 1), now=now)
-    assert is_current_month_publication(datetime(2026, 8, 1), now=now)
-    assert is_current_month_publication(now, now=now)
-    assert not is_current_month_publication(datetime(2026, 6, 30, 23, 59, 59), now=now)
-    assert not is_current_month_publication(None, now=now)
-    assert not is_current_month_publication(datetime(2026, 8, 26, 12, 0, 1), now=now)
+    assert is_fresh_publication(now - timedelta(days=60), now=now)
+    assert is_fresh_publication(datetime(2026, 8, 1), now=now)
+    assert is_fresh_publication(now, now=now)
+    assert not is_fresh_publication(now - timedelta(days=61), now=now)
+    assert not is_fresh_publication(None, now=now)
+    assert not is_fresh_publication(datetime(2026, 8, 26, 12, 0, 1), now=now)
 
 
 def test_ingestion_hard_gates_source_outside_freshness_window() -> None:
     _create_source()
     current = datetime(2026, 8, 26, 12, 0, 0)
-    stale = replace(_parsed(), published_at=datetime(2026, 6, 30, 23, 59, 59))
+    stale = replace(_parsed(), published_at=current - timedelta(days=61))
 
     with get_session_context() as db:
         source = db.get(NewsSource, "journal-one")
@@ -456,12 +620,10 @@ def test_ingestion_hard_gates_non_channel_topic_even_with_low_threshold() -> Non
             ],
             candidate_threshold=1,
         )
-        cluster = db.query(NewsCluster).one()
         assert counts["candidate"] == 0
-        assert counts["clustered"] == 1
-        assert cluster.topic == "other"
-        assert cluster.score == 0
-        assert "topic_not_allowlisted" in cluster.risk_flags
+        assert counts["clustered"] == 0
+        assert counts["rejected"] == 1
+        assert db.query(NewsCluster).count() == 0
 
 
 def test_scoring_rejects_esports_coaching_without_physical_health_context() -> None:
@@ -483,11 +645,9 @@ def test_scoring_rejects_esports_coaching_without_physical_health_context() -> N
             ],
             candidate_threshold=55,
         )
-        cluster = db.query(NewsCluster).one()
         assert counts["candidate"] == 0
-        assert cluster.topic == "other"
-        assert cluster.score == 0
-        assert "topic_not_allowlisted" in cluster.risk_flags
+        assert counts["rejected"] == 1
+        assert db.query(NewsCluster).count() == 0
 
 
 def test_ingestion_accepts_safe_research_in_expanded_channel_topics() -> None:
@@ -512,7 +672,7 @@ def test_ingestion_accepts_safe_research_in_expanded_channel_topics() -> None:
         )
         cluster = db.query(NewsCluster).one()
         assert counts["candidate"] == 1
-        assert cluster.topic in {"medicine_pharmacology", "peptides", "bodybuilding"}
+        assert cluster.topic == "sports_bodybuilding_pharmacology"
         assert "priority:new_research" in cluster.score_reasons
         assert "priority:practical" in cluster.score_reasons
         assert "priority:tools_products" in cluster.score_reasons
@@ -522,20 +682,11 @@ def test_ingestion_accepts_safe_research_in_expanded_channel_topics() -> None:
 def test_stale_draft_is_not_enqueued_for_owner_review(monkeypatch) -> None:
     _create_source()
     cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
         assert cluster is not None
         draft = asyncio.run(create_draft_revision(db, cluster))
-        current_month_start = utcnow().replace(
-            day=1,
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-        previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
-        stale = previous_month_start - timedelta(seconds=1)
+        stale = utcnow() - timedelta(days=61)
         draft.evidence_metadata = {
             **draft.evidence_metadata,
             "source_published_at": stale.isoformat(),
@@ -579,48 +730,6 @@ def test_ingestion_rejects_untrusted_item_host_unless_operator_allowlists_it() -
             candidate_threshold=55,
         )
         assert accepted["new"] == 1
-
-
-def test_source_outage_is_isolated_and_applies_per_source_backoff(monkeypatch) -> None:
-    _create_source(source_id="broken")
-    _create_source(source_id="healthy")
-
-    async def fake_fetch(self, source):
-        if source.id == "broken":
-            raise SourceFetchError("provider_unavailable")
-        return SourceFetchResult(
-            status="fetched",
-            items=(
-                _parsed(
-                    external_id="healthy-item",
-                    url="https://healthy.example/article",
-                ),
-            ),
-        )
-
-    monkeypatch.setattr(SafeNewsFetcher, "fetch", fake_fetch)
-
-    async def run() -> dict[str, int]:
-        async with httpx.AsyncClient() as client:
-            return await fetch_due_sources(client)
-
-    counts = asyncio.run(run())
-    assert counts["new"] == 1
-    assert counts["candidate"] == 1
-    assert counts["sources_total"] == 2
-    assert counts["sources_checked"] == 2
-    assert counts["sources_success"] == 1
-    assert counts["sources_failed"] == 1
-    assert counts["fetched"] == 1
-    assert counts["eligible"] == 1
-    with get_session_context() as db:
-        broken = db.get(NewsSource, "broken")
-        healthy = db.get(NewsSource, "healthy")
-        assert broken is not None and healthy is not None
-        assert broken.last_error_code == "provider_unavailable"
-        assert broken.consecutive_error_count == 1
-        assert broken.next_fetch_at is not None
-        assert healthy.last_success_at is not None
 
 
 def test_dedupe_clusters_url_doi_and_same_event_with_auditable_primary() -> None:
@@ -777,313 +886,10 @@ def test_draft_contract_normalizes_extra_paragraphs_and_importance_sentences() -
     assert fields["why_it_matters"] == "Первое предложение."
 
 
-def test_generation_repairs_invented_number_before_creating_revision(monkeypatch) -> None:
-    _create_source()
-    cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "openai_compatible")
-    monkeypatch.setattr(settings, "news_llm_endpoint", "https://llm.example/v1/chat/completions")
-    monkeypatch.setattr(settings, "news_llm_api_key", "test-key")
-    monkeypatch.setattr(settings, "news_llm_model", "test-model")
-    rejected_payload = {
-        "headline": "Что показала новая работа",
-        "summary": (
-            "Авторы описали результат для изученной группы. Нагрузка вырастет на 99% за неделю."
-        ),
-        "why_it_matters": "Материал помогает уточнить контекст силовых тренировок.",
-    }
-    repaired_payload = {
-        "headline": "Что показала новая работа",
-        "summary": "Авторы описали результат для изученной группы в заданном контексте.",
-        "why_it_matters": "Материал помогает уточнить контекст силовых тренировок.",
-    }
-    request_count = 0
-
-    def respond(request: httpx.Request) -> httpx.Response:
-        nonlocal request_count
-        request_count += 1
-        request_payload = json.loads(request.content)
-        assert request_payload["messages"][0]["role"] == "system"
-        assert "одном или двух коротких абзацах" in request_payload["messages"][0]["content"]
-        assert request_payload["messages"][1]["content"].startswith("SOURCE_DATA_JSON")
-        if request_count == 2:
-            assert request_payload["messages"][-1]["content"].startswith("REPAIR_REQUEST")
-            assert "unsupported_number" in request_payload["messages"][-1]["content"]
-        return httpx.Response(
-            200,
-            request=request,
-            json={
-                "model": "actual-test-model",
-                "choices": [
-                    {
-                        "message": {
-                            "content": json.dumps(
-                                rejected_payload if request_count == 1 else repaired_payload,
-                                ensure_ascii=False,
-                            )
-                        }
-                    }
-                ],
-                "usage": {"prompt_tokens": 100, "completion_tokens": 50},
-            },
-        )
-
-    async def generate():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            with get_session_context() as db:
-                cluster = db.get(NewsCluster, cluster_id)
-                assert cluster is not None
-                draft = await create_draft_revision(db, cluster, client=client)
-                return draft.id
-
-    draft_id = asyncio.run(generate())
-    with get_session_context() as db:
-        stored = db.get(NewsDraftRevision, draft_id)
-        assert stored is not None
-        assert stored.provider == "openai_compatible"
-        assert stored.warnings == []
-        assert "99%" not in stored.draft_text
-        assert "Авторы описали результат" in stored.draft_text
-        assert stored.revision == 1
-        assert stored.source_digest
-        assert stored.generation_input_tokens == 200
-        assert stored.generation_output_tokens == 100
-        assert "КРАТКО" in stored.draft_text
-        assert "ПОЧЕМУ ЭТО ВАЖНО" in stored.draft_text
-        assert "ИСТОЧНИК" in stored.draft_text
-        assert "Ограничения" not in stored.draft_text
-    assert request_count == 2
-
-
-def test_generation_falls_back_when_repair_still_contains_invented_number(monkeypatch) -> None:
-    _create_source()
-    cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "openai_compatible")
-    monkeypatch.setattr(settings, "news_llm_endpoint", "https://llm.example/v1/chat/completions")
-    monkeypatch.setattr(settings, "news_llm_api_key", "test-key")
-    monkeypatch.setattr(settings, "news_llm_model", "test-model")
-    rejected_payload = {
-        "headline": "Что показала новая работа",
-        "summary": "Авторы обещают улучшение результата на 99%.",
-        "why_it_matters": "Материал помогает уточнить контекст силовых тренировок.",
-    }
-    request_count = 0
-
-    def respond(request: httpx.Request) -> httpx.Response:
-        nonlocal request_count
-        request_count += 1
-        return httpx.Response(
-            200,
-            request=request,
-            json={
-                "model": "actual-test-model",
-                "choices": [
-                    {"message": {"content": json.dumps(rejected_payload, ensure_ascii=False)}}
-                ],
-            },
-        )
-
-    async def generate():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            with get_session_context() as db:
-                cluster = db.get(NewsCluster, cluster_id)
-                assert cluster is not None
-                draft = await create_draft_revision(db, cluster, client=client)
-                return draft.id
-
-    draft_id = asyncio.run(generate())
-    with get_session_context() as db:
-        stored = db.get(NewsDraftRevision, draft_id)
-        assert stored is not None
-        assert stored.provider == "deterministic"
-        assert "unsupported_number" in stored.warnings
-        assert "99%" not in stored.draft_text
-    assert request_count == 2
-
-
-def test_worker_cycle_counts_llm_failure_when_safe_fallback_creates_draft(monkeypatch) -> None:
-    _create_source()
-    _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "openai_compatible")
-    monkeypatch.setattr(settings, "news_llm_endpoint", "https://llm.example/v1/chat/completions")
-    monkeypatch.setattr(settings, "news_llm_api_key", "test-key")
-    monkeypatch.setattr(settings, "news_llm_model", "test-model")
-    monkeypatch.setattr(settings, "news_image_provider", "disabled")
-    stats = NewsCycleStats()
-
-    def timeout(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("provider timeout", request=request)
-
-    async def generate() -> int:
-        async with httpx.AsyncClient(transport=httpx.MockTransport(timeout)) as client:
-            return await generate_candidate_drafts(client, cycle_stats=stats)
-
-    assert asyncio.run(generate()) == 1
-    assert stats.drafts_created == 1
-    assert stats.llm_failures == 1
-    with get_session_context() as db:
-        draft = db.query(NewsDraftRevision).one()
-        assert draft.provider == "deterministic"
-        assert "provider_timeout" in draft.warnings
-
-
-def test_generation_repairs_text_that_exceeds_telegram_photo_caption(monkeypatch) -> None:
-    _create_source()
-    cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "openai_compatible")
-    monkeypatch.setattr(settings, "news_llm_endpoint", "https://llm.example/v1/chat/completions")
-    monkeypatch.setattr(settings, "news_llm_api_key", "test-key")
-    monkeypatch.setattr(settings, "news_llm_model", "test-model")
-    overlong_payload = {
-        "headline": "Что показала новая работа",
-        "summary": " ".join(["Авторы описали результат для изученной группы."] * 24),
-        "why_it_matters": "Материал помогает уточнить контекст силовых тренировок.",
-    }
-    repaired_payload = {
-        "headline": "Что показала новая работа",
-        "summary": "Авторы описали результат для изученной группы и обозначили его ограничения.",
-        "why_it_matters": "Материал помогает уточнить контекст силовых тренировок.",
-    }
-    request_count = 0
-
-    def respond(request: httpx.Request) -> httpx.Response:
-        nonlocal request_count
-        request_count += 1
-        request_payload = json.loads(request.content)
-        if request_count == 2:
-            assert "telegram_photo_caption_too_long" in request_payload["messages"][-1]["content"]
-            assert "до 900 символов" in request_payload["messages"][-1]["content"]
-        payload = overlong_payload if request_count == 1 else repaired_payload
-        return httpx.Response(
-            200,
-            request=request,
-            json={
-                "model": "actual-test-model",
-                "choices": [{"message": {"content": json.dumps(payload, ensure_ascii=False)}}],
-            },
-        )
-
-    async def generate():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-            with get_session_context() as db:
-                cluster = db.get(NewsCluster, cluster_id)
-                assert cluster is not None
-                draft = await create_draft_revision(db, cluster, client=client)
-                return draft.id
-
-    draft_id = asyncio.run(generate())
-    with get_session_context() as db:
-        stored = db.get(NewsDraftRevision, draft_id)
-        assert stored is not None
-        assert stored.provider == "openai_compatible"
-        assert stored.warnings == []
-        assert repaired_payload["summary"] in stored.draft_text
-        assert overlong_payload["summary"] not in stored.draft_text
-    assert request_count == 2
-
-
-def test_fetch_and_worker_generation_are_idempotent(monkeypatch) -> None:
-    _create_source()
-    with get_session_context() as db:
-        source = db.get(NewsSource, "journal-one")
-        assert source is not None
-        parsed = _parsed()
-        first = ingest_items(db, source, [parsed], candidate_threshold=55)
-        repeated = ingest_items(db, source, [parsed], candidate_threshold=55)
-        assert first["new"] == 1
-        assert repeated["duplicate"] == 1
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
-
-    async def generate_twice() -> tuple[int, int]:
-        async with httpx.AsyncClient() as client:
-            return (
-                await generate_candidate_drafts(client),
-                await generate_candidate_drafts(client),
-            )
-
-    assert asyncio.run(generate_twice()) == (1, 0)
-    with get_session_context() as db:
-        assert db.query(NewsDraftRevision).count() == 1
-
-
-def test_daily_draft_limit_counts_only_first_revision_of_a_new_cluster(monkeypatch) -> None:
-    _create_source()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
-    monkeypatch.setattr(settings, "news_image_provider", "disabled")
-    monkeypatch.setattr(settings, "news_daily_draft_limit", 1)
-
-    with get_session_context() as db:
-        source = db.get(NewsSource, "journal-one")
-        assert source is not None
-        ingest_items(db, source, [_parsed()], candidate_threshold=55)
-        first_cluster = db.query(NewsCluster).one()
-        first_revision = asyncio.run(create_draft_revision(db, first_cluster))
-        first_revision.created_at = utcnow() - timedelta(days=2)
-        second_revision = asyncio.run(create_draft_revision(db, first_cluster))
-        assert second_revision.revision == 2
-        third_revision = asyncio.run(create_draft_revision(db, first_cluster))
-        assert third_revision.revision == 3
-        first_cluster.status = "awaiting_review"
-
-        ingest_items(
-            db,
-            source,
-            [
-                _parsed(
-                    external_id="article-2",
-                    url="https://journal-one.example/article-2",
-                    title="Cardio recovery study in trained runners",
-                    summary="A randomized exercise study assessed cardio recovery and sleep.",
-                    doi="10.1000/test.2",
-                )
-            ],
-            candidate_threshold=55,
-        )
-
-    stats = NewsCycleStats()
-
-    async def generate() -> int:
-        async with httpx.AsyncClient() as client:
-            return await generate_candidate_drafts(client, cycle_stats=stats)
-
-    assert asyncio.run(generate()) == 1
-    assert stats.drafts_created == 1
-    assert stats.drafts_skipped_daily_limit == 0
-    with get_session_context() as db:
-        assert db.query(NewsDraftRevision).count() == 4
-        assert db.query(NewsDraftRevision).filter(NewsDraftRevision.revision == 1).count() == 2
-        source = db.get(NewsSource, "journal-one")
-        assert source is not None
-        ingest_items(
-            db,
-            source,
-            [
-                _parsed(
-                    external_id="article-3",
-                    url="https://journal-one.example/article-3",
-                    title="Sleep and strength recovery in trained adults",
-                    summary="A controlled exercise study assessed sleep and muscle recovery.",
-                    doi="10.1000/test.3",
-                )
-            ],
-            candidate_threshold=55,
-        )
-
-    blocked_stats = NewsCycleStats()
-
-    async def generate_after_limit() -> int:
-        async with httpx.AsyncClient() as client:
-            return await generate_candidate_drafts(client, cycle_stats=blocked_stats)
-
-    assert asyncio.run(generate_after_limit()) == 0
-    assert blocked_stats.drafts_created == 0
-    assert blocked_stats.drafts_skipped_daily_limit == 1
-
-
 def test_source_revisions_do_not_inflate_support_and_draft_binds_exact_evidence(
     monkeypatch,
 ) -> None:
     _create_source()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     original = _parsed(doi=None)
     updated = replace(
         original,
@@ -1106,7 +912,6 @@ def test_source_revisions_do_not_inflate_support_and_draft_binds_exact_evidence(
 def test_review_message_uses_immutable_draft_evidence_after_cluster_changes(monkeypatch) -> None:
     _create_source()
     _create_source(source_id="review-journal", source_type="systematic_review")
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     first = _parsed(doi=None)
     with get_session_context() as db:
         source = db.get(NewsSource, "journal-one")
@@ -1134,10 +939,9 @@ def test_review_message_uses_immutable_draft_evidence_after_cluster_changes(monk
         assert review_message(db, draft)[1] == original_url
 
 
-def test_regeneration_makes_old_revision_stale_for_other_admin(monkeypatch) -> None:
+def test_regeneration_does_not_change_revision_state_for_other_admin(monkeypatch) -> None:
     _create_source()
     cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
         assert cluster is not None
@@ -1150,7 +954,7 @@ def test_regeneration_makes_old_revision_stale_for_other_admin(monkeypatch) -> N
                 admin_telegram_user_id=7001,
                 action="regenerate",
             ).status
-            == "queued"
+            == "unavailable"
         )
         assert (
             moderate_draft(
@@ -1159,9 +963,9 @@ def test_regeneration_makes_old_revision_stale_for_other_admin(monkeypatch) -> N
                 admin_telegram_user_id=7002,
                 action="accept_for_design",
             ).status
-            == "stale"
+            == "accepted"
         )
-        assert cluster.status == "candidate"
+        assert cluster.status == "accepted_for_design"
 
 
 def test_owner_only_moderation_is_revision_bound_idempotent_and_never_publishes(
@@ -1169,7 +973,6 @@ def test_owner_only_moderation_is_revision_bound_idempotent_and_never_publishes(
 ) -> None:
     _create_source()
     cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
@@ -1229,10 +1032,66 @@ def test_owner_only_moderation_is_revision_bound_idempotent_and_never_publishes(
     assert not any("publish" in path or "channel" in path for path in paths if "/news/" in path)
 
 
+def test_publication_failed_does_not_requeue_an_already_shown_draft() -> None:
+    _create_source()
+    cluster_id = _candidate_cluster()
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        draft = asyncio.run(create_draft_revision(db, cluster))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+        delivery = db.query(NewsReviewDelivery).filter_by(draft_id=draft.id).one()
+        delivery.status = "sent"
+        delivery.sent_at = utcnow()
+        record_audit_event(
+            db,
+            action="news.preview_created",
+            resource_type="news_draft_revision",
+            resource_id=draft.id,
+            details={"preview_message_id": 101},
+        )
+        cluster.status = "publication_failed"
+        cluster.delivery_round += 1
+        draft_id = draft.id
+
+    with get_session_context() as db:
+        assert enqueue_review_deliveries(db, {7001}) == 0
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        assert cluster.status == "publication_failed"
+        deliveries = (
+            db.query(NewsReviewDelivery)
+            .filter_by(draft_id=draft_id)
+            .order_by(NewsReviewDelivery.delivery_round)
+            .all()
+        )
+        assert [(row.status, row.delivery_round) for row in deliveries] == [("sent", 0)]
+
+
+def test_publication_failed_unshown_draft_can_still_enter_review() -> None:
+    _create_source()
+    cluster_id = _candidate_cluster()
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        draft = asyncio.run(create_draft_revision(db, cluster))
+        cluster.status = "publication_failed"
+        cluster.delivery_round = 1
+        draft_id = draft.id
+
+    with get_session_context() as db:
+        assert enqueue_review_deliveries(db, {7001}) == 1
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        assert cluster.status == "awaiting_review"
+        delivery = db.query(NewsReviewDelivery).filter_by(draft_id=draft_id).one()
+        assert delivery.status == "queued"
+        assert delivery.delivery_round == 1
+
+
 def test_defer_requeues_same_revision_by_new_delivery_round(monkeypatch) -> None:
     _create_source()
     cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     monkeypatch.setattr(settings, "news_defer_hours", 1)
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
@@ -1270,7 +1129,6 @@ def test_defer_requeues_same_revision_by_new_delivery_round(monkeypatch) -> None
 def test_terminal_retention_is_bounded(monkeypatch) -> None:
     _create_source()
     cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
         assert cluster is not None
@@ -1295,7 +1153,6 @@ def test_callback_contract_is_bounded_and_has_no_public_action() -> None:
 def test_legacy_sent_delivery_is_requeued_once_for_exact_preview(monkeypatch) -> None:
     _create_source()
     cluster_id = _candidate_cluster()
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
         assert cluster is not None

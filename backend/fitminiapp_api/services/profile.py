@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from fitminiapp_api.services.heart_rate import (
     calculate_heart_rates,
     calculate_max_heart_rate,
 )
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 
 
 class ProfileError(ValueError):
@@ -112,6 +114,7 @@ def update_profile(
     commit: bool = True,
 ) -> User:
     profile = ensure_profile(db, user, commit=commit)
+    onboarding_was_complete = profile.goal is not None
     changes = payload.model_dump(exclude_unset=True)
     body_priority = changes.pop("body_priority", ...)
     training_preferences = changes.pop("training_preferences", ...)
@@ -127,6 +130,7 @@ def update_profile(
         if resting_heart_rate >= calculate_max_heart_rate(age):
             raise ProfileError("Resting heart rate must be below maximum heart rate")
     nutrition_field_map = {
+        "sex": "sex",
         "goal": "goal",
         "height_cm": "height_cm",
         "weight_kg": "weight_kg",
@@ -140,9 +144,39 @@ def update_profile(
                 value = DEFAULT_TIMEZONE
             elif not is_valid_timezone(value):
                 continue
+        if field == "weight_kg" and value is not None:
+            from fitminiapp_api.services.measurements import latest_current_weight_measurement
+
+            latest = latest_current_weight_measurement(db, user)
+            if latest is not None and latest.weight_kg == Decimal(str(value)):
+                # The profile form submits its full state. An unchanged weight
+                # projected from yesterday's diary is not a new weigh-in today.
+                continue
         if field in nutrition_field_map and value is not None and getattr(profile, field) != value:
             nutrition_updates[nutrition_field_map[field]] = value
         setattr(profile, field, value)
+
+    # The user's explicitly saved profile weight is a current measurement too.
+    # Mirror it into today's dated ledger without triggering another target version.
+    changed_weight = nutrition_updates.get("weight_kg")
+    if isinstance(changed_weight, (Decimal, float, int)):
+        from fitminiapp_api.services.measurements import sync_current_weight_to_diary
+
+        sync_current_weight_to_diary(db, user, float(changed_weight))
+
+    # Birth date, not a previously entered calculator age, is the durable fact.
+    if "birth_date" in changes and profile.birth_date is not None:
+        reference_date = date.today()
+        age = (
+            reference_date.year
+            - profile.birth_date.year
+            - (
+                (reference_date.month, reference_date.day)
+                < (profile.birth_date.month, profile.birth_date.day)
+            )
+        )
+        if 18 <= age <= 100:
+            nutrition_updates["age"] = age
 
     if body_priority is not ...:
         _replace_body_priority(
@@ -178,6 +212,13 @@ def update_profile(
             user,
             nutrition_updates,
             changed_by or user,
+        )
+    if not onboarding_was_complete and profile.goal is not None:
+        record_lifecycle_milestone(
+            db,
+            user,
+            "onboarding_completed",
+            account_scope=True,
         )
     if commit:
         db.commit()

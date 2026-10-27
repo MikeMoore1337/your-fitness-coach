@@ -6,11 +6,27 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.account import AccountDataExport
+from fitminiapp_api.models.acquisition import FirstTouchAttribution
+from fitminiapp_api.models.ai_coach import (
+    AiCoachConsent,
+    AiCoachConversation,
+    AiCoachConversationMessage,
+    AiCoachMemory,
+    AiCoachMemoryConsent,
+)
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, LocalCredential
 from fitminiapp_api.models.billing import Payment, Subscription
 from fitminiapp_api.models.cardio import CardioSession
 from fitminiapp_api.models.check_in import WeeklyCheckIn
+from fitminiapp_api.models.coach_crm import (
+    CoachBusinessSession,
+    CoachPackage,
+    CoachPackageLedgerEntry,
+    CoachPayment,
+    CoachSessionSeries,
+    CoachTask,
+)
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
     Exercise,
@@ -19,10 +35,22 @@ from fitminiapp_api.models.exercise import (
     ExerciseGuideMetadata,
     ExerciseMuscle,
 )
+from fitminiapp_api.models.exercise_setup_memory import ExerciseSetupMemory
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
-from fitminiapp_api.models.notification import Notification, NotificationSetting
+from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
+from fitminiapp_api.models.notification import (
+    Notification,
+    NotificationDelivery,
+    NotificationSetting,
+    WebPushSubscription,
+)
 from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition_label import (
+    NutritionCatalogContribution,
+    NutritionLabelDraft,
+)
+from fitminiapp_api.models.photo_meal import PhotoMealDraft
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
     ProgramRevision,
@@ -35,10 +63,15 @@ from fitminiapp_api.models.program import (
     UserWorkoutExercise,
     UserWorkoutSet,
 )
+from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
+from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
+from fitminiapp_api.models.report_handoff import ReportHandoff
 from fitminiapp_api.models.support import BotSupportCase
 from fitminiapp_api.models.token import RefreshToken
 from fitminiapp_api.models.user import (
     BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
     CoachClient,
     CoachClientInvite,
     CoachRoleApplication,
@@ -261,6 +294,44 @@ def delete_user_cascade(db: Session, user: User) -> None:
         {"assigned_by_user_id": None}, synchronize_session=False
     )
     _delete_or_anonymize_user_exercises(db, user.id)
+    db.query(ReportHandoff).filter(
+        or_(
+            ReportHandoff.sender_user_id == user.id,
+            ReportHandoff.trainer_user_id == user.id,
+        )
+    ).delete(synchronize_session=False)
+    crm_package_ids = [
+        row.id
+        for row in db.query(CoachPackage.id)
+        .filter(or_(CoachPackage.coach_user_id == user.id, CoachPackage.client_user_id == user.id))
+        .all()
+    ]
+    if crm_package_ids:
+        db.query(CoachPackageLedgerEntry).filter(
+            CoachPackageLedgerEntry.package_id.in_(crm_package_ids)
+        ).delete(synchronize_session=False)
+    db.query(CoachBusinessSession).filter(
+        or_(
+            CoachBusinessSession.coach_user_id == user.id,
+            CoachBusinessSession.client_user_id == user.id,
+        )
+    ).delete(synchronize_session=False)
+    db.query(CoachSessionSeries).filter(
+        or_(
+            CoachSessionSeries.coach_user_id == user.id,
+            CoachSessionSeries.client_user_id == user.id,
+        )
+    ).delete(synchronize_session=False)
+    db.query(CoachPayment).filter(
+        or_(CoachPayment.coach_user_id == user.id, CoachPayment.client_user_id == user.id)
+    ).delete(synchronize_session=False)
+    db.query(CoachTask).filter(
+        or_(CoachTask.coach_user_id == user.id, CoachTask.client_user_id == user.id)
+    ).delete(synchronize_session=False)
+    if crm_package_ids:
+        db.query(CoachPackage).filter(CoachPackage.id.in_(crm_package_ids)).delete(
+            synchronize_session=False
+        )
     db.query(CoachClient).filter(
         or_(CoachClient.coach_user_id == user.id, CoachClient.client_user_id == user.id)
     ).delete(synchronize_session=False)
@@ -289,6 +360,9 @@ def delete_user_cascade(db: Session, user: User) -> None:
         {"training_preferences_updated_by_user_id": None},
         synchronize_session=False,
     )
+    db.query(ExerciseSetupMemory).filter(ExerciseSetupMemory.user_id == user.id).delete(
+        synchronize_session=False
+    )
 
     db.query(EnergyCalibration).filter(EnergyCalibration.user_id == user.id).delete(
         synchronize_session=False
@@ -314,8 +388,21 @@ def delete_user_cascade(db: Session, user: User) -> None:
     db.query(HydrationGoal).filter(HydrationGoal.user_id == user.id).delete(
         synchronize_session=False
     )
+    notification_ids = [
+        row.id for row in db.query(Notification.id).filter(Notification.user_id == user.id).all()
+    ]
+    if notification_ids:
+        db.query(NotificationDelivery).filter(
+            NotificationDelivery.notification_id.in_(notification_ids)
+        ).delete(synchronize_session=False)
     db.query(Notification).filter(Notification.user_id == user.id).delete(synchronize_session=False)
+    db.query(WebPushSubscription).filter(WebPushSubscription.user_id == user.id).delete(
+        synchronize_session=False
+    )
     db.query(NotificationSetting).filter(NotificationSetting.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(ReminderTemplateSchedule).filter(ReminderTemplateSchedule.user_id == user.id).delete(
         synchronize_session=False
     )
     db.query(WeeklyDigestDelivery).filter(WeeklyDigestDelivery.user_id == user.id).delete(
@@ -326,7 +413,18 @@ def delete_user_cascade(db: Session, user: User) -> None:
     )
     db.query(Payment).filter(Payment.user_id == user.id).delete(synchronize_session=False)
     db.query(Subscription).filter(Subscription.user_id == user.id).delete(synchronize_session=False)
+    measurement_ids = [
+        row.id
+        for row in db.query(BodyMeasurement.id).filter(BodyMeasurement.user_id == user.id).all()
+    ]
+    if measurement_ids:
+        db.query(BodyMeasurementCustomValue).filter(
+            BodyMeasurementCustomValue.measurement_id.in_(measurement_ids)
+        ).delete(synchronize_session=False)
     db.query(BodyMeasurement).filter(BodyMeasurement.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(BodyMeasurementDefinition).filter(BodyMeasurementDefinition.user_id == user.id).delete(
         synchronize_session=False
     )
     db.query(CardioSession).filter(CardioSession.user_id == user.id).delete(
@@ -334,6 +432,52 @@ def delete_user_cascade(db: Session, user: User) -> None:
     )
     db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).delete(
         synchronize_session=False
+    )
+    db.query(FirstTouchAttribution).filter(FirstTouchAttribution.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(LifecycleMilestone).filter(LifecycleMilestone.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(AiCoachConsent).filter(AiCoachConsent.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    conversation_ids = [
+        row.id
+        for row in db.query(AiCoachConversation.id)
+        .filter(AiCoachConversation.user_id == user.id)
+        .all()
+    ]
+    if conversation_ids:
+        db.query(AiCoachConversationMessage).filter(
+            AiCoachConversationMessage.conversation_id.in_(conversation_ids)
+        ).delete(synchronize_session=False)
+        db.query(AiCoachConversation).filter(AiCoachConversation.id.in_(conversation_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(AiCoachMemoryConsent).filter(AiCoachMemoryConsent.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(AiCoachMemory).filter(AiCoachMemory.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(NutritionLabelDraft).filter(NutritionLabelDraft.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(PhotoMealDraft).filter(PhotoMealDraft.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(PublicShareImport).filter(PublicShareImport.recipient_user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(PublicShare).filter(PublicShare.owner_user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(NutritionCatalogContribution).filter(
+        NutritionCatalogContribution.contributor_user_id == user.id
+    ).update(
+        {NutritionCatalogContribution.contributor_user_id: None},
+        synchronize_session=False,
     )
     db.query(RefreshToken).filter(RefreshToken.user_id == user.id).delete(synchronize_session=False)
     db.query(AuthIdentity).filter(AuthIdentity.user_id == user.id).delete(synchronize_session=False)

@@ -14,11 +14,15 @@ from fitminiapp_api.services.food_provider import (
     RequestBudget,
 )
 from fitminiapp_api.services.food_search_aliases import (
-    USDA_RU_DISPLAY_NAMES_V2,
+    USDA_RU_DISPLAY_NAMES_V4,
     generic_food_search_query,
     has_generic_food_alias,
     is_russian_food_query,
     usda_ru_result_ids,
+)
+from fitminiapp_api.services.usda_reviewed_expansion import USDA_REVIEWED_FNDDS_EXPANSION_V3
+from fitminiapp_api.services.usda_reviewed_foundation_legacy import (
+    USDA_REVIEWED_FOUNDATION_LEGACY_V4,
 )
 
 _API_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
@@ -46,10 +50,12 @@ class USDAFoodDataCentralProvider:
         api_key: str,
         timeout_seconds: float = 4.0,
         transport: httpx.BaseTransport | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         self._api_key = api_key.strip()
         self._timeout = httpx.Timeout(timeout_seconds)
         self._transport = transport
+        self._proxy_url = proxy_url
 
     def search(self, query: str, *, limit: int) -> list[ProviderFood]:
         russian_query = is_russian_food_query(query)
@@ -86,6 +92,7 @@ class USDAFoodDataCentralProvider:
                     headers={"Accept": "application/json"},
                     timeout=self._timeout,
                     transport=self._transport,
+                    proxy=self._proxy_url,
                     follow_redirects=False,
                     trust_env=False,
                 ) as client:
@@ -137,7 +144,18 @@ class USDAFoodDataCentralProvider:
         data_type = cls._text(raw_food.get("dataType"))
         if external_id is None or source_name is None or data_type not in _DATA_TYPES:
             return None
-        russian_name = USDA_RU_DISPLAY_NAMES_V2.get(external_id)
+        russian_name = USDA_RU_DISPLAY_NAMES_V4.get(external_id)
+        reviewed_mixed = USDA_REVIEWED_FOUNDATION_LEGACY_V4.get(external_id)
+        if reviewed_mixed is not None and (
+            data_type != reviewed_mixed[2] or source_name != reviewed_mixed[1]
+        ):
+            russian_name = None
+        reviewed_addition = USDA_REVIEWED_FNDDS_EXPANSION_V3.get(external_id)
+        if reviewed_addition is not None and (
+            data_type != "Survey (FNDDS)" or source_name != reviewed_addition[1]
+        ):
+            # FDC data-type and source-description drift must never inherit a reviewed RU label.
+            russian_name = None
         if require_russian_name and russian_name is None:
             return None
         name = russian_name or source_name
@@ -149,6 +167,16 @@ class USDAFoodDataCentralProvider:
                 expected_unit=expected_unit,
                 maximum=maximum,
             )
+            if value is None and nutrient_id == 1008 and data_type == "Foundation":
+                # Modern Foundation records may only provide Atwater energy 2048/2047.
+                for fallback_id in (2048, 2047):
+                    value = cls._nutrient_value(
+                        nutrients.get(fallback_id),
+                        expected_unit="KCAL",
+                        maximum=Decimal(1000),
+                    )
+                    if value is not None:
+                        break
             if value is None:
                 return None
             required[field] = value

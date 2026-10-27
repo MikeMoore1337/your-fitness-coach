@@ -1,0 +1,29 @@
+{
+  "issue": 867,
+  "runtime_commit": "be3d2a2a0ffac3e27c44029578f3354197387736",
+  "source_pr": "https://github.com/MikeMoore1337/your-fitness-coach/pull/927",
+  "fixture": "mockActiveWorkout (synthetic demo data; no production credentials)",
+  "scenario": "complete set 201, complete set 202, show rest timer, inspect current set 202 and visible next set 203 before any navigation tap",
+  "assertions": [
+    "current completion control is at least 8 CSS px above #appBottomNav",
+    "visible next-set controls are at least 8 CSS px above #appBottomNav",
+    "elementFromPoint hits the workout control rather than the dock",
+    "rest panel does not overlap the current input",
+    "touching the dock preserves current set 202 and emits no set mutation"
+  ],
+  "generated": "2026-10-11",
+  "engines": {
+    "chromium": {
+      "command": "npx playwright test tests/e2e/active-workout-experience.spec.ts --grep \"resting active workout keeps the next set clear of the dock\" --workers=1",
+      "viewports": [320, 360, 393, 430],
+      "themes": ["dark", "light"]
+    },
+    "webkit": {
+      "command": "npx playwright test tests/e2e/active-workout-experience.spec.ts --config=playwright.cross-browser.config.ts --project=webkit --grep \"resting active workout keeps the next set clear of the dock\" --workers=1",
+      "viewports": [320, 360, 393, 430],
+      "themes": ["dark", "light"]
+    }
+  },
+  "before_reference_commit": "c8ece94",
+  "before_reference": "docs/ux/issue-914-acceptance/before/*-timer.png"
+}

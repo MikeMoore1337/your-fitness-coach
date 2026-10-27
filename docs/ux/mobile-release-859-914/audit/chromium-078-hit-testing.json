@@ -1,0 +1,165 @@
+{
+  "point": {
+    "x": 66,
+    "y": 103,
+    "panel": {
+      "x": 12,
+      "y": 0,
+      "width": 296,
+      "height": 110,
+      "top": 0,
+      "right": 308,
+      "bottom": 110,
+      "left": 12
+    },
+    "previous": {
+      "x": 12,
+      "y": 78.734375,
+      "width": 296,
+      "height": 48,
+      "top": 78.734375,
+      "right": 308,
+      "bottom": 126.734375,
+      "left": 12
+    }
+  },
+  "writes": [],
+  "events": [
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "touchstart",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "touchend",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "touchstart",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "touchend",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": "ASIDE",
+      "hit": "ASIDE",
+      "path": [
+        "ASIDE",
+        "SECTION",
+        "DIV",
+        "SECTION",
+        "DIV"
+      ],
+      "active": "202"
+    }
+  ]
+}

@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from fitminiapp_api.schemas.food_diary import DiaryAmountUnit, FoodDiaryNutrition
+from fitminiapp_api.schemas.food_diary import FoodDiaryNutrition
+
+RecipeAmountUnit = Literal["g", "serving"]
 
 
 class RecipeIngredientInput(BaseModel):
     food_id: int = Field(gt=0)
     amount: Decimal = Field(gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False)
-    amount_unit: DiaryAmountUnit = "g"
+    amount_unit: RecipeAmountUnit = "g"
 
 
 class RecipeCreate(BaseModel):
@@ -85,7 +88,7 @@ class RecipeIngredientResponse(BaseModel):
     food_name: str
     food_brand: str | None
     amount: Decimal
-    amount_unit: DiaryAmountUnit
+    amount_unit: RecipeAmountUnit
     weight_g: Decimal
     serving_amount: Decimal | None
     serving_unit: str | None

@@ -11,13 +11,59 @@ requires-python = ">=3.14"
 dependencies = []
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=9.1",
-    "httpx>=0.28",
-    "pre-commit>=4.6",
-    "ruff>=0.16.1",
-    "mypy>=2.3",
+backend = [
+    "fastapi",
+    "msgpack>=1.2.1",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "psycopg[binary]",
+    "pydantic-settings",
+    "pydantic",
+    "alembic",
+    "authlib",
+    "cryptography",
+    "PyJWT",
+    "pwdlib[argon2]",
+    "httpx[socks]",
+    "pywebpush==2.5.0",
+    "itsdangerous",
+    "python-multipart",
+    "qrcode[pil]",
+    "reportlab",
+    "setuptools>=78.1.1",
+    "slowapi",
+    "onnxruntime==1.30.0",
+    "rapidocr==3.9.2",
 ]
+bot = [
+    "aiogram",
+    # Минимальная версия с исправлениями GHSA для aiohttp в bot runtime.
+    "aiohttp>=3.14.4,<4",
+    "aiohttp-socks",
+    "httpx",
+    "pydantic-settings",
+    "tzdata",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28",
+    "mypy>=2.3",
+    "pre-commit>=4.6",
+    "pytest>=9.1",
+    "pytest-xdist",
+    "ruff>=0.16.1",
+]
+scheduled-report = [
+    "allure-pytest==2.16.0",
+]
+
+[tool.uv]
+package = false
+default-groups = []
+required-version = ">=0.11.32,<0.12"
+# Starlette 1.6 still references the deprecated anyio.abc.BlockingPortal alias; pytest treats it as an error.
+constraint-dependencies = ["anyio>=4.14.2,<4.15", "pillow>=13.0.0", "certifi>=2026.10.19"]
 
 # Backend и bot имеют уникальные имена пакетов, чтобы локальные инструменты типизации
 # не зависели от порядка PYTHONPATH.
@@ -26,7 +72,7 @@ dev = [
 target-version = "py314"
 line-length = 100
 src = ["backend", "bot", "tests", "scripts"]
-cache-dir = ".artifacts/cache/ruff"
+cache-dir = ".artifacts/runtime/cache/ruff"
 # Historical Alembic revisions are immutable deployment artifacts. New application
 # code and tests remain covered by Ruff through pre-commit and CI.
 extend-exclude = ["backend/alembic/versions"]
@@ -68,7 +114,7 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.14"
 strict = false
-cache_dir = ".artifacts/cache/mypy"
+cache_dir = ".artifacts/runtime/cache/mypy"
 mypy_path = "backend"
 explicit_package_bases = true
 packages = ["fitminiapp_api"]
@@ -83,8 +129,8 @@ check_untyped_defs = true
 no_implicit_optional = false
 
 [tool.pytest.ini_options]
-cache_dir = ".artifacts/cache/pytest"
-addopts = "--basetemp=.artifacts/tests/pytest-tmp"
+cache_dir = ".artifacts/runtime/cache/pytest"
+addopts = "--basetemp=.artifacts/runtime/tests/pytest-tmp"
 filterwarnings = [
     "error",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",

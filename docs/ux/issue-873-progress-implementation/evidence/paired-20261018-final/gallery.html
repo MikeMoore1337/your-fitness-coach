@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Issue #873 · финальный AFTER</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font: 14px system-ui;
+      background: #111;
+      color: #eee;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      padding: 12px;
+      background: #111;
+      z-index: 1;
+    }
+    select {
+      margin-right: 8px;
+      padding: 6px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    figure {
+      margin: 0;
+      padding: 8px;
+      background: #1b1d1f;
+      border: 1px solid #444;
+      border-radius: 12px;
+    }
+    figcaption {
+      min-height: 36px;
+      margin-bottom: 8px;
+      color: #ddd;
+    }
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+    }
+  </style>
+  <header>
+    <h1>Issue #873 · финальный AFTER</h1>
+    <p>
+      Chromium · 144 synthetic captures · revision
+      00e2701adcb5ae889f27aa72555265628c19df25
+    </p>
+    <p>
+      <a href="comparisons.html" style="color: #b6f238"
+        >Крупные BEFORE/AFTER сравнения</a
+      >
+      · <a href="after/manifest.json" style="color: #b6f238">manifest.json</a>
+    </p>
+    <label
+      >Тема
+      <select id="theme">
+        <option value="all">all</option>
+        <option>light</option>
+        <option>dark</option>
+      </select></label
+    >
+    <label
+      >Раздел
+      <select id="section">
+        <option value="all">all</option>
+        <option>overview</option>
+        <option>body</option>
+        <option>training</option>
+        <option>nutrition</option>
+        <option>cardio</option>
+        <option>wellbeing</option>
+        <option>history</option>
+      </select></label
+    >
+    <label
+      >Состояние
+      <select id="state">
+        <option value="all">all</option>
+        <option>default</option>
+        <option>expanded</option>
+        <option>action-add-measurement</option>
+      </select></label
+    >
+  </header>
+  <main id="gallery"></main>
+  <script>
+    const themes = ["light", "dark"];
+    const sections = [
+      "overview",
+      "body",
+      "training",
+      "nutrition",
+      "cardio",
+      "wellbeing",
+      "history",
+    ];
+    const widths = [320, 360, 393, 430, 1024, 1280, 1440, 1920];
+    const captures = [];
+    for (const theme of themes) {
+      for (const width of widths) {
+        for (const section of sections)
+          captures.push({ theme, section, width, state: "default" });
+      }
+      for (const width of [393, 1440]) {
+        for (const section of sections)
+          captures.push({ theme, section, width, state: "expanded" });
+        captures.push({
+          theme,
+          section: "body",
+          width,
+          state: "action-add-measurement",
+        });
+      }
+    }
+    const gallery = document.getElementById("gallery");
+    for (const capture of captures) {
+      const file = `${capture.theme}-${capture.section}-${capture.width}-${capture.state}.jpg`;
+      const figure = document.createElement("figure");
+      figure.dataset.theme = capture.theme;
+      figure.dataset.section = capture.section;
+      figure.dataset.state = capture.state;
+      figure.innerHTML = `<figcaption>${capture.theme} · ${capture.section} · ${capture.width}px · ${capture.state}</figcaption><a href="after/${file}"><img loading="lazy" src="after/${file}" alt="${capture.theme} ${capture.section} ${capture.width}px ${capture.state}"></a>`;
+      gallery.append(figure);
+    }
+    for (const id of ["theme", "section", "state"]) {
+      document.getElementById(id).addEventListener("change", () => {
+        const value = document.getElementById(id).value;
+        document.querySelectorAll("figure").forEach((figure) => {
+          figure.hidden = value !== "all" && figure.dataset[id] !== value;
+        });
+      });
+    }
+  </script>
+</html>

@@ -3,6 +3,7 @@ const workoutStatusLabels: Record<string, string> = {
   in_progress: 'В процессе',
   completed: 'Завершена',
   skipped: 'Пропущена',
+  missed: 'Нужно решить',
   cancelled: 'Отменена',
 };
 

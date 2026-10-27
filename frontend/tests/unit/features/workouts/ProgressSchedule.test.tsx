@@ -116,6 +116,27 @@ const schedule = [
     week_number: 1,
   },
 ];
+let scheduleRows = schedule;
+
+const recoveryPreview = {
+  status: 'preview',
+  workout: schedule[0],
+  action: 'move',
+  ruleset_version: 'schedule-recovery-v2',
+  changes: [
+    {
+      kind: 'moved',
+      from_scheduled_date: '2030-01-10',
+      from_scheduled_time: '18:30:00',
+      to_scheduled_date: '2030-01-12',
+      to_scheduled_time: '19:15:00',
+    },
+  ],
+  remaining_workouts: [],
+  warnings: [],
+  message: 'Перенесём только эту тренировку.',
+  preview_token: 'a'.repeat(64),
+};
 
 const suspiciousLowDays: Array<{
   diary_date: string;
@@ -172,6 +193,66 @@ const weeklyCheckIn = {
         carbs_g: 190,
       },
       suspicious_low_days: suspiciousLowDays,
+      planning_review: {
+        week_start: '2030-01-07',
+        week_end: '2030-01-13',
+        availability: 'available',
+        days: [
+          {
+            diary_date: '2030-01-08',
+            observed: true,
+            plan_status: 'partial',
+            plan_revision: 2,
+            planned_items: 1,
+            consumed_items: 0,
+            pending_items: 1,
+            skipped_items: 0,
+            planned: {
+              energy_kcal: '120.00',
+              protein_g: '10.00',
+              fat_g: '3.00',
+              carbs_g: '8.00',
+              fiber_g: '0.00',
+            },
+            consumed: null,
+            target: {
+              energy_kcal: '2000.00',
+              protein_g: '150.00',
+              fat_g: '70.00',
+              carbs_g: '190.00',
+            },
+          },
+        ],
+        planned_days: 1,
+        target_days: 1,
+        consumed_days: 0,
+        pending_days: 1,
+        repeated_miss_dates: [],
+        planned_total: {
+          energy_kcal: '120.00',
+          protein_g: '10.00',
+          fat_g: '3.00',
+          carbs_g: '8.00',
+          fiber_g: '0.00',
+        },
+        consumed_total: null,
+        target_total: {
+          energy_kcal: '2000.00',
+          protein_g: '150.00',
+          fat_g: '70.00',
+          carbs_g: '190.00',
+        },
+        proposals: [
+          {
+            source_date: '2030-01-08',
+            target_date: '2030-01-15',
+            source_revision: 2,
+            target_revision: 0,
+            pending_item_count: 1,
+            target_item_count: 0,
+          },
+        ],
+      },
     },
     weight_trend: null,
     anthropometry_trends: [],
@@ -250,7 +331,7 @@ const pendingCalibration = {
 
 let calibrationResult: Record<string, unknown> = insufficientCalibration;
 
-function renderPanel(userId: number | 'anonymous' = 'anonymous') {
+function renderPanel(userId: number | 'anonymous' = 'anonymous', focusedWorkoutId?: number) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -258,7 +339,7 @@ function renderPanel(userId: number | 'anonymous' = 'anonymous') {
     <NavigationProvider>
       <QueryClientProvider client={queryClient}>
         <FeedbackProvider>
-          <ProgressSchedule userId={userId} />
+          <ProgressSchedule userId={userId} focusedWorkoutId={focusedWorkoutId} />
         </FeedbackProvider>
       </QueryClientProvider>
     </NavigationProvider>,
@@ -268,6 +349,8 @@ function renderPanel(userId: number | 'anonymous' = 'anonymous') {
 describe('ProgressSchedule', () => {
   beforeEach(() => {
     localStorage.clear();
+    schedule[0]!.status = 'planned';
+    scheduleRows = schedule;
     suspiciousLowDays.length = 0;
     calibrationResult = insufficientCalibration;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -302,16 +385,38 @@ describe('ProgressSchedule', () => {
       if (path === '/api/v1/check-ins/weekly' && init?.method === 'POST') {
         return new Response(JSON.stringify({ id: 1 }), { status: 201 });
       }
+      if (path === '/api/v1/check-ins/weekly/planning-review/confirm' && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            week_start: '2030-01-07',
+            week_end: '2030-01-13',
+            replayed: false,
+            planning_review: { ...weeklyCheckIn.summary.nutrition.planning_review, proposals: [] },
+          }),
+          { status: 200 },
+        );
+      }
       if (path === '/api/v1/nutrition/diary/status' && init?.method === 'PUT') {
         return new Response(JSON.stringify({ status: 'incomplete' }), { status: 200 });
       }
       if (path === '/api/v1/workouts/schedule' && (!init?.method || init.method === 'GET')) {
-        return new Response(JSON.stringify(schedule), { status: 200 });
+        return new Response(JSON.stringify(scheduleRows), { status: 200 });
       }
-      if (path === '/api/v1/workouts/42/schedule' && init?.method === 'PATCH') {
-        return new Response(JSON.stringify({ ...schedule[0], scheduled_date: '2030-01-12' }), {
-          status: 200,
-        });
+      if (path === '/api/v1/workouts/42/recovery/preview' && init?.method === 'POST') {
+        return new Response(JSON.stringify(recoveryPreview), { status: 200 });
+      }
+      if (path === '/api/v1/workouts/42/recovery/apply' && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            applied_at: '2030-01-10T12:00:00',
+            workout: { ...schedule[0], scheduled_date: '2030-01-12', scheduled_time: '19:15:00' },
+            remaining_workouts: [],
+            next_workout: null,
+          }),
+          {
+            status: 200,
+          },
+        );
       }
       return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
     });
@@ -322,32 +427,112 @@ describe('ProgressSchedule', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows progress and sends a reschedule request', async () => {
+  it.each([1, 4, 12])(
+    'keeps all %i schedule rows available behind the compact preview',
+    async (count) => {
+      scheduleRows = Array.from({ length: count }, (_, index) => ({
+        ...schedule[0]!,
+        id: 100 + index,
+        title: `Занятие ${index + 1}`,
+      }));
+      renderPanel();
+      await screen.findByText('Занятие 1');
+      fireEvent.click(screen.getByText('Расписание'));
+      expect(screen.getByText('Занятие 1')).toBeVisible();
+      expect(screen.getAllByRole('article', { name: /^Тренировка Занятие/ })).toHaveLength(count);
+      expect(screen.getByRole('heading', { name: 'Расписание' }).closest('details')).toHaveClass(
+        'workout-schedule-card',
+      );
+      const scheduleLists = [...document.querySelectorAll('.workout-schedule-list')];
+      expect(scheduleLists).toHaveLength(count > 4 ? 2 : 1);
+      expect(scheduleLists[0]).not.toHaveClass('top-gap');
+      if (count > 4) {
+        expect(
+          screen.getByRole('article', { name: 'Тренировка Занятие 12 в расписании' }),
+        ).not.toBeVisible();
+        fireEvent.click(screen.getByText('Все восемь недель · ещё 8'));
+        expect(screen.getAllByRole('article', { name: /^Тренировка Занятие/ })).toHaveLength(count);
+        await waitFor(() =>
+          expect(
+            within(
+              screen.getByRole('article', { name: 'Тренировка Занятие 12 в расписании' }),
+            ).getByRole('button', { name: 'Изменить план' }),
+          ).toBeVisible(),
+        );
+      }
+    },
+  );
+
+  it('opens the full calendar for a deep link to its last workout', async () => {
+    scheduleRows = Array.from({ length: 12 }, (_, index) => ({
+      ...schedule[0]!,
+      id: 100 + index,
+      title: `Занятие ${index + 1}`,
+    }));
+    renderPanel('anonymous', 111);
+    expect(
+      await screen.findByRole('article', { name: 'Тренировка Занятие 12 в расписании' }),
+    ).toHaveFocus();
+  });
+
+  it('shows progress and applies a reviewed reschedule request', async () => {
     renderPanel();
 
-    expect((await screen.findAllByText('80%')).length).toBeGreaterThan(1);
+    expect(await screen.findByText('80%', { exact: true })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Прогресс' })).toBeInTheDocument();
-    expect(screen.getByText('Замеров за этот период нет')).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
+        name: 'Тело',
+      }),
+    );
+    expect(await screen.findByText('Мало данных для динамики')).toBeVisible();
     expect(screen.getByText('Тренировка A')).toBeInTheDocument();
     expect(screen.getByText('Запланирована')).toBeInTheDocument();
     expect(screen.queryByText('planned')).not.toBeInTheDocument();
 
-    const input = screen.getByLabelText('Новая дата для Тренировка A');
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить план' }));
+    const input = screen.getByLabelText('Новая дата');
     fireEvent.change(input, { target: { value: '2030-01-12' } });
-    fireEvent.change(screen.getByLabelText('Новое время для Тренировка A'), {
+    fireEvent.change(screen.getByLabelText('Время'), {
       target: { value: '19:15' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Перенести' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать изменения' }));
+    expect(await screen.findByRole('heading', { name: 'Что изменится' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить' }));
 
     await waitFor(() =>
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        '/api/v1/workouts/42/schedule',
+        '/api/v1/workouts/42/recovery/preview',
         expect.objectContaining({
-          method: 'PATCH',
-          body: JSON.stringify({ scheduled_date: '2030-01-12', scheduled_time: '19:15' }),
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'move',
+            expected_scheduled_date: '2030-01-10',
+            expected_scheduled_time: '18:30:00',
+            scheduled_date: '2030-01-12',
+            scheduled_time: '19:15',
+          }),
         }),
       ),
     );
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/v1/workouts/42/recovery/apply',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"preview_token"'),
+        }),
+      ),
+    );
+  });
+
+  it('uses the recovery action for a server-derived missed workout', async () => {
+    schedule[0]!.status = 'missed';
+    renderPanel();
+
+    expect(await screen.findByText('Тренировка A')).toBeInTheDocument();
+    expect(screen.getByText('Нужно решить')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Вернуться к тренировке' })).toBeInTheDocument();
   });
 
   it('submits optional weekly self-assessment', async () => {
@@ -378,6 +563,40 @@ describe('ProgressSchedule', () => {
             adherence_difficulty: null,
             note: 'Больше сна',
             energy_calibration_id: null,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('keeps the next-plan adjustment preview-only until explicit confirmation', async () => {
+    renderPanel();
+
+    expect(await screen.findByText('Предпросмотр следующего плана')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить перенос' }));
+    const dialog = screen.getByRole('dialog', { name: 'Перенести незавершённое?' });
+    expect(dialog).toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      '/api/v1/check-ins/weekly/planning-review/confirm',
+      expect.anything(),
+    );
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Перенести' }));
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/v1/check-ins/weekly/planning-review/confirm',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            week_start: '2030-01-07',
+            adjustments: [
+              {
+                source_date: '2030-01-08',
+                target_date: '2030-01-15',
+                source_revision: 2,
+                target_revision: 0,
+              },
+            ],
           }),
         }),
       ),

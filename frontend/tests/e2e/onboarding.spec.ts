@@ -77,6 +77,16 @@ async function mockFirstRunApi(
   profile: 'missing' | 'partial' | 'complete' = 'missing',
 ) {
   const user = onboardingUser(status, profile);
+  const suggestionsResponse = (url: URL) => ({
+    mode: 'deterministic',
+    diary_date: url.searchParams.get('diary_date') || '2030-01-30',
+    targets: null,
+    remaining: null,
+    remaining_confidence: null,
+    limitations: [],
+    max_candidates: 0,
+    candidates: [],
+  });
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
@@ -131,6 +141,9 @@ async function mockFirstRunApi(
         },
       });
     }
+    if (path.endsWith('/nutrition/diary/suggestions')) {
+      return route.fulfill({ json: suggestionsResponse(url) });
+    }
     if (path.endsWith('/workouts/progress/summary')) {
       return route.fulfill({
         json: {
@@ -169,6 +182,9 @@ async function mockFirstRunApi(
             average_protein_g: null,
             target_protein_g: null,
             target_effective_on: null,
+            exact_entry_count: 0,
+            approximate_entry_count: 0,
+            partial_entry_count: 0,
           },
           body: {
             latest_measurement: null,
@@ -271,8 +287,14 @@ async function mockFirstRunApi(
           period_days: 30,
           period_start: '2030-01-01',
           period_end: '2030-01-30',
+          previous_period_start: '2029-12-02',
+          previous_period_end: '2029-12-31',
           exercise_history_limit: 20,
           completed_set_count: 0,
+          completed_workout_count: 0,
+          frequency_per_week: 0,
+          previous_completed_workout_count: 0,
+          previous_frequency_per_week: 0,
           reps_total: null,
           reps_recorded_sets: 0,
           external_load_volume_kg: null,
@@ -286,6 +308,7 @@ async function mockFirstRunApi(
           },
           primary_muscle_exposure: [],
           secondary_muscle_exposure: [],
+          muscle_group_workload: [],
           completed_sets_without_muscle_metadata: 0,
           data_sufficiency: {
             ruleset_version: 'data-sufficiency-v1',
@@ -331,6 +354,9 @@ async function mockFirstRunApi(
             calorie_tolerance_evaluated_days: 0,
             days_meeting_protein_target: 0,
             protein_target_evaluated_days: 0,
+            exact_entry_count: 0,
+            approximate_entry_count: 0,
+            partial_entry_count: 0,
           },
           daily: [],
           target_changes: [],
@@ -371,7 +397,7 @@ async function mockFirstRunApi(
           week_end: '2030-01-30',
           submitted_on: '2030-01-30',
           timezone: 'Europe/Moscow',
-          existing: null,
+          existing: { id: 1 },
           summary: {
             ruleset_version: 'weekly-review-summary-v2',
             period_start: '2030-01-24',
@@ -427,9 +453,19 @@ async function mockFirstRunApi(
     }
     return route.fulfill({ json: [] });
   });
+
+  // Keep this route outside the broad handler: some tests replace that handler
+  // between navigations while a suggestions request from the previous view may
+  // still be in flight.
+  await page.route('**/api/v1/nutrition/diary/suggestions*', async (route) => {
+    const url = new URL(route.request().url());
+    return route.fulfill({ json: suggestionsResponse(url) });
+  });
 }
 
-test('brand-new Web user enters Today without a mandatory profile step', async ({ page }) => {
+test('brand-new Web user sees the profile prerequisite as the Today primary action', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockFirstRunApi(page, 'required', 'missing');
 
@@ -441,9 +477,18 @@ test('brand-new Web user enters Today without a mandatory profile step', async (
   await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Выбрать готовую' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Заполнить профиль' }).click();
+  await expect(page).toHaveURL('/app?section=profile#profile-fitness');
+
+  await page.unroute('**/api/v1/**');
+  await mockFirstRunApi(page, 'complete', 'complete');
+  await page.goto('/app');
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Создать свою программу' }).click();
   await expect(page).toHaveURL('/app?section=programs&start=create');
@@ -454,7 +499,7 @@ test('brand-new Web user enters Today without a mandatory profile step', async (
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Сегодня', exact: true }).click();
-  await page.getByRole('link', { name: 'Выбрать готовую' }).click();
+  await page.getByRole('link', { name: 'Выбрать готовую программу' }).click();
   await expect(page).toHaveURL('/app?section=programs&start=templates');
   const library = page.locator('#program-library');
   await expect(library).toHaveAttribute('open', '');
@@ -484,8 +529,8 @@ test('returning and legacy required users keep requested core routes without red
   await page.getByRole('button', { name: 'Выйти из аккаунта' }).click();
   await expect(page).toHaveURL(/\/login\?next=%2Fapp/);
   await page.getByRole('button', { name: 'Клиент' }).click();
-  await expect(page).toHaveURL('/app');
-  await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
+  await expect(page).toHaveURL('/app?section=nutrition');
+  await expect(page.getByRole('heading', { level: 1, name: 'Питание' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
 });
 
@@ -527,11 +572,13 @@ test('first-run shell stays usable across required responsive surfaces', async (
     await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(current.width);
-    for (const action of ['Создать свою программу', 'Выбрать готовую', 'Заполнить профиль']) {
+    for (const action of ['Заполнить профиль']) {
       const box = await page.getByRole('link', { name: action }).boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
     }
+    await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
 
     if (captureTask117Proofs) {
       await page.screenshot({
@@ -556,6 +603,7 @@ test('Telegram Mini App uses the same first-run shell for a legacy required user
   await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Включить .* тему/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Выбрать готовую' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
 });

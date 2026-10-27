@@ -1,11 +1,9 @@
-import { StrictMode, lazy, Suspense, useEffect } from 'react';
+import { StrictMode, lazy, Suspense, useEffect, useLayoutEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './app/AuthProvider';
-import { AuthGate } from './app/AuthGate';
-import { OnboardingGate } from './app/OnboardingGate';
 import { ErrorBoundary } from './app/ErrorBoundary';
 import { FeedbackProvider } from './shared/ui/FeedbackProvider';
+import { GlassInteractions } from './shared/ui/GlassInteractions';
 import { OnlineStatus } from './shared/ui/OnlineStatus';
 import { LoadingState } from './shared/ui/common';
 import { isTelegramLaunch } from './shared/telegram/launch';
@@ -15,22 +13,54 @@ import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
 } from './shared/navigation/knowledgeRoutes';
-import { isPublishedKnowledgePath } from './content/publicContent';
-import { applyRouteMetadata } from './shared/seo/metadata';
-import { clearAllDemoSessions } from './features/demo/demoApi';
+import { PwaProvider } from './shared/pwa/PwaProvider';
+import { captureFirstTouchAttribution } from './shared/analytics/attribution';
+import { LANDING_AUDIENCE_ROUTES } from './pages/landing/landingAudience';
 import './styles/legacy.css';
-import './styles/react.css';
+import './styles/fonts.css';
 import './styles/design-system.css';
-import './styles/design-v2.css';
+import './styles/liquid-glass.css';
 
 const publicContentRoots = new Set([
   '/training',
+  '/programs/full-body-3-days',
   '/nutrition',
+  '/calculators/1rm',
   '/progress',
   '/for-trainers',
   '/knowledge',
   '/exercises',
 ]);
+
+function applyPrivateRouteMetadata(path: string): void {
+  void import('./shared/seo/metadata').then(({ applyRouteMetadata }) => {
+    if (window.location.pathname === path) applyRouteMetadata(path);
+  });
+}
+
+function initializeYandexMetrica(): void {
+  void import('./shared/analytics/yandexMetrica').then(({ initializeYandexMetrica }) => {
+    initializeYandexMetrica();
+  });
+}
+
+function trackYandexPageView(path: string, title?: string): void {
+  void import('./shared/analytics/yandexMetrica').then(({ trackYandexPageView }) => {
+    trackYandexPageView(path, title);
+  });
+}
+
+function setYandexPrivateContentMask(masked: boolean): void {
+  document.getElementById('root')?.classList.toggle('ym-hide-content', masked);
+}
+
+function isArticleRoute(path: string): boolean {
+  return path === '/articles' || path.startsWith('/articles/');
+}
+
+function isPublicShareRoute(path: string): boolean {
+  return path.startsWith('/share/');
+}
 
 function isPublicContentRoute(path: string): boolean {
   return (
@@ -38,20 +68,51 @@ function isPublicContentRoute(path: string): boolean {
   );
 }
 
-const MiniAppPage = lazy(() => import('./pages/miniapp/MiniAppPage'));
+function isPublicLandingRoute(path: string): boolean {
+  return (
+    path === LANDING_AUDIENCE_ROUTES.athlete ||
+    path === LANDING_AUDIENCE_ROUTES.athleteAlias ||
+    path === LANDING_AUDIENCE_ROUTES.coach
+  );
+}
+
 const ProgressReportPage = lazy(() => import('./pages/reports/ProgressReportPage'));
 const CoachPage = lazy(() => import('./pages/coach/CoachPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
-const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
+const HermesEditorialBridgePage = lazy(() => import('./pages/admin/HermesEditorialBridgePage'));
+const LandingV10AthletePage = lazy(() => import('./pages/landing/LandingV10AthletePage'));
+const LandingV10CoachPage = lazy(() => import('./pages/landing/LandingV10CoachPage'));
 const DemoPage = lazy(() => import('./pages/demo/DemoPage'));
 const PublicContentPage = lazy(() => import('./pages/public/PublicContentPage'));
-const KnowledgeHandoffPage = lazy(() => import('./pages/public/KnowledgeHandoffPage'));
+const PublicSharePage = lazy(() => import('./pages/public/PublicSharePage'));
+const ArticlesPage = lazy(() => import('./pages/public/ArticlesPage'));
+const PublicKnowledgeRoute = lazy(() => import('./pages/public/PublicKnowledgeRoute'));
 const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const JoinCoachPage = lazy(() => import('./pages/join/JoinCoachPage'));
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const AuthProvider = lazy(() =>
+  import('./app/AuthProvider').then((module) => ({
+    default: module.AuthProvider,
+  })),
+);
+const OnboardingGate = lazy(() =>
+  import('./app/OnboardingGate').then((module) => ({
+    default: module.OnboardingGate,
+  })),
+);
+const AuthenticatedRoute = lazy(() =>
+  import('./app/AuthenticatedRoutes').then((module) => ({
+    default: module.AuthenticatedRoute,
+  })),
+);
+const AuthenticatedAppPage = lazy(() =>
+  import('./app/AuthenticatedAppPage').then((module) => ({
+    default: module.AuthenticatedAppPage,
+  })),
+);
 function loadTelegramSdk(): Promise<void> {
   if (!isTelegramLaunch(window.location) || window.Telegram?.WebApp) {
     return Promise.resolve();
@@ -73,32 +134,44 @@ const queryClient = new QueryClient({
   },
 });
 
-function AuthenticatedRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      <AuthGate>{children}</AuthGate>
-    </AuthProvider>
-  );
-}
-
 function AppRoutes() {
   const { path } = useNavigation();
-  const isMiniApp =
-    Boolean(window.Telegram?.WebApp?.initData?.trim()) || isTelegramLaunch(window.location);
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
   useEffect(() => {
-    if (path !== '/' && !isPublicContentRoute(path)) applyRouteMetadata(path);
+    if (isPublicLandingRoute(path)) {
+      void import('./content/publicContent').then(({ getPublicContentPage }) => {
+        if (window.location.pathname !== path) return;
+        void import('./shared/seo/metadata').then(({ applyRouteMetadata }) => {
+          const metadataPage = path === LANDING_AUDIENCE_ROUTES.athleteAlias ? '/' : path;
+          applyRouteMetadata(path, getPublicContentPage(metadataPage));
+        });
+      });
+      return;
+    }
+    if (!isPublicContentRoute(path) && !isArticleRoute(path) && !isPublicShareRoute(path)) {
+      applyPrivateRouteMetadata(path);
+    }
   }, [path]);
-  if (path === '/') return <LandingPage />;
+  if (isPublicLandingRoute(path)) {
+    if (path === LANDING_AUDIENCE_ROUTES.coach) return <LandingV10CoachPage />;
+    return <LandingV10AthletePage />;
+  }
+  if (isArticleRoute(path)) return <ArticlesPage />;
+  if (isPublicShareRoute(path))
+    return (
+      <AuthProvider>
+        <PublicSharePage />
+      </AuthProvider>
+    );
   if (path === '/demo') {
     if (isTelegramLaunch(window.location)) return <Redirect to="/app" />;
     return <DemoPage />;
   }
-  if (legacyKnowledgePath && isPublishedKnowledgePath(legacyKnowledgePath)) {
-    return <KnowledgeHandoffPage articlePath={legacyKnowledgePath} />;
+  if (legacyKnowledgePath) {
+    return <PublicKnowledgeRoute articlePath={legacyKnowledgePath} legacyRoute />;
   }
-  if (isMiniApp && isPublicKnowledgePath(path) && isPublishedKnowledgePath(path)) {
-    return <KnowledgeHandoffPage articlePath={path} />;
+  if (isPublicKnowledgePath(path)) {
+    return <PublicKnowledgeRoute articlePath={path} />;
   }
   if (isPublicContentRoute(path)) {
     return <PublicContentPage />;
@@ -131,14 +204,7 @@ function AppRoutes() {
       );
     }
   }
-  if (path === '/app')
-    return (
-      <AuthenticatedRoute>
-        <OnboardingGate>
-          <MiniAppPage />
-        </OnboardingGate>
-      </AuthenticatedRoute>
-    );
+  if (path === '/app') return <AuthenticatedAppPage />;
   if (path === '/app/report')
     return (
       <AuthenticatedRoute>
@@ -159,6 +225,13 @@ function AppRoutes() {
         <CoachPage />
       </AuthenticatedRoute>
     );
+  if (path === '/admin/hermes-bridge') {
+    return (
+      <AuthenticatedRoute>
+        <HermesEditorialBridgePage />
+      </AuthenticatedRoute>
+    );
+  }
   if (path === '/admin') {
     if (isTelegramLaunch(window.location)) return <Redirect to="/app" />;
     return (
@@ -170,26 +243,49 @@ function AppRoutes() {
   return <NotFoundPage />;
 }
 
+function AnalyticsRuntime() {
+  const { path } = useNavigation();
+  const publicRoute =
+    isPublicLandingRoute(path) ||
+    isPublicContentRoute(path) ||
+    isArticleRoute(path) ||
+    isPublicShareRoute(path);
+
+  useLayoutEffect(() => {
+    setYandexPrivateContentMask(!publicRoute);
+  }, [publicRoute]);
+
+  useEffect(() => {
+    trackYandexPageView(path, publicRoute ? document.title : undefined);
+  }, [path, publicRoute]);
+
+  return null;
+}
+
 function Root() {
   useTelegram();
   return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <FeedbackProvider>
-          <NavigationProvider>
-            <OnlineStatus />
-            <Suspense
-              fallback={
-                <main className="container">
-                  <LoadingState />
-                </main>
-              }
-            >
-              <AppRoutes />
-            </Suspense>
-          </NavigationProvider>
-        </FeedbackProvider>
-      </ErrorBoundary>
+      <PwaProvider>
+        <ErrorBoundary>
+          <FeedbackProvider>
+            <GlassInteractions />
+            <NavigationProvider>
+              <OnlineStatus />
+              <AnalyticsRuntime />
+              <Suspense
+                fallback={
+                  <main className="container">
+                    <LoadingState />
+                  </main>
+                }
+              >
+                <AppRoutes />
+              </Suspense>
+            </NavigationProvider>
+          </FeedbackProvider>
+        </ErrorBoundary>
+      </PwaProvider>
     </QueryClientProvider>
   );
 }
@@ -207,7 +303,10 @@ async function bootstrap(): Promise<void> {
   if (isTelegramLaunch(window.location)) {
     await loadTelegramSdk();
   }
+  captureFirstTouchAttribution();
+  initializeYandexMetrica();
   if (window.location.pathname === '/demo' && isTelegramLaunch(window.location)) {
+    const { clearAllDemoSessions } = await import('./features/demo/demoApi');
     clearAllDemoSessions();
   }
   renderApp();

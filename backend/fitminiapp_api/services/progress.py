@@ -8,7 +8,7 @@ from decimal import Decimal
 from math import floor
 from typing import Literal, cast
 
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.core.timezone import (
@@ -28,6 +28,8 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import (
     BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
     CoachClient,
     User,
     UserProfile,
@@ -41,6 +43,7 @@ from fitminiapp_api.services.data_quality import (
     build_training_data_sufficiency,
     collect_training_data_counts,
 )
+from fitminiapp_api.services.diary_nutrition import DiaryDayNutrition, aggregate_diary_entries
 from fitminiapp_api.services.period_bounds import (
     MAX_REPORT_DAYS,
     resolve_progress_bounds,
@@ -57,6 +60,22 @@ ADHERENCE_WEIGHTS = {
     "protein": 0.20,
 }
 BODY_METRICS = ("weight_kg", "chest_cm", "waist_cm", "hips_cm", "biceps_cm", "thigh_cm")
+BODY_METRIC_LABELS = {
+    "weight_kg": "Вес",
+    "chest_cm": "Грудь",
+    "waist_cm": "Талия",
+    "hips_cm": "Бёдра",
+    "biceps_cm": "Окружность плеча",
+    "thigh_cm": "Окружность бедра",
+}
+BODY_METRIC_UNITS = {
+    "weight_kg": "kg",
+    "chest_cm": "cm",
+    "waist_cm": "cm",
+    "hips_cm": "cm",
+    "biceps_cm": "cm",
+    "thigh_cm": "cm",
+}
 BODY_TREND_MIN_POINTS = 3
 BODY_TREND_MIN_SPAN_DAYS = 14
 BODY_MEASUREMENT_GUIDANCE = {
@@ -86,6 +105,9 @@ class NutritionDiaryDay:
     protein_g: Decimal | None
     status: NutritionDiaryStatus
     has_entries: bool
+    exact_entry_count: int = 0
+    approximate_entry_count: int = 0
+    partial_entry_count: int = 0
 
 
 def calculate_adherence_component(
@@ -178,44 +200,84 @@ def _user_date_filter(
     )
 
 
+def _body_trend(
+    *,
+    metric: str,
+    label: str,
+    unit: str,
+    points: list[tuple[date, float]],
+    definition_id: int | None = None,
+) -> dict:
+    first_date, first_value = points[0]
+    latest_date, latest_value = points[-1]
+    span_days = (latest_date - first_date).days
+    if len(points) == 1:
+        interpretation_status = "single_point"
+    elif len(points) < BODY_TREND_MIN_POINTS:
+        interpretation_status = "insufficient_points"
+    elif span_days < BODY_TREND_MIN_SPAN_DAYS:
+        interpretation_status = "insufficient_period"
+    else:
+        interpretation_status = "available"
+    return {
+        "metric": metric,
+        "label": label,
+        "unit": unit,
+        "definition_id": definition_id,
+        "first_value": first_value,
+        "latest_value": latest_value,
+        "change": round(latest_value - first_value, 2) if len(points) >= 2 else None,
+        "first_measured_on": first_date,
+        "latest_measured_on": latest_date,
+        "point_count": len(points),
+        "span_days": span_days,
+        "interpretation_status": interpretation_status,
+        "points": [{"measured_on": measured_on, "value": value} for measured_on, value in points],
+    }
+
+
 def _body_trends(rows: list) -> list[dict]:
     trends: list[dict] = []
     for metric in BODY_METRICS:
-        points = [row for row in rows if getattr(row, metric) is not None]
-        if not points:
-            continue
-        first = points[0]
-        latest = points[-1]
-        first_value = float(getattr(first, metric))
-        latest_value = float(getattr(latest, metric))
-        span_days = (latest.measured_on - first.measured_on).days
-        if len(points) == 1:
-            interpretation_status = "single_point"
-        elif len(points) < BODY_TREND_MIN_POINTS:
-            interpretation_status = "insufficient_points"
-        elif span_days < BODY_TREND_MIN_SPAN_DAYS:
-            interpretation_status = "insufficient_period"
-        else:
-            interpretation_status = "available"
+        points = [
+            (row.measured_on, float(getattr(row, metric)))
+            for row in rows
+            if getattr(row, metric) is not None
+        ]
+        if points:
+            trends.append(
+                _body_trend(
+                    metric=metric,
+                    label=BODY_METRIC_LABELS[metric],
+                    unit=BODY_METRIC_UNITS[metric],
+                    points=points,
+                )
+            )
+
+    custom_points: dict[int, list[tuple[date, float]]] = defaultdict(list)
+    custom_definitions: dict[int, BodyMeasurementDefinition] = {}
+    for row in rows:
+        for custom_value in getattr(row, "custom_values", []):
+            custom_points[custom_value.definition_id].append(
+                (row.measured_on, float(custom_value.value))
+            )
+            custom_definitions[custom_value.definition_id] = custom_value.definition
+    for definition_id in sorted(
+        custom_points,
+        key=lambda item: (
+            str(getattr(custom_definitions[item], "label", "")).casefold(),
+            item,
+        ),
+    ):
+        definition = custom_definitions[definition_id]
         trends.append(
-            {
-                "metric": metric,
-                "first_value": first_value,
-                "latest_value": latest_value,
-                "change": round(latest_value - first_value, 2) if len(points) >= 2 else None,
-                "first_measured_on": first.measured_on,
-                "latest_measured_on": latest.measured_on,
-                "point_count": len(points),
-                "span_days": span_days,
-                "interpretation_status": interpretation_status,
-                "points": [
-                    {
-                        "measured_on": point.measured_on,
-                        "value": float(getattr(point, metric)),
-                    }
-                    for point in points
-                ],
-            }
+            _body_trend(
+                metric=f"custom:{definition_id}",
+                label=definition.label,
+                unit=definition.unit,
+                definition_id=definition_id,
+                points=custom_points[definition_id],
+            )
         )
     return trends
 
@@ -486,6 +548,11 @@ def build_progress_summaries(
 
     measurement_rows = (
         db.query(BodyMeasurement)
+        .options(
+            joinedload(BodyMeasurement.custom_values).joinedload(
+                BodyMeasurementCustomValue.definition
+            )
+        )
         .filter(
             _user_date_filter(
                 user_ids,
@@ -504,7 +571,7 @@ def build_progress_summaries(
 
     latest_measurement_candidates = (
         db.query(
-            BodyMeasurement,
+            BodyMeasurement.id.label("measurement_id"),
             func.row_number()
             .over(
                 partition_by=BodyMeasurement.user_id,
@@ -526,20 +593,44 @@ def build_progress_summaries(
         .subquery()
     )
     latest_measurement_rows = (
-        db.query(latest_measurement_candidates)
+        db.query(BodyMeasurement)
+        .join(
+            latest_measurement_candidates,
+            BodyMeasurement.id == latest_measurement_candidates.c.measurement_id,
+        )
+        .options(
+            joinedload(BodyMeasurement.custom_values).joinedload(
+                BodyMeasurementCustomValue.definition
+            )
+        )
         .filter(latest_measurement_candidates.c.row_number == 1)
         .all()
     )
-    latest_measurement_by_user = {
-        row.user_id: {
+    latest_measurement_by_user: dict[int, dict] = {}
+    for row in latest_measurement_rows:
+        if row.user_id in latest_measurement_by_user:
+            continue
+        latest_measurement_by_user[row.user_id] = {
             "measured_on": row.measured_on,
             **{
                 metric: float(getattr(row, metric)) if getattr(row, metric) is not None else None
                 for metric in BODY_METRICS
             },
+            "custom_measurements": [
+                {
+                    "definition_id": value.definition_id,
+                    "label": value.definition.label,
+                    "unit": value.definition.unit,
+                    "value": float(value.value),
+                    "measured_on": row.measured_on,
+                    "archived": value.definition.archived_at is not None,
+                }
+                for value in sorted(
+                    row.custom_values,
+                    key=lambda item: (item.definition.label.casefold(), item.definition_id),
+                )
+            ],
         }
-        for row in latest_measurement_rows
-    }
 
     visible_nutrition_ids = set(user_ids) & nutrition_visible_user_ids
     targets = (
@@ -558,41 +649,11 @@ def build_progress_summaries(
         user_id: min(current_day, actual_today_by_user[user_id] - timedelta(days=1))
         for user_id, current_day in today_by_user.items()
     }
-    diary_rows = []
     diary_status_rows = []
+    diary_totals: dict[tuple[int, date], DiaryDayNutrition] = {}
     if visible_nutrition_ids:
-        energy_value = case(
-            (
-                FoodDiaryEntry.entry_kind == "quick_add",
-                FoodDiaryEntry.quick_energy_kcal,
-            ),
-            else_=FoodDiaryEntry.weight_g * FoodDiaryEntry.energy_kcal_per_100g / 100,
-        )
-        protein_value = case(
-            (
-                FoodDiaryEntry.entry_kind == "quick_add",
-                FoodDiaryEntry.quick_protein_g,
-            ),
-            else_=FoodDiaryEntry.weight_g * FoodDiaryEntry.protein_g_per_100g / 100,
-        )
-        missing_protein = case(
-            (
-                and_(
-                    FoodDiaryEntry.entry_kind == "quick_add",
-                    FoodDiaryEntry.quick_protein_g.is_(None),
-                ),
-                1,
-            ),
-            else_=0,
-        )
-        diary_rows = (
-            db.query(
-                FoodDiaryEntry.user_id,
-                FoodDiaryEntry.diary_date,
-                func.sum(energy_value).label("calories"),
-                func.sum(protein_value).label("protein_g"),
-                func.sum(missing_protein).label("missing_protein_count"),
-            )
+        diary_entries = (
+            db.query(FoodDiaryEntry)
             .filter(
                 _user_date_filter(
                     visible_nutrition_ids,
@@ -602,10 +663,10 @@ def build_progress_summaries(
                     FoodDiaryEntry.diary_date,
                 )
             )
-            .group_by(FoodDiaryEntry.user_id, FoodDiaryEntry.diary_date)
             .order_by(FoodDiaryEntry.user_id, FoodDiaryEntry.diary_date)
             .all()
         )
+        diary_totals = aggregate_diary_entries(diary_entries)
         diary_status_rows = (
             db.query(FoodDiaryDayStatus)
             .filter(
@@ -621,23 +682,24 @@ def build_progress_summaries(
         )
     statuses_by_key = {(row.user_id, row.diary_date): row.status for row in diary_status_rows}
     diary_by_user: dict[int, list[NutritionDiaryDay]] = defaultdict(list)
-    for diary_row in diary_rows:
-        diary_by_user[diary_row.user_id].append(
+    for (diary_user_id, diary_date), totals in sorted(diary_totals.items()):
+        diary_by_user[diary_user_id].append(
             NutritionDiaryDay(
-                user_id=diary_row.user_id,
-                diary_date=diary_row.diary_date,
-                calories=Decimal(diary_row.calories),
-                protein_g=(
-                    None if diary_row.missing_protein_count else Decimal(diary_row.protein_g)
-                ),
+                user_id=diary_user_id,
+                diary_date=diary_date,
+                calories=totals.calories,
+                protein_g=totals.protein_g,
                 status=cast(
                     NutritionDiaryStatus,
-                    statuses_by_key.get((diary_row.user_id, diary_row.diary_date), "incomplete"),
+                    statuses_by_key.get((diary_user_id, diary_date), "incomplete"),
                 ),
                 has_entries=True,
+                exact_entry_count=totals.exact_entry_count,
+                approximate_entry_count=totals.approximate_entry_count,
+                partial_entry_count=totals.partial_entry_count,
             )
         )
-    populated_keys = {(row.user_id, row.diary_date) for row in diary_rows}
+    populated_keys = set(diary_totals)
     for status_row in diary_status_rows:
         key = (status_row.user_id, status_row.diary_date)
         if key in populated_keys:
@@ -906,6 +968,9 @@ def build_progress_summaries(
         fasted_day_count = sum(row.status == "fasted" for row in diary_days)
         observed_day_count = len({row.diary_date for row in diary_days})
         unlogged_day_count = max(0, eligible_nutrition_days - observed_day_count)
+        exact_entry_count = sum(row.exact_entry_count for row in diary_days)
+        approximate_entry_count = sum(row.approximate_entry_count for row in diary_days)
+        partial_entry_count = sum(row.partial_entry_count for row in diary_days)
         body_trends = _body_trends(measurements_by_user[user.id])
         weight_trend = next(
             (trend for trend in body_trends if trend["metric"] == "weight_kg"),
@@ -964,6 +1029,9 @@ def build_progress_summaries(
                 "target_effective_on": (
                     target.effective_from if target and nutrition_visible else None
                 ),
+                "exact_entry_count": exact_entry_count if nutrition_visible else 0,
+                "approximate_entry_count": approximate_entry_count if nutrition_visible else 0,
+                "partial_entry_count": partial_entry_count if nutrition_visible else 0,
             },
             "body": {
                 "latest_measurement": latest_measurement_by_user.get(user.id),
@@ -983,6 +1051,9 @@ def build_progress_summaries(
                     logged_day_count=logged_day_count if nutrition_visible else 0,
                     eligible_day_count=eligible_nutrition_days,
                     visible=nutrition_visible,
+                    exact_entry_count=exact_entry_count if nutrition_visible else 0,
+                    approximate_entry_count=approximate_entry_count if nutrition_visible else 0,
+                    partial_entry_count=partial_entry_count if nutrition_visible else 0,
                 ),
                 "weight_trend": build_body_metric_signal(
                     point_count=weight_trend["point_count"] if weight_trend else 0,

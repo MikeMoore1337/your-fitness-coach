@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "task403-hermes-worker-provenance-v2",
+  "upstream": {
+    "repository": "https://github.com/NousResearch/hermes-agent.git",
+    "version": "0.21.0",
+    "tag": "v2026.8.31",
+    "commit": "29112bef099274229cadff79cdff7bf7b99c4b77",
+    "license": "MIT",
+    "licenseSha256": "821556e6336796450ab852d375117b48a4887e71d255794fd6318d99982a5ab6"
+  },
+  "base": {
+    "image": "python:3.13-alpine",
+    "digest": "sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee",
+    "platform": "linux/amd64",
+    "alpine": "3.24.1"
+  },
+  "worker": {
+    "version": "editorial-worker-v1",
+    "jobSchema": "hermes-editorial-job-v1",
+    "intakeSchema": "hermes-editorial-intake-v2",
+    "promptVersion": "task403-editorial-worker-v3-clear-voice-1.0.0",
+    "skillVersion": "yfc-hermes-editorial-v1",
+    "sourceBehaviorPatches": {
+      "relevanceGate": "hermes-relevance-v1, hermes-relevance-v2 or hermes-relevance-v3 required before provider",
+      "richCaptionTarget": "850-1000 UTF-16 characters when evidence supports it",
+      "providerRateLimit": "429 retry-after honored with a 60 second maximum; provider attempts remain bounded",
+      "sourceHashCanonicalization": "Canonical source hash normalizes URLs with the same tracking/query/path rules as YFC intake",
+      "clearVoice": "Clear Voice v1.0.0 (MIT) editorial-only adapter; inspired by human-writing and humanizer; source grounding and YFC safety gates unchanged",
+      "clearVoiceSha256": "0fc681306452e15b429387bc5d5e7affd366b6f46e1bacb6249a50dd729875d2"
+    },
+    "provider": "OpenAI-compatible HTTP, local-only before Gate A",
+    "publishCapability": false,
+    "telegramCapability": false,
+    "toolCapability": false
+  },
+  "dependencies": {
+    "lock": "requirements.lock",
+    "floatingVersions": false
+  }
+}

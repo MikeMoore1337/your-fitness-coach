@@ -97,6 +97,9 @@ class NutritionPeriodSummary(BaseModel):
     average_protein_g: float | None = None
     target_protein_g: int | None = None
     target_effective_on: date | None = None
+    exact_entry_count: int | None = Field(default=0, ge=0)
+    approximate_entry_count: int | None = Field(default=0, ge=0)
+    partial_entry_count: int | None = Field(default=0, ge=0)
 
 
 class NutritionReportMetricSummary(BaseModel):
@@ -121,6 +124,7 @@ class NutritionReportDailyPoint(BaseModel):
     protein_g: float | None = None
     fat_g: float | None = None
     carbs_g: float | None = None
+    fiber_g: float | None = None
     target_calories: int | None = None
     target_protein_g: int | None = None
     target_fat_g: int | None = None
@@ -170,6 +174,7 @@ class NutritionReportSummary(BaseModel):
     protein_g: NutritionReportMetricSummary
     fat_g: NutritionReportMetricSummary
     carbs_g: NutritionReportMetricSummary
+    fiber_g: NutritionReportMetricSummary | None = None
     calorie_comparison: NutritionReportTargetComparison
     protein_comparison: NutritionReportTargetComparison
     fat_comparison: NutritionReportTargetComparison
@@ -178,6 +183,19 @@ class NutritionReportSummary(BaseModel):
     calorie_tolerance_evaluated_days: int = Field(ge=0)
     days_meeting_protein_target: int = Field(ge=0)
     protein_target_evaluated_days: int = Field(ge=0)
+    exact_entry_count: int | None = Field(default=0, ge=0)
+    approximate_entry_count: int | None = Field(default=0, ge=0)
+    partial_entry_count: int | None = Field(default=0, ge=0)
+
+
+class NutritionReportInsight(BaseModel):
+    metric: Literal["calories", "protein_g", "fat_g", "carbs_g"]
+    direction: Literal["above", "below"]
+    evaluated_days: int = Field(ge=3)
+    deviation_days: int = Field(ge=3)
+    average_deviation: float
+    action_code: Literal["review_portions", "open_meal_suggestions"]
+    message: str
 
 
 class NutritionReportResponse(BaseModel):
@@ -189,6 +207,7 @@ class NutritionReportResponse(BaseModel):
     daily: list[NutritionReportDailyPoint]
     target_changes: list[NutritionReportTargetChange]
     hydration: HydrationReportSummary | None = None
+    insights: list[NutritionReportInsight] = Field(default_factory=list)
 
 
 class BodyMetricPoint(BaseModel):
@@ -197,7 +216,10 @@ class BodyMetricPoint(BaseModel):
 
 
 class BodyMetricTrend(BaseModel):
-    metric: Literal["weight_kg", "chest_cm", "waist_cm", "hips_cm", "biceps_cm", "thigh_cm"]
+    metric: str
+    label: str = ""
+    unit: Literal["kg", "cm"] = "cm"
+    definition_id: int | None = Field(default=None, ge=1)
     first_value: float
     latest_value: float
     change: float | None = None
@@ -211,6 +233,15 @@ class BodyMetricTrend(BaseModel):
     points: list[BodyMetricPoint]
 
 
+class LatestCustomBodyMeasurement(BaseModel):
+    definition_id: int = Field(ge=1)
+    label: str
+    unit: Literal["cm"] = "cm"
+    value: float
+    measured_on: date
+    archived: bool = False
+
+
 class LatestBodyMeasurement(BaseModel):
     measured_on: date
     weight_kg: float | None = None
@@ -219,6 +250,7 @@ class LatestBodyMeasurement(BaseModel):
     hips_cm: float | None = None
     biceps_cm: float | None = None
     thigh_cm: float | None = None
+    custom_measurements: list[LatestCustomBodyMeasurement] = Field(default_factory=list)
 
 
 class BodyMeasurementGuidance(BaseModel):
@@ -286,6 +318,13 @@ class ProgressReportExerciseTrend(BaseModel):
     sessions: list[ProgressReportExerciseSession]
 
 
+class ProgressReportRestSummary(BaseModel):
+    observation_count: int = Field(ge=0)
+    mean_seconds: float | None = Field(default=None, ge=0)
+    median_seconds: float | None = Field(default=None, ge=0)
+    mean_difference_seconds: float | None = None
+
+
 class ProgressReportTraining(BaseModel):
     planned_workouts: int = Field(ge=0)
     completed_workouts: int = Field(ge=0)
@@ -296,6 +335,7 @@ class ProgressReportTraining(BaseModel):
     volume_recorded_sets: int = Field(ge=0)
     new_personal_records: int = Field(ge=0)
     exercises: list[ProgressReportExerciseTrend]
+    rest: ProgressReportRestSummary | None = None
 
 
 class ProgressReportProgramChange(BaseModel):
@@ -337,7 +377,6 @@ class ProgressReportCheckIn(BaseModel):
     recovery: int | None = Field(default=None, ge=1, le=5)
     hunger: int | None = Field(default=None, ge=1, le=5)
     adherence_difficulty: int | None = Field(default=None, ge=1, le=5)
-    note: str | None = None
 
 
 class ProgressReportResponse(BaseModel):

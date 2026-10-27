@@ -266,3 +266,519 @@ def test_migrated_postgres_account_deletion_removes_owner_nutrition_graph() -> N
             assert db.get(FoodDiaryCopyOperation, copy_operation_id) is None
             assert db.get(NutritionTarget, target_id) is None
             assert db.get(EnergyCalibration, calibration_id) is None
+
+
+def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
+    database_url = os.environ.get("DATABASE_URL", "")
+    assert database_url.startswith("postgresql+psycopg://"), (
+        "the migration compatibility test must run against PostgreSQL"
+    )
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import create_engine, inspect, text
+    from sqlalchemy.engine import make_url
+
+    from alembic import command
+
+    root = Path(__file__).resolve().parents[2]
+    database = make_url(database_url)
+    assert database.database == "fitminiapp_test", "migration test database must be isolated"
+    schema_name = f"task393_{os.getpid()}_{os.urandom(4).hex()}"
+    maintenance_engine = create_engine(database_url)
+    with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        version = conn.execute(text("SELECT current_setting('server_version_num')")).scalar_one()
+        assert str(version).startswith("16"), "the migration test requires PostgreSQL 16"
+        conn.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
+    schema_database_url = schema_url.render_as_string(hide_password=False)
+    alembic_config = Config(str(root / "backend" / "alembic.ini"))
+    alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    expected_revision = ScriptDirectory.from_config(alembic_config).get_current_head()
+    schema_engine = create_engine(schema_database_url)
+    try:
+        with schema_engine.connect() as connection:
+            connection.execute(text(f'SET search_path TO "{schema_name}", public'))
+            connection.commit()
+            alembic_config.attributes["connection"] = connection
+            alembic_config.attributes["version_table_schema"] = schema_name
+
+            command.upgrade(alembic_config, "0092_coach_crm_core")
+            with connection.begin():
+                connection.execute(
+                    text(
+                        "INSERT INTO program_templates "
+                        "(slug, title, goal, level, split_type, default_duration_weeks, is_public) "
+                        "VALUES (:slug, :title, 'strength', 'beginner', 'full_body', 1, :is_public)"
+                    ),
+                    [
+                        {
+                            "slug": "stronglifts-5x5",
+                            "title": "StrongLifts",
+                            "is_public": True,
+                        },
+                        {
+                            "slug": "legacy-yfc-template",
+                            "title": "Legacy YFC template",
+                            "is_public": True,
+                        },
+                        {
+                            "slug": "private-custom-template",
+                            "title": "Private custom template",
+                            "is_public": False,
+                        },
+                    ],
+                )
+
+            command.upgrade(alembic_config, "head")
+            inspector = inspect(connection)
+            provenance_columns = {
+                column["name"]: column for column in inspector.get_columns("program_templates")
+            }
+            assert provenance_columns["provenance_type"]["nullable"] is True
+            assert provenance_columns["provenance"]["nullable"] is True
+            assert provenance_columns["program_metadata"]["nullable"] is True
+
+            source_foreign_keys = {
+                column
+                for foreign_key in inspector.get_foreign_keys("user_workout_exercises")
+                for column in foreign_key["constrained_columns"]
+            }
+            assert "source_template_exercise_id" not in source_foreign_keys
+            assert "source_weekly_prescription_id" not in source_foreign_keys
+
+            lineage_column = next(
+                column
+                for column in inspector.get_columns("user_programs")
+                if column["name"] == "restarted_from_program_id"
+            )
+            assert lineage_column["nullable"] is True
+            lineage_foreign_keys = {
+                column
+                for foreign_key in inspector.get_foreign_keys("user_programs")
+                for column in foreign_key["constrained_columns"]
+            }
+            assert "restarted_from_program_id" not in lineage_foreign_keys
+            lineage_indexes = {
+                column
+                for index in inspector.get_indexes("user_programs")
+                for column in index["column_names"]
+            }
+            assert "restarted_from_program_id" not in lineage_indexes
+
+            migration_context = connection.execute(
+                text(
+                    "SELECT current_schema(), current_setting('search_path'), "
+                    "(SELECT version_num FROM alembic_version)"
+                )
+            ).one()
+            template_schema = connection.execute(
+                text(
+                    "SELECT n.nspname FROM pg_class AS c "
+                    "JOIN pg_namespace AS n ON n.oid = c.relnamespace "
+                    "WHERE c.oid = 'program_templates'::regclass"
+                )
+            ).scalar_one()
+            template_count = connection.execute(
+                text("SELECT count(*) FROM program_templates")
+            ).scalar_one()
+            backfill_batch = (
+                connection.execute(
+                    text(
+                        "SELECT id FROM program_templates WHERE provenance_type IS NULL "
+                        "ORDER BY CASE WHEN owner_user_id IS NULL AND created_by_user_id IS NULL "
+                        "AND is_public = TRUE THEN 0 ELSE 1 END, id LIMIT 10"
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            provenance = dict(
+                connection.execute(
+                    text("SELECT slug, provenance_type FROM program_templates")
+                ).all()
+            )
+            revision_check = connection.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "
+                    "WHERE conrelid = 'program_revisions'::regclass "
+                    "AND conname = 'ck_program_revisions_change_kind'"
+                )
+            ).one()
+            status_check = connection.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "
+                    "WHERE conrelid = 'user_programs'::regclass "
+                    "AND conname = 'ck_user_programs_status'"
+                )
+            ).one()
+            assert migration_context[0] == schema_name, migration_context
+            assert migration_context[1].split(",")[0].strip('"') == schema_name, migration_context
+            assert migration_context[2] == expected_revision, migration_context
+            assert template_schema == schema_name, template_schema
+            assert provenance == {
+                "stronglifts-5x5": "SOURCE_ADAPTATION",
+                "legacy-yfc-template": "YFC_GENERIC",
+                "private-custom-template": "CUSTOM",
+            }, (
+                f"migration_context={migration_context!r}; template_schema={template_schema!r}; "
+                f"template_count={template_count}; backfill_batch={backfill_batch!r}; "
+                f"provenance={provenance!r}"
+            )
+            assert "paused" in status_check[0]
+            assert "terminated" in status_check[0]
+            assert status_check[1] is True
+            assert "program_lifecycle" in revision_check[0]
+            assert "program_restarted" in revision_check[0]
+            assert revision_check[1] is True
+            assert "exercise_replaced" not in revision_check[0]
+            assert "prescription_updated" not in revision_check[0]
+    finally:
+        schema_engine.dispose()
+        with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+        maintenance_engine.dispose()
+
+
+def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -> None:
+    database_url = os.environ.get("DATABASE_URL", "")
+    assert database_url.startswith("postgresql+psycopg://"), (
+        "the migration compatibility test must run against PostgreSQL"
+    )
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.orm import Session
+
+    from alembic import command
+
+    root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "backend"))
+
+    from fitminiapp_api.models.food import Food
+
+    database = make_url(database_url)
+    assert database.database == "fitminiapp_test", "migration test database must be isolated"
+    schema_name = f"task500_{os.getpid()}_{os.urandom(4).hex()}"
+    maintenance_engine = create_engine(database_url)
+    with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        version = conn.execute(text("SELECT current_setting('server_version_num')")).scalar_one()
+        assert str(version).startswith("16"), "the migration test requires PostgreSQL 16"
+        conn.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
+    schema_database_url = schema_url.render_as_string(hide_password=False)
+    alembic_config = Config(str(root / "backend" / "alembic.ini"))
+    alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    expected_revision = ScriptDirectory.from_config(alembic_config).get_current_head()
+    schema_engine = create_engine(schema_database_url)
+    try:
+        with schema_engine.connect() as connection:
+            connection.execute(text(f'SET search_path TO "{schema_name}", public'))
+            connection.commit()
+            alembic_config.attributes["connection"] = connection
+            alembic_config.attributes["version_table_schema"] = schema_name
+
+            command.upgrade(alembic_config, "0095_program_provenance_backfill")
+            legacy_constraint = connection.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "WHERE conrelid = 'foods'::regclass "
+                    "AND conname = 'ck_foods_active_catalog_trust'"
+                )
+            ).scalar_one()
+            assert "community_unverified" not in legacy_constraint
+
+            command.upgrade(alembic_config, "head")
+            corrected_constraint, validated = connection.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "
+                    "WHERE conrelid = 'foods'::regclass "
+                    "AND conname = 'ck_foods_active_catalog_trust'"
+                )
+            ).one()
+            revision = connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one()
+            assert "community_unverified" in corrected_constraint
+            assert validated is True
+            assert revision == expected_revision
+            connection.commit()
+
+        with Session(schema_engine) as session:
+            food = Food(
+                name="Task 500 community food",
+                brand="YFC",
+                energy_kcal_per_100g=Decimal("70"),
+                protein_g_per_100g=Decimal("7.6"),
+                fat_g_per_100g=Decimal("2.5"),
+                carbs_g_per_100g=Decimal("4.4"),
+                nutrition_basis_kind="per_100_g",
+                nutrition_basis_amount=Decimal("100"),
+                nutrition_basis_unit="g",
+                canonical_facts={},
+                nutrition_provenance={},
+                canonical_complete=True,
+                catalog_quality="community_unverified",
+                food_type="branded",
+                owner_user_id=None,
+                provenance="user_confirmed_package",
+                legacy_provenance="internal",
+                source_name="yfc_community",
+                source_version="nutrition-label-local-v3",
+                trust_level="unverified",
+                status="active",
+            )
+            session.add(food)
+            session.commit()
+            assert food.id is not None
+    finally:
+        schema_engine.dispose()
+        with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+        maintenance_engine.dispose()
+
+
+def test_migrated_postgres_shared_package_scan_confirmation(monkeypatch) -> None:
+    database_url = os.environ.get("DATABASE_URL", "")
+    assert database_url.startswith("postgresql+psycopg://"), (
+        "the migrated package-scan regression must run against PostgreSQL"
+    )
+
+    from io import BytesIO
+
+    from fastapi.testclient import TestClient
+    from PIL import Image
+
+    root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "backend"))
+
+    from fitminiapp_api.core.config import settings
+    from fitminiapp_api.main import app
+    from fitminiapp_api.services import nutrition_label as nutrition_label_service
+
+    class _FakeOcr:
+        name = "local_tesseract"
+        version = "task-500-migrated-stack-v1"
+
+        def extract_text(self, image_bytes: bytes) -> str:
+            assert image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+            return "\n".join(
+                (
+                    "Nutrition Facts",
+                    "Per 100 g",
+                    "Energy 70 kcal 300 kJ",
+                    "Protein 7.6 g",
+                    "Fat 2.5 g",
+                    "Carbohydrate 4.4 g",
+                )
+            )
+
+    image = Image.new("RGB", (128, 128), "white")
+    output = BytesIO()
+    image.save(output, format="PNG")
+
+    monkeypatch.setattr(settings, "nutrition_label_scan_enabled", True)
+    monkeypatch.setattr(settings, "nutrition_label_scan_kill_switch", False)
+    monkeypatch.setattr(settings, "nutrition_label_scan_internal_user_ids", "")
+    monkeypatch.setattr(nutrition_label_service, "_build_ocr_engine", lambda: _FakeOcr())
+
+    with TestClient(app) as client:
+        login = client.post(
+            "/api/v1/auth/dev-login",
+            json={
+                "telegram_user_id": 9_900_500,
+                "username": "task500_catalog",
+                "full_name": "Task 500 Catalog",
+            },
+        )
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+        scan = client.post(
+            "/api/v1/nutrition/label-scans",
+            headers={**headers, "Idempotency-Key": "task-500-community-scan"},
+            files={"image": ("label.png", output.getvalue(), "image/png")},
+        )
+        assert scan.status_code == 201, scan.text
+        draft = scan.json()
+
+        confirm = client.post(
+            f"/api/v1/nutrition/label-scans/{draft['draft_id']}/confirm",
+            headers=headers,
+            json={
+                "revision": draft["revision"],
+                "name": "Task 500 migrated yogurt",
+                "brand": "YFC CI",
+                "barcode": None,
+                "classification": "commercial",
+                "nutrition": {
+                    "source_basis": "per_100_g",
+                    "energy_kcal": "70",
+                    "energy_kj": "300",
+                    "protein_g": "7.6",
+                    "fat_g": "2.5",
+                    "carbohydrate_g": "4.4",
+                },
+            },
+        )
+        assert confirm.status_code == 201, confirm.text
+        body = confirm.json()
+        assert body["visibility"] == "share_to_yfc_catalog"
+        assert body["catalog_quality"] == "community_unverified"
+        assert body["contribution_outcome"] == "created"
+
+        from fitminiapp_api.db.session import get_session_context
+        from fitminiapp_api.models.food import Food
+
+        with get_session_context() as db:
+            stored = db.get(Food, body["food"]["id"])
+            assert stored is not None
+            assert stored.status == "active"
+            assert stored.catalog_quality == "community_unverified"
+
+
+def test_rest_0130_history_survives_pg16_unique_swap_and_blocks_unsafe_downgrade() -> None:
+    """Exercise the actual Alembic path on isolated PG16, never on production records."""
+    database_url = os.environ.get("DATABASE_URL", "")
+    assert database_url.startswith("postgresql+psycopg://")
+
+    from alembic.config import Config
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    from alembic import command
+
+    root = Path(__file__).resolve().parents[2]
+    database = make_url(database_url)
+    assert database.database == "fitminiapp_test", "history drill requires the isolated CI database"
+
+    schema_name = f"rest_history_{os.getpid()}_{os.urandom(4).hex()}"
+    maintenance_engine = create_engine(database_url)
+    with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as admin:
+        major = admin.execute(text("SHOW server_version_num")).scalar_one()
+        assert str(major).startswith("16"), "history drill requires PostgreSQL 16"
+        admin.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
+    schema_engine = create_engine(schema_url.render_as_string(hide_password=False))
+    config = Config(str(root / "backend" / "alembic.ini"))
+    config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    try:
+        with schema_engine.connect() as connection:
+            # Small, isolated parent stubs satisfy actual 0130 foreign keys. All rest
+            # tables, constraints and indexes still come from real Alembic scripts.
+            for parent in ("users", "user_workouts", "user_workout_sets"):
+                connection.execute(text(f"CREATE TABLE {parent} (id INTEGER PRIMARY KEY)"))
+                connection.execute(text(f"INSERT INTO {parent} (id) VALUES (1)"))
+            connection.commit()
+
+            config.attributes["connection"] = connection
+            config.attributes["version_table_schema"] = schema_name
+            command.stamp(config, "0129_coach_workflow_templates")
+            command.upgrade(config, "0130_workout_rest_sessions")
+
+            connection.execute(
+                text(
+                    "INSERT INTO workout_rest_sessions "
+                    "(id, user_id, workout_id, source_set_id, started_at, ended_at, "
+                    "planned_seconds, adjusted_seconds, measured_seconds, status, "
+                    "source, quality, version, created_at) "
+                    "VALUES (10, 1, 1, 1, TIMESTAMP '2026-10-23 08:00:00', "
+                    "TIMESTAMP '2026-10-23 08:01:00', 90, 90, 60, 'completed', "
+                    "'USER_CONFIRMED', 'normal', 1, TIMESTAMP '2026-10-23 08:00:00')"
+                )
+            )
+            before = connection.execute(
+                text(
+                    "SELECT id, user_id, workout_id, source_set_id, started_at, "
+                    "ended_at, planned_seconds, adjusted_seconds, measured_seconds, "
+                    "status, source, quality, version, created_at "
+                    "FROM workout_rest_sessions WHERE id = 10"
+                )
+            ).one()
+            connection.commit()
+
+            command.upgrade(config, "0131_rest_interval_expand")
+            expanded = connection.execute(
+                text(
+                    "SELECT predecessor_id, start_mutation_id, start_fingerprint "
+                    "FROM workout_rest_sessions WHERE id = 10"
+                )
+            ).one()
+            assert expanded == (None, None, None)
+            connection.commit()
+
+            command.upgrade(config, "0132_rest_interval_unique_swap")
+            after = connection.execute(
+                text(
+                    "SELECT id, user_id, workout_id, source_set_id, started_at, "
+                    "ended_at, planned_seconds, adjusted_seconds, measured_seconds, "
+                    "status, source, quality, version, created_at "
+                    "FROM workout_rest_sessions WHERE id = 10"
+                )
+            ).one()
+            assert after == before, "migration must preserve every old rest fact"
+            indexes = set(
+                connection.execute(
+                    text(
+                        "SELECT indexname FROM pg_indexes "
+                        "WHERE schemaname = :schema AND tablename = 'workout_rest_sessions'"
+                    ),
+                    {"schema": schema_name},
+                ).scalars()
+            )
+            assert {
+                "uq_workout_rest_initial_source",
+                "uq_workout_rest_predecessor",
+                "uq_workout_rest_start_mutation",
+                "uq_workout_rest_running_workout",
+            } <= indexes
+            legacy_unique = connection.execute(
+                text(
+                    "SELECT COUNT(*) FROM pg_constraint "
+                    "WHERE conrelid = 'workout_rest_sessions'::regclass "
+                    "AND conname = 'uq_workout_rest_source_set'"
+                )
+            ).scalar_one()
+            assert legacy_unique == 0
+            connection.commit()
+
+            # A second historical interval is now legal only with a predecessor.
+            connection.execute(
+                text(
+                    "INSERT INTO workout_rest_sessions "
+                    "(id, user_id, workout_id, source_set_id, predecessor_id, "
+                    "start_mutation_id, start_fingerprint, started_at, ended_at, "
+                    "planned_seconds, adjusted_seconds, measured_seconds, status, "
+                    "source, quality, version, created_at) "
+                    "VALUES (11, 1, 1, 1, 10, 'test-repeat-mutation', "
+                    "'test-fingerprint', TIMESTAMP '2026-10-23 08:02:00', "
+                    "TIMESTAMP '2026-10-23 08:03:00', 90, 90, 60, 'completed', "
+                    "'USER_CONFIRMED', 'normal', 1, TIMESTAMP '2026-10-23 08:02:00')"
+                )
+            )
+            connection.commit()
+            with pytest.raises(RuntimeError, match=r"Unsafe downgrade.*forward-fix"):
+                command.downgrade(config, "0131_rest_interval_expand")
+            connection.rollback()
+
+            revision = connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one()
+            rows = connection.execute(
+                text(
+                    "SELECT id, source_set_id, predecessor_id, measured_seconds "
+                    "FROM workout_rest_sessions ORDER BY id"
+                )
+            ).all()
+            assert revision == "0132_rest_interval_unique_swap"
+            assert rows == [(10, 1, None, 60), (11, 1, 10, 60)]
+    finally:
+        schema_engine.dispose()
+        with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as admin:
+            admin.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+        maintenance_engine.dispose()

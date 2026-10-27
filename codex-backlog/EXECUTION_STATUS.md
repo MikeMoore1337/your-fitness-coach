@@ -1,6 +1,86 @@
-# Execution status v51
+# Execution status v53
 
-Подтверждённое владельцем состояние на 28.08.2026:
+## Product v8 current state — 2026-10-04
+
+Канонический Product v8 roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
+Closeout source baseline — `e8d9228b259e35740ff68048f2772482fb4e8945` on `master` and
+`origin/master`; Product v8 implementation baseline остаётся production-verified после V8-01,
+а dependency maintenance PR `#589` и replacement PR `#689` merged separately. Product v8
+**COMPLETED / CLOSED**.
+
+V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**: Issue `#684` closed, PR `#686`
+merged, product deployed SHA `bffaf336f350def789376ce7eb299705371188f3`. Для V8-01 не потребовались
+env, migration, schema или provider changes. Post-merge/release и production smoke зелёные.
+Later lockfile-only maintenance merges do not change this product verification result.
+
+Product v8 current execution state:
+
+```text
+Product v8
+  -> COMPLETED
+
+V8-01 / Task 684
+  -> COMPLETED / PRODUCTION VERIFIED
+
+V8-00 / Task 124B
+  -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
+  -> not an evidence gate
+  -> not a dependency or Product v8 blocker
+  -> must not auto-start or recreate V8-03
+
+V8-R1 / measurement reporting boundedness
+  -> BLOCKED_ON_EVIDENCE
+  -> separate optional reliability task
+  -> NOT a Product v8 blocker
+
+V8-03
+  -> CANCELLED AS GENERIC PLACEHOLDER
+  -> do not create without a newly specified concrete problem
+
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK
+  -> NONE
+  -> Product v8 is closed; no next Product v8 task is selected
+```
+
+Synthetic/demo evidence still cannot be represented as real-user evidence. Its absence is no
+longer a blocker for Product v8. The bounded backlog review found no unimplemented, independently
+executable product task: the requested hydration/wellbeing/trainer/reminder/knowledge/PWA/Web Push/
+AI/import/progress/nutrition and trainer directions are already implemented in the current product;
+remaining candidates retain their own evidence, provider, owner or infrastructure gates.
+Controller refactor — `SEPARATE_INFRA_WORKSTREAM / DEFER`; exercise video technique evaluation —
+`NO_GO / OUT_OF_SCOPE`.
+
+The confirmed executable Product v8 scope is delivered. Removed/cancelled placeholders and
+optional or evidence-gated external workstreams do not count as unfinished Product v8 tasks and
+do not block closeout. Parked workstreams are not transferred to a future product version
+automatically.
+
+Этот current-state block имеет приоритет над историческими owner-driven очередями ниже.
+
+Historical audit reconciliation:
+
+- Task `138` — `ALREADY_IMPLEMENTED`: security-gate/SkillSpector delivered through Task `364`
+  and PR `#365`; это не dependency Product v8. Root task/link drift должен быть убран отдельной
+  governance-синхронизацией, но не требует продуктовой реализации.
+- Tasks `119`, `120A-D`, `120E`, `124A` и Product v7 tasks — уже закрытые фактические
+  workstreams; старое утверждение о Task `119` как следующей незапущенной product task — stale.
+- Task `124B` is preserved only as historical provenance and is
+  `REMOVED_FROM_PRODUCT_V8 / NO_GO BY OWNER`; it is not a gate, dependency, blocker or auto-run
+  candidate. Task `124C` is likewise not spawned by it; the old conditional remediation linkage
+  is historical only.
+- Nutrition label-scan finding `F-128G-01` остаётся отдельным deferred/flag-off workstream и
+  не переносится в v8 без production-quality GO и owner trigger.
+- SEO `#324` и зависимые `#320-#323` остаются `BLOCKED_ON_EVIDENCE`; SEO Growth Stage 2 и
+  массовые programmatic pages не входят в v8.
+- Optional, owner-selected и infrastructure workstreams (`107`, `108`, `110`, `111`, `127`,
+  `138`, `269`, `388`, `403`, `415`, AI/SEO pools) не запускаются автоматически и не становятся
+  Product v8 только из-за наличия в backlog. The bounded review separately recorded completed
+  implementations and own-gated candidates in `POST_RELEASE_PRODUCT_REVIEW.md`.
+
+## Historical backlog/provenance — owner-confirmed state on 2026-08-28
+
+The following historical checklist is retained for provenance. It does not override the
+Product v8 current-state block above and does not define an executable task or dependency.
 
 - [x] tasks `00-73`, включая `69B` и предшествующие буквенные подзадачи, complete;
 - [x] завершённые task-файлы перенесены в локальный owner-only `tasks/done/` и доступны владельцу
@@ -60,9 +140,11 @@
 - [x] tasks `116-core-navigation-today-quick-start.md`,
       `117-first-run-without-mandatory-onboarding.md` и
       `118-simple-training-program-flow.md` завершены и архивированы отдельными task lifecycle;
-- [ ] **next product task, not started:** `119-type-aware-workout-logging.md` — требует отдельной
-      команды владельца и не запускается автоматически;
-- [ ] owner-driven sequence сохраняется:
+- [ ] **historical/stale sequence (superseded by Product v8 audit #683):** `119-type-aware-workout-logging.md`
+      не является текущей next product task; её lifecycle требует отдельной команды владельца
+      и не запускается автоматически;
+- [ ] historical owner-driven sequence (superseded by Product v8 audit #683 and owner removal of
+      Task `124B`):
       `114 -> 115A -> 116 -> 117 -> 118 [COMPLETED] -> 119..123 -> 81 -> 82 -> 84`
       `-> 124A -> owner release approval -> 124B -> conditional 124C`;
 - [x] owner-selected task `106-landing-telegram-product-news-links.md` завершена вне основной
@@ -119,9 +201,27 @@ branch normalization owner вставил и принял Task `113A`; Task `114
 owner approval, production release явно разрешён.
 `DESIGN_V2_1` с owner-approved bounded Pulse pilot остаётся production baseline. Permanent branch
 source разработки — `dev`, production source — protected `master`. Tasks `114`, `115A` и `116-118`
-завершены и архивированы; фактическая next product task — `119`, но её lifecycle не запускается без
-отдельной команды владельца.
+завершены и архивированы; историческая запись о Task `119` как фактической next product task
+superseded Product v8 audit #683 и не запускает её lifecycle.
 Umbrella `100` отдельно не выполняется; `100A` не назначена без собственного Trigger, dependency
 и owner decision. Tasks `107-111`, family `126` и Task `127` также не запускаются автоматически.
 Завершённая task `112` не изменила product order. Другие pending tasks автоматически не
 реализуются.
+
+## Nutrition Label OCR closeout
+
+- [x] Task 128G: implementation, PR #281, merge, production deployment, RapidOCR activation и
+      synthetic/corpus validation complete; production HUMAN_EVIDENCE FAIL /
+      BLOCKED BY CURRENT INFRASTRUCTURE из-за 503 local_ocr_timeout на текущем host; production
+      quality GO NO; public rollout и дальнейшая оптимизация DEFERRED UNTIL SERVER MIGRATION.
+- [x] Task 128G exposure mitigation: production NUTRITION_LABEL_SCAN_ENABLED=false,
+      NUTRITION_LABEL_SCAN_KILL_SWITCH=false; active SHA остаётся
+      1dae5176456b190c15fcd9c9fb6078cf8c338bf1; отдельный deploy не требуется.
+- [ ] Task 128H: DEFERRED, not started. Exact trigger:
+      Production migrated to a more powerful server and owner explicitly authorizes reopening
+      nutrition-label OCR work.
+- [ ] F-128G-01: MEDIUM UX follow-up deferred with 128H; обычные Nutrition/Food flows не входят
+      в dependency и продолжаются независимо от OCR.
+
+Task 128G не блокирует более приоритетные backlog tasks. Только tasks, которым нужен именно
+production-ready label scanning, сохраняют будущую dependency на 128H.

@@ -59,8 +59,8 @@ class NutritionTarget(Base):
     )
 
     sex: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
-    height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    height_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     age: Mapped[float | None] = mapped_column(Float, nullable=True)
     daily_activity_level: Mapped[str | None] = mapped_column(
         String(16), nullable=True, default="sedentary"
