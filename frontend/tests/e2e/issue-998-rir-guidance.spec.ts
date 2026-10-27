@@ -132,6 +132,10 @@ test('@critical Issue #998 preserves input order and keyboard disclosure control
   await page.keyboard.press('Tab');
   await expect(reps).toBeFocused();
   await page.keyboard.press('Tab');
+  const rirButtons = currentSet.locator('.active-workout-set__rir-row button');
+  await expect(rirButtons.first()).toBeFocused();
+  await rirButtons.last().focus();
+  await page.keyboard.press('Tab');
   await expect(complete).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(rirSummary).toBeFocused();
