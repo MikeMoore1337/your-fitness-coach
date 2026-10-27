@@ -5118,6 +5118,16 @@ button.today-text-link {
   align-items: end;
   gap: 10px;
 }
+.active-workout-set__controls--with-rir {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.active-workout-set__rir-row,
+.active-workout-set__controls--with-rir > .active-workout-set__done {
+  grid-column: 1 / -1;
+}
+.active-workout-set__rir-row {
+  min-width: 0;
+}
 .active-workout-input {
   display: grid;
   gap: 6px;
