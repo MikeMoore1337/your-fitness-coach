@@ -1,6 +1,7 @@
 """End-to-end authorization and deterministic real-world-like DEV fixtures."""
 
 from datetime import timedelta
+from decimal import Decimal
 
 import pytest
 
@@ -83,6 +84,12 @@ def test_dev_fixture_is_rich_idempotent_and_user_scoped() -> None:
         assert any(round(m.weight_kg * 100) % 10 != 0 for m in measurements)
         assert any(m.measured_on < today_msk() - timedelta(days=60) for m in measurements)
 
+        measurement = measurements[0]
+        measurement_id = measurement.id
+        measurement.weight_kg = Decimal("81.37")
+        measurement.note = "Manually edited DEV measurement"
+        db.flush()
+
         tables = (
             User,
             CoachClient,
@@ -100,6 +107,10 @@ def test_dev_fixture_is_rich_idempotent_and_user_scoped() -> None:
         seed_local_dev_data(db)
         db.flush()
         assert before == tuple(db.query(table).count() for table in tables)
+        db.expire_all()
+        preserved = db.get(BodyMeasurement, measurement_id)
+        assert preserved.weight_kg == Decimal("81.37")
+        assert preserved.note == "Manually edited DEV measurement"
 
 
 def test_fixed_dev_roles_authorization_and_coach_tenant_scope(client, monkeypatch) -> None:
