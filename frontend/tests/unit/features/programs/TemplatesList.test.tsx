@@ -422,7 +422,10 @@ describe('TemplatesList editing', () => {
     ).closest('article')!;
     const actions = readyCard.querySelector<HTMLElement>('.program-template-card__actions')!;
 
-    expect(within(actions).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual([
+    const actionLabels = within(actions)
+      .getAllByRole('button')
+      .map((button) => button.textContent?.trim());
+    expect(actionLabels).toEqual([
       'Настроить копию',
       'Запустить',
       'Скрыть шаблон',
@@ -434,8 +437,12 @@ describe('TemplatesList editing', () => {
       await screen.findByRole('button', { name: 'Посмотреть программу «Моя программа»' })
     ).closest('article')!;
     expect(within(ownCard).getByText('Другие действия')).toBeInTheDocument();
-    expect(within(ownCard).getByRole('region', { name: 'Поделиться программой' })).toBeInTheDocument();
-    expect(within(ownCard).queryByRole('button', { name: 'Скрыть шаблон' })).not.toBeInTheDocument();
+    expect(
+      within(ownCard).getByRole('region', { name: 'Поделиться программой' }),
+    ).toBeInTheDocument();
+    expect(
+      within(ownCard).queryByRole('button', { name: 'Скрыть шаблон' }),
+    ).not.toBeInTheDocument();
   });
 
   it('does not hide a ready template when confirmation is cancelled', async () => {
