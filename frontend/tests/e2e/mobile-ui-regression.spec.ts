@@ -494,6 +494,33 @@ test('@critical mocked TMA keeps the dock inside the effective viewport and hit-
   );
 });
 
+test('@critical reduced motion keeps TMA dock clearance current', async ({ page }) => {
+  await preparePage(page, 'dark', 'telegram');
+  await page.goto('/app?tgWebAppPlatform=android');
+  await waitForSurface(page, 'today');
+
+  await expect(page.locator('body')).toHaveCSS('transition-duration', '0s');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const rootStyle = getComputedStyle(document.documentElement);
+        const dockHeight = Number.parseFloat(rootStyle.getPropertyValue('--app-bottom-nav-height'));
+        const viewportBottom = Number.parseFloat(
+          rootStyle.getPropertyValue('--yfc-viewport-bottom'),
+        );
+        const safeBottom = Math.max(
+          Number.parseFloat(rootStyle.getPropertyValue('--yfc-tg-safe-bottom')) || 0,
+          Number.parseFloat(rootStyle.getPropertyValue('--yfc-content-safe-bottom')) || 0,
+        );
+        return (
+          Number.parseFloat(getComputedStyle(document.body).paddingBottom) -
+          (dockHeight + 24 + Math.max(8, safeBottom) + viewportBottom - 1)
+        );
+      }),
+    )
+    .toBeGreaterThanOrEqual(0);
+});
+
 for (const theme of ['dark', 'light'] as const) {
   for (const width of [320, 360, 390, 393, 430]) {
     test(`@critical mocked TMA keeps Active Workout RIR and finish controls clear at ${width}px ${theme}`, async ({
