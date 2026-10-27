@@ -4319,6 +4319,78 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`V12 #1272 orders inputs and persists RIR in ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const first = page.locator('[data-workout-set-id="201"]');
+    const weight = first.getByLabel('Вес, Жим штанги лёжа, подход 1');
+    const reps = first.getByLabel('Повторы, Жим штанги лёжа, подход 1');
+    const rir = first.locator('.active-workout-set__rir-row .active-workout-rir');
+    const done = first.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' });
+    await expect(rir).toBeVisible();
+    expect(server.readSet(201).rir).toBeNull();
+
+    const ordering = await first.evaluate((row) => {
+      const fields = [
+        row.querySelector('[data-workout-field="weight"]'),
+        row.querySelector('[data-workout-field="reps"]'),
+        row.querySelector('.active-workout-set__rir-row button'),
+        row.querySelector('[data-workout-field="done"]'),
+      ];
+      if (fields.some((field) => !field)) throw new Error('Missing workout controls');
+      const following = Node.DOCUMENT_POSITION_FOLLOWING;
+      return fields.slice(0, -1).every((field, index) => {
+        const next = fields[index + 1]!;
+        return Boolean(field!.compareDocumentPosition(next) & following);
+      });
+    });
+    expect(ordering).toBe(true);
+
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(weight).toBeVisible();
+      await expect(reps).toBeVisible();
+      await expect(rir).toBeVisible();
+      await expect(done).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+      ).toBe(true);
+    }
+
+    await weight.fill('42.5');
+    await reps.fill('8');
+    await reps.press('Enter');
+    const choices = rir.locator('button');
+    await expect(choices).toHaveCount(5);
+    await expect(choices.first()).toBeFocused();
+    await expect(choices.nth(4)).toHaveText('4+');
+    await choices.nth(4).focus();
+    await page.keyboard.press('Tab');
+    await expect(done).toBeFocused();
+
+    await choices.nth(4).click();
+    await expect(choices.nth(4)).toHaveAttribute('aria-pressed', 'true');
+    await expect.poll(() => server.readSet(201).rir).toBe('4+');
+    await choices.nth(4).click();
+    await expect.poll(() => server.readSet(201).rir).toBeNull();
+    await choices.first().click();
+    await expect.poll(() => server.readSet(201).rir).toBe('0');
+
+    await done.click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    expect(server.readSet(201)).toMatchObject({ actual_weight: 42.5, actual_reps: 8, rir: '0' });
+    const nextSet = page.locator('[data-workout-set-id="202"]');
+    await expect(nextSet).toHaveAttribute('aria-current', 'step');
+  });
+}
+
 test('V9-03 fits the supported 360, 390 and 430px Mobile Web widths', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await mockActiveWorkout(page);
@@ -4815,6 +4887,10 @@ test('active workout keeps the current exercise primary and exposes keyboard han
   await weight.press('Enter');
   await expect(reps).toBeFocused();
   await reps.press('Enter');
+  const rirOptions = currentSet.locator('.active-workout-set__rir-row button');
+  await expect(rirOptions.first()).toBeFocused();
+  await rirOptions.last().focus();
+  await page.keyboard.press('Tab');
   await expect(done).toBeFocused();
 
   const nextExercise = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
