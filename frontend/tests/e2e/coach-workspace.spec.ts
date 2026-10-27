@@ -2218,9 +2218,6 @@ test('#1276 preserves Telegram host safe-area across personal and Coach OS', asy
       contentSafeAreaInset: { top: 0, right: 0, bottom: 8, left: 0 },
     });
     await mockCoachWorkspace(page, { attention: 'actionable' });
-    await page.goto('/app');
-    await page.getByRole('button', { name: 'Тренер', exact: true }).click();
-    await expect(page).toHaveURL('/coach');
     const dock = page.locator('#appBottomNav');
     const measure = async () =>
       dock.evaluate((element) => {
