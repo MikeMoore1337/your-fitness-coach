@@ -4887,6 +4887,10 @@ test('active workout keeps the current exercise primary and exposes keyboard han
   await weight.press('Enter');
   await expect(reps).toBeFocused();
   await reps.press('Enter');
+  const rirOptions = currentSet.locator('.active-workout-set__rir-row button');
+  await expect(rirOptions.first()).toBeFocused();
+  await rirOptions.last().focus();
+  await page.keyboard.press('Tab');
   await expect(done).toBeFocused();
 
   const nextExercise = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
