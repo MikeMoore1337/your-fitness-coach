@@ -5120,6 +5120,10 @@ button.today-text-link {
 }
 .active-workout-set__controls.has-rir {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+}
+.active-workout-set__rir-row .active-workout-rir legend {
+  margin-bottom: 0;
 }
 .active-workout-set__rir-row,
 .active-workout-set__controls.has-rir > .active-workout-set__done {
