@@ -1503,6 +1503,26 @@ test.describe('#1099 standalone PWA keyboard path', () => {
         });
         await settleViewport(page);
       }
+      if (placement === 'upper') {
+        // iOS focus-pan may include native document scrolling as well as a
+        // visualViewport offset. Model that native part explicitly when the
+        // keyboard pan leaves the field behind the pinned rest panel.
+        // Use the captured native method: app scroll calls must remain zero.
+        await page.evaluate(() => {
+          const input = document.activeElement as HTMLElement;
+          const viewport = window.visualViewport!;
+          const rest = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+          const safeTop = Math.max(viewport.offsetTop, rest?.bottom ?? viewport.offsetTop);
+          const overlap = Math.max(0, safeTop - input.getBoundingClientRect().top);
+          if (overlap > 0)
+            (window as Window & { __yfc1099NativeScrollTo?: typeof window.scrollTo })
+              .__yfc1099NativeScrollTo!({
+                top: Math.max(0, scrollY - overlap),
+                behavior: 'instant',
+              });
+        });
+        await settleViewport(page);
+      }
       if (placement === 'upper-native-scroll-no-rest') {
         // Model the native document-scroll part independently from application scroll calls.
         await page.evaluate(() => {
