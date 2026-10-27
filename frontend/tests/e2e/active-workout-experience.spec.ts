@@ -4346,9 +4346,11 @@ for (const theme of ['light', 'dark'] as const) {
         row.querySelector('[data-workout-field="done"]'),
       ];
       if (fields.some((field) => !field)) throw new Error('Missing workout controls');
-      return fields.slice(0, -1).every((field, index) =>
-        Boolean(field!.compareDocumentPosition(fields[index + 1]!) & Node.DOCUMENT_POSITION_FOLLOWING),
-      );
+      const following = Node.DOCUMENT_POSITION_FOLLOWING;
+      return fields.slice(0, -1).every((field, index) => {
+        const next = fields[index + 1]!;
+        return Boolean(field!.compareDocumentPosition(next) & following);
+      });
     });
     expect(ordering).toBe(true);
 
