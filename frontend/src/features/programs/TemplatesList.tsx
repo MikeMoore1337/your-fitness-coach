@@ -422,7 +422,11 @@ export function TemplatesList({
         </span>
       </button>
       <div
-        className={`program-template-card__actions${item.is_example ? ' program-template-card__actions--example' : ''}`}
+        className={
+          item.is_example
+            ? 'program-template-card__actions program-template-card__actions--example'
+            : 'program-template-card__actions'
+        }
       >
         <button
           type="button"
