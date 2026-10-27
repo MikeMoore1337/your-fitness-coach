@@ -5128,19 +5128,19 @@ button.today-text-link {
 .active-workout-set__rir-row {
   min-width: 0;
 }
-/* #1272: add the optional RIR row without pushing current-set controls
-   behind the pinned rest timer or iOS dock on narrow mobile viewports.
-   Preserve 44px touch targets for the inputs, RIR chips and finish action. */
+/* #1272: later active sets need the additional vertical clearance when
+   a preceding set has completed and the fixed rest timer is visible.
+   Preserve the first-set 390px visual baseline and 44px touch targets. */
 @media (max-width: 899px) {
-  .active-workout-set__controls.has-rir {
+  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-set__controls.has-rir {
     row-gap: 4px;
   }
-  .active-workout-set.is-current .active-workout-set__controls.has-rir .active-workout-input input,
-  .active-workout-set.is-current .active-workout-set__controls.has-rir .active-workout-set__done,
-  .active-workout-set__controls.has-rir .active-workout-rir__options button {
+  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-set__controls.has-rir .active-workout-input input,
+  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-set__controls.has-rir .active-workout-set__done,
+  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-rir__options button {
     min-height: 44px;
   }
-  .active-workout-set__controls.has-rir .active-workout-rir legend {
+  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-rir legend {
     margin-bottom: 2px;
   }
 }
