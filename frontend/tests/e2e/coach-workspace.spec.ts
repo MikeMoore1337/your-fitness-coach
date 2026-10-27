@@ -2117,87 +2117,88 @@ test('Task 291 показывает все четыре trainer destinations н�
   }
 });
 
-test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces', async ({
-  page,
-}, testInfo) => {
-  test.slow(); // Same-user navigation through eight mobile viewport/theme combinations.
-  await mockCoachWorkspace(page, { attention: 'actionable' });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+test(
+  '#1276 uses the same iOS dock baseline in personal and Coach OS workspaces',
+  async ({ page }, testInfo) => {
+    test.slow(); // Same-user navigation through eight mobile viewport/theme combinations.
+    await mockCoachWorkspace(page, { attention: 'actionable' });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
 
-  const dockGeometry = async () =>
-    page.locator('#appBottomNav').evaluate((element) => {
-      const box = element.getBoundingClientRect();
-      const viewport = window.visualViewport;
-      const visualBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
-      const root = getComputedStyle(document.documentElement);
-      return {
-        bottomGap: visualBottom - box.bottom,
-        bottomInset: Number.parseFloat(getComputedStyle(element).bottom),
-        width: box.width,
-        height: box.height,
-        clearance: Number.parseFloat(root.getPropertyValue('--yfc-mobile-dock-clearance')),
-        scrollWidth: document.documentElement.scrollWidth,
-      };
-    });
+    const dockGeometry = async () =>
+      page.locator('#appBottomNav').evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const viewport = window.visualViewport;
+        const visualBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+        const root = getComputedStyle(document.documentElement);
+        return {
+          bottomGap: visualBottom - box.bottom,
+          bottomInset: Number.parseFloat(getComputedStyle(element).bottom),
+          width: box.width,
+          height: box.height,
+          clearance: Number.parseFloat(root.getPropertyValue('--yfc-mobile-dock-clearance')),
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      });
 
-  for (const scheme of ['light', 'dark'] as const) {
-    for (const width of [320, 360, 393, 430] as const) {
-      await page.setViewportSize({ width, height: 844 });
-      await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
-      // The existing coach mock has verified personal nutrition routing; use it to isolate dock geometry.
-      await page.goto('/app?section=nutrition');
-      await page.evaluate((theme) => localStorage.setItem('app-theme', theme), scheme);
-      await page.reload();
-      await expect(page).toHaveURL(/\/app\?section=nutrition/);
-      await expect(page.getByRole('link', { name: 'В кабинет тренера', exact: true })).toBeVisible();
-      const personalNav = page.getByRole('navigation', { name: 'Основная навигация' });
-      await expect(personalNav.getByRole('link', { name: 'План', exact: true })).toBeVisible();
-      await expect(personalNav.locator('.app-bottom-nav__quick-add')).toHaveCount(1);
-      const personal = await dockGeometry();
-      expect(personal.clearance).toBeGreaterThan(personal.height);
-      expect(personal.scrollWidth).toBeLessThanOrEqual(width);
-      if (width === 393) {
-        await testInfo.attach(`1276-personal-${scheme}.png`, {
-          body: await page.screenshot(),
-          contentType: 'image/png',
-        });
-      }
+    for (const scheme of ['light', 'dark'] as const) {
+      for (const width of [320, 360, 393, 430] as const) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
+        // The existing coach mock has verified personal nutrition routing; use it to isolate dock geometry.
+        await page.goto('/app?section=nutrition');
+        await page.evaluate((theme) => localStorage.setItem('app-theme', theme), scheme);
+        await page.reload();
+        await expect(page).toHaveURL(/\/app\?section=nutrition/);
+        await expect(page.getByRole('link', { name: 'В кабинет тренера', exact: true })).toBeVisible();
+        const personalNav = page.getByRole('navigation', { name: 'Основная навигация' });
+        await expect(personalNav.getByRole('link', { name: 'План', exact: true })).toBeVisible();
+        await expect(personalNav.locator('.app-bottom-nav__quick-add')).toHaveCount(1);
+        const personal = await dockGeometry();
+        expect(personal.clearance).toBeGreaterThan(personal.height);
+        expect(personal.scrollWidth).toBeLessThanOrEqual(width);
+        if (width === 393) {
+          await testInfo.attach(`1276-personal-${scheme}.png`, {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+          });
+        }
 
-      await page.getByRole('link', { name: 'В кабинет тренера', exact: true }).click();
-      const trainerChoice = page.getByRole('button', { name: 'Тренер', exact: true });
-      if (await trainerChoice.isVisible()) await trainerChoice.click();
-      await expect(page).toHaveURL(/\/coach/);
-      const coachNav = page.getByRole('navigation', { name: 'Основная навигация' });
-      await expect(coachNav.locator('.app-bottom-nav__quick-add')).toHaveCount(0);
-      for (const name of ['Сегодня', 'Клиенты', 'Программы', 'Ещё']) {
-        await expect(coachNav.getByRole('link', { name, exact: true })).toBeVisible();
-        await coachNav.getByRole('link', { name, exact: true }).click();
-        await expect(coachNav.getByRole('link', { name, exact: true })).toHaveAttribute(
-          'aria-current',
-          'page',
-        );
-        const coach = await dockGeometry();
-        expect(Math.abs(personal.bottomGap - coach.bottomGap)).toBeLessThanOrEqual(2);
-        expect(Math.abs(personal.bottomInset - coach.bottomInset)).toBeLessThanOrEqual(2);
-        expect(coach.clearance).toBeGreaterThan(coach.height);
-        expect(coach.scrollWidth).toBeLessThanOrEqual(width);
+        await page.getByRole('link', { name: 'В кабинет тренера', exact: true }).click();
+        const trainerChoice = page.getByRole('button', { name: 'Тренер', exact: true });
+        if (await trainerChoice.isVisible()) await trainerChoice.click();
+        await expect(page).toHaveURL(/\/coach/);
+        const coachNav = page.getByRole('navigation', { name: 'Основная навигация' });
+        await expect(coachNav.locator('.app-bottom-nav__quick-add')).toHaveCount(0);
+        for (const name of ['Сегодня', 'Клиенты', 'Программы', 'Ещё']) {
+          await expect(coachNav.getByRole('link', { name, exact: true })).toBeVisible();
+          await coachNav.getByRole('link', { name, exact: true }).click();
+          await expect(coachNav.getByRole('link', { name, exact: true })).toHaveAttribute(
+            'aria-current',
+            'page',
+          );
+          const coach = await dockGeometry();
+          expect(Math.abs(personal.bottomGap - coach.bottomGap)).toBeLessThanOrEqual(2);
+          expect(Math.abs(personal.bottomInset - coach.bottomInset)).toBeLessThanOrEqual(2);
+          expect(coach.clearance).toBeGreaterThan(coach.height);
+          expect(coach.scrollWidth).toBeLessThanOrEqual(width);
+        }
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        const scrolled = await dockGeometry();
+        expect(Math.abs(personal.bottomGap - scrolled.bottomGap)).toBeLessThanOrEqual(2);
+        if (width === 393) {
+          await testInfo.attach(`1276-coach-${scheme}.png`, {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+          });
+        }
+        await page.getByRole('link', { name: 'Для себя', exact: true }).click();
+        await expect(page).toHaveURL(/\/app\?section=today/);
+        const returned = await dockGeometry();
+        expect(Math.abs(personal.bottomGap - returned.bottomGap)).toBeLessThanOrEqual(2);
       }
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-      const scrolled = await dockGeometry();
-      expect(Math.abs(personal.bottomGap - scrolled.bottomGap)).toBeLessThanOrEqual(2);
-      if (width === 393) {
-        await testInfo.attach(`1276-coach-${scheme}.png`, {
-          body: await page.screenshot(),
-          contentType: 'image/png',
-        });
-      }
-      await page.getByRole('link', { name: 'Для себя', exact: true }).click();
-      await expect(page).toHaveURL(/\/app\?section=today/);
-      const returned = await dockGeometry();
-      expect(Math.abs(personal.bottomGap - returned.bottomGap)).toBeLessThanOrEqual(2);
     }
-  }
-});
+  },
+);
 
 test('#1276 preserves Telegram host safe-area across personal and Coach OS', async ({
   browser,
