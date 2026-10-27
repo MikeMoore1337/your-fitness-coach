@@ -2601,7 +2601,11 @@ export function TodayWorkout({
   useLayoutEffect(() => {
     if (!completionNavigation?.accepted || navigatedCompletion.current === completionNavigation)
       return;
+    // Let the newly-current RIR row and the rest timer settle before taking
+    // the one allowed completion-navigation scroll measurement.
+    let layoutFrame: number | null = null;
     const frame = window.requestAnimationFrame(() => {
+      layoutFrame = window.requestAnimationFrame(() => {
       navigatedCompletion.current = completionNavigation;
       // Only acceptance owns navigation; autosave and later queue acknowledgements do not.
       const focused = document.activeElement;
@@ -2634,8 +2638,12 @@ export function TodayWorkout({
         delta = Math.max(minScroll, Math.min(delta, maxScroll));
       }
       window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
+      });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (layoutFrame !== null) window.cancelAnimationFrame(layoutFrame);
+    };
   }, [completionNavigation, currentSetId]);
 
   useEffect(() => {
