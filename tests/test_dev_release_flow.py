@@ -1,6 +1,7 @@
 """Two-stage YFC release governance contracts."""
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import yaml
 from scripts import ci_contract
 
 ROOT = Path(__file__).resolve().parents[1]
+UPDATE_SCRIPT = ROOT / "scripts/update_dev.ps1"
 
 
 def test_dev_push_runs_ci_but_cannot_start_production_deploy() -> None:
@@ -199,3 +201,92 @@ def test_workflow_does_not_override_lime_base_for_other_prs_or_skip_checks() -> 
     assert "tests/test_dev_release_flow.py" in ci_contract.COMMAND_GROUPS["policy"].commands[0].argv
     assert "LIME_EDGE_BASE_SHA" not in workflow["env"]
     assert "LIME_EDGE_BASE_SHA" not in workflow["jobs"]["frontend"]["env"]
+
+
+def test_local_dev_updater_is_fail_closed_and_reuses_project_launcher() -> None:
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+    check_body = source.split("function Invoke-Check", 1)[1].split("function Get-AvailableSha", 1)[
+        0
+    ]
+
+    for forbidden in (
+        "git reset --hard",
+        "docker compose down --volumes",
+        "-Action reset",
+        "production.env",
+        "docker-compose.yml",
+    ):
+        assert forbidden not in source
+
+    for required in (
+        "scripts\\dev.ps1",
+        "-Action start",
+        "safe.directory=",
+        "dev:refs/remotes/origin/dev",
+        "merge', '--ff-only', 'origin/dev",
+        "head_sha",
+        "branch-checks",
+        "check_online_migrations.py",
+        "verify_dev_roles.py",
+        "Global\\YFC_DEV_UPDATE",
+        "MultipleInstances IgnoreNew",
+        "manual-acceptance.lock",
+        "auto-apply.enabled",
+        "dev_postgres_data",
+        "VOLUME_CHECK_FAILED",
+        "dockerBefore",
+    ):
+        assert required in source
+    assert "result = 'NO_UPDATE'" in check_body
+    assert "Invoke-DevStart" not in check_body
+    assert "$script:ExitCode = 2" in check_body
+
+
+@pytest.mark.parametrize(
+    ("scenario", "marker"),
+    [
+        ("no update", "NO_UPDATE"),
+        ("successful update", "result = 'PASS'"),
+        ("dirty repository", "GIT_DIRTY"),
+        ("divergent repository", "DIVERGENT"),
+        ("pending or failed CI", "CI_{0}"),
+        ("Docker unavailable", "DOCKER_UNAVAILABLE"),
+        ("health failure", "HEALTH_READY_FAILED"),
+        ("RBAC failure", "RBAC_FAILED"),
+        ("incomplete or parallel update", "UPDATE_IN_PROGRESS"),
+        ("volume changed", "VOLUME_CHANGED"),
+    ],
+)
+def test_local_dev_updater_records_required_safety_scenarios(scenario: str, marker: str) -> None:
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+    assert marker in source, scenario
+
+
+def test_local_dev_updater_parser_and_scheduler_contract() -> None:
+    pwsh = shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("PowerShell is not available on this runner")
+
+    parser = subprocess.run(
+        [
+            pwsh,
+            "-NoProfile",
+            "-Command",
+            (
+                "$tokens=$null; $errors=$null; "
+                "[System.Management.Automation.Language.Parser]::ParseFile("
+                "(Resolve-Path 'scripts/update_dev.ps1'), [ref]$tokens, [ref]$errors) > $null; "
+                "if ($errors.Count) { exit 1 }"
+            ),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    assert parser.returncode == 0, parser.stderr or parser.stdout
+
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+    assert "New-ScheduledTaskTrigger" in source
+    assert "New-TimeSpan -Minutes 5" in source
+    assert "-Mode Check -Automatic" in source
+    assert "Remove-Item -LiteralPath $script:AutoApplyPath" in source

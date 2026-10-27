@@ -131,3 +131,56 @@ tailscale serve status
 ## Решение по доставке
 
 PR #1238 направлен только в `dev`. Он остаётся Draft до успешных exact-head CI, локальной приёмки Windows DEV и обязательной физической приёмки iPhone. После выполнения этих условий допустимо слияние в защищённую `dev`, затем post-push CI и повторный Windows health/RBAC smoke на итоговом SHA. Слияние в `master`, PR `dev → master` и production release в эту задачу не входят. Задача #1266 остаётся открытой до полной проверки процесса и первого отдельно одобренного продвижения `dev → master`.
+
+## 5. Безопасное обновление локального DEV
+
+Для локального Windows-ПК используется `scripts/update_dev.ps1`. Скрипт работает только с
+веткой `dev`, публичным GitHub API и локальным Compose-проектом `yfc-dev`. Production `.env`,
+production Compose и production credentials не читаются.
+
+Ручная проверка и установка:
+
+```powershell
+Set-Location D:\Pet-projects\yfc-dev
+.\scripts\update_dev.ps1 -Mode Check
+.\scripts\update_dev.ps1 -Mode Apply
+.\scripts\update_dev.ps1 -Mode Status
+```
+
+`Check` не пересобирает приложение. `Apply` продолжает работу только при чистой ветке `dev`,
+ожидаемом `origin`, fast-forward, успешном exact-head post-push CI для целевого SHA и отсутствии
+блокировки ручной приёмки. Затем он вызывает существующий `scripts/dev.ps1 -Action start`,
+проверяет оба health endpoint и `verify_dev_roles.py`. Ошибка останавливает процесс с ненулевым
+кодом; Git не сбрасывается и база автоматически не откатывается.
+
+При изменении Alembic-миграций перед обновлением запускается штатный
+`scripts/check_online_migrations.py`, затем создаётся локальный SQL-бэкап в
+`.artifacts\runtime\dev-update\backups\`. Этот бэкап может содержать данные локального DEV;
+журналы содержат только дату, SHA и статусы, без токенов, паролей и содержимого базы.
+
+Планировщик Windows по умолчанию не устанавливается и автоустановку не включает. Явные команды:
+
+```powershell
+.\scripts\update_dev.ps1 -TaskAction Register
+.\scripts\update_dev.ps1 -TaskAction EnableCheck
+.\scripts\update_dev.ps1 -TaskAction DisableCheck
+.\scripts\update_dev.ps1 -TaskAction EnableAutoApply
+.\scripts\update_dev.ps1 -TaskAction DisableAutoApply
+.\scripts\update_dev.ps1 -TaskAction Lock
+.\scripts\update_dev.ps1 -TaskAction Unlock
+.\scripts\update_dev.ps1 -TaskAction SchedulerStatus
+.\scripts\update_dev.ps1 -TaskAction Unregister
+```
+
+`Register` создаёт локальное интерактивное задание `YFC-DEV-Update-Check` с интервалом пять
+минут, оставляя автоустановку выключенной. `Lock` предназначен для ручной DEV-приёмки и всегда
+сохраняет текущую версию; отсутствие обращений к API не используется как признак отсутствия
+пользователя. Параллельный запуск и незавершённое предыдущее обновление блокируются mutex и
+маркером состояния. Зависший маркер разрешается очищать только после проверки `Status`:
+
+```powershell
+.\scripts\update_dev.ps1 -TaskAction ClearIncomplete -ConfirmClearIncomplete
+```
+
+Не используйте для этого процесса `scripts/dev.ps1 -Action reset`, `docker compose down --volumes`,
+удаление volume или `git reset --hard`.
