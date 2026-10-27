@@ -290,3 +290,16 @@ def test_local_dev_updater_parser_and_scheduler_contract() -> None:
     assert "New-TimeSpan -Minutes 5" in source
     assert "-Mode Check -Automatic" in source
     assert "Remove-Item -LiteralPath $script:AutoApplyPath" in source
+
+
+def test_local_dev_updater_registration_uses_supported_interactive_logon_and_safe_errors() -> None:
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+
+    assert "-LogonType Interactive" in source
+    assert "-LogonType InteractiveToken" not in source
+    assert "-UserId $env:USERNAME" in source
+    assert "-RunLevel Limited" in source
+    assert "TASK_REGISTER_FAILED" in source
+    assert "error_id=" in source
+    assert "hresult=" in source
+    assert "[REDACTED]" in source
