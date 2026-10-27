@@ -425,11 +425,7 @@ describe('TemplatesList editing', () => {
     const actionLabels = within(actions)
       .getAllByRole('button')
       .map((button) => button.textContent?.trim());
-    expect(actionLabels).toEqual([
-      'Настроить копию',
-      'Запустить',
-      'Скрыть шаблон',
-    ]);
+    expect(actionLabels).toEqual(['Настроить копию', 'Запустить', 'Скрыть шаблон']);
     expect(actions).toHaveClass('program-template-card__actions--example');
     expect(readyCard.querySelector('details.program-danger-menu')).toBeNull();
 
