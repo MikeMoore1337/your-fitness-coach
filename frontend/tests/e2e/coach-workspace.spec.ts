@@ -2120,6 +2120,7 @@ test('Task 291 показывает все четыре trainer destinations н�
 test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces', async ({
   page,
 }, testInfo) => {
+  test.slow(); // Same-user navigation through eight mobile viewport/theme combinations.
   await mockCoachWorkspace(page, { attention: 'actionable' });
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
