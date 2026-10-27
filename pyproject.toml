@@ -13,14 +13,14 @@ dependencies = []
 [project.optional-dependencies]
 backend = [
     "fastapi",
-    "msgpack>=1.2.1",
+    "msgpack>=1.2.3",
     "uvicorn[standard]",
     "sqlalchemy",
     "psycopg[binary]",
     "pydantic-settings",
     "pydantic",
     "alembic",
-    "authlib",
+    "authlib>=1.9.1,<2",
     "cryptography",
     "PyJWT",
     "pwdlib[argon2]",
