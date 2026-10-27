@@ -1382,7 +1382,7 @@ test('schedule card keeps one contour and only internal dividers across mobile s
         const borderColors = sides.map((side) => style.getPropertyValue(`border-${side}-color`));
         const borderWidths = sides.map((side) => style.getPropertyValue(`border-${side}-width`));
         const channels = (color: string): number[] =>
-          (color.match(/[\\d.]+/g) ?? []).slice(0, 3).map(Number);
+          (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
         const foreground = channels(style.borderTopColor);
         const background = channels(style.backgroundColor);
         return {
