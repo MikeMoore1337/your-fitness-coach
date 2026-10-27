@@ -399,13 +399,14 @@ jobs:
           fi
       - name: Install cached WebKit shared-library prerequisite
         if: steps.mobile-playwright-cache.outputs.cache-hit == 'true'
-        # On Ubuntu 24.04 the cached WebKit WPE binary requires
-        # libevent-2.1.so.7 from libevent-2.1-7t64; the full
-        # playwright --with-deps apt-update stage timed out after 25m.
+        # Cached WebKit binaries need libevent/libopus on Ubuntu 24.04.
+        # A full WebKit apt install on Azure mirrors repeatedly hit the 180s limit
+        # on 27 Oct 2026 (PRs #1277/#1278). The actual Chromium/WebKit tests
+        # below remain mandatory and detect missing runtime dependencies.
         # Keep real WebKit execution mandatory and bound this targeted
         # system package install; failure remains a required CI failure.
         run: |
-          sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-base gstreamer1.0-plugins-good libicu74 libatomic1 libatk-bridge2.0-0t64 libatk1.0-0t64 libcairo-gobject2 libcairo2 libdbus-1-3 libdrm2 libenchant-2-2 libepoxy0 libevent-2.1-7t64 libflite1 libfontconfig1 libfreetype6 libgbm1 libgdk-pixbuf-2.0-0 libgles2 libglib2.0-0t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer1.0-0 libgtk-4-1 libharfbuzz-icu0 libharfbuzz0b libhyphen0 libjpeg-turbo8 liblcms2-2 libmanette-0.2-0 libopus0 libpango-1.0-0 libpangocairo-1.0-0 libpng16-16t64 libsecret-1-0 libvpx9 libwayland-client0 libwayland-egl1 libwayland-server0 libwebp7 libwebpdemux2 libwoff1 libx11-6 libxkbcommon0 libxml2 libxslt1.1 libx264-164 libavif16
+          sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends libevent-2.1-7t64 libopus0
           ldconfig -p | grep -F 'libevent-2.1.so.7'
           ldconfig -p | grep -F 'libopus.so.0'
           # The bundled WebKit wrapper sets its own LD_LIBRARY_PATH.
