@@ -2625,18 +2625,13 @@ export function TodayWorkout({
       const box = controls.getBoundingClientRect();
       const targetTop = safeTop + Math.max(0, (safeBottom - safeTop - box.height) / 2);
       let delta = box.top - targetTop;
-      const nextRow = row?.nextElementSibling;
-      const nextDone = nextRow?.querySelector<HTMLElement>('[data-workout-field="done"]');
-      const rir = row?.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
-      if (nextDone) {
-        // Clear the adjacent set only within the space that keeps the current inputs visible.
-        delta = Math.max(
-          delta,
-          Math.min(
-            nextDone.getBoundingClientRect().bottom - safeBottom,
-            Math.min(box.top, rir?.top ?? box.top) - safeTop,
-          ),
-        );
+      // Keep the newly active controls fully within the available viewport.
+      // Taller RIR controls must not be pushed under the sticky timer just to
+      // clear the following (non-current) set from the dock.
+      const minScroll = box.bottom - safeBottom;
+      const maxScroll = box.top - safeTop;
+      if (minScroll <= maxScroll) {
+        delta = Math.max(minScroll, Math.min(delta, maxScroll));
       }
       window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
