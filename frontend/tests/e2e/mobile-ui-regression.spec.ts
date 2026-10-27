@@ -458,6 +458,9 @@ test('@critical mocked TMA keeps the dock inside the effective viewport and hit-
   if (!prepared.tma) throw new Error('TMA harness was not installed');
   await page.goto('/app?tgWebAppPlatform=android');
   await waitForSurface(page, 'today');
+  // The dock-clearance assertion is for the keyboard-closed layout.
+  // Wait for the layout adapter to finish any focus/viewport update.
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
 
   const geometry = await page.evaluate(() => {
     const rootStyle = getComputedStyle(document.documentElement);

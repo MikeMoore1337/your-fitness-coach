@@ -1375,6 +1375,31 @@ test('schedule card keeps one contour and only internal dividers across mobile s
       if (width === 320 && colorScheme === 'light') {
         await page.addStyleTag({ content: 'html { font-size: 125%; }' });
       }
+      // Regression #1228: checking border width only missed an unreadable collapsed top edge.
+      const collapsedContour = await card.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const sides = ['top', 'right', 'bottom', 'left'];
+        const borderColors = sides.map((side) => style.getPropertyValue(`border-${side}-color`));
+        const borderWidths = sides.map((side) => style.getPropertyValue(`border-${side}-width`));
+        const channels = (color: string): number[] =>
+          (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+        const foreground = channels(style.borderTopColor);
+        const background = channels(style.backgroundColor);
+        return {
+          borderColors,
+          borderWidths,
+          radius: style.borderTopLeftRadius,
+          contrastDistance: foreground.reduce(
+            (sum, channel, index) => sum + Math.abs(channel - (background[index] ?? 0)),
+            0,
+          ),
+        };
+      });
+      expect(collapsedContour.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(new Set(collapsedContour.borderColors).size).toBe(1);
+      expect(collapsedContour.radius).not.toBe('0px');
+      // CSS RGB channel distance catches a painted but barely visible border on both themes.
+      expect(collapsedContour.contrastDistance).toBeGreaterThanOrEqual(180);
       if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
         await card.screenshot({
           path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-collapsed.png`),
