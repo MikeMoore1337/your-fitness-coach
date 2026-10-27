@@ -1388,9 +1388,8 @@ test('schedule card keeps one contour and only internal dividers across mobile s
         const luminance = (rgb: number[]) => {
           const linear = rgb.map((channel) => {
             const normalized = channel / 255;
-            return normalized <= 0.04045
-              ? normalized / 12.92
-              : ((normalized + 0.055) / 1.055) ** 2.4;
+            if (normalized <= 0.04045) return normalized / 12.92;
+            return ((normalized + 0.055) / 1.055) ** 2.4;
           });
           return (
             0.2126 * (linear[0] ?? 0) +
