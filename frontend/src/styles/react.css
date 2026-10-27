@@ -5758,6 +5758,13 @@ html[data-yfc-pwa-focus-placement='true']:has(#appContent .active-workout) {
 html[data-yfc-pwa-focus-placement='true'] .active-workout {
   overflow-anchor: none;
 }
+/* Keep native PWA keyboard panning in charge: reclaim card spacing above
+   focused weight/reps without scripted scrolling on focus or while typing. */
+html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
+  .active-workout-set.is-current {
+  gap: 2px;
+  padding-top: 7px;
+}
 .active-workout:has(.active-workout-rest:not(.is-compact)) .active-workout-set__contextual-help {
   display: none;
 }
