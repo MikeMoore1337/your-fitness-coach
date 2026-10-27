@@ -4253,6 +4253,72 @@ test('V9-03 calculates exact and nearest local loads without network or workout 
   await page.context().setOffline(false);
 });
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`V12 #1273 keeps plate reset separate from instructions at 320-430px in ${theme}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const currentSet = page.locator('[data-workout-set-id="201"]');
+    await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
+    const inventory = currentSet.locator('.active-workout-plate-inventory');
+    const hint = inventory.locator(':scope > p');
+    const reset = inventory.getByRole('button', { name: 'Сбросить' });
+    const count = inventory.getByLabel('Количество блинов 25 кг на сторону');
+    const originalCount = await count.inputValue();
+    await count.fill(originalCount === '0' ? '1' : '0');
+    await expect(count).not.toHaveValue(originalCount);
+
+    // Enlarged text must still take up its own row rather than overlap the control.
+    await hint.evaluate((element) => {
+      element.style.fontSize = '1.25rem';
+    });
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(hint).toBeVisible();
+      await expect(reset).toBeVisible();
+      const rects = await inventory.evaluate((fieldset) => {
+        const paragraph = fieldset.querySelector(':scope > p');
+        const button = fieldset.querySelector('.active-workout-plate-inventory__reset button');
+        if (!paragraph || !button) throw new Error('Plate inventory elements missing');
+        const helpRect = paragraph.getBoundingClientRect();
+        const resetRect = button.getBoundingClientRect();
+        return {
+          helpBottom: helpRect.bottom,
+          resetTop: resetRect.top,
+          resetRight: resetRect.right,
+          viewportRight: window.innerWidth,
+          fieldsetRight: fieldset.getBoundingClientRect().right,
+        };
+      });
+      expect(rects.resetTop).toBeGreaterThanOrEqual(rects.helpBottom);
+      expect(rects.resetRight).toBeLessThanOrEqual(rects.fieldsetRight + 1);
+      expect(rects.resetRight).toBeLessThanOrEqual(rects.viewportRight + 1);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+      ).toBe(true);
+      if (width === 393) {
+        await test.info().attach(`1273-after-${theme}-393px`, {
+          body: await page.screenshot(),
+          contentType: 'image/png',
+        });
+      }
+    }
+
+    await reset.click();
+    await expect(count).toHaveValue(originalCount);
+    await expect(currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('');
+    await expect(currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('');
+    await expect(currentSet).toHaveAttribute('aria-current', 'step');
+  });
+}
+
 test('V9-03 fits the supported 360, 390 and 430px Mobile Web widths', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await mockActiveWorkout(page);
