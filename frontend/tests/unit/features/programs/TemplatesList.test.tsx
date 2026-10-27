@@ -453,9 +453,11 @@ describe('TemplatesList editing', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(
-      vi.mocked(globalThis.fetch).mock.calls.filter(
-        ([input, init]) => String(input).includes('/templates/10') && init?.method === 'DELETE',
-      ),
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(
+          ([input, init]) => String(input).includes('/templates/10') && init?.method === 'DELETE',
+        ),
     ).toHaveLength(0);
   });
 
@@ -470,17 +472,21 @@ describe('TemplatesList editing', () => {
 
     await waitFor(() =>
       expect(
-        vi.mocked(globalThis.fetch).mock.calls.filter(
-          ([input, init]) =>
-            String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE',
-        ),
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.filter(
+            ([input, init]) =>
+              String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE',
+          ),
       ).toHaveLength(1),
     );
     expect(
-      vi.mocked(globalThis.fetch).mock.calls.filter(
-        ([input, init]) =>
-          String(input) === '/api/v1/programs/templates/11' && init?.method === 'DELETE',
-      ),
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(
+          ([input, init]) =>
+            String(input) === '/api/v1/programs/templates/11' && init?.method === 'DELETE',
+        ),
     ).toHaveLength(0);
   });
 
@@ -507,10 +513,12 @@ describe('TemplatesList editing', () => {
     await waitFor(() => expect(hideButton).toBeDisabled());
     fireEvent.click(hideButton);
     expect(
-      vi.mocked(globalThis.fetch).mock.calls.filter(
-        ([input, init]) =>
-          String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE',
-      ),
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(
+          ([input, init]) =>
+            String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE',
+        ),
     ).toHaveLength(1);
 
     resolveDelete(new Response(null, { status: 204 }));
