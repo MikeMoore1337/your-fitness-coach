@@ -1244,14 +1244,14 @@ def dev_login(
 
         user.is_coach = payload.is_coach
         user.is_admin = payload.is_admin
-        if payload.username is not None:
+        if payload.username is not None and not settings.dev_auth_fixed_accounts_only:
             user.username = username
         if payload.full_name is not None:
             profile = user.profile
-            if profile:
-                profile.full_name = payload.full_name
-            else:
+            if not profile:
                 db.add(UserProfile(user_id=user.id, full_name=payload.full_name))
+            elif not settings.dev_auth_fixed_accounts_only:
+                profile.full_name = payload.full_name
 
     ensure_telegram_identity(db, user)
     db.commit()
