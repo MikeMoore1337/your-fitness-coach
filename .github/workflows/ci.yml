@@ -399,14 +399,14 @@ jobs:
           fi
       - name: Install cached WebKit shared-library prerequisite
         if: steps.mobile-playwright-cache.outputs.cache-hit == 'true'
-        # Cached WebKit binaries need libevent/libopus on Ubuntu 24.04.
+        # Cached WebKit WPE needs core GStreamer/codec-independent libraries on Ubuntu 24.04.
         # A full WebKit apt install on Azure mirrors repeatedly hit the 180s limit
         # on 27 Oct 2026 (PRs #1277/#1278). The actual Chromium/WebKit tests
         # below remain mandatory and detect missing runtime dependencies.
         # Keep real WebKit execution mandatory and bound this targeted
         # system package install; failure remains a required CI failure.
         run: |
-          sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends libevent-2.1-7t64 libopus0
+          sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends libevent-2.1-7t64 libopus0 libgstreamer-plugins-base1.0-0 gstreamer1.0-plugins-base libenchant-2-2 libflite1 libhyphen0 libmanette-0.2-0 libsecret-1-0 libwoff1
           ldconfig -p | grep -F 'libevent-2.1.so.7'
           ldconfig -p | grep -F 'libopus.so.0'
           # The bundled WebKit wrapper sets its own LD_LIBRARY_PATH.
