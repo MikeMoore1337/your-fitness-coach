@@ -1,0 +1,52 @@
+# Temporary one-shot maintenance workflow for PR #1275 only. Remove after committing generated PNG baselines.
+name: V12 1272 one-shot visual baseline
+on:
+  push:
+    branches:
+      - feat/1272-rir-after-set-values
+permissions:
+  contents: write
+jobs:
+  baseline:
+    if: github.repository == 'MikeMoore1337/your-fitness-coach' && github.ref == 'refs/heads/feat/1272-rir-after-set-values'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Format changed sources exactly
+        working-directory: frontend
+        run: npx prettier --write src/features/workouts/TodayWorkout.tsx tests/e2e/active-workout-experience.spec.ts
+      - name: Build preview
+        working-directory: frontend
+        run: npx vite build
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium webkit
+      - name: Update only RIR-affected mobile screenshots
+        working-directory: frontend
+        env:
+          CI: 'true'
+        run: npx playwright test --config=playwright.mobile-regression.config.ts --project=mobile-chromium --project=mobile-webkit --grep 'active workout keeps controls, keyboard and dock usable on mobile' --update-snapshots
+      - name: Commit generated sources and snapshots to issue branch only
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- frontend/src/features/workouts/TodayWorkout.tsx frontend/tests/e2e/active-workout-experience.spec.ts frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/
+          git diff --cached --stat
+          if git diff --cached --quiet; then
+            echo 'No files changed'
+            exit 1
+          fi
+          git commit -m 'test(visual): approve RIR layout reference images (#1272)'
+          git push origin HEAD:refs/heads/feat/1272-rir-after-set-values
