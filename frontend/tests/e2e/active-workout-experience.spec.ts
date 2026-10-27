@@ -4319,9 +4319,7 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`V12 #1272 orders weight, reps, RIR and finish without changing RIR meaning in ${theme}`, async ({
-    page,
-  }) => {
+  test(`V12 #1272 orders inputs and persists RIR in ${theme}`, async ({ page }) => {
     await page.setViewportSize({ width: 393, height: 844 });
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
     await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
@@ -4387,7 +4385,8 @@ for (const theme of ['light', 'dark'] as const) {
     await done.click();
     await expect.poll(() => server.readSet(201).is_completed).toBe(true);
     expect(server.readSet(201)).toMatchObject({ actual_weight: 42.5, actual_reps: 8, rir: '0' });
-    await expect(page.locator('[data-workout-set-id="202"]')).toHaveAttribute('aria-current', 'step');
+    const nextSet = page.locator('[data-workout-set-id="202"]');
+    await expect(nextSet).toHaveAttribute('aria-current', 'step');
   });
 }
 
