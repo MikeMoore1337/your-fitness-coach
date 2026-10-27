@@ -74,6 +74,35 @@ $script:ExpectedOrigin = 'https://github.com/mikemoore1337/your-fitness-coach'
 $script:ApiBaseUrl = $GitHubApiBaseUrl.TrimEnd('/')
 $script:CurrentResult.repository = $script:RepoRoot
 
+function ConvertTo-SafeErrorText {
+    param(
+        [AllowNull()][object]$Value,
+        [string]$Fallback = 'NO_DATA'
+    )
+    $text = if ($null -eq $Value) { '' } else { [string]$Value }
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $Fallback
+    }
+    $text = $text -replace '[\r\n]+', ' '
+    $text = $text -replace '(?i)(password|passwd|secret|token|api[_-]?key|authorization|cookie)\s*[:=]\s*[^\s,;]+', '$1=[REDACTED]'
+    $text = $text -replace '(?i)(https?://[^/\s:@]+:)[^@\s]+@', '$1[REDACTED]@'
+    $text = $text -replace '(?i)((?:\?|&)(?:password|passwd|secret|token|api[_-]?key|authorization|cookie)=)[^&\s]+', '$1[REDACTED]'
+    return $text.Trim()
+}
+
+function Get-ScheduledTaskErrorSummary {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord
+    )
+    $exception = $ErrorRecord.Exception
+    $reason = if ($null -ne $exception) { $exception.Message } else { 'Неизвестная ошибка' }
+    $errorId = ConvertTo-SafeErrorText -Value $ErrorRecord.FullyQualifiedErrorId
+    $hresult = if ($null -ne $exception) { [string]$exception.HResult } else { 'NO_DATA' }
+    return ('Регистрация задания завершилась ошибкой: причина="{0}"; error_id={1}; hresult={2}.' -f `
+        (ConvertTo-SafeErrorText -Value $reason), $errorId, $hresult)
+}
+
 function Stop-Update {
     param(
         [Parameter(Mandatory = $true)][string]$Code,
@@ -736,20 +765,24 @@ function Invoke-TaskAction {
     New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
     switch ($TaskAction) {
         'Register' {
-            $scriptPath = Join-Path $script:RepoRoot 'scripts\update_dev.ps1'
-            $hostPath = Get-TaskHost
-            $escapedScript = $scriptPath.Replace('"', '\"')
-            $action = New-ScheduledTaskAction -Execute $hostPath -Argument ('-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Mode Check -Automatic' -f $escapedScript)
-            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
-                -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
-            $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
-                -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
-            $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType InteractiveToken -RunLevel Limited
-            Register-ScheduledTask -TaskName $script:TaskName -Action $action -Trigger $trigger `
-                -Settings $settings -Principal $principal -Force | Out-Null
-            Enable-ScheduledTask -TaskName $script:TaskName | Out-Null
-            Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
-            Write-Host 'Планировщик зарегистрирован: проверка каждые 5 минут; автоустановка выключена.'
+            try {
+                $scriptPath = Join-Path $script:RepoRoot 'scripts\update_dev.ps1'
+                $hostPath = Get-TaskHost
+                $escapedScript = $scriptPath.Replace('"', '\"')
+                $action = New-ScheduledTaskAction -Execute $hostPath -Argument ('-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Mode Check -Automatic' -f $escapedScript)
+                $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
+                    -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
+                $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
+                    -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+                $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+                Register-ScheduledTask -TaskName $script:TaskName -Action $action -Trigger $trigger `
+                    -Settings $settings -Principal $principal -Force | Out-Null
+                Enable-ScheduledTask -TaskName $script:TaskName | Out-Null
+                Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
+                Write-Host 'Планировщик зарегистрирован: проверка каждые 5 минут; автоустановка выключена.'
+            } catch {
+                Stop-Update -Code 'TASK_REGISTER_FAILED' -Summary (Get-ScheduledTaskErrorSummary -ErrorRecord $_)
+            }
         }
         'Unregister' {
             Unregister-ScheduledTask -TaskName $script:TaskName -Confirm:$false -ErrorAction SilentlyContinue
@@ -851,6 +884,6 @@ try {
     }
     $script:CurrentResult.result = if ($script:ExitCode -eq 2) { 'DEFERRED' } else { 'FAIL' }
     try { Save-Result } catch { }
-    Write-Error $script:FailureSummary
+    Write-Error ('[{0}] {1}' -f $script:FailureCode, $script:FailureSummary)
     exit $script:ExitCode
 }
