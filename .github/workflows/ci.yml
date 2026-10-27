@@ -346,6 +346,10 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression == 'true'
     runs-on: ubuntu-latest
+    # The image pins the exact playwright/package-lock.json version and provides
+    # real Chromium/WebKit binaries and system libraries without slow Ubuntu apt mirrors.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
     timeout-minutes: 25
     env:
       CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-timing.jsonl
@@ -384,35 +388,13 @@ jobs:
           key: playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
       - name: Report mobile Playwright cache
         run: echo "CI_CACHE package=playwright-mobile hit=${{ steps.mobile-playwright-cache.outputs.cache-hit }}"
-      - name: Install mobile Chromium and WebKit
+      - name: Verify pinned Chromium and WebKit runtime
         working-directory: frontend
-        # A Playwright browser cache hit already contains browser binaries.
-        # Running --with-deps also invokes unbounded apt on hosted runners;
-        # the I4 PR #1241 hit the 25-minute job timeout there despite a
-        # 364 MB browser cache hit. Keep actual browser/E2E tests mandatory:
-        # do not skip installation checks or shared regression execution.
         run: |
-          if [ "${{ steps.mobile-playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install chromium webkit
-          else
-            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
-          fi
-      - name: Install cached WebKit shared-library prerequisite
-        if: steps.mobile-playwright-cache.outputs.cache-hit == 'true'
-        # Cached WebKit WPE needs core GStreamer/codec-independent libraries on Ubuntu 24.04.
-        # A full WebKit apt install on Azure mirrors repeatedly hit the 180s limit
-        # on 27 Oct 2026 (PRs #1277/#1278). The actual Chromium/WebKit tests
-        # below remain mandatory and detect missing runtime dependencies.
-        # Keep real WebKit execution mandatory and bound this targeted
-        # system package install; failure remains a required CI failure.
-        run: |
-          sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 install -y --no-install-recommends libevent-2.1-7t64 libopus0 libgstreamer-gl1.0-0 libgstreamer-plugins-base1.0-0 gstreamer1.0-plugins-base libenchant-2-2 libflite1 libhyphen0 libmanette-0.2-0 libsecret-1-0 libwoff1
+          python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install chromium webkit
           ldconfig -p | grep -F 'libevent-2.1.so.7'
           ldconfig -p | grep -F 'libopus.so.0'
-          # The bundled WebKit wrapper sets its own LD_LIBRARY_PATH.
-          # Direct ldd on MiniBrowser without that wrapper can falsely
-          # report private bundled libraries missing. Actual mandatory
-          # mobile Chromium/WebKit tests verify runtime dependency health.
+      # Shared mobile Chromium/WebKit tests remain mandatory and fail the job.
       - name: Run shared mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression
       - name: Upload mobile regression evidence
