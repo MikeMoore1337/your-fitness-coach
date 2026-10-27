@@ -2374,7 +2374,6 @@ export function TodayWorkout({
     const root = document.documentElement;
     let focusPlacementPending = false;
     let focusGeometry: number[] = [];
-    let pwaPlacedRow: Element | null = null;
     if (standalonePwa) root.dataset.yfcPwaFocusPlacement = 'true';
     const safeArea = standalonePwa ? document.createElement('div') : null;
     if (safeArea) {
@@ -2397,23 +2396,7 @@ export function TodayWorkout({
         const editingRir = document.activeElement?.matches('.active-workout-rir button');
         if (!editingWorkoutField() && !editingRir) return;
         if (standalonePwa && editingWorkoutField()) {
-          // Native iOS owns keyboard panning. Correct an initially occluded input
-          // only once per set at focus; subsequent typing/visualViewport events
-          // never request a scroll, preserving the stable PWA input contract.
-          const activeInput = document.activeElement as HTMLElement;
-          const activeRow = activeInput.closest('.active-workout-set');
-          if (focusPlacementPending && activeRow && pwaPlacedRow !== activeRow) {
-            pwaPlacedRow = activeRow;
-            const viewport = window.visualViewport;
-            const bottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
-            const occluded = activeInput.getBoundingClientRect().bottom - bottom;
-            if (occluded > 1) {
-              window.scrollTo({
-                top: window.scrollY + Math.ceil(occluded + 2),
-                behavior: 'instant',
-              });
-            }
-          }
+          // Standalone iOS owns focus visibility; app scroll would compete with native keyboard pan.
           focusPlacementPending = false;
           return;
         }
