@@ -1638,23 +1638,26 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   }
 }
 
-/* The personal mobile dock owns the add action; the floating trigger remains for desktop and demos. */
+/* The personal (5 destinations) and Coach OS (4 destinations) docks share one
+   mobile viewport/safe-area offset. Demos keep their separate floating-add layout. */
 @media (max-width: 899px) {
   :root {
-    --yfc-personal-dock-bottom-gap: calc(12px + var(--yfc-layout-safe-bottom));
+    --yfc-workspace-dock-bottom-gap: calc(12px + var(--yfc-layout-safe-bottom));
   }
 
-  /* Browser/PWA: align the outer pill closer to native iOS floating tab bars.
-     Keep the Telegram host safe-area contract unchanged. */
+  /* Browser/PWA moves both workspace docks together; Telegram keeps host insets. */
   :root[data-yfc-layout-surface='browser'] {
-    --yfc-personal-dock-bottom-gap: max(12px, calc(var(--yfc-layout-safe-bottom) - 14px));
+    --yfc-workspace-dock-bottom-gap: max(12px, calc(var(--yfc-layout-safe-bottom) - 14px));
+  }
+
+  .app-shell--design-v2:not(:has(.app-quick-add-trigger--floating)) .app-bottom-nav {
+    inset: auto max(10px, var(--yfc-layout-safe-right))
+      calc(var(--yfc-workspace-dock-bottom-gap) + var(--yfc-viewport-bottom-effective, 0px))
+      max(10px, var(--yfc-layout-safe-left));
   }
 
   .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav {
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    inset: auto max(10px, var(--yfc-layout-safe-right))
-      calc(var(--yfc-personal-dock-bottom-gap) + var(--yfc-viewport-bottom-effective, 0px))
-      max(10px, var(--yfc-layout-safe-left));
     gap: 2px;
     padding: 6px;
   }
@@ -2057,9 +2060,10 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   cursor: pointer;
 }
 
-/* Card body already supplies the header separator; the schedule list owns only internal dividers. */
+/* Use a legible four-sided contour even while the schedule disclosure is collapsed on iOS.
+   The body owns its header separator; list rows own internal separators. */
 .app-section--programs .workout-schedule-card {
-  border: 1px solid var(--v2-border);
+  border: 1px solid var(--v2-border-strong);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
 }
