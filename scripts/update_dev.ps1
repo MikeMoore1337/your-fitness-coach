@@ -14,6 +14,7 @@ param(
         'Lock',
         'Unlock',
         'SchedulerStatus',
+        'InstallSilentAction',
         'ClearIncomplete'
     )]
     [string]$TaskAction = 'None',
@@ -754,11 +755,30 @@ function Invoke-Status {
     }
 }
 
-function Get-TaskHost {
-    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
-    if ($null -ne $pwsh) { return $pwsh.Source }
-    $powershell = Get-Command powershell -ErrorAction Stop
-    return $powershell.Source
+function Get-DevPythonwHost {
+    if ($null -eq (Get-Command py -ErrorAction SilentlyContinue)) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'Для скрытого запуска требуется установленный Python 3.14 с pythonw.exe.'
+    }
+    $python = @(& py -3.14 -c 'import sys; print(sys.executable)' 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $python.Count -ne 1 -or [string]::IsNullOrWhiteSpace($python[0])) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'Невозможно определить путь Python 3.14.'
+    }
+    $pythonw = Join-Path (Split-Path -Parent ([string]$python[0]).Trim()) 'pythonw.exe'
+    if (-not (Test-Path -LiteralPath $pythonw -PathType Leaf)) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'pythonw.exe отсутствует рядом с Python 3.14; видимый PowerShell не используется как запасной вариант.'
+    }
+    return $pythonw
+}
+
+function New-SilentUpdaterAction {
+    $launcherPath = Join-Path $script:RepoRoot 'scripts\dev_update_silent.pyw'
+    if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
+        Stop-Update -Code 'SILENT_LAUNCHER_MISSING' -Summary 'Не найден scripts/dev_update_silent.pyw.'
+    }
+    $pythonw = Get-DevPythonwHost
+    # pythonw.exe uses the Windows GUI subsystem and never allocates a console.
+    # The launcher starts PowerShell with CREATE_NO_WINDOW and forwards exit codes.
+    return New-ScheduledTaskAction -Execute $pythonw -Argument ('-I -B "{0}"' -f $launcherPath)
 }
 
 function Invoke-TaskAction {
@@ -766,10 +786,7 @@ function Invoke-TaskAction {
     switch ($TaskAction) {
         'Register' {
             try {
-                $scriptPath = Join-Path $script:RepoRoot 'scripts\update_dev.ps1'
-                $hostPath = Get-TaskHost
-                $escapedScript = $scriptPath.Replace('"', '\"')
-                $action = New-ScheduledTaskAction -Execute $hostPath -Argument ('-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Mode Check -Automatic' -f $escapedScript)
+                $action = New-SilentUpdaterAction
                 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
                     -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
                 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
@@ -782,6 +799,236 @@ function Invoke-TaskAction {
                 Write-Host 'Планировщик зарегистрирован: проверка каждые 5 минут; автоустановка выключена.'
             } catch {
                 Stop-Update -Code 'TASK_REGISTER_FAILED' -Summary (Get-ScheduledTaskErrorSummary -ErrorRecord $_)
+            }
+        }
+        'InstallSilentAction' {
+            # Upgrade only the executable of an existing task; keep its schedule,
+            # principal, manual lock and auto-apply enabled marker unchanged.
+            try {
+                $task = Get-ScheduledTask -TaskName $script:TaskName -ErrorAction Stop
+                $existing = @($task.Actions)
+                if ($existing.Count -ne 1) {
+                    Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Ожидалось ровно одно действие задания; изменение отменено.'
+                }
+                $executable = [string]$existing[0].Execute
+                $arguments = [string]$existing[0].Arguments
+                $oldPowerShell = $executable -match '(?i)(?:^|[\\/])(powershell|pwsh)\.exe
+            Unregister-ScheduledTask -TaskName $script:TaskName -Confirm:$false -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
+            Write-Host 'Планировщик отключён и удалён; данные DEV не изменялись.'
+        }
+        'EnableCheck' {
+            Enable-ScheduledTask -TaskName $script:TaskName -ErrorAction Stop | Out-Null
+            Write-Host 'Автоматическая проверка включена.'
+        }
+        'DisableCheck' {
+            Disable-ScheduledTask -TaskName $script:TaskName -ErrorAction Stop | Out-Null
+            Write-Host 'Автоматическая проверка отключена.'
+        }
+        'EnableAutoApply' {
+            if ($null -eq (Get-ScheduledTask -TaskName $script:TaskName -ErrorAction SilentlyContinue)) {
+                Stop-Update -Code 'TASK_NOT_REGISTERED' -Summary 'Сначала зарегистрируйте локальное задание.'
+            }
+            Set-Content -LiteralPath $script:AutoApplyPath -Value 'enabled' -Encoding ASCII -NoNewline
+            Write-Host 'Автоматическая установка включена; CI, lock и fast-forward проверки обязательны.'
+        }
+        'DisableAutoApply' {
+            Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
+            Write-Host 'Автоматическая установка отключена.'
+        }
+        'Lock' {
+            Set-Content -LiteralPath $script:ManualLockPath -Value 'locked' -Encoding ASCII -NoNewline
+            Write-Host 'Обновления заблокированы для ручной DEV-приёмки.'
+        }
+        'Unlock' {
+            Remove-Item -LiteralPath $script:ManualLockPath -Force -ErrorAction SilentlyContinue
+            Write-Host 'Блокировка ручной DEV-приёмки снята.'
+        }
+        'SchedulerStatus' {
+            $task = Get-ScheduledTask -TaskName $script:TaskName -ErrorAction SilentlyContinue
+            if ($null -eq $task) {
+                Write-Host 'scheduler=NOT_REGISTERED'
+            } else {
+                $info = Get-ScheduledTaskInfo -TaskName $script:TaskName
+                Write-Host ('scheduler={0}; last_run={1}; next_run={2}' -f $task.State, $info.LastRunTime, $info.NextRunTime)
+            }
+            Write-Host ('auto_apply={0}' -f (Format-OnOff -Enabled (Test-AutoApplyEnabled)))
+            Write-Host ('manual_acceptance_lock={0}' -f (Format-OnOff -Enabled (Test-ManualLock)))
+        }
+        'ClearIncomplete' {
+            if (-not $ConfirmClearIncomplete) {
+                Stop-Update -Code 'CONFIRMATION_REQUIRED' -Summary 'Для очистки незавершённого состояния нужен -ConfirmClearIncomplete.'
+            }
+            if (-not (Test-Path -LiteralPath $script:InProgressPath)) {
+                Write-Host 'Незавершённое состояние отсутствует.'
+                return
+            }
+            $payload = Get-Content -Raw -LiteralPath $script:InProgressPath | ConvertFrom-Json
+            try {
+                Get-Process -Id ([int]$payload.pid) -ErrorAction Stop | Out-Null
+                Stop-Update -Code 'UPDATE_IN_PROGRESS' -Summary 'Процесс из незавершённого состояния ещё работает.' -Deferred
+            } catch [Microsoft.PowerShell.Commands.ProcessCommandException] {
+                # The recorded process no longer exists; the named mutex check below is authoritative.
+            }
+            Enter-UpdateMutex
+            try {
+                Remove-Item -LiteralPath $script:InProgressPath -Force
+                Write-Host 'Зависшее состояние обновления очищено; база данных не откатывалась.'
+            } finally {
+                Exit-UpdateMutex
+            }
+        }
+    }
+}
+
+try {
+    New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
+    if ($TaskAction -ne 'None') {
+        Invoke-TaskAction
+        exit 0
+    }
+    if ($Mode -eq 'Status') {
+        Invoke-Status
+        exit 0
+    }
+    Enter-UpdateMutex
+    try {
+        if ($Mode -eq 'Check') {
+            Invoke-Check
+        } else {
+            Invoke-Apply
+        }
+    } finally {
+        Remove-InProgress
+        Exit-UpdateMutex
+    }
+    exit $script:ExitCode
+} catch {
+    if (-not $script:FailureCode) {
+        $script:FailureCode = 'UPDATE_FAILED'
+        $script:FailureSummary = 'Обновление остановлено из-за ошибки.'
+        $script:ExitCode = 1
+        $script:CurrentResult.error_code = $script:FailureCode
+    }
+    $script:CurrentResult.result = if ($script:ExitCode -eq 2) { 'DEFERRED' } else { 'FAIL' }
+    try { Save-Result } catch { }
+    Write-Error ('[{0}] {1}' -f $script:FailureCode, $script:FailureSummary)
+    exit $script:ExitCode
+}
+ -and $arguments -match '(?i)update_dev\.ps1'
+                $newPythonw = $executable -match '(?i)(?:^|[\\/])pythonw\.exe
+            Unregister-ScheduledTask -TaskName $script:TaskName -Confirm:$false -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
+            Write-Host 'Планировщик отключён и удалён; данные DEV не изменялись.'
+        }
+        'EnableCheck' {
+            Enable-ScheduledTask -TaskName $script:TaskName -ErrorAction Stop | Out-Null
+            Write-Host 'Автоматическая проверка включена.'
+        }
+        'DisableCheck' {
+            Disable-ScheduledTask -TaskName $script:TaskName -ErrorAction Stop | Out-Null
+            Write-Host 'Автоматическая проверка отключена.'
+        }
+        'EnableAutoApply' {
+            if ($null -eq (Get-ScheduledTask -TaskName $script:TaskName -ErrorAction SilentlyContinue)) {
+                Stop-Update -Code 'TASK_NOT_REGISTERED' -Summary 'Сначала зарегистрируйте локальное задание.'
+            }
+            Set-Content -LiteralPath $script:AutoApplyPath -Value 'enabled' -Encoding ASCII -NoNewline
+            Write-Host 'Автоматическая установка включена; CI, lock и fast-forward проверки обязательны.'
+        }
+        'DisableAutoApply' {
+            Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
+            Write-Host 'Автоматическая установка отключена.'
+        }
+        'Lock' {
+            Set-Content -LiteralPath $script:ManualLockPath -Value 'locked' -Encoding ASCII -NoNewline
+            Write-Host 'Обновления заблокированы для ручной DEV-приёмки.'
+        }
+        'Unlock' {
+            Remove-Item -LiteralPath $script:ManualLockPath -Force -ErrorAction SilentlyContinue
+            Write-Host 'Блокировка ручной DEV-приёмки снята.'
+        }
+        'SchedulerStatus' {
+            $task = Get-ScheduledTask -TaskName $script:TaskName -ErrorAction SilentlyContinue
+            if ($null -eq $task) {
+                Write-Host 'scheduler=NOT_REGISTERED'
+            } else {
+                $info = Get-ScheduledTaskInfo -TaskName $script:TaskName
+                Write-Host ('scheduler={0}; last_run={1}; next_run={2}' -f $task.State, $info.LastRunTime, $info.NextRunTime)
+            }
+            Write-Host ('auto_apply={0}' -f (Format-OnOff -Enabled (Test-AutoApplyEnabled)))
+            Write-Host ('manual_acceptance_lock={0}' -f (Format-OnOff -Enabled (Test-ManualLock)))
+        }
+        'ClearIncomplete' {
+            if (-not $ConfirmClearIncomplete) {
+                Stop-Update -Code 'CONFIRMATION_REQUIRED' -Summary 'Для очистки незавершённого состояния нужен -ConfirmClearIncomplete.'
+            }
+            if (-not (Test-Path -LiteralPath $script:InProgressPath)) {
+                Write-Host 'Незавершённое состояние отсутствует.'
+                return
+            }
+            $payload = Get-Content -Raw -LiteralPath $script:InProgressPath | ConvertFrom-Json
+            try {
+                Get-Process -Id ([int]$payload.pid) -ErrorAction Stop | Out-Null
+                Stop-Update -Code 'UPDATE_IN_PROGRESS' -Summary 'Процесс из незавершённого состояния ещё работает.' -Deferred
+            } catch [Microsoft.PowerShell.Commands.ProcessCommandException] {
+                # The recorded process no longer exists; the named mutex check below is authoritative.
+            }
+            Enter-UpdateMutex
+            try {
+                Remove-Item -LiteralPath $script:InProgressPath -Force
+                Write-Host 'Зависшее состояние обновления очищено; база данных не откатывалась.'
+            } finally {
+                Exit-UpdateMutex
+            }
+        }
+    }
+}
+
+try {
+    New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
+    if ($TaskAction -ne 'None') {
+        Invoke-TaskAction
+        exit 0
+    }
+    if ($Mode -eq 'Status') {
+        Invoke-Status
+        exit 0
+    }
+    Enter-UpdateMutex
+    try {
+        if ($Mode -eq 'Check') {
+            Invoke-Check
+        } else {
+            Invoke-Apply
+        }
+    } finally {
+        Remove-InProgress
+        Exit-UpdateMutex
+    }
+    exit $script:ExitCode
+} catch {
+    if (-not $script:FailureCode) {
+        $script:FailureCode = 'UPDATE_FAILED'
+        $script:FailureSummary = 'Обновление остановлено из-за ошибки.'
+        $script:ExitCode = 1
+        $script:CurrentResult.error_code = $script:FailureCode
+    }
+    $script:CurrentResult.result = if ($script:ExitCode -eq 2) { 'DEFERRED' } else { 'FAIL' }
+    try { Save-Result } catch { }
+    Write-Error ('[{0}] {1}' -f $script:FailureCode, $script:FailureSummary)
+    exit $script:ExitCode
+}
+ -and $arguments -match '(?i)dev_update_silent\.pyw'
+                if (-not ($oldPowerShell -or $newPythonw)) {
+                    Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Действие задания не принадлежит DEV updater; изменение отменено.'
+                }
+                $action = New-SilentUpdaterAction
+                Set-ScheduledTask -TaskName $script:TaskName -Action $action -ErrorAction Stop | Out-Null
+                Write-Host 'Задание переведено на скрытый pythonw.exe; расписание и auto_apply сохранены.'
+            } catch {
+                if ($script:FailureCode) { throw }
+                Stop-Update -Code 'TASK_ACTION_UPDATE_FAILED' -Summary (Get-ScheduledTaskErrorSummary -ErrorRecord $_)
             }
         }
         'Unregister' {
