@@ -184,7 +184,13 @@ export function formatPlannedGroupKind(kind: WorkoutSet['planned_group_kind']): 
   return kind ? plannedGroupKindLabels[kind] : null;
 }
 
-function focusWorkoutControl(row: HTMLDivElement | null, field: 'reps' | 'distance' | 'done') {
+function focusWorkoutControl(row: HTMLDivElement | null, field: 'reps' | 'distance' | 'rir' | 'done') {
+  if (field === 'rir') {
+    row
+      ?.querySelector<HTMLElement>('.active-workout-set__rir-row .active-workout-rir__options button')
+      ?.focus({ preventScroll: true });
+    return;
+  }
   const control = row?.querySelector<HTMLElement>(`[data-workout-field="${field}"]`);
   control?.focus();
 }
@@ -810,20 +816,7 @@ function WorkoutSetRow({
         </p>
       )}
 
-      {isCurrent && (
-        <RirSelector
-          compact
-          disabled={completedFieldsDisabled}
-          value={rir}
-          onChange={(nextRir) => {
-            editing.current = true;
-            setRir(nextRir);
-            if (!editingCompleted) enqueueSave({ rir: nextRir });
-          }}
-        />
-      )}
-
-      <div className="active-workout-set__controls">
+      <div className={`active-workout-set__controls${isCurrent ? ' active-workout-set__controls--with-rir' : ''}`}>
         <label className="active-workout-input">
           <span>Вес, кг</span>
           <input
@@ -866,7 +859,7 @@ function WorkoutSetRow({
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                focusWorkoutControl(rowRef.current, 'done');
+                focusWorkoutControl(rowRef.current, 'rir');
               }
             }}
             onChange={(event) => {
@@ -878,6 +871,20 @@ function WorkoutSetRow({
             }}
           />
         </label>
+        {isCurrent && (
+          <div className="active-workout-set__rir-row">
+            <RirSelector
+              compact
+              disabled={completedFieldsDisabled}
+              value={rir}
+              onChange={(nextRir) => {
+                editing.current = true;
+                setRir(nextRir);
+                if (!editingCompleted) enqueueSave({ rir: nextRir });
+              }}
+            />
+          </div>
+        )}
         <Button
           type="button"
           disabled={disabled || completing || (completed && !retryCompletion)}
