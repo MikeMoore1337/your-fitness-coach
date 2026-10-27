@@ -3548,6 +3548,9 @@ details:not([open]) > :not(summary) {
   min-width: 0;
   padding-inline: 9px;
 }
+.program-template-card__actions--example {
+  grid-template-columns: minmax(0, 1fr);
+}
 .program-danger-menu,
 .exercise-catalog-item__danger {
   color: var(--muted);
