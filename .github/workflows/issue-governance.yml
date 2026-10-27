@@ -1,0 +1,41 @@
+name: Issue governance advisory
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Existing Issue number to inspect (read-only)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  issue-title-review:
+    name: Non-blocking Issue title review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Fetch exact Issue (read-only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || inputs.issue_number }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$REPO/issues/$ISSUE_NUMBER" > "$RUNNER_TEMP/issue.json"
+      - name: Review approved title prefixes
+        run: python scripts/issue_governance.py check --input "$RUNNER_TEMP/issue.json"
+      - name: Note manual DoD acceptance on closure
+        if: github.event_name == 'issues' && github.event.action == 'closed'
+        run: |
+          echo "::notice title=YFC DoD::Closing an Issue does not automatically prove DoD. Before moving its Project status to Done, check required approval, merged PR, CI, deployment and applicable production smoke."

@@ -48,8 +48,14 @@ class NewsSourceDefinition:
     fetch_interval_minutes: int
     trust_notes: str
     licensing_notes: str
+    topics: tuple[str, ...] = ()
+    authoritative: bool = False
+    freshness_policy: str = "current_month"
+    health_claim_limitations: str = ""
+    jurisdiction: tuple[str, ...] = ()
     allowed_redirect_hosts: tuple[str, ...] = ()
     allowed_item_hosts: tuple[str, ...] = ()
+    adapter: str | None = None
 
 
 def _bounded_text(value: object, *, field: str, maximum: int, required: bool = False) -> str:
@@ -91,6 +97,15 @@ def parse_source_definition(raw: object) -> NewsSourceDefinition:
     fetch_kind = _bounded_text(raw.get("fetch_kind"), field="fetch_kind", maximum=24, required=True)
     if fetch_kind not in FETCH_KINDS:
         raise ValueError("unsupported fetch_kind")
+    adapter_raw = raw.get("adapter")
+    if adapter_raw is None:
+        adapter = None
+    else:
+        adapter = _bounded_text(adapter_raw, field="adapter", maximum=64, required=True)
+        if adapter != "pubmed_eutils":
+            raise ValueError("unsupported adapter")
+        if fetch_kind != "json_feed":
+            raise ValueError("pubmed_eutils adapter requires json_feed fetch_kind")
     language = _bounded_text(
         raw.get("language", "en"), field="language", maximum=8, required=True
     ).lower()
@@ -114,11 +129,39 @@ def parse_source_definition(raw: object) -> NewsSourceDefinition:
                 raise ValueError(f"{field} contains an invalid host")
             normalized_hosts.append(normalized)
         host_lists[field] = normalized_hosts
+    raw_topics = raw.get("topics", [])
+    if not isinstance(raw_topics, list) or len(raw_topics) > 24:
+        raise ValueError("topics must be a list of at most 24 values")
+    topics = tuple(
+        _bounded_text(item, field="topics", maximum=64, required=True) for item in raw_topics
+    )
+    raw_jurisdiction = raw.get("jurisdiction", [])
+    if not isinstance(raw_jurisdiction, list) or len(raw_jurisdiction) > 12:
+        raise ValueError("jurisdiction must be a list of at most 12 values")
+    jurisdiction = tuple(
+        _bounded_text(item, field="jurisdiction", maximum=64, required=True)
+        for item in raw_jurisdiction
+    )
+    authoritative = raw.get("authoritative", False)
+    if not isinstance(authoritative, bool):
+        raise ValueError("authoritative must be a boolean")
+    freshness_policy = _bounded_text(
+        raw.get("freshness_policy", "current_month"),
+        field="freshness_policy",
+        maximum=64,
+        required=True,
+    )
+    health_claim_limitations = _bounded_text(
+        raw.get("health_claim_limitations", ""),
+        field="health_claim_limitations",
+        maximum=2000,
+    )
     return NewsSourceDefinition(
         id=source_id,
         name=_bounded_text(raw.get("name"), field="name", maximum=160, required=True),
         source_type=cast(NewsSourceType, source_type),
         fetch_kind=cast(NewsFetchKind, fetch_kind),
+        adapter=adapter,
         url=_source_url(raw.get("url")),
         language=language,
         enabled=enabled,
@@ -127,6 +170,11 @@ def parse_source_definition(raw: object) -> NewsSourceDefinition:
         licensing_notes=_bounded_text(
             raw.get("licensing_notes", ""), field="licensing_notes", maximum=2000
         ),
+        topics=tuple(dict.fromkeys(topics)),
+        authoritative=authoritative,
+        freshness_policy=freshness_policy,
+        health_claim_limitations=health_claim_limitations,
+        jurisdiction=tuple(dict.fromkeys(jurisdiction)),
         allowed_redirect_hosts=tuple(dict.fromkeys(host_lists["allowed_redirect_hosts"])),
         allowed_item_hosts=tuple(dict.fromkeys(host_lists["allowed_item_hosts"])),
     )
@@ -142,14 +190,21 @@ def parse_source_allowlist(raw: object) -> list[NewsSourceDefinition]:
     return definitions
 
 
-def load_source_allowlist(path: Path = DEFAULT_SOURCE_ALLOWLIST_PATH) -> list[NewsSourceDefinition]:
+def load_source_allowlist(
+    path: Path = DEFAULT_SOURCE_ALLOWLIST_PATH,
+    *,
+    include_disabled: bool = False,
+) -> list[NewsSourceDefinition]:
     if not path.is_file() or path.stat().st_size > 1_048_576:
         raise ValueError("source allowlist file is missing or too large")
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("source allowlist file is not valid UTF-8 JSON") from exc
-    return parse_source_allowlist(raw)
+    definitions = parse_source_allowlist(raw)
+    if include_disabled:
+        return definitions
+    return [definition for definition in definitions if definition.enabled]
 
 
 def apply_source_allowlist(
@@ -163,6 +218,24 @@ def apply_source_allowlist(
     updated = 0
     for definition in definitions:
         row = existing.get(definition.id)
+        fetch_options: dict[str, object] = {
+            "allowed_redirect_hosts": list(definition.allowed_redirect_hosts),
+            "allowed_item_hosts": list(definition.allowed_item_hosts),
+        }
+        if definition.adapter:
+            fetch_options["adapter"] = definition.adapter
+        if (
+            definition.topics
+            or definition.authoritative
+            or definition.freshness_policy != "current_month"
+            or definition.health_claim_limitations
+            or definition.jurisdiction
+        ):
+            fetch_options["topics"] = list(definition.topics)
+            fetch_options["authoritative"] = definition.authoritative
+            fetch_options["freshness_policy"] = definition.freshness_policy
+            fetch_options["health_claim_limitations"] = definition.health_claim_limitations
+            fetch_options["jurisdiction"] = list(definition.jurisdiction)
         values = {
             "name": definition.name,
             "source_type": definition.source_type,
@@ -173,10 +246,7 @@ def apply_source_allowlist(
             "fetch_interval_minutes": definition.fetch_interval_minutes,
             "trust_notes": definition.trust_notes,
             "licensing_notes": definition.licensing_notes,
-            "fetch_options": {
-                "allowed_redirect_hosts": list(definition.allowed_redirect_hosts),
-                "allowed_item_hosts": list(definition.allowed_item_hosts),
-            },
+            "fetch_options": fetch_options,
         }
         if row is None:
             db.add(NewsSource(id=definition.id, **values))
@@ -194,12 +264,20 @@ def apply_source_allowlist(
     return created, updated
 
 
+def reconcile_default_news_sources(db: Session) -> tuple[int, int]:
+    """Reconcile registry-owned sources while preserving runtime fetch state and custom rows."""
+    definitions = load_source_allowlist(include_disabled=True)
+    if not any(item.enabled for item in definitions):
+        raise ValueError("default source allowlist must contain an enabled source")
+    return apply_source_allowlist(db, definitions, disable_missing=False)
+
+
 def bootstrap_default_news_sources(db: Session) -> int:
-    """Create the versioned baseline only when an environment has no source records yet."""
-    if db.query(NewsSource.id).first() is not None:
-        return 0
+    """Add missing enabled canonical sources without changing existing rows."""
     definitions = load_source_allowlist()
     if not any(item.enabled for item in definitions):
         raise ValueError("default source allowlist must contain an enabled source")
-    created, _ = apply_source_allowlist(db, definitions)
+    existing_ids = {row.id for row in db.query(NewsSource).all()}
+    missing = [definition for definition in definitions if definition.id not in existing_ids]
+    created, _ = apply_source_allowlist(db, missing)
     return created

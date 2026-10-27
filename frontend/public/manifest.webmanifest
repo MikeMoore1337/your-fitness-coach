@@ -1,0 +1,71 @@
+{
+  "id": "/app",
+  "name": "Your Fitness Coach",
+  "short_name": "YFC",
+  "description": "Тренировки, питание и прогресс в Your Fitness Coach.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "/app?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#f1f3ec",
+  "background_color": "#f1f3ec",
+  "icons": [
+    {
+      "src": "/assets/brand/pwa-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/brand/pwa-icon-maskable.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/brand/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Сегодня",
+      "short_name": "Сегодня",
+      "url": "/app?section=today&source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/assets/brand/pwa-icon.svg",
+          "sizes": "192x192 512x512",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Тренировка",
+      "short_name": "Тренировка",
+      "url": "/app?section=today&source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/assets/brand/pwa-icon.svg",
+          "sizes": "192x192 512x512",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Добавить еду",
+      "short_name": "Добавить еду",
+      "url": "/app?section=nutrition&quick_add=food&source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/assets/brand/pwa-icon.svg",
+          "sizes": "192x192 512x512",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}

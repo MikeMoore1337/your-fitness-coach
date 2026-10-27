@@ -1,0 +1,261 @@
+{
+  "source_archive": "Landing.zip (same bytes as user upload Landing(2).zip)",
+  "source_zip_sha256": "2be733d3539d98ecb575e9da0449978dfaf8ee993dda8bebbadb7d7e03d3acef",
+  "expected_image_count": 28,
+  "screen_capture_includes_browser_chrome": true,
+  "note": "Archive supersedes earlier #852/#858 images where they conflict. Screenshots 14:13* show review gallery only.",
+  "images": [
+    {
+      "filename": "2026-10-08_14-04.png",
+      "description": "Athlete hero and product cycle",
+      "width": 1663,
+      "height": 1247,
+      "sha256": "3bfb3cb3fdd726ef09dfed070598af9ed42a0caa1fc3f665ab975840266bfa35",
+      "bytes": 1071276,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-05.png",
+      "description": "Athlete training strength scene: effort",
+      "width": 1660,
+      "height": 1285,
+      "sha256": "38a5bdaf9987fec798e5abce3a7ec0621279e1cee3bb0c9da4b9e3edfb11936d",
+      "bytes": 388497,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-05_1.png",
+      "description": "Athlete training strength scene: record/effort alternate",
+      "width": 1665,
+      "height": 1292,
+      "sha256": "3bc1a795d7def221990c701396a235617b67955f2fd1d14106bc0689569fc1c6",
+      "bytes": 377538,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-05_2.png",
+      "description": "Athlete training strength scene: result",
+      "width": 1660,
+      "height": 1278,
+      "sha256": "294eebc9a067c137f5ebb6c01d2eec566d5d9dd2d1f5da874a5ef2343bf16545",
+      "bytes": 166648,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-05_3.png",
+      "description": "Athlete Today/training and nutrition planner",
+      "width": 1662,
+      "height": 1300,
+      "sha256": "54ea503edaaca3bb9251b55fa34ef84228badb645d6295b91f7155a804925985",
+      "bytes": 746328,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-06.png",
+      "description": "Athlete training and nutrition purchase tab",
+      "width": 1661,
+      "height": 1292,
+      "sha256": "2ad02befc790949d1316c7c61be932788c882285f4b44528ef95df319c3d0df8",
+      "bytes": 785393,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-07.png",
+      "description": "Athlete nutrition actual diary tab",
+      "width": 1664,
+      "height": 1281,
+      "sha256": "d89befa204ed0b4c65c0f830cb8d9e0e9cd16fca1fd92a592d8e7bd3388782dd",
+      "bytes": 673297,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-07_1.png",
+      "description": "Athlete progress and weekly review, initial",
+      "width": 1675,
+      "height": 1289,
+      "sha256": "f9cdeddee29eb3075511d85a049b64c5f47a78d3b83055dac0e785373b9210fd",
+      "bytes": 449617,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-07_2.png",
+      "description": "Athlete progress and weekly review, selected state",
+      "width": 1667,
+      "height": 1293,
+      "sha256": "1d3af407eff8555a68009b1a8059d3040726f436b47f04710eaae58823bb250f",
+      "bytes": 459349,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-08.png",
+      "description": "Athlete Coach OS teaser and interactive Coach Today",
+      "width": 1662,
+      "height": 1295,
+      "sha256": "0c8bcf7cd3745b4b58b6b5334e2ef34c4b2927739569f01e1b9da5da81f56d7b",
+      "bytes": 493717,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-08_1.png",
+      "description": "Athlete Coach OS interactive change state",
+      "width": 1669,
+      "height": 1298,
+      "sha256": "90e40429406673944d36e02e54fc72d4eaa3bb747f2943e5f5e7eb7d7d8a07b2",
+      "bytes": 495368,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-08_2.png",
+      "description": "Athlete Coach OS interactive message state",
+      "width": 1663,
+      "height": 1293,
+      "sha256": "afda44b2c518781a3e77cf57846d247247ebf890eb00cd5ce830d6434eedd4da",
+      "bytes": 497088,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-08_3.png",
+      "description": "Athlete why, demo entry and continuity",
+      "width": 1652,
+      "height": 1288,
+      "sha256": "b2e7f32143fe25a2bd3bf6857bfe3d927550792f8ce99ab9b372010e38c98297",
+      "bytes": 131164,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-08_4.png",
+      "description": "Athlete browser/Telegram, FAQ, CTA",
+      "width": 1664,
+      "height": 1268,
+      "sha256": "40f18834ed0b5786b8de4955c21e647ba2bc032ab4d3b5cd15786db4288e737f",
+      "bytes": 100055,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-09.png",
+      "description": "Athlete final FAQ and CTA/footer",
+      "width": 1666,
+      "height": 1301,
+      "sha256": "02ba61f12192cf1e37ffc820b1a2e1270e956e928d1fa2eb1d0b51c52e8b6e3f",
+      "bytes": 110982,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-10.png",
+      "description": "Trainer hero and trainer work cycle",
+      "width": 1665,
+      "height": 1287,
+      "sha256": "f80364db136f725db9ee6cf04391267cab7809ba08721a37e80d8f58ccab840a",
+      "bytes": 824744,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-10_1.png",
+      "description": "Trainer Coach Today and workflow structure",
+      "width": 1662,
+      "height": 1293,
+      "sha256": "d69cf4890fb3c7b412a57b336015cea03b6e30f5d847668d8ce8efe42116952d",
+      "bytes": 168705,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-10_2.png",
+      "description": "Trainer photo-led program/strength preview",
+      "width": 1665,
+      "height": 1299,
+      "sha256": "03db217e6c6123e67c934396ade98d54c2bc5d2f90648541c28e5690d2a25cb7",
+      "bytes": 699874,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-10_3.png",
+      "description": "Trainer strength preview interaction",
+      "width": 1669,
+      "height": 1297,
+      "sha256": "124bff6163c540fac73cfc92f65d986599f388751da25e783b83744970f71bdc",
+      "bytes": 396907,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-10_4.png",
+      "description": "Trainer strength preview alternative interaction",
+      "width": 1665,
+      "height": 1303,
+      "sha256": "98811a2404b3b954e5fc3d56e87b2a7434d2290e3f7c1819830c840373c86962",
+      "bytes": 378684,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-11.png",
+      "description": "Trainer strength preview result",
+      "width": 1669,
+      "height": 1294,
+      "sha256": "9c5ea3b5e7b076cdf61f46cd86d9c8ba4cc545ccdb8d1bf6607270760eade93d",
+      "bytes": 167838,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-11_1.png",
+      "description": "Trainer workflow interactive chapters",
+      "width": 1666,
+      "height": 1306,
+      "sha256": "0f44642e1a77653cc4ff18d5f2c66c5c78ff90e3a104c55308220aabacefc255",
+      "bytes": 762318,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-11_2.png",
+      "description": "Trainer lower chapters with browser/Telegram preview",
+      "width": 1658,
+      "height": 1295,
+      "sha256": "e8661df393799f10e152a7ff0004cf5aae02725c08fd709a3b941142879509f9",
+      "bytes": 168310,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-12.png",
+      "description": "Trainer continuity, account and privacy/FAQ",
+      "width": 1665,
+      "height": 1281,
+      "sha256": "131957aeb9881d6290b8dbcf50a573df60f81591e80dd551c30308369cade5b9",
+      "bytes": 144038,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-12_1.png",
+      "description": "Trainer final call to action and footer",
+      "width": 1667,
+      "height": 1295,
+      "sha256": "60c973ab113d7d8d1139e998e018e997bb1d623fea345df51d5c4e2ceb4fb1e8",
+      "bytes": 106328,
+      "type": "approved-ui-reference"
+    },
+    {
+      "filename": "2026-10-08_14-13.png",
+      "description": "Design gallery comparative reference; NOT a public site section",
+      "width": 1656,
+      "height": 1285,
+      "sha256": "31159311b157fa983fadf8bd754c360388a6a0a7e992fa720ac75c066e476926",
+      "bytes": 824575,
+      "type": "comparison-only"
+    },
+    {
+      "filename": "2026-10-08_14-13_1.png",
+      "description": "Design gallery comparative reference; NOT a public site section",
+      "width": 1667,
+      "height": 1297,
+      "sha256": "0287f8e172588adcb19830321a0492049456ee2b3d2ed70cae3fcd5747226314",
+      "bytes": 272874,
+      "type": "comparison-only"
+    },
+    {
+      "filename": "2026-10-08_14-13_2.png",
+      "description": "Design gallery rationale; NOT a public site section",
+      "width": 1655,
+      "height": 1289,
+      "sha256": "484d15a9bb971a7dc2fd8e989520d1f39fbe81d925f175d4d114e8b8cebb5919",
+      "bytes": 153985,
+      "type": "comparison-only"
+    }
+  ]
+}

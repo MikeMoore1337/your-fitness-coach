@@ -1,8 +1,68 @@
 # Порядок направлений после release gate `79`
 
-## Текущий owner-driven UX-reset cycle
+## Canonical Product v8 closeout — 2026-10-04
 
-До возврата к прежнему trigger-gated pool действует линейная canonical очередь:
+См. [Product v8 roadmap #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
+Closeout source baseline: `e8d9228b259e35740ff68048f2772482fb4e8945` (governance sync PR #691 merge). Product v8 implementation
+baseline remains V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**; later dependency-only
+merges `#589` and `#689` are separate maintenance workstreams. No environment, migration, schema
+or provider change is required by this governance reconciliation.
+
+Канонический current-state decision после owner removal Task 124B:
+
+```text
+Product v8
+  -> COMPLETED
+
+V8-01 / Task 684
+  -> COMPLETED / PRODUCTION VERIFIED
+
+V8-00 / Task 124B
+  -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
+  -> not an evidence gate, dependency or blocker
+  -> no auto-start and no V8-03 generation
+
+V8-R1 / measurement reporting boundedness
+  -> BLOCKED_ON_EVIDENCE
+  -> separate optional reliability task
+  -> not a Product v8 blocker
+
+V8-03
+  -> CANCELLED AS GENERIC PLACEHOLDER
+  -> no creation without a concrete newly specified problem
+
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK
+  -> NONE
+  -> Product v8 is closed; no next Product v8 task is selected
+```
+
+Synthetic/demo evidence remains distinct from real-user evidence, but its absence no longer blocks
+Product v8. The review found no unimplemented, independently executable bounded product task in the
+existing backlog: Hydration, Sleep/Mood, trainer handoff, reminder templates, knowledge, PWA,
+Web Push, bounded AI Coach, imports, Progress, trainer and nutrition improvements are already
+implemented. Report-delivery, SEO/product-handoff, AI-routing and measurement options retain their
+own gates and are not promoted into the executable slate. Controller refactor —
+`SEPARATE_INFRA_WORKSTREAM / DEFER`.
+
+Существующие SEO, AI, legal, billing, import, PWA, notifications, camera/photo, controller и
+owner-selected tasks остаются outside v8 или под своими trigger/evidence gates. Старые записи
+`119` как “next product task” и последовательность `116 -> 119...` — historical/stale и не должны
+использоваться для запуска Product v8. Exercise video technique evaluation — `NO_GO / OUT_OF_SCOPE`.
+Parked or gated workstreams do not transfer automatically to a future product version.
+
+## Product v8 closeout result — bounded backlog review
+
+Product v8 status: **COMPLETED**. The executable slate is **empty** because the confirmed scope was
+already delivered and every remaining candidate was either already implemented or retained an
+explicit independent gate. No new Issues were created. This is a deliberate closeout result, not
+a blocker and not a return to the generic real-user evidence gate. It does not create or select a
+future product version.
+
+## Исторический owner-driven UX-reset cycle (provenance only; not the Product v8 graph)
+
+Старый sequence сохранён для provenance. Он superseded и не запускается автоматически; в нём
+сохраняется исходная связь `124B -> conditional 124C`, но текущий owner decision удалил 124B из
+Product v8 и отменил generic remediation path.
 
 ```text
 113 branch normalization [COMPLETED]
@@ -37,10 +97,16 @@ Tasks `80-101` и их буквенные подзадачи образуют tr
 задаёт предпочтительную последовательность реализации, но не отменяет фактический Trigger,
 dependency и отдельное решение владельца.
 
-## Последовательность pending-задач
+Nutrition Label OCR family после owner-authorized closeout Task 128G вынесена в отдельную
+deferred ветку: production-quality GO отсутствует, exposure выключена, а Task 128H не входит
+в текущую общую очередь и не запускается автоматически. Более приоритетные tasks не должны
+ждать OCR; dependency на 128H сохраняется только для будущей production-ready label-scanning
+работы после миграции host и exact owner trigger.
 
-Таблица ниже сохраняет порядок общего pool после текущего UX-reset cycle и не переопределяет
-описанный выше critical path.
+## Legacy pending-pool inventory (provenance; not the current Product v8 slate)
+
+Таблица ниже сохраняет старый порядок общего pool для provenance и не переопределяет
+описанный выше Product v8 current state или bounded review.
 
 |        Task | Направление                          | Почему здесь                                                                                                      |
 | ----------: | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
@@ -51,6 +117,7 @@ dependency и отдельное решение владельца.
 |        `84` | Reminder templates                   | Переиспользует task `64` и данные hydration после `81`                                                            |
 |        `85` | Knowledge package                    | Низкий runtime risk, практичная польза и grounding для AI                                                         |
 |        `86` | PWA                                  | Улучшает возврат к тренировке при подтверждённом Web retention gap                                                |
+|       `86A` | Web Push notifications               | Отдельный follow-up на базе PWA/SW Task `86`; не зависит от Telegram как единственного канала                     |
 |     `87-91` | AI Coach beta и period insights      | Сначала privacy/provider gate, затем grounded core, tools, evals, rollout и bounded report insights               |
 |   `92A-92B` | Advanced AI                          | Memory и multiprovider остаются рядом с AI Coach, но запускаются независимо только после evidence beta            |
 |       `93A` | Deterministic import XLSX/CSV без AI | Даёт раннюю ценность через versioned template и общий безопасный preview/confirm pipeline без provider dependency |

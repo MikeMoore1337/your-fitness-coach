@@ -1,15 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createProductAnalytics,
+  clearProductOnboardingCompletionMarker,
   clearProductLoginAttempt,
+  FUTURE_GROWTH_EVENT_NAMES,
+  GROWTH_GOAL_IDS,
+  IMPLEMENTED_GROWTH_EVENT_NAMES,
   isProductEvent,
   isProductEventEnvelope,
+  markProductOnboardingCompleted,
   markProductLoginStarted,
   PRODUCT_ANALYTICS_STATUS_NAME,
   PRODUCT_EVENT_NAME,
   PRODUCT_EVENT_SCHEMA_VERSION,
   productAnalyticsEnvironment,
   productEventSurface,
+  trackProductEvent,
+  trackGrowthEvent,
   trackProductLoginCompletedIfStarted,
   type ProductAnalyticsStatus,
   type ProductAnalyticsProvider,
@@ -39,11 +46,25 @@ function allowedProvider(send: ProductAnalyticsProvider['send'] = vi.fn()) {
 
 afterEach(() => {
   clearProductLoginAttempt();
+  clearProductOnboardingCompletionMarker();
   vi.unstubAllGlobals();
   delete window.Telegram;
 });
 
 describe('product event contract', () => {
+  it('keeps the growth goal registry typed and action-only', () => {
+    expect(Object.keys(GROWTH_GOAL_IDS)).toEqual([
+      ...IMPLEMENTED_GROWTH_EVENT_NAMES,
+      ...FUTURE_GROWTH_EVENT_NAMES,
+    ]);
+    expect(IMPLEMENTED_GROWTH_EVENT_NAMES).toContain('calculator_started');
+    expect(IMPLEMENTED_GROWTH_EVENT_NAMES).toContain('calculator_result');
+    expect(FUTURE_GROWTH_EVENT_NAMES).toContain('calculator_saved');
+    expect(isProductEvent({ name: 'registration_completed', surface: 'desktop_web' })).toBe(true);
+    expect(trackGrowthEvent('registration_completed')).toBe(true);
+    expect(isProductEvent({ name: 'calculator_result', surface: 'desktop_web' })).toBe(true);
+  });
+
   it('emits a versioned provider-neutral envelope with a privacy-safe surface', () => {
     const { target, analytics } = testAnalytics();
     const events: ProductEventEnvelope[] = [];
@@ -157,6 +178,20 @@ describe('product event contract', () => {
   it('validates constrained event context values and surface combinations', () => {
     expect(
       isProductEvent({
+        name: 'trainer_landing_cta_clicked',
+        surface: 'mobile_web',
+        destination: 'demo',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'trainer_landing_cta_clicked',
+        surface: 'mobile_web',
+        destination: '/coach?name=private',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
         name: 'landing_telegram_selected',
         surface: 'desktop_web',
         placement: 'continuity',
@@ -184,6 +219,34 @@ describe('product event contract', () => {
       }),
     ).toBe(true);
     expect(
+      isProductEvent({ name: 'food_logged', surface: 'mobile_web', entry_method: 'label_scan' }),
+    ).toBe(true);
+    expect(isProductEvent({ name: 'nutrition_label_scan_started', surface: 'tma' })).toBe(true);
+    expect(isProductEvent({ name: 'hydration_logged', surface: 'mobile_web' })).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'tma_core_action_completed',
+        surface: 'tma',
+        action: 'hydration_logged',
+      }),
+    ).toBe(true);
+    expect(isProductEvent({ name: 'nutrition_label_scan_result_success', surface: 'tma' })).toBe(
+      true,
+    );
+    expect(
+      isProductEvent({ name: 'nutrition_label_scan_barcode_miss', surface: 'mobile_web' }),
+    ).toBe(true);
+    expect(
+      isProductEvent({ name: 'nutrition_label_catalog_saved_shared', surface: 'mobile_web' }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_label_scan_confirmed',
+        surface: 'mobile_web',
+        barcode: '4006381333931',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
       isProductEvent({
         name: 'today_primary_action_selected',
         surface: 'tma',
@@ -203,6 +266,386 @@ describe('product event contract', () => {
         surface: 'mobile_web',
         action: 'workout_completed',
       }),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'telegram_news_cta_clicked',
+        surface: 'telegram',
+        destination: 'tma',
+        campaign: 'telegram_editorial_v1',
+      }),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'telegram_news_cta_clicked',
+        surface: 'tma',
+        destination: 'article',
+        campaign: 'telegram_editorial_v1',
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps coach attention telemetry aggregate-only', () => {
+    for (const kind of [
+      'workout_feedback',
+      'weekly_check_in',
+      'missed_workout',
+      'skipped_workout',
+      'without_program',
+    ] as const) {
+      expect(isProductEvent({ name: 'coach_attention_shown', surface: 'desktop_web', kind })).toBe(
+        true,
+      );
+      expect(isProductEvent({ name: 'coach_attention_opened', surface: 'mobile_web', kind })).toBe(
+        true,
+      );
+      expect(isProductEvent({ name: 'coach_attention_resolved', surface: 'tma', kind })).toBe(true);
+    }
+    expect(
+      isProductEvent({
+        name: 'coach_attention_load_timing',
+        surface: 'desktop_web',
+        latency_bucket: '250_1000ms',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_attention_opened',
+        surface: 'desktop_web',
+        kind: 'workout_feedback',
+        client_id: 42,
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('keeps Coach OS telemetry bounded to aggregate interaction enums', () => {
+    expect(isProductEvent({ name: 'coach_home_viewed', surface: 'mobile_web' })).toBe(true);
+    expect(isProductEvent({ name: 'coach_client_opened', surface: 'desktop_web' })).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_navigation_selected',
+        surface: 'mobile_web',
+        destination: 'today',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_quick_action_used',
+        surface: 'mobile_web',
+        kind: 'report',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_timeline_event_opened',
+        surface: 'desktop_web',
+        kind: 'measurement',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_time_to_first_useful_action',
+        surface: 'mobile_web',
+        latency_bucket: '10_30s',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_quick_action_used',
+        surface: 'mobile_web',
+        kind: 'client_comment_text',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'coach_timeline_event_opened',
+        surface: 'mobile_web',
+        kind: 'weight_value',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'coach_navigation_selected',
+        surface: 'mobile_web',
+        destination: 'client/51001',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('keeps guided-flow telemetry typed, bounded and free of private context', () => {
+    expect(
+      isProductEvent({
+        name: 'next_action_shown',
+        surface: 'mobile_web',
+        action_kind: 'scheduled_workout',
+        position: 'primary',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'section_navigation_selected',
+        surface: 'desktop_web',
+        from_section: 'today',
+        to_section: 'progress',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'quick_add_action_selected',
+        surface: 'tma',
+        action: 'food',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'quick_add_action_selected',
+        surface: 'tma',
+        action: 'ai-coach',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'section_navigation_selected',
+        surface: 'desktop_web',
+        from_section: 'today',
+        to_section: 'today',
+      }),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'next_action_clicked',
+        surface: 'mobile_web',
+        action_kind: 'trainer_feedback',
+        position: 'primary',
+        comment_body: 'private',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('keeps nutrition telemetry aggregate-only and bounded to declared outcomes', () => {
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_add_path_selected',
+        surface: 'mobile_web',
+        path: 'manual',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_search_result',
+        surface: 'mobile_web',
+        outcome: 'no_result',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_source_selected',
+        surface: 'tma',
+        source: 'shared',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_classification_selected',
+        surface: 'mobile_web',
+        classification: 'commercial',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_catalog_contribution_outcome',
+        surface: 'mobile_web',
+        outcome: 'conflict',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_flow_timing',
+        surface: 'mobile_web',
+        path: 'photo',
+        duration_bucket: '30_60s',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_repeat_used',
+        surface: 'mobile_web',
+        scope: 'product',
+        outcome: 'completed',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_completeness_set',
+        surface: 'mobile_web',
+        status: 'incomplete',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_search_result',
+        surface: 'mobile_web',
+        outcome: 'success',
+        query: 'Овсянка',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('allows only aggregate nutrition power outcomes and duration buckets', () => {
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_completed',
+        surface: 'mobile_web',
+        flow: 'natural_input',
+        outcome: 'success',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_timing',
+        surface: 'tma',
+        flow: 'meal_template',
+        duration_bucket: '10_30s',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_completed',
+        surface: 'mobile_web',
+        flow: 'natural_input',
+        outcome: 'success',
+        input_text: 'творог 180 г',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_timing',
+        surface: 'mobile_web',
+        flow: 'natural_input',
+        duration_bucket: '180_seconds',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('measures first useful action once after onboarding without storing content', () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) => {
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    };
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+    markProductOnboardingCompleted();
+    now.mockReturnValue(1_025_000);
+
+    expect(
+      trackProductEvent({
+        name: 'next_action_clicked',
+        surface: 'mobile_web',
+        action_kind: 'ready_program',
+        position: 'primary',
+      }),
+    ).toBe(true);
+    expect(events.map((event) => event.name)).toEqual([
+      'next_action_clicked',
+      'onboarding_first_useful_action',
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      name: 'onboarding_first_useful_action',
+      latency_bucket: '10_30s',
+    });
+    expect(
+      window.sessionStorage.getItem('fit_product_analytics_onboarding_completed_at'),
+    ).toBeNull();
+    now.mockRestore();
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+  });
+
+  it('keeps PWA analytics context-free and limits service-worker error categories', () => {
+    expect(isProductEvent({ name: 'pwa_install_option_shown', surface: 'mobile_web' })).toBe(true);
+    expect(isProductEvent({ name: 'pwa_workout_resume_failure', surface: 'desktop_web' })).toBe(
+      true,
+    );
+    expect(
+      isProductEvent({
+        name: 'pwa_service_worker_error',
+        surface: 'mobile_web',
+        category: 'navigation',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'pwa_service_worker_error',
+        surface: 'mobile_web',
+        category: 'network-stack',
+      }),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'pwa_update_applied',
+        surface: 'desktop_web',
+        user_id: 7,
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('keeps public article analytics limited to a slug and canonical CTA destination', () => {
+    expect(
+      isProductEvent({
+        name: 'article_viewed',
+        surface: 'mobile_web',
+        content_key: 'kak-nachat-silovye-trenirovki',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'article_cta_clicked',
+        surface: 'desktop_web',
+        content_key: 'kak-nachat-silovye-trenirovki',
+        destination: 'tma',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'article_viewed',
+        surface: 'desktop_web',
+        content_key: 'article?query=private',
+      }),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'article_cta_clicked',
+        surface: 'desktop_web',
+        content_key: 'article-slug',
+        destination: 'https://example.com/private',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('keeps AI Coach analytics at outcome level without accepting prompt-like fields', () => {
+    expect(
+      isProductEvent({
+        name: 'ai_coach_response_received',
+        surface: 'mobile_web',
+        mode: 'personal',
+        outcome: 'insufficient_data',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'ai_coach_response_received',
+        surface: 'mobile_web',
+        mode: 'personal',
+        outcome: 'secret-provider-error',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'ai_coach_request_started',
+        surface: 'mobile_web',
+        mode: 'generic',
+        prompt: 'private question',
+      } as unknown as ProductEvent),
     ).toBe(false);
   });
 

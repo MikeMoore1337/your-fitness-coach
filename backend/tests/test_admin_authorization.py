@@ -385,7 +385,8 @@ def test_export_retry_is_bounded_to_error_or_expired_and_notification_has_no_ret
     assert client.post("/api/v1/admin/notifications/1/retry", headers=root).status_code == 404
 
 
-def test_funnel_returns_only_canonical_cohort_counts_without_raw_events(client, monkeypatch):
+def test_funnel_returns_only_server_confirmed_kpis_without_raw_events(client, monkeypatch):
+    monkeypatch.setattr(settings, "app_env", "prod")
     root = _root(client, monkeypatch)
     _auth(client, 71_060)
 
@@ -393,15 +394,37 @@ def test_funnel_returns_only_canonical_cohort_counts_without_raw_events(client, 
     assert response.status_code == 200
     payload = response.json()
     assert payload["analytics_provider_status"] == "not_connected"
-    assert [stage["key"] for stage in payload["stages"]] == [
-        "registered",
-        "profile_ready",
-        "program_activated",
-        "core_value_reached",
+    assert [kpi["key"] for kpi in payload["kpis"]] == [
+        "activation_rate",
+        "time_to_first_useful_action",
+        "first_workout_completion_rate",
+        "first_week_value_rate",
+        "d1_meaningful_return",
+        "d7_meaningful_return",
+        "d30_meaningful_return",
+        "missed_workout_recovery_conversion",
+        "recovery_to_completion_rate",
+        "time_to_recovery",
+        "nutrition_repeat_rate",
+        "progress_next_action_completion_rate",
+        "weekly_loop_completion",
     ]
-    assert payload["stages"][0]["account_count"] >= 2
-    assert "landing/login/demo" in payload["coverage_note"]
+    assert payload["kpis"][0]["denominator"] >= 2
+    assert "Демо-сессии" in payload["coverage_note"]
     assert "user_id" not in response.text
+
+
+def test_funnel_excludes_trainer_and_admin_accounts_from_user_cohort(client, monkeypatch):
+    monkeypatch.setattr(settings, "app_env", "prod")
+    root = _root(client, monkeypatch, telegram_user_id=71_061)
+    before = client.get("/api/v1/admin/funnel?period_days=30", headers=root).json()
+
+    _auth(client, 71_062)
+    _auth(client, 71_063, is_coach=True)
+    _auth(client, 71_064, is_admin=True)
+
+    after = client.get("/api/v1/admin/funnel?period_days=30", headers=root).json()
+    assert after["kpis"][0]["denominator"] == before["kpis"][0]["denominator"] + 1
 
 
 def test_invalid_reason_is_rejected_before_operation(client, monkeypatch):

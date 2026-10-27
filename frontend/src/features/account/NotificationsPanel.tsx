@@ -2,14 +2,25 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../shared/api/client';
-import type { NotificationItem, NotificationSetting } from '../../shared/api/types';
+import type {
+  NotificationItem,
+  NotificationSetting,
+  ReminderTemplate,
+  ReminderTemplateUpdate,
+} from '../../shared/api/types';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
-import { addCalendarDays, dateInputValue, detectedTimeZone } from '../../shared/dateTime';
+import {
+  addCalendarDays,
+  dateInputValue,
+  dateTimeInputValue,
+  detectedTimeZone,
+} from '../../shared/dateTime';
 import { usePersistentState } from '../../shared/storage';
 import { notificationDraftStorageKey } from '../../shared/userScopedStorage';
 import { DisclosureIcon, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput, TimeInput } from '../../shared/ui/PickerInput';
+import { WebPushSettings } from './WebPushSettings';
 
 interface NotificationOpenResponse {
   destination: string;
@@ -26,7 +37,11 @@ const categoryLabels: Record<string, string> = {
   relationship_event: 'Связь с тренером',
   nutrition_update: 'Питание',
   workout_change: 'Расписание',
+  report_handoff: 'Отчёт тренеру',
   custom_reminder: 'Личное напоминание',
+  meal_logging_reminder: 'Приём пищи',
+  hydration_reminder: 'Гидратация',
+  movement_break_reminder: 'Перерыв на движение',
 };
 
 const navigableCategories = new Set([
@@ -38,7 +53,277 @@ const navigableCategories = new Set([
   'relationship_event',
   'nutrition_update',
   'workout_change',
+  'report_handoff',
+  'meal_logging_reminder',
+  'hydration_reminder',
+  'movement_break_reminder',
 ]);
+
+const weekdayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+type ReminderTemplateKey = ReminderTemplate['template_key'];
+
+function formatTemplateWeekdays(weekdays: number[]): string {
+  const sorted = [...weekdays].sort((left, right) => left - right);
+  if (sorted.length === weekdayLabels.length) return 'Пн–Вс';
+  return sorted.map((weekday) => weekdayLabels[weekday] ?? `День ${weekday + 1}`).join(', ');
+}
+
+function templateScheduleSummary(template: ReminderTemplate): string {
+  const days = formatTemplateWeekdays(template.weekdays);
+  if (template.schedule_kind === 'times') {
+    return `${days} · ${template.times.map((value) => timeValue(value, '00:00')).join(', ')}`;
+  }
+  return `${days} · ${timeValue(template.window_start, '09:00')}–${timeValue(
+    template.window_end,
+    '21:00',
+  )} · каждые ${template.interval_minutes ?? 120} мин`;
+}
+
+function templateUpdatePayload(template: ReminderTemplate): ReminderTemplateUpdate {
+  return {
+    enabled: template.enabled,
+    weekdays: template.weekdays,
+    times: template.schedule_kind === 'times' ? template.times : [],
+    window_start:
+      template.schedule_kind === 'interval' ? timeValue(template.window_start, '09:00') : null,
+    window_end:
+      template.schedule_kind === 'interval' ? timeValue(template.window_end, '21:00') : null,
+    interval_minutes: template.schedule_kind === 'interval' ? template.interval_minutes : null,
+    max_per_day: template.schedule_kind === 'times' ? template.times.length : template.max_per_day,
+    minimum_spacing_minutes: template.minimum_spacing_minutes,
+  };
+}
+
+interface ReminderTemplateCardProps {
+  template: ReminderTemplate;
+  serverTemplate: ReminderTemplate;
+  isSaving: boolean;
+  onChange: (template: ReminderTemplate) => void;
+  onSave: (template: ReminderTemplate) => void;
+}
+
+function ReminderTemplateCard({
+  template,
+  serverTemplate,
+  isSaving,
+  onChange,
+  onSave,
+}: ReminderTemplateCardProps) {
+  const isDirty = JSON.stringify(template) !== JSON.stringify(serverTemplate);
+  const update = (patch: Partial<ReminderTemplate>) => onChange({ ...template, ...patch });
+  const updateTime = (index: number, value: string) => {
+    const times = [...template.times];
+    if (value) times[index] = `${value}:00`;
+    update({ times });
+  };
+  const addTime = () => update({ times: [...template.times, '12:00:00'] });
+  const removeTime = (index: number) =>
+    update({ times: template.times.filter((_value, timeIndex) => timeIndex !== index) });
+
+  return (
+    <article className={`notification-template-card ${template.enabled ? 'is-enabled' : ''}`}>
+      <header className="notification-template-card__head">
+        <div>
+          <span className="notification-template-card__eyebrow">Готовый сценарий</span>
+          <h4>{template.label}</h4>
+          <p>{template.purpose}</p>
+        </div>
+        <label className="switch-row notification-template-toggle">
+          <input
+            type="checkbox"
+            aria-label={`Включить: ${template.label}`}
+            checked={template.enabled}
+            onChange={(event) => update({ enabled: event.target.checked })}
+          />
+          <span>
+            <strong>{template.enabled ? 'Включён' : 'Выключен'}</strong>
+            <small>По умолчанию выключен</small>
+          </span>
+        </label>
+      </header>
+
+      <div className="notification-template-card__summary">
+        <div>
+          <span>Когда</span>
+          <strong>{templateScheduleSummary(template)}</strong>
+        </div>
+        <div>
+          <span>Почему может быть пропущено</span>
+          <p>{template.suppression}</p>
+        </div>
+        <div>
+          <span>Канал</span>
+          <p>{template.channel_note}</p>
+          <small>Внешний текст: «{template.neutral_copy}»</small>
+        </div>
+      </div>
+
+      {template.enabled && (
+        <div className="notification-template-card__editor">
+          <fieldset className="notification-template-weekdays">
+            <legend>Дни недели</legend>
+            <div className="notification-template-weekdays__options">
+              {weekdayLabels.map((label, weekday) => {
+                const checked = template.weekdays.includes(weekday);
+                return (
+                  <label className="notification-template-day" key={label}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={checked && template.weekdays.length === 1}
+                      onChange={(event) =>
+                        update({
+                          weekdays: event.target.checked
+                            ? [...template.weekdays, weekday].sort((left, right) => left - right)
+                            : template.weekdays.filter((value) => value !== weekday),
+                        })
+                      }
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          {template.schedule_kind === 'times' ? (
+            <div className="notification-template-fields">
+              <div className="notification-template-times">
+                <div className="notification-template-fields__label">
+                  <span>Времена</span>
+                  <small>Каждое выбранное время — отдельный мягкий повод записать еду.</small>
+                </div>
+                <div className="notification-template-times__list">
+                  {template.times.map((value, index) => (
+                    <div className="notification-template-time" key={`time-${index}`}>
+                      <label className="field">
+                        <span>Окно {index + 1}</span>
+                        <TimeInput
+                          value={timeValue(value, '08:00')}
+                          onChange={(event) => updateTime(index, event.target.value)}
+                        />
+                      </label>
+                      {template.times.length > 1 && (
+                        <button
+                          type="button"
+                          className="text-button notification-template-time__remove"
+                          onClick={() => removeTime(index)}
+                        >
+                          Убрать
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {template.times.length < 3 && (
+                  <button type="button" className="secondary" onClick={addTime}>
+                    Добавить время
+                  </button>
+                )}
+              </div>
+              <label className="field">
+                <span>Минимальный интервал, минут</span>
+                <input
+                  type="number"
+                  min={15}
+                  max={720}
+                  step={15}
+                  value={template.minimum_spacing_minutes}
+                  onChange={(event) =>
+                    update({ minimum_spacing_minutes: Number(event.target.value) })
+                  }
+                />
+                <small className="field-hint">Окна не будут стоять ближе этого значения.</small>
+              </label>
+            </div>
+          ) : (
+            <div className="notification-template-fields notification-template-fields--interval">
+              <label className="field">
+                <span>Начало окна</span>
+                <TimeInput
+                  value={timeValue(template.window_start, '09:00')}
+                  onChange={(event) =>
+                    update({ window_start: event.target.value ? `${event.target.value}:00` : null })
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>Конец окна</span>
+                <TimeInput
+                  value={timeValue(template.window_end, '21:00')}
+                  onChange={(event) =>
+                    update({ window_end: event.target.value ? `${event.target.value}:00` : null })
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>Повтор, минут</span>
+                <input
+                  type="number"
+                  min={30}
+                  max={360}
+                  step={30}
+                  value={template.interval_minutes ?? 120}
+                  onChange={(event) => update({ interval_minutes: Number(event.target.value) })}
+                />
+              </label>
+              <label className="field">
+                <span>Максимум в день</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  step={1}
+                  value={template.max_per_day}
+                  onChange={(event) => update({ max_per_day: Number(event.target.value) })}
+                />
+              </label>
+              <label className="field">
+                <span>Минимальный интервал, минут</span>
+                <input
+                  type="number"
+                  min={15}
+                  max={720}
+                  step={15}
+                  value={template.minimum_spacing_minutes}
+                  onChange={(event) =>
+                    update({ minimum_spacing_minutes: Number(event.target.value) })
+                  }
+                />
+              </label>
+            </div>
+          )}
+
+          <div className="notification-template-card__notes">
+            <p>
+              <strong>Тихие часы:</strong> {template.quiet_hours_behavior}
+            </p>
+            <p>
+              <strong>Откроется:</strong> {template.deep_link}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <footer className="notification-template-card__actions">
+        <small>
+          {template.enabled
+            ? 'Изменения применятся после сохранения и будут работать в часовом поясе профиля.'
+            : 'Включите шаблон, чтобы настроить расписание и сохранить его.'}
+        </small>
+        <button
+          type="button"
+          aria-label={`Сохранить шаблон «${template.label}»`}
+          disabled={!isDirty || isSaving}
+          onClick={() => onSave(template)}
+        >
+          {isSaving ? 'Сохраняем…' : 'Сохранить шаблон'}
+        </button>
+      </footer>
+    </article>
+  );
+}
 
 function timeValue(value: string | null | undefined, fallback: string): string {
   return value ? value.slice(0, 5) : fallback;
@@ -57,6 +342,24 @@ function formatWallTime(value: string): string {
   }).format(parsed);
 }
 
+function manualNotificationScheduleError(
+  scheduledDate: string,
+  reminderHour: number,
+  timeZone: string,
+  now = new Date(),
+): string | null {
+  const nowInProfile = dateTimeInputValue(now, timeZone);
+  const today = nowInProfile.slice(0, 10);
+  if (!scheduledDate || scheduledDate < today) return 'Выберите сегодняшнюю или будущую дату.';
+  if (scheduledDate === today) {
+    const scheduledTime = `${String(reminderHour).padStart(2, '0')}:00`;
+    if (scheduledTime <= nowInProfile.slice(11, 16)) {
+      return 'Для сегодняшней даты выберите будущее время сегодня в часовом поясе профиля.';
+    }
+  }
+  return null;
+}
+
 export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string) => void }) {
   const queryClient = useQueryClient();
   const { toast, confirm } = useFeedback();
@@ -70,6 +373,10 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
     queryKey: ['notifications', 'list'],
     queryFn: () => api<NotificationItem[]>('/api/v1/notifications'),
   });
+  const templates = useQuery({
+    queryKey: ['notifications', 'templates'],
+    queryFn: () => api<ReminderTemplate[]>('/api/v1/notifications/templates'),
+  });
   const defaultNotification = () => ({
     title: 'Личное напоминание',
     body: 'Откройте приложение и проверьте запланированное действие',
@@ -80,6 +387,10 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
     defaultNotification,
   );
   const [settingsDraft, setSettingsDraft] = useState<NotificationSetting | null>(null);
+  const [templateDrafts, setTemplateDrafts] = useState<
+    Partial<Record<ReminderTemplateKey, ReminderTemplate>>
+  >({});
+  const [savingTemplateKey, setSavingTemplateKey] = useState<ReminderTemplateKey | null>(null);
   const visibleSettings = settingsDraft ?? settings.data ?? null;
   const settingsDirty = Boolean(
     settings.data &&
@@ -115,6 +426,29 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
       toast('Настройки уведомлений сохранены');
     },
     onError: (reason) => toast((reason as Error).message, 'error'),
+  });
+  const templateMutation = useMutation({
+    mutationFn: (template: ReminderTemplate) =>
+      api<ReminderTemplate>(`/api/v1/notifications/templates/${template.template_key}`, {
+        method: 'PATCH',
+        body: templateUpdatePayload(template),
+      }),
+    onSuccess: (saved) => {
+      queryClient.setQueryData<ReminderTemplate[]>(['notifications', 'templates'], (current) =>
+        current?.map((template) =>
+          template.template_key === saved.template_key ? saved : template,
+        ),
+      );
+      setTemplateDrafts((current) =>
+        current ? { ...current, [saved.template_key]: saved } : current,
+      );
+      setSavingTemplateKey(null);
+      toast(`Шаблон «${saved.label}» сохранён`);
+    },
+    onError: (reason) => {
+      setSavingTemplateKey(null);
+      toast((reason as Error).message, 'error');
+    },
   });
   const listMutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
@@ -334,8 +668,56 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
         )}
       </section>
 
+      <WebPushSettings />
+
+      <details className="notification-templates profile-disclosure">
+        <summary className="yfc-disclosure-summary">
+          <span>
+            <strong>Готовые шаблоны</strong>
+            <small>
+              Мягкие подсказки для питания, воды и коротких перерывов · выключены по умолчанию
+            </small>
+          </span>
+          <DisclosureIcon />
+        </summary>
+        <div className="profile-disclosure__body">
+          {templates.isLoading ? (
+            <LoadingState />
+          ) : templates.error ? (
+            <ErrorState
+              message={(templates.error as Error).message}
+              retry={() => void templates.refetch()}
+            />
+          ) : (
+            <div className="notification-template-list">
+              {templates.data?.map((serverTemplate) => {
+                const template = templateDrafts?.[serverTemplate.template_key] ?? serverTemplate;
+                return (
+                  <ReminderTemplateCard
+                    key={serverTemplate.template_key}
+                    template={template}
+                    serverTemplate={serverTemplate}
+                    isSaving={savingTemplateKey === serverTemplate.template_key}
+                    onChange={(next) =>
+                      setTemplateDrafts((current) => ({
+                        ...(current ?? {}),
+                        [next.template_key]: next,
+                      }))
+                    }
+                    onSave={(next) => {
+                      setSavingTemplateKey(next.template_key);
+                      templateMutation.mutate(next);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </details>
+
       <details className="notification-center profile-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Центр уведомлений</strong>
             <small>
@@ -445,7 +827,7 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
       </details>
 
       <details className="notification-personal profile-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Личное напоминание</strong>
             <small>Свободный текст остаётся внутри приложения</small>
@@ -460,6 +842,16 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
             className="stack"
             onSubmit={(event) => {
               event.preventDefault();
+              const scheduledHour = settings.data?.reminder_hour ?? 9;
+              const scheduleError = manualNotificationScheduleError(
+                notificationDraft.scheduledDate,
+                scheduledHour,
+                timeZone,
+              );
+              if (scheduleError) {
+                toast(scheduleError, 'error');
+                return;
+              }
               listMutation.mutate({
                 path: '/api/v1/notifications',
                 method: 'POST',
@@ -467,7 +859,7 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
                   title: notificationDraft.title,
                   body: notificationDraft.body,
                   scheduled_for: `${notificationDraft.scheduledDate}T${String(
-                    settings.data?.reminder_hour ?? 9,
+                    scheduledHour,
                   ).padStart(2, '0')}:00:00`,
                 },
               });

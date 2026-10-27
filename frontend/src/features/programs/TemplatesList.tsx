@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../../shared/api/client';
+import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type { ProgramTemplate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import {
@@ -20,8 +20,15 @@ import { ProgramBuilder } from './ProgramBuilder';
 import { shouldSaveTemplateAsCopy } from './templateEditing';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { ProgramRecommendation } from './ProgramRecommendation';
+import { LegacyProgramRecommendation } from './LegacyProgramRecommendation';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { AssignedProgramDetails } from './AssignedProgramDetails';
+import { ProgramImportPanel } from './ProgramImportPanel';
+import { PublicProgramSharePanel } from './PublicProgramSharePanel';
+import { AppLink } from '../../shared/navigation/router';
+import { programPreviewFacts, previewSourceSignature } from './programPreviewFacts';
+import { exerciseCountLabel } from './programDefaults';
+import './programPreview.css';
 
 const goalLabels: Record<string, string> = {
   muscle_gain: 'Набор мышечной массы',
@@ -56,6 +63,17 @@ function defaultWeekdays(template: ProgramTemplate, startDate: string): number[]
   return template.days.map((_, index) => (firstWeekday + index) % 7);
 }
 
+function weeksLabel(value: number): string {
+  const remainder = value % 10;
+  const suffix =
+    remainder === 1 && value % 100 !== 11
+      ? 'неделя'
+      : remainder >= 2 && remainder <= 4 && (value % 100 < 10 || value % 100 >= 20)
+        ? 'недели'
+        : 'недель';
+  return `${value} ${suffix}`;
+}
+
 function programMeta(item: ProgramTemplate) {
   const remainder = item.days.length % 10;
   const suffix =
@@ -66,7 +84,9 @@ function programMeta(item: ProgramTemplate) {
           (item.days.length % 100 < 10 || item.days.length % 100 >= 20)
         ? 'тренировки'
         : 'тренировок';
-  return `${goalLabels[item.goal] ?? 'Цель не указана'} · ${levelLabels[item.level] ?? 'Уровень не указан'} · ${item.days.length} ${suffix} в цикле`;
+  const duration =
+    item.default_duration_weeks > 1 ? ` · ${weeksLabel(item.default_duration_weeks)}` : '';
+  return `${goalLabels[item.goal] ?? 'Цель не указана'} · ${levelLabels[item.level] ?? 'Уровень не указан'} · ${item.days.length} ${suffix} в цикле${duration}`;
 }
 
 function programKind(item: ProgramTemplate, currentUserId?: number): string {
@@ -76,22 +96,59 @@ function programKind(item: ProgramTemplate, currentUserId?: number): string {
   return 'Шаблон';
 }
 
+function previewOwnership(item: ProgramTemplate, currentUserId?: number): string {
+  if (item.assigned_by_user_id && item.assigned_by_user_id !== currentUserId) {
+    return `Назначил тренер${item.assigned_by_full_name ? ` ${item.assigned_by_full_name}` : ''}. Изменения доступны только по разрешённым правам.`;
+  }
+  if (item.owner_user_id === currentUserId) {
+    return 'Владелец: вы. Вы можете редактировать свою программу.';
+  }
+  if (item.owner_full_name) return `Владелец: ${item.owner_full_name}.`;
+  return item.can_edit
+    ? 'Вы можете редактировать свою программу.'
+    : 'Изменения исходного шаблона недоступны. Можно создать личную копию.';
+}
+
 export function TemplatesList({
   children,
   defaultLibraryOpen = false,
+  mode = 'full',
+  readOnly = false,
 }: {
   children?: ReactNode;
   defaultLibraryOpen?: boolean;
+  mode?: 'full' | 'summary';
+  readOnly?: boolean;
 }) {
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
   const queryClient = useQueryClient();
   const [selectedExample, setSelectedExample] = useState<ProgramTemplate | null>(null);
+  const [previewSelectionId, setPreviewSelectionId] = useState<number | null>(null);
+  const [previewStale, setPreviewStale] = useState(false);
+  const [previewChecking, setPreviewChecking] = useState(false);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<ProgramTemplate | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const closeEditor = async () => {
+    if (
+      editorDirty &&
+      !(await confirm({
+        title: 'Закрыть редактор?',
+        message: 'Изменения ещё не сохранены в программе. Черновик останется на этом устройстве.',
+      }))
+    )
+      return;
+    setEditingTemplate(null);
+    setEditorDirty(false);
+  };
+  const editorPanelRef = useModalA11y<HTMLDivElement>(Boolean(editingTemplate), () => {
+    void closeEditor();
+  });
   const [saveAsCopy, setSaveAsCopy] = useState(false);
   const [assignmentTemplate, setAssignmentTemplate] = useState<ProgramTemplate | null>(null);
   const [recommendationOpen, setRecommendationOpen] = useState(false);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
   const defaultStartDate = dateInputValue(
     new Date(),
     user?.profile?.timezone || detectedTimeZone(),
@@ -102,6 +159,10 @@ export function TemplatesList({
   const examplePanelRef = useModalA11y<HTMLDivElement>(Boolean(selectedExample), () =>
     setSelectedExample(null),
   );
+  const selectedExampleIsTrainerReadonly =
+    selectedExample?.is_active_for_current_user === true &&
+    selectedExample.assigned_by_user_id != null &&
+    selectedExample.assigned_by_user_id !== user?.id;
   const assignmentPanelRef = useModalA11y<HTMLDivElement>(Boolean(assignmentTemplate), () =>
     setAssignmentTemplate(null),
   );
@@ -113,6 +174,15 @@ export function TemplatesList({
     queryKey: ['templates', 'hidden'],
     queryFn: () => api<ProgramTemplate[]>('/api/v1/programs/templates/hidden'),
   });
+  const refreshProgramState = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['templates'] }),
+      queryClient.invalidateQueries({ queryKey: ['workout'] }),
+      queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      reloadUser(),
+    ]);
+  };
   const mutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
       api(path, { method, body }),
@@ -145,11 +215,7 @@ export function TemplatesList({
         'program_activated',
       );
       setAssignmentTemplate(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['templates'] }),
-        queryClient.invalidateQueries({ queryKey: ['workout'] }),
-        reloadUser(),
-      ]);
+      await refreshProgramState();
       toast('Программа назначена');
     },
     onError: async (reason, variables) => {
@@ -157,7 +223,7 @@ export function TemplatesList({
         reason instanceof ApiError &&
         reason.status === 409 &&
         !variables.replaceActive &&
-        reason.message.toLowerCase().includes('confirmation')
+        apiErrorDetailIncludes(reason, 'confirmation')
       ) {
         if (
           await confirm({
@@ -171,11 +237,41 @@ export function TemplatesList({
         return;
       }
       toast(
-        reason instanceof ApiError && reason.message.toLowerCase().includes('in progress')
+        apiErrorDetailIncludes(reason, 'in progress')
           ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
           : (reason as Error).message,
         'error',
       );
+    },
+  });
+
+  const deleteAssignedMutation = useMutation({
+    mutationFn: (programId: number) =>
+      api<void>(`/api/v1/programs/assigned/${programId}`, { method: 'DELETE' }),
+    onSuccess: async (_data, programId) => {
+      queryClient.setQueryData<ProgramTemplate[]>(['templates', 'mine'], (current) =>
+        current?.map((item) =>
+          item.assigned_program_id === programId
+            ? { ...item, is_active_for_current_user: false }
+            : item,
+        ),
+      );
+      await refreshProgramState();
+      toast('Программа удалена');
+    },
+    onError: (reason) => {
+      if (
+        reason instanceof ApiError &&
+        reason.status === 409 &&
+        apiErrorDetailIncludes(reason, 'in progress')
+      ) {
+        toast(
+          'Сначала завершите текущую тренировку - во время неё программу удалить нельзя.',
+          'error',
+        );
+        return;
+      }
+      toast(reason instanceof Error ? reason.message : 'Не удалось удалить программу', 'error');
     },
   });
 
@@ -194,9 +290,36 @@ export function TemplatesList({
 
   const openAssignment = (template: ProgramTemplate) => {
     setAssignmentStartDate(defaultStartDate);
-    setAssignmentDuration(4);
+    setAssignmentDuration(
+      template.default_duration_weeks > 1 ? template.default_duration_weeks : 4,
+    );
     setAssignmentWeekdays(defaultWeekdays(template, defaultStartDate));
     setAssignmentTemplate(template);
+  };
+
+  const assignFromPreview = async (template: ProgramTemplate) => {
+    if (previewChecking) return;
+    setPreviewChecking(true);
+    try {
+      // Refresh before entering the existing assignment flow; never silently use stale preview facts.
+      const latest = await api<ProgramTemplate>(`/api/v1/programs/templates/${template.id}`);
+      if (previewSourceSignature(latest) !== previewSourceSignature(template)) {
+        setSelectedExample(latest);
+        setPreviewStale(true);
+        toast('Данные программы обновились. Проверьте состав и повторите выбор.', 'error');
+        return;
+      }
+      setPreviewStale(false);
+      setSelectedExample(null);
+      openAssignment(latest);
+    } catch (reason) {
+      toast(
+        reason instanceof Error ? reason.message : 'Не удалось проверить актуальность программы',
+        'error',
+      );
+    } finally {
+      setPreviewChecking(false);
+    }
   };
 
   const editCopy = (template: ProgramTemplate) => {
@@ -205,6 +328,21 @@ export function TemplatesList({
   };
 
   const activeTemplate = templates.data?.find((item) => item.is_active_for_current_user) ?? null;
+  const deleteActiveProgram = async () => {
+    const assignedProgramId = activeTemplate?.assigned_program_id;
+    if (assignedProgramId == null || deleteAssignedMutation.isPending) return;
+    if (
+      await confirm({
+        title: 'Удалить текущую программу?',
+        message:
+          'Программа перестанет быть активной, а будущие запланированные тренировки будут отменены. История выполненных тренировок и сам шаблон программы сохранятся.',
+        confirmText: 'Удалить программу',
+        danger: true,
+      })
+    ) {
+      deleteAssignedMutation.mutate(assignedProgramId);
+    }
+  };
   const ownTemplates =
     templates.data?.filter(
       (item) =>
@@ -220,7 +358,7 @@ export function TemplatesList({
     ) ?? [];
 
   useEffect(() => {
-    if (!defaultLibraryOpen || templates.isLoading) return;
+    if (mode !== 'full' || !defaultLibraryOpen || templates.isLoading) return;
     const frame = window.requestAnimationFrame(() => {
       const target = document.getElementById('program-library');
       if (!(target instanceof HTMLDetailsElement)) return;
@@ -229,7 +367,7 @@ export function TemplatesList({
       target.querySelector<HTMLElement>(':scope > summary')?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [defaultLibraryOpen, templates.isLoading]);
+  }, [defaultLibraryOpen, mode, templates.isLoading]);
 
   const renderTemplate = (item: ProgramTemplate) => (
     <article className="program-template-card" key={item.id}>
@@ -237,14 +375,23 @@ export function TemplatesList({
         type="button"
         className="text-button program-template-card__main"
         aria-label={`Посмотреть ${item.is_example ? 'шаблон' : 'программу'} «${item.title}»`}
-        onClick={() => setSelectedExample(item)}
+        onClick={(event) => {
+          // WebKit does not focus mouse-clicked buttons consistently; keep the preview opener for Escape return.
+          event.currentTarget.focus();
+          setPreviewStale(false);
+          setSelectedExample(item);
+        }}
       >
         <span className="program-template-badges">
           <Badge>{programKind(item, user?.id)}</Badge>
         </span>
         <strong>{item.title}</strong>
         <span className="muted">{programMeta(item)}</span>
-        <span className="program-example-trigger__hint">Открыть состав</span>
+        <span className="program-example-trigger__hint">
+          {previewSelectionId === item.id
+            ? 'Выбрана для назначения · Посмотреть состав'
+            : 'Посмотреть состав'}
+        </span>
       </button>
       <div className="program-template-card__actions">
         <button
@@ -259,8 +406,12 @@ export function TemplatesList({
         </button>
         <button onClick={() => openAssignment(item)}>Запустить</button>
       </div>
+      {item.owner_user_id === user?.id && <PublicProgramSharePanel template={item} />}
       <details className="program-danger-menu">
-        <summary>Другие действия</summary>
+        <summary className="yfc-disclosure-summary">
+          Другие действия
+          <DisclosureIcon />
+        </summary>
         <button
           type="button"
           className="btn-danger"
@@ -309,61 +460,97 @@ export function TemplatesList({
               </div>
               <Badge tone="success">Активна</Badge>
             </div>
-            <div className="program-active__source">
-              <strong>{programKind(activeTemplate, user?.id)}</strong>
-              {activeTemplate.assigned_by_user_id &&
-              activeTemplate.assigned_by_user_id !== user?.id ? (
-                <span>
-                  Назначил тренер
-                  {activeTemplate.assigned_by_full_name
-                    ? ` ${activeTemplate.assigned_by_full_name}`
-                    : ''}
-                </span>
-              ) : (
-                <span>Вы можете посмотреть состав или изменить будущий шаблон.</span>
-              )}
-            </div>
-            {activeTemplate.assigned_program_id &&
-              activeTemplate.assigned_program_start_date &&
-              activeTemplate.assigned_program_duration_weeks != null &&
-              activeTemplate.current_revision_number != null && (
-                <AssignedProgramDetails
-                  key={activeTemplate.assigned_program_id}
-                  programId={activeTemplate.assigned_program_id}
-                  currentRevisionNumber={activeTemplate.current_revision_number}
-                  startDate={activeTemplate.assigned_program_start_date}
-                  durationWeeks={activeTemplate.assigned_program_duration_weeks}
-                  workoutHistoryReturnPath="/app?section=programs"
-                />
-              )}
-            <div className="program-active__actions">
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setSelectedExample(activeTemplate)}
-              >
-                Посмотреть план
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setRecommendationOpen(true)}
-              >
-                Подобрать другую
-              </button>
-              <button
-                type="button"
-                className="program-active__edit-action"
-                onClick={() => {
-                  setSaveAsCopy(shouldSaveTemplateAsCopy(activeTemplate));
-                  setEditingTemplate(activeTemplate);
-                }}
-              >
-                {shouldSaveTemplateAsCopy(activeTemplate)
-                  ? 'Настроить свою копию'
-                  : 'Редактировать шаблон'}
-              </button>
-            </div>
+            {mode === 'summary' ? (
+              <div className="program-active__summary">
+                <span>Ближайшие тренировки и календарь — в разделе «План».</span>
+                {readOnly ? (
+                  <span className="muted">Управление доступно после входа.</span>
+                ) : (
+                  <AppLink className="button-link" to="/app?section=programs&view=manage">
+                    Управление программой
+                  </AppLink>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="program-active__source">
+                  <strong>{programKind(activeTemplate, user?.id)}</strong>
+                  {activeTemplate.assigned_by_user_id &&
+                  activeTemplate.assigned_by_user_id !== user?.id ? (
+                    <span>
+                      Назначил тренер
+                      {activeTemplate.assigned_by_full_name
+                        ? ` ${activeTemplate.assigned_by_full_name}`
+                        : ''}
+                    </span>
+                  ) : (
+                    <span>Вы можете посмотреть состав или изменить будущий шаблон.</span>
+                  )}
+                </div>
+                {activeTemplate.assigned_program_id &&
+                  activeTemplate.assigned_program_start_date &&
+                  activeTemplate.assigned_program_duration_weeks != null &&
+                  activeTemplate.current_revision_number != null && (
+                    <AssignedProgramDetails
+                      key={activeTemplate.assigned_program_id}
+                      programId={activeTemplate.assigned_program_id}
+                      currentRevisionNumber={activeTemplate.current_revision_number}
+                      startDate={activeTemplate.assigned_program_start_date}
+                      durationWeeks={activeTemplate.assigned_program_duration_weeks}
+                      showAiAdaptation
+                      workoutHistoryReturnPath="/app?section=programs"
+                    />
+                  )}
+                <div className="program-active__actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={(event) => {
+                      event.currentTarget.focus();
+                      setPreviewStale(false);
+                      setSelectedExample(activeTemplate);
+                    }}
+                  >
+                    Посмотреть план
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setRecommendationOpen(true)}
+                  >
+                    Подобрать другую
+                  </button>
+                  <button type="button" onClick={() => setGeneratorOpen(true)}>
+                    Подобрать программу
+                  </button>
+                  <button
+                    type="button"
+                    className="program-active__edit-action"
+                    onClick={() => {
+                      setSaveAsCopy(shouldSaveTemplateAsCopy(activeTemplate));
+                      setEditingTemplate(activeTemplate);
+                    }}
+                  >
+                    {shouldSaveTemplateAsCopy(activeTemplate)
+                      ? 'Настроить свою копию'
+                      : 'Редактировать шаблон'}
+                  </button>
+                </div>
+                {activeTemplate.owner_user_id === user?.id && (
+                  <PublicProgramSharePanel template={activeTemplate} />
+                )}
+                {activeTemplate.assigned_program_id != null && (
+                  <button
+                    type="button"
+                    className="btn-danger program-active__delete-action"
+                    disabled={deleteAssignedMutation.isPending}
+                    onClick={() => void deleteActiveProgram()}
+                  >
+                    Удалить программу
+                  </button>
+                )}
+              </>
+            )}
           </>
         ) : (
           <div className="program-active__empty">
@@ -371,85 +558,138 @@ export function TemplatesList({
             <h2 id="active-program-title">План ещё не выбран</h2>
             <p>Создайте свою программу сразу или выберите готовый шаблон.</p>
             <div className="program-active__actions">
-              <a className="button-link program-wizard__anchor" href="#program-builder">
-                Создать свою программу
-              </a>
-              <a className="secondary program-wizard__anchor" href="#program-library">
-                Программы и шаблоны
-              </a>
+              {mode === 'summary' ? (
+                <>
+                  {readOnly ? (
+                    <span className="muted">Создание и выбор программы доступны после входа.</span>
+                  ) : (
+                    <>
+                      <AppLink
+                        className="button-link program-wizard__anchor"
+                        to="/app?section=programs&view=manage&start=create"
+                      >
+                        Создать свою программу
+                      </AppLink>
+                      <AppLink
+                        className="secondary program-wizard__anchor"
+                        to="/app?section=programs&view=manage&start=templates"
+                      >
+                        Программы и шаблоны
+                      </AppLink>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <AppLink
+                    className="button-link program-wizard__anchor"
+                    to="/app?section=programs&view=manage&start=generator"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setGeneratorOpen(true);
+                    }}
+                  >
+                    Подобрать программу
+                  </AppLink>
+                  <a className="button-link program-wizard__anchor" href="#program-builder">
+                    Создать свою программу
+                  </a>
+                  <a className="secondary program-wizard__anchor" href="#program-library">
+                    Программы и шаблоны
+                  </a>
+                </>
+              )}
             </div>
           </div>
         )}
       </section>
-      {children}
-      <ProgramRecommendation
-        open={recommendationOpen}
-        onOpenChange={setRecommendationOpen}
-        onPreview={setSelectedExample}
-        onEditCopy={editCopy}
-      />
-      <Card
-        defaultOpen={defaultLibraryOpen}
-        family="training"
-        id="program-library"
-        title="Программы и шаблоны"
-        description="Ваши заготовки и готовые варианты для быстрого запуска."
-      >
-        {templates.isLoading ? (
-          <LoadingState />
-        ) : templates.error ? (
-          <ErrorState message={(templates.error as Error).message} />
-        ) : !ownTemplates.length && !readyTemplates.length ? (
-          <EmptyState title="Программ пока нет" text="Создайте первую программу в конструкторе." />
-        ) : (
-          <div className="program-library top-gap">
-            {!!ownTemplates.length && (
-              <section className="program-library__group" aria-labelledby="own-programs-title">
-                <div>
-                  <h3 id="own-programs-title">Мои программы</h3>
-                  <span>{ownTemplates.length}</span>
-                </div>
-                <div className="program-template-grid">{ownTemplates.map(renderTemplate)}</div>
-              </section>
-            )}
-            {!!readyTemplates.length && (
-              <section className="program-library__group" aria-labelledby="ready-programs-title">
-                <div>
-                  <h3 id="ready-programs-title">Готовые шаблоны</h3>
-                  <span>{readyTemplates.length}</span>
-                </div>
-                <div className="program-template-grid">{readyTemplates.map(renderTemplate)}</div>
-              </section>
-            )}
-          </div>
-        )}
-        {!!hidden.data?.length && (
-          <details className="compact-disclosure top-gap">
-            <summary>
-              <span>Скрытые примеры программ ({hidden.data.length})</span>
-              <DisclosureIcon />
-            </summary>
-            <div className="list-grid top-gap">
-              {hidden.data.map((item) => (
-                <article className="list-row" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <button
-                    className="secondary"
-                    onClick={() =>
-                      mutation.mutate({
-                        path: `/api/v1/programs/templates/${item.id}/restore`,
-                        method: 'POST',
-                      })
-                    }
+      {mode === 'full' && (
+        <>
+          {children}
+          <ProgramImportPanel />
+          <LegacyProgramRecommendation
+            open={recommendationOpen}
+            onOpenChange={setRecommendationOpen}
+            onPreview={setSelectedExample}
+            onEditCopy={editCopy}
+          />
+          <ProgramRecommendation
+            open={generatorOpen}
+            onOpenChange={setGeneratorOpen}
+            onConfirmed={refreshProgramState}
+          />
+          <Card
+            defaultOpen={defaultLibraryOpen}
+            family="training"
+            id="program-library"
+            title="Программы и шаблоны"
+            description="Ваши заготовки и готовые варианты для быстрого запуска."
+          >
+            {templates.isLoading ? (
+              <LoadingState />
+            ) : templates.error ? (
+              <ErrorState message={(templates.error as Error).message} />
+            ) : !ownTemplates.length && !readyTemplates.length ? (
+              <EmptyState
+                title="Программ пока нет"
+                text="Создайте первую программу в конструкторе."
+              />
+            ) : (
+              <div className="program-library top-gap">
+                {!!ownTemplates.length && (
+                  <section className="program-library__group" aria-labelledby="own-programs-title">
+                    <div>
+                      <h3 id="own-programs-title">Мои программы</h3>
+                      <span>{ownTemplates.length}</span>
+                    </div>
+                    <div className="program-template-grid">{ownTemplates.map(renderTemplate)}</div>
+                  </section>
+                )}
+                {!!readyTemplates.length && (
+                  <section
+                    className="program-library__group"
+                    aria-labelledby="ready-programs-title"
                   >
-                    Восстановить
-                  </button>
-                </article>
-              ))}
-            </div>
-          </details>
-        )}
-      </Card>
+                    <div>
+                      <h3 id="ready-programs-title">Готовые шаблоны</h3>
+                      <span>{readyTemplates.length}</span>
+                    </div>
+                    <div className="program-template-grid">
+                      {readyTemplates.map(renderTemplate)}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+            {!!hidden.data?.length && (
+              <details className="compact-disclosure top-gap">
+                <summary className="yfc-disclosure-summary">
+                  <span>Скрытые примеры программ ({hidden.data.length})</span>
+                  <DisclosureIcon />
+                </summary>
+                <div className="list-grid top-gap">
+                  {hidden.data.map((item) => (
+                    <article className="list-row" key={item.id}>
+                      <strong>{item.title}</strong>
+                      <button
+                        className="secondary"
+                        onClick={() =>
+                          mutation.mutate({
+                            path: `/api/v1/programs/templates/${item.id}/restore`,
+                            method: 'POST',
+                          })
+                        }
+                      >
+                        Восстановить
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </details>
+            )}
+          </Card>
+        </>
+      )}
       {selectedExample && (
         <div
           className="modal program-example-modal"
@@ -468,93 +708,188 @@ export function TemplatesList({
             ref={examplePanelRef}
             tabIndex={-1}
           >
-            <div className="program-example-modal__head">
-              <div>
-                <span className="eyebrow">
-                  {selectedExample.is_example ? 'Пример программы' : 'Моя программа'}
-                </span>
-                <h2 id="program-example-title">{selectedExample.title}</h2>
-                <p className="muted">{programMeta(selectedExample)}</p>
-              </div>
-              <button
-                type="button"
-                className="secondary program-example-modal__close"
-                aria-label="Закрыть состав программы"
-                onClick={() => setSelectedExample(null)}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <div className="program-example-days">
-              {selectedExample.days.map((day) => (
-                <section className="program-example-day" key={day.id}>
-                  <h3>
-                    День {day.day_number}. {day.title}
-                  </h3>
-                  <ol>
-                    {day.exercises.map((exercise) => (
-                      <li key={exercise.id}>
-                        <strong>{exercise.exercise_title}</strong>
-                        <span>
-                          {exercise.metric_type === 'cardio'
-                            ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
-                            : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
-                        </span>
-                        {exercise.superset_group && (
-                          <small>
-                            Суперсет {exercise.superset_group} · упражнение{' '}
-                            {exercise.superset_order} из 2
-                          </small>
-                        )}
-                        {exercise.notes && <small>{exercise.notes}</small>}
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={() =>
-                            setGuide({
-                              id: exercise.exercise_id,
-                              title: exercise.exercise_title,
-                            })
-                          }
-                        >
-                          {exercise.has_guide ? 'Техника и детали' : 'Подробнее об упражнении'}
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              ))}
-            </div>
-            <div className="program-example-modal__actions">
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  const template = selectedExample;
-                  setSelectedExample(null);
-                  setSaveAsCopy(shouldSaveTemplateAsCopy(template));
-                  setEditingTemplate(template);
-                }}
-              >
-                {shouldSaveTemplateAsCopy(selectedExample)
-                  ? 'Настроить личную копию'
-                  : 'Редактировать программу'}
-              </button>
-              {selectedExample.is_active_for_current_user ? (
-                <button type="button" disabled>
-                  Уже запущена
-                </button>
-              ) : (
+            <div className="program-example-modal__content">
+              <div className="program-example-modal__head">
+                <div>
+                  <span className="eyebrow">{programKind(selectedExample, user?.id)}</span>
+                  <h2 id="program-example-title">{selectedExample.title}</h2>
+                  <p className="muted">{programMeta(selectedExample)}</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    const template = selectedExample;
-                    setSelectedExample(null);
-                    openAssignment(template);
-                  }}
+                  className="secondary program-example-modal__close"
+                  aria-label="Закрыть состав программы"
+                  onClick={() => setSelectedExample(null)}
                 >
-                  Настроить расписание и запустить
+                  <CloseIcon />
                 </button>
+              </div>
+              <section
+                className="program-preview-section"
+                aria-label="Известные сведения о программе"
+              >
+                <h3>Что известно</h3>
+                <p className="muted">Только сведения из программы без предположений о нагрузке.</p>
+                <dl className="program-preview-facts">
+                  {programPreviewFacts(selectedExample).map((fact) => (
+                    <div className="program-preview-fact" key={fact.label}>
+                      <dt>{fact.label}</dt>
+                      <dd>{fact.value}</dd>
+                      <small>{fact.source}</small>
+                    </div>
+                  ))}
+                </dl>
+                <p className="program-example-modal__owner">
+                  {previewOwnership(selectedExample, user?.id)}
+                </p>
+                {selectedExample.assigned_program_revision_number != null && (
+                  <p className="program-example-modal__owner">
+                    Ревизия назначения: {selectedExample.assigned_program_revision_number}
+                  </p>
+                )}
+              </section>
+              <section className="program-preview-section" aria-label="Состав недели">
+                <h3>Состав недели</h3>
+                <p className="muted">
+                  Все дни из исходного шаблона. Первый день раскрыт для примера.
+                </p>
+                <div className="program-example-days">
+                  {selectedExample.days.map((day, dayIndex) => {
+                    return (
+                      <details className="program-example-day" key={day.id} open={dayIndex === 0}>
+                        <summary className="yfc-disclosure-summary">
+                          <span>
+                            <strong>
+                              День {day.day_number}. {day.title}
+                            </strong>
+                            <span className="muted">
+                              {' '}
+                              · {exerciseCountLabel(day.exercises.length)}
+                            </span>
+                          </span>
+                          <DisclosureIcon />
+                        </summary>
+                        <h3 className="sr-only">
+                          День {day.day_number}. {day.title}
+                        </h3>
+                        <ol>
+                          {day.exercises.map((exercise) => {
+                            const isCardio = exercise.metric_type === 'cardio';
+                            return (
+                              <li key={exercise.id}>
+                                <strong>{exercise.exercise_title}</strong>
+                                <span>
+                                  {isCardio
+                                    ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
+                                    : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
+                                </span>
+                                {exercise.superset_group && (
+                                  <small>
+                                    Суперсет {exercise.superset_group} · упражнение{' '}
+                                    {exercise.superset_order} из 2
+                                  </small>
+                                )}
+                                {exercise.notes && <small>{exercise.notes}</small>}
+                                <button
+                                  type="button"
+                                  className="text-button"
+                                  onClick={() =>
+                                    setGuide({
+                                      id: exercise.exercise_id,
+                                      title: exercise.exercise_title,
+                                    })
+                                  }
+                                >
+                                  {exercise.has_guide
+                                    ? 'Техника и детали'
+                                    : 'Подробнее об упражнении'}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </details>
+                    );
+                  })}
+                </div>
+              </section>
+              <p className="program-preview-source">
+                Состав и настройки отображены по источнику. Если данных нет, они не заменяются
+                приблизительными значениями. Просмотр не изменяет активную программу.
+              </p>
+              {previewStale && (
+                <p className="program-preview-stale" role="status">
+                  Данные обновились. Проверьте сведения выше и повторите назначение.
+                </p>
+              )}
+            </div>
+            <div
+              className={`program-example-modal__actions${
+                selectedExampleIsTrainerReadonly ? ' program-example-modal__actions--readonly' : ''
+              }`}
+            >
+              {selectedExampleIsTrainerReadonly ? (
+                <p className="muted program-example-modal__readonly">
+                  Эта программа назначена тренером. Изменение недоступно.
+                </p>
+              ) : (
+                <>
+                  <div className="program-example-modal__secondary-actions">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setPreviewSelectionId(selectedExample.id);
+                        toast('Программа выбрана. Назначение выполняется отдельно.');
+                      }}
+                    >
+                      {previewSelectionId === selectedExample.id ? 'Выбрана' : 'Выбрать'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setSaveAsCopy(true);
+                        setEditingTemplate(selectedExample);
+                        setSelectedExample(null);
+                      }}
+                    >
+                      Создать копию
+                    </button>
+                    {selectedExample.can_edit && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          setSaveAsCopy(false);
+                          setEditingTemplate(selectedExample);
+                          setSelectedExample(null);
+                        }}
+                      >
+                        Редактировать
+                      </button>
+                    )}
+                  </div>
+                  {selectedExample.is_active_for_current_user ? (
+                    <button
+                      type="button"
+                      className="program-example-modal__primary-action"
+                      disabled
+                    >
+                      Уже запущена
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="program-example-modal__primary-action"
+                      disabled={previewChecking}
+                      aria-label="Настроить расписание и запустить"
+                      onClick={() => void assignFromPreview(selectedExample)}
+                    >
+                      {previewChecking ? 'Проверяем…' : 'Назначить по расписанию'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -632,13 +967,24 @@ export function TemplatesList({
                   <input
                     type="number"
                     min="1"
-                    max="24"
+                    max={
+                      assignmentTemplate.default_duration_weeks > 1
+                        ? assignmentTemplate.default_duration_weeks
+                        : 24
+                    }
                     value={assignmentDuration}
                     onChange={(event) => setAssignmentDuration(Number(event.target.value))}
                     required
                   />
                 </label>
               </div>
+              {assignmentTemplate.default_duration_weeks > 1 && (
+                <p className="auth-notice">
+                  Для этого шаблона доступны назначения на{' '}
+                  {assignmentTemplate.default_duration_weeks} недель с сохранённой схемой
+                  повторений.
+                </p>
+              )}
               {assignmentTemplate.days.length > 7 ? (
                 <p className="auth-notice">
                   Восьмидневный цикл планируется последовательно: одна тренировка за другой, начиная
@@ -707,9 +1053,9 @@ export function TemplatesList({
             type="button"
             className="modal__backdrop"
             aria-label="Закрыть редактирование"
-            onClick={() => setEditingTemplate(null)}
+            onClick={() => void closeEditor()}
           />
-          <div className="modal__panel assignment-modal">
+          <div className="modal__panel program-editor-modal" ref={editorPanelRef} tabIndex={-1}>
             <div className="section-head">
               <strong>
                 {saveAsCopy ? 'Редактирование личной копии' : 'Редактирование программы'}
@@ -718,7 +1064,7 @@ export function TemplatesList({
                 type="button"
                 className="secondary"
                 aria-label="Закрыть редактирование"
-                onClick={() => setEditingTemplate(null)}
+                onClick={() => void closeEditor()}
               >
                 <CloseIcon />
               </button>
@@ -727,6 +1073,7 @@ export function TemplatesList({
               editingTemplate={editingTemplate}
               saveAsCopy={saveAsCopy}
               onSaved={() => setEditingTemplate(null)}
+              onDirtyChange={setEditorDirty}
             />
           </div>
         </div>

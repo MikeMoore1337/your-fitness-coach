@@ -1,0 +1,483 @@
+import asyncio
+import hashlib
+import json
+import time
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
+import pytest
+from pydantic import SecretStr
+
+from fitminiapp_api.core.config import settings
+from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.models.news import (
+    HermesEditorialSubmission,
+    NewsCluster,
+    NewsDraftRevision,
+    NewsItem,
+    NewsReviewDelivery,
+    NewsSource,
+)
+from fitminiapp_api.services import news_hermes
+from fitminiapp_api.services.news_hermes import _canonical_source_hash, hermes_signature
+from fitminiapp_api.services.news_worker import run_news_pipeline_once
+
+
+def _payload() -> dict:
+    published_at = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+    source = {
+        "source_id": "journal-one",
+        "external_id": "hermes-1",
+        "canonical_url": "https://example.com/story",
+        "primary_url": None,
+        "title": "Исследование связало силовые тренировки с восстановлением",
+        "summary": "Авторы изучили силовые тренировки и восстановление у взрослых.",
+        "content": "Публичный источник описывает результаты и ограничения исследования.",
+        "author": None,
+        "publisher": "Journal One",
+        "published_at": published_at.isoformat(),
+        "updated_at": None,
+        "doi": None,
+    }
+    source["content_hash"] = _canonical_source_hash(
+        title=source["title"],
+        summary=source["summary"],
+        canonical_url=source["canonical_url"],
+        published_at=published_at,
+    )
+    source["content_sha256"] = hashlib.sha256(source["content"].encode()).hexdigest()
+    return {
+        "schema_version": "hermes-editorial-intake-v2",
+        "idempotency_key": "hermes-test-idempotency-1",
+        "request_nonce": "hermes-test-nonce-1",
+        "source": source,
+        "draft": {
+            "headline": "Силовые тренировки и восстановление: что показало исследование",
+            "summary": "Авторы изучили связь силовых тренировок с восстановлением у взрослых. "
+            "Результат относится к исследованной группе и не заменяет индивидуальную оценку.",
+            "why_it_matters": "Данные помогают точнее обсуждать восстановление после нагрузки.",
+        },
+        "provenance": {
+            "provider": "hermes",
+            "model": "test-model",
+            "prompt_version": "hermes-editorial-v1",
+            "skill_version": "yfc-hermes-editorial-v1",
+        },
+        "revision": {
+            "revision_id": "hermes-test-revision-1",
+            "parent_revision_id": None,
+            "attempt": 1,
+            "requested_blockers": [],
+        },
+    }
+
+
+def _signed_headers(body: bytes) -> dict[str, str]:
+    timestamp = str(int(time.time()))
+    nonce = "hermes-test-nonce-1"
+    return {
+        "X-Hermes-Key-Id": "hermes-test",
+        "X-Hermes-Timestamp": timestamp,
+        "X-Hermes-Nonce": nonce,
+        "X-Hermes-Signature": hermes_signature(
+            "test-hermes-shared-secret-that-is-long-enough",
+            timestamp=timestamp,
+            nonce=nonce,
+            body=body,
+        ),
+    }
+
+
+def _set_published_at(payload: dict, published_at: datetime | None) -> None:
+    source = payload["source"]
+    assert isinstance(source, dict)
+    source["published_at"] = published_at.isoformat() if published_at else None
+    source["content_hash"] = _canonical_source_hash(
+        title=source["title"],
+        summary=source["summary"],
+        canonical_url=source["canonical_url"],
+        published_at=published_at,
+    )
+
+
+def test_signed_hermes_intake_creates_preview_and_is_idempotent(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    body = json.dumps(_payload(), ensure_ascii=False, separators=(",", ":")).encode()
+    headers = _signed_headers(body)
+    first = client.post("/api/v1/hermes/editorial/intake", content=body, headers=headers)
+    assert first.status_code == 200, first.text
+    first_payload = first.json()
+    assert first_payload["status"] == "accepted"
+    assert first_payload["publication_policy"] == "manual_required"
+    assert "силовые тренировки" in first_payload["preview_text"].lower()
+
+    second = client.post("/api/v1/hermes/editorial/intake", content=body, headers=headers)
+    assert second.status_code == 200, second.text
+    assert second.json()["status"] == "duplicate"
+    assert second.json()["draft_id"] == first_payload["draft_id"]
+    with get_session_context() as db:
+        assert db.query(HermesEditorialSubmission).count() == 1
+
+
+@pytest.mark.parametrize(
+    ("published_at", "expected_status"),
+    [
+        (None, 422),
+        (datetime(2026, 8, 30, 12, 0, 1), 422),
+        (datetime(2026, 8, 23, 11, 59, 59), 422),
+        (datetime(2026, 8, 23, 12, 0, 0), 200),
+        (datetime(2026, 8, 29, 12, 0, 0), 200),
+    ],
+)
+def test_signed_hermes_intake_enforces_source_freshness_before_ingestion(
+    client, monkeypatch, published_at: datetime | None, expected_status: int
+) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    fixed_now = datetime(2026, 8, 30, 12, 0, 0)
+    monkeypatch.setattr(news_hermes, "utcnow", lambda: fixed_now)
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    payload["idempotency_key"] = f"hermes-test-freshness-{expected_status}"
+    payload["request_nonce"] = "hermes-test-nonce-1"
+    _set_published_at(payload, published_at)
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+
+    with get_session_context() as db:
+        before_submissions = db.query(HermesEditorialSubmission).count()
+        before_items = db.query(NewsItem).count()
+        before_drafts = db.query(NewsDraftRevision).count()
+
+    response = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+
+    assert response.status_code == expected_status, response.text
+    with get_session_context() as db:
+        if expected_status == 422:
+            assert response.json()["detail"] == "source_publication_not_fresh"
+            assert db.query(HermesEditorialSubmission).count() == before_submissions
+            assert db.query(NewsItem).count() == before_items
+            assert db.query(NewsDraftRevision).count() == before_drafts
+        else:
+            assert response.json()["status"] == "accepted"
+
+
+def test_fresh_hermes_relevance_bypasses_legacy_numeric_candidate_gate(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    monkeypatch.setattr(settings, "news_candidate_score_threshold", 100)
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="reputable_secondary",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+    response = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+
+    assert response.status_code == 200, response.text
+    with get_session_context() as db:
+        submission = db.query(HermesEditorialSubmission).one()
+        cluster = db.get(NewsCluster, submission.cluster_id)
+        assert cluster is not None
+        assert cluster.score < settings.news_candidate_score_threshold
+        assert cluster.discovery_eligible is True
+        assert "hermes_relevance_v2_accepted" in cluster.discovery_reasons
+        assert "hermes_fresh_7d" in cluster.discovery_reasons
+
+
+def test_hermes_intake_rejects_bad_signature_without_source_processing(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    body = json.dumps(_payload(), ensure_ascii=False).encode()
+    headers = _signed_headers(body)
+    headers["X-Hermes-Signature"] = "sha256=" + hashlib.sha256(b"wrong").hexdigest()
+
+    response = client.post("/api/v1/hermes/editorial/intake", content=body, headers=headers)
+
+    assert response.status_code == 403
+
+
+def test_hermes_image_pending_downstream_survives_disabled_legacy_fetch(
+    client, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    monkeypatch.setattr(settings, "news_ingestion_enabled", True)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    body = json.dumps(_payload(), ensure_ascii=False, separators=(",", ":")).encode()
+    intake = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+    assert intake.status_code == 200, intake.text
+    assert intake.json()["status"] == "accepted"
+
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=501, message_date=datetime.now(UTC))
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 502
+
+    async def send_publication(*_args, **_kwargs):
+        raise AssertionError("publication is not part of this manual-required flow")
+
+    asyncio.run(
+        run_news_pipeline_once(
+            send_message=send_control,
+            send_preview=send_preview,
+            send_publication=send_publication,
+            publication_ready=True,
+        )
+    )
+
+    with get_session_context() as db:
+        submission = db.query(HermesEditorialSubmission).one()
+        draft = db.get(NewsDraftRevision, submission.draft_id)
+        assert draft is not None
+        assert draft.evidence_metadata["source_published_at"]
+    assert preview_calls == [7001]
+    assert control_calls == [7001]
+    with get_session_context() as db:
+        submission = db.query(HermesEditorialSubmission).one()
+        cluster = db.get(NewsCluster, submission.cluster_id)
+        assert cluster is not None
+        assert cluster.status == "awaiting_review"
+        assert cluster.current_image_revision == 1
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "sent"
+
+
+def test_hermes_sensitive_source_requires_bounded_remediation(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    payload["idempotency_key"] = "hermes-sensitive-idempotency"
+    payload["request_nonce"] = "hermes-sensitive-nonce"
+    payload["source"]["title"] = "Исследование дозировки пептида для спорта"
+    payload["source"]["summary"] = (
+        "Фармакологическая работа рассмотрела дозировку пептида и ограничения "
+        "результатов для самостоятельной интерпретации."
+    )
+    payload["draft"]["headline"] = "Исследование пептида: контекст результатов"
+    payload["draft"]["summary"] = (
+        "Работа описывает дозировку пептида и ограничения результатов без "
+        "индивидуального назначения."
+    )
+    payload["source"]["content_hash"] = _canonical_source_hash(
+        title=payload["source"]["title"],
+        summary=payload["source"]["summary"],
+        canonical_url=payload["source"]["canonical_url"],
+        published_at=datetime.fromisoformat(payload["source"]["published_at"]),
+    )
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+    intake = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+    assert intake.status_code == 422, intake.text
+    detail = intake.json()["detail"]
+    assert detail["code"] == "remediation_required"
+    assert "medical_prescription_language" in detail["blockers"]
+    with get_session_context() as db:
+        assert db.query(HermesEditorialSubmission).count() == 0
+        assert db.query(NewsDraftRevision).count() == 0
+
+
+def test_hermes_unsupported_number_without_source_evidence_requests_remediation(
+    client, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    payload["idempotency_key"] = "hermes-unsupported-number-no-evidence"
+    payload["request_nonce"] = "hermes-unsupported-number-nonce"
+    payload["draft"]["summary"] = (
+        "Авторы описали результат с изменением на 99 процентов у исследованной группы."
+    )
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+
+    response = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert detail["code"] == "remediation_required"
+    assert detail["blockers"] == ["unsupported_number"]
+    with get_session_context() as db:
+        assert db.query(HermesEditorialSubmission).count() == 0
+        assert db.query(NewsDraftRevision).count() == 0
+
+
+def test_hermes_number_grounded_in_source_content_is_accepted(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    payload["idempotency_key"] = "hermes-grounded-number"
+    payload["request_nonce"] = "hermes-grounded-number-nonce"
+    payload["source"]["content"] = (
+        "Публичный источник описывает результаты у 12 взрослых участников и ограничения исследования."
+    )
+    payload["source"]["content_sha256"] = hashlib.sha256(
+        payload["source"]["content"].encode()
+    ).hexdigest()
+    payload["draft"]["summary"] = (
+        "Авторы описали результаты у 12 взрослых участников и ограничения исследования."
+    )
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+
+    response = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "accepted"

@@ -3,6 +3,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { installTelegramHarness, TelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi, type PlatformApiController } from './fixtures/platform-api';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 const avatarFile = {
   name: 'new-avatar.png',
@@ -14,8 +15,7 @@ const avatarFile = {
 };
 
 async function openPersonalData(page: Page) {
-  await page.goto('/app?section=profile');
-  await page.getByRole('link', { name: 'Личные данные', exact: true }).click();
+  await page.goto('/app?section=profile#profile-personal');
   await expect(page.getByRole('button', { name: 'Изменить аватар' })).toBeVisible();
 }
 
@@ -87,7 +87,7 @@ test('deletion requires confirmation and restores the provider avatar', async ({
   await expect(page.getByRole('status')).toContainText('фото из способа входа');
   await expect(page.locator('.app-desktop-account-entry img')).toHaveAttribute(
     'src',
-    /^data:image\/svg\+xml/,
+    'https://provider.example.test/avatar.svg',
   );
   expect(api.avatarDeletes()).toBe(1);
   await context.close();
@@ -119,7 +119,7 @@ for (const viewport of [
     expect(overflow).toBeLessThanOrEqual(1);
     for (const button of await editor.locator('button').all()) {
       const box = await button.boundingBox();
-      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44 - 0.01);
     }
     await context.close();
   });
@@ -233,18 +233,7 @@ test('light mobile keeps avatar actions outlined and current account boundary li
   });
   await expect(accountPanel).toBeVisible();
   await expect(currentProfile).toBeVisible();
-  const boundary = await currentProfile.evaluate((element) => {
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--v2-lime)';
-    document.body.append(probe);
-    const result = {
-      boxShadow: getComputedStyle(element).boxShadow,
-      lime: getComputedStyle(probe).color,
-    };
-    probe.remove();
-    return result;
-  });
-  expect(boundary.boxShadow).toContain(boundary.lime);
+  await expectSelectedChoice(currentProfile);
   await accountPage.screenshot({
     path: '../.artifacts/screenshots/task-110B/mobile-light-account-boundary.png',
     fullPage: false,

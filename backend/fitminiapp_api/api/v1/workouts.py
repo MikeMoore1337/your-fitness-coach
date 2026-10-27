@@ -5,8 +5,8 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.api.v1.workout_rest import _as_response as serialize_rest_session
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.core.timezone import now_for_user_naive, today_for_user
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.notification import Notification
@@ -18,6 +18,7 @@ from fitminiapp_api.models.program import (
     WorkoutAdaptation,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.schemas.cardio import (
     CardioSessionCreate,
     CardioSessionResponse,
@@ -35,9 +36,16 @@ from fitminiapp_api.schemas.progress import (
     ProgressSummaryResponse,
 )
 from fitminiapp_api.schemas.workout import (
+    BodyMeasurementDefinitionCreate,
+    BodyMeasurementDefinitionResponse,
+    BodyMeasurementDefinitionUpdate,
     BodyMeasurementResponse,
     BodyMeasurementSave,
     TrainingAnalyticsResponse,
+    WarmupProposalApplyRequest,
+    WarmupProposalApplyResponse,
+    WarmupProposalPreviewRequest,
+    WarmupProposalPreviewResponse,
     WorkoutAdaptationApplyRequest,
     WorkoutAdaptationApplyResponse,
     WorkoutAdaptationPreviewResponse,
@@ -48,6 +56,11 @@ from fitminiapp_api.schemas.workout import (
     WorkoutHistoryItem,
     WorkoutHistorySummary,
     WorkoutProgressResponse,
+    WorkoutRecoveryApplyRequest,
+    WorkoutRecoveryApplyResponse,
+    WorkoutRecoveryPreviewResponse,
+    WorkoutRecoveryRequest,
+    WorkoutRecoveryStateResponse,
     WorkoutRescheduleRequest,
     WorkoutScheduleItem,
     WorkoutSetUpdate,
@@ -58,6 +71,7 @@ from fitminiapp_api.services.analytics import (
     build_training_analytics_for_range,
     build_user_progress,
 )
+from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.cardio import (
     CardioSessionError,
     complete_cardio_session,
@@ -68,15 +82,29 @@ from fitminiapp_api.services.cardio import (
     update_cardio_session,
 )
 from fitminiapp_api.services.coach_clients import get_client_managed_by_coach
-from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
+from fitminiapp_api.services.exercise_catalog import (
+    _source_exercise_slug,
+    get_visible_exercise_display_map,
+)
+from fitminiapp_api.services.exercise_catalog_metadata import CANONICAL_EXERCISE_REDIRECTS
+from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
+from fitminiapp_api.services.exercise_setup_memory import get_exercise_setup_memories_for_workout
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.measurements import (
+    CustomMeasurementDefinitionError,
     MeasurementError,
     MeasurementNotFoundError,
+    archive_custom_measurement_definition,
+    create_custom_measurement_definition,
     delete_measurement,
+    list_custom_measurement_definitions,
     list_measurements,
+    restore_custom_measurement_definition,
     save_measurement,
+    serialize_custom_measurement_definition,
     serialize_measurement,
+    update_custom_measurement_definition,
 )
 from fitminiapp_api.services.notifications import cancel_workout_reminder, queue_notification
 from fitminiapp_api.services.nutrition_reports import (
@@ -86,6 +114,7 @@ from fitminiapp_api.services.nutrition_reports import (
 )
 from fitminiapp_api.services.period_bounds import PeriodBoundsError, resolve_progress_bounds
 from fitminiapp_api.services.program_common import ProgramError
+from fitminiapp_api.services.program_versioning import record_program_revision
 from fitminiapp_api.services.progress import (
     build_progress_summary_for_range,
 )
@@ -95,12 +124,21 @@ from fitminiapp_api.services.progress_report_downloads import (
 )
 from fitminiapp_api.services.progress_report_pdf import build_progress_report_pdf
 from fitminiapp_api.services.progress_reports import build_progress_report
+from fitminiapp_api.services.progress_weekly_action import (
+    record_progress_weekly_action_completion,
+)
 from fitminiapp_api.services.progression_guidance import build_progression_guidance
+from fitminiapp_api.services.warmup_proposals import (
+    WarmupProposalError,
+    apply_warmup_proposal,
+    build_warmup_proposal,
+)
 from fitminiapp_api.services.workout_adaptation import (
     WorkoutAdaptationError,
     apply_adaptation,
     build_adaptation_preview,
     list_compatible_alternatives,
+    record_adaptation_outcome,
 )
 from fitminiapp_api.services.workout_comments import (
     WorkoutCommentError,
@@ -111,6 +149,17 @@ from fitminiapp_api.services.workout_completion import build_workout_completion_
 from fitminiapp_api.services.workout_metrics import (
     validate_workout_set_changes,
     workout_exercise_metric_type,
+)
+from fitminiapp_api.services.workout_recovery import (
+    WorkoutRecoveryError,
+    apply_recovery,
+    build_recovery_preview,
+    recoverable_missed_workout_ids,
+    recovery_now_for_user_naive,
+    recovery_state,
+    recovery_today_for_user,
+    recovery_user_local_naive_to_utc_naive,
+    serialize_schedule_item,
 )
 from fitminiapp_api.services.workout_sync import (
     WorkoutSetSyncError,
@@ -124,6 +173,11 @@ from fitminiapp_api.services.workouts import (
 )
 
 router = APIRouter()
+
+
+def now_for_user_naive(user: User):
+    """Compatibility seam for existing route tests and local time control."""
+    return recovery_now_for_user_naive(user)
 
 
 @router.get("/cardio", response_model=list[CardioSessionResponse])
@@ -216,8 +270,14 @@ def get_my_workout_comments(
     return [serialize_workout_comment(comment) for comment in comments]
 
 
-def _get_user_workout_or_404(db: Session, current_user: User, workout_id: int) -> UserWorkout:
-    workout = (
+def _get_user_workout_or_404(
+    db: Session,
+    current_user: User,
+    workout_id: int,
+    *,
+    refresh: bool = False,
+) -> UserWorkout:
+    query = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .options(
@@ -230,8 +290,10 @@ def _get_user_workout_or_404(db: Session, current_user: User, workout_id: int) -
             UserWorkout.id == workout_id,
             UserProgram.user_id == current_user.id,
         )
-        .first()
     )
+    if refresh:
+        query = query.populate_existing()
+    workout = query.first()
     if not workout:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
     return workout
@@ -249,7 +311,7 @@ def _lock_program(db: Session, program_id: int) -> UserProgram:
 
 def _require_active_program(program: UserProgram) -> None:
     if not program.is_active:
-        raise HTTPException(status_code=409, detail="Программа уже завершена или архивирована")
+        raise HTTPException(status_code=409, detail="Программа сейчас неактивна")
 
 
 def _reconcile_program_completion(db: Session, program: UserProgram, current_user: User) -> None:
@@ -262,10 +324,33 @@ def _reconcile_program_completion(db: Session, program: UserProgram, current_use
         )
         .first()
     )
-    if remaining_workout is None:
+    if remaining_workout is None and program.status != "completed":
+        previous_status = program.status
         program.status = "completed"
         program.is_active = False
         program.completed_at = now_for_user_naive(current_user)
+        revision = record_program_revision(
+            db,
+            program,
+            actor=current_user,
+            change_kind="program_lifecycle",
+            reason="Все тренировки программы завершены",
+            changed_fields={
+                "operation": "program_completed_from_schedule",
+                "previous_status": previous_status,
+                "status": program.status,
+                "is_active": program.is_active,
+            },
+        )
+        record_audit_event(
+            db,
+            actor_user_id=current_user.id,
+            target_user_id=program.user_id,
+            action="program.completed",
+            resource_type="user_program",
+            resource_id=program.id,
+            details={"revision_number": revision.revision_number},
+        )
 
 
 def _delete_workouts(db: Session, workout_ids: list[int]) -> int:
@@ -321,6 +406,11 @@ def _delete_workouts(db: Session, workout_ids: list[int]) -> int:
 
 def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) -> dict:
     visible_map = get_visible_exercise_display_map(db, current_user)
+    setup_memories = get_exercise_setup_memories_for_workout(
+        db,
+        current_user,
+        (item.exercise_id for item in workout.exercises),
+    )
     exercise_titles = {
         item.id: (
             visible_map[item.exercise_id].title
@@ -331,6 +421,28 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
     }
     progression_guidance = build_progression_guidance(db, current_user, workout)
     metric_types = {item.id: workout_exercise_metric_type(item) for item in workout.exercises}
+
+    def media_preview(item: UserWorkoutExercise) -> dict[str, object]:
+        exercise = visible_map.get(item.exercise_id) or item.exercise
+        if exercise is None:
+            return {
+                "state": "blocked",
+                "thumbnail_url": None,
+                "thumbnail_sources": [],
+                "preferred_mode": None,
+                "animation_url": None,
+            }
+        source_slug = _source_exercise_slug(exercise)
+        return get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
+
+    media_previews = {item.id: media_preview(item) for item in workout.exercises}
+
+    def set_sort_key(set_item: UserWorkoutSet) -> tuple[int, int, int]:
+        return (
+            0 if set_item.set_kind == "warmup" or set_item.planned_role == "warmup" else 1,
+            set_item.set_number,
+            set_item.id,
+        )
 
     return {
         "id": workout.id,
@@ -354,12 +466,25 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 "prescribed_duration_minutes": item.prescribed_duration_minutes,
                 "rest_seconds": item.rest_seconds,
                 "notes": item.notes,
+                "setup_memory": setup_memories.get(item.exercise_id),
                 "superset_group": item.superset_group,
                 "superset_order": item.superset_order,
+                "prescription": item.prescription,
+                "source_template_exercise_id": item.source_template_exercise_id,
+                "source_weekly_prescription_id": item.source_weekly_prescription_id,
+                "group_id": item.group_id,
+                "group_kind": item.group_kind,
+                "group_order": item.group_order,
                 "has_guide": bool(
                     (visible_map.get(item.exercise_id) or item.exercise)
                     and get_exercise_guide(visible_map.get(item.exercise_id) or item.exercise)
                 ),
+                "media_state": media_previews[item.id]["state"],
+                "media_thumbnail_url": media_previews[item.id]["thumbnail_url"],
+                "media_thumbnail_sources": media_previews[item.id]["thumbnail_sources"],
+                "media_preferred_mode": media_previews[item.id]["preferred_mode"],
+                "media_animation_url": media_previews[item.id]["animation_url"],
+                "media_video_sources": media_previews[item.id]["video_sources"],
                 "progression_guidance": (
                     progression_guidance[item.id] if metric_types[item.id] == "strength" else None
                 ),
@@ -368,9 +493,17 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                         "id": set_item.id,
                         "set_number": set_item.set_number,
                         "actual_reps": set_item.actual_reps,
-                        "actual_weight": set_item.actual_weight,
+                        "actual_weight": (
+                            float(set_item.actual_weight)
+                            if set_item.actual_weight is not None
+                            else None
+                        ),
                         "duration_minutes": set_item.duration_minutes,
-                        "distance_km": set_item.distance_km,
+                        "distance_km": (
+                            float(set_item.distance_km)
+                            if set_item.distance_km is not None
+                            else None
+                        ),
                         "average_heart_rate_bpm": set_item.average_heart_rate_bpm,
                         "heart_rate_zone": set_item.heart_rate_zone,
                         "rir": set_item.rir,
@@ -378,8 +511,13 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                         "reached_failure": set_item.reached_failure,
                         "is_completed": set_item.is_completed,
                         "version": set_item.version,
+                        "planned_role": set_item.planned_role,
+                        "planned_group_id": set_item.planned_group_id,
+                        "planned_group_kind": set_item.planned_group_kind,
+                        "planned_position": set_item.planned_position,
+                        "planned_round": set_item.planned_round,
                     }
-                    for set_item in sorted(item.sets, key=lambda x: x.set_number)
+                    for set_item in sorted(item.sets, key=set_sort_key)
                 ],
             }
             for item in sorted(workout.exercises, key=lambda x: x.sort_order)
@@ -399,9 +537,9 @@ def get_today_workout(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    today = today_for_user(current_user)
+    today = recovery_today_for_user(current_user)
 
-    workout = (
+    active_workout = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .options(
@@ -410,22 +548,32 @@ def get_today_workout(
         )
         .filter(
             UserProgram.user_id == current_user.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
+            UserWorkout.status == "in_progress",
+        )
+        .order_by(UserWorkout.started_at.desc(), UserWorkout.id.desc())
+        .first()
+    )
+    workout = active_workout or (
+        db.query(UserWorkout)
+        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .options(
+            joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
+            joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
+        )
+        .filter(
+            UserProgram.user_id == current_user.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date == today,
-            UserWorkout.status.in_({"planned", "in_progress", "completed"}),
+            UserWorkout.status.in_({"planned", "completed"}),
         )
         .order_by(
-            case(
-                (UserWorkout.status == "in_progress", 0),
-                (UserWorkout.status == "planned", 1),
-                else_=2,
-            ),
+            case((UserWorkout.status == "planned", 0), else_=1),
             case((UserWorkout.completed_at.is_(None), 1), else_=0),
             UserWorkout.completed_at.desc(),
-            case(
-                (UserWorkout.status == "completed", UserWorkout.id),
-                else_=None,
-            ).desc(),
-            UserWorkout.id.asc(),
+            UserWorkout.id.desc(),
         )
         .first()
     )
@@ -434,6 +582,14 @@ def get_today_workout(
         raise HTTPException(status_code=404, detail="На сегодня тренировка не назначена")
 
     return _serialize_workout(workout, db, current_user)
+
+
+@router.get("/recovery", response_model=WorkoutRecoveryStateResponse)
+def get_workout_recovery_state(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return recovery_state(db, current_user)
 
 
 @router.get(
@@ -456,16 +612,100 @@ def workout_exercise_alternatives(
             detail="Укажите не больше девяти уникальных видов оборудования",
         )
     workout = _get_user_workout_or_404(db, current_user, workout_id)
+    workout_status = workout.status
     try:
-        return list_compatible_alternatives(
+        alternatives = list_compatible_alternatives(
             db,
             current_user,
             workout,
             workout_exercise_id,
             set(available_equipment_ids or []),
         )
+        if not alternatives and workout_status == "in_progress":
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason="replace_exercise",
+                outcome="no_compatible_alternative",
+                workout_status=workout_status,
+                target_workout_exercise_id=workout_exercise_id,
+            )
+            db.commit()
+        return alternatives
     except WorkoutAdaptationError as exc:
+        db.rollback()
+        if exc.outcome is not None:
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason="replace_exercise",
+                outcome=exc.outcome,
+                workout_status=workout_status,
+                target_workout_exercise_id=workout_exercise_id,
+            )
+            db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/preview",
+    response_model=WarmupProposalPreviewResponse,
+)
+def preview_warmup_proposal(
+    workout_id: int,
+    workout_exercise_id: int,
+    payload: WarmupProposalPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    try:
+        return build_warmup_proposal(
+            db,
+            current_user,
+            workout,
+            workout_exercise_id,
+            payload,
+        )
+    except WarmupProposalError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.detail},
+        ) from exc
+
+
+@router.post(
+    "/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/apply",
+    response_model=WarmupProposalApplyResponse,
+)
+def apply_warmup_proposal_route(
+    workout_id: int,
+    workout_exercise_id: int,
+    payload: WarmupProposalApplyRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    _lock_program(db, workout.user_program_id)
+    workout = _get_user_workout_or_404(db, current_user, workout_id, refresh=True)
+    try:
+        result = apply_warmup_proposal(
+            db,
+            current_user,
+            workout,
+            workout_exercise_id,
+            payload,
+        )
+    except WarmupProposalError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.detail},
+        ) from exc
+    updated = _get_user_workout_or_404(db, current_user, workout_id, refresh=True)
+    return {**result, "workout": _serialize_workout(updated, db, current_user)}
 
 
 @router.post(
@@ -479,9 +719,41 @@ def preview_workout_adaptation(
     db: Session = Depends(get_db),
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id)
+    workout_status = workout.status
     try:
-        return build_adaptation_preview(db, current_user, workout, payload)
+        result = build_adaptation_preview(db, current_user, workout, payload)
+        if workout_status == "in_progress":
+            outcome = "safety_stop" if result["status"] == "safety_stop" else None
+            if result["status"] == "preview":
+                outcome = "preview_created"
+            if outcome is not None:
+                record_adaptation_outcome(
+                    db,
+                    current_user,
+                    workout_id=workout_id,
+                    reason=payload.reason,
+                    outcome=outcome,
+                    workout_status=workout_status,
+                    target_workout_exercise_id=payload.target_workout_exercise_id,
+                    changed_workout_exercise_ids=[
+                        item["workout_exercise_id"] for item in result["changes"]
+                    ],
+                )
+                db.commit()
+        return result
     except WorkoutAdaptationError as exc:
+        db.rollback()
+        if exc.outcome is not None:
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason=payload.reason,
+                outcome=exc.outcome,
+                workout_status=workout_status,
+                target_workout_exercise_id=payload.target_workout_exercise_id,
+            )
+            db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -497,7 +769,8 @@ def apply_workout_adaptation(
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id)
     _lock_program(db, workout.user_program_id)
-    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    workout = _get_user_workout_or_404(db, current_user, workout_id, refresh=True)
+    workout_status = workout.status
     try:
         adaptation = apply_adaptation(
             db,
@@ -508,6 +781,17 @@ def apply_workout_adaptation(
         )
     except WorkoutAdaptationError as exc:
         db.rollback()
+        if exc.outcome is not None:
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason=payload.reason,
+                outcome=exc.outcome,
+                workout_status=workout_status,
+                target_workout_exercise_id=payload.target_workout_exercise_id,
+            )
+            db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     updated = _get_user_workout_or_404(db, current_user, workout_id)
     return {
@@ -517,12 +801,49 @@ def apply_workout_adaptation(
     }
 
 
+@router.post(
+    "/{workout_id}/recovery/preview",
+    response_model=WorkoutRecoveryPreviewResponse,
+)
+def preview_workout_recovery(
+    workout_id: int,
+    payload: WorkoutRecoveryRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    try:
+        return build_recovery_preview(db, current_user, workout, payload)
+    except WorkoutRecoveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/{workout_id}/recovery/apply",
+    response_model=WorkoutRecoveryApplyResponse,
+)
+def apply_workout_recovery(
+    workout_id: int,
+    payload: WorkoutRecoveryApplyRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    _lock_program(db, workout.user_program_id)
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    try:
+        return apply_recovery(db, current_user, workout, payload, payload.preview_token)
+    except WorkoutRecoveryError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
 @router.get("/week", response_model=list[WorkoutScheduleItem])
 def get_week_schedule(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    today = today_for_user(current_user)
+    today = recovery_today_for_user(current_user)
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     workouts = (
@@ -531,21 +852,19 @@ def get_week_schedule(
         .filter(
             UserProgram.user_id == current_user.id,
             UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date.between(week_start, week_end),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
     )
+    missed_ids = recoverable_missed_workout_ids(db, current_user)
     return [
-        {
-            "id": workout.id,
-            "scheduled_date": str(workout.scheduled_date),
-            "scheduled_time": workout.scheduled_time,
-            "title": workout.title,
-            "status": workout.status,
-            "day_number": workout.day_number,
-            "week_number": workout.week_number,
-        }
+        serialize_schedule_item(
+            workout,
+            current_user,
+            status_override="missed" if workout.id in missed_ids else None,
+        )
         for workout in workouts
     ]
 
@@ -557,7 +876,7 @@ def get_schedule(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    start = date_from or today_for_user(current_user)
+    start = date_from or recovery_today_for_user(current_user)
     end = date_to or (start + timedelta(days=55))
     if end < start:
         raise HTTPException(status_code=422, detail="date_to must not be before date_from")
@@ -572,21 +891,19 @@ def get_schedule(
         .filter(
             UserProgram.user_id == current_user.id,
             UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date.between(start, end),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
     )
+    missed_ids = recoverable_missed_workout_ids(db, current_user)
     return [
-        {
-            "id": workout.id,
-            "scheduled_date": workout.scheduled_date,
-            "scheduled_time": workout.scheduled_time,
-            "title": workout.title,
-            "status": workout.status,
-            "day_number": workout.day_number,
-            "week_number": workout.week_number,
-        }
+        serialize_schedule_item(
+            workout,
+            current_user,
+            status_override="missed" if workout.id in missed_ids else None,
+        )
         for workout in workouts
     ]
 
@@ -816,7 +1133,7 @@ def delete_today_workout(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    today = today_for_user(current_user)
+    today = recovery_today_for_user(current_user)
 
     workout = (
         db.query(UserWorkout)
@@ -861,20 +1178,52 @@ def start_workout(
     program = _lock_program(db, workout.user_program_id)
     db.refresh(workout)
 
-    if workout.scheduled_date != today_for_user(current_user):
-        raise HTTPException(status_code=409, detail="Можно начать только тренировку на сегодня")
     if workout.status == "completed":
         raise HTTPException(status_code=409, detail="Тренировка уже завершена")
     _require_active_program(program)
+    if workout.status == "in_progress":
+        return _serialize_workout(workout, db, current_user)
+    if workout.scheduled_date != recovery_today_for_user(current_user):
+        raise HTTPException(status_code=409, detail="Можно начать только тренировку на сегодня")
     if workout.status not in {"planned", "in_progress"}:
         raise HTTPException(status_code=409, detail="Недопустимое состояние тренировки")
 
+    was_started = workout.started_at is not None
     if not workout.started_at:
         workout.started_at = now_for_user_naive(current_user)
     workout.status = "in_progress"
+    if not was_started and workout.started_at is not None:
+        record_lifecycle_milestone(
+            db,
+            current_user,
+            "workout_started",
+            occurred_at=recovery_user_local_naive_to_utc_naive(workout.started_at, current_user),
+        )
     cancel_workout_reminder(db, workout.id)
     if program.status == "scheduled":
+        previous_status = program.status
         program.status = "active"
+        revision = record_program_revision(
+            db,
+            program,
+            actor=current_user,
+            change_kind="program_lifecycle",
+            reason="Первая тренировка программы начата",
+            changed_fields={
+                "operation": "program_started",
+                "previous_status": previous_status,
+                "status": program.status,
+            },
+        )
+        record_audit_event(
+            db,
+            actor_user_id=current_user.id,
+            target_user_id=program.user_id,
+            action="program.started",
+            resource_type="user_program",
+            resource_id=program.id,
+            details={"revision_number": revision.revision_number},
+        )
     db.commit()
     db.refresh(workout)
 
@@ -895,8 +1244,6 @@ def finish_workout(
 
     if workout.status == "completed":
         return _serialize_workout(workout, db, current_user)
-    if workout.scheduled_date != today_for_user(current_user):
-        raise HTTPException(status_code=409, detail="Можно завершить только тренировку на сегодня")
     _require_active_program(program)
     if workout.status != "in_progress":
         raise HTTPException(status_code=409, detail="Сначала начните тренировку")
@@ -945,6 +1292,14 @@ def finish_workout(
 
     workout.completed_at = now_for_user_naive(current_user)
     workout.status = "completed"
+    if workout.completed_at is not None:
+        record_lifecycle_milestone(
+            db,
+            current_user,
+            "workout_completed",
+            occurred_at=recovery_user_local_naive_to_utc_naive(workout.completed_at, current_user),
+        )
+        record_progress_weekly_action_completion(db, current_user, "workout")
     cancel_workout_reminder(db, workout.id)
 
     _reconcile_program_completion(db, program, current_user)
@@ -1006,6 +1361,14 @@ def update_workout_set(
     changes = payload.model_dump(exclude_unset=True)
     expected_version = changes.pop("expected_version", None)
     mutation_id = changes.pop("mutation_id", None)
+    # Exact retries depend on the original request, not today's mutable set state.
+    try:
+        replayed = replayed_workout_set(db, set_row, mutation_id, changes)
+    except WorkoutSetSyncError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    if replayed is not None:
+        return serialize_workout_set(replayed)
+
     try:
         validate_workout_set_changes(
             workout_exercise_metric_type(workout_exercise),
@@ -1016,9 +1379,6 @@ def update_workout_set(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     try:
-        replayed = replayed_workout_set(db, set_row, mutation_id, changes)
-        if replayed is not None:
-            return serialize_workout_set(replayed)
         if mutation_id is None and workout.status != "in_progress":
             raise HTTPException(
                 status_code=409,
@@ -1058,7 +1418,7 @@ def reschedule_workout(
             status_code=409,
             detail="Перенести можно только запланированную тренировку",
         )
-    if payload.scheduled_date < today_for_user(current_user):
+    if payload.scheduled_date < recovery_today_for_user(current_user):
         raise HTTPException(status_code=422, detail="Нельзя перенести тренировку в прошлое")
     now = now_for_user_naive(current_user)
     if (
@@ -1172,6 +1532,18 @@ def workout_history(
         .all()
     )
 
+    rest_by_workout: dict[int, list] = {workout.id: [] for workout in workouts}
+    if rest_by_workout:
+        for rest_row in (
+            db.query(WorkoutRestSession)
+            .filter(
+                WorkoutRestSession.user_id == current_user.id,
+                WorkoutRestSession.workout_id.in_(rest_by_workout),
+            )
+            .order_by(WorkoutRestSession.started_at.asc(), WorkoutRestSession.id.asc())
+            .all()
+        ):
+            rest_by_workout[rest_row.workout_id].append(serialize_rest_session(rest_row))
     rows = []
     for item in workouts:
         sets = [set_row for exercise in item.exercises for set_row in exercise.sets]
@@ -1191,9 +1563,10 @@ def workout_history(
                 "started_at": item.started_at.isoformat() if item.started_at else None,
                 "completed_at": item.completed_at.isoformat() if item.completed_at else None,
                 "completed_sets": len(completed_sets),
-                "volume_kg": round(volume_kg, 1),
+                "volume_kg": round(volume_kg, 2),
                 "completion_feedback": item.completion_feedback,
                 "completion_note": item.completion_note,
+                "rest_sessions": rest_by_workout.get(item.id, []),
                 "exercises": [
                     {
                         "workout_exercise_id": exercise.id,
@@ -1283,6 +1656,91 @@ def save_body_measurement(
     except MeasurementError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_measurement(row)
+
+
+@router.get(
+    "/diary/custom-definitions",
+    response_model=list[BodyMeasurementDefinitionResponse],
+)
+def body_measurement_definitions(
+    include_archived: bool = Query(default=False),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return [
+        serialize_custom_measurement_definition(row)
+        for row in list_custom_measurement_definitions(
+            db,
+            current_user,
+            include_archived=include_archived,
+        )
+    ]
+
+
+@router.post(
+    "/diary/custom-definitions",
+    response_model=BodyMeasurementDefinitionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_body_measurement_definition(
+    payload: BodyMeasurementDefinitionCreate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = create_custom_measurement_definition(db, current_user, payload)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
+
+
+@router.patch(
+    "/diary/custom-definitions/{definition_id}",
+    response_model=BodyMeasurementDefinitionResponse,
+)
+def update_body_measurement_definition(
+    definition_id: int,
+    payload: BodyMeasurementDefinitionUpdate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = update_custom_measurement_definition(db, current_user, definition_id, payload)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
+
+
+@router.delete(
+    "/diary/custom-definitions/{definition_id}",
+    response_model=BodyMeasurementDefinitionResponse,
+)
+def archive_body_measurement_definition(
+    definition_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = archive_custom_measurement_definition(db, current_user, definition_id)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
+
+
+@router.post(
+    "/diary/custom-definitions/{definition_id}/restore",
+    response_model=BodyMeasurementDefinitionResponse,
+)
+def restore_body_measurement_definition(
+    definition_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = restore_custom_measurement_definition(db, current_user, definition_id)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
 
 
 @router.delete("/diary/{measurement_id}", status_code=status.HTTP_204_NO_CONTENT)

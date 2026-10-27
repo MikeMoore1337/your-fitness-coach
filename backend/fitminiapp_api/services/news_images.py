@@ -5,7 +5,6 @@ import hashlib
 import io
 import logging
 import secrets
-import textwrap
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,6 +39,9 @@ PROVIDER_POLICY_CHECKED_AT = "2026-08-26"
 BRAND_LABEL_POSITION = (90, 84)
 RUBRIC_POSITION = (90, 155)
 HEADLINE_X = 86
+HEADLINE_MAX_WIDTH = 980
+HEADLINE_INITIAL_FONT_SIZE = 55
+HEADLINE_MIN_FONT_SIZE = 18
 REVIEW_LABEL_POSITION = (90, 685)
 HEADLINE_SPACING = 10
 
@@ -153,12 +155,17 @@ def _rubric(draft: NewsDraftRevision) -> str:
             if value:
                 return value[:48]
     return {
-        "fitness": "Фитнес и тренировки",
-        "nutrition": "Питание и спортпит",
-        "medicine_pharmacology": "Медицина и фармакология",
-        "peptides": "Пептиды",
+        "fitness_training": "Фитнес и тренировки",
         "bodybuilding": "Бодибилдинг",
+        "sports_bodybuilding_pharmacology": "Спортивная фармакология",
+        "peptides": "Пептиды",
+        "nutrition": "Питание",
+        "sports_nutrition": "Спортивное питание",
+        "dietary_supplements": "БАДы и добавки",
+        "healthy_lifestyle": "ЗОЖ и восстановление",
         # Historical topics remain readable for already-created immutable revisions.
+        "fitness": "Фитнес и тренировки",
+        "medicine_pharmacology": "Медицина и фармакология",
         "strength": "Силовые тренировки",
         "cardio_recovery": "Кардио и восстановление",
         "research": "Исследования",
@@ -217,6 +224,90 @@ def _centered_headline_y(
     return round(centered_top - headline_bounds[1])
 
 
+def _wrap_headline(
+    draw: ImageDraw.ImageDraw,
+    headline: str,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    *,
+    max_width: int,
+) -> tuple[str, ...]:
+    normalized = " ".join(headline.split())
+    if not normalized:
+        return ()
+
+    lines: list[str] = []
+    current = ""
+    for word in normalized.split(" "):
+        candidate = word if not current else f"{current} {word}"
+        if draw.textlength(candidate, font=font) <= max_width:
+            current = candidate
+            continue
+
+        if current:
+            lines.append(current)
+            current = ""
+
+        remaining = word
+        while draw.textlength(remaining, font=font) > max_width:
+            split_at = next(
+                (
+                    index
+                    for index in range(len(remaining), 0, -1)
+                    if draw.textlength(remaining[:index], font=font) <= max_width
+                ),
+                1,
+            )
+            lines.append(remaining[:split_at])
+            remaining = remaining[split_at:]
+        current = remaining
+
+    if current:
+        lines.append(current)
+    return tuple(lines)
+
+
+def _fit_headline_layout(
+    draw: ImageDraw.ImageDraw,
+    headline: str,
+    *,
+    rubric_bounds: tuple[float, float, float, float],
+    review_label_bounds: tuple[float, float, float, float],
+) -> tuple[str, ImageFont.FreeTypeFont | ImageFont.ImageFont, int]:
+    available_height = review_label_bounds[1] - rubric_bounds[3]
+    for font_size in range(HEADLINE_INITIAL_FONT_SIZE, HEADLINE_MIN_FONT_SIZE - 1, -1):
+        headline_font = _font(font_size, bold=True)
+        headline_lines = _wrap_headline(
+            draw,
+            headline,
+            headline_font,
+            max_width=HEADLINE_MAX_WIDTH,
+        )
+        if not headline_lines:
+            raise NewsImageError("headline_layout_invalid")
+        headline_text = "\n".join(headline_lines)
+        headline_bounds = draw.multiline_textbbox(
+            (0, 0),
+            headline_text,
+            font=headline_font,
+            spacing=HEADLINE_SPACING,
+        )
+        headline_height = headline_bounds[3] - headline_bounds[1]
+        max_line_width = max(draw.textlength(line, font=headline_font) for line in headline_lines)
+        if max_line_width <= HEADLINE_MAX_WIDTH and headline_height <= available_height:
+            return (
+                headline_text,
+                headline_font,
+                _centered_headline_y(
+                    draw,
+                    headline_text,
+                    headline_font,
+                    rubric_bounds=rubric_bounds,
+                    review_label_bounds=review_label_bounds,
+                ),
+            )
+    raise NewsImageError("headline_layout_invalid")
+
+
 def _draw_brand_overlay(image: Image.Image, draft: NewsDraftRevision) -> Image.Image:
     canvas = ImageOps.fit(image.convert("RGB"), CANVAS_SIZE, method=Image.Resampling.LANCZOS)
     overlay = Image.new("RGBA", CANVAS_SIZE, (0, 0, 0, 0))
@@ -237,19 +328,15 @@ def _draw_brand_overlay(image: Image.Image, draft: NewsDraftRevision) -> Image.I
         font=review_label_font,
         fill="#EEF0EA",
     )
-    headline_lines = textwrap.wrap(_headline(draft), width=27)[:4]
-    headline_text = "\n".join(headline_lines)
-    headline_font = _font(55, bold=True)
     rubric_bounds = draw.textbbox(RUBRIC_POSITION, rubric_text, font=rubric_font)
     review_label_bounds = draw.textbbox(
         REVIEW_LABEL_POSITION,
         review_label_text,
         font=review_label_font,
     )
-    headline_y = _centered_headline_y(
+    headline_text, headline_font, headline_y = _fit_headline_layout(
         draw,
-        headline_text,
-        headline_font,
+        _headline(draft),
         rubric_bounds=rubric_bounds,
         review_label_bounds=review_label_bounds,
     )

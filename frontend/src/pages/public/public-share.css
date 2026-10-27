@@ -1,0 +1,173 @@
+.public-share {
+  width: min(100% - 2rem, 920px);
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.public-share__card {
+  display: grid;
+  gap: 2rem;
+  padding: clamp(1.25rem, 3vw, 2.5rem);
+}
+
+.public-share__snapshot-heading,
+.public-share__section-heading {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.public-share__snapshot-heading h1,
+.public-share__section-heading h2,
+.public-share__quality h2,
+.public-share__import h2 {
+  margin: 0;
+}
+
+.public-share__snapshot-heading p,
+.public-share__limit,
+.public-share__quality-notes p,
+.public-share__import p {
+  color: var(--text-secondary, #68717d);
+  margin: 0;
+}
+
+.public-share__metrics,
+.public-share__exercise-list {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.public-share__metrics > div,
+.public-share__exercise-list article,
+.public-share__program-day,
+.public-share__quality,
+.public-share__import {
+  background: color-mix(in srgb, var(--surface-muted, #f4f5f6) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border, #d8dce1) 70%, transparent);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.public-share__metrics > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.public-share__metrics span,
+.public-share__metrics small,
+.public-share__exercise-list dt,
+.public-share__program-day small {
+  color: var(--text-secondary, #68717d);
+}
+
+.public-share__metrics strong {
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.public-share__quality,
+.public-share__import {
+  display: grid;
+  gap: 1rem;
+}
+
+.public-share__quality ul {
+  display: grid;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.public-share__quality li {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.public-share__quality-notes {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.public-share__exercise-list article {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.public-share__exercise-list h3 {
+  margin: 0;
+}
+
+.public-share__exercise-list dl {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+}
+
+.public-share__exercise-list dl div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.public-share__exercise-list dd {
+  margin: 0;
+}
+
+.public-share__program-days {
+  display: grid;
+  gap: 1rem;
+}
+
+.public-share__program-day ol {
+  display: grid;
+  gap: 0.8rem;
+  margin: 1rem 0 0;
+  padding-left: 1.35rem;
+}
+
+.public-share__program-day li {
+  padding-left: 0.35rem;
+}
+
+.public-share__program-day li > div,
+.public-share__program-day li > small {
+  display: block;
+}
+
+.public-share__program-day li > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.public-share__program-day li > div span {
+  color: var(--text-secondary, #68717d);
+}
+
+.public-share__program-day li > small + small {
+  margin-top: 0.2rem;
+}
+
+.public-share__import-result {
+  color: var(--text-primary, #1e242b) !important;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .public-share {
+    width: min(100% - 1rem, 920px);
+    padding-top: 1rem;
+  }
+
+  .public-share__card {
+    gap: 1.35rem;
+    padding: 1rem;
+  }
+
+  .public-share__exercise-list dl {
+    grid-template-columns: 1fr;
+  }
+}

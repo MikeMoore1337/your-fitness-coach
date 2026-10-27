@@ -1,0 +1,71 @@
+name: Upload encrypted Allure results
+description: Encrypt one isolated scheduled result directory before using an Actions artifact
+inputs:
+  enabled:
+    description: Whether the scheduled report lane is active
+    required: true
+  source:
+    description: Isolated Allure result directory
+    required: true
+  bundle:
+    description: Encrypted bundle output path
+    required: true
+  artifact-name:
+    description: Unique Actions artifact name
+    required: true
+  suite:
+    description: Stable suite identifier
+    required: true
+  browser:
+    description: Browser or runner identifier
+    required: true
+  retention-days:
+    description: Raw encrypted bundle retention
+    required: false
+    default: "3"
+runs:
+  using: composite
+  steps:
+    - name: Measure isolated Allure results
+      if: always() && inputs.enabled == 'true' && inputs.suite == 'frontend-cross-browser'
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        mkdir -p '${{ inputs.source }}' "$(dirname '${{ inputs.bundle }}')"
+        python scripts/allure_bundle.py measure \
+          --source '${{ inputs.source }}' \
+          --output '${{ inputs.bundle }}.size.json' \
+          --suite '${{ inputs.suite }}' \
+          --browser '${{ inputs.browser }}'
+    - name: Upload Allure size evidence
+      if: always() && inputs.enabled == 'true' && inputs.suite == 'frontend-cross-browser'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}-size
+        path: ${{ inputs.bundle }}.size.json
+        if-no-files-found: error
+        include-hidden-files: true
+        retention-days: ${{ inputs.retention-days }}
+    - name: Encrypt isolated Allure results
+      if: always() && inputs.enabled == 'true'
+      shell: bash
+      env:
+        ALLURE_REPORT_ENCRYPTION_KEY: ${{ env.ALLURE_REPORT_ENCRYPTION_KEY }}
+      run: |
+        set -Eeuo pipefail
+        test -n "${ALLURE_REPORT_ENCRYPTION_KEY:-}"
+        mkdir -p '${{ inputs.source }}' "$(dirname '${{ inputs.bundle }}')"
+        python scripts/allure_bundle.py encrypt \
+          --source '${{ inputs.source }}' \
+          --output '${{ inputs.bundle }}' \
+          --suite '${{ inputs.suite }}' \
+          --browser '${{ inputs.browser }}'
+    - name: Upload encrypted Allure bundle
+      if: always() && inputs.enabled == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.bundle }}
+        if-no-files-found: error
+        include-hidden-files: true
+        retention-days: ${{ inputs.retention-days }}

@@ -1,6 +1,16 @@
 from typing import Literal, cast
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -11,8 +21,14 @@ from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.account import AccountDataExport
+from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User, UserProfile
+from fitminiapp_api.schemas.acquisition import FirstTouchAttributionRequest
+from fitminiapp_api.schemas.exercise_setup import (
+    ExerciseSetupMemoryResponse,
+    ExerciseSetupMemorySaveRequest,
+)
 from fitminiapp_api.schemas.invite import CoachInvitePreviewResponse, CoachInviteTokenRequest
 from fitminiapp_api.schemas.trainer_capability import (
     TrainerCapabilityActivateRequest,
@@ -63,6 +79,7 @@ from fitminiapp_api.services.account_linking import (
     create_telegram_link_url,
 )
 from fitminiapp_api.services.accounts import build_account_export, delete_user_cascade
+from fitminiapp_api.services.acquisition import save_first_touch_attribution
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.avatars import (
     AVATAR_UPLOAD_MAX_BYTES,
@@ -78,6 +95,14 @@ from fitminiapp_api.services.coach_clients import (
     remove_current_trainer,
 )
 from fitminiapp_api.services.exercise_domain import BODY_PRIORITY_TAXONOMY
+from fitminiapp_api.services.exercise_setup_memory import (
+    ExerciseSetupMemoryConflictError,
+    ExerciseSetupMemoryError,
+    ExerciseSetupMemoryNotFoundError,
+    delete_exercise_setup_memory,
+    get_exercise_setup_memory,
+    save_exercise_setup_memory,
+)
 from fitminiapp_api.services.nutrition import (
     NutritionError,
     build_nutrition_target_response_for_user,
@@ -162,10 +187,12 @@ def _build_user_response(db: Session, user) -> UserResponse:
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .filter(UserProgram.user_id == user.id, UserWorkout.status == "completed")
     )
-    has_active_program, has_workout_history, profile = (
+    food_history_exists = db.query(FoodDiaryEntry.id).filter(FoodDiaryEntry.user_id == user.id)
+    has_active_program, has_workout_history, has_food_history, profile = (
         db.query(
             active_program_exists.exists(),
             workout_history_exists.exists(),
+            food_history_exists.exists(),
             UserProfile,
         )
         .select_from(User)
@@ -176,6 +203,11 @@ def _build_user_response(db: Session, user) -> UserResponse:
     set_committed_value(user, "profile", profile)
     target = get_current_nutrition_target(db, user.id)
     kbju = build_nutrition_target_response_for_user(db, target, user)
+    # The current physical weight comes from the latest dated measurement.
+    # The profile field remains the fallback baseline if measurements are deleted.
+    from fitminiapp_api.services.measurements import latest_current_weight_measurement
+
+    latest_weight = latest_current_weight_measurement(db, user)
     trainer = get_current_trainer(db, user)
     heart_rates = calculate_profile_heart_rates(
         user.profile.birth_date if user.profile else None,
@@ -205,6 +237,7 @@ def _build_user_response(db: Session, user) -> UserResponse:
         is_root=has_verified_root_identity(db, user),
         has_active_program=has_active_program,
         has_workout_history=has_workout_history,
+        has_food_history=has_food_history,
         auth_providers=sorted(identity.provider for identity in user.auth_identities),
         onboarding=build_onboarding_state(user.profile),
         profile=UserProfileResponse(
@@ -214,7 +247,13 @@ def _build_user_response(db: Session, user) -> UserResponse:
             goal=user.profile.goal if user.profile else None,
             level=user.profile.level if user.profile else None,
             height_cm=user.profile.height_cm if user.profile else None,
-            weight_kg=user.profile.weight_kg if user.profile else None,
+            weight_kg=(
+                latest_weight.weight_kg
+                if latest_weight is not None
+                else user.profile.weight_kg
+                if user.profile
+                else None
+            ),
             workouts_per_week=user.profile.workouts_per_week if user.profile else None,
             cardio_trainings_per_week=(
                 user.profile.cardio_trainings_per_week if user.profile else None
@@ -259,6 +298,17 @@ def _build_user_response(db: Session, user) -> UserResponse:
 @router.get("", response_model=UserResponse)
 def read_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
     return _build_user_response(db, user)
+
+
+@router.post("/acquisition", status_code=status.HTTP_204_NO_CONTENT)
+def save_acquisition(
+    payload: FirstTouchAttributionRequest,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    save_first_touch_attribution(db, user, payload)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/avatar")
@@ -476,6 +526,68 @@ def preview_heart_rates(
     return _heart_rate_response(heart_rates)
 
 
+@router.get(
+    "/exercise-setup-memories/{exercise_id}",
+    response_model=ExerciseSetupMemoryResponse | None,
+)
+def get_own_exercise_setup_memory(
+    exercise_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ExerciseSetupMemoryResponse | None:
+    try:
+        return get_exercise_setup_memory(db, user, exercise_id)
+    except ExerciseSetupMemoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.put(
+    "/exercise-setup-memories/{exercise_id}",
+    response_model=ExerciseSetupMemoryResponse,
+)
+def save_own_exercise_setup_memory(
+    exercise_id: int,
+    payload: ExerciseSetupMemorySaveRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ExerciseSetupMemoryResponse:
+    try:
+        return save_exercise_setup_memory(
+            db,
+            user,
+            exercise_id,
+            payload.body,
+            payload.expected_version,
+        )
+    except ExerciseSetupMemoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ExerciseSetupMemoryConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ExerciseSetupMemoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.delete(
+    "/exercise-setup-memories/{exercise_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_own_exercise_setup_memory(
+    exercise_id: int,
+    expected_version: int | None = Query(default=None, ge=1),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    try:
+        delete_exercise_setup_memory(db, user, exercise_id, expected_version)
+    except ExerciseSetupMemoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ExerciseSetupMemoryConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/export")
 def export_account_data(
     user=Depends(get_current_user), db: Session = Depends(get_db)
@@ -500,6 +612,17 @@ def current_account_export(
     return _account_export_status(row)
 
 
+def _current_export_status_or_account_gone(
+    db: Session, user_id: int
+) -> AccountExportStatusResponse:
+    latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user_id).first()
+    if latest is None:
+        # Account deletion cascades the generation row while an archive may be
+        # building. Do not turn that expected lifecycle race into a 500.
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Аккаунт больше недоступен")
+    return _account_export_status(latest)
+
+
 @router.post(
     "/exports",
     response_model=AccountExportStatusResponse,
@@ -519,8 +642,7 @@ def create_account_export(
         archive_bytes, filename = build_account_export_archive(db, user)
         current_row = lock_account_export_generation(db, user.id, generation_id)
         if current_row is None:
-            latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).one()
-            return _account_export_status(latest)
+            return _current_export_status_or_account_gone(db, user.id)
         complete_account_export(current_row, archive_bytes, filename)
         record_audit_event(
             db,
@@ -534,8 +656,7 @@ def create_account_export(
     except AccountExportError as exc:
         current_row = lock_account_export_generation(db, user.id, generation_id)
         if current_row is None:
-            latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).one()
-            return _account_export_status(latest)
+            return _current_export_status_or_account_gone(db, user.id)
         fail_account_export(current_row, exc.error_code)
         record_audit_event(
             db,
@@ -550,8 +671,7 @@ def create_account_export(
         db.rollback()
         current_row = lock_account_export_generation(db, user.id, generation_id)
         if current_row is None:
-            latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).one()
-            return _account_export_status(latest)
+            return _current_export_status_or_account_gone(db, user.id)
         fail_account_export(current_row, "generation_failed")
         db.commit()
         raise HTTPException(

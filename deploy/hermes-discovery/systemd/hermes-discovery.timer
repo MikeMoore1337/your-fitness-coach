@@ -1,0 +1,13 @@
+[Unit]
+Description=Task 403 bounded Hermes discovery schedule
+
+[Timer]
+Unit=hermes-discovery.service
+OnBootSec=5min
+OnUnitActiveSec=1h
+RandomizedDelaySec=2min
+AccuracySec=1min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

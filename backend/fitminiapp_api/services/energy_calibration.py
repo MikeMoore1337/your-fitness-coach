@@ -5,10 +5,8 @@ import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from typing import Literal, cast
 
-from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.timezone import now_for_user_naive, today_for_user
@@ -20,6 +18,7 @@ from fitminiapp_api.schemas.nutrition import (
     EnergyCalibrationStatus,
     EnergyCalibrationSufficiency,
 )
+from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries, diary_entry_confidence
 from fitminiapp_api.services.nutrition import (
     NutritionMacros,
     calculate_macros,
@@ -47,7 +46,7 @@ HISTORY_LIMIT = 20
 
 GOAL_MULTIPLIERS = {
     "fat_loss": 0.85,
-    "recomposition": 1.0,
+    "recomposition": 0.95,
     "maintenance": 1.0,
     "muscle_gain": 1.05,
 }
@@ -127,6 +126,7 @@ def _sufficiency(
     weights: Sequence[tuple[date, float]],
     period_start: date,
     period_end: date,
+    confidence_counts: Mapping[str, int] | None = None,
 ) -> tuple[str, dict[str, int | float], list[str], list[float], list[float]]:
     first_window_end = period_start + timedelta(days=SMOOTHING_WINDOW_DAYS - 1)
     last_window_start = period_end - timedelta(days=SMOOTHING_WINDOW_DAYS - 1)
@@ -150,6 +150,8 @@ def _sufficiency(
         "first_window_weight_range_percent": round(first_range, 1),
         "last_window_weight_range_percent": round(last_range, 1),
     }
+    if confidence_counts is not None:
+        counters.update(confidence_counts)
 
     essential_reasons: list[str] = []
     if len(day_totals) < LIMITED_LOGGED_DAYS:
@@ -183,6 +185,7 @@ def evaluate_energy_calibration(
     day_totals: Mapping[date, float],
     weights: Sequence[tuple[date, float]],
     today: date,
+    confidence_counts: Mapping[str, int] | None = None,
 ) -> CalibrationEvaluation:
     period_end = today - timedelta(days=1)
     period_start = period_end - timedelta(days=LOOKBACK_DAYS - 1)
@@ -265,6 +268,7 @@ def evaluate_energy_calibration(
         weights=filtered_weights,
         period_start=period_start,
         period_end=period_end,
+        confidence_counts=confidence_counts,
     )
     if sufficiency == "insufficient":
         return CalibrationEvaluation(
@@ -357,16 +361,20 @@ def evaluate_energy_calibration(
             proposed_target = _round_to_fifty(target.calories + delta)
             proposed_macros = calculate_macros(target.weight_kg, proposed_target, target.goal)
             if proposed_macros["macro_warning"]:
-                macro_floor = proposed_macros["protein_g"] * 4 + proposed_macros["fat_g"] * 9
-                proposed_target = math.ceil(macro_floor / 50) * 50
-            if proposed_target != target.calories:
-                proposed_macros = calculate_macros(target.weight_kg, proposed_target, target.goal)
+                # Never override a calibrated energy budget to satisfy
+                # weight-based macro heuristics. No proposal is safer than
+                # a silently larger-than-intended target.
+                proposed_target = None
+                proposed_macros = None
+                status = "limited"
+                rationale_keys.append("macro_allocation_infeasible")
+            elif proposed_target != target.calories:
                 status = "pending"
                 rationale_keys.append("gradual_target_change_proposed")
             else:
                 proposed_target = None
                 proposed_macros = None
-        if proposed_target is None:
+        if proposed_target is None and status != "limited":
             rationale_keys.append("current_target_within_range")
 
     return CalibrationEvaluation(
@@ -554,15 +562,8 @@ def _load_inputs(
     period_start: date,
     period_end: date,
 ) -> tuple[dict[date, float], list[tuple[date, float]]]:
-    energy = case(
-        (
-            FoodDiaryEntry.entry_kind == "quick_add",
-            FoodDiaryEntry.quick_energy_kcal,
-        ),
-        else_=FoodDiaryEntry.energy_kcal_per_100g * FoodDiaryEntry.weight_g / Decimal("100"),
-    )
-    diary_rows = (
-        db.query(FoodDiaryEntry.diary_date, func.sum(energy))
+    diary_entries = (
+        db.query(FoodDiaryEntry)
         .join(
             FoodDiaryDayStatus,
             (FoodDiaryDayStatus.user_id == FoodDiaryEntry.user_id)
@@ -573,9 +574,10 @@ def _load_inputs(
             FoodDiaryEntry.diary_date.between(period_start, period_end),
             FoodDiaryDayStatus.status == "complete",
         )
-        .group_by(FoodDiaryEntry.diary_date)
+        .order_by(FoodDiaryEntry.diary_date.asc(), FoodDiaryEntry.id.asc())
         .all()
     )
+    diary_totals = aggregate_diary_entries(diary_entries)
     fasted_dates = (
         db.query(FoodDiaryDayStatus.diary_date)
         .filter(
@@ -597,11 +599,45 @@ def _load_inputs(
     )
     return (
         {
-            **{logged_on: float(total) for logged_on, total in diary_rows if total is not None},
+            **{
+                diary_date: float(total.calories)
+                for (entry_user_id, diary_date), total in diary_totals.items()
+                if entry_user_id == user.id and total.calories is not None
+            },
             **{logged_on: 0.0 for (logged_on,) in fasted_dates},
         },
         [(measured_on, float(weight)) for measured_on, weight in weight_rows if weight is not None],
     )
+
+
+def _load_confidence_counts(
+    db: Session,
+    user: User,
+    period_start: date,
+    period_end: date,
+) -> dict[str, int]:
+    entries = (
+        db.query(FoodDiaryEntry)
+        .join(
+            FoodDiaryDayStatus,
+            (FoodDiaryDayStatus.user_id == FoodDiaryEntry.user_id)
+            & (FoodDiaryDayStatus.diary_date == FoodDiaryEntry.diary_date),
+        )
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.diary_date.between(period_start, period_end),
+            FoodDiaryDayStatus.status == "complete",
+        )
+        .all()
+    )
+    counts = {
+        "exact_entry_count": 0,
+        "approximate_entry_count": 0,
+        "partial_entry_count": 0,
+    }
+    for entry in entries:
+        counts[f"{diary_entry_confidence(entry)}_entry_count"] += 1
+    return counts
 
 
 def preview_energy_calibration(db: Session, user: User) -> EnergyCalibrationResponse:
@@ -610,11 +646,13 @@ def preview_energy_calibration(db: Session, user: User) -> EnergyCalibrationResp
     period_start = period_end - timedelta(days=LOOKBACK_DAYS - 1)
     target = get_current_nutrition_target(db, user.id)
     day_totals, weights = _load_inputs(db, user, period_start, period_end)
+    confidence_counts = _load_confidence_counts(db, user, period_start, period_end)
     evaluation = evaluate_energy_calibration(
         target=target,
         day_totals=day_totals,
         weights=weights,
         today=today,
+        confidence_counts=confidence_counts,
     )
     if evaluation.estimated_expenditure_kcal is None:
         return _response_from_evaluation(evaluation)
@@ -726,6 +764,13 @@ def decide_energy_calibration(
             "Для текущей цели больше нет данных калькулятора; выполните новую проверку"
         )
     macros = calculate_macros(target.weight_kg, record.proposed_target_calories, target.goal)
+    if macros["macro_warning"]:
+        record.status = "superseded"
+        record.decided_at = decided_at
+        db.commit()
+        raise EnergyCalibrationConflictError(
+            "Нельзя принять цель: белки и жиры превышают калорийность; обновите расчёт"
+        )
     context = nutrition_target_context(target)
     context.update(
         tdee=record.estimated_expenditure_kcal,
@@ -772,11 +817,13 @@ def inspect_energy_calibration(db: Session, user: User) -> EnergyCalibrationResp
     period_start = period_end - timedelta(days=LOOKBACK_DAYS - 1)
     target = get_current_nutrition_target(db, user.id)
     day_totals, weights = _load_inputs(db, user, period_start, period_end)
+    confidence_counts = _load_confidence_counts(db, user, period_start, period_end)
     evaluation = evaluate_energy_calibration(
         target=target,
         day_totals=day_totals,
         weights=weights,
         today=today,
+        confidence_counts=confidence_counts,
     )
     return _response_from_evaluation(evaluation)
 

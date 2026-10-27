@@ -8,6 +8,7 @@ export const queryKeys = {
   measurements: {
     all: ['measurements'] as const,
     subject: (clientId?: number) => ['measurements', clientId ?? 'me'] as const,
+    definitions: (clientId?: number) => ['measurement-definitions', clientId ?? 'me'] as const,
   },
   progress: {
     summaries: ['workout', 'progress-summary'] as const,
@@ -16,10 +17,41 @@ export const queryKeys = {
       ['workout', 'nutrition-report', subject, period, dateFrom ?? null, dateTo ?? null] as const,
   },
   trainer: {
+    attention: ['coach', 'attention'] as const,
+    inbox: ['coach', 'inbox'] as const,
+    workflowAutomation: ['coach', 'workflow-automation'] as const,
+    capacity: ['coach', 'capacity'] as const,
+    checkInReviews: (status: 'pending' | 'reviewed' = 'pending') =>
+      ['coach', 'check-in-reviews', status] as const,
+    checkInTemplates: ['coach', 'check-in-templates'] as const,
+    checkInTemplateHistory: (templateId: number) =>
+      ['coach', 'check-in-template-history', templateId] as const,
+    onboardingWorkflowTemplates: ['coach', 'workflow-templates', 'onboarding'] as const,
+    communicationWorkflowTemplates: ['coach', 'workflow-templates', 'communication'] as const,
+    communicationWorkflowDraft: (draftId: number) =>
+      ['coach', 'workflow-templates', 'communication-draft', draftId] as const,
+    operationsToday: ['coach', 'operations', 'today'] as const,
+    agenda: (dateFrom: string, dateTo: string) => ['coach', 'agenda', dateFrom, dateTo] as const,
     clients: ['coach', 'clients'] as const,
     clientAnalytics: (clientId: number) => ['coach', 'client', clientId, 'analytics'] as const,
+    clientTrainingAnalytics: (clientId: number) =>
+      ['coach', 'client', clientId, 'training-analytics'] as const,
     clientSummary: (clientId: number) => ['coach', 'client', clientId, 'summary'] as const,
     clientSummaries: ['coach', 'client-summaries'] as const,
+    clientWorkouts: (clientId: number) => ['coach', 'client', clientId, 'workouts'] as const,
+    clientCheckIns: (clientId: number) =>
+      ['coach', 'client', clientId, 'weekly-check-ins'] as const,
+    clientReviewWorkspace: (clientId: number) =>
+      ['coach', 'client', clientId, 'review-workspace'] as const,
+    clientReportHandoffs: (clientId: number) =>
+      ['coach', 'client', clientId, 'report-handoffs'] as const,
+    clientOperations: (clientId: number) => ['coach', 'client', clientId, 'operations'] as const,
+    packages: ['coach', 'packages'] as const,
+    payments: ['coach', 'payments'] as const,
+    tasks: ['coach', 'tasks'] as const,
+  },
+  checkInTemplates: {
+    assigned: ['check-in-templates', 'assigned'] as const,
   },
   workoutComments: {
     client: (workoutId: number) => ['workout', workoutId, 'comments'] as const,
@@ -34,6 +66,17 @@ export const queryKeys = {
       ['nutrition', 'targets', 'history', targetTelegramId ?? 'me'] as const,
     hydration: ['nutrition', 'hydration'] as const,
     hydrationDate: (diaryDate: string) => ['nutrition', 'hydration', diaryDate] as const,
+    recipes: ['nutrition', 'recipes'] as const,
+    mealTemplates: ['nutrition', 'meal-templates'] as const,
+    suggestions: (diaryDate: string) => ['nutrition', 'suggestions', diaryDate] as const,
+    planSuggestions: (planDate: string) => ['nutrition', 'plan-suggestions', planDate] as const,
+    foodAliases: ['nutrition', 'food-aliases'] as const,
+    plans: {
+      all: ['nutrition', 'plans'] as const,
+      day: (planDate: string) => ['nutrition', 'plans', 'day', planDate] as const,
+      week: (weekStart: string) => ['nutrition', 'plans', 'week', weekStart] as const,
+    },
+    groceryList: (weekStart: string) => ['nutrition', 'grocery-list', weekStart] as const,
   },
   notifications: {
     all: ['notifications'] as const,
@@ -51,16 +94,21 @@ export async function invalidateMeasurementMutation(
 ): Promise<void> {
   const invalidations = [
     queryClient.invalidateQueries({ queryKey: queryKeys.measurements.subject(clientId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.measurements.definitions(clientId) }),
   ];
   if (clientId == null) {
     invalidations.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.progress.summaries }),
       queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.diary }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.currentTarget }),
+      queryClient.invalidateQueries({ queryKey: ['nutrition', 'targets', 'history'] }),
+      queryClient.invalidateQueries({ queryKey: ['weekly-check-ins'] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all }),
     );
   } else {
     invalidations.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clientAnalytics(clientId) }),
+      queryClient.invalidateQueries({ queryKey: ['nutrition', 'targets', 'history'] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clientSummary(clientId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clientSummaries }),
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clients }),
@@ -77,6 +125,7 @@ export async function invalidateNutritionSummaries(
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.progress.summaries }),
       queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.diary }),
+      queryClient.invalidateQueries({ queryKey: ['weekly-check-ins'] }),
     ]);
     return;
   }

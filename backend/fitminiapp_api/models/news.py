@@ -97,6 +97,27 @@ class NewsCluster(Base):
     score_reasons: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     risk_flags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     conflict_notes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    primary_topic: Mapped[str | None] = mapped_column(String(64), nullable=True, default="unknown")
+    topics: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    content_type: Mapped[str | None] = mapped_column(String(32), nullable=True, default="explainer")
+    product_class: Mapped[str | None] = mapped_column(String(32), nullable=True, default="unknown")
+    evidence_level: Mapped[str | None] = mapped_column(String(32), nullable=True, default="unknown")
+    risk_level: Mapped[str | None] = mapped_column(String(32), nullable=True, default="unknown")
+    audience: Mapped[str | None] = mapped_column(String(32), nullable=True, default="general")
+    geography: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    classification_version: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, default="news-taxonomy-v1"
+    )
+    classification_reasons: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    discovery_eligible: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
+    discovery_reasons: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    publication_policy: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, default="manual_required"
+    )
+    risk_reasons: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    risk_policy_version: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, default="news-risk-v1"
+    )
     merge_reason: Mapped[str] = mapped_column(String(160), nullable=False, default="new_event")
     latest_draft_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     latest_image_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -444,3 +465,246 @@ class NewsPublicationSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+
+
+class HermesEditorialSubmission(Base):
+    """Replay-protected, privacy-safe receipt for the external Hermes intake boundary."""
+
+    __tablename__ = "hermes_editorial_submissions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('accepted', 'rejected', 'expired')",
+            name="ck_hermes_editorial_submissions_status",
+        ),
+        CheckConstraint("source_count BETWEEN 1 AND 20", name="ck_hermes_source_count"),
+        UniqueConstraint("idempotency_key", name="uq_hermes_submission_idempotency"),
+        UniqueConstraint("request_nonce", name="uq_hermes_submission_nonce"),
+        Index("ix_hermes_submissions_created", "created_at"),
+        Index("ix_hermes_submissions_expires_status", "expires_at", "status"),
+    )
+
+    submission_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_id: Mapped[str] = mapped_column(
+        ForeignKey("news_sources.id", ondelete="RESTRICT"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_nonce: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="accepted")
+    cluster_id: Mapped[str | None] = mapped_column(
+        ForeignKey("news_clusters.id", ondelete="SET NULL"), nullable=True
+    )
+    draft_id: Mapped[str | None] = mapped_column(
+        ForeignKey("news_draft_revisions.id", ondelete="SET NULL"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    skill_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    taxonomy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    risk_policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    response_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    rejection_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class WebArticleCandidate(Base):
+    """Provider-neutral article idea and scoring receipt; never a publish instruction."""
+
+    __tablename__ = "web_article_candidates"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('candidate', 'approved', 'researching', 'draft', 'review', 'rejected')",
+            name="ck_web_article_candidates_status",
+        ),
+        CheckConstraint(
+            "source_kind IN ('manual', 'seo_import', 'news_handoff')",
+            name="ck_web_article_candidates_source_kind",
+        ),
+        CheckConstraint(
+            "search_demand_signal BETWEEN 0 AND 100 AND intent_clarity BETWEEN 0 AND 100 "
+            "AND topical_relevance BETWEEN 0 AND 100 AND product_relevance BETWEEN 0 AND 100 "
+            "AND audience_usefulness BETWEEN 0 AND 100 AND evergreen_potential BETWEEN 0 AND 100 "
+            "AND evidence_availability BETWEEN 0 AND 100 AND existing_content_overlap BETWEEN 0 AND 100 "
+            "AND internal_link_potential BETWEEN 0 AND 100 AND risk_review_cost BETWEEN 0 AND 100 "
+            "AND freshness_need BETWEEN 0 AND 100 AND news_opportunity BETWEEN 0 AND 100",
+            name="ck_web_article_candidate_signals",
+        ),
+        CheckConstraint("priority_score BETWEEN 0 AND 100", name="ck_web_article_candidate_score"),
+        Index("ix_web_article_candidates_queue", "status", "priority_score", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    source_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="candidate")
+    working_title: Mapped[str] = mapped_column(String(240), nullable=False)
+    primary_topic: Mapped[str] = mapped_column(String(64), nullable=False)
+    topics: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    article_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    search_intent: Mapped[str] = mapped_column(String(24), nullable=False)
+    primary_query: Mapped[str] = mapped_column(String(240), nullable=False)
+    secondary_queries: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    audience: Mapped[str] = mapped_column(String(32), nullable=False, default="general")
+    risk_level: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
+    evidence_level: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
+    search_demand_signal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    intent_clarity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    topical_relevance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    product_relevance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    audience_usefulness: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evergreen_potential: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    evidence_availability: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    existing_content_overlap: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    internal_link_potential: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    risk_review_cost: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    freshness_need: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    news_opportunity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    priority_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    score_breakdown: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    web_article_potential_reasons: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class WebArticle(Base):
+    """Canonical Web article state. Public routes expose only the published status."""
+
+    __tablename__ = "web_articles"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('candidate', 'researching', 'draft', 'review', 'approved', 'published', "
+            "'update_required', 'archived', 'retracted')",
+            name="ck_web_articles_status",
+        ),
+        CheckConstraint("content_version >= 1", name="ck_web_articles_content_version"),
+        CheckConstraint("evergreen_score BETWEEN 0 AND 100", name="ck_web_articles_evergreen"),
+        CheckConstraint(
+            "product_relevance BETWEEN 0 AND 100", name="ck_web_articles_product_relevance"
+        ),
+        CheckConstraint(
+            "editorial_value BETWEEN 0 AND 100", name="ck_web_articles_editorial_value"
+        ),
+        Index("ix_web_articles_candidate_id", "candidate_id"),
+        Index("ix_web_articles_public_queue", "status", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    candidate_id: Mapped[str | None] = mapped_column(
+        ForeignKey("web_article_candidates.id", ondelete="SET NULL"), nullable=True
+    )
+    slug: Mapped[str] = mapped_column(String(180), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="draft")
+    title: Mapped[str] = mapped_column(String(180), nullable=False)
+    description: Mapped[str] = mapped_column(String(320), nullable=False)
+    lead: Mapped[str] = mapped_column(Text, nullable=False)
+    body_sections: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    topics: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    article_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    search_intent: Mapped[str] = mapped_column(String(24), nullable=False)
+    primary_query: Mapped[str] = mapped_column(String(240), nullable=False)
+    secondary_queries: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    risk_level: Mapped[str] = mapped_column(String(32), nullable=False)
+    evidence_level: Mapped[str] = mapped_column(String(32), nullable=False)
+    claims: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    sources: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    claim_source_matrix: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    author: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    editor: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    domain_reviewer: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    canonical_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    related_slugs: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    cta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    evergreen_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    product_relevance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    editorial_value: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    web_article_potential_reasons: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    content_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    research_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    skill_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    generated_with_ai: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    research_assistance: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    correction_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+
+class WebArticleRevision(Base):
+    """Immutable snapshot of every submitted or published Web article version."""
+
+    __tablename__ = "web_article_revisions"
+    __table_args__ = (
+        UniqueConstraint("article_id", "content_version", name="uq_web_article_revision_version"),
+        CheckConstraint("content_version >= 1", name="ck_web_article_revision_positive"),
+        Index("ix_web_article_revisions_article_created", "article_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    article_id: Mapped[str] = mapped_column(
+        ForeignKey("web_articles.id", ondelete="CASCADE"), nullable=False
+    )
+    content_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    change_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+
+class HermesWebArticleSubmission(Base):
+    """Replay-protected receipt for the long-form Hermes boundary."""
+
+    __tablename__ = "hermes_web_article_submissions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('accepted', 'expired')",
+            name="ck_hermes_web_article_submissions_status",
+        ),
+        UniqueConstraint("idempotency_key", name="uq_hermes_web_article_idempotency"),
+        UniqueConstraint("request_nonce", name="uq_hermes_web_article_nonce"),
+        Index("ix_hermes_web_article_submissions_created", "created_at"),
+        Index("ix_hermes_web_article_submissions_expires_status", "expires_at", "status"),
+    )
+
+    submission_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    candidate_id: Mapped[str] = mapped_column(
+        ForeignKey("web_article_candidates.id", ondelete="RESTRICT"), nullable=False
+    )
+    article_id: Mapped[str] = mapped_column(
+        ForeignKey("web_articles.id", ondelete="RESTRICT"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_nonce: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    research_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    skill_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="accepted")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

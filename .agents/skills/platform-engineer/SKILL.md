@@ -71,8 +71,8 @@ description: >
 Docker, Kubernetes, Terraform или другой инфраструктурный слой только потому, что он типичен.
 Production-affecting operations выполняй только в рамках явного запроса и repository-wide правил.
 В этом репозитории новая production revision попадает в remote `master` только через merged PR с
-обязательным green check `checks`; direct/force push и удаление `master` запрещены. Merge является
-release authorization: post-merge CI, exact-SHA provenance gate и production deployment проходят
-автоматически без отдельного ручного approval. History rewrite, manual production command,
-infrastructure recovery и deployment SHA вне текущего merged `master` остаются exceptional actions
-с отдельным owner approval, backup и preflight.
+обязательным green check `checks`; direct/force push и удаление `master` запрещены. GitHub Actions
+проверяет PR/merge SHA, определяет changed-path scope и выполняет production deployment/smoke для
+application changes. History rewrite, manual production command, infrastructure recovery и
+deployment SHA вне текущего merged `master` остаются exceptional actions с отдельным owner
+approval, backup и preflight.

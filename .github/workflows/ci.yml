@@ -1,325 +1,656 @@
 name: CI
 
 on:
-  push:
-    branches: [dev, master]
-    # Existing-branch push filters use a two-dot tree diff. A normal task/master update changes
-    # files and still runs full exact-SHA CI; the deployed master -> dev fast-forward normally has
-    # an identical tree and therefore creates no redundant workflow run.
-    paths: ["**"]
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, reopened, ready_for_review, synchronize, edited]
+  push:
+    # Run post-merge quality on staging without invoking production deploy.
+    branches: [master, dev]
+  schedule:
+    # Europe/Moscow: daily at 05:17.
+    - cron: "17 2 * * *"
+    # Europe/Moscow: weekly Sunday at 06:43.
+    - cron: "43 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      run_kind:
+        description: Scheduled regression tier
+        required: true
+        default: daily
+        type: choice
+        options: [daily, weekly]
 
 permissions:
-  actions: read
   contents: read
   pull-requests: read
 
 concurrency:
-  # All dev pushes and dev -> master PR runs share the supported native lane.
-  # The explicit PR gate below still rejects a PR that was opened before its
-  # exact-SHA push CI succeeded.
-  group: ${{ github.workflow }}-${{ (github.ref_name == 'dev' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository)) && 'dev-release' || github.ref }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  NPM_CONFIG_CACHE: ${{ github.workspace }}/.artifacts/cache/npm
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   PYTHONDONTWRITEBYTECODE: "1"
   PYTHONUNBUFFERED: "1"
-  UV_CACHE_DIR: ${{ github.workspace }}/.artifacts/cache/uv
+  UV_CACHE_DIR: ${{ github.workspace }}/.artifacts/runtime/cache/uv
   UV_SYSTEM_PYTHON: "1"
 
 jobs:
-  release-sequence:
-    name: Release sequence
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-
-    steps:
-      - name: Require successful push CI before release PR
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.base.ref == 'master' &&
-          github.event.pull_request.head.ref == 'dev' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_GATE_AT: ${{ github.event.pull_request.updated_at }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          current_pr_head="$(
-            gh api --method GET \
-              "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
-              --jq ".head.sha"
-          )"
-
-          if [ "$current_pr_head" != "$HEAD_SHA" ]; then
-            echo "Release sequence violation: stale PR event head $HEAD_SHA; current PR head is $current_pr_head." >&2
-            exit 1
-          fi
-
-          successful_run_id="$(
-            gh api --method GET \
-              "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
-              -f event=push \
-              -f head_sha="$HEAD_SHA" \
-              -f status=success \
-              -f per_page=100 \
-              --jq ".workflow_runs[] | select(
-                .head_branch == \"dev\" and
-                .head_sha == \"$HEAD_SHA\" and
-                .event == \"push\" and
-                .status == \"completed\" and
-                .conclusion == \"success\" and
-                .updated_at <= \"$PR_GATE_AT\"
-              ) | .id" \
-              | head -n 1
-          )"
-
-          if [ -z "$successful_run_id" ]; then
-            echo "Release sequence violation: PR dev -> master was opened before exact-SHA push CI completed successfully." >&2
-            echo "Close the PR, wait for successful push CI for $HEAD_SHA, then reopen or create the PR." >&2
-            exit 1
-          fi
-
-          echo "Release sequence verified by successful push CI run $successful_run_id."
-
-  task-provenance:
-    name: Task provenance
+  scope-router:
+    name: CI scope router
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      actions: read
-      contents: read
-      deployments: read
-      pull-requests: read
     outputs:
-      dev-update-kind: ${{ steps.verify-dev.outputs.kind }}
-
+      profile: ${{ steps.route.outputs.profile }}
+      required_groups: ${{ steps.route.outputs.required_groups }}
+      required_jobs: ${{ steps.route.outputs.required_jobs }}
+      skipped_groups: ${{ steps.route.outputs.skipped_groups }}
+      changed_paths: ${{ steps.route.outputs.changed_paths }}
+      run_quality: ${{ steps.route.outputs.run_quality }}
+      run_policy: ${{ steps.route.outputs.run_policy }}
+      run_external_skill_security: ${{ steps.route.outputs.run_external_skill_security }}
+      run_frontend: ${{ steps.route.outputs.run_frontend }}
+      run_frontend_smoke: ${{ steps.route.outputs.run_frontend_smoke }}
+      run_frontend_mobile_regression: ${{ steps.route.outputs.run_frontend_mobile_regression }}
+      run_frontend_mobile_regression_extended: ${{ steps.route.outputs.run_frontend_mobile_regression_extended }}
+      run_frontend_cross_browser: ${{ steps.route.outputs.run_frontend_cross_browser }}
+      run_python: ${{ steps.route.outputs.run_python }}
+      run_migrated_stack: ${{ steps.route.outputs.run_migrated_stack }}
+      run_dependency_audit: ${{ steps.route.outputs.run_dependency_audit }}
+      run_full_dependency_audit: ${{ steps.route.outputs.run_full_dependency_audit }}
+      run_frontend_dependency_audit: ${{ steps.route.outputs.run_frontend_dependency_audit }}
+      run_python_dependency_audit: ${{ steps.route.outputs.run_python_dependency_audit }}
+      run_containers: ${{ steps.route.outputs.run_containers }}
+      run_critical_smoke: ${{ steps.route.outputs.run_critical_smoke }}
+      run_workflow_contracts: ${{ steps.route.outputs.run_workflow_contracts }}
+      run_workflow_config: ${{ steps.route.outputs.run_workflow_config }}
+      run_image_contract: ${{ steps.route.outputs.run_image_contract }}
+      run_deployment_contract: ${{ steps.route.outputs.run_deployment_contract }}
+      run_scheduled_report: ${{ steps.route.outputs.run_scheduled_report }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-
-      - name: Validate task PR traceability
-        if: github.event_name == 'pull_request'
+      - name: Route exact repository scope
+        id: route
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: >-
-          python scripts/task_session.py
-          --github-repository "$GITHUB_REPOSITORY"
-          validate-pr --event "$GITHUB_EVENT_PATH"
-
-      - name: Validate exact dev update provenance
-        id: verify-dev
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          APPROVED_RECOVERY_SHA: ${{ vars.DEV_RECOVERY_APPROVED_SHA }}
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET_REF: ${{ github.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUN_KIND: ${{ inputs.run_kind || '' }}
+          SCHEDULE_CRON: ${{ github.event.schedule || '' }}
         run: |
           set -Eeuo pipefail
-          result="$(
-            python scripts/task_session.py \
-              --github-repository "$GITHUB_REPOSITORY" \
-              verify-dev-provenance --sha "$GITHUB_SHA" \
-              --actor "$GITHUB_ACTOR" \
-              --approved-recovery-sha "$APPROVED_RECOVERY_SHA"
-          )"
-          kind="$(jq -er '.kind' <<<"$result")"
-          printf 'kind=%s\n' "$kind" >> "$GITHUB_OUTPUT"
-          printf '%s\n' "$result"
+          if [ "$EVENT_NAME" = schedule ]; then
+            if [ "$TARGET_REF" != refs/heads/master ]; then
+              echo "Scheduled CI is restricted to refs/heads/master" >&2
+              exit 1
+            fi
+          elif [ "$EVENT_NAME" = workflow_dispatch ]; then
+            test -n "$TARGET_REF"
+          fi
+          if [ "$EVENT_NAME" = pull_request ]; then
+            python scripts/ci_contract.py route \
+              --event pull_request \
+              --base-sha "$BASE_SHA" \
+              --head-sha "$HEAD_SHA" \
+              --github-output "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = schedule ]; then
+            python scripts/ci_contract.py route \
+              --event "$EVENT_NAME" \
+              --schedule-cron "$SCHEDULE_CRON" \
+              --github-output "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = workflow_dispatch ]; then
+            python scripts/ci_contract.py route \
+              --event "$EVENT_NAME" \
+              --run-kind "$RUN_KIND" \
+              --github-output "$GITHUB_OUTPUT"
+          else
+            python scripts/ci_contract.py route \
+              --event "$EVENT_NAME" \
+              --github-output "$GITHUB_OUTPUT"
+          fi
 
   quality:
     name: Python quality
-    needs: [release-sequence, task-provenance]
-    if: >-
-      needs.task-provenance.outputs.dev-update-kind != 'deployed-master-sync' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.base.ref != 'master' ||
-       github.event.pull_request.head.ref != 'dev' ||
-       github.event.pull_request.head.repo.full_name != github.repository)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_quality == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      PRE_COMMIT_HOME: ${{ github.workspace }}/.artifacts/cache/pre-commit
-
+      PRE_COMMIT_HOME: ${{ github.workspace }}/.artifacts/runtime/cache/pre-commit
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        id: setup-python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Cache pre-commit environments
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.PRE_COMMIT_HOME }}
-          key: pre-commit-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            pre-commit-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
-
-      - name: Install pre-commit
-        run: python -m pip install pre-commit==4.6.1
-
-      - name: Pre-commit
-        run: pre-commit run --all-files --show-diff-on-failure
-
-  frontend:
-    name: Frontend
-    needs: [release-sequence, task-provenance]
-    if: >-
-      needs.task-provenance.outputs.dev-update-kind != 'deployed-master-sync' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.base.ref != 'master' ||
-       github.event.pull_request.head.ref != 'dev' ||
-       github.event.pull_request.head.repo.full_name != github.repository)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Set up Python for API schema generation
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: backend/requirements-runtime.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
-          cache-suffix: frontend
-
-      - name: Install API schema dependencies
-        run: uv pip install -r backend/requirements-runtime.txt
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Verify generated API types
-        working-directory: frontend
+          cache-suffix: quality
+      - name: Sync quality dependencies
         run: |
-          npm run api:types
-          git diff --exit-code -- src/shared/api/schema.d.ts
+          uv sync --locked --no-default-groups --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Run shared quality group
+        run: python scripts/ci_contract.py run-group quality
+      - name: GEO read-only adapter offline contract tests
+        run: python -m pytest -o filterwarnings=error tests/test_geo_readonly_audit.py -q
 
-      - name: Frontend checks
-        shell: bash
-        working-directory: frontend
-        run: |
-          set -uo pipefail
-          npm run typecheck & typecheck_pid=$!
-          npm run lint & lint_pid=$!
-          npm run format:check & format_pid=$!
-          npm run test & test_pid=$!
-
-          status=0
-          wait "$typecheck_pid" || status=1
-          wait "$lint_pid" || status=1
-          wait "$format_pid" || status=1
-          wait "$test_pid" || status=1
-          exit "$status"
-
-      - name: Build frontend for production
-        working-directory: frontend
-        run: npx vite build
-
-  frontend-smoke:
-    name: Frontend smoke (${{ matrix.shard }}/3)
-    needs: [release-sequence, task-provenance]
-    if: >-
-      needs.task-provenance.outputs.dev-update-kind != 'deployed-master-sync' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.base.ref != 'master' ||
-       github.event.pull_request.head.ref != 'dev' ||
-       github.event.pull_request.head.repo.full_name != github.repository)
+  policy:
+    name: Delivery policy
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_policy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      # Build locally so all Playwright shards can start immediately instead of
-      # waiting for the full frontend job only to reuse its fast Vite build.
-      - name: Build frontend for smoke tests
-        working-directory: frontend
-        run: npx vite build
-
-      - name: Install Playwright Chromium
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
-
-      - name: Frontend smoke tests
-        working-directory: frontend
-        run: npm run e2e:ci -- --shard=${{ matrix.shard }}/3
-
-      - name: Upload Playwright traces on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
-          name: playwright-failure-${{ github.run_id }}-shard-${{ matrix.shard }}
-          path: .artifacts/tests/playwright
-          if-no-files-found: ignore
-          include-hidden-files: true
-          retention-days: 7
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: policy
+      - name: Sync Python dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --extra bot --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Prepare pytest runtime directories
+        run: mkdir -p .artifacts/runtime/tests
+      - name: Run shared delivery policy group
+        run: python scripts/ci_contract.py run-group policy
+      - name: Run SkillSpector external skill gate
+        if: needs.scope-router.outputs.run_external_skill_security == 'true'
+        run: python scripts/ci_contract.py run-group external-skill-security
 
-  python-tests:
-    name: Python tests (${{ matrix.shard }})
-    needs: [release-sequence, task-provenance]
-    if: >-
-      needs.task-provenance.outputs.dev-update-kind != 'deployed-master-sync' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.base.ref != 'master' ||
-       github.event.pull_request.head.ref != 'dev' ||
-       github.event.pull_request.head.repo.full_name != github.repository)
+  frontend:
+    name: Frontend (${{ matrix.lane }})
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - shard: "1/3"
-            index: 0
-          - shard: "2/3"
-            index: 1
-          - shard: "3/3"
-            index: 2
+        lane: [checks, unit]
+    env:
+      ALLURE_RESULTS_DIR: ${{ matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-checks', github.workspace) || '' }}
+      ALLURE_VITEST_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-vitest/dist/reporter.js
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        if: matrix.lane == 'checks'
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: frontend
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install PR Playwright browser
+        if: matrix.lane == 'checks'
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Install scheduled Vitest reporter
+        if: matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Sync API schema dependencies
+        if: matrix.lane == 'checks'
+        run: |
+          uv sync --locked --no-default-groups --extra backend
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Validate one-time dev bootstrap lime baseline
+        if: matrix.lane == 'checks' && github.event_name == 'pull_request' && github.event.pull_request.number == 1267
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/ci_contract.py bootstrap-lime-base >> "$GITHUB_ENV"
+      - name: Run shared frontend checks group
+        if: matrix.lane == 'checks'
+        run: python scripts/ci_contract.py run-group frontend-checks
+      - name: Run shared frontend unit group
+        if: matrix.lane == 'unit'
+        run: python scripts/ci_contract.py run-group frontend-unit
+      - name: Upload encrypted Allure results
+        if: always() && matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-checks.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-checks
+          suite: frontend-checks
+          browser: node-unit
+
+  frontend-smoke:
+    name: Frontend smoke (${{ matrix.shard }}/5)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_smoke == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-e2e-shard-{1}', github.workspace, matrix.shard) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        with:
+          python-version: "3.14"
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Build frontend for smoke tests
+        working-directory: frontend
+        run: npx vite build
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run shared frontend E2E group
+        run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/5"
+      - name: Upload Playwright traces on failure
+        if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: .artifacts/runtime/tests/playwright
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
+      - name: Upload redesign visual and motion evidence
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: redesign-evidence-${{ github.sha }}-shard-${{ matrix.shard }}
+          path: |
+            .artifacts/runtime/tests/playwright/redesign-visual-*/
+            .artifacts/runtime/tests/playwright/redesign-motion-*/
+            .artifacts/runtime/tests/playwright/active-workout-experience-*/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 30
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-e2e-shard-${{ matrix.shard }}.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-e2e-shard-${{ matrix.shard }}
+          suite: frontend-e2e
+          browser: chromium-shard-${{ matrix.shard }}
+
+  frontend-mobile-regression:
+    name: Mobile regression (Chromium + WebKit)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-timing.jsonl
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-mobile-regression', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command npm-ci -- npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Build frontend preview
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command vite-build -- npx vite build
+      - name: Cache mobile Playwright browsers
+        id: mobile-playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Report mobile Playwright cache
+        run: echo "CI_CACHE package=playwright-mobile hit=${{ steps.mobile-playwright-cache.outputs.cache-hit }}"
+      - name: Install mobile Chromium and WebKit
+        working-directory: frontend
+        # A Playwright browser cache hit already contains browser binaries.
+        # Running --with-deps also invokes unbounded apt on hosted runners;
+        # the I4 PR #1241 hit the 25-minute job timeout there despite a
+        # 364 MB browser cache hit. Keep actual browser/E2E tests mandatory:
+        # do not skip installation checks or shared regression execution.
+        run: |
+          if [ "${{ steps.mobile-playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install chromium webkit
+          else
+            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
+          fi
+      - name: Install cached WebKit shared-library prerequisite
+        if: steps.mobile-playwright-cache.outputs.cache-hit == 'true'
+        # On Ubuntu 24.04 the cached WebKit WPE binary requires
+        # libevent-2.1.so.7 from libevent-2.1-7t64; the full
+        # playwright --with-deps apt-update stage timed out after 25m.
+        # Keep real WebKit execution mandatory and bound this targeted
+        # system package install; failure remains a required CI failure.
+        run: |
+          sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-base gstreamer1.0-plugins-good libicu74 libatomic1 libatk-bridge2.0-0t64 libatk1.0-0t64 libcairo-gobject2 libcairo2 libdbus-1-3 libdrm2 libenchant-2-2 libepoxy0 libevent-2.1-7t64 libflite1 libfontconfig1 libfreetype6 libgbm1 libgdk-pixbuf-2.0-0 libgles2 libglib2.0-0t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer1.0-0 libgtk-4-1 libharfbuzz-icu0 libharfbuzz0b libhyphen0 libjpeg-turbo8 liblcms2-2 libmanette-0.2-0 libopus0 libpango-1.0-0 libpangocairo-1.0-0 libpng16-16t64 libsecret-1-0 libvpx9 libwayland-client0 libwayland-egl1 libwayland-server0 libwebp7 libwebpdemux2 libwoff1 libx11-6 libxkbcommon0 libxml2 libxslt1.1 libx264-164 libavif16
+          ldconfig -p | grep -F 'libevent-2.1.so.7'
+          ldconfig -p | grep -F 'libopus.so.0'
+          # The bundled WebKit wrapper sets its own LD_LIBRARY_PATH.
+          # Direct ldd on MiniBrowser without that wrapper can falsely
+          # report private bundled libraries missing. Actual mandatory
+          # mobile Chromium/WebKit tests verify runtime dependency health.
+      - name: Run shared mobile regression group
+        run: python scripts/ci_contract.py run-group frontend-mobile-regression
+      - name: Upload mobile regression evidence
+        if: always() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mobile-regression-${{ github.run_id }}
+          path: |
+            .artifacts/runtime/ci/mobile-regression-timing.jsonl
+            .artifacts/runtime/tests/playwright-mobile-regression
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression
+          suite: frontend-mobile-regression
+          browser: mobile-chromium-webkit
+
+  frontend-mobile-regression-extended:
+    name: Extended mobile regression (Firefox + WebKit)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression_extended == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-extended-timing.jsonl
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-mobile-regression-extended', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command npm-ci -- npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Build frontend preview
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command vite-build -- npx vite build
+      - name: Cache extended mobile Playwright browsers
+        id: extended-playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-mobile-extended-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Report extended Playwright cache
+        run: echo "CI_CACHE package=playwright-mobile-extended hit=${{ steps.extended-playwright-cache.outputs.cache-hit }}"
+      - name: Install extended mobile Firefox and WebKit
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command playwright-install -- npx playwright install --with-deps firefox webkit
+      - name: Run shared extended mobile regression group
+        run: python scripts/ci_contract.py run-group frontend-mobile-regression-extended
+      - name: Upload extended mobile regression evidence
+        if: always() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mobile-regression-extended-${{ github.run_id }}
+          path: |
+            .artifacts/runtime/ci/mobile-regression-extended-timing.jsonl
+            .artifacts/runtime/tests/playwright-mobile-regression-extended
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression-extended.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression-extended
+          suite: frontend-mobile-regression-extended
+          browser: mobile-firefox-webkit
+
+  frontend-cross-browser:
+    name: Weekly cross-browser regression (Chromium + Firefox + WebKit)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_cross_browser == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-cross-browser', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
+      APP_ENV: test
+      APP_NAME: Your Fitness Coach CI
+      APP_DEBUG: "false"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      REFRESH_TOKEN_EXPIRE_DAYS: "30"
+      DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
+      ENABLE_DEV_AUTH: "true"
+      TELEGRAM_BOT_TOKEN: test-token
+      BOT_INTERNAL_TOKEN: test-bot-internal-token
+      SECRET_KEY: test-secret-key-at-least-thirty-two-characters
+      PW_API_SERVER: "true"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: fitminiapp_test
+          POSTGRES_USER: fitminiapp
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fitminiapp -d fitminiapp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: cross-browser
+      - name: Sync backend dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Build frontend preview
+        working-directory: frontend
+        run: npx vite build
+      - name: Cache cross-browser Playwright browsers
+        id: cross-browser-playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-cross-browser-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Report cross-browser Playwright cache
+        run: echo "CI_CACHE package=playwright-cross-browser hit=${{ steps.cross-browser-playwright-cache.outputs.cache-hit }}"
+      - name: Install cross-browser Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run shared cross-browser regression group
+        run: python scripts/ci_contract.py run-group frontend-cross-browser
+      - name: Upload UI quality sweep evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-quality-sweep-${{ github.run_id }}
+          path: .artifacts/runtime/tests/playwright-ui-quality-sweep
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}/chromium
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-chromium.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-chromium
+          suite: frontend-cross-browser
+          browser: chromium
+      - name: Upload encrypted Firefox Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}/firefox
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-firefox.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-firefox
+          suite: frontend-cross-browser
+          browser: firefox
+      - name: Upload encrypted WebKit Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}/webkit
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-webkit.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-webkit
+          suite: frontend-cross-browser
+          browser: webkit
+
+  python-tests:
+    name: Python tests (${{ matrix.shard }}/5)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_python == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/python-tests-shard-{1}', github.workspace, matrix.shard) || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
 
     services:
       postgres:
@@ -335,86 +666,55 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: |
-            backend/requirements.txt
-            bot/requirements.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: python-tests
-
-      - name: Install dependencies
-        run: uv pip install -r backend/requirements.txt -r bot/requirements.txt
-
-      - name: Dependency consistency
-        run: python -m pip check
-
-      - name: Pytest on PostgreSQL
-        shell: bash
+      - name: Sync Python dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --extra bot --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Sync scheduled Pytest Allure adapter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        run: uv sync --locked --no-default-groups --extra backend --extra bot --group dev --group scheduled-report
+      - name: Run shared Python tests group
         env:
           TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
           ENABLE_DEV_AUTH: "true"
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-          PYTEST_SHARD_INDEX: ${{ matrix.index }}
-        run: |
-          set -euo pipefail
-
-          # Collect the exact pytest node IDs first, then distribute them round-robin
-          # across three independent runners. This balances parametrized/heavy test
-          # modules much better than file-size sharding while keeping every test.
-          mapfile -t all_test_nodes < <(
-            python scripts/run_pytest.py backend/tests bot/tests --collect-only -q \
-              | sed -n '/::/p'
-          )
-
-          if (( ${#all_test_nodes[@]} == 0 )); then
-            echo "Pytest collection returned no tests" >&2
-            exit 1
-          fi
-
-          test_nodes=()
-          shard_count=3
-          for i in "${!all_test_nodes[@]}"; do
-            if (( i % shard_count == PYTEST_SHARD_INDEX )); then
-              test_nodes+=("${all_test_nodes[$i]}")
-            fi
-          done
-
-          if (( ${#test_nodes[@]} == 0 )); then
-            echo "No tests selected for shard ${PYTEST_SHARD_INDEX}" >&2
-            exit 1
-          fi
-
-          printf 'Selected %s of %s tests for shard %s/3\n' \
-            "${#test_nodes[@]}" "${#all_test_nodes[@]}" "$((PYTEST_SHARD_INDEX + 1))"
-          python scripts/run_pytest.py "${test_nodes[@]}" -q -n 4 --dist=worksteal --durations=20
+        run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/5"
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/python-tests-shard-${{ matrix.shard }}.enc
+          artifact-name: allure-results-${{ github.run_id }}-python-tests-shard-${{ matrix.shard }}
+          suite: python-tests
+          browser: python-shard-${{ matrix.shard }}
 
   migrated-stack:
     name: Migrated PostgreSQL stack
-    needs: [release-sequence, task-provenance]
-    if: >-
-      needs.task-provenance.outputs.dev-update-kind != 'deployed-master-sync' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.base.ref != 'master' ||
-       github.event.pull_request.head.ref != 'dev' ||
-       github.event.pull_request.head.repo.full_name != github.repository)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_migrated_stack == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 20
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/migrated-stack', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     services:
       postgres:
         image: postgres:16-alpine
@@ -429,62 +729,52 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: backend/requirements.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: migrated-stack
-
-      - name: Install dependencies
-        run: uv pip install -r backend/requirements.txt
-
-      - name: Build frontend and install browser dependencies
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Sync stack dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+          npm --prefix frontend ci
+      - name: Sync scheduled Pytest Allure adapter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        run: uv sync --locked --no-default-groups --extra backend --group dev --group scheduled-report
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
-        run: |
-          npm ci
-          npx vite build
-          npx playwright install --with-deps chromium
-
-      - name: Dependency consistency
-        run: python -m pip check
-
-      - name: Alembic migrations
-        working-directory: backend
-        run: |
-          alembic upgrade head
-          alembic check
-        env:
-          APP_ENV: test
-          APP_NAME: Your Fitness Coach CI
-          APP_DEBUG: "false"
-          ACCESS_TOKEN_EXPIRE_MINUTES: "60"
-          REFRESH_TOKEN_EXPIRE_DAYS: "30"
-          DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
-          ENABLE_DEV_AUTH: "true"
-          TELEGRAM_BOT_TOKEN: test-token
-          SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-
-      - name: Migrated PostgreSQL API and account-deletion smoke
-        run: python scripts/run_pytest.py tests/integration/test_migrated_stack.py -q
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build frontend preview
+        working-directory: frontend
+        run: npm run build
+      - name: Run shared migrated-stack group
         env:
           RUN_MIGRATED_STACK_TEST: "1"
           APP_ENV: test
@@ -493,87 +783,123 @@ jobs:
           ACCESS_TOKEN_EXPIRE_MINUTES: "60"
           REFRESH_TOKEN_EXPIRE_DAYS: "30"
           DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
+          TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
           ENABLE_DEV_AUTH: "true"
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-
-      - name: Migrated PostgreSQL real browser smoke
-        working-directory: frontend
-        run: npm run e2e:migrated-stack
+        run: python scripts/ci_contract.py run-group migrated-stack
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
         env:
-          APP_ENV: test
-          APP_NAME: Your Fitness Coach CI
-          APP_DEBUG: "false"
-          ACCESS_TOKEN_EXPIRE_MINUTES: "60"
-          REFRESH_TOKEN_EXPIRE_DAYS: "30"
-          DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
-          ENABLE_DEV_AUTH: "true"
-          TELEGRAM_BOT_TOKEN: test-token
-          BOT_INTERNAL_TOKEN: test-bot-internal-token
-          SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-
-      - name: Upload migrated-stack traces on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
-          name: migrated-stack-playwright-failure-${{ github.run_id }}
-          path: .artifacts/tests/playwright-migrated-stack
-          if-no-files-found: ignore
-          include-hidden-files: true
-          retention-days: 7
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/migrated-stack.enc
+          artifact-name: allure-results-${{ github.run_id }}-migrated-stack
+          suite: migrated-stack
+          browser: chromium-api
 
   dependency-audit:
     name: Dependency audit
-    needs: [release-sequence, task-provenance]
+    needs: scope-router
     if: >-
-      needs.task-provenance.outputs.dev-update-kind != 'deployed-master-sync' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.base.ref != 'master' ||
-       github.event.pull_request.head.ref != 'dev' ||
-       github.event.pull_request.head.repo.full_name != github.repository)
+      always() &&
+      needs.scope-router.result == 'success' &&
+      needs.scope-router.outputs.run_dependency_audit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        if: needs.scope-router.outputs.run_frontend_dependency_audit == 'true' || needs.scope-router.outputs.run_full_dependency_audit == 'true'
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Report npm cache
+        if: needs.scope-router.outputs.run_frontend_dependency_audit == 'true' || needs.scope-router.outputs.run_full_dependency_audit == 'true'
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: |
-            backend/requirements-runtime.txt
-            bot/requirements.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: dependency-audit
+      - name: Run shared full dependency audit group
+        if: needs.scope-router.outputs.run_full_dependency_audit == 'true'
+        run: python scripts/ci_contract.py run-group dependency-audit
+      - name: Run shared frontend dependency audit group
+        if: needs.scope-router.outputs.run_frontend_dependency_audit == 'true' && needs.scope-router.outputs.run_full_dependency_audit != 'true'
+        run: python scripts/ci_contract.py run-group frontend-dependency-audit
+      - name: Run shared Python dependency audit group
+        if: needs.scope-router.outputs.run_python_dependency_audit == 'true' && needs.scope-router.outputs.run_full_dependency_audit != 'true'
+        run: python scripts/ci_contract.py run-group python-dependency-audit
 
-      - name: Frontend production dependency audit
-        working-directory: frontend
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Python dependency vulnerability audit
+  critical-smoke:
+    name: Critical application smoke
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_critical_smoke == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: critical-smoke
+      - name: Sync application runtime dependencies
         run: |
-          uvx --from pip-audit==2.10.1 pip-audit -r backend/requirements-runtime.txt
-          uvx --from pip-audit==2.10.1 pip-audit -r bot/requirements.txt
+          uv sync --locked --no-default-groups --extra backend --extra bot
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Run shared critical smoke group
+        run: python scripts/ci_contract.py run-group critical-smoke
+
+  workflow-contracts:
+    name: Workflow contracts
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_workflow_contracts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Validate shared CI contract
+        if: needs.scope-router.outputs.run_workflow_config == 'true'
+        run: python scripts/ci_contract.py run-group workflow-config
+      - name: Validate image contract
+        if: needs.scope-router.outputs.run_image_contract == 'true'
+        run: python scripts/ci_contract.py run-group image-contract
+      - name: Validate deployment contract
+        if: needs.scope-router.outputs.run_deployment_contract == 'true'
+        run: python scripts/ci_contract.py run-group deployment-contract
 
   containers:
     name: Container (${{ matrix.image }})
-    needs: [release-sequence, task-provenance]
+    needs: [scope-router, quality]
     if: >-
-      needs.task-provenance.outputs.dev-update-kind != 'deployed-master-sync' &&
-      (github.event_name != 'pull_request' ||
-       github.event.pull_request.base.ref != 'master' ||
-       github.event.pull_request.head.ref != 'dev' ||
-       github.event.pull_request.head.repo.full_name != github.repository)
+      always() &&
+      needs.scope-router.result == 'success' &&
+      needs.scope-router.outputs.run_containers == 'true' &&
+      (needs.quality.result == 'success' ||
+       (github.event_name == 'push' && needs.quality.result == 'skipped'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -586,61 +912,210 @@ jobs:
           - image: backend
             context: .
             dockerfile: backend/Dockerfile
-            tag: fit-mini-app-backend:ci
             no_cache: false
           - image: bot
-            context: bot
+            context: .
             dockerfile: bot/Dockerfile
-            tag: fit-mini-app-bot:ci
-            # A corrupted shared GHA COPY cache previously published a correctly
-            # labelled image with stale runtime sources. Keep this small image
-            # fail-closed until cache provenance can be proven independently.
+            # Keep the bot image fail-closed until shared COPY-cache provenance is proven.
             no_cache: true
-
+          - image: hermes-discovery
+            context: deploy/hermes-discovery
+            dockerfile: deploy/hermes-discovery/Dockerfile
+            no_cache: false
+          - image: hermes-worker
+            context: deploy/hermes-editorial-worker
+            dockerfile: deploy/hermes-editorial-worker/Dockerfile
+            no_cache: false
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build production image
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Run shared container contract group
+        run: python scripts/ci_contract.py run-group container-contract
+      - name: Verify Hermes source provenance
+        if: startsWith(matrix.image, 'hermes-')
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [ "${{ matrix.image }}" = hermes-discovery ]; then
+            python scripts/hermes_discovery.py provenance
+          else
+            python scripts/hermes_worker.py provenance
+          fi
+      - uses: docker/setup-buildx-action@v4
+      - name: Resolve immutable image reference
+        id: image
+        env:
+          IMAGE_KIND: ${{ matrix.image }}
+        run: python scripts/deployment_contract.py refs --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" --kind "$IMAGE_KIND" >> "$GITHUB_OUTPUT"
+      - name: Build and scan production image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          load: true
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-          load: true
-          tags: ${{ matrix.tag }}
+          tags: ${{ steps.image.outputs.local_tag }}
           no-cache: ${{ matrix.no_cache }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
-
+      - name: Verify built application image provenance
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        id: image-provenance
+        shell: bash
+        env:
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$BUILD_DIGEST"
+          [[ "$BUILD_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          local_image_id="$(docker image inspect "$LOCAL_TAG" --format '{{.Id}}')"
+          oci_revision="$(docker image inspect "$LOCAL_TAG" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          architecture="$(docker image inspect "$LOCAL_TAG" --format '{{.Os}}/{{.Architecture}}')"
+          [[ "$local_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$oci_revision" = "$SOURCE_REVISION"
+          test "$architecture" = "linux/amd64"
+          echo "image_digest=$BUILD_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "local_image_id=$local_image_id" >> "$GITHUB_OUTPUT"
+          echo "oci_revision=$oci_revision" >> "$GITHUB_OUTPUT"
+          echo "architecture=$architecture" >> "$GITHUB_OUTPUT"
+      - name: Prepare image SBOM output
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        shell: bash
+        run: mkdir -p ".artifacts/runtime/sbom/${{ matrix.image }}"
       - name: Verify bot runtime image contract
         if: matrix.image == 'bot'
         shell: bash
         env:
-          LOCAL_TAG: ${{ matrix.tag }}
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
         run: |
-          docker run --rm --network none \
+          docker run --rm -i --network none \
+            --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            --mount type=volume,destination=/var/lock/fitminiapp-bot \
             --env TELEGRAM_BOT_TOKEN=ci-image-contract-token \
             --env BOT_INTERNAL_TOKEN=ci-image-contract-internal-token \
-            "$LOCAL_TAG" \
-            python -c "import fitminiapp_bot.profile_sync; import fitminiapp_bot.public_profile; import fitminiapp_bot.telegram_client"
+            "$LOCAL_TAG" python - <<'PY'
+          import asyncio
+          import errno
+          import fcntl
+          import json
+          import os
+          from pathlib import Path
 
-      # v0.36.0 is an immutable, signed post-remediation release. Keep the full SHA.
+          import fitminiapp_bot.profile_sync
+          import fitminiapp_bot.public_profile
+          import fitminiapp_bot.telegram_client
+          from fitminiapp_bot.bot import PollingFileLock
+
+          assert os.getuid() == 10001
+          status = dict(line.split(":", 1) for line in Path("/proc/self/status").read_text().splitlines() if ":" in line)
+          assert int(status["CapEff"], 16) == int(status["CapPrm"], 16) == int(status["CapBnd"], 16) == 0
+          assert status["NoNewPrivs"].strip() == "1"
+          for directory in (Path.home(), Path("/app/fitminiapp_bot"), Path("/tmp")):
+              try:
+                  (directory / "read-only-probe").write_text("must fail")
+              except OSError as exc:
+                  assert exc.errno == errno.EROFS, exc
+              else:
+                  raise AssertionError(f"root filesystem is writable: {directory}")
+
+          lock_dir = Path("/var/lock/fitminiapp-bot")
+          state = lock_dir / "profile-sync-state.json"
+          for version in ("first", "replacement"):
+              fitminiapp_bot.profile_sync._write_avatar_state(state, asset_sha256=version, file_unique_id="synthetic")
+              assert json.loads(state.read_text())["asset_sha256"] == version
+          assert not state.with_suffix(".json.tmp").exists()
+
+          async def check_lock():
+              leader = PollingFileLock(str(lock_dir), "synthetic-token")
+              standby = PollingFileLock(str(lock_dir), "synthetic-token")
+              try:
+                  await leader.acquire()
+                  with leader.path.open("a+") as contender:
+                      try:
+                          fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                      except BlockingIOError:
+                          pass
+                      else:
+                          raise AssertionError("polling lock allowed a second owner")
+                  leader.release()
+                  await standby.acquire()
+              finally:
+                  leader.release()
+                  standby.release()
+
+          asyncio.run(check_lock())
+          print("PASS: bot UID, capabilities, no-new-privileges, read-only root, atomic state and polling lock takeover")
+          PY
+      - name: Verify Hermes discovery runtime contract
+        if: matrix.image == 'hermes-discovery'
+        shell: bash
+        env:
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
+        run: docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true --user 10000:10000 "$LOCAL_TAG" --self-check
+      - name: Verify Hermes worker runtime contract
+        if: matrix.image == 'hermes-worker'
+        shell: bash
+        env:
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
+        run: docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true --user 10000:10000 "$LOCAL_TAG" --self-check
       - name: Scan image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           version: v0.73.0
-          image-ref: ${{ matrix.tag }}
+          image-ref: ${{ steps.image.outputs.local_tag }}
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           trivyignores: .trivyignore.yaml
           exit-code: "1"
-
+      - name: Generate CycloneDX SBOM
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          image-ref: ${{ steps.image.outputs.local_tag }}
+          format: cyclonedx
+          output: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.cyclonedx.json
+          exit-code: "0"
+      - name: Generate SPDX JSON SBOM
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          image-ref: ${{ steps.image.outputs.local_tag }}
+          format: spdx-json
+          output: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.spdx.json
+          exit-code: "0"
+      - name: Validate image SBOM provenance
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        env:
+          CYCLONEDX_PATH: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.cyclonedx.json
+          SPDX_PATH: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.spdx.json
+          PROVENANCE_PATH: .artifacts/runtime/sbom/${{ matrix.image }}/provenance.json
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          IMAGE_DIGEST: ${{ steps.image-provenance.outputs.image_digest }}
+          LOCAL_IMAGE_ID: ${{ steps.image-provenance.outputs.local_image_id }}
+          SOURCE_REVISION: ${{ github.sha }}
+          OCI_REVISION: ${{ steps.image-provenance.outputs.oci_revision }}
+          ARCHITECTURE: ${{ steps.image-provenance.outputs.architecture }}
+        run: |
+          python scripts/validate_image_sbom.py \
+            --cyclonedx "$CYCLONEDX_PATH" \
+            --spdx "$SPDX_PATH" \
+            --image-ref "$IMAGE_REF" \
+            --image-digest "$IMAGE_DIGEST" \
+            --local-image-id "$LOCAL_IMAGE_ID" \
+            --source-revision "$SOURCE_REVISION" \
+            --oci-revision "$OCI_REVISION" \
+            --architecture "$ARCHITECTURE" \
+            --output "$PROVENANCE_PATH"
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: docker/login-action@v4
@@ -648,69 +1123,343 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Publish scanned image
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
+          PUBLISHED_REF: ${{ steps.image.outputs.image_ref }}
+        run: docker tag "$LOCAL_TAG" "$PUBLISHED_REF" && docker push "$PUBLISHED_REF"
+      - name: Verify published application image digest
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/master' &&
+          (matrix.image == 'backend' || matrix.image == 'bot')
         shell: bash
         env:
-          IMAGE_KIND: ${{ matrix.image }}
-          LOCAL_TAG: ${{ matrix.tag }}
+          PUBLISHED_REF: ${{ steps.image.outputs.image_ref }}
+          EXPECTED_IMAGE_ID: ${{ steps.image-provenance.outputs.local_image_id }}
+          SOURCE_REVISION: ${{ github.sha }}
+          SBOM_DIR: .artifacts/runtime/sbom/${{ matrix.image }}
         run: |
-          registry_tag="ghcr.io/${GITHUB_REPOSITORY,,}-${IMAGE_KIND}:${GITHUB_SHA}"
-          docker tag "$LOCAL_TAG" "$registry_tag"
-          docker push "$registry_tag"
+          set -Eeuo pipefail
+          published_repository="${PUBLISHED_REF%:*}"
+          published_digest="$(docker buildx imagetools inspect "$PUBLISHED_REF" --format '{{.Manifest.Digest}}')"
+          [[ "$published_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          immutable_ref="$published_repository@$published_digest"
+          published_image_id="$(docker buildx imagetools inspect "$immutable_ref" --raw | python -c 'import json, sys; print(json.load(sys.stdin)["config"]["digest"])')"
+          test "$published_image_id" = "$EXPECTED_IMAGE_ID"
+          docker pull "$immutable_ref"
+          oci_revision="$(docker image inspect "$immutable_ref" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          architecture="$(docker image inspect "$immutable_ref" --format '{{.Os}}/{{.Architecture}}')"
+          test "$architecture" = "linux/amd64"
+          # Docker load/push can change the manifest representation; verify the scanned config ID.
+          cp "$SBOM_DIR/provenance.json" "$SBOM_DIR/build-provenance.json"
+          python scripts/validate_image_sbom.py \
+            --cyclonedx "$SBOM_DIR/sbom.cyclonedx.json" \
+            --spdx "$SBOM_DIR/sbom.spdx.json" \
+            --image-ref "$immutable_ref" \
+            --image-digest "$published_digest" \
+            --local-image-id "$published_image_id" \
+            --source-revision "$SOURCE_REVISION" \
+            --oci-revision "$oci_revision" \
+            --architecture "$architecture" \
+            --output "$SBOM_DIR/provenance.json"
+      - name: Upload image SBOMs
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-sbom-${{ matrix.image }}-${{ github.sha }}
+          path: .artifacts/runtime/sbom/${{ matrix.image }}
+          if-no-files-found: error
+          retention-days: 14
+
+  scheduled-report:
+    name: Private scheduled Allure report
+    concurrency:
+      group: yfc-scheduled-allure-publication
+      cancel-in-progress: false
+    needs:
+      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack]
+    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: read
+    env:
+      RUN_KIND: ${{ needs.scope-router.outputs.profile == 'weekly-exhaustive' && 'weekly' || 'daily' }}
+      REPORT_TIER: ${{ needs.scope-router.outputs.profile }}
+      RUN_STARTED_AT: ${{ github.run_started_at }}
+      TEST_RESULTS_JSON: >-
+        {"frontend":"${{ needs.frontend.result }}","frontend-smoke":"${{ needs.frontend-smoke.result }}","frontend-mobile-regression":"${{ needs.frontend-mobile-regression.result }}","frontend-mobile-regression-extended":"${{ needs.frontend-mobile-regression-extended.result }}","frontend-cross-browser":"${{ needs.frontend-cross-browser.result }}","python-tests":"${{ needs.python-tests.result }}","migrated-stack":"${{ needs.migrated-stack.result }}"}
+      BUNDLE_DOWNLOAD_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/downloaded-allure
+      BUNDLE_DECRYPTED_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/decrypted-allure
+      MERGED_RESULTS_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/allure-results-merged
+      REPORT_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report
+      REPORT_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report-metadata.json
+      PUBLICATION_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-publication.json
+      ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST }}
+      ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT }}
+      ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install report and adapter dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+          npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Download encrypted Allure bundles
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-${{ github.run_id }}-*
+          path: .artifacts/runtime/tests/downloaded-allure
+          merge-multiple: true
+      - name: Decrypt only current-run result bundles
+        if: always()
+        continue-on-error: true
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$BUNDLE_DOWNLOAD_ROOT" "$BUNDLE_DECRYPTED_ROOT"
+          shopt -s nullglob
+          bundles=("$BUNDLE_DOWNLOAD_ROOT"/*.enc)
+          if [ "${#bundles[@]}" -eq 0 ]; then
+            printf '%s\n' 'No encrypted Allure bundles were downloaded' > "$BUNDLE_DECRYPTED_ROOT/decrypt-failed.txt"
+          fi
+          for bundle in "${bundles[@]}"; do
+            filename="${bundle##*/}"
+            stem="${filename%.enc}"
+            if ! python scripts/allure_bundle.py decrypt \
+              --source "$bundle" \
+              --output "$BUNDLE_DECRYPTED_ROOT/$stem"; then
+              printf '%s\n' "$stem" >> "$BUNDLE_DECRYPTED_ROOT/decrypt-failed.txt"
+            fi
+          done
+      - name: Aggregate and enrich Allure results
+        if: always()
+        continue-on-error: true
+        run: |
+          set -Eeuo pipefail
+          duration_seconds="$(python - "$RUN_STARTED_AT" <<'PY'
+          from datetime import UTC, datetime
+          import sys
+
+          value = sys.argv[1].strip()
+          if not value:
+              print("0")
+          else:
+              started = datetime.fromisoformat(value.replace("Z", "+00:00"))
+              print(max(0.0, (datetime.now(UTC) - started.astimezone(UTC)).total_seconds()))
+          PY
+          )"
+          playwright_version="$(node -p "require('./frontend/node_modules/@playwright/test/package.json').version")"
+          python scripts/allure_report.py aggregate \
+            --bundle-root "$BUNDLE_DECRYPTED_ROOT" \
+            --output-root "$MERGED_RESULTS_ROOT" \
+            --metadata "$REPORT_METADATA" \
+            --run-kind "$RUN_KIND" \
+            --tier "$REPORT_TIER" \
+            --run-id "${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}" \
+            --commit-sha "$GITHUB_SHA" \
+            --branch "$GITHUB_REF_NAME" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --operating-system "ubuntu-latest" \
+            --python-version "3.14" \
+            --node-version "24" \
+            --playwright-version "$playwright_version" \
+            --duration-seconds "$duration_seconds"
+      - name: Generate Allure HTML
+        if: always()
+        continue-on-error: true
+        working-directory: frontend
+        run: ./scheduled-report/node_modules/.bin/allure generate "$MERGED_RESULTS_ROOT" -o "$REPORT_ROOT" --clean
+      - name: Validate generated report and privacy boundary
+        if: always()
+        continue-on-error: true
+        run: python scripts/allure_report.py validate --report-root "$REPORT_ROOT" --metadata "$REPORT_METADATA"
+      - name: Publish private report to isolated VPS origin
+        if: always()
+        continue-on-error: true
+        env:
+          ALLURE_REPORT_SSH_PRIVATE_KEY: ${{ secrets.ALLURE_REPORT_SSH_PRIVATE_KEY }}
+          ALLURE_REPORT_SSH_KNOWN_HOSTS: ${{ secrets.ALLURE_REPORT_SSH_KNOWN_HOSTS }}
+        run: |
+          python scripts/publish_allure_report.py publish \
+            --report-root "$REPORT_ROOT" \
+            --metadata "$REPORT_METADATA" \
+            --publication "$PUBLICATION_METADATA"
+      - name: Write scheduled report summary
+        if: always()
+        continue-on-error: true
+        run: |
+          python scripts/allure_report.py summary \
+            --metadata "$REPORT_METADATA" \
+            --publication "$PUBLICATION_METADATA" \
+            --test-results "$TEST_RESULTS_JSON" \
+            --output "$GITHUB_STEP_SUMMARY"
+      - name: Require complete private publication
+        if: always()
+        run: python scripts/allure_report.py finalize --metadata "$REPORT_METADATA" --publication "$PUBLICATION_METADATA"
+
+  codeql-security:
+    name: CodeQL security (${{ matrix.language }})
+    needs: scope-router
+    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - name: Analyze with CodeQL
+        id: codeql
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+          output: .artifacts/codeql/${{ matrix.language }}
+      - name: Enforce blocking CodeQL severities
+        run: python3 scripts/codeql_sarif_gate.py ".artifacts/codeql/${{ matrix.language }}"
+
+  security-audit:
+    name: Free PR security audit
+    needs: scope-router
+    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Scan repository vulnerabilities, misconfiguration and secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
 
   checks:
-    # Keep the Ruleset-required `checks` context exclusive to PR validation.
-    # A later push run therefore cannot overwrite a failed release PR verdict.
     name: ${{ github.event_name == 'pull_request' && 'checks' || 'branch-checks' }}
     if: always()
     needs:
-      [
-        release-sequence,
-        task-provenance,
-        quality,
-        frontend,
-        frontend-smoke,
-        python-tests,
-        migrated-stack,
-        dependency-audit,
-        containers,
-      ]
+      [scope-router, codeql-security, security-audit, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
-      - name: Verify all CI jobs succeeded
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      # The required "checks" result must deny direct feature->master PRs.
+      # Same-repository dev is the sole normal production promotion source.
+      - name: Require accepted dev promotion for master PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'master'
         env:
-          CANONICAL_RELEASE_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository }}
-          LIGHTWEIGHT_DEV_SYNC: ${{ needs.task-provenance.outputs.dev-update-kind == 'deployed-master-sync' }}
-          RELEASE_SEQUENCE_RESULT: ${{ needs.release-sequence.result }}
-          TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          if [ "$PR_HEAD_REF" != dev ] || [ "$PR_HEAD_REPO" != "$REPOSITORY" ]; then
+            echo "::error::Direct PR to master forbidden. Merge into dev, test on private Windows DEV, then promote dev to master."
+            exit 1
+          fi
+      - name: Verify required result set
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PROFILE: ${{ needs.scope-router.outputs.profile }}
+          EXPECTED_JOBS: ${{ needs.scope-router.outputs.required_jobs }}
+          REQUIRED_GROUPS: ${{ needs.scope-router.outputs.required_groups }}
+          SKIPPED_GROUPS: ${{ needs.scope-router.outputs.skipped_groups }}
+          SCOPE_ROUTER_RESULT: ${{ needs.scope-router.result }}
+          CODEQL_SECURITY_RESULT: ${{ needs.codeql-security.result }}
+          SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}
           QUALITY_RESULT: ${{ needs.quality.result }}
+          POLICY_RESULT: ${{ needs.policy.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           FRONTEND_SMOKE_RESULT: ${{ needs.frontend-smoke.result }}
+          FRONTEND_MOBILE_REGRESSION_RESULT: ${{ needs.frontend-mobile-regression.result }}
+          FRONTEND_MOBILE_REGRESSION_EXTENDED_RESULT: ${{ needs.frontend-mobile-regression-extended.result }}
+          FRONTEND_CROSS_BROWSER_RESULT: ${{ needs.frontend-cross-browser.result }}
           PYTHON_TESTS_RESULT: ${{ needs.python-tests.result }}
           MIGRATED_STACK_RESULT: ${{ needs.migrated-stack.result }}
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           CONTAINERS_RESULT: ${{ needs.containers.result }}
+          CRITICAL_SMOKE_RESULT: ${{ needs.critical-smoke.result }}
+          WORKFLOW_CONTRACTS_RESULT: ${{ needs.workflow-contracts.result }}
+          SCHEDULED_REPORT_RESULT: ${{ needs.scheduled-report.result }}
         run: |
-          test "$RELEASE_SEQUENCE_RESULT" = success
-          test "$TASK_PROVENANCE_RESULT" = success
-          if [ "$CANONICAL_RELEASE_PR" = "true" ] || [ "$LIGHTWEIGHT_DEV_SYNC" = "true" ]; then
-            test "$QUALITY_RESULT" = skipped
-            test "$FRONTEND_RESULT" = skipped
-            test "$FRONTEND_SMOKE_RESULT" = skipped
-            test "$PYTHON_TESTS_RESULT" = skipped
-            test "$MIGRATED_STACK_RESULT" = skipped
-            test "$DEPENDENCY_AUDIT_RESULT" = skipped
-            test "$CONTAINERS_RESULT" = skipped
-          else
-            test "$QUALITY_RESULT" = success
-            test "$FRONTEND_RESULT" = success
-            test "$FRONTEND_SMOKE_RESULT" = success
-            test "$PYTHON_TESTS_RESULT" = success
-            test "$MIGRATED_STACK_RESULT" = success
-            test "$DEPENDENCY_AUDIT_RESULT" = success
-            test "$CONTAINERS_RESULT" = success
-          fi
+          set -Eeuo pipefail
+          test "$SCOPE_ROUTER_RESULT" = success
+          test -n "$EXPECTED_JOBS"
+          echo "CI_RESULT_PROFILE=$PROFILE"
+          echo "CI_RESULT_REQUIRED_GROUPS=$REQUIRED_GROUPS"
+          echo "CI_RESULT_SKIPPED_GROUPS=$SKIPPED_GROUPS"
+          RESULTS_JSON="$(python - <<'PY'
+          import json
+          import os
+
+          result_names = (
+              "scope-router",
+              "codeql-security",
+              "security-audit",
+              "quality",
+              "policy",
+              "frontend",
+              "frontend-smoke",
+              "frontend-mobile-regression",
+              "frontend-mobile-regression-extended",
+              "frontend-cross-browser",
+              "python-tests",
+              "migrated-stack",
+              "dependency-audit",
+              "containers",
+              "critical-smoke",
+              "workflow-contracts",
+              "scheduled-report",
+          )
+          env_names = {
+              name: name.upper().replace("-", "_") + "_RESULT"
+              for name in result_names
+          }
+          print(json.dumps({name: os.environ[env_name] for name, env_name in env_names.items()}))
+          PY
+          )"
+          python scripts/ci_contract.py verify-results \
+            --expected-jobs "$EXPECTED_JOBS" \
+            --results-json "$RESULTS_JSON"

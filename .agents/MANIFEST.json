@@ -1,18 +1,30 @@
 {
   "package": "your-fitness-coach-agents",
-  "version": "6",
+  "version": "11",
   "root": ".agents",
-  "skill_count": 33,
+  "skill_count": 51,
   "skills": [
     "accessibility-engineer",
+    "allure-reporting",
+    "api-testing",
+    "apple-design",
     "backend-engineer",
     "billing-engineer",
-    "code-reviewer",
+    "change-impact-analysis",
+    "clear-voice",
+    "contract-testing",
+    "coverage-analysis",
+    "cross-layer-debugging",
     "data-engineer",
+    "database-validation",
     "document-import-engineer",
+    "e2e-review",
     "evidence-content-editor",
+    "failure-triage",
     "fitness-domain-reviewer",
+    "flaky-analysis",
     "frontend-engineer",
+    "impeccable",
     "landing-art-director",
     "llm-engineer",
     "localization-engineer",
@@ -21,31 +33,35 @@
     "observability-engineer",
     "performance-engineer",
     "platform-engineer",
+    "playwright-testing",
     "privacy-engineer",
     "product-analytics-engineer",
     "product-designer",
     "product-discovery",
+    "pydantic-contracts",
+    "pytest-test-design",
     "python-engineer",
     "qa-engineer",
     "release-manager",
+    "requirements-traceability",
     "ru-legal-risk",
     "security-engineer",
     "seo-auditor",
     "solution-architect",
     "technical-writer",
     "telegram-engineer",
+    "test-data-management",
     "ui-audit",
     "ui-prototyper",
-    "ux-researcher"
+    "ux-researcher",
+    "ux-ui-design-orchestra"
   ],
   "roles": [
     "orchestrator",
     "researcher",
     "product-lawyer",
     "implementer",
-    "independent-reviewer",
-    "qa-verifier",
-    "integration-release"
+    "qa-verifier"
   ],
   "deprecated_skills": [
     "commercial-product-builder"
@@ -61,15 +77,33 @@
     ],
     "wow_is_first_class_quality": true
   },
-  "routing_model": "focused-core-plus-conditional-skills; task-declared-lifecycle-roles",
-  "role_count": 7,
+  "routing_model": "focused-core-plus-conditional-skills; optional role planning; qa-strategy-plus-specialists",
+  "role_count": 5,
   "notes": [
     "commercial-product-builder removed because orchestration belongs to role orchestrator",
     "mobile-engineer narrowed to smartphone runtime/lifecycle",
     "landing-art-director is a marketing overlay, not a second product-designer",
     "llm-engineer expanded to AI/LLM product engineering and AI Coach",
     "motion-design-engineer and ui-prototyper added",
-    "role contracts slimmed; lifecycle policy remains canonical in TASK_EXECUTION_LIFECYCLE.md",
-    "product-lawyer and ru-legal-risk provide read-only Russian legal-risk audit and owner decision routing"
-  ]
+    "role contracts slimmed; GitHub Flow remains the delivery policy",
+    "product-lawyer and ru-legal-risk provide read-only Russian legal-risk audit and owner decision routing",
+    "QA v8 keeps qa-engineer as strategy/router and adds focused testing, E2E review, triage, flakiness and coverage skills",
+    "QA work profiles are modes, not additional lifecycle roles",
+    "Security v9 adds repository-native diff/full review, YFC threat model and a separate deterministic Security Audit workflow",
+    "Security v10 adds free mandatory PR security jobs (CodeQL, dependency audit, Trivy) while semantic Security Review remains manual/conditional",
+    "Agent Harness v12 keeps optional pytest evals and owner-review learning candidates without lifecycle state",
+    "Toolkit methods adapted as conditional QA/fullstack helpers; apple-design and clear-voice tracked as pre-existing references; no new roles or controllers.",
+    "Impeccable 4.7.0 via exact-SHA git submodule is a development-only UX/UI critique skill; incumbent brand and visual gates supersede upstream aesthetic bans.",
+    "UX/UI Design Orchestra: project-scoped read-only audit/proposal coordinator, no runtime UI edits or owner gate bypass."
+  ],
+  "agent_harness": {
+    "script": "scripts/agent_harness.py",
+    "eval_root": ".agents/evals",
+    "features": [
+      "deterministic-pytest-backed-evals",
+      "owner-reviewable-learning-candidates"
+    ],
+    "source_of_truth": false,
+    "generated_artifacts": ".artifacts/tasks/<LABEL>/{temporary,evidence,deliverables}"
+  }
 }

@@ -1,0 +1,209 @@
+{
+  "approval": "OWNER_VISUAL_APPROVAL=APPROVED; APPROVAL_SCOPE=FINAL_CORRECTION_VISUAL_DESIGN",
+  "scope": "Frozen #895 first-screen/header/hero/CTA and mobile menu only. Does not approve lower trainer chapters.",
+  "images": [
+    {
+      "file": "athlete-dark-320-first-screen.png",
+      "sha256": "bf0ca1d2d689715390ed6d185f5bd689800c94d8b39b1dfabad8a1d8a4646b83",
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 320,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-320-first-screen.png"
+    },
+    {
+      "file": "athlete-dark-320-menu-open.png",
+      "sha256": "2ddd8eb583d1dd41d7f20ff26019eaec7748f751357599dbbf543d93fc5eb268",
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 320,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-320-menu-open.png"
+    },
+    {
+      "file": "athlete-dark-390-first-screen.png",
+      "sha256": "0257c2af2cfa114d1171c87880a5b0b3b16b095ed8af77fd09ff65861ae249f2",
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-390-first-screen.png"
+    },
+    {
+      "file": "athlete-dark-390-menu-open.png",
+      "sha256": "7849627c28b7c21f3b10d3e3c46c1dc19477375f0073a3d5694e773eaba1a7cb",
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-390-menu-open.png"
+    },
+    {
+      "file": "athlete-dark-desktop-first-screen.png",
+      "sha256": "cf6f76617f854f689a380efb8da2d38e39e56198426ddeffc3a91c532358d6d7",
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 1440,
+      "height": 1000,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-desktop-first-screen.png"
+    },
+    {
+      "file": "athlete-light-320-first-screen.png",
+      "sha256": "54e656493fdf4911e33095c761f92500463b19f10621e062efaaa137df3e19a4",
+      "audience": "athlete",
+      "theme": "light",
+      "width": 320,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-light-320-first-screen.png"
+    },
+    {
+      "file": "athlete-light-320-menu-open.png",
+      "sha256": "959c6a7852b2848f32826b0f72b8a72924584f84368dcab2522d0dbc7f403f3c",
+      "audience": "athlete",
+      "theme": "light",
+      "width": 320,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-light-320-menu-open.png"
+    },
+    {
+      "file": "athlete-light-390-first-screen.png",
+      "sha256": "0cb5fce38807ab6c9b8cd40fba54b373df97f8c4f515a169bfab8e58c00056fe",
+      "audience": "athlete",
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-light-390-first-screen.png"
+    },
+    {
+      "file": "athlete-light-390-menu-open.png",
+      "sha256": "444495f6c2fdff1df11708926da305f98c96180233e1d01b55824a6b9a0bb68c",
+      "audience": "athlete",
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-light-390-menu-open.png"
+    },
+    {
+      "file": "athlete-light-desktop-first-screen.png",
+      "sha256": "71d6314df41c453efae4baa5bc342a6b24d503d70e754233d8c7b9023a9bfb34",
+      "audience": "athlete",
+      "theme": "light",
+      "width": 1440,
+      "height": 1000,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/athlete-light-desktop-first-screen.png"
+    },
+    {
+      "file": "coach-dark-320-first-screen.png",
+      "sha256": "f515c5ed5505e4c8233bc66f795a0c16534798e6123a9be781862d5fa7e82e40",
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-dark-320-first-screen.png"
+    },
+    {
+      "file": "coach-dark-320-menu-open.png",
+      "sha256": "317571629cfa1d51ed2115381fc79ca5fa18b4f0546c615438caccf1d6779a41",
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-dark-320-menu-open.png"
+    },
+    {
+      "file": "coach-dark-390-first-screen.png",
+      "sha256": "70a76d637580b0d8a2fb7d60b28e3e93d4c3912ceab589663c6e1618418c5b25",
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-dark-390-first-screen.png"
+    },
+    {
+      "file": "coach-dark-390-menu-open.png",
+      "sha256": "fe60e2852d198bb7ccf641fd2c295ad15f9608976f82b59cad60ec13d1c07ec7",
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-dark-390-menu-open.png"
+    },
+    {
+      "file": "coach-dark-desktop-first-screen.png",
+      "sha256": "252031c6d9b60a7c019f8734211cecdc39a25408da7dd56362ba4381a001b865",
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "height": 1000,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png"
+    },
+    {
+      "file": "coach-light-320-first-screen.png",
+      "sha256": "e5b1a9c7d8d787545863dc461f0d8475cb1a75b00eb73bb1ec05c6da6639b56e",
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-light-320-first-screen.png"
+    },
+    {
+      "file": "coach-light-320-menu-open.png",
+      "sha256": "1466bef081790aa33ebb005c04d73a1aa375771a6cd01b13b67f1ba9ac0289d6",
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-light-320-menu-open.png"
+    },
+    {
+      "file": "coach-light-390-first-screen.png",
+      "sha256": "33d17352c17e9bb017625a04e18161ea1e94302959051b134e682534696030dc",
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-light-390-first-screen.png"
+    },
+    {
+      "file": "coach-light-390-menu-open.png",
+      "sha256": "6ae2505608bce239c165af4fff781933c997c22796cd68bb94c9b718d795cf69",
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "menu": true,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-light-390-menu-open.png"
+    },
+    {
+      "file": "coach-light-desktop-first-screen.png",
+      "sha256": "e39721a0acc86e97283831edce2042dd9e26016a1e44bcd32363c02cb214a1ff",
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "height": 1000,
+      "menu": false,
+      "source": ".artifacts/tasks/895/evidence/final-correction/coach-light-desktop-first-screen.png"
+    }
+  ],
+  "deliveryHead": "4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c",
+  "captureTimestamp": "2026-10-09T09:24:16.697Z",
+  "captureRuntimeNote": "Original final-correction captures predate 05277f8fb21695daf35d2b608f8d6843e1b76dc0 (44px mobile hero-footer link). Exact screenshot capture commit was not recorded; deliveryHead is not the screenshot runtime SHA. Mobile mismatch must not be silently rebaselined."
+}

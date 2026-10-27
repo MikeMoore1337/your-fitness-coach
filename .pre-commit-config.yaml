@@ -1,4 +1,4 @@
-# Запуск: pip install pre-commit && pre-commit install
+# Запуск: uv sync --locked --group dev && uv run --no-sync pre-commit install
 # Все файлы: pre-commit run --all-files
 #
 # Ruff закрывает автофикс, сортировку импортов (isort), lint (flake8-подобные правила)
@@ -11,13 +11,19 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # Third-party snapshots are byte-pinned: preserve upstream whitespace/EOF.
+      # First-party files retain both formatting checks.
       - id: trailing-whitespace
+        exclude: ^\.agents/references/external-quality/
       - id: end-of-file-fixer
+        exclude: ^\.agents/references/external-quality/
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=500"]
+        # Four immutable owner-approved #895 frames; hashes are checked by the visual suite.
+        exclude: ^docs/design/references/product-v10-landing-approved/final-895/(athlete|coach)-(light|dark)-desktop-first-screen\.png$
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -40,3 +46,31 @@ repos:
           - mypy==2.3.0
         pass_filenames: false
         files: ^(backend/fitminiapp_api|scripts/run_mypy\.py|pyproject\.toml)
+
+      - id: hermes-host-python
+        name: Hermes host Python 3.12 compatibility
+        entry: python3 scripts/check_hermes_host_python.py
+        language: system
+        pass_filenames: false
+        files: ^(deploy/hermes-discovery/.*\.py|scripts/(hermes_colocation|generate_hermes_source_definitions|check_hermes_host_python)\.py)$
+
+      - id: skill-safety
+        name: deterministic external skill safety
+        entry: python scripts/skill_safety.py scan-all
+        language: system
+        pass_filenames: false
+        files: ^(\.agents/skills/|scripts/skill_safety\.py)
+
+      - id: deterministic-link-check
+        name: deterministic local link check
+        entry: python scripts/check_links.py
+        language: system
+        pass_filenames: false
+        files: ^(README\.md|codex-backlog/|docs/|frontend/index\.html|frontend/public/manifest\.webmanifest|frontend/src/(content/publicContent\.json|pages/(landing|public)/|shared/navigation/)|scripts/check_links\.py|tests/test_check_links\.py)
+
+      - id: link-check-tests
+        name: link checker tests
+        entry: python -m pytest --override-ini addopts= --override-ini filterwarnings=default tests/test_check_links.py -q
+        language: system
+        pass_filenames: false
+        files: ^(scripts/check_links\.py|tests/test_check_links\.py|docs/development/link-checking\.md)

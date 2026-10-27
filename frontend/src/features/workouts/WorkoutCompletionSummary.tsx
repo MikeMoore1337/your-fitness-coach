@@ -4,10 +4,12 @@ import { api } from '../../shared/api/client';
 import type { Workout } from '../../shared/api/types';
 import { formatCalendarDate } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
-import { Badge, Button, CheckIcon, SemanticArtwork } from '../../shared/ui/common';
+import { DisclosureIcon, Badge, Button } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 
 export const workoutCompletionFeedbackLabels: Record<string, string> = {
   easier_than_expected: 'Легче ожидаемого',
@@ -41,7 +43,7 @@ export function formatCompletionDuration(seconds: number | null | undefined): st
 }
 
 function formatLoad(value: number): string {
-  return `${Number.isInteger(value) ? value : value.toFixed(1)} кг`;
+  return `${Number(value.toFixed(2))} кг`;
 }
 
 function formatDistance(value: number): string {
@@ -64,9 +66,11 @@ function nextWorkoutText(workout: NonNullable<Workout['completion_summary']>['ne
 export function WorkoutCompletionSummary({
   workout,
   onReturnToday,
+  readOnly = false,
 }: {
   workout: Workout;
   onReturnToday?: () => void;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const summary = workout.completion_summary;
@@ -120,9 +124,8 @@ export function WorkoutCompletionSummary({
       onAnimationEnd={motion.onMotionAnimationEnd}
     >
       <header className="workout-completion__hero">
-        <SemanticArtwork variant="workout-completion" />
         <span className="workout-completion__check" aria-hidden="true">
-          <CheckIcon />
+          <Icon name="week-strength" size={24} />
         </span>
         <div>
           <Badge tone="success">Результат сохранён</Badge>
@@ -130,7 +133,6 @@ export function WorkoutCompletionSummary({
           <p>{workout.title}</p>
         </div>
       </header>
-
       <dl className="workout-completion__facts" aria-label="Ключевые факты тренировки">
         <div>
           <dt>Длительность</dt>
@@ -146,55 +148,12 @@ export function WorkoutCompletionSummary({
         </div>
       </dl>
 
-      <section className="workout-completion__next" aria-labelledby="workout-next-title">
-        <span className="eyebrow">Следующий шаг</span>
-        <h3 id="workout-next-title">План продолжается</h3>
-        <p>{nextWorkoutText(summary?.next_workout ?? null)}</p>
-        <div className="workout-completion__actions">
-          {onReturnToday ? (
-            <Button type="button" onClick={onReturnToday}>
-              Вернуться в Сегодня
-            </Button>
-          ) : (
-            <AppLink className="button-link" to="/app?section=today">
-              Вернуться в Сегодня
-            </AppLink>
-          )}
-          <AppLink className="button-link secondary-link" to="/app?section=progress">
-            Посмотреть Прогресс
-          </AppLink>
-        </div>
-      </section>
-
-      {!!summary?.personal_records.length && (
-        <section className="workout-completion__records" aria-labelledby="workout-records-title">
-          <span className="eyebrow">Личные результаты</span>
-          <h3 id="workout-records-title">Новый лучший результат</h3>
-          <ul>
-            {summary.personal_records.map((record) => (
-              <li key={record.exercise_id}>
-                <strong>{record.exercise_title}</strong>
-                <span>
-                  {[
-                    record.kinds.includes('max_load') && record.max_load_kg != null
-                      ? `максимальный вес ${formatLoad(record.max_load_kg)}`
-                      : null,
-                    record.kinds.includes('best_set_volume') && record.best_set_volume_kg != null
-                      ? `лучший подход ${formatLoad(record.best_set_volume_kg)} (вес × повторы)`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
       {!!summary?.exercises.length && (
         <details className="workout-completion__results">
-          <summary>Записанные результаты</summary>
+          <summary className="yfc-disclosure-summary">
+            Записанные результаты
+            <DisclosureIcon />
+          </summary>
           <ul>
             {summary.exercises.map((exercise) => (
               <li key={exercise.workout_exercise_id}>
@@ -228,58 +187,92 @@ export function WorkoutCompletionSummary({
         </details>
       )}
 
-      <form
-        className="workout-completion__feedback"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (changed && !saveFeedback.isPending) saveFeedback.mutate();
-        }}
-      >
-        <fieldset>
-          <legend>
-            Как ощущалась тренировка? <span>Необязательно</span>
-          </legend>
-          <div className="workout-completion__feedback-options">
-            {feedbackOptions.map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={feedback === value}
-                onClick={() => updateFeedback(value)}
-              >
-                {label}
-              </button>
+      {!!summary?.personal_records.length && (
+        <section className="workout-completion__records" aria-labelledby="workout-records-title">
+          <span className="eyebrow">Личные результаты</span>
+          <h3 id="workout-records-title">Новый лучший результат</h3>
+          <ul>
+            {summary.personal_records.map((record) => (
+              <li key={record.exercise_id}>
+                <strong>{record.exercise_title}</strong>
+                <span>
+                  {[
+                    record.kinds.includes('max_load') && record.max_load_kg != null
+                      ? `максимальный вес ${formatLoad(record.max_load_kg)}`
+                      : null,
+                    record.kinds.includes('best_set_volume') && record.best_set_volume_kg != null
+                      ? `лучший подход ${formatLoad(record.best_set_volume_kg)} (вес × повторы)`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </li>
             ))}
-          </div>
-        </fieldset>
-        <label htmlFor={`workout-completion-note-${workout.id}`}>Заметка</label>
-        <textarea
-          id={`workout-completion-note-${workout.id}`}
-          value={note}
-          rows={3}
-          maxLength={NOTE_MAX_LENGTH}
-          placeholder="Что стоит учесть в следующий раз"
-          onChange={(event) => {
-            setNote(event.target.value);
-            saveFeedback.reset();
+          </ul>
+        </section>
+      )}
+
+      {readOnly && (
+        <p className="muted demo-capability-notice" role="status">
+          Обратная связь к результату доступна после входа.
+        </p>
+      )}
+      <fieldset className="demo-capability-fieldset" disabled={readOnly}>
+        <form
+          className="workout-completion__feedback"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (changed && !saveFeedback.isPending) saveFeedback.mutate();
           }}
-        />
-        <div className="workout-completion__feedback-footer">
-          <span aria-live="polite">
-            {saveFeedback.isSuccess && !changed
-              ? 'Обратная связь сохранена'
-              : `${note.length} из ${NOTE_MAX_LENGTH}`}
-          </span>
-          <Button type="submit" disabled={!changed || saveFeedback.isPending}>
-            {saveFeedback.isPending ? 'Сохраняем…' : 'Сохранить'}
-          </Button>
-        </div>
-        {saveFeedback.error && (
-          <p className="workout-completion__error" role="alert">
-            {(saveFeedback.error as Error).message} Введённый текст сохранён в форме.
-          </p>
-        )}
-      </form>
+        >
+          <fieldset>
+            <legend>
+              Как ощущалась тренировка? <span>Необязательно</span>
+            </legend>
+            <div className="workout-completion__feedback-options">
+              {feedbackOptions.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={feedback === value}
+                  data-yfc-choice="compact"
+                  onClick={() => updateFeedback(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label htmlFor={`workout-completion-note-${workout.id}`}>Заметка</label>
+          <textarea
+            id={`workout-completion-note-${workout.id}`}
+            value={note}
+            rows={3}
+            maxLength={NOTE_MAX_LENGTH}
+            placeholder="Что стоит учесть в следующий раз"
+            onChange={(event) => {
+              setNote(event.target.value);
+              saveFeedback.reset();
+            }}
+          />
+          <div className="workout-completion__feedback-footer">
+            <span aria-live="polite">
+              {saveFeedback.isSuccess && !changed
+                ? 'Обратная связь сохранена'
+                : `${note.length} из ${NOTE_MAX_LENGTH}`}
+            </span>
+            <Button type="submit" disabled={!changed || saveFeedback.isPending}>
+              {saveFeedback.isPending ? 'Сохраняем…' : 'Сохранить'}
+            </Button>
+          </div>
+          {saveFeedback.error && (
+            <p className="workout-completion__error" role="alert">
+              {(saveFeedback.error as Error).message} Введённый текст сохранён в форме.
+            </p>
+          )}
+        </form>
+      </fieldset>
 
       <WorkoutFeedbackDisclosure
         workoutId={workout.id}
@@ -290,6 +283,32 @@ export function WorkoutCompletionSummary({
           title: exercise.exercise_title,
         }))}
         viewer="client"
+      />
+
+      <section className="workout-completion__next" aria-labelledby="workout-next-title">
+        <span className="eyebrow">Следующий шаг</span>
+        <h3 id="workout-next-title">План продолжается</h3>
+        <p>{nextWorkoutText(summary?.next_workout ?? null)}</p>
+        <div className="workout-completion__actions app-action-group">
+          {onReturnToday ? (
+            <Button type="button" onClick={onReturnToday}>
+              Вернуться в Сегодня
+            </Button>
+          ) : (
+            <AppLink className="button-link" to="/app?section=today">
+              Вернуться в Сегодня
+            </AppLink>
+          )}
+          <AppLink className="button-link secondary-link" to="/app?section=progress">
+            Посмотреть Прогресс
+          </AppLink>
+        </div>
+      </section>
+
+      <AiCoachContextualEntry
+        actionLabel="Разобрать с AI Coach"
+        context={{ surface: 'workout', resourceId: workout.id }}
+        entryPoint="workout"
       />
     </section>
   );

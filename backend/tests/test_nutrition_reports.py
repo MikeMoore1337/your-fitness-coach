@@ -10,9 +10,15 @@ from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services.nutrition_reports import (
+    _metric_summary,
     _safe_csv_value,
     resolve_report_bounds,
 )
+
+
+def test_nutrition_metric_summary_preserves_decimal_scale() -> None:
+    assert _metric_summary([{"calories": Decimal("72.34")}], "calories")["average"] == 72.34
+    assert _metric_summary([{"protein_g": Decimal("42.344")}], "protein_g")["average"] == 42.344
 
 
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
@@ -152,6 +158,9 @@ def test_report_aggregates_only_confirmed_days_against_effective_targets(client)
     assert summary["incomplete_days"] == 1
     assert summary["missing_days"] == 4
     assert summary["current_day_status"] == "incomplete"
+    assert summary["exact_entry_count"] == 1
+    assert summary["approximate_entry_count"] == 0
+    assert summary["partial_entry_count"] == 1
     assert summary["calories"] == {
         "average": 1000.0,
         "minimum": 0.0,
@@ -316,3 +325,111 @@ def test_csv_formula_injection_values_are_forced_to_text() -> None:
     assert _safe_csv_value("=1+1") == "'=1+1"
     assert _safe_csv_value("  @cmd") == "'  @cmd"
     assert _safe_csv_value("safe") == "safe"
+
+
+def test_nutrition_report_fiber_is_nullable_and_only_confirmed_days_enter_averages(client) -> None:
+    headers = _auth(client, 57_201)
+    user_id = _user_id(57_201)
+    today = today_msk()
+    yesterday = today - timedelta(days=1)
+    two_days_ago = today - timedelta(days=2)
+    with get_session_context() as db:
+        known = _entry(user_id, yesterday)
+        known.fiber_g_per_100g = Decimal("3")
+        unknown = _entry(user_id, two_days_ago)
+        unknown.fiber_g_per_100g = None
+        db.add_all(
+            [
+                known,
+                unknown,
+                FoodDiaryDayStatus(user_id=user_id, diary_date=yesterday, status="complete"),
+                FoodDiaryDayStatus(user_id=user_id, diary_date=two_days_ago, status="complete"),
+            ]
+        )
+
+    response = client.get(
+        "/api/v1/workouts/progress/nutrition-report?period=days_7", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    report = response.json()
+    points = {item["diary_date"]: item for item in report["daily"]}
+    assert points[yesterday.isoformat()]["fiber_g"] == 6
+    assert points[two_days_ago.isoformat()]["fiber_g"] is None
+    assert points[today.isoformat()]["fiber_g"] is None
+    assert report["summary"]["fiber_g"] == {
+        "average": 6,
+        "minimum": 6,
+        "maximum": 6,
+        "sample_days": 1,
+    }
+    assert report["insights"] == []
+
+    csv_response = client.get(
+        "/api/v1/workouts/progress/nutrition-report.csv?period=days_7", headers=headers
+    )
+    assert csv_response.status_code == 200
+    assert "fiber_g" in csv_response.text
+    assert "summary_fiber_average_g" in csv_response.text
+
+
+def test_nutrition_report_explains_consistent_historical_macro_deviation(client) -> None:
+    headers = _auth(client, 57_202)
+    user_id = _user_id(57_202)
+    today = today_msk()
+    with get_session_context() as db:
+        db.add(
+            _target(
+                user_id,
+                effective_from=today - timedelta(days=10),
+                calories=2500,
+                protein_g=200,
+                fat_g=70,
+                carbs_g=250,
+            )
+        )
+        for offset in range(1, 6):
+            day = today - timedelta(days=offset)
+            db.add(_entry(user_id, day))
+            db.add(FoodDiaryDayStatus(user_id=user_id, diary_date=day, status="complete"))
+
+    response = client.get(
+        "/api/v1/workouts/progress/nutrition-report?period=days_7", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    report = response.json()
+    protein = next(insight for insight in report["insights"] if insight["metric"] == "protein_g")
+    assert protein["direction"] == "below"
+    assert protein["evaluated_days"] == 5
+    assert protein["deviation_days"] == 5
+    assert protein["average_deviation"] == -50
+    assert protein["action_code"] == "open_meal_suggestions"
+    assert "5 из 5" in protein["message"]
+
+
+def test_nutrition_insights_exclude_fasted_and_partial_days_and_require_coverage() -> None:
+    from fitminiapp_api.services.nutrition_reports import _nutrition_trend_insights
+
+    confirmed = [
+        {
+            "status": "complete",
+            "calories": 1200,
+            "target_calories": 2500,
+            "protein_g": None,
+            "target_protein_g": 200,
+            "fat_g": None,
+            "target_fat_g": 70,
+            "carbs_g": None,
+            "target_carbs_g": 250,
+        }
+        for _ in range(3)
+    ]
+    explicit_fasting = {
+        **confirmed[0],
+        "status": "fasted",
+        "calories": 0,
+    }
+    incomplete = {**confirmed[0], "status": "incomplete"}
+    missing = {**confirmed[0], "status": "missing"}
+    assert _nutrition_trend_insights([*confirmed, explicit_fasting, incomplete, missing]) == []
+    assert _nutrition_trend_insights([*confirmed, explicit_fasting, incomplete]) != []
+    assert _nutrition_trend_insights([explicit_fasting] * 7) == []

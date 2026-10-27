@@ -171,9 +171,12 @@ test('Landing ведёт на canonical Login, а protected route сохраня
 }) => {
   await mockAuthApi(page);
   await page.goto('/');
-  await page.getByRole('link', { name: 'Войти' }).click();
+  await page
+    .locator('.ref-hero .landing-hero__actions')
+    .getByRole('link', { name: 'Начать со своими данными', exact: true })
+    .click();
 
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login\?next=%2Fapp$/);
   await expect(page.locator('#login-title .login-title--desktop')).toBeVisible();
   await expect(page.locator('#login-title')).toContainText('Вернитесь к своему плану.');
 
@@ -183,6 +186,113 @@ test('Landing ведёт на canonical Login, а protected route сохраня
     'href',
     '/api/v1/auth/oauth/google/start?next=%2Fcoach',
   );
+});
+
+test('Trainer CTA сохраняет bounded intent до авторизации', async ({ page }) => {
+  await mockAuthApi(page);
+  await page.goto('/for-trainers');
+
+  const cta = page.locator('a[href*="trainer_intent"]').first();
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute('href', '/login?next=%2Fapp%3Ftrainer_intent%3D1');
+  await cta.click();
+  await expect(page).toHaveURL(/\/login\?next=%2Fapp%3Ftrainer_intent%3D1$/);
+});
+
+test('Trainer intent требует явного согласия и после capability activation открывает Coach Today', async ({
+  page,
+}) => {
+  const initialUser = userPayload();
+  await mockAuthApi(page, { authenticated: true, initialUser });
+  let capabilityActive = false;
+  await page.route('**/api/v1/me/trainer-capability', async (route) => {
+    if (route.request().method() === 'POST') {
+      capabilityActive = true;
+      initialUser.is_coach = true;
+      return route.fulfill({
+        json: {
+          is_active: true,
+          activated_now: true,
+          active_client_count: 0,
+          pending_invite_count: 0,
+          can_disable: true,
+          terms_version: 'trainer-capability-v1',
+        },
+      });
+    }
+    return route.fulfill({
+      json: {
+        is_active: capabilityActive,
+        activated_now: false,
+        active_client_count: 0,
+        pending_invite_count: 0,
+        can_disable: capabilityActive,
+        terms_version: 'trainer-capability-v1',
+      },
+    });
+  });
+
+  await page.goto('/app?trainer_intent=1');
+  const activate = page.getByRole('button', { name: 'Включить режим тренера' });
+  await expect(activate).toBeDisabled();
+  await page.getByRole('checkbox', { name: /принимаю условия/i }).check();
+  await expect(activate).toBeEnabled();
+  await activate.click();
+  await expect(page).toHaveURL(/\/coach$/);
+});
+
+test('Trainer intent в TMA сохраняет явное согласие и не смешивает Telegram transport query', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.Telegram = {
+      WebApp: {
+        initData: 'signed-trainer-intent-data',
+        initDataUnsafe: {},
+        colorScheme: 'dark',
+        ready() {},
+        expand() {},
+        BackButton: {
+          show() {},
+          hide() {},
+          onClick() {},
+          offClick() {},
+        },
+      },
+    };
+  });
+  const telegramUser = userPayload();
+  await mockAuthApi(page, { telegramUser });
+  await page.route('**/api/v1/me/trainer-capability', async (route) => {
+    if (route.request().method() === 'POST') {
+      telegramUser.is_coach = true;
+      return route.fulfill({
+        json: {
+          is_active: true,
+          activated_now: true,
+          active_client_count: 0,
+          pending_invite_count: 0,
+          can_disable: true,
+          terms_version: 'trainer-capability-v1',
+        },
+      });
+    }
+    return route.fulfill({
+      json: {
+        is_active: false,
+        activated_now: false,
+        active_client_count: 0,
+        pending_invite_count: 0,
+        can_disable: false,
+        terms_version: 'trainer-capability-v1',
+      },
+    });
+  });
+
+  await page.goto('/app?trainer_intent=1&tgWebAppPlatform=android');
+  await page.getByRole('checkbox', { name: /принимаю условия/i }).check();
+  await page.getByRole('button', { name: 'Включить режим тренера' }).click();
+  await expect(page).toHaveURL(/\/coach$/);
 });
 
 test('Login использует surface-aware logo и не дублирует Войти в mobile header', async ({
@@ -270,8 +380,8 @@ test('Telegram fallback сохраняет контраст, когда browser 
   const fallback = page.getByRole('link', { name: 'Открыть в Telegram' });
   await expect(fallback).toBeVisible();
   await expect(fallback).toHaveCSS('min-height', '48px');
-  await expect(fallback).toHaveCSS('background-color', 'rgb(236, 237, 233)');
-  await expect(fallback).toHaveCSS('color', 'rgb(22, 26, 23)');
+  await expect(fallback).toHaveCSS('background-color', 'rgb(240, 240, 240)');
+  await expect(fallback).toHaveCSS('color', 'rgb(21, 21, 21)');
 });
 
 test('Повторить сохраняет контраст и единый hover с provider-кнопками', async ({ page }) => {
@@ -306,9 +416,9 @@ test('Повторить сохраняет контраст и единый hov
 
     expect(retryStyles).toEqual(providerStyles);
     expect(retryStyles.backgroundColor).toBe(
-      scheme === 'light' ? 'rgb(236, 237, 233)' : 'rgb(30, 34, 30)',
+      scheme === 'light' ? 'rgb(240, 240, 240)' : 'rgb(27, 31, 31)',
     );
-    expect(retryStyles.color).toBe(scheme === 'light' ? 'rgb(22, 26, 23)' : 'rgb(238, 240, 234)');
+    expect(retryStyles.color).toBe(scheme === 'light' ? 'rgb(21, 21, 21)' : 'rgb(245, 245, 245)');
   }
 });
 
@@ -478,7 +588,7 @@ test('Login адаптивен, доступен с клавиатуры и ув
       await expect(page.getByRole('combobox')).toHaveCount(0);
 
       const google = page.getByRole('link', { name: 'Продолжить с Google' });
-      await expect(google).toHaveCSS('border-radius', '12px');
+      await expect(google).toHaveCSS('border-radius', '14px');
       const googleBox = await google.boundingBox();
       expect(googleBox).not.toBeNull();
 

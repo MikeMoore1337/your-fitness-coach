@@ -1,11 +1,11 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import LoginPage from '../../../../src/pages/auth/LoginPage';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
 
 const { authState } = vi.hoisted(() => ({
   authState: {
-    user: null as { id: number } | null,
+    user: null as { id: number; is_coach?: boolean; is_root?: boolean } | null,
     config: {
       app_env: 'prod',
       enable_dev_auth: false,
@@ -37,6 +37,8 @@ describe('LoginPage', () => {
     authState.user = null;
     authState.loading = false;
     authState.error = null;
+    authState.devLogin.mockReset().mockResolvedValue(undefined);
+    authState.config.enable_dev_auth = false;
     authState.config.enable_web_auth = true;
     authState.config.enable_email_auth = false;
     authState.config.oauth_providers = ['telegram', 'google', 'yandex', 'vk'];
@@ -118,11 +120,31 @@ describe('LoginPage', () => {
     expect(document.body).not.toHaveTextContent('secret-state');
   });
 
-  it('redirects an already authenticated account to the intended destination', async () => {
-    authState.user = { id: 9 };
+  it('redirects an authenticated coach to an explicitly requested coach destination', async () => {
+    authState.user = { id: 9, is_coach: true };
     renderLogin();
 
     await waitFor(() => expect(window.location.pathname).toBe('/coach'));
+  });
+
+  it.each([
+    ['/coach', { id: 9 }],
+    ['/admin', { id: 9 }],
+    ['/admin', { id: 9, is_coach: true }],
+  ])('rejects unauthorized privileged next destination %s', async (next, user) => {
+    authState.user = user;
+    window.history.replaceState(null, '', `/login?next=${encodeURIComponent(next)}`);
+    renderLogin();
+
+    await waitFor(() => expect(window.location.pathname).toBe('/app'));
+  });
+
+  it('allows an authenticated root account to use an explicit admin destination', async () => {
+    authState.user = { id: 9, is_root: true };
+    window.history.replaceState(null, '', '/login?next=%2Fadmin');
+    renderLogin();
+
+    await waitFor(() => expect(window.location.pathname).toBe('/admin'));
   });
 
   it('explains clean onboarding and provides an explicit return to the demo scenario', () => {
@@ -135,5 +157,63 @@ describe('LoginPage', () => {
       'href',
       '/demo?scenario=trainer',
     );
+  });
+
+  it.each([
+    {
+      role: 'Клиент',
+      input: {
+        telegram_user_id: 2001,
+        username: 'demo_client',
+        is_coach: false,
+        is_admin: false,
+        full_name: 'Демо клиент',
+      },
+      destination: '/app',
+    },
+    {
+      role: 'Тренер',
+      input: {
+        telegram_user_id: 1002,
+        username: 'demo_coach',
+        is_coach: true,
+        is_admin: false,
+        full_name: 'Демо тренер',
+      },
+      destination: '/coach',
+    },
+    {
+      role: 'Админ',
+      input: {
+        telegram_user_id: 1001,
+        username: 'demo_admin',
+        is_coach: true,
+        is_admin: true,
+        full_name: 'Демо админ',
+      },
+      destination: '/admin',
+    },
+  ])(
+    'uses the isolated $role fixture and its default workspace',
+    async ({ role, input, destination }) => {
+      authState.config.enable_dev_auth = true;
+      window.history.replaceState(null, '', '/login');
+      renderLogin();
+
+      fireEvent.click(screen.getByRole('button', { name: role }));
+
+      expect(authState.devLogin).toHaveBeenCalledWith(input);
+      await waitFor(() => expect(window.location.pathname).toBe(destination));
+    },
+  );
+
+  it('keeps an explicit safe destination for a demo role', async () => {
+    authState.config.enable_dev_auth = true;
+    window.history.replaceState(null, '', '/login?next=%2Fapp');
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Админ' }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/app'));
   });
 });

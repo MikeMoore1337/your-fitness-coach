@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
+from hashlib import sha256
 from typing import Literal, cast
 from urllib.parse import parse_qs, urlsplit
 
@@ -9,6 +10,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.timezone import (
     local_naive_to_utc_naive,
     now_for_user_naive,
@@ -19,9 +21,22 @@ from fitminiapp_api.core.timezone import (
 )
 from fitminiapp_api.models.check_in import WeeklyCheckIn
 from fitminiapp_api.models.feedback import WorkoutComment
-from fitminiapp_api.models.notification import Notification, NotificationSetting
+from fitminiapp_api.models.notification import (
+    Notification,
+    NotificationDelivery,
+    NotificationSetting,
+    WebPushSubscription,
+)
 from fitminiapp_api.models.program import UserProgram, UserWorkout
-from fitminiapp_api.models.user import BodyMeasurement, CoachClientInvite, User, UserProfile
+from fitminiapp_api.models.report_handoff import ReportHandoff
+from fitminiapp_api.models.user import (
+    BodyMeasurement,
+    CoachClient,
+    CoachClientInvite,
+    User,
+    UserProfile,
+)
+from fitminiapp_api.services.telegram_transport import TelegramPublicationError
 
 MAX_DELIVERY_ATTEMPTS = 5
 PROCESSING_TIMEOUT = timedelta(minutes=5)
@@ -35,12 +50,36 @@ ALLOWED_NOTIFICATION_QUERY_KEYS = frozenset(
         "workout_id",
         "comment_id",
         "workout_exercise_id",
+        "report_handoff_id",
         "weekly_review",
         "date",
+        "meal",
+        "hydration",
         "return_to",
     }
 )
 ALLOWED_NOTIFICATION_SECTIONS = frozenset({"today", "progress", "programs", "nutrition", "profile"})
+SCHEDULER_CANCELLATION_REASONS = frozenset(
+    {
+        "workout_reminder_invalidated",
+        "workout_reminder_not_due",
+        "workout_reminders_disabled",
+        "weekly_check_in_not_due",
+        "weekly_check_in_reminders_disabled",
+        "measurement_reminder_not_due",
+        "measurement_reminders_disabled",
+        "contextual_reminder_disabled",
+        "contextual_reminder_not_due",
+    }
+)
+_LEGACY_SCHEDULER_REMINDER_KEYS = (
+    ("workout_reminder", "workout:"),
+    ("weekly_check_in_reminder", "weekly_check_in:"),
+    ("measurement_reminder", "measurement:"),
+    ("meal_logging_reminder", "contextual:"),
+    ("hydration_reminder", "contextual:"),
+    ("movement_break_reminder", "contextual:"),
+)
 
 
 class NotificationDeliveryError(RuntimeError):
@@ -59,6 +98,31 @@ class NotificationDeliveryError(RuntimeError):
         self.terminal_status = terminal_status
 
 
+class ManualNotificationScheduleError(ValueError):
+    """The requested personal reminder is no longer a future local wall time."""
+
+
+PAST_NOTIFICATION_DATE_MESSAGE = "Выберите сегодняшнюю или будущую дату."
+PAST_NOTIFICATION_TODAY_MESSAGE = (
+    "Для сегодняшней даты выберите будущее время сегодня в часовом поясе профиля."
+)
+
+
+def can_scheduler_reactivate_cancelled_notification(notification: Notification) -> bool:
+    """Allow only scheduler-owned cancellation state to become queued again."""
+    if notification.status != "cancelled" or notification.event_kind != "reminder":
+        return False
+    if notification.last_error in SCHEDULER_CANCELLATION_REASONS:
+        return True
+    if notification.last_error is not None:
+        return False
+    dedupe_key = notification.dedupe_key or ""
+    return any(
+        notification.category == category and dedupe_key.startswith(prefix)
+        for category, prefix in _LEGACY_SCHEDULER_REMINDER_KEYS
+    )
+
+
 def normalize_notification_action_url(action_url: str | None) -> str | None:
     if action_url is None:
         return None
@@ -73,13 +137,31 @@ def normalize_notification_action_url(action_url: str | None) -> str | None:
     section = query.get("section", [None])[0]
     if section is not None and section not in ALLOWED_NOTIFICATION_SECTIONS:
         raise ValueError("unsupported notification section")
-    for key in ("workout_id", "comment_id", "workout_exercise_id"):
+    for key in ("workout_id", "comment_id", "workout_exercise_id", "report_handoff_id"):
         value = query.get(key, [None])[0]
         if value is not None and (not value.isdigit() or int(value) <= 0):
             raise ValueError("invalid notification entity identifier")
+    if query.get("report_handoff_id") is not None and section != "progress":
+        raise ValueError("report handoff must open progress section")
     weekly_review = query.get("weekly_review", [None])[0]
     if weekly_review is not None and weekly_review != "1":
         raise ValueError("invalid weekly review destination")
+    date_value = query.get("date", [None])[0]
+    if date_value is not None:
+        try:
+            date.fromisoformat(date_value)
+        except ValueError as exc:
+            raise ValueError("invalid notification date") from exc
+    meal = query.get("meal", [None])[0]
+    if meal is not None and meal not in {"breakfast", "lunch", "dinner", "snacks"}:
+        raise ValueError("invalid notification meal")
+    hydration = query.get("hydration", [None])[0]
+    if hydration is not None and hydration != "quick":
+        raise ValueError("invalid hydration destination")
+    if meal is not None and section != "nutrition":
+        raise ValueError("meal must open nutrition section")
+    if hydration is not None and section != "nutrition":
+        raise ValueError("hydration must open nutrition section")
     return_to = query.get("return_to", [None])[0]
     if return_to is not None and return_to != "/app?section=profile#profile-notifications":
         raise ValueError("invalid notification return destination")
@@ -103,6 +185,11 @@ def neutral_telegram_text(notification: Notification) -> str:
         "trainer_program_update": "Тренер обновил программу. Подробности — в приложении.",
         "weekly_check_in_reminder": "Пора подвести итоги недели. Подробности — в приложении.",
         "measurement_reminder": "Можно обновить замеры. Подробности — в приложении.",
+        "meal_logging_reminder": "Можно записать приём пищи. Подробности — в приложении.",
+        "hydration_reminder": "Можно выпить воды. Подробности — в приложении.",
+        "movement_break_reminder": (
+            "Пора сделать короткий перерыв и немного подвигаться. Подробности — в приложении."
+        ),
         "relationship_event": "Статус связи с тренером изменился. Подробности — в приложении.",
         "nutrition_update": "Ориентиры питания обновлены. Подробности — в приложении.",
         "workout_change": "Расписание тренировки изменилось. Подробности — в приложении.",
@@ -124,6 +211,9 @@ def reminder_category_enabled(
         "workout_reminder": setting.workout_reminders_enabled,
         "weekly_check_in_reminder": setting.weekly_check_in_reminders_enabled,
         "measurement_reminder": setting.measurement_reminders_enabled,
+        "meal_logging_reminder": setting.meal_reminders_enabled,
+        "hydration_reminder": setting.hydration_reminders_enabled,
+        "movement_break_reminder": setting.movement_reminders_enabled,
     }
     return category_flags.get(notification.category, True)
 
@@ -162,6 +252,9 @@ def resolve_notification_destination(
         "trainer_program_update": "/app?section=programs",
         "weekly_check_in_reminder": "/app?section=progress&weekly_review=1",
         "measurement_reminder": "/app?section=progress",
+        "meal_logging_reminder": "/app?section=nutrition",
+        "hydration_reminder": "/app?section=nutrition",
+        "movement_break_reminder": "/app?section=today",
         "relationship_event": "/app?section=profile",
         "nutrition_update": "/app?section=nutrition",
         "workout_change": "/app?section=progress",
@@ -175,6 +268,43 @@ def resolve_notification_destination(
         return NOTIFICATION_FALLBACK, True
 
     query = parse_qs(urlsplit(destination).query)
+    report_handoff_id_value = query.get("report_handoff_id", [None])[0]
+    if report_handoff_id_value is not None:
+        if notification.category != "report_handoff":
+            return NOTIFICATION_FALLBACK, True
+        handoff = (
+            db.query(ReportHandoff)
+            .filter(
+                ReportHandoff.id == int(report_handoff_id_value),
+                ReportHandoff.notification_id == notification.id,
+                ReportHandoff.trainer_user_id == user.id,
+            )
+            .first()
+        )
+        if handoff is None:
+            return NOTIFICATION_FALLBACK, True
+        active_relation = (
+            db.query(CoachClient.id)
+            .join(User, User.id == CoachClient.coach_user_id)
+            .filter(
+                CoachClient.id == handoff.relationship_id,
+                CoachClient.coach_user_id == handoff.trainer_user_id,
+                CoachClient.client_user_id == handoff.sender_user_id,
+                CoachClient.status == "active",
+                User.id == user.id,
+                User.is_active.is_(True),
+                User.is_coach.is_(True),
+            )
+            .first()
+        )
+        sender_is_active = (
+            db.query(User.id)
+            .filter(User.id == handoff.sender_user_id, User.is_active.is_(True))
+            .first()
+            is not None
+        )
+        if active_relation is None or not sender_is_active:
+            return NOTIFICATION_FALLBACK, True
     workout_id_value = query.get("workout_id", [None])[0]
     if workout_id_value is not None:
         workout_id = int(workout_id_value)
@@ -211,6 +341,8 @@ def utcnow() -> datetime:
 def safe_delivery_error(error: Exception) -> str:
     """Return a bounded diagnostic code without serializing request URLs or secrets."""
     if isinstance(error, NotificationDeliveryError):
+        return error.code
+    if isinstance(error, TelegramPublicationError):
         return error.code
     if isinstance(error, httpx.HTTPStatusError):
         return f"http_status:{error.response.status_code}"
@@ -256,9 +388,9 @@ def list_my_notifications(db: Session, user: User, limit: int = 100) -> list[Not
 def prune_terminal_records(db: Session) -> int:
     """Bound terminal operational history while preserving relation/audit rows."""
     cutoff = now_msk_naive() - TERMINAL_RETENTION
-    notification_ids = [
-        row.id
-        for row in db.query(Notification.id)
+    terminal_notifications = [
+        (row.id, row.status)
+        for row in db.query(Notification.id, Notification.status)
         .filter(
             Notification.status.in_(("sent", "cancelled", "failed")),
             Notification.created_at < cutoff,
@@ -267,6 +399,7 @@ def prune_terminal_records(db: Session) -> int:
         .limit(RETENTION_BATCH_SIZE)
         .all()
     ]
+    notification_ids = [notification_id for notification_id, _status in terminal_notifications]
     invite_ids = [
         row.id
         for row in db.query(CoachClientInvite.id)
@@ -279,6 +412,24 @@ def prune_terminal_records(db: Session) -> int:
         .all()
     ]
     if notification_ids:
+        delivered_ids = [
+            notification_id
+            for notification_id, notification_status in terminal_notifications
+            if notification_status == "sent"
+        ]
+        failed_ids = [
+            notification_id
+            for notification_id, notification_status in terminal_notifications
+            if notification_status != "sent"
+        ]
+        if delivered_ids:
+            db.query(ReportHandoff).filter(ReportHandoff.notification_id.in_(delivered_ids)).update(
+                {ReportHandoff.delivery_status: "delivered"}, synchronize_session=False
+            )
+        if failed_ids:
+            db.query(ReportHandoff).filter(ReportHandoff.notification_id.in_(failed_ids)).update(
+                {ReportHandoff.delivery_status: "failed"}, synchronize_session=False
+            )
         db.query(Notification).filter(Notification.id.in_(notification_ids)).delete(
             synchronize_session=False
         )
@@ -394,7 +545,10 @@ def sync_workout_reminders(db: Session) -> int:
         dedupe_key = f"workout:{workout.id}:reminder"
         existing_notification = reminders_by_key.get(dedupe_key)
         if existing_notification:
-            if existing_notification.status in {"queued", "cancelled"}:
+            if existing_notification.status == "queued" or (
+                existing_notification.status == "cancelled"
+                and can_scheduler_reactivate_cancelled_notification(existing_notification)
+            ):
                 was_cancelled = existing_notification.status == "cancelled"
                 existing_notification.status = "queued"
                 existing_notification.scheduled_for = scheduled_for
@@ -428,8 +582,16 @@ def sync_workout_reminders(db: Session) -> int:
     for user_id, notifications in queued_by_user.items():
         setting, _, _ = settings_by_user[user_id]
         for notification in notifications:
-            if not setting.workout_reminders_enabled or notification.dedupe_key not in active_keys:
-                notification.status = "cancelled"
+            if setting.workout_reminders_enabled and notification.dedupe_key in active_keys:
+                continue
+            notification.status = "cancelled"
+            notification.last_error = (
+                "workout_reminders_disabled"
+                if not setting.workout_reminders_enabled
+                else "workout_reminder_not_due"
+            )
+            notification.processing_started_at = None
+            notification.next_attempt_at = None
 
     try:
         db.commit()
@@ -473,6 +635,7 @@ def sync_weekly_check_in_reminders(db: Session) -> int:
         return 0
 
     week_by_user: dict[int, tuple[date, date]] = {}
+    settings_by_user = {user.id: setting for setting, user, _timezone in rows}
     for _setting, user, timezone in rows:
         local_day = today_in_timezone(timezone)
         week_start = local_day - timedelta(days=local_day.weekday())
@@ -524,7 +687,10 @@ def sync_weekly_check_in_reminders(db: Session) -> int:
     for dedupe_key, (user, timezone, scheduled_for) in active.items():
         existing = reminders_by_key.get(dedupe_key)
         if existing:
-            if existing.status in {"queued", "cancelled"}:
+            if existing.status == "queued" or (
+                existing.status == "cancelled"
+                and can_scheduler_reactivate_cancelled_notification(existing)
+            ):
                 was_cancelled = existing.status == "cancelled"
                 existing.status = "queued"
                 existing.scheduled_for = scheduled_for
@@ -555,6 +721,14 @@ def sync_weekly_check_in_reminders(db: Session) -> int:
     for reminder in reminders:
         if reminder.status == "queued" and reminder.dedupe_key not in active_keys:
             reminder.status = "cancelled"
+            setting = settings_by_user.get(reminder.user_id)
+            reminder.last_error = (
+                "weekly_check_in_reminders_disabled"
+                if setting is not None and not setting.weekly_check_in_reminders_enabled
+                else "weekly_check_in_not_due"
+            )
+            reminder.processing_started_at = None
+            reminder.next_attempt_at = None
 
     try:
         db.commit()
@@ -584,6 +758,7 @@ def sync_measurement_reminders(db: Session) -> int:
         .all(),
     )
     last_measurement_by_user: dict[int, date] = dict(last_measurement_rows)
+    settings_by_user = {user.id: setting for setting, user, _timezone in rows}
     active: dict[str, tuple[User, str | None, datetime]] = {}
     for setting, user, timezone in rows:
         local_day = today_in_timezone(timezone)
@@ -614,7 +789,10 @@ def sync_measurement_reminders(db: Session) -> int:
     for dedupe_key, (user, timezone, scheduled_for) in active.items():
         existing = reminders_by_key.get(dedupe_key)
         if existing:
-            if existing.status in {"queued", "cancelled"}:
+            if existing.status == "queued" or (
+                existing.status == "cancelled"
+                and can_scheduler_reactivate_cancelled_notification(existing)
+            ):
                 was_cancelled = existing.status == "cancelled"
                 existing.status = "queued"
                 existing.scheduled_for = scheduled_for
@@ -645,6 +823,14 @@ def sync_measurement_reminders(db: Session) -> int:
     for reminder in reminders:
         if reminder.status == "queued" and reminder.dedupe_key not in active_keys:
             reminder.status = "cancelled"
+            setting = settings_by_user.get(reminder.user_id)
+            reminder.last_error = (
+                "measurement_reminders_disabled"
+                if setting is not None and not setting.measurement_reminders_enabled
+                else "measurement_reminder_not_due"
+            )
+            reminder.processing_started_at = None
+            reminder.next_attempt_at = None
 
     try:
         db.commit()
@@ -693,6 +879,207 @@ def claim_due_notifications(db: Session, limit: int = 100) -> list[Notification]
     if not claimed_ids:
         return []
     return db.query(Notification).filter(Notification.id.in_(claimed_ids)).all()
+
+
+def enqueue_web_push_deliveries(
+    db: Session,
+    notifications: list[Notification],
+) -> int:
+    """Fan out one canonical event to each currently owned browser subscription."""
+
+    if not settings.web_push_enabled or not notifications:
+        return 0
+    user_ids = {notification.user_id for notification in notifications}
+    users = {user.id: user for user in db.query(User).filter(User.id.in_(user_ids)).all()}
+    notification_settings = {
+        setting.user_id: setting
+        for setting in db.query(NotificationSetting)
+        .filter(NotificationSetting.user_id.in_(user_ids))
+        .all()
+    }
+    subscriptions = (
+        db.query(WebPushSubscription)
+        .filter(WebPushSubscription.user_id.in_(user_ids))
+        .order_by(WebPushSubscription.id.asc())
+        .all()
+    )
+    subscriptions_by_user: dict[int, list[WebPushSubscription]] = {}
+    for subscription in subscriptions:
+        subscriptions_by_user.setdefault(subscription.user_id, []).append(subscription)
+    notification_ids = [notification.id for notification in notifications if notification.id]
+    existing_pairs = {
+        (notification_id, subscription_id)
+        for notification_id, subscription_id in db.query(
+            NotificationDelivery.notification_id,
+            NotificationDelivery.subscription_id,
+        )
+        .filter(NotificationDelivery.notification_id.in_(notification_ids))
+        .all()
+    }
+
+    created = 0
+    for notification in notifications:
+        user = users.get(notification.user_id)
+        if user is None or not user.is_active:
+            continue
+        setting = notification_settings.get(notification.user_id)
+        if notification.event_kind == "reminder" and setting is None:
+            continue
+        if setting is not None and not reminder_category_enabled(notification, setting):
+            continue
+        retry_at = (
+            None
+            if notification.event_kind == "security" or setting is None
+            else quiet_hours_retry_at(setting, user)
+        )
+        for subscription in subscriptions_by_user.get(notification.user_id, []):
+            pair = (notification.id, subscription.id)
+            if pair in existing_pairs:
+                continue
+            db.add(
+                NotificationDelivery(
+                    notification_id=notification.id,
+                    subscription_id=subscription.id,
+                    next_attempt_at=retry_at,
+                )
+            )
+            existing_pairs.add(pair)
+            created += 1
+    if created:
+        db.flush()
+    return created
+
+
+def claim_due_web_push_deliveries(db: Session, limit: int = 500) -> list[NotificationDelivery]:
+    stale_before = utcnow() - PROCESSING_TIMEOUT
+    db.query(NotificationDelivery).filter(
+        NotificationDelivery.status == "processing",
+        NotificationDelivery.processing_started_at < stale_before,
+        NotificationDelivery.attempt_count < MAX_DELIVERY_ATTEMPTS,
+    ).update(
+        {
+            NotificationDelivery.status: "queued",
+            NotificationDelivery.processing_started_at: None,
+        },
+        synchronize_session=False,
+    )
+    db.commit()
+
+    current = utcnow()
+    due = (
+        db.query(NotificationDelivery)
+        .join(Notification, Notification.id == NotificationDelivery.notification_id)
+        .filter(
+            NotificationDelivery.status == "queued",
+            Notification.scheduled_for_utc <= current,
+            or_(
+                NotificationDelivery.next_attempt_at.is_(None),
+                NotificationDelivery.next_attempt_at <= current,
+            ),
+        )
+        .order_by(Notification.scheduled_for_utc.asc(), NotificationDelivery.id.asc())
+        .limit(limit)
+        .all()
+    )
+    claimed_ids: list[int] = []
+    started_at = utcnow()
+    for delivery in due:
+        updated = (
+            db.query(NotificationDelivery)
+            .filter(
+                NotificationDelivery.id == delivery.id,
+                NotificationDelivery.status == "queued",
+            )
+            .update(
+                {
+                    NotificationDelivery.status: "processing",
+                    NotificationDelivery.processing_started_at: started_at,
+                },
+                synchronize_session=False,
+            )
+        )
+        if updated == 1:
+            claimed_ids.append(delivery.id)
+    db.commit()
+    if not claimed_ids:
+        return []
+    return db.query(NotificationDelivery).filter(NotificationDelivery.id.in_(claimed_ids)).all()
+
+
+def cancel_web_push_delivery(
+    db: Session,
+    delivery: NotificationDelivery,
+    reason: str,
+) -> None:
+    delivery.status = "cancelled"
+    delivery.last_error = reason
+    delivery.processing_started_at = None
+    delivery.next_attempt_at = None
+
+
+def mark_web_push_delivery_succeeded(
+    db: Session,
+    delivery: NotificationDelivery,
+    subscription: WebPushSubscription,
+    *,
+    commit: bool = True,
+) -> None:
+    now = now_msk_naive()
+    delivery.status = "sent"
+    delivery.sent_at = now
+    delivery.last_error = None
+    delivery.processing_started_at = None
+    delivery.next_attempt_at = None
+    subscription.last_success_at = now
+    subscription.last_error = None
+    subscription.failure_count = 0
+    if commit:
+        db.commit()
+
+
+def mark_web_push_delivery_failed(
+    db: Session,
+    delivery: NotificationDelivery,
+    error: Exception,
+    *,
+    subscription: WebPushSubscription | None = None,
+    commit: bool = True,
+) -> None:
+    delivery.attempt_count += 1
+    delivery.last_error = safe_delivery_error(error)
+    delivery.processing_started_at = None
+    now = now_msk_naive()
+    subscription = subscription or db.get(WebPushSubscription, delivery.subscription_id)
+    remove_subscription = bool(getattr(error, "remove_subscription", False))
+    if subscription is not None:
+        subscription.last_failure_at = now
+        subscription.failure_count += 1
+        subscription.last_error = delivery.last_error
+
+    terminal_status = (
+        getattr(error, "terminal_status", None)
+        if isinstance(error, NotificationDeliveryError)
+        else None
+    )
+    if remove_subscription:
+        delivery.status = "cancelled"
+        delivery.next_attempt_at = None
+        if subscription is not None:
+            db.delete(subscription)
+    elif terminal_status is not None:
+        delivery.status = terminal_status
+        delivery.next_attempt_at = None
+    elif delivery.attempt_count >= MAX_DELIVERY_ATTEMPTS:
+        delivery.status = "failed"
+        delivery.next_attempt_at = None
+    else:
+        delivery.status = "queued"
+        retry_after = error.retry_after if isinstance(error, NotificationDeliveryError) else None
+        if retry_after is None:
+            retry_after = timedelta(minutes=min(60, 2 ** (delivery.attempt_count - 1)))
+        delivery.next_attempt_at = utcnow() + retry_after
+    if commit:
+        db.commit()
 
 
 def mark_delivery_succeeded(
@@ -746,23 +1133,60 @@ def create_manual_notification(
     scheduled_for: datetime,
     channel: str = "telegram",
 ) -> Notification:
+    # Serialize manual reminder creation per account so the final wall-clock check and
+    # unique key cover retries and requests racing the minute/day boundary.
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
+    local_scheduled_for = to_user_timezone_naive(scheduled_for, user)
+
+    def ensure_future_schedule(now_local: datetime) -> None:
+        if local_scheduled_for.date() < now_local.date():
+            raise ManualNotificationScheduleError(PAST_NOTIFICATION_DATE_MESSAGE)
+        if local_scheduled_for.date() == now_local.date() and local_scheduled_for <= now_local:
+            raise ManualNotificationScheduleError(PAST_NOTIFICATION_TODAY_MESSAGE)
+
+    ensure_future_schedule(now_for_user_naive(user))
+    title = title.strip()
+    body = body.strip()
+    dedupe_key = "custom:{}:{}".format(
+        user.id,
+        sha256(
+            "\x1f".join(
+                (channel, title, body, local_scheduled_for.isoformat()),
+            ).encode("utf-8")
+        ).hexdigest(),
+    )
+    existing = db.query(Notification).filter(Notification.dedupe_key == dedupe_key).first()
+    if existing is not None:
+        return existing
+
     notification = Notification(
         user_id=user.id,
         channel=channel,
         category="custom_reminder",
         event_kind="reminder",
-        title=title.strip(),
-        body=body.strip(),
-        scheduled_for=to_user_timezone_naive(scheduled_for, user),
-        scheduled_for_utc=(
-            scheduled_for.astimezone(UTC).replace(tzinfo=None)
-            if scheduled_for.tzinfo is not None
-            else user_local_naive_to_utc_naive(scheduled_for, user)
-        ),
+        title=title,
+        body=body,
+        scheduled_for=local_scheduled_for,
+        scheduled_for_utc=user_local_naive_to_utc_naive(local_scheduled_for, user),
         status="queued",
+        dedupe_key=dedupe_key,
     )
     db.add(notification)
-    db.commit()
+    try:
+        db.flush()
+        # The first check can pass just before the selected minute expires. Recheck while
+        # the per-user transaction lock is still held, before making the row visible.
+        ensure_future_schedule(now_for_user_naive(user))
+        db.commit()
+    except ManualNotificationScheduleError:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(Notification).filter(Notification.dedupe_key == dedupe_key).first()
+        if existing is None:
+            raise
+        return existing
     db.refresh(notification)
     return notification
 
@@ -839,6 +1263,11 @@ def delete_notification_for_user(
     if not row:
         return False
 
+    handoffs = db.query(ReportHandoff).filter(ReportHandoff.notification_id == row.id).all()
+    for handoff in handoffs:
+        handoff.delivery_status = "delivered" if row.status == "sent" else "failed"
+    if handoffs:
+        db.flush()
     db.delete(row)
     db.commit()
     return True

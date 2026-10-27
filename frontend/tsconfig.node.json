@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "../.artifacts/cache/typescript/tsconfig.node.tsbuildinfo",
+    "tsBuildInfoFile": "../.artifacts/runtime/cache/typescript/tsconfig.node.tsbuildinfo",
     "target": "ES2023",
     "lib": ["ES2023"],
     "module": "ESNext",

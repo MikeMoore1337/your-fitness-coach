@@ -4,6 +4,7 @@ import { ErrorState } from '../../shared/ui/common';
 import {
   clearProductLoginAttempt,
   markProductLoginStarted,
+  trackGrowthEvent,
 } from '../../shared/analytics/productEvents';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 
@@ -37,7 +38,9 @@ export function EmailAuthPanel({ nextPath }: { nextPath?: string | null }) {
         markProductLoginStarted();
         await emailLogin(email, password);
       } else if (mode === 'register') {
+        trackGrowthEvent('registration_started');
         await emailRegister(username, email, password, nextPath);
+        trackGrowthEvent('registration_completed');
         setMessage('Аккаунт создан. Проверьте почту и подтвердите email.');
         setPassword('');
       } else {
@@ -59,6 +62,7 @@ export function EmailAuthPanel({ nextPath }: { nextPath?: string | null }) {
           type="button"
           role="tab"
           aria-selected={mode === 'login'}
+          data-yfc-choice="capsule"
           className={mode === 'login' ? 'is-active' : 'secondary'}
           onClick={() => switchMode('login')}
         >
@@ -68,6 +72,7 @@ export function EmailAuthPanel({ nextPath }: { nextPath?: string | null }) {
           type="button"
           role="tab"
           aria-selected={mode === 'register'}
+          data-yfc-choice="capsule"
           className={mode === 'register' ? 'is-active' : 'secondary'}
           onClick={() => switchMode('register')}
         >

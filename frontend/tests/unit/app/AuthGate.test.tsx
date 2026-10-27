@@ -44,6 +44,18 @@ describe('AuthGate', () => {
     expect(window.location.search).toBe('?next=%2Fcoach');
   });
 
+  it('preserves query and hash deep links through browser login', async () => {
+    window.history.replaceState(null, '', '/app?section=nutrition#meal-dinner');
+    render(
+      <NavigationProvider>
+        <AuthGate>Питание</AuthGate>
+      </NavigationProvider>,
+    );
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe('?next=%2Fapp%3Fsection%3Dnutrition%23meal-dinner');
+  });
+
   it('renders the requested route after authentication', () => {
     authState.user = { id: 7 };
     render(

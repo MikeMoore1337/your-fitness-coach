@@ -4,6 +4,7 @@ import json
 import re
 import time
 from datetime import UTC, date, datetime, timedelta
+from html.parser import HTMLParser
 from http.cookies import SimpleCookie
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -217,11 +218,57 @@ def test_production_settings_reject_placeholder_secret():
         )
 
 
+def test_db_application_name_is_bounded_and_overridable():
+    common = {
+        "app_env": "dev",
+        "app_name": "Your Fitness Coach",
+        "app_debug": False,
+        "secret_key": "test-secret",
+        "access_token_expire_minutes": 60,
+        "refresh_token_expire_days": 30,
+        "database_url": "postgresql+psycopg://app:password@db/app",
+        "telegram_bot_token": "test-token",
+    }
+
+    configured = Settings(**common, db_application_name="yfc-worker")
+
+    assert configured.db_application_name == "yfc-worker"
+    with pytest.raises(ValidationError):
+        Settings(**common, db_application_name="yfc-rogue")
+    with pytest.raises(ValidationError):
+        Settings(**common, db_application_name="not safe; application name")
+
+
 def test_versioned_frontend_assets_have_immutable_cache_contract(client):
     response = client.get("/assets/test.js")
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+
+def test_pwa_control_assets_are_same_origin_and_not_cached(client, monkeypatch, tmp_path):
+    from fitminiapp_api import main
+
+    (tmp_path / "manifest.webmanifest").write_text(
+        '{"id":"/app","start_url":"/app?source=pwa","scope":"/"}',
+        encoding="utf-8",
+    )
+    (tmp_path / "sw.js").write_text(
+        "self.addEventListener('fetch', () => undefined);", encoding="utf-8"
+    )
+    monkeypatch.setattr(main, "FRONTEND_DIST_DIR", tmp_path)
+
+    manifest = client.get("/manifest.webmanifest")
+    worker = client.get("/sw.js")
+
+    assert manifest.status_code == 200
+    assert manifest.headers["content-type"] == "application/manifest+json"
+    assert manifest.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+    assert worker.status_code == 200
+    assert worker.headers["content-type"] == "application/javascript"
+    assert worker.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+    assert "access_token" not in manifest.text
+    assert "access_token" not in worker.text
 
 
 def test_production_settings_reject_placeholder_bot_internal_token():
@@ -707,7 +754,7 @@ def test_client_parameter_and_weight_changes_recalculate_kbju_and_notify(client)
 
     measurement = client.post(
         "/api/v1/workouts/diary",
-        json={"measured_on": "2026-08-01", "weight_kg": 75.5},
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 75.5},
         headers=headers,
     )
     assert measurement.status_code == 200
@@ -722,10 +769,122 @@ def test_client_parameter_and_weight_changes_recalculate_kbju_and_notify(client)
 
     client.post(
         "/api/v1/workouts/diary",
-        json={"measured_on": "2026-08-01", "weight_kg": 75.5},
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 75.5},
         headers=headers,
     )
     assert len(client.get("/api/v1/notifications", headers=headers).json()) == 3
+
+
+def test_calculated_recomposition_syncs_confirmed_profile_inputs_and_today_weight(client):
+    headers = auth(client, telegram_user_id=61_330, is_coach=False)
+    response = client.post(
+        "/api/v1/nutrition/targets",
+        json={
+            "sex": "female",
+            "record_weight_measurement": True,
+            "weight_kg": 68.5,
+            "height_cm": 170,
+            "age": 33,
+            "strength_trainings_per_week": 3,
+            "cardio_trainings_per_week": 1,
+            "goal": "recomposition",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    target = response.json()
+    assert target["goal"] == "recomposition"
+    assert abs(target["calories"] - target["tdee"] * 0.95) <= 10
+
+    profile = client.get("/api/v1/me", headers=headers).json()["profile"]
+    assert profile["sex"] == "female"
+    assert profile["weight_kg"] == 68.5
+    assert profile["height_cm"] == 170
+    assert profile["goal"] == "recomposition"
+    assert profile["workouts_per_week"] == 3
+    assert profile["cardio_trainings_per_week"] == 1
+
+    measurements = client.get("/api/v1/workouts/diary", headers=headers).json()
+    assert measurements[0]["measured_on"] == today_msk().isoformat()
+    assert measurements[0]["weight_kg"] == 68.5
+
+
+def test_minor_weight_changes_update_current_weight_without_rewriting_calculated_kbju(client):
+    headers = auth(client, telegram_user_id=61_331, is_coach=False)
+    initial = client.post(
+        "/api/v1/nutrition/targets",
+        json={
+            "sex": "male",
+            "weight_kg": 80,
+            "height_cm": 180,
+            "age": 30,
+            "strength_trainings_per_week": 3,
+            "cardio_trainings_per_week": 0,
+            "goal": "recomposition",
+        },
+        headers=headers,
+    )
+    assert initial.status_code == 200
+    base_id = initial.json()["id"]
+
+    small = client.post(
+        "/api/v1/workouts/diary",
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 79.7},
+        headers=headers,
+    )
+    assert small.status_code == 200
+    updated = client.get("/api/v1/me", headers=headers).json()["profile"]
+    assert updated["weight_kg"] == 79.7
+    assert updated["kbju"]["id"] == base_id
+    assert updated["kbju"]["weight_kg"] == 80
+
+    # Saving unrelated profile fields with the already-shown diary weight
+    # must not turn a small fluctuation into an explicit recalculation.
+    unchanged_profile = client.patch(
+        "/api/v1/me/profile",
+        json={"full_name": "Изменил имя", "weight_kg": 79.7},
+        headers=headers,
+    )
+    assert unchanged_profile.status_code == 200
+    assert unchanged_profile.json()["profile"]["kbju"]["id"] == base_id
+
+    substantial = client.post(
+        "/api/v1/workouts/diary",
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 79.1},
+        headers=headers,
+    )
+    assert substantial.status_code == 200
+    recalculated = client.get("/api/v1/me", headers=headers).json()["profile"]
+    assert recalculated["weight_kg"] == 79.1
+    assert recalculated["kbju"]["weight_kg"] == 79.1
+    assert recalculated["kbju"]["id"] != base_id
+
+
+def test_calculated_kbju_api_rejects_infeasible_macros_without_saving(client):
+    headers = auth(client, telegram_user_id=61_371, is_coach=False)
+    invalid = {
+        "sex": "female",
+        "weight_kg": 350,
+        "height_cm": 100,
+        "age": 100,
+        "daily_routine": "mostly_sitting",
+        "steps_range": "up_to_4000",
+        "strength_trainings_per_week": 0,
+        "cardio_trainings": [],
+        "goal": "fat_loss",
+    }
+    response = client.post("/api/v1/nutrition/targets", json=invalid, headers=headers)
+    assert response.status_code == 400
+    assert "превышают целевую калорийность" in response.json()["detail"]
+
+    current = client.get("/api/v1/me", headers=headers)
+    assert current.status_code == 200
+    assert current.json()["profile"]["kbju"] is None
+
+    valid = {**invalid, "sex": "male", "weight_kg": 80, "height_cm": 180, "age": 30}
+    created = client.post("/api/v1/nutrition/targets", json=valid, headers=headers)
+    assert created.status_code == 200
+    assert created.json()["calories"] < created.json()["tdee"]
 
 
 def test_coach_profile_and_measurement_changes_preserve_explicit_trainer_target(client):
@@ -842,7 +1001,7 @@ def test_coach_can_update_own_client_profile_and_measurements(client):
         headers=coach_headers,
     )
     assert rows.status_code == 200
-    assert rows.json()[0]["weight_kg"] == 73.5
+    assert any(row["weight_kg"] == 73.5 for row in rows.json())
 
     forbidden = client.patch(
         f"/api/v1/coach/clients/{client_user['id']}/profile",
@@ -993,6 +1152,7 @@ def test_coach_can_assign_existing_template_to_own_client(client):
         f"{assigned.json()['user_program_id']}/exercises",
         json={
             "expected_revision_number": 1,
+            "effective_scope": "future_program",
             "exercise_id": second_exercise["id"],
             "day_number": 1,
             "prescribed_sets": 4,
@@ -1790,20 +1950,38 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
     standard_exercises = [item for item in exercises if not item["is_custom"]]
     static_dir = Path(__file__).resolve().parents[2] / "backend" / "assets"
 
-    assert len(standard_exercises) == 182
-    assert len(client.get("/api/v1/programs/exercises", headers=headers).content) < 130_000
+    assert len(standard_exercises) == 207
+    # Stage 4 adds one local poster URL and an explicit media state per catalog
+    # item; retain a bounded response-size guard with that metadata included.
+    assert len(client.get("/api/v1/programs/exercises", headers=headers).content) < 300_000
     assert all(
         exercise["has_guide"] and exercise["guide"] is None for exercise in standard_exercises
     )
 
+    sample_exercise = next(item for item in standard_exercises if item["slug"] == "bench-press")
+    assert sample_exercise["media_state"] == "approved_animated"
+    assert sample_exercise["media_thumbnail_url"].endswith(".jpg")
+    assert sample_exercise["media_thumbnail_sources"]
+    assert sample_exercise["media_preferred_mode"] == "static"
+    assert sample_exercise["media_animation_url"] is None
     sample = client.get(
-        f"/api/v1/programs/exercises/{standard_exercises[0]['id']}/guide",
+        f"/api/v1/programs/exercises/{sample_exercise['id']}/guide",
         headers=headers,
     )
     assert sample.status_code == 200
-    assert len(sample.json()["images"]) == 2
-    assert len(sample.json()["media"]) == 2
-    assert [item["sort_order"] for item in sample.json()["media"]] == [0, 1]
+    sample_payload = sample.json()
+    assert len(sample_payload["images"]) == 1
+    assert len(sample_payload["media"]) == 1
+    assert sample_payload["media"][0]["type"] == "animation"
+    assert sample_payload["media"][0]["poster"] != sample_payload["media"][0]["url"]
+    assert [item["sort_order"] for item in sample_payload["media"]] == [0]
+    detail = client.get(
+        f"/api/v1/programs/exercises/{sample_exercise['id']}",
+        headers=headers,
+    )
+    assert detail.status_code == 200
+    assert detail.json()["media_state"] == "approved_animated"
+    assert detail.json()["media_animation_url"].endswith(".gif")
 
     with get_session_context() as session:
         seeded_guides = [
@@ -1814,17 +1992,28 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
                 .all()
             )
         ]
+    media_manifest = json.loads(
+        (static_dir / "exercise-guides" / "manifest.json").read_text(encoding="utf-8")
+    )
     for slug, guide in seeded_guides:
         assert guide is not None, slug
         assert len(guide["technique_steps"]) >= 3
         assert guide["breathing"]
         assert len(guide["common_mistakes"]) >= 3
         assert guide["muscles"]
+        manifest_item = media_manifest["exercises"].get(slug)
+        if not manifest_item or manifest_item["status"] != "approved":
+            assert guide["images"] == []
+            assert guide["media"] == []
+            continue
         assert guide["images"]
         assert guide["media"]
         for media in guide["media"]:
-            assert media["type"] == "image"
-            assert media["poster"] == media["url"]
+            if media["type"] == "animation":
+                assert media["poster"] != media["url"]
+            else:
+                assert media["type"] == "image"
+                assert media["poster"] == media["url"]
             assert media["width"] > 0
             assert media["height"] > 0
             assert media["byte_size"] > 0
@@ -1836,14 +2025,21 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
 
 
 def test_exercise_guide_assets_have_cache_headers_and_missing_asset_is_safe(client):
-    asset = client.get("/static/exercise-guides/bench-press-start.jpg")
+    asset = client.get("/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif")
 
     assert asset.status_code == 200
-    assert asset.headers["content-type"] == "image/jpeg"
+    assert asset.headers["content-type"] == "image/gif"
     assert asset.headers["cache-control"] == (
         "public, max-age=2592000, stale-while-revalidate=86400"
     )
     assert asset.headers["etag"]
+
+    poster = client.get("/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg")
+    assert poster.status_code == 200
+    assert poster.headers["content-type"] == "image/jpeg"
+    assert poster.headers["cache-control"] == (
+        "public, max-age=2592000, stale-while-revalidate=86400"
+    )
 
     missing = client.get("/static/exercise-guides/not-a-real-exercise-start.jpg")
     assert missing.status_code == 404
@@ -1874,9 +2070,14 @@ def test_cardio_exercises_have_specific_guides_and_generated_images(client):
         assert response.status_code == 200
         guide = response.json()
         assert len(guide["technique_steps"]) >= 3
-        assert guide["source_name"] == "Your Fitness Coach"
-        assert guide["images"][0]["phase"] == "Техника движения"
-        assert guide["media"][0]["source_license"] == "Иллюстрация создана для приложения"
+        if exercise["media_state"] == "approved_animated":
+            assert guide["source_name"] == "Gym visual"
+            assert guide["images"][0]["phase"] == "Движение"
+            assert guide["media"][0]["type"] == "animation"
+            assert guide["media"][0]["source_license"] == "Owner-purchased GymVisual license"
+        else:
+            assert exercise["media_state"] == "blocked"
+            assert guide["media"] == []
 
 
 def test_custom_exercise_has_no_incorrect_stock_guide(client):
@@ -3014,8 +3215,13 @@ def test_create_notification_and_list(client):
     assert any(row["title"] == "Test напоминание" for row in rows)
 
 
-def test_notification_scheduled_for_is_stored_as_msk_wall_time(client):
+def test_notification_scheduled_for_is_stored_as_msk_wall_time(client, monkeypatch):
     headers = auth(client, telegram_user_id=6501, is_coach=False)
+    monkeypatch.setattr(
+        notifications_service,
+        "now_for_user_naive",
+        lambda _user: datetime(2026, 4, 25, 6),
+    )
 
     response = client.post(
         "/api/v1/notifications",
@@ -3029,6 +3235,90 @@ def test_notification_scheduled_for_is_stored_as_msk_wall_time(client):
 
     assert response.status_code == 201
     assert response.json()["scheduled_for"] == "2026-04-25T10:30:00"
+
+
+def test_manual_notification_rejects_past_profile_time_and_deduplicates(client, monkeypatch):
+    headers = auth(client, telegram_user_id=6502, is_coach=False)
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 6502).one()
+        user.profile.timezone = "America/New_York"
+
+    fixed_local_now = datetime(2026, 10, 10, 9, 30)
+    monkeypatch.setattr(
+        notifications_service,
+        "now_for_user_naive",
+        lambda _user: fixed_local_now,
+    )
+    past = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Не создавать",
+            "body": "Время уже прошло",
+            "scheduled_for": "2026-10-10T09:30:00",
+        },
+    )
+    assert past.status_code == 422
+    assert past.json()["detail"] == (
+        "Для сегодняшней даты выберите будущее время сегодня в часовом поясе профиля."
+    )
+
+    first = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Одна запись",
+            "body": "Не дублировать",
+            "scheduled_for": "2026-10-10T09:31:00",
+        },
+    )
+    repeated = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Одна запись",
+            "body": "Не дублировать",
+            "scheduled_for": "2026-10-10T09:31:00",
+        },
+    )
+    aware_retry = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Одна запись",
+            "body": "Не дублировать",
+            "scheduled_for": "2026-10-10T13:31:00Z",
+        },
+    )
+    assert first.status_code == repeated.status_code == aware_retry.status_code == 201
+    assert repeated.json()["id"] == first.json()["id"] == aware_retry.json()["id"]
+    assert first.json()["scheduled_for"] == "2026-10-10T09:31:00"
+
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 6502).one()
+        rows = db.query(Notification).filter(Notification.user_id == user.id).all()
+        assert len(rows) == 1
+
+
+def test_manual_notification_rechecks_time_after_flush_at_boundary(client, monkeypatch):
+    headers = auth(client, telegram_user_id=6503, is_coach=False)
+    moments = iter((datetime(2026, 10, 10, 9, 29), datetime(2026, 10, 10, 9, 31)))
+    monkeypatch.setattr(notifications_service, "now_for_user_naive", lambda _user: next(moments))
+
+    response = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Граница",
+            "body": "Не сохранять после смены минуты",
+            "scheduled_for": "2026-10-10T09:30:00",
+        },
+    )
+
+    assert response.status_code == 422
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 6503).one()
+        assert db.query(Notification).filter(Notification.user_id == user.id).count() == 0
 
 
 def test_workout_reminders_are_deduplicated_claimed_and_retried(client, monkeypatch):
@@ -3073,7 +3363,7 @@ def test_workout_reminders_are_deduplicated_claimed_and_retried(client, monkeypa
 
         rows[0].status = "cancelled"
         rows[0].attempt_count = 3
-        rows[0].last_error = "disabled"
+        rows[0].last_error = "workout_reminder_invalidated"
         rows[0].next_attempt_at = fixed_utc_now
         session.commit()
         assert sync_workout_reminders(session) == 0
@@ -3094,7 +3384,12 @@ def test_workout_reminders_are_deduplicated_claimed_and_retried(client, monkeypa
         assert claimed[0].next_attempt_at is not None
 
 
-def test_bot_can_set_user_timezone_and_notifications_use_it(client):
+def test_bot_can_set_user_timezone_and_notifications_use_it(client, monkeypatch):
+    monkeypatch.setattr(
+        notifications_service,
+        "now_for_user_naive",
+        lambda _user: datetime(2026, 4, 25, 8),
+    )
     updated = client.post(
         "/api/v1/bot/timezone",
         headers={"X-Bot-Token": settings.bot_internal_token},
@@ -3413,6 +3708,33 @@ def test_removed_user_delete_route_preserves_coach_program_and_workouts(client):
         assert db.query(UserWorkout).filter(UserWorkout.user_program_id == program.id).count() == 1
 
 
+class _InlineScriptContentParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._inside_script = False
+        self.inline_sources: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        del attrs
+        if tag.casefold() == "script":
+            self._inside_script = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() == "script":
+            self._inside_script = False
+
+    def handle_data(self, data: str) -> None:
+        if self._inside_script and data.strip():
+            self.inline_sources.append(data)
+
+
+def _inline_script_sources(document: str) -> list[str]:
+    parser = _InlineScriptContentParser()
+    parser.feed(document)
+    parser.close()
+    return parser.inline_sources
+
+
 def test_csp_blocks_unhashed_inline_scripts(client):
     response = client.get("/app")
     policy = response.headers["content-security-policy"]
@@ -3427,15 +3749,14 @@ def test_csp_blocks_unhashed_inline_scripts(client):
     assert "'sha256-" not in script_policy
 
     html = response.text
-    inline_sources = re.findall(r"<script(?:\s+[^>]*)?>([\s\S]*?)</script>", html)
-    assert all(not source.strip() for source in inline_sources)
+    assert _inline_script_sources(html) == []
 
     source_template = (Path(__file__).resolve().parents[2] / "frontend" / "index.html").read_text(
         encoding="utf-8"
     )
+    assert '<link rel="manifest" href="/manifest.webmanifest" />' in source_template
     assert '<script src="/assets/theme-bootstrap-20260826.js"></script>' in source_template
-    source_inline_scripts = re.findall(r"<script(?:\s+[^>]*)?>([\s\S]*?)</script>", source_template)
-    assert all(not source.strip() for source in source_inline_scripts)
+    assert _inline_script_sources(source_template) == []
     assert (
         Path(__file__).resolve().parents[2]
         / "frontend"
@@ -3476,20 +3797,77 @@ def test_root_serves_public_landing_spa(client):
 
     assert response.status_code == 200
     assert '<main class="seo-fallback">' in response.text
-    assert "Тренировки, питание и прогресс" in response.text
+    assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in response.text
     assert "no-store" in response.headers["cache-control"]
+
+
+def test_public_nutrition_serves_kbju_seo_fallback_without_private_routes(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/nutrition", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "index, follow"
+    assert (
+        "<title>Калькулятор КБЖУ — рассчитать калории, белки, жиры и углеводы | "
+        "Your Fitness Coach</title>" in response.text
+    )
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/nutrition" />' in response.text
+    )
+    assert '<main class="seo-fallback">' in response.text
+    assert "Рассчитать КБЖУ: калории, белки, жиры и углеводы" in response.text
+    assert "Mifflin–St Jeor" in response.text
+    assert "/knowledge/nutrition/kbju-as-a-reference" in response.text
+    assert 'href="/calculators/kbju"' not in response.text
+    assert 'href="/calculator-kbju"' not in response.text
+    assert 'href="/kbju"' not in response.text
+    assert 'href="/kz"' not in response.text
+    assert 'href="/by"' not in response.text
+    assert 'href="/ru"' not in response.text
+    assert "?weight" not in response.text
+
+
+def test_public_one_rep_max_serves_canonical_seo_fallback_without_private_routes(
+    client, monkeypatch
+):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/calculators/1rm", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "index, follow"
+    assert (
+        "<title>Калькулятор 1ПМ — рассчитать одноповторный максимум | Your Fitness Coach</title>"
+        in response.text
+    )
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/calculators/1rm" />'
+        in response.text
+    )
+    assert '<main class="seo-fallback">' in response.text
+    assert "Калькулятор 1ПМ: оценочный одноповторный максимум" in response.text
+    assert "формулу Бжицки" in response.text
+    assert "/exercises/bench-press" in response.text
+    assert "/knowledge/training/repetitions-in-reserve" in response.text
+    assert "/knowledge/training/progressive-overload" in response.text
+    assert 'href="/calculators/one-rep-max"' not in response.text
+    assert 'href="/calculators/bench-press-1rm"' not in response.text
+    assert "?weight" not in response.text
 
 
 @pytest.mark.parametrize(
     ("method", "path"),
     [
         ("GET", "/app"),
+        ("GET", "/admin/hermes-bridge"),
         ("GET", "/login"),
         ("GET", "/join/abcdefghijklmnopqrstuvwxyz"),
-        ("POST", "/api/v1/auth/refresh"),
     ],
 )
-def test_landing_host_redirects_application_requests_to_canonical_origin(
+def test_landing_host_redirects_browser_application_requests_to_canonical_origin(
     client, monkeypatch, method, path
 ):
     from fitminiapp_api.core.config import settings
@@ -3508,6 +3886,36 @@ def test_landing_host_redirects_application_requests_to_canonical_origin(
     assert response.headers["location"] == f"https://app.your-fitness-coach.ru{path}"
 
 
+@pytest.mark.parametrize(
+    ("method", "path", "expected_status"),
+    [
+        ("GET", "/api/v1/public/articles", 200),
+        ("GET", "/api/v1/public/config", 200),
+        ("GET", "/api/v1/public/exercises", 200),
+        ("GET", "/api/v1/me", 401),
+        ("POST", "/api/v1/auth/refresh", 401),
+    ],
+)
+def test_landing_host_keeps_api_requests_same_origin(
+    client, monkeypatch, method, path, expected_status
+):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    monkeypatch.setattr(settings, "frontend_base_url", "https://app.your-fitness-coach.ru")
+
+    response = client.request(
+        method,
+        path,
+        headers={"Host": "your-fitness-coach.ru", "Origin": "https://evil.example"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == expected_status
+    assert "location" not in response.headers
+    assert "access-control-allow-origin" not in response.headers
+
+
 def test_landing_host_keeps_public_home_on_landing_domain(client, monkeypatch):
     from fitminiapp_api.core.config import settings
 
@@ -3516,6 +3924,79 @@ def test_landing_host_keeps_public_home_on_landing_domain(client, monkeypatch):
 
     assert response.status_code == 200
     assert '<main class="seo-fallback">' in response.text
+
+
+def test_landing_v10_no_js_fallback_matches_public_audience_copy(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    for path, heading, lead, section in (
+        (
+            "/",
+            "СИЛА В ДЕЙСТВИИ.",
+            "Тренируйтесь по плану. Сопоставляйте питание, результаты и самочувствие",
+            "Вошли в ритм. Продолжайте.",
+        ),
+        (
+            "/for-trainers",
+            "ВАШ МЕТОД В ДЕЙСТВИИ.",
+            "Программы, проверки и история клиента",
+            "От внимания к следующему действию",
+        ),
+    ):
+        response = client.get(path, headers={"Host": "your-fitness-coach.ru"})
+
+        assert response.status_code == 200
+        assert response.headers["x-robots-tag"] == "index, follow"
+        assert (
+            f'<link rel="canonical" href="https://your-fitness-coach.ru{path}" />' in response.text
+        )
+        assert f"<h1>{heading}</h1>" in response.text
+        assert lead in response.text
+        assert section in response.text
+        assert '<main class="seo-fallback">' in response.text
+        assert '<a href="/training">' in response.text
+
+    alias = client.get("/for-athletes", headers={"Host": "your-fitness-coach.ru"})
+    assert alias.status_code == 200
+    assert alias.headers["x-robots-tag"] == "noindex, follow"
+    assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in alias.text
+    assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in alias.text
+
+    frontend_template = (Path(__file__).resolve().parents[2] / "frontend" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in frontend_template
+    assert "Тренировки, питание и прогресс — в одном приложении" not in frontend_template
+
+
+def test_athlete_landing_alias_keeps_root_canonical_without_indexable_duplicate(
+    client, monkeypatch
+):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get(
+        "/for-athletes?utm_source=owner#demo",
+        headers={"Host": "your-fitness-coach.ru"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "noindex, follow"
+    assert '<meta name="robots" content="noindex, follow" />' in response.text
+    assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in response.text
+    assert '<main class="seo-fallback">' in response.text
+    assert "for-athletes" not in response.text
+
+
+def test_athlete_landing_alias_is_not_published_in_sitemap(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/sitemap.xml", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert "https://your-fitness-coach.ru/for-athletes" not in response.text
 
 
 def test_public_seo_response_uses_canonical_metadata_and_truthful_structured_data(
@@ -3531,6 +4012,10 @@ def test_public_seo_response_uses_canonical_metadata_and_truthful_structured_dat
     assert '<meta name="robots" content="index, follow" />' in response.text
     assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in response.text
     assert '<meta property="og:url" content="https://your-fitness-coach.ru/" />' in response.text
+    assert (
+        '<noscript><div><img src="https://mc.yandex.ru/watch/112530718" '
+        'style="position:absolute; left:-9999px;" alt="" /></div></noscript>' in response.text
+    )
     assert (
         '<meta property="og:image" '
         'content="https://your-fitness-coach.ru/assets/brand/yfc-social-preview.png" />'
@@ -3553,20 +4038,37 @@ def test_public_seo_response_uses_canonical_metadata_and_truthful_structured_dat
     assert "offers" not in structured_data.group(1)
 
 
-def test_public_seo_response_injects_optional_webmaster_verification_tags(client, monkeypatch):
+def test_public_seo_response_does_not_inject_webmaster_verification_tags(client, monkeypatch):
     from fitminiapp_api.core.config import settings
 
     monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
-    monkeypatch.setattr(settings, "google_site_verification", "google-token-123")
-    monkeypatch.setattr(settings, "yandex_verification", "yandex-token-456")
 
     landing = client.get("/", headers={"Host": "your-fitness-coach.ru"})
     private = client.get("/app")
 
-    assert '<meta name="google-site-verification" content="google-token-123" />' in landing.text
-    assert '<meta name="yandex-verification" content="yandex-token-456" />' in landing.text
+    assert "google-site-verification" not in landing.text
+    assert "yandex-verification" not in landing.text
     assert "google-site-verification" not in private.text
     assert "yandex-verification" not in private.text
+    assert "mc.yandex.ru/watch/112530718" not in private.text
+
+
+def test_yandex_verification_file_is_served_directly(client):
+    response = client.get("/yandex_bce1658cc6fe44e5.html")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["x-robots-tag"] == "noindex, nofollow"
+    assert (
+        response.text.replace("\r\n", "\n")
+        == """<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    </head>
+    <body>Verification: bce1658cc6fe44e5</body>
+</html>
+"""
+    )
 
 
 def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypatch):
@@ -3579,6 +4081,7 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
     assert robots.status_code == 200
     assert "User-agent: *" in robots.text
     assert "Allow: /" in robots.text
+    assert "Allow: /api/v1/public/" in robots.text
     assert "Disallow: /api/" in robots.text
     assert "Disallow: /app" not in robots.text
     assert "Sitemap: https://your-fitness-coach.ru/sitemap.xml" in robots.text
@@ -3589,19 +4092,28 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
         for element in root.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}url")
         for element in element.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
     ]
-    assert len(urls) == 20
+    assert len(urls) == 29
     assert len(urls) == len(set(urls))
     assert {
         "https://your-fitness-coach.ru/",
+        "https://your-fitness-coach.ru/articles",
+        "https://your-fitness-coach.ru/calculators/1rm",
+        "https://your-fitness-coach.ru/programs/full-body-3-days",
         "https://your-fitness-coach.ru/knowledge",
         "https://your-fitness-coach.ru/knowledge/training/repetitions-in-reserve",
         "https://your-fitness-coach.ru/knowledge/nutrition/creatine-monohydrate",
         "https://your-fitness-coach.ru/knowledge/cardio/heart-rate-zones",
         "https://your-fitness-coach.ru/knowledge/progress/how-to-read-progress",
+        "https://your-fitness-coach.ru/knowledge/nutrition/glycemic-index",
+        "https://your-fitness-coach.ru/knowledge/nutrition/food-sources-for-kbju",
+        "https://your-fitness-coach.ru/knowledge/progress/bmi-calculator",
+        "https://your-fitness-coach.ru/knowledge/nutrition/hydration-and-water",
         "https://your-fitness-coach.ru/exercises",
         "https://your-fitness-coach.ru/exercises/bench-press",
         "https://your-fitness-coach.ru/exercises/lat-pulldown",
         "https://your-fitness-coach.ru/exercises/squat",
+        "https://your-fitness-coach.ru/exercises/deadlift",
+        "https://your-fitness-coach.ru/exercises/overhead-press",
     }.issubset(urls)
     assert all(
         segment not in sitemap.text for segment in ("/app", "/admin", "/coach", "/join", "/login")
@@ -3609,13 +4121,51 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
 
 
 @pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/public/config",
+        "/api/v1/public/exercises",
+        "/api/v1/public/exercises/deadlift",
+        "/api/v1/public/programs/full-body-3-days",
+        "/api/v1/public/articles",
+    ],
+)
+def test_public_api_resources_are_fetchable_but_not_indexable(client, path):
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "noindex, follow"
+
+
+@pytest.mark.parametrize(
     ("path", "heading"),
     [
-        ("/training", "План тренировки, который остаётся перед глазами"),
-        ("/nutrition", "Ориентиры КБЖУ без обещаний"),
+        ("/training", "Дневник тренировок: от программы до прогресса"),
+        (
+            "/programs/full-body-3-days",
+            "Программа тренировок 3 раза в неделю: всё тело (Full Body)",
+        ),
+        ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
+        ("/calculators/1rm", "Калькулятор 1ПМ: оценочный одноповторный максимум"),
         ("/progress", "Прогресс, который можно проверить"),
-        ("/for-trainers", "Кабинет тренера для программ"),
+        ("/for-trainers", "ВАШ МЕТОД В ДЕЙСТВИИ."),
         ("/knowledge", "Материалы, которые помогают понять"),
+        (
+            "/knowledge/nutrition/glycemic-index",
+            "Гликемический индекс описывает продукт, а не весь приём пищи",
+        ),
+        (
+            "/knowledge/nutrition/food-sources-for-kbju",
+            "Источники КБЖУ — это варианты, а не рейтинг продуктов",
+        ),
+        (
+            "/knowledge/progress/bmi-calculator",
+            "ИМТ — скрининговый ориентир, а не диагноз",
+        ),
+        (
+            "/knowledge/nutrition/hydration-and-water",
+            "Гидратация: ориентир помогает, но не заменяет контекст",
+        ),
     ],
 )
 def test_public_content_routes_render_unique_crawlable_pages(client, monkeypatch, path, heading):
@@ -3631,6 +4181,37 @@ def test_public_content_routes_render_unique_crawlable_pages(client, monkeypatch
     assert heading in response.text
     assert '<a href="/knowledge">База знаний</a>' in response.text
     assert "Личный интерфейс Your Fitness Coach" not in response.text
+
+
+def test_training_public_fallback_renders_diary_workflow_and_truthful_cta(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/training", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert (
+        "<title>Дневник тренировок: программа, подходы и прогресс | Your Fitness Coach</title>"
+        in response.text
+    )
+    assert '<link rel="canonical" href="https://your-fitness-coach.ru/training" />' in response.text
+    assert '<section class="seo-fallback-workflow"' in response.text
+    assert response.text.count("<h1>") == 1
+    assert [
+        response.text.index(f"<h3>{title}</h3>")
+        for title in ("Программа", "Занятие", "Запись подходов", "История", "Прогресс")
+    ] == sorted(
+        response.text.index(f"<h3>{title}</h3>")
+        for title in ("Программа", "Занятие", "Запись подходов", "История", "Прогресс")
+    )
+    assert (
+        '<a href="https://app.your-fitness-coach.ru/app">Начать вести тренировки</a>'
+        in response.text
+    )
+    assert '<a href="/progress">История и прогресс тренировок</a>' in response.text
+    assert '<a href="/exercises/bench-press">Техника жима лёжа</a>' in response.text
+    assert "/training?" not in response.text
+    assert "гарант" not in response.text.lower()
 
 
 def test_public_campaign_url_keeps_clean_canonical_metadata(client, monkeypatch):
@@ -3681,7 +4262,7 @@ def test_public_guide_has_visible_editorial_metadata_and_truthful_schema(client,
     assert "Опубликованные руководства" in knowledge.text
     assert (
         '<a href="/knowledge/training/how-to-start-strength-training">'
-        "Full Body и Split: выберите схему, которую сможете повторять</a>" in knowledge.text
+        "Всё тело или сплит: выберите схему, которую сможете повторять</a>" in knowledge.text
     )
 
 
@@ -3693,6 +4274,8 @@ def test_public_exercise_api_uses_allowlisted_domain_data_and_excludes_private_r
         "bench-press",
         "lat-pulldown",
         "squat",
+        "deadlift",
+        "overhead-press",
     ]
     assert all("created_by_user_id" not in item for item in catalog.json())
 
@@ -3701,10 +4284,75 @@ def test_public_exercise_api_uses_allowlisted_domain_data_and_excludes_private_r
     assert squat.json()["title"] == "Приседания"
     assert squat.json()["primary_muscle"] == "Квадрицепс"
     assert squat.json()["technique_steps"]
-    assert squat.json()["source_name"] == "free-exercise-db"
+    assert squat.json()["safety_notes"]
+    assert squat.json()["media"]
+    assert squat.json()["source_name"] == "Gym visual"
+
+    bench = client.get("/api/v1/public/exercises/bench-press")
+    assert bench.status_code == 200
+    assert bench.json()["difficulty_level"] == "intermediate"
+    assert len(bench.json()["media"]) == 1
+    assert all(
+        item["type"] == "animation"
+        and item["source_license"] == "Owner-purchased GymVisual license"
+        for item in bench.json()["media"]
+    )
 
     private_slug = client.get("/api/v1/public/exercises/squat-u-private")
     assert private_slug.status_code == 404
+
+
+def test_public_program_api_and_fallback_expose_only_canonical_schedule(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    program = client.get("/api/v1/public/programs/full-body-3-days")
+    assert program.status_code == 200
+    payload = program.json()
+    assert payload["slug"] == "full-body-3-days"
+    assert len(payload["days"]) == 3
+    assert payload["days"][0]["exercises"][0] == {
+        "slug": "squat",
+        "title": "Приседания",
+        "primary_muscle": "Квадрицепс",
+        "equipment": "Штанга",
+        "difficulty_level": "intermediate",
+        "prescribed_sets": 4,
+        "prescribed_reps": "6-8",
+        "rest_seconds": 150,
+    }
+    assert "owner_user_id" not in payload
+
+    missing = client.get("/api/v1/public/programs/not-published")
+    assert missing.status_code == 404
+    assert missing.headers["x-robots-tag"] == "noindex, nofollow"
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get(
+        "/programs/full-body-3-days",
+        headers={"Host": "your-fitness-coach.ru"},
+    )
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "index, follow"
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/programs/full-body-3-days" />'
+        in response.text
+    )
+    assert response.text.count("<h1>") == 1
+    assert "Всё тело A" in response.text
+    assert "Приседания" in response.text
+    assert "4 подхода" in response.text
+    assert "?section=programs" in response.text
+    structured_data = re.search(
+        r'<script type="application/ld\+json">(.*?)</script>', response.text, re.DOTALL
+    )
+    assert structured_data is not None
+    assert [entry["@type"] for entry in json.loads(structured_data.group(1))["@graph"]] == [
+        "WebPage",
+        "BreadcrumbList",
+    ]
+    assert "FAQPage" not in structured_data.group(1)
+    assert "aggregateRating" not in structured_data.group(1)
+    assert "public_program_saved" not in response.text
 
 
 def test_public_exercise_route_has_domain_fallback_and_webpage_schema(client, monkeypatch):
@@ -3718,13 +4366,55 @@ def test_public_exercise_route_has_domain_fallback_and_webpage_schema(client, mo
     assert "Основная группа: Квадрицепс" in response.text
     assert "Техника выполнения" in response.text
     assert "Колени заваливаются внутрь" in response.text
-    assert "free-exercise-db" in response.text
+    assert "Что важно для безопасности" in response.text
+    assert "/static/exercise-guides/exercises-media/squat/poster-" in response.text
+    assert "Gym visual" in response.text
     structured_data = re.search(
         r'<script type="application/ld\+json">(.*?)</script>', response.text, re.DOTALL
     )
     assert structured_data is not None
     payload = json.loads(structured_data.group(1))
     assert [entry["@type"] for entry in payload["@graph"]] == ["WebPage", "BreadcrumbList"]
+
+
+def test_bench_press_public_page_has_one_canonical_seo_exemplar(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/exercises/bench-press", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert (
+        "<title>Жим штанги лёжа — техника выполнения, ошибки и безопасность | "
+        "Your Fitness Coach</title>"
+    ) in response.text
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/exercises/bench-press" />'
+        in response.text
+    )
+    assert "<h1>Жим штанги лёжа: техника выполнения</h1>" in response.text
+    assert "Дыхание" in response.text
+    assert "Частые ошибки" in response.text
+    assert "Что важно для безопасности" in response.text
+    assert "/static/exercise-guides/exercises-media/bench-press/poster-" in response.text
+    assert "Owner-purchased GymVisual license" in response.text
+    assert "<video" not in response.text
+    assert "Открыть тренировки в Your Fitness Coach" in response.text
+    assert "exercise_added_from_public_page" not in response.text
+
+    sitemap = client.get("/sitemap.xml", headers={"Host": "your-fitness-coach.ru"})
+    assert sitemap.status_code == 200
+    assert sitemap.text.count("https://your-fitness-coach.ru/exercises/bench-press") == 1
+    assert "/exercises/bench-press-technique" not in sitemap.text
+
+
+def test_public_exercise_metadata_fails_closed_when_domain_quality_is_incomplete(monkeypatch):
+    from fitminiapp_api import seo
+
+    monkeypatch.setattr(seo, "public_exercise", lambda slug: {"slug": slug})
+
+    with pytest.raises(RuntimeError, match="public quality contract"):
+        seo.metadata_for_path("/exercises/bench-press")
 
 
 def test_draft_public_content_is_noindex_and_absent_from_sitemap_source(monkeypatch):
@@ -3819,12 +4509,36 @@ def test_public_fallback_replaces_the_built_vite_marker_without_stale_landing_co
     assert '<main class="seo-fallback">' not in private
 
 
+def test_i4_hermes_editorial_popup_is_html_not_fastapi_json_404(client):
+    """A real popup navigates directly; client-side routing alone is insufficient."""
+    response = client.get(
+        "/admin/hermes-bridge",
+        headers={"Host": "app.your-fitness-coach.ru"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+    assert response.headers["x-robots-tag"] == "noindex, nofollow"
+    assert '<div id="root"></div>' in response.text
+    assert '"detail":"Not Found"' not in response.text
+
+    # A SPA shell is public HTML, not a Root API or an implicit owner grant.
+    # All backend article reads/writes still enforce require_root_admin.
+    denied = client.get("/api/v1/admin/articles/drafts?limit=25&offset=0")
+    assert denied.status_code in {401, 403}
+    assert client.post("/admin/hermes-bridge").status_code == 405
+    assert client.get("/admin/hermes-bridge/unexpected").status_code == 404
+
+
 @pytest.mark.parametrize(
     "path",
     [
         "/app",
         "/app/report?period=days_30",
         "/admin",
+        "/admin/hermes-bridge",
         "/coach",
         "/login",
         "/verify-email",
@@ -3863,6 +4577,11 @@ def test_canonical_hosts_and_missing_routes_do_not_create_duplicate_or_soft_404_
     app_host_public_page = client.get(
         "/training", headers={"Host": "app.your-fitness-coach.ru"}, follow_redirects=False
     )
+    app_host_athlete_alias = client.get(
+        "/for-athletes?utm_source=owner",
+        headers={"Host": "app.your-fitness-coach.ru"},
+        follow_redirects=False,
+    )
     trailing_public_page = client.get(
         "/training/", headers={"Host": "your-fitness-coach.ru"}, follow_redirects=False
     )
@@ -3876,6 +4595,11 @@ def test_canonical_hosts_and_missing_routes_do_not_create_duplicate_or_soft_404_
     assert landing_app_slash.headers["location"] == "https://app.your-fitness-coach.ru/app"
     assert app_host_public_page.status_code == 308
     assert app_host_public_page.headers["location"] == "https://your-fitness-coach.ru/training"
+    assert app_host_athlete_alias.status_code == 308
+    assert (
+        app_host_athlete_alias.headers["location"]
+        == "https://your-fitness-coach.ru/for-athletes?utm_source=owner"
+    )
     assert trailing_public_page.status_code == 308
     assert trailing_public_page.headers["location"] == "https://your-fitness-coach.ru/training"
     assert missing.status_code == 404

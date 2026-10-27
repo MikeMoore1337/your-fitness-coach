@@ -12,11 +12,17 @@ describe('oauthRecovery', () => {
   });
 
   it('builds a provider retry link with only an allowlisted next path', () => {
+    expect(oauthStartHref('google', '/admin/hermes-bridge')).toBe(
+      '/api/v1/auth/oauth/google/start?next=%2Fadmin%2Fhermes-bridge',
+    );
     expect(oauthStartHref('GOOGLE', '/coach')).toBe(
       '/api/v1/auth/oauth/google/start?next=%2Fcoach',
     );
     expect(oauthStartHref('google', 'https://evil.example')).toBe(
       '/api/v1/auth/oauth/google/start',
+    );
+    expect(oauthStartHref('google', '/app?trainer_intent=1')).toBe(
+      '/api/v1/auth/oauth/google/start?next=%2Fapp%3Ftrainer_intent%3D1',
     );
     expect(oauthStartHref('unknown', '/app')).toBeNull();
   });

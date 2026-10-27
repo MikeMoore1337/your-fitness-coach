@@ -1,0 +1,3250 @@
+{
+  "verdict": "COMPLETE_LOCAL_SYNTHETIC_SCREEN_MATRIX_WITH_RECORDED_LIMITS",
+  "runtime": "Local Vite build6213; only Nutrition refreshed on build78497 after confirmed glyph fallback fix; immutable source bound by package README.",
+  "fixture": "installPlatformApi and canonical progress report fixture",
+  "fixedDate": "2026-09-06",
+  "sampleCount": 420,
+  "surfaceCount": 15,
+  "browsers": [
+    "chromium",
+    "webkit"
+  ],
+  "themes": [
+    "dark",
+    "light"
+  ],
+  "widths": [
+    320,
+    360,
+    390,
+    393,
+    430,
+    1280,
+    1440
+  ],
+  "geometryReports": 900,
+  "completed": true,
+  "assertionFailures": 0,
+  "provenance": {
+    "status": "COMPLETE_FROM_BOUNDED_REFRESH",
+    "initialRun": {
+      "session": 44741,
+      "tests": "4 failed on Landing1440 PNG budget only",
+      "completedSamples": 104,
+      "assertionFailures": 0,
+      "originalEvidence": ".artifacts/tasks/final-ux-closeout/evidence/final-capture-initial"
+    },
+    "refreshRun": {
+      "session": 6975,
+      "tests": "4 passed",
+      "surfaces": [
+        "program-editor",
+        "landing"
+      ],
+      "samples": 14,
+      "assertionFailures": 0,
+      "originalEvidence": ".artifacts/tasks/final-ux-closeout/evidence/final-refresh"
+    },
+    "unchangedSurfaces": [
+      "today",
+      "plan",
+      "program-management",
+      "exercise-catalog",
+      "nutrition",
+      "progress",
+      "history",
+      "profile-settings",
+      "coach-today",
+      "coach-clients",
+      "coach-programs",
+      "coach-tools",
+      "progress-report"
+    ],
+    "hydrationFontRefresh": {
+      "reason": "Actual glyph fallback confirmed by CDP; only Nutrition28samples replaced.",
+      "tests": "4/4PASS",
+      "samples": 28,
+      "build": 78497
+    }
+  },
+  "severityOccurrences": {
+    "BLOCKER": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0
+  },
+  "uniqueFindingCounts": {
+    "BLOCKER": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0
+  },
+  "uniqueFindings": [],
+  "fontStatus": "Inter and Oswald Latin/Cyrillic faces loaded; actual typography, weight, line-height, tracking and role sizes recorded per sample.",
+  "editorFooter": [
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 320,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 145,
+      "scrollHeight": 963,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 288,
+        "height": 820,
+        "top": 12,
+        "right": 304,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 228,
+        "height": 44,
+        "top": 758.0625,
+        "right": 274,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 360,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 328,
+        "height": 820,
+        "top": 12,
+        "right": 344,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 268,
+        "height": 44,
+        "top": 758.0625,
+        "right": 314,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 390,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 358,
+        "height": 820,
+        "top": 12,
+        "right": 374,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 298,
+        "height": 44,
+        "top": 758.0625,
+        "right": 344,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 393,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 89,
+      "scrollHeight": 907,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 361,
+        "height": 820,
+        "top": 12,
+        "right": 377,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 301,
+        "height": 44,
+        "top": 758.0625,
+        "right": 347,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 430,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 89,
+      "scrollHeight": 907,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 398,
+        "height": 820,
+        "top": 12,
+        "right": 414,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 338,
+        "height": 44,
+        "top": 758.0625,
+        "right": 384,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 1280,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 50,
+        "y": 129.765625,
+        "width": 1180,
+        "height": 740.46875,
+        "top": 129.765625,
+        "right": 1230,
+        "bottom": 870.234375,
+        "left": 50
+      },
+      "save": {
+        "x": 937,
+        "y": 773.234375,
+        "width": 240,
+        "height": 44,
+        "top": 773.234375,
+        "right": 1177,
+        "bottom": 817.234375,
+        "left": 937
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 1440,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 130,
+        "y": 129.765625,
+        "width": 1180,
+        "height": 740.46875,
+        "top": 129.765625,
+        "right": 1310,
+        "bottom": 870.234375,
+        "left": 130
+      },
+      "save": {
+        "x": 1017,
+        "y": 773.234375,
+        "width": 240,
+        "height": 44,
+        "top": 773.234375,
+        "right": 1257,
+        "bottom": 817.234375,
+        "left": 1017
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 320,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 145,
+      "scrollHeight": 963,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 288,
+        "height": 820,
+        "top": 12,
+        "right": 304,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 228,
+        "height": 44,
+        "top": 758.0625,
+        "right": 274,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 360,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 328,
+        "height": 820,
+        "top": 12,
+        "right": 344,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 268,
+        "height": 44,
+        "top": 758.0625,
+        "right": 314,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 390,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 358,
+        "height": 820,
+        "top": 12,
+        "right": 374,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 298,
+        "height": 44,
+        "top": 758.0625,
+        "right": 344,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 393,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 89,
+      "scrollHeight": 907,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 361,
+        "height": 820,
+        "top": 12,
+        "right": 377,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 301,
+        "height": 44,
+        "top": 758.0625,
+        "right": 347,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 430,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 89,
+      "scrollHeight": 907,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12,
+        "width": 398,
+        "height": 820,
+        "top": 12,
+        "right": 414,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.0625,
+        "width": 338,
+        "height": 44,
+        "top": 758.0625,
+        "right": 384,
+        "bottom": 802.0625,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 1280,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 50,
+        "y": 129.765625,
+        "width": 1180,
+        "height": 740.46875,
+        "top": 129.765625,
+        "right": 1230,
+        "bottom": 870.234375,
+        "left": 50
+      },
+      "save": {
+        "x": 937,
+        "y": 773.234375,
+        "width": 240,
+        "height": 44,
+        "top": 773.234375,
+        "right": 1177,
+        "bottom": 817.234375,
+        "left": 937
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 1440,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 130,
+        "y": 129.765625,
+        "width": 1180,
+        "height": 740.46875,
+        "top": 129.765625,
+        "right": 1310,
+        "bottom": 870.234375,
+        "left": 130
+      },
+      "save": {
+        "x": 1017,
+        "y": 773.234375,
+        "width": 240,
+        "height": 44,
+        "top": 773.234375,
+        "right": 1257,
+        "bottom": 817.234375,
+        "left": 1017
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 320,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 145,
+      "scrollHeight": 963,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 288,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 304,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 228,
+        "height": 44,
+        "top": 758.046875,
+        "right": 274,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 360,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 328,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 344,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 268,
+        "height": 44,
+        "top": 758.046875,
+        "right": 314,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 390,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 358,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 374,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 298,
+        "height": 44,
+        "top": 758.046875,
+        "right": 344,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 393,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 361,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 377,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 301,
+        "height": 44,
+        "top": 758.046875,
+        "right": 347,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 430,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 89,
+      "scrollHeight": 907,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 398,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 414,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 338,
+        "height": 44,
+        "top": 758.046875,
+        "right": 384,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 1280,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 50,
+        "y": 129.78125,
+        "width": 1180,
+        "height": 740.4375,
+        "top": 129.78125,
+        "right": 1230,
+        "bottom": 870.21875,
+        "left": 50
+      },
+      "save": {
+        "x": 936.984375,
+        "y": 773.21875,
+        "width": 240,
+        "height": 44,
+        "top": 773.21875,
+        "right": 1176.984375,
+        "bottom": 817.21875,
+        "left": 936.984375
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 1440,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 130,
+        "y": 129.78125,
+        "width": 1180,
+        "height": 740.4375,
+        "top": 129.78125,
+        "right": 1310,
+        "bottom": 870.21875,
+        "left": 130
+      },
+      "save": {
+        "x": 1016.984375,
+        "y": 773.21875,
+        "width": 240,
+        "height": 44,
+        "top": 773.21875,
+        "right": 1256.984375,
+        "bottom": 817.21875,
+        "left": 1016.984375
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 320,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 145,
+      "scrollHeight": 963,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 288,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 304,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 228,
+        "height": 44,
+        "top": 758.046875,
+        "right": 274,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 360,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 328,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 344,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 268,
+        "height": 44,
+        "top": 758.046875,
+        "right": 314,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 390,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 358,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 374,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 298,
+        "height": 44,
+        "top": 758.046875,
+        "right": 344,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 393,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 109,
+      "scrollHeight": 927,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 361,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 377,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 301,
+        "height": 44,
+        "top": 758.046875,
+        "right": 347,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 430,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 89,
+      "scrollHeight": 907,
+      "clientHeight": 818,
+      "panel": {
+        "x": 16,
+        "y": 12.015625,
+        "width": 398,
+        "height": 819.984375,
+        "top": 12.015625,
+        "right": 414,
+        "bottom": 832,
+        "left": 16
+      },
+      "save": {
+        "x": 46,
+        "y": 758.046875,
+        "width": 338,
+        "height": 44,
+        "top": 758.046875,
+        "right": 384,
+        "bottom": 802.046875,
+        "left": 46
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 1280,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 50,
+        "y": 129.78125,
+        "width": 1180,
+        "height": 740.4375,
+        "top": 129.78125,
+        "right": 1230,
+        "bottom": 870.21875,
+        "left": 50
+      },
+      "save": {
+        "x": 936.984375,
+        "y": 773.21875,
+        "width": 240,
+        "height": 44,
+        "top": 773.21875,
+        "right": 1176.984375,
+        "bottom": 817.21875,
+        "left": 936.984375
+      },
+      "saveDisabled": true
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 1440,
+      "scrollContainer": ".program-editor-modal",
+      "scrollTop": 0,
+      "scrollHeight": 738,
+      "clientHeight": 738,
+      "panel": {
+        "x": 130,
+        "y": 129.78125,
+        "width": 1180,
+        "height": 740.4375,
+        "top": 129.78125,
+        "right": 1310,
+        "bottom": 870.21875,
+        "left": 130
+      },
+      "save": {
+        "x": 1016.984375,
+        "y": 773.21875,
+        "width": 240,
+        "height": 44,
+        "top": 773.21875,
+        "right": 1256.984375,
+        "bottom": 817.21875,
+        "left": 1016.984375
+      },
+      "saveDisabled": true
+    }
+  ],
+  "screenshotCount": 316,
+  "maximumScreenshotBytes": 371020,
+  "landingDesktopCapture": "Each unchanged 1440x1000 top/bottom viewport is split losslessly into 300+300+300+100px PNG strips; screenshotClips in computed JSON reconstruct every pixel.",
+  "screenshots": [
+    {
+      "file": "coach-clients-chromium-dark-1440-bottom.png",
+      "bytes": 210715,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-chromium-dark-1440.png",
+      "bytes": 228923,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-chromium-dark-390-bottom.png",
+      "bytes": 48478,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-chromium-dark-390-expanded.png",
+      "bytes": 58025,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-chromium-dark-390.png",
+      "bytes": 60941,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-chromium-light-1440-bottom.png",
+      "bytes": 177940,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-chromium-light-1440.png",
+      "bytes": 195516,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-chromium-light-390-bottom.png",
+      "bytes": 48208,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-chromium-light-390-expanded.png",
+      "bytes": 56373,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-chromium-light-390.png",
+      "bytes": 60387,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-webkit-dark-1440-bottom.png",
+      "bytes": 117435,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-webkit-dark-1440.png",
+      "bytes": 127916,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-webkit-dark-390-bottom.png",
+      "bytes": 38472,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-webkit-dark-390-expanded.png",
+      "bytes": 46939,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-webkit-dark-390.png",
+      "bytes": 49089,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-webkit-light-1440-bottom.png",
+      "bytes": 103537,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-webkit-light-1440.png",
+      "bytes": 114658,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-clients-webkit-light-390-bottom.png",
+      "bytes": 35869,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-webkit-light-390-expanded.png",
+      "bytes": 44348,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-clients-webkit-light-390.png",
+      "bytes": 46731,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-chromium-dark-1440-bottom.png",
+      "bytes": 154604,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-chromium-dark-1440.png",
+      "bytes": 160215,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-chromium-dark-390-bottom.png",
+      "bytes": 52499,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-chromium-dark-390-expanded.png",
+      "bytes": 73453,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-chromium-dark-390.png",
+      "bytes": 59811,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-chromium-light-1440-bottom.png",
+      "bytes": 129599,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-chromium-light-1440.png",
+      "bytes": 134475,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-chromium-light-390-bottom.png",
+      "bytes": 52109,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-chromium-light-390-expanded.png",
+      "bytes": 68830,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-chromium-light-390.png",
+      "bytes": 59173,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-webkit-dark-1440-bottom.png",
+      "bytes": 72163,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-webkit-dark-1440.png",
+      "bytes": 76205,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-webkit-dark-390-bottom.png",
+      "bytes": 40887,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-webkit-dark-390-expanded.png",
+      "bytes": 55835,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-webkit-dark-390.png",
+      "bytes": 47415,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-webkit-light-1440-bottom.png",
+      "bytes": 63764,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-webkit-light-1440.png",
+      "bytes": 68057,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-programs-webkit-light-390-bottom.png",
+      "bytes": 38714,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-webkit-light-390-expanded.png",
+      "bytes": 51342,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-programs-webkit-light-390.png",
+      "bytes": 45089,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-chromium-dark-1440-bottom.png",
+      "bytes": 194962,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-chromium-dark-1440.png",
+      "bytes": 215396,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-chromium-dark-390-bottom.png",
+      "bytes": 57099,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-chromium-dark-390.png",
+      "bytes": 73111,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-chromium-light-1440-bottom.png",
+      "bytes": 164776,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-chromium-light-1440.png",
+      "bytes": 183887,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-chromium-light-390-bottom.png",
+      "bytes": 55710,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-chromium-light-390.png",
+      "bytes": 71813,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-webkit-dark-1440-bottom.png",
+      "bytes": 107007,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-webkit-dark-1440.png",
+      "bytes": 117639,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-webkit-dark-390-bottom.png",
+      "bytes": 45580,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-webkit-dark-390.png",
+      "bytes": 56563,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-webkit-light-1440-bottom.png",
+      "bytes": 94323,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-webkit-light-1440.png",
+      "bytes": 104899,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-today-webkit-light-390-bottom.png",
+      "bytes": 41732,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-today-webkit-light-390.png",
+      "bytes": 53918,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-chromium-dark-1440-bottom.png",
+      "bytes": 206040,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-chromium-dark-1440.png",
+      "bytes": 213522,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-chromium-dark-390-bottom.png",
+      "bytes": 71157,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-chromium-dark-390.png",
+      "bytes": 73766,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-chromium-light-1440-bottom.png",
+      "bytes": 173560,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-chromium-light-1440.png",
+      "bytes": 179843,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-chromium-light-390-bottom.png",
+      "bytes": 66903,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-chromium-light-390.png",
+      "bytes": 71132,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-webkit-dark-1440-bottom.png",
+      "bytes": 112300,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-webkit-dark-1440.png",
+      "bytes": 117713,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-webkit-dark-390-bottom.png",
+      "bytes": 54266,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-webkit-dark-390.png",
+      "bytes": 59214,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-webkit-light-1440-bottom.png",
+      "bytes": 99390,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-webkit-light-1440.png",
+      "bytes": 104991,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "coach-tools-webkit-light-390-bottom.png",
+      "bytes": 48577,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "coach-tools-webkit-light-390.png",
+      "bytes": 55805,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-chromium-dark-1440-bottom.png",
+      "bytes": 191686,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-chromium-dark-1440.png",
+      "bytes": 199284,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-chromium-dark-390-bottom.png",
+      "bytes": 83036,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-chromium-dark-390-expanded.png",
+      "bytes": 82655,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-chromium-dark-390.png",
+      "bytes": 89441,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-chromium-light-1440-bottom.png",
+      "bytes": 166539,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-chromium-light-1440.png",
+      "bytes": 173261,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-chromium-light-390-bottom.png",
+      "bytes": 79816,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-chromium-light-390-expanded.png",
+      "bytes": 79154,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-chromium-light-390.png",
+      "bytes": 86924,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-webkit-dark-1440-bottom.png",
+      "bytes": 96794,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-webkit-dark-1440.png",
+      "bytes": 101989,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-webkit-dark-390-bottom.png",
+      "bytes": 58777,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-webkit-dark-390-expanded.png",
+      "bytes": 61407,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-webkit-dark-390.png",
+      "bytes": 66583,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-webkit-light-1440-bottom.png",
+      "bytes": 84674,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-webkit-light-1440.png",
+      "bytes": 90794,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "exercise-catalog-webkit-light-390-bottom.png",
+      "bytes": 49188,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-webkit-light-390-expanded.png",
+      "bytes": 52156,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "exercise-catalog-webkit-light-390.png",
+      "bytes": 58457,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-chromium-dark-1440-bottom.png",
+      "bytes": 203380,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-chromium-dark-1440.png",
+      "bytes": 211521,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-chromium-dark-390-bottom.png",
+      "bytes": 55908,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-chromium-dark-390-expanded.png",
+      "bytes": 49944,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-chromium-dark-390.png",
+      "bytes": 80350,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-chromium-light-1440-bottom.png",
+      "bytes": 182465,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-chromium-light-1440.png",
+      "bytes": 190786,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-chromium-light-390-bottom.png",
+      "bytes": 53354,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-chromium-light-390-expanded.png",
+      "bytes": 47392,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-chromium-light-390.png",
+      "bytes": 79200,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-webkit-dark-1440-bottom.png",
+      "bytes": 103414,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-webkit-dark-1440.png",
+      "bytes": 109192,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-webkit-dark-390-bottom.png",
+      "bytes": 41656,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-webkit-dark-390-expanded.png",
+      "bytes": 49521,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-webkit-dark-390.png",
+      "bytes": 61001,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-webkit-light-1440-bottom.png",
+      "bytes": 94050,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-webkit-light-1440.png",
+      "bytes": 99508,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "history-webkit-light-390-bottom.png",
+      "bytes": 39361,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-webkit-light-390-expanded.png",
+      "bytes": 46520,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "history-webkit-light-390.png",
+      "bytes": 57575,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-chromium-dark-1440-bottom-part2.png",
+      "bytes": 35192,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-dark-1440-bottom-part3.png",
+      "bytes": 25845,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-dark-1440-bottom-part4.png",
+      "bytes": 3428,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-chromium-dark-1440-bottom.png",
+      "bytes": 25813,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-dark-1440-part2.png",
+      "bytes": 300683,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-dark-1440-part3.png",
+      "bytes": 368572,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-dark-1440-part4.png",
+      "bytes": 117248,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-chromium-dark-1440.png",
+      "bytes": 239640,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-dark-390-bottom.png",
+      "bytes": 53816,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-chromium-dark-390-expanded.png",
+      "bytes": 66370,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-chromium-dark-390.png",
+      "bytes": 341026,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-chromium-light-1440-bottom-part2.png",
+      "bytes": 35202,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-light-1440-bottom-part3.png",
+      "bytes": 23936,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-light-1440-bottom-part4.png",
+      "bytes": 3277,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-chromium-light-1440-bottom.png",
+      "bytes": 21557,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-light-1440-part2.png",
+      "bytes": 300692,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-light-1440-part3.png",
+      "bytes": 368538,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-light-1440-part4.png",
+      "bytes": 117249,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-chromium-light-1440.png",
+      "bytes": 239514,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-chromium-light-390-bottom.png",
+      "bytes": 51616,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-chromium-light-390-expanded.png",
+      "bytes": 58832,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-chromium-light-390.png",
+      "bytes": 340810,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-webkit-dark-1440-bottom-part2.png",
+      "bytes": 24812,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-dark-1440-bottom-part3.png",
+      "bytes": 19381,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-dark-1440-bottom-part4.png",
+      "bytes": 2741,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-webkit-dark-1440-bottom.png",
+      "bytes": 18296,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-dark-1440-part2.png",
+      "bytes": 305374,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-dark-1440-part3.png",
+      "bytes": 371020,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-dark-1440-part4.png",
+      "bytes": 99524,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-webkit-dark-1440.png",
+      "bytes": 248511,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-dark-390-bottom.png",
+      "bytes": 36197,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-webkit-dark-390-expanded.png",
+      "bytes": 48695,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-webkit-dark-390.png",
+      "bytes": 346015,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-webkit-light-1440-bottom-part2.png",
+      "bytes": 24821,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-light-1440-bottom-part3.png",
+      "bytes": 18094,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-light-1440-bottom-part4.png",
+      "bytes": 2658,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-webkit-light-1440-bottom.png",
+      "bytes": 17786,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-light-1440-part2.png",
+      "bytes": 305399,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-light-1440-part3.png",
+      "bytes": 370982,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-light-1440-part4.png",
+      "bytes": 99521,
+      "width": 1440,
+      "height": 100
+    },
+    {
+      "file": "landing-webkit-light-1440.png",
+      "bytes": 248339,
+      "width": 1440,
+      "height": 300
+    },
+    {
+      "file": "landing-webkit-light-390-bottom.png",
+      "bytes": 35471,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-webkit-light-390-expanded.png",
+      "bytes": 45492,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "landing-webkit-light-390.png",
+      "bytes": 345861,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-chromium-dark-1440-bottom.png",
+      "bytes": 190526,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-chromium-dark-1440.png",
+      "bytes": 208981,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-chromium-dark-390-bottom.png",
+      "bytes": 55934,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-chromium-dark-390-expanded.png",
+      "bytes": 73860,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-chromium-dark-390.png",
+      "bytes": 71377,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-chromium-light-1440-bottom.png",
+      "bytes": 167092,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-chromium-light-1440.png",
+      "bytes": 184466,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-chromium-light-390-bottom.png",
+      "bytes": 53456,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-chromium-light-390-expanded.png",
+      "bytes": 67888,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-chromium-light-390.png",
+      "bytes": 68681,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-webkit-dark-1440-bottom.png",
+      "bytes": 101948,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-webkit-dark-1440.png",
+      "bytes": 109516,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-webkit-dark-390-bottom.png",
+      "bytes": 45369,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-webkit-dark-390-expanded.png",
+      "bytes": 56499,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-webkit-dark-390.png",
+      "bytes": 55690,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-webkit-light-1440-bottom.png",
+      "bytes": 92977,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-webkit-light-1440.png",
+      "bytes": 100098,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "nutrition-webkit-light-390-bottom.png",
+      "bytes": 42879,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-webkit-light-390-expanded.png",
+      "bytes": 50746,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "nutrition-webkit-light-390.png",
+      "bytes": 53821,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-chromium-dark-1440-bottom.png",
+      "bytes": 176497,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-chromium-dark-1440.png",
+      "bytes": 183811,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-chromium-dark-390-bottom.png",
+      "bytes": 68204,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-chromium-dark-390-expanded.png",
+      "bytes": 73039,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-chromium-dark-390.png",
+      "bytes": 75978,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-chromium-light-1440-bottom.png",
+      "bytes": 154068,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-chromium-light-1440.png",
+      "bytes": 161473,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-chromium-light-390-bottom.png",
+      "bytes": 65784,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-chromium-light-390-expanded.png",
+      "bytes": 70325,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-chromium-light-390.png",
+      "bytes": 73558,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-webkit-dark-1440-bottom.png",
+      "bytes": 87084,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-webkit-dark-1440.png",
+      "bytes": 92546,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-webkit-dark-390-bottom.png",
+      "bytes": 50678,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-webkit-dark-390-expanded.png",
+      "bytes": 54644,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-webkit-dark-390.png",
+      "bytes": 57262,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-webkit-light-1440-bottom.png",
+      "bytes": 78366,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-webkit-light-1440.png",
+      "bytes": 84141,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "plan-webkit-light-390-bottom.png",
+      "bytes": 48208,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-webkit-light-390-expanded.png",
+      "bytes": 51455,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "plan-webkit-light-390.png",
+      "bytes": 54676,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-chromium-dark-1440-bottom.png",
+      "bytes": 189715,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-chromium-dark-1440.png",
+      "bytes": 206766,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-chromium-dark-390-bottom.png",
+      "bytes": 62225,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-chromium-dark-390-expanded.png",
+      "bytes": 69686,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-chromium-dark-390.png",
+      "bytes": 61917,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-chromium-light-1440-bottom.png",
+      "bytes": 164645,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-chromium-light-1440.png",
+      "bytes": 180497,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-chromium-light-390-bottom.png",
+      "bytes": 58028,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-chromium-light-390-expanded.png",
+      "bytes": 63982,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-chromium-light-390.png",
+      "bytes": 58847,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-webkit-dark-1440-bottom.png",
+      "bytes": 101008,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-webkit-dark-1440.png",
+      "bytes": 111272,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-webkit-dark-390-bottom.png",
+      "bytes": 48174,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-webkit-dark-390-expanded.png",
+      "bytes": 56500,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-webkit-dark-390.png",
+      "bytes": 50612,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-webkit-light-1440-bottom.png",
+      "bytes": 89238,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-webkit-light-1440.png",
+      "bytes": 100661,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "profile-settings-webkit-light-390-bottom.png",
+      "bytes": 42266,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-webkit-light-390-expanded.png",
+      "bytes": 50476,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "profile-settings-webkit-light-390.png",
+      "bytes": 47248,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-chromium-dark-1440-bottom.png",
+      "bytes": 137013,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-chromium-dark-1440.png",
+      "bytes": 137020,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-chromium-dark-390-bottom.png",
+      "bytes": 54186,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-chromium-dark-390-expanded.png",
+      "bytes": 57659,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-chromium-dark-390.png",
+      "bytes": 54186,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-chromium-light-1440-bottom.png",
+      "bytes": 120828,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-chromium-light-1440.png",
+      "bytes": 120828,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-chromium-light-390-bottom.png",
+      "bytes": 50095,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-chromium-light-390-expanded.png",
+      "bytes": 52920,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-chromium-light-390.png",
+      "bytes": 50095,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-webkit-dark-1440-bottom.png",
+      "bytes": 110942,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-webkit-dark-1440.png",
+      "bytes": 110942,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-webkit-dark-390-bottom.png",
+      "bytes": 42723,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-webkit-dark-390-expanded.png",
+      "bytes": 42983,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-webkit-dark-390.png",
+      "bytes": 42723,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-webkit-light-1440-bottom.png",
+      "bytes": 104508,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-webkit-light-1440.png",
+      "bytes": 104508,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-editor-webkit-light-390-bottom.png",
+      "bytes": 40900,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-webkit-light-390-expanded.png",
+      "bytes": 41093,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-editor-webkit-light-390.png",
+      "bytes": 40900,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-chromium-dark-1440-bottom.png",
+      "bytes": 229751,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-chromium-dark-1440.png",
+      "bytes": 252681,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-chromium-dark-390-bottom.png",
+      "bytes": 78069,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-chromium-dark-390-expanded.png",
+      "bytes": 78090,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-chromium-dark-390.png",
+      "bytes": 80043,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-chromium-light-1440-bottom.png",
+      "bytes": 201491,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-chromium-light-1440.png",
+      "bytes": 222900,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-chromium-light-390-bottom.png",
+      "bytes": 73989,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-chromium-light-390-expanded.png",
+      "bytes": 74028,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-chromium-light-390.png",
+      "bytes": 76500,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-webkit-dark-1440-bottom.png",
+      "bytes": 125485,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-webkit-dark-1440.png",
+      "bytes": 136944,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-webkit-dark-390-bottom.png",
+      "bytes": 55749,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-webkit-dark-390-expanded.png",
+      "bytes": 60224,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-webkit-dark-390.png",
+      "bytes": 61023,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-webkit-light-1440-bottom.png",
+      "bytes": 111801,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-webkit-light-1440.png",
+      "bytes": 123775,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "program-management-webkit-light-390-bottom.png",
+      "bytes": 51834,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-webkit-light-390-expanded.png",
+      "bytes": 55369,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "program-management-webkit-light-390.png",
+      "bytes": 57985,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-chromium-dark-1440-bottom.png",
+      "bytes": 231954,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-chromium-dark-1440.png",
+      "bytes": 256649,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-chromium-dark-390-bottom.png",
+      "bytes": 59861,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-chromium-dark-390-expanded.png",
+      "bytes": 78068,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-chromium-dark-390.png",
+      "bytes": 84971,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-chromium-light-1440-bottom.png",
+      "bytes": 203346,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-chromium-light-1440.png",
+      "bytes": 232777,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-chromium-light-390-bottom.png",
+      "bytes": 57117,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-chromium-light-390-expanded.png",
+      "bytes": 72086,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-chromium-light-390.png",
+      "bytes": 83316,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-chromium-dark-1440-bottom.png",
+      "bytes": 115347,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-chromium-dark-1440.png",
+      "bytes": 131515,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-chromium-dark-390-bottom.png",
+      "bytes": 63717,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-chromium-dark-390-expanded.png",
+      "bytes": 59783,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-chromium-dark-390.png",
+      "bytes": 60402,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-chromium-light-1440-bottom.png",
+      "bytes": 108969,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-chromium-light-1440.png",
+      "bytes": 131285,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-chromium-light-390-bottom.png",
+      "bytes": 53703,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-chromium-light-390-expanded.png",
+      "bytes": 54883,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-chromium-light-390.png",
+      "bytes": 56090,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-webkit-dark-1440-bottom.png",
+      "bytes": 74321,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-webkit-dark-1440.png",
+      "bytes": 83007,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-webkit-dark-390-bottom.png",
+      "bytes": 44468,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-webkit-dark-390-expanded.png",
+      "bytes": 39362,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-webkit-dark-390.png",
+      "bytes": 39532,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-webkit-light-1440-bottom.png",
+      "bytes": 68695,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-webkit-light-1440.png",
+      "bytes": 75993,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-report-webkit-light-390-bottom.png",
+      "bytes": 42029,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-webkit-light-390-expanded.png",
+      "bytes": 36836,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-report-webkit-light-390.png",
+      "bytes": 36979,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-webkit-dark-1440-bottom.png",
+      "bytes": 126870,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-webkit-dark-1440.png",
+      "bytes": 144692,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-webkit-dark-390-bottom.png",
+      "bytes": 44734,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-webkit-dark-390-expanded.png",
+      "bytes": 56713,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-webkit-dark-390.png",
+      "bytes": 65395,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-webkit-light-1440-bottom.png",
+      "bytes": 113798,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-webkit-light-1440.png",
+      "bytes": 132198,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "progress-webkit-light-390-bottom.png",
+      "bytes": 41266,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-webkit-light-390-expanded.png",
+      "bytes": 51655,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "progress-webkit-light-390.png",
+      "bytes": 61319,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-chromium-dark-1440-bottom.png",
+      "bytes": 314538,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-chromium-dark-1440.png",
+      "bytes": 321953,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-chromium-dark-390-bottom.png",
+      "bytes": 67067,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-chromium-dark-390-expanded.png",
+      "bytes": 77862,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-chromium-dark-390.png",
+      "bytes": 134276,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-chromium-light-1440-bottom.png",
+      "bytes": 289446,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-chromium-light-1440.png",
+      "bytes": 295215,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-chromium-light-390-bottom.png",
+      "bytes": 63279,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-chromium-light-390-expanded.png",
+      "bytes": 73565,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-chromium-light-390.png",
+      "bytes": 132405,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-webkit-dark-1440-bottom.png",
+      "bytes": 217943,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-webkit-dark-1440.png",
+      "bytes": 223632,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-webkit-dark-390-bottom.png",
+      "bytes": 53223,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-webkit-dark-390-expanded.png",
+      "bytes": 121534,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-webkit-dark-390.png",
+      "bytes": 121079,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-webkit-light-1440-bottom.png",
+      "bytes": 207349,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-webkit-light-1440.png",
+      "bytes": 213129,
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "file": "today-webkit-light-390-bottom.png",
+      "bytes": 50217,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-webkit-light-390-expanded.png",
+      "bytes": 119587,
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "today-webkit-light-390.png",
+      "bytes": 119601,
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "surfaces": [
+    {
+      "name": "today",
+      "path": "/app?section=today",
+      "state": "Planned workout and existing synthetic daily data",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 4,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "plan",
+      "path": "/app?section=programs",
+      "state": "Active program, schedule and existing revision fixture",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 4,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "program-management",
+      "path": "/app?section=programs&view=manage&start=templates",
+      "state": "Populated template library and revision history",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 28,
+      "disclosureChecks": 60,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "program-editor",
+      "path": "/app?section=programs&view=manage&start=templates",
+      "state": "Existing template with one empty workout and zero exercises; save disabled, no persistence assertion",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 4,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "exercise-catalog",
+      "path": "/app?section=catalog",
+      "state": "Populated general catalog using the existing exercise fixture",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 4,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "nutrition",
+      "path": "/app?section=nutrition",
+      "state": "Diary empty state plus hydration goal/presets; no meal writes",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 24,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "progress",
+      "path": "/app?section=progress",
+      "state": "Populated existing progress and measurement fixtures",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 24,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "history",
+      "path": "/app?section=progress&progress_view=history",
+      "state": "One completed contextual workout; completed exercise list is empty in fixture",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 12,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "profile-settings",
+      "path": "/app?section=profile",
+      "state": "Existing account, personal data, goals, trainer and notification sections",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 56,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "coach-today",
+      "path": "/coach",
+      "state": "One synthetic client; no attention/inbox items or assigned coach programs",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 0,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "coach-clients",
+      "path": "/coach?tab=clients",
+      "state": "One synthetic client; no client summary/history data",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 4,
+      "hiddenDisclosureStatesNotVerified": [
+        "Рабочее место проверкиИтоги, факты, изменения и ручные действия тренера",
+        "Лента активностиТренировки, недельные итоги и замеры в одной хронологии",
+        "Программа тренировокТекущий план, ближайшая тренировка и новое назначение",
+        "Тренировки, прогресс и замерыПока мало данных о выполнении плана",
+        "Расширенный отчётКанонический report и комментарий клиента",
+        "ПитаниеАгрегаты питания не доступны",
+        "Профиль клиентаАнкета, цель и параметры",
+        "Рабочее место проверкиИтоги, факты, изменения и ручные действия тренера",
+        "Лента активностиТренировки, недельные итоги и замеры в одной хронологии",
+        "Программа тренировокТекущий план, ближайшая тренировка и новое назначение",
+        "Тренировки, прогресс и замерыПока мало данных о выполнении плана",
+        "Расширенный отчётКанонический report и комментарий клиента",
+        "ПитаниеАгрегаты питания не доступны",
+        "Профиль клиентаАнкета, цель и параметры",
+        "Рабочее место проверкиИтоги, факты, изменения и ручные действия тренера",
+        "Лента активностиТренировки, недельные итоги и замеры в одной хронологии",
+        "Программа тренировокТекущий план, ближайшая тренировка и новое назначение",
+        "Тренировки, прогресс и замерыПока мало данных о выполнении плана",
+        "Расширенный отчётКанонический report и комментарий клиента",
+        "ПитаниеАгрегаты питания не доступны",
+        "Профиль клиентаАнкета, цель и параметры",
+        "Рабочее место проверкиИтоги, факты, изменения и ручные действия тренера",
+        "Лента активностиТренировки, недельные итоги и замеры в одной хронологии",
+        "Программа тренировокТекущий план, ближайшая тренировка и новое назначение",
+        "Тренировки, прогресс и замерыПока мало данных о выполнении плана",
+        "Расширенный отчётКанонический report и комментарий клиента",
+        "ПитаниеАгрегаты питания не доступны",
+        "Профиль клиентаАнкета, цель и параметры"
+      ]
+    },
+    {
+      "name": "coach-programs",
+      "path": "/coach?tab=programs",
+      "state": "Program operations shell and explicit empty assigned-program state",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 20,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "coach-tools",
+      "path": "/coach?tab=tools",
+      "state": "Focused tools navigation; tool workflows are outside this bounded pass",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 0,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "progress-report",
+      "path": "/app/report",
+      "state": "Existing canonical full synthetic report; screen rendering only",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 20,
+      "hiddenDisclosureStatesNotVerified": []
+    },
+    {
+      "name": "landing",
+      "path": "/",
+      "state": "Public current production layout; local assets and synthetic product examples",
+      "status": "VERIFIED_LOCAL_SYNTHETIC_STATED_STATE",
+      "samples": 28,
+      "widths": [
+        320,
+        360,
+        390,
+        393,
+        430,
+        1280,
+        1440
+      ],
+      "loadedFontFamilies": [
+        "Inter",
+        "Oswald"
+      ],
+      "canonicalRoleMeasurements": 0,
+      "disclosureChecks": 24,
+      "hiddenDisclosureStatesNotVerified": []
+    }
+  ],
+  "unavailableFixtureEndpoints": [
+    {
+      "path": "/api/v1/shares",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/nutrition/diary/suggestions",
+      "status": 503
+    },
+    {
+      "path": "/api/v1/nutrition/plans/day",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/nutrition/recipes",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/nutrition/templates",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/nutrition/grocery-list",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/notifications/web-push/config",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/coach/workflow-automation/preview",
+      "status": 404
+    },
+    {
+      "path": "/api/v1/coach/clients/11/operations",
+      "status": 404
+    }
+  ],
+  "limits": [
+    "Nutrition diary empty state and hydration controls verified; populated meal/planning/recipe workflows not verified by this fixture.",
+    "History has one contextual workout but no populated completed exercise list.",
+    "Coach includes one client and explicit empty attention/inbox/assigned-program states; client details and tool workflows are not verified.",
+    "Editor footer is geometrically reachable; the zero-exercise fixture disables save, so persistence/save workflow is not proved by this screen audit.",
+    "Viewport screenshot coverage is 390 and 1440; measured geometry and computed styles cover all seven widths.",
+    "Disclosure keyboard/touch/open direction checks are performed at390; expanded computed evidence is recorded at390.",
+    "Physical iPhone/Safari, real virtual keyboard, native Telegram, VoiceOver and production data remain NOT_VERIFIED."
+  ]
+}

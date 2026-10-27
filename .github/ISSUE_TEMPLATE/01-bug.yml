@@ -1,0 +1,51 @@
+name: "Bug Report"
+description: "Ошибка или некорректное поведение, включая UI и API"
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "Пожалуйста, не размещайте секреты и персональные данные. Для критического инцидента допускается неполное описание."
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Фактическое поведение"
+      description: "Что работает неправильно?"
+      placeholder: "Что происходит и как часто?"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Ожидаемое поведение"
+      placeholder: "Как должно быть?"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "Шаги воспроизведения"
+      description: "Если ошибка нестабильна, укажите наблюдаемые условия."
+      placeholder: "1. Открыть...\n2. Нажать...\n3. Увидеть..."
+    validations:
+      required: false
+  - type: dropdown
+    id: environment
+    attributes:
+      label: "Окружение"
+      options: ["Web", "iOS / Safari", "Android / Chrome", "Telegram Mini App", "Backend / API", "Production / Infrastructure", "Другое / не установлено"]
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "Доказательства и дополнительный контекст"
+      description: "Санитизированные логи, скриншоты, ссылки на связанные Issues/PR."
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Критерии исправления"
+      placeholder: "Какие проверки подтвердят отсутствие дефекта?"
+    validations:
+      required: false

@@ -1,0 +1,608 @@
+{
+  "2026-10-08_14-05.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "strength-effort-copy",
+        "x": 0,
+        "y": 72,
+        "width": 820,
+        "height": 1170
+      },
+      {
+        "name": "strength-effort-product",
+        "x": 820,
+        "y": 72,
+        "width": 821,
+        "height": 1170
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1641,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-05_1.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "strength-record-copy",
+        "x": 0,
+        "y": 72,
+        "width": 823,
+        "height": 1173
+      },
+      {
+        "name": "strength-record-product",
+        "x": 823,
+        "y": 72,
+        "width": 823,
+        "height": 1173
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1646,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-05_2.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "strength-result-copy",
+        "x": 0,
+        "y": 72,
+        "width": 820,
+        "height": 1172
+      },
+      {
+        "name": "strength-result-product",
+        "x": 820,
+        "y": 72,
+        "width": 821,
+        "height": 1172
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1641,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-05_3.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "training-copy",
+        "x": 0,
+        "y": 72,
+        "width": 821,
+        "height": 553
+      },
+      {
+        "name": "training-product",
+        "x": 821,
+        "y": 72,
+        "width": 822,
+        "height": 553
+      },
+      {
+        "name": "nutrition-copy",
+        "x": 0,
+        "y": 625,
+        "width": 821,
+        "height": 621
+      },
+      {
+        "name": "nutrition-product",
+        "x": 821,
+        "y": 625,
+        "width": 822,
+        "height": 621
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1643,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-06.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "training-summary-copy",
+        "x": 0,
+        "y": 72,
+        "width": 821,
+        "height": 517
+      },
+      {
+        "name": "training-summary-product",
+        "x": 821,
+        "y": 72,
+        "width": 821,
+        "height": 517
+      },
+      {
+        "name": "nutrition-purchases-copy",
+        "x": 0,
+        "y": 589,
+        "width": 821,
+        "height": 657
+      },
+      {
+        "name": "nutrition-purchases-product",
+        "x": 821,
+        "y": 589,
+        "width": 821,
+        "height": 657
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1642,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-07.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "training-progress-copy",
+        "x": 0,
+        "y": 72,
+        "width": 822,
+        "height": 652
+      },
+      {
+        "name": "training-progress-product",
+        "x": 822,
+        "y": 72,
+        "width": 823,
+        "height": 652
+      },
+      {
+        "name": "nutrition-diary-copy",
+        "x": 0,
+        "y": 724,
+        "width": 822,
+        "height": 520
+      },
+      {
+        "name": "nutrition-diary-product",
+        "x": 822,
+        "y": 724,
+        "width": 823,
+        "height": 520
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1645,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-07_1.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "progress-copy",
+        "x": 0,
+        "y": 72,
+        "width": 824,
+        "height": 782
+      },
+      {
+        "name": "progress-product",
+        "x": 824,
+        "y": 72,
+        "width": 824,
+        "height": 782
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1648,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      },
+      {
+        "region": {
+          "x": 0,
+          "y": 854,
+          "width": 1648,
+          "height": 391
+        },
+        "reason": "Photographic athlete Coach OS bridge replaced by compact teaser/preview.",
+        "ownerSource": "OWNER FOLLOW-UP AFTER RESTORATION, section 2, screenshot 3",
+        "ownerDirective": "C:/Users/Mike/.codex/attachments/6aa84c98-df4b-4cf1-bdcb-a2ac545bfd6d/Вставленный текст.txt"
+      }
+    ]
+  },
+  "2026-10-08_14-07_2.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "progress-weekly-copy",
+        "x": 0,
+        "y": 72,
+        "width": 824,
+        "height": 781
+      },
+      {
+        "name": "progress-weekly-product",
+        "x": 824,
+        "y": 72,
+        "width": 824,
+        "height": 781
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1648,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      },
+      {
+        "region": {
+          "x": 0,
+          "y": 853,
+          "width": 1648,
+          "height": 392
+        },
+        "reason": "Photographic athlete Coach OS bridge replaced by compact teaser/preview.",
+        "ownerSource": "OWNER FOLLOW-UP AFTER RESTORATION, section 2, screenshot 3",
+        "ownerDirective": "C:/Users/Mike/.codex/attachments/6aa84c98-df4b-4cf1-bdcb-a2ac545bfd6d/Вставленный текст.txt"
+      }
+    ]
+  },
+  "2026-10-08_14-08_3.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "difference-copy",
+        "x": 0,
+        "y": 72,
+        "width": 816,
+        "height": 438
+      },
+      {
+        "name": "difference-product",
+        "x": 816,
+        "y": 72,
+        "width": 817,
+        "height": 438
+      },
+      {
+        "name": "demo-copy",
+        "x": 0,
+        "y": 510,
+        "width": 816,
+        "height": 511
+      },
+      {
+        "name": "demo-product",
+        "x": 816,
+        "y": 510,
+        "width": 817,
+        "height": 511
+      },
+      {
+        "name": "continuity-partial-copy",
+        "x": 0,
+        "y": 1021,
+        "width": 816,
+        "height": 225
+      },
+      {
+        "name": "continuity-partial-product",
+        "x": 816,
+        "y": 1021,
+        "width": 817,
+        "height": 225
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1633,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-08_4.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "continuity-copy",
+        "x": 0,
+        "y": 72,
+        "width": 822,
+        "height": 385
+      },
+      {
+        "name": "continuity-product",
+        "x": 822,
+        "y": 72,
+        "width": 823,
+        "height": 385
+      },
+      {
+        "name": "faq-copy",
+        "x": 0,
+        "y": 457,
+        "width": 822,
+        "height": 506
+      },
+      {
+        "name": "faq-product",
+        "x": 822,
+        "y": 457,
+        "width": 823,
+        "height": 506
+      },
+      {
+        "name": "closing-partial-copy",
+        "x": 0,
+        "y": 963,
+        "width": 822,
+        "height": 281
+      },
+      {
+        "name": "closing-partial-product",
+        "x": 822,
+        "y": 963,
+        "width": 823,
+        "height": 281
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1645,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-09.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "faq-copy",
+        "x": 0,
+        "y": 72,
+        "width": 823,
+        "height": 410
+      },
+      {
+        "name": "faq-product",
+        "x": 823,
+        "y": 72,
+        "width": 824,
+        "height": 410
+      },
+      {
+        "name": "closing-copy",
+        "x": 0,
+        "y": 482,
+        "width": 823,
+        "height": 448
+      },
+      {
+        "name": "closing-product",
+        "x": 823,
+        "y": 482,
+        "width": 824,
+        "height": 448
+      },
+      {
+        "name": "footer-copy",
+        "x": 0,
+        "y": 930,
+        "width": 823,
+        "height": 316
+      },
+      {
+        "name": "footer-product",
+        "x": 823,
+        "y": 930,
+        "width": 824,
+        "height": 316
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1647,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-10_1.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "coach-today-copy",
+        "x": 0,
+        "y": 72,
+        "width": 821,
+        "height": 657
+      },
+      {
+        "name": "coach-today-product",
+        "x": 821,
+        "y": 72,
+        "width": 822,
+        "height": 657
+      },
+      {
+        "name": "process-copy",
+        "x": 0,
+        "y": 729,
+        "width": 821,
+        "height": 512
+      },
+      {
+        "name": "process-product",
+        "x": 821,
+        "y": 729,
+        "width": 822,
+        "height": 512
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1643,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/coach-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  },
+  "2026-10-08_14-12_1.png": {
+    "coordinateSpace": "unchanged original sourceCrop and candidateClip; no pixel registration, rescaling, or threshold increase",
+    "regions": [
+      {
+        "name": "faq-copy",
+        "x": 0,
+        "y": 72,
+        "width": 824,
+        "height": 410
+      },
+      {
+        "name": "faq-product",
+        "x": 824,
+        "y": 72,
+        "width": 824,
+        "height": 410
+      },
+      {
+        "name": "closing-copy",
+        "x": 0,
+        "y": 482,
+        "width": 824,
+        "height": 448
+      },
+      {
+        "name": "closing-product",
+        "x": 824,
+        "y": 482,
+        "width": 824,
+        "height": 448
+      },
+      {
+        "name": "footer-copy",
+        "x": 0,
+        "y": 930,
+        "width": 824,
+        "height": 315
+      },
+      {
+        "name": "footer-product",
+        "x": 824,
+        "y": 930,
+        "width": 824,
+        "height": 315
+      }
+    ],
+    "excluded": [
+      {
+        "region": {
+          "x": 0,
+          "y": 0,
+          "width": 1648,
+          "height": 72
+        },
+        "reason": "Late owner-approved sticky matte Glass header; archive inner captures have no header.",
+        "ownerSource": "docs/design/references/product-v10-landing-approved/final-895/coach-dark-desktop-first-screen.png",
+        "ownerDirective": "TASK #895 FINAL VISUAL FIX P0-2, sticky/fixed and scroll states; owner approval FINAL_CORRECTION_VISUAL_DESIGN"
+      }
+    ]
+  }
+}

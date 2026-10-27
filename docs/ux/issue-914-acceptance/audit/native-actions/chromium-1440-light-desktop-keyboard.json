@@ -1,0 +1,15 @@
+{
+  "engine": "chromium",
+  "width": 1440,
+  "theme": "light",
+  "scene": "desktop-keyboard",
+  "box": {
+    "x": 380,
+    "y": 0,
+    "width": 680,
+    "height": 64
+  },
+  "outline": "2px",
+  "writes": [],
+  "status": "PASS"
+}

@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import type { Workout } from '../../../../src/shared/api/types';
 import {
   formatSetResult,
+  formatPlannedGroupKind,
+  formatPlannedSetRole,
   formatWorkoutDuration,
+  resolvePreviousSetValues,
   shouldCollapseCompletedExercise,
 } from '../../../../src/features/workouts/TodayWorkout';
+import type { ActiveWorkoutMutation } from '../../../../src/features/workouts/activeWorkoutQueue';
 
 describe('formatWorkoutDuration', () => {
   it('formats a workout shorter than one hour', () => {
@@ -46,5 +52,81 @@ describe('formatSetResult', () => {
     expect(formatSetResult(8, null)).toBe('8 повт.');
     expect(formatSetResult(null, 40)).toBe('40 кг');
     expect(formatSetResult(null, null)).toBeNull();
+  });
+});
+
+describe('structured workout labels', () => {
+  it('keeps accepted planned roles readable without flattening them into set kind', () => {
+    expect(formatPlannedSetRole('top')).toBe('Тяжёлый подход');
+    expect(formatPlannedSetRole('backoff')).toBe('Облегчённый подход');
+    expect(formatPlannedSetRole('mini_set')).toBe('Мини-сет');
+    expect(formatPlannedSetRole(null)).toBeNull();
+  });
+
+  it('shows an accepted advanced group only when the API provides one', () => {
+    expect(formatPlannedGroupKind('rest_pause')).toBe('Rest-pause');
+    expect(formatPlannedGroupKind('drop_chain')).toBe('Подход со снижением веса');
+    expect(formatPlannedGroupKind(undefined)).toBeNull();
+  });
+});
+
+describe('resolvePreviousSetValues', () => {
+  it('keeps nullable pending values instead of restoring stale server values', () => {
+    const set: Pick<
+      Workout['exercises'][number]['sets'][number],
+      'actual_reps' | 'actual_weight' | 'duration_minutes' | 'distance_km'
+    > = {
+      actual_reps: 8,
+      actual_weight: 40,
+      duration_minutes: 25,
+      distance_km: 5,
+    };
+    const pending: Pick<ActiveWorkoutMutation, 'values'> = {
+      values: {
+        actual_reps: null,
+        actual_weight: null,
+        duration_minutes: null,
+        distance_km: null,
+        is_completed: false,
+      },
+    };
+
+    expect(resolvePreviousSetValues(set, pending)).toEqual({
+      actual_reps: null,
+      actual_weight: null,
+      duration_minutes: null,
+      distance_km: null,
+    });
+    expect(resolvePreviousSetValues(set)).toMatchObject({
+      actual_reps: 8,
+      actual_weight: 40,
+      duration_minutes: 25,
+      distance_km: 5,
+    });
+  });
+});
+
+describe('active workout prefill layout', () => {
+  it('removes dismissed prefill actions from the layout flow', () => {
+    const styles = readFileSync('src/styles/react.css', 'utf8').replace(/\r\n/g, '\n');
+    const rule = styles.match(
+      /\.active-workout-set__prefill-actions\.is-hidden\s*\{([^}]*)\}/,
+    )?.[1];
+
+    expect(rule).toContain('display: none;');
+    expect(styles).toMatch(/\.active-workout-set__prefill-actions\s*\{[^}]*order: 1;/s);
+  });
+});
+
+describe('completed action layout', () => {
+  it('keeps completed actions on one compact touch-target row', () => {
+    const styles = readFileSync('src/styles/react.css', 'utf8').replace(/\r\n/g, '\n');
+
+    expect(styles).toMatch(
+      /\.active-workout-set__completed-actions\s*\{[^}]*display: grid;[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
+    );
+    expect(styles).toMatch(
+      /\.active-workout-set__completed-actions > \.ui-button\s*\{[^}]*min-height: 44px;[^}]*white-space: nowrap;/s,
+    );
   });
 });

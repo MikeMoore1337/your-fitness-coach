@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.notification import (
@@ -11,8 +12,16 @@ from fitminiapp_api.schemas.notification import (
     NotificationResponse,
     NotificationSettingResponse,
     NotificationSettingUpdate,
+    ReminderTemplateResponse,
+    ReminderTemplateUpdate,
+    WebPushConfigResponse,
+    WebPushStatusResponse,
+    WebPushSubscriptionDeleteRequest,
+    WebPushSubscriptionRequest,
+    WebPushSubscriptionResponse,
 )
 from fitminiapp_api.services.notifications import (
+    ManualNotificationScheduleError,
     create_manual_notification,
     delete_notification_for_user,
     get_or_create_settings,
@@ -21,8 +30,94 @@ from fitminiapp_api.services.notifications import (
     mark_notification_read,
     resolve_notification_destination,
 )
+from fitminiapp_api.services.reminder_templates import (
+    get_template_definition,
+    list_reminder_templates,
+    update_reminder_template,
+)
+from fitminiapp_api.services.web_push import (
+    WebPushDisabledError,
+    WebPushSubscriptionError,
+    has_registered_subscription,
+    register_subscription,
+    revoke_subscription,
+)
 
 router = APIRouter()
+
+
+@router.get("/web-push/config", response_model=WebPushConfigResponse)
+def get_web_push_config(
+    current_user: User = Depends(require_user),
+):
+    del current_user
+    return WebPushConfigResponse(
+        enabled=settings.web_push_enabled,
+        application_server_key=(
+            settings.web_push_vapid_public_key if settings.web_push_enabled else None
+        ),
+    )
+
+
+@router.get("/web-push/status", response_model=WebPushStatusResponse)
+def get_web_push_status(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return WebPushStatusResponse(
+        enabled=settings.web_push_enabled,
+        registered=has_registered_subscription(db, current_user),
+    )
+
+
+@router.post(
+    "/web-push/subscription",
+    response_model=WebPushSubscriptionResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "Web Push is disabled or not configured"
+        }
+    },
+)
+def register_web_push_subscription(
+    payload: WebPushSubscriptionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        register_subscription(
+            db,
+            current_user,
+            endpoint=payload.endpoint,
+            p256dh=payload.keys.p256dh,
+            auth=payload.keys.auth,
+        )
+        db.commit()
+    except WebPushDisabledError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Уведомления браузера сейчас недоступны",
+        ) from exc
+    except WebPushSubscriptionError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Недопустимая подписка браузера",
+        ) from exc
+    return WebPushSubscriptionResponse(status="registered")
+
+
+@router.delete("/web-push/subscription", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_web_push_subscription(
+    payload: WebPushSubscriptionDeleteRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    revoke_subscription(db, current_user, payload.endpoint)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _settings_response(settings, user: User) -> NotificationSettingResponse:
@@ -30,6 +125,9 @@ def _settings_response(settings, user: User) -> NotificationSettingResponse:
         workout_reminders_enabled=settings.workout_reminders_enabled,
         weekly_check_in_reminders_enabled=settings.weekly_check_in_reminders_enabled,
         measurement_reminders_enabled=settings.measurement_reminders_enabled,
+        meal_reminders_enabled=settings.meal_reminders_enabled,
+        hydration_reminders_enabled=settings.hydration_reminders_enabled,
+        movement_reminders_enabled=settings.movement_reminders_enabled,
         telegram_enabled=settings.telegram_enabled,
         telegram_linked=user.telegram_user_id is not None,
         reminder_hour=settings.reminder_hour,
@@ -89,6 +187,9 @@ def update_notification_settings(
         "workout_reminders_enabled",
         "weekly_check_in_reminders_enabled",
         "measurement_reminders_enabled",
+        "meal_reminders_enabled",
+        "hydration_reminders_enabled",
+        "movement_reminders_enabled",
         "telegram_enabled",
         "reminder_hour",
         "quiet_hours_start",
@@ -99,6 +200,30 @@ def update_notification_settings(
     db.commit()
     db.refresh(settings)
     return _settings_response(settings, current_user)
+
+
+@router.get("/templates", response_model=list[ReminderTemplateResponse])
+def get_reminder_templates(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_settings(db, current_user)
+    return list_reminder_templates(db, current_user, settings)
+
+
+@router.patch("/templates/{template_key}", response_model=ReminderTemplateResponse)
+def patch_reminder_template(
+    template_key: str,
+    payload: ReminderTemplateUpdate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        get_template_definition(template_key)
+        settings = get_or_create_settings(db, current_user)
+        return update_reminder_template(db, current_user, settings, template_key, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("", response_model=list[NotificationResponse])
@@ -132,13 +257,16 @@ def create_notification(
     if not body:
         raise HTTPException(status_code=400, detail="body обязателен")
 
-    row = create_manual_notification(
-        db,
-        current_user,
-        title=title,
-        body=body,
-        scheduled_for=payload.scheduled_for,
-    )
+    try:
+        row = create_manual_notification(
+            db,
+            current_user,
+            title=title,
+            body=body,
+            scheduled_for=payload.scheduled_for,
+        )
+    except ManualNotificationScheduleError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _notification_response(row)
 
 

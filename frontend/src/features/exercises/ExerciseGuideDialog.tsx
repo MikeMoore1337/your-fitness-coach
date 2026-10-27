@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
-import type { Exercise } from '../../shared/api/types';
+import type { Exercise, ExerciseHistory } from '../../shared/api/types';
 import { Badge, CloseIcon, ErrorState, LoadingState } from '../../shared/ui/common';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideMedia } from './ExerciseGuideMedia';
+import { ExerciseProgressPanel } from './ExerciseProgressPanel';
+import { knownEquipmentLabel, localizedEquipmentDisplayLabel } from '../../shared/equipmentLabels';
 
 const difficultyLabels: Record<Exercise['difficulty_level'], string> = {
   beginner: 'Начальный уровень',
@@ -38,6 +40,10 @@ export function ExerciseGuideDialog({
     queryKey: ['exercises', currentExercise.id, 'details'],
     queryFn: () => api<Exercise>(`/api/v1/programs/exercises/${currentExercise.id}`),
   });
+  const history = useQuery({
+    queryKey: ['exercises', currentExercise.id, 'history'],
+    queryFn: () => api<ExerciseHistory>(`/api/v1/programs/exercises/${currentExercise.id}/history`),
+  });
   const guide = details.data?.guide;
   const primaryMuscles = useMemo(
     () => guide?.muscles.filter((muscle) => muscle.role_id === 'primary') ?? [],
@@ -48,6 +54,10 @@ export function ExerciseGuideDialog({
     [guide?.muscles],
   );
   const alternatives = guide?.alternatives ?? details.data?.alternatives ?? [];
+  const equipmentLabel = localizedEquipmentDisplayLabel(
+    details.data?.equipment_ids,
+    details.data?.equipment,
+  );
 
   const openAlternative = (alternative: (typeof alternatives)[number]) => {
     setMediaExpanded(false);
@@ -65,7 +75,7 @@ export function ExerciseGuideDialog({
     >
       <div className="modal__backdrop" aria-hidden="true" onClick={onClose} />
       <div className="modal__panel card exercise-guide-modal__panel" ref={panelRef} tabIndex={-1}>
-        <div className="exercise-guide-modal__head">
+        <div data-glass="" data-glass-variant="regular" className="exercise-guide-modal__head">
           <div>
             <span className="eyebrow">Карточка упражнения</span>
             <h2 className="modal__title" id="exercise-guide-title" aria-live="polite">
@@ -99,6 +109,11 @@ export function ExerciseGuideDialog({
 
               {guide?.media.length ? (
                 <ExerciseGuideMedia items={guide.media} onExpandedChange={setMediaExpanded} />
+              ) : guide ? (
+                <section className="exercise-guide-media-empty" aria-label="Изображение упражнения">
+                  <strong>Изображение пока недоступно</strong>
+                  <p>Для этого упражнения нет проверенного визуального материала.</p>
+                </section>
               ) : null}
 
               {guide ? (
@@ -188,16 +203,18 @@ export function ExerciseGuideDialog({
                   </section>
                 )}
 
-                {(guide?.equipment.length || details.data.equipment) && (
+                {(guide?.equipment.length || equipmentLabel) && (
                   <section className="exercise-guide-section" aria-labelledby="guide-equipment">
                     <h3 id="guide-equipment">Оборудование</h3>
                     <div className="toolbar wrap">
                       {guide?.equipment.length ? (
                         guide.equipment.map((item) => (
-                          <Badge key={item.identifier}>{item.name}</Badge>
+                          <Badge key={item.identifier}>
+                            {knownEquipmentLabel(item.identifier) ?? item.name}
+                          </Badge>
                         ))
                       ) : (
-                        <Badge>{details.data.equipment}</Badge>
+                        <Badge>{equipmentLabel}</Badge>
                       )}
                     </div>
                   </section>
@@ -217,6 +234,12 @@ export function ExerciseGuideDialog({
                   </section>
                 )}
               </div>
+
+              <ExerciseProgressPanel
+                data={history.data}
+                error={history.error instanceof Error ? history.error : null}
+                isLoading={history.isLoading}
+              />
 
               {!!alternatives.length && (
                 <section className="exercise-guide-section exercise-guide-alternatives">

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { ExternalFood, Food, FoodBarcodeLookup } from '../../shared/api/types';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { Button, Field, Input, LoadingState } from '../../shared/ui/common';
-import { isValidGtin } from './FoodEditor';
 import { startBarcodeScanner, type BarcodeScannerSession } from './barcodeScanner';
+import { isValidGtin } from './nutritionFoodUtils';
 
 const TOUCH_CAMERA_QUERY = '(hover: none) and (pointer: coarse)';
 const documentIsHidden = () => document.visibilityState === 'hidden';
@@ -49,9 +50,11 @@ function ExternalBarcodeResult({ food }: { food: ExternalFood }) {
 
 export function BarcodeLookup({
   onCreate,
+  onScanLabel,
   onSelect,
 }: {
   onCreate: (barcode: string) => void;
+  onScanLabel?: (barcode: string) => void;
   onSelect: (food: Food) => void;
 }) {
   const [barcode, setBarcode] = useState('');
@@ -108,6 +111,26 @@ export function BarcodeLookup({
   const lookup = useMutation({
     mutationFn: (value: string) =>
       api<FoodBarcodeLookup>(`/api/v1/nutrition/foods/barcode/${value}`),
+    onSuccess: (response) => {
+      trackProductEvent({
+        name:
+          response.local_item || response.external_item
+            ? 'nutrition_label_scan_barcode_hit'
+            : 'nutrition_label_scan_barcode_miss',
+        surface: productEventSurface(),
+      });
+      if (response.source === 'local') {
+        trackProductEvent({
+          name: 'yfc_food_catalog_local_hit',
+          surface: productEventSurface(),
+        });
+      } else if (response.source === 'external') {
+        trackProductEvent({
+          name: 'yfc_food_catalog_external_fallback',
+          surface: productEventSurface(),
+        });
+      }
+    },
   });
   const submitBarcode = (value: string) => {
     const normalized = value.replace(/\s+/g, '');
@@ -307,9 +330,23 @@ export function BarcodeLookup({
             })}{' '}
             ккал / 100 г
           </span>
-          <Button type="button" onClick={() => onSelect(result.local_item!)}>
-            Выбрать продукт
-          </Button>
+          {result.local_item.canonical_complete === false && (
+            <span>Карточка заполнена не полностью — сверить данные можно по фото этикетки.</span>
+          )}
+          <div className="nutrition-barcode__result-actions">
+            {result.local_item.canonical_complete === false && onScanLabel && (
+              <Button type="button" onClick={() => onScanLabel(result.barcode)}>
+                Распознать по фото
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant={result.local_item.canonical_complete === false ? 'secondary' : 'primary'}
+              onClick={() => onSelect(result.local_item!)}
+            >
+              Выбрать продукт
+            </Button>
+          </div>
         </div>
       )}
       {result?.status === 'found' && result.external_item && (
@@ -326,9 +363,16 @@ export function BarcodeLookup({
           <span>
             {providerFallback || 'Проверьте код или добавьте продукт по данным с упаковки.'}
           </span>
-          <Button type="button" variant="secondary" onClick={() => onCreate(result.barcode)}>
-            Создать свой продукт
-          </Button>
+          <div className="nutrition-barcode__result-actions">
+            {onScanLabel && (
+              <Button type="button" onClick={() => onScanLabel(result.barcode)}>
+                Распознать по фото
+              </Button>
+            )}
+            <Button type="button" variant="secondary" onClick={() => onCreate(result.barcode)}>
+              Создать свой продукт
+            </Button>
+          </div>
         </div>
       )}
     </div>

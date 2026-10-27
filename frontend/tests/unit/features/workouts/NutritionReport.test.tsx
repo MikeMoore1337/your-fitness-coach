@@ -151,6 +151,9 @@ function makeReport(): NutritionReport {
       calorie_tolerance_evaluated_days: 3,
       days_meeting_protein_target: 1,
       protein_target_evaluated_days: 3,
+      exact_entry_count: 0,
+      approximate_entry_count: 0,
+      partial_entry_count: 0,
     },
     daily: days,
     target_changes: [
@@ -205,12 +208,32 @@ describe('NutritionPeriodReport', () => {
     renderReport();
 
     expect(await screen.findByText('Заполнено 3 из 7 дней')).toBeVisible();
+    const targetHistory = document.querySelector('.nutrition-report-target-history');
+    const targetHistorySummary = targetHistory?.querySelector('summary');
+    expect(targetHistory).not.toHaveAttribute('open');
+    expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('Дни периода: 7')).toBeVisible();
+    const days = document.querySelector('.nutrition-report-days');
+    const daysSummary = days?.querySelector('summary');
+    expect(days).not.toHaveAttribute('open');
+    expect(daysSummary).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(daysSummary!);
+    expect(days).toHaveAttribute('open');
+    await waitFor(() => expect(daysSummary).toHaveAttribute('aria-expanded', 'true'));
     expect(
       screen.getByText('Средние значения рассчитаны только по заполненным дням.'),
     ).toBeVisible();
     expect(screen.getByRole('img', { name: /Калории по дням за период/ })).toBeVisible();
     expect(screen.getByText(/Точки — фактические значения/)).toBeVisible();
+    fireEvent.click(screen.getByText('История целей питания'));
     expect(screen.getByText('Принятая адаптация')).toBeVisible();
+    const targetChange = document.querySelector('.nutrition-report-targets ol li');
+    expect(
+      targetChange?.querySelector('.nutrition-report-targets__mobile-label')?.textContent,
+    ).toBe('Дата');
+    expect(targetChange?.querySelectorAll('.nutrition-report-targets__value')).toHaveLength(2);
+    expect(targetChange?.textContent).toContain('Калории');
+    expect(targetChange?.textContent).toContain('Б / Ж / У');
     expect(screen.getAllByText('Новая цель').length).toBeGreaterThan(0);
     expect(screen.getByText('2 из 3')).toBeVisible();
     expect(screen.getByText('1 из 3')).toBeVisible();
@@ -274,6 +297,8 @@ describe('NutritionPeriodReport', () => {
       'href',
       '/app?section=nutrition',
     );
+    fireEvent.click(screen.getByText('История целей питания'));
+    expect(screen.getByText('За выбранный период изменений целей питания не было.')).toBeVisible();
   });
 
   it('uses the managed-client endpoint without linking into the trainer diary', async () => {
@@ -286,5 +311,57 @@ describe('NutritionPeriodReport', () => {
       expect.anything(),
     );
     expect(screen.queryByRole('link', { name: /Открыть дневник/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('NutritionReport optional fiber and evidence insights', () => {
+  it('shows an informative fiber average and historical fact without inventing a target', async () => {
+    const report = makeReport();
+    report.summary.fiber_g = { average: 7.5, minimum: 5, maximum: 10, sample_days: 2 };
+    report.daily = report.daily.map((day, index) => (index === 0 ? { ...day, fiber_g: 10 } : day));
+    report.insights = [
+      {
+        metric: 'protein_g',
+        direction: 'below',
+        evaluated_days: 4,
+        deviation_days: 3,
+        average_deviation: -30,
+        action_code: 'open_meal_suggestions',
+        message: 'В 3 из 4 подтверждённых дней белка было меньше цели.',
+      },
+    ];
+    installApi(report);
+    renderReport();
+
+    expect(await screen.findByText('Клетчатка')).toBeVisible();
+    expect(screen.getByText('по 2 дн. с известными данными')).toBeVisible();
+    // The compact day card starts collapsed. Details remain available after opening it.
+    fireEvent.click(screen.getByText('Дни периода: 7'));
+    expect(screen.getByText('Клетчатка: 10 г')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Повторяющиеся отклонения' })).toBeVisible();
+    expect(screen.getByText('В 3 из 4 подтверждённых дней белка было меньше цели.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Открыть питание' })).toHaveAttribute(
+      'href',
+      '/app?section=nutrition',
+    );
+  });
+
+  it('does not reveal a client diary link to a trainer', async () => {
+    const report = makeReport();
+    report.insights = [
+      {
+        metric: 'calories',
+        direction: 'above',
+        evaluated_days: 4,
+        deviation_days: 4,
+        average_deviation: 200,
+        action_code: 'review_portions',
+        message: 'Проверьте историю порций.',
+      },
+    ];
+    installApi(report);
+    renderReport(73);
+    expect(await screen.findByText('Проверьте историю порций.')).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Открыть питание' })).not.toBeInTheDocument();
   });
 });

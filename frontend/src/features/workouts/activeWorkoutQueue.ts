@@ -8,6 +8,7 @@ import {
   legacyWorkoutPendingStorageKey,
   legacyWorkoutSetStorageKey,
 } from '../../shared/userScopedStorage';
+import { getApiRuntime } from '../../shared/runtime/runtime';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 
@@ -44,12 +45,21 @@ export interface ActiveWorkoutQueue {
   workout_snapshot?: Workout;
 }
 
+function runtimeStorageKey(key: string): string {
+  const runtime = getApiRuntime();
+  return runtime.kind === 'demo' ? `fit-demo:${runtime.sessionToken}:${key}` : key;
+}
+
+function activeWorkoutPointerKey(userId: number): string {
+  return runtimeStorageKey(activeWorkoutPointerStorageKey(userId));
+}
+
 type StoredActiveWorkoutQueue = Omit<ActiveWorkoutQueue, 'schema_version'> & {
   schema_version: number;
 };
 
 export function activeWorkoutQueueKey(userId: number, workoutId: number): string {
-  return activeWorkoutQueueStorageKey(userId, workoutId);
+  return runtimeStorageKey(activeWorkoutQueueStorageKey(userId, workoutId));
 }
 
 export function activeWorkoutLockName(userId: number, workoutId: number): string {
@@ -57,7 +67,7 @@ export function activeWorkoutLockName(userId: number, workoutId: number): string
 }
 
 export function activeWorkoutRestKey(userId: number, workoutId: number): string {
-  return activeWorkoutRestStorageKey(userId, workoutId);
+  return runtimeStorageKey(activeWorkoutRestStorageKey(userId, workoutId));
 }
 
 export function emptyActiveWorkoutQueue(userId: number, workoutId: number): ActiveWorkoutQueue {
@@ -385,7 +395,7 @@ export function clearActiveWorkoutDataForUser(userId: number): void {
     for (const key of keys) {
       if (key && prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
     }
-    localStorage.removeItem(activeWorkoutPointerStorageKey(userId));
+    localStorage.removeItem(activeWorkoutPointerKey(userId));
   } catch {
     // Storage is optional in restrictive webviews.
   }
@@ -418,7 +428,7 @@ export function saveActiveWorkoutSnapshot(
   workout: Workout,
 ): ActiveWorkoutQueue | undefined {
   if (workout.status !== 'in_progress') return undefined;
-  const pointerKey = activeWorkoutPointerStorageKey(userId);
+  const pointerKey = activeWorkoutPointerKey(userId);
   try {
     const previousWorkoutId = Number(localStorage.getItem(pointerKey));
     if (
@@ -482,7 +492,7 @@ export function saveActiveWorkoutSnapshot(
 
 export function loadCurrentActiveWorkoutSnapshot(userId: number): Workout | undefined {
   try {
-    const pointerKey = activeWorkoutPointerStorageKey(userId);
+    const pointerKey = activeWorkoutPointerKey(userId);
     const workoutId = Number(localStorage.getItem(pointerKey));
     if (!Number.isInteger(workoutId) || workoutId <= 0) {
       localStorage.removeItem(pointerKey);
@@ -498,7 +508,7 @@ export function clearActiveWorkoutData(userId: number, workoutId: number): void 
   try {
     localStorage.removeItem(activeWorkoutQueueKey(userId, workoutId));
     localStorage.removeItem(activeWorkoutRestKey(userId, workoutId));
-    const pointerKey = activeWorkoutPointerStorageKey(userId);
+    const pointerKey = activeWorkoutPointerKey(userId);
     if (localStorage.getItem(pointerKey) === String(workoutId)) localStorage.removeItem(pointerKey);
   } catch {
     // Storage is optional in restrictive webviews.

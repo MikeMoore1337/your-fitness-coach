@@ -3,6 +3,21 @@ import { apiFile } from '../api/client';
 
 const AVATAR_EMOJIS = ['🏋️', '💪', '🏃', '🚴', '🥗', '⚡', '🎯', '🔥'] as const;
 
+function avatarSource(value: string | null | undefined, allowBlob = false): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const source = url.href;
+    if (source.startsWith('https://') || source.startsWith('http://')) return source;
+    if (allowBlob && source.startsWith('blob:') && url.origin === window.location.origin) {
+      return source;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function avatarFallback(name: string): string {
   const hash = Array.from(name.trim()).reduce(
     (value, character) => (value * 31 + (character.codePointAt(0) ?? 0)) >>> 0,
@@ -57,12 +72,13 @@ export function AccountAvatar({
 
   const customUrl =
     privateAvatar && privateAvatar.version === customAvatarVersion ? privateAvatar.url : null;
-  const privateUrl = previewUrl || customUrl || null;
+  const privateUrl = avatarSource(previewUrl, true) || avatarSource(customUrl, true);
+  const providerUrl = avatarSource(photoUrl);
   const selectedUrl =
     privateUrl && !failedPhotoUrls.has(privateUrl)
       ? privateUrl
-      : photoUrl && !failedPhotoUrls.has(photoUrl)
-        ? photoUrl
+      : providerUrl && !failedPhotoUrls.has(providerUrl)
+        ? providerUrl
         : null;
 
   return (

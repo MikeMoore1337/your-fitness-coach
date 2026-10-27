@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
-import type { WorkoutProgress, WorkoutTimelineItem } from '../../shared/api/types';
+import type {
+  TrainingAnalytics,
+  WeeklyCheckInHistory,
+  WorkoutProgress,
+  WorkoutTimelineItem,
+} from '../../shared/api/types';
 import { queryKeys } from '../../shared/queryKeys';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import {
   Badge,
+  Button,
   DisclosureIcon,
   EmptyState,
   ErrorState,
@@ -13,8 +19,10 @@ import {
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput, TimeInput } from '../../shared/ui/PickerInput';
+import { Icon } from '../../shared/ui/Icon';
 import { WorkoutFeedbackDisclosure } from '../workouts/WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from '../workouts/WorkoutCompletionSummary';
+import { MuscleWorkloadList } from '../workouts/MuscleWorkload';
 
 function formatDate(value: string): string {
   return new Date(`${value}T12:00:00`).toLocaleDateString('ru-RU', {
@@ -74,21 +82,42 @@ export function ClientAnalytics({
   clientId,
   clientName,
   canComment = true,
+  canSchedule = true,
+  focusedCheckIn = false,
+  focusedWorkoutId = null,
 }: {
   clientId: number;
   clientName: string;
   canComment?: boolean;
+  canSchedule?: boolean;
+  focusedCheckIn?: boolean;
+  focusedWorkoutId?: number | null;
 }) {
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
+  const [showTrainingWorkload, setShowTrainingWorkload] = useState(false);
   const progress = useQuery({
     queryKey: queryKeys.trainer.clientAnalytics(clientId),
     queryFn: () => api<WorkoutProgress>(`/api/v1/coach/clients/${clientId}/analytics`),
   });
   const timeline = useQuery({
-    queryKey: ['coach', 'client', clientId, 'workouts'],
+    queryKey: queryKeys.trainer.clientWorkouts(clientId),
     queryFn: () =>
       api<WorkoutTimelineItem[]>(`/api/v1/coach/clients/${clientId}/workouts?limit=30`),
+  });
+  const trainingAnalytics = useQuery({
+    queryKey: queryKeys.trainer.clientTrainingAnalytics(clientId),
+    queryFn: () =>
+      api<TrainingAnalytics>(`/api/v1/coach/clients/${clientId}/training-analytics?period_days=30`),
+    enabled: showTrainingWorkload,
+    retry: false,
+  });
+  const checkIns = useQuery({
+    queryKey: queryKeys.trainer.clientCheckIns(clientId),
+    queryFn: () =>
+      api<WeeklyCheckInHistory>(`/api/v1/coach/clients/${clientId}/weekly-check-ins?limit=1`),
+    enabled: focusedCheckIn,
+    retry: false,
   });
   const scheduleMutation = useMutation({
     mutationFn: ({ workoutId, date, time }: { workoutId: number; date: string; time: string }) =>
@@ -106,8 +135,57 @@ export function ClientAnalytics({
     onError: (reason) => toast((reason as Error).message, 'error'),
   });
 
+  useEffect(() => {
+    if (!focusedWorkoutId || !timeline.data) return;
+    const details = document.getElementById(`coach-workout-${focusedWorkoutId}`);
+    if (!(details instanceof HTMLDetailsElement)) return;
+    details.open = true;
+    details.scrollIntoView({ block: 'start' });
+  }, [focusedWorkoutId, timeline.data]);
+
+  const checkIn = checkIns.data?.items?.[0];
+
   return (
     <div className="stack">
+      {focusedCheckIn && (
+        <section className="coach-weekly-check-in" aria-labelledby="coach-weekly-check-in-title">
+          <h3 id="coach-weekly-check-in-title">Недельный итог клиента</h3>
+          {checkIns.isLoading ? (
+            <LoadingState label="Загружаем недельный итог…" />
+          ) : checkIns.error ? (
+            <ErrorState
+              message="Не удалось загрузить недельный итог. Остальные данные клиента доступны."
+              retry={() => void checkIns.refetch()}
+            />
+          ) : !checkIn ? (
+            <EmptyState title="Недельный итог не найден" />
+          ) : (
+            <div className="coach-weekly-check-in__content">
+              <p className="muted">
+                {formatDate(checkIn.week_start)} — {formatDate(checkIn.week_end)}
+              </p>
+              <div className="metric-grid">
+                <div className="metric">
+                  <span>Тренировки</span>
+                  <strong>
+                    {checkIn.summary.training.completed_workouts} из{' '}
+                    {checkIn.summary.training.planned_workouts}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <span>Объём</span>
+                  <strong>{Math.round(checkIn.summary.progression.training_volume_kg)} кг</strong>
+                </div>
+                <div className="metric">
+                  <span>Новые результаты</span>
+                  <strong>{checkIn.summary.progression.new_personal_records}</strong>
+                </div>
+              </div>
+              {checkIn.note && <p className="coach-weekly-check-in__note">{checkIn.note}</p>}
+            </div>
+          )}
+        </section>
+      )}
       {progress.isLoading ? (
         <LoadingState label="Считаем показатели…" />
       ) : progress.error ? (
@@ -145,6 +223,41 @@ export function ClientAnalytics({
               {progress.data.workouts_missed}.
             </p>
           )}
+          <section
+            className="coach-client-training-workload"
+            aria-labelledby="coach-training-workload-title"
+          >
+            <div className="measurement-diary__header">
+              <div>
+                <h3 id="coach-training-workload-title">Распределение нагрузки</h3>
+                <p>Факты за 30 дней и сравнение с предыдущим равным периодом.</p>
+              </div>
+              {!showTrainingWorkload && (
+                <Button
+                  aria-expanded={false}
+                  variant="secondary"
+                  onClick={() => setShowTrainingWorkload(true)}
+                >
+                  Показать данные
+                  <Icon name="chevron-down" size={16} />
+                </Button>
+              )}
+            </div>
+            {showTrainingWorkload && (
+              <>
+                {trainingAnalytics.isLoading ? (
+                  <LoadingState label="Загружаем распределение нагрузки…" />
+                ) : trainingAnalytics.error ? (
+                  <ErrorState
+                    message="Не удалось загрузить распределение нагрузки. Остальные данные клиента доступны."
+                    retry={() => void trainingAnalytics.refetch()}
+                  />
+                ) : trainingAnalytics.data ? (
+                  <MuscleWorkloadList analytics={trainingAnalytics.data} />
+                ) : null}
+              </>
+            )}
+          </section>
           {!!progress.data.personal_records.length && (
             <div>
               <h3>Лучшие результаты</h3>
@@ -180,8 +293,12 @@ export function ClientAnalytics({
         ) : (
           <div className="list-grid top-gap">
             {timeline.data.map((workout) => (
-              <details className="card compact-disclosure" key={workout.id}>
-                <summary>
+              <details
+                className="card compact-disclosure"
+                id={`coach-workout-${workout.id}`}
+                key={workout.id}
+              >
+                <summary className="yfc-disclosure-summary">
                   <span>
                     <strong>{workout.title}</strong>
                     <small>
@@ -195,7 +312,7 @@ export function ClientAnalytics({
                   <DisclosureIcon />
                 </summary>
                 <div className="stack top-gap">
-                  {workout.status === 'planned' && (
+                  {workout.status === 'planned' && canSchedule && (
                     <CoachScheduleForm
                       workout={workout}
                       pending={

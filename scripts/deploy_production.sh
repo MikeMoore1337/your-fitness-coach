@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly EXPECTED_ROOT="/root/fit-mini-app"
+readonly EXPECTED_ROOT="${DEPLOY_ROOT:-$(pwd -P)}"
+readonly DEPLOY_STATE_ROOT="${DEPLOY_STATE_ROOT:-$EXPECTED_ROOT/.artifacts/operations/deployments}"
+readonly NUTRITION_LABEL_SCAN_ROLLOUT_MARKER="$DEPLOY_STATE_ROOT/nutrition-label-scan-task-128I-configured.json"
 readonly TARGET_SHA="${1:?usage: deploy_production.sh TARGET_SHA BASE_URL}"
 readonly BASE_URL="${2:?usage: deploy_production.sh TARGET_SHA BASE_URL}"
 readonly PUBLIC_BASE_URL="${3:-https://your-fitness-coach.ru}"
@@ -48,8 +50,13 @@ if [[ "$(pwd -P)" != "$EXPECTED_ROOT" ]]; then
   exit 1
 fi
 
-if [[ ! -d .git ]]; then
-  echo "$EXPECTED_ROOT is not a Git checkout" >&2
+if [[ ! -f .deployment-sha ]]; then
+  echo "$EXPECTED_ROOT/.deployment-sha is missing; immutable bundle provenance is unavailable" >&2
+  exit 1
+fi
+
+if [[ "$(tr -d '\r\n' < .deployment-sha)" != "$TARGET_SHA" ]]; then
+  echo "Immutable bundle marker does not match requested revision $TARGET_SHA" >&2
   exit 1
 fi
 
@@ -72,11 +79,14 @@ require_digest_ref POSTGRES_IMAGE
 require_digest_ref CADDY_IMAGE
 require_digest_ref CLOUDFLARED_IMAGE
 
-readonly CURRENT_SHA="$(git rev-parse HEAD)"
-if [[ "$CURRENT_SHA" != "$TARGET_SHA" ]]; then
-  echo "Checked-out revision $CURRENT_SHA does not match requested revision $TARGET_SHA" >&2
-  exit 1
+# A separate read-only gate must pass BEFORE any configuration-file or runtime
+# mutation. The deployment orchestrator independently rechecks at its stage.
+echo "Checking trusted PostgreSQL capacity before production configuration changes"
+capacity_command=capacity-check
+if [[ "$ROLLOUT_MODE" == "single-slot" ]]; then
+  capacity_command=capacity-check-single-slot
 fi
+python3 scripts/zero_downtime_deploy.py "$capacity_command" "$TARGET_SHA" "$BASE_URL" "$PUBLIC_BASE_URL"
 
 echo "Enabling browser OAuth and keeping email registration disabled"
 python3 scripts/configure_production_auth.py .env
@@ -86,6 +96,15 @@ python3 scripts/configure_production_food_search.py .env
 
 echo "Normalizing the production news image provider"
 python3 scripts/normalize_production_news_image_provider.py .env
+
+echo "Applying the production AI Coach runtime config with the user UI hidden"
+python3 scripts/configure_production_ai_coach.py .env
+
+echo "Applying the one-time Task 128I Nutrition Label rollout configuration"
+python3 scripts/configure_production_nutrition_label_scan.py .env "$NUTRITION_LABEL_SCAN_ROLLOUT_MARKER"
+
+echo "Ensuring the bounded production journald policy before rollout"
+python3 scripts/configure_production_log_retention.py --revision "$TARGET_SHA"
 
 echo "Validating Compose configuration for $TARGET_SHA"
 docker compose config --quiet
@@ -112,6 +131,14 @@ case "$ROLLOUT_MODE" in
     exit 1
     ;;
 esac
+
+echo "Rechecking production journald after rollout"
+python3 scripts/configure_production_log_retention.py --revision "$TARGET_SHA"
+
+echo "Verifying bounded logging for active YFC application containers"
+python3 scripts/configure_production_log_retention.py \
+  --verify-application-logs \
+  --revision "$TARGET_SHA"
 
 echo "Checking the public Telegram bot profile"
 set +e

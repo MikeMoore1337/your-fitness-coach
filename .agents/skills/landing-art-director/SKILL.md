@@ -125,6 +125,14 @@ Mobile Landing проектируется отдельно, а не станов
 - no horizontal overflow;
 - media/motion budget проверяется отдельно.
 
+## Apple / Liquid Glass reference
+
+Если Landing task использует Apple-like materials, Liquid Glass controls, native-feel interactions
+или физичный gesture/motion language, подключай `$apple-design` как reference.
+
+Не превращай Landing в Apple clone: YFC sport-tech identity, lime/black/white core, storytelling и
+product truth остаются главными.
+
 ## Motion
 
 Landing может быть выразительнее authenticated product.
@@ -147,3 +155,11 @@ Landing может быть выразительнее authenticated product.
 - `$frontend-engineer` - production implementation;
 - `$ui-audit` - rendered quality;
 - `$seo-auditor`/`$performance-engineer` - при соответствующем scope.
+
+## Внешние справочники для отдельного visual exploration
+
+После явного owner-approved исследования могут использоваться
+`../../references/external-quality/taste/redesign-existing-projects.md` и
+`../../references/external-quality/ui-ux-pro-max/quick-reference.md`.
+Они не заменяют sport-tech, фирменный стиль и обязательное визуальное согласование.
+См. `../../../docs/development/external-ui-quality-skills.md`.

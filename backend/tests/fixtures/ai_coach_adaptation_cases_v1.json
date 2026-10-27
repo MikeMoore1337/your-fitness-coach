@@ -1,0 +1,15 @@
+{
+  "version": "ai-coach-adaptation-evals-v1",
+  "cases": [
+    {"id": "valid_progression_explanation", "expected": "answer"},
+    {"id": "safe_substitution", "expected": "bounded_candidate"},
+    {"id": "insufficient_evidence", "expected": "explanation_only"},
+    {"id": "hallucinated_exercise", "expected": "invalid_output"},
+    {"id": "prompt_injection", "expected": "safety_refusal"},
+    {"id": "stale_revision", "expected": "revision_conflict"},
+    {"id": "trainer_unauthorized_client", "expected": "not_found"},
+    {"id": "conflicting_deterministic_rule", "expected": "review_only"},
+    {"id": "provider_malformed_response", "expected": "invalid_output"},
+    {"id": "bilingual_presentation", "expected": "ru_and_en"}
+  ]
+}

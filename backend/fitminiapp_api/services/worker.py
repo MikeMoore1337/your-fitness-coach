@@ -18,18 +18,32 @@ from sqlalchemy.orm import Session
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.logging_config import configure_logging
 from fitminiapp_api.db.session import get_session_context
-from fitminiapp_api.models.notification import Notification, NotificationSetting
+from fitminiapp_api.models.notification import (
+    Notification,
+    NotificationDelivery,
+    NotificationSetting,
+    WebPushSubscription,
+)
 from fitminiapp_api.models.user import User
 from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery
 from fitminiapp_api.services.account_exports import prune_account_exports
 from fitminiapp_api.services.audit import prune_audit_events
 from fitminiapp_api.services.bot_support import prune_support_cases
+from fitminiapp_api.services.lifecycle_milestones import prune_lifecycle_milestones
+from fitminiapp_api.services.news_ingestion import utcnow
+from fitminiapp_api.services.news_review_schedule import current_news_review_slot
 from fitminiapp_api.services.news_worker import run_news_pipeline_once
 from fitminiapp_api.services.notifications import (
+    MAX_DELIVERY_ATTEMPTS,
     NotificationDeliveryError,
+    cancel_web_push_delivery,
     claim_due_notifications,
+    claim_due_web_push_deliveries,
+    enqueue_web_push_deliveries,
     mark_delivery_failed,
     mark_delivery_succeeded,
+    mark_web_push_delivery_failed,
+    mark_web_push_delivery_succeeded,
     neutral_telegram_text,
     quiet_hours_retry_at,
     reminder_category_enabled,
@@ -40,6 +54,13 @@ from fitminiapp_api.services.notifications import (
     sync_workout_reminders,
     validate_notification_destination,
 )
+from fitminiapp_api.services.program_imports import expire_program_imports
+from fitminiapp_api.services.reminder_templates import sync_contextual_reminders
+from fitminiapp_api.services.telegram_transport import (
+    TelegramPublicationError,
+    telegram_transport_options,
+)
+from fitminiapp_api.services.web_push import send_web_push
 from fitminiapp_api.services.weekly_digest import (
     claim_due_digest_deliveries,
     digest_delivery_counts,
@@ -59,22 +80,6 @@ WORKER_HEARTBEAT_PATH = Path("/tmp/fitminiapp-worker-heartbeat")
 class TelegramPublicationResult:
     message_id: int
     message_date: datetime
-
-
-class TelegramPublicationError(RuntimeError):
-    def __init__(
-        self,
-        code: str,
-        *,
-        retry_after: timedelta | None = None,
-        terminal: bool = False,
-        uncertain: bool = False,
-    ) -> None:
-        super().__init__(code)
-        self.code = code
-        self.retry_after = retry_after
-        self.terminal = terminal
-        self.uncertain = uncertain
 
 
 class TelegramRateLimiter:
@@ -154,26 +159,56 @@ def _telegram_delivery_error(response: httpx.Response) -> NotificationDeliveryEr
     return NotificationDeliveryError(f"telegram_http_status:{error_code}")
 
 
-def telegram_transport_options() -> dict[str, object]:
-    """Return an explicit Bot API route without inheriting ambient proxy settings."""
-
-    options: dict[str, object] = {"trust_env": False}
-    if settings.bot_api_proxy_url:
-        options["proxy"] = settings.bot_api_proxy_url
-    return options
-
-
-def _log_delivery_failure(notification_id: int, error: Exception) -> None:
+def _log_delivery_failure(
+    notification_id: int,
+    error: Exception,
+    *,
+    provider: str | None = None,
+    category: str | None = None,
+    outcome: str | None = None,
+) -> None:
     notification_ref = hmac.new(
         settings.secret_key.encode("utf-8"),
         str(notification_id).encode("ascii"),
         hashlib.sha256,
     ).hexdigest()[:16]
-    logger.error(
-        "notification_delivery_failed",
+    extra: dict[str, object] = {
+        "notification_ref": f"notification:{notification_ref}",
+        "delivery_error": safe_delivery_error(error),
+    }
+    if provider is not None:
+        extra["provider"] = provider
+    if category is not None:
+        extra["notification_category"] = category
+    if outcome is not None:
+        extra["outcome"] = outcome
+    terminal_cancelled = outcome == "cancelled" or (
+        isinstance(error, NotificationDeliveryError) and error.terminal_status == "cancelled"
+    )
+    if terminal_cancelled:
+        logger.warning("notification_delivery_cancelled", extra=extra)
+    else:
+        logger.error("notification_delivery_failed", extra=extra)
+
+
+def _log_delivery_completed(
+    notification_id: int,
+    category: str,
+    *,
+    provider: str = "web_push",
+) -> None:
+    notification_ref = hmac.new(
+        settings.secret_key.encode("utf-8"),
+        str(notification_id).encode("ascii"),
+        hashlib.sha256,
+    ).hexdigest()[:16]
+    logger.info(
+        "notification_delivery_completed",
         extra={
             "notification_ref": f"notification:{notification_ref}",
-            "delivery_error": safe_delivery_error(error),
+            "notification_category": category,
+            "provider": provider,
+            "outcome": "sent",
         },
     )
 
@@ -252,7 +287,7 @@ async def run_weekly_digest_once() -> None:
 
     semaphore = asyncio.Semaphore(settings.weekly_digest_delivery_concurrency)
     rate_limiter = TelegramRateLimiter(TELEGRAM_DELIVERY_RATE_PER_SECOND)
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with httpx.AsyncClient(timeout=20, **telegram_transport_options()) as client:
 
         async def deliver(delivery_id: int) -> tuple[int, Exception | None, int | None]:
             try:
@@ -505,16 +540,155 @@ def _prepare_delivery(
     return user.telegram_user_id, neutral_telegram_text(row), open_app_path
 
 
+def _prepare_web_push_delivery(
+    db: Session,
+    delivery: NotificationDelivery,
+) -> dict[str, object] | None:
+    if delivery.status != "processing":
+        return None
+    notification = db.get(Notification, delivery.notification_id)
+    subscription = db.get(WebPushSubscription, delivery.subscription_id)
+    if notification is None:
+        cancel_web_push_delivery(db, delivery, "notification_unavailable")
+        return None
+    if subscription is None:
+        cancel_web_push_delivery(db, delivery, "subscription_unavailable")
+        return None
+    if subscription.user_id != notification.user_id:
+        cancel_web_push_delivery(db, delivery, "subscription_ownership_changed")
+        return None
+    user = db.get(User, notification.user_id)
+    if user is None or not user.is_active:
+        cancel_web_push_delivery(db, delivery, "account_unavailable")
+        return None
+    if notification.last_error in {
+        "workout_reminder_invalidated",
+        "account_unavailable",
+    }:
+        cancel_web_push_delivery(db, delivery, notification.last_error)
+        return None
+    setting = db.query(NotificationSetting).filter(NotificationSetting.user_id == user.id).first()
+    if notification.event_kind == "reminder" and setting is None:
+        cancel_web_push_delivery(db, delivery, "notification_settings_unavailable")
+        return None
+    if setting is not None and not reminder_category_enabled(notification, setting):
+        cancel_web_push_delivery(db, delivery, "reminder_category_disabled")
+        return None
+    if notification.event_kind != "security" and setting is not None:
+        retry_at = quiet_hours_retry_at(setting, user)
+        if retry_at is not None:
+            delivery.status = "queued"
+            delivery.next_attempt_at = retry_at
+            delivery.processing_started_at = None
+            return None
+    destination, _ = resolve_notification_destination(db, user, notification)
+    return {
+        "notification_id": notification.id,
+        "category": notification.category,
+        "subscription_id": subscription.id,
+        "subscription": {
+            "endpoint": subscription.endpoint,
+            "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
+            "action_url": destination,
+        },
+    }
+
+
+async def _run_web_push_delivery_batch() -> None:
+    if not settings.web_push_enabled:
+        return
+    with get_session_context() as db:
+        delivery_ids = [delivery.id for delivery in claim_due_web_push_deliveries(db)]
+    if not delivery_ids:
+        return
+
+    semaphore = asyncio.Semaphore(settings.notification_delivery_concurrency)
+
+    async def deliver(delivery_id: int) -> tuple[int, bool, Exception | None]:
+        try:
+            async with semaphore:
+                with get_session_context() as preflight_db:
+                    delivery = preflight_db.get(NotificationDelivery, delivery_id)
+                    prepared = (
+                        _prepare_web_push_delivery(preflight_db, delivery)
+                        if delivery is not None
+                        else None
+                    )
+                if prepared is None:
+                    return delivery_id, False, None
+                target = prepared["subscription"]
+                if not isinstance(target, dict):
+                    raise RuntimeError("web_push_target_malformed")
+                await send_web_push(target)
+            return delivery_id, True, None
+        except Exception as exc:
+            return delivery_id, True, exc
+
+    results = await asyncio.gather(*(deliver(delivery_id) for delivery_id in delivery_ids))
+    with get_session_context() as db:
+        for delivery_id, attempted, error in results:
+            if not attempted:
+                continue
+            delivery = db.get(NotificationDelivery, delivery_id)
+            if delivery is None or delivery.status != "processing":
+                continue
+            notification = db.get(Notification, delivery.notification_id)
+            if notification is None:
+                cancel_web_push_delivery(db, delivery, "notification_unavailable")
+                continue
+            subscription = db.get(WebPushSubscription, delivery.subscription_id)
+            if error is None:
+                if subscription is None or subscription.user_id != notification.user_id:
+                    cancel_web_push_delivery(db, delivery, "subscription_ownership_changed")
+                    continue
+                mark_web_push_delivery_succeeded(
+                    db,
+                    delivery,
+                    subscription,
+                    commit=False,
+                )
+                _log_delivery_completed(notification.id, notification.category)
+                continue
+            mark_web_push_delivery_failed(
+                db,
+                delivery,
+                error,
+                subscription=subscription,
+                commit=False,
+            )
+            if getattr(error, "remove_subscription", False):
+                outcome = "expired"
+            elif getattr(error, "terminal_status", None) is not None or (
+                delivery.attempt_count >= MAX_DELIVERY_ATTEMPTS
+            ):
+                outcome = "failed"
+            else:
+                outcome = "retry"
+            _log_delivery_failure(
+                notification.id,
+                error,
+                provider="web_push",
+                category=notification.category,
+                outcome=outcome,
+            )
+
+
 async def run_once(*, sync_reminders: bool = True) -> None:
     with get_session_context() as db:
         prune_account_exports(db)
+        expire_program_imports(db)
         if sync_reminders:
             prune_audit_events(db, retention_days=settings.audit_event_retention_days)
+            prune_lifecycle_milestones(
+                db,
+                retention_days=settings.lifecycle_milestone_retention_days,
+            )
             prune_weekly_digest(db, retention_days=settings.news_retention_days)
             prune_support_cases(db)
             sync_workout_reminders(db)
             sync_weekly_check_in_reminders(db)
             sync_measurement_reminders(db)
+            sync_contextual_reminders(db)
         rows = claim_due_notifications(db)
         users = {
             user.id: user
@@ -532,96 +706,116 @@ async def run_once(*, sync_reminders: bool = True) -> None:
             setting = notification_settings.get(user.id) if user is not None else None
             if _prepare_delivery(db, row, user, setting) is not None:
                 deliveries.append(row.id)
+        enqueue_web_push_deliveries(db, rows)
         db.commit()
 
-        if not deliveries:
-            return
+        if deliveries:
+            semaphore = asyncio.Semaphore(settings.notification_delivery_concurrency)
+            rate_limiter = TelegramRateLimiter(TELEGRAM_DELIVERY_RATE_PER_SECOND)
 
-        semaphore = asyncio.Semaphore(settings.notification_delivery_concurrency)
-        rate_limiter = TelegramRateLimiter(TELEGRAM_DELIVERY_RATE_PER_SECOND)
+            async with httpx.AsyncClient(timeout=20, **telegram_transport_options()) as client:
 
-        async with httpx.AsyncClient(timeout=20, **telegram_transport_options()) as client:
-
-            async def deliver(
-                notification_id: int,
-            ) -> tuple[int, bool, Exception | None]:
-                try:
-                    async with semaphore:
-                        await rate_limiter.acquire()
-                        with get_session_context() as preflight_db:
-                            current_row = preflight_db.get(Notification, notification_id)
-                            current_user = (
-                                preflight_db.get(User, current_row.user_id)
-                                if current_row is not None
-                                else None
-                            )
-                            current_setting = (
-                                preflight_db.query(NotificationSetting)
-                                .filter(NotificationSetting.user_id == current_user.id)
-                                .first()
-                                if current_user is not None
-                                else None
-                            )
-                            prepared = (
-                                _prepare_delivery(
-                                    preflight_db,
-                                    current_row,
-                                    current_user,
-                                    current_setting,
+                async def deliver(
+                    notification_id: int,
+                ) -> tuple[int, bool, Exception | None]:
+                    try:
+                        async with semaphore:
+                            await rate_limiter.acquire()
+                            with get_session_context() as preflight_db:
+                                current_row = preflight_db.get(Notification, notification_id)
+                                current_user = (
+                                    preflight_db.get(User, current_row.user_id)
+                                    if current_row is not None
+                                    else None
                                 )
-                                if current_row is not None
-                                else None
+                                current_setting = (
+                                    preflight_db.query(NotificationSetting)
+                                    .filter(NotificationSetting.user_id == current_user.id)
+                                    .first()
+                                    if current_user is not None
+                                    else None
+                                )
+                                prepared = (
+                                    _prepare_delivery(
+                                        preflight_db,
+                                        current_row,
+                                        current_user,
+                                        current_setting,
+                                    )
+                                    if current_row is not None
+                                    else None
+                                )
+                            if prepared is None:
+                                return notification_id, False, None
+                            chat_id, text, open_app_path = prepared
+                            await send_telegram_message(
+                                client, chat_id, text, open_app_path=open_app_path
                             )
-                        if prepared is None:
-                            return notification_id, False, None
-                        chat_id, text, open_app_path = prepared
-                        await send_telegram_message(
-                            client, chat_id, text, open_app_path=open_app_path
+                        return notification_id, True, None
+                    except NotificationDeliveryError as exc:
+                        if exc.retry_after is not None:
+                            await rate_limiter.defer(exc.retry_after.total_seconds())
+                        return notification_id, True, exc
+                    except Exception as exc:
+                        return notification_id, True, exc
+
+                results = await asyncio.gather(
+                    *(deliver(notification_id) for notification_id in deliveries)
+                )
+
+            attempted_results = [
+                (notification_id, error)
+                for notification_id, attempted, error in results
+                if attempted
+            ]
+            if attempted_results:
+                result_by_id = dict(attempted_results)
+                db.expire_all()
+                delivered_rows: dict[int, Notification] = {
+                    row.id: row
+                    for row in db.query(Notification)
+                    .filter(Notification.id.in_(result_by_id))
+                    .all()
+                }
+                delivered_users = {
+                    user.id: user
+                    for user in db.query(User)
+                    .filter(User.id.in_({row.user_id for row in delivered_rows.values()}))
+                    .all()
+                }
+                for notification_id, error in attempted_results:
+                    delivered_row = delivered_rows.get(notification_id)
+                    if delivered_row is None or delivered_row.status != "processing":
+                        continue
+                    if error is None:
+                        user = delivered_users.get(delivered_row.user_id)
+                        if user is not None and user.is_active:
+                            mark_delivery_succeeded(db, delivered_row, user, commit=False)
+                            _log_delivery_completed(
+                                delivered_row.id,
+                                delivered_row.category,
+                                provider="telegram",
+                            )
+                        else:
+                            delivered_row.status = "cancelled"
+                            delivered_row.processing_started_at = None
+                    else:
+                        mark_delivery_failed(db, delivered_row, error, commit=False)
+                        outcome = {
+                            "queued": "retry",
+                            "cancelled": "cancelled",
+                            "failed": "failed",
+                        }.get(delivered_row.status, "failed")
+                        _log_delivery_failure(
+                            delivered_row.id,
+                            error,
+                            provider="telegram",
+                            category=delivered_row.category,
+                            outcome=outcome,
                         )
-                    return notification_id, True, None
-                except NotificationDeliveryError as exc:
-                    if exc.retry_after is not None:
-                        await rate_limiter.defer(exc.retry_after.total_seconds())
-                    return notification_id, True, exc
-                except Exception as exc:
-                    return notification_id, True, exc
+                db.commit()
 
-            results = await asyncio.gather(
-                *(deliver(notification_id) for notification_id in deliveries)
-            )
-
-        attempted_results = [
-            (notification_id, error) for notification_id, attempted, error in results if attempted
-        ]
-        if not attempted_results:
-            return
-        result_by_id = dict(attempted_results)
-        db.expire_all()
-        delivered_rows: dict[int, Notification] = {
-            row.id: row
-            for row in db.query(Notification).filter(Notification.id.in_(result_by_id)).all()
-        }
-        delivered_users = {
-            user.id: user
-            for user in db.query(User)
-            .filter(User.id.in_({row.user_id for row in delivered_rows.values()}))
-            .all()
-        }
-        for notification_id, error in attempted_results:
-            delivered_row = delivered_rows.get(notification_id)
-            if delivered_row is None or delivered_row.status != "processing":
-                continue
-            if error is None:
-                user = delivered_users.get(delivered_row.user_id)
-                if user is not None and user.is_active:
-                    mark_delivery_succeeded(db, delivered_row, user, commit=False)
-                else:
-                    delivered_row.status = "cancelled"
-                    delivered_row.processing_started_at = None
-            else:
-                mark_delivery_failed(db, delivered_row, error, commit=False)
-                _log_delivery_failure(delivered_row.id, error)
-        db.commit()
+    await _run_web_push_delivery_batch()
 
 
 async def run_until_stopped(
@@ -630,7 +824,7 @@ async def run_until_stopped(
     news_publication_ready: bool,
 ) -> None:
     next_reminder_sync = 0.0
-    next_news_sync = 0.0
+    last_news_review_slot_key: str | None = None
     WORKER_HEARTBEAT_PATH.touch()
     while not stop_requested.is_set():
         current = monotonic()
@@ -641,14 +835,18 @@ async def run_until_stopped(
         if should_sync:
             next_reminder_sync = current + settings.reminder_sync_seconds
         if settings.news_ingestion_enabled:
-            should_fetch_news = current >= next_news_sync
+            review_slot = current_news_review_slot(utcnow())
+            review_delivery_due = (
+                review_slot is not None and review_slot.key != last_news_review_slot_key
+            )
             try:
                 await run_news_pipeline_once(
                     send_message=send_telegram_message,
                     send_preview=send_telegram_preview,
                     send_publication=send_telegram_publication,
                     publication_ready=news_publication_ready,
-                    fetch_sources=should_fetch_news,
+                    review_delivery_due=review_delivery_due,
+                    review_slot=review_slot,
                 )
             except Exception as exc:
                 logger.error(
@@ -658,8 +856,9 @@ async def run_until_stopped(
                         "reason": type(exc).__name__,
                     },
                 )
-            if should_fetch_news:
-                next_news_sync = current + settings.news_ingestion_cycle_seconds
+            else:
+                if review_delivery_due and review_slot is not None:
+                    last_news_review_slot_key = review_slot.key
         WORKER_HEARTBEAT_PATH.touch()
         if stop_requested.is_set():
             break
@@ -693,8 +892,8 @@ async def main() -> None:
             settings.yandex_oauth_client_secret,
             settings.apple_oauth_client_secret,
             settings.database_url,
-            settings.news_llm_api_key,
             settings.news_image_cloudflare_api_token,
+            settings.web_push_vapid_private_key.get_secret_value(),
         ),
     )
     stop_requested = asyncio.Event()
@@ -710,12 +909,22 @@ async def main() -> None:
     logger.info("worker_started")
     heartbeat_task = asyncio.create_task(refresh_worker_heartbeat(stop_requested))
     try:
-        async with httpx.AsyncClient(timeout=15) as preflight_client:
+        async with httpx.AsyncClient(
+            timeout=15,
+            **telegram_transport_options(),
+        ) as preflight_client:
             news_publication_ready = await check_news_channel_rights(preflight_client)
         await run_until_stopped(
             stop_requested,
             news_publication_ready=news_publication_ready,
         )
+    except Exception as exc:
+        logger.critical(
+            "worker_failed",
+            exc_info=exc,
+            extra={"reason": type(exc).__name__},
+        )
+        raise
     finally:
         stop_requested.set()
         await heartbeat_task

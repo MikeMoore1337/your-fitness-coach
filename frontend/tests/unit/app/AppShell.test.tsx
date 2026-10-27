@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../../../src/app/AppShell';
+import { PRODUCT_EVENT_NAME } from '../../../src/shared/analytics/productEvents';
 
 const logout = vi.fn();
 function stubViewport(initialWidth: number, reducedMotion = false) {
@@ -26,10 +27,25 @@ function finishAnimation(element: Element, animationName: string) {
   Object.defineProperty(event, 'animationName', { value: animationName });
   fireEvent(element, event);
 }
-const { authState, avatarFile, navigation, user } = vi.hoisted(() => ({
+const { authState, avatarFile, navigation, pwa, user } = vi.hoisted(() => ({
   authState: { missing: false },
   avatarFile: vi.fn(),
   navigation: { path: '/coach', search: '' },
+  pwa: {
+    enabled: true,
+    isStandalone: false,
+    isIosInstallSurface: false,
+    shouldShowInstallPrompt: false,
+    installPromptAvailable: false,
+    installPending: false,
+    recordAppValue: vi.fn(),
+    markInstallOptionShown: vi.fn(),
+    install: vi.fn(async () => undefined),
+    dismissInstall: vi.fn(),
+    updateAvailable: false,
+    updateBlockedByWorkout: false,
+    applyUpdate: vi.fn(),
+  },
   user: {
     id: 1,
     username: 'mikhail',
@@ -53,8 +69,18 @@ vi.mock('../../../src/app/AuthProvider', () => ({
   useOptionalAuth: () => (authState.missing ? null : { user, logout }),
 }));
 
+vi.mock('../../../src/shared/pwa/PwaProvider', () => ({
+  usePwa: () => pwa,
+}));
+
 vi.mock('../../../src/shared/navigation/router', () => ({
   useNavigation: () => navigation,
+  coachTabFromSearch: (search: string) => new URLSearchParams(search).get('tab') ?? 'today',
+  safeTrainerReturnPath: (value: string | null | undefined) => {
+    if (!value) return null;
+    const parsed = new URL(value, 'http://localhost');
+    return `${parsed.pathname}${parsed.search}`;
+  },
   AppLink: ({ to, className, children, ...props }: React.ComponentProps<'a'> & { to: string }) => (
     <a href={to} className={className} {...props}>
       {children}
@@ -82,34 +108,63 @@ describe('AppShell', () => {
     render(<AppShell>Содержимое</AppShell>);
 
     expect(screen.getByRole('navigation', { name: 'Основная навигация' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute('href', '/coach');
+    expect(screen.getByRole('link', { name: 'Клиенты' })).toHaveAttribute(
       'href',
-      '/app?section=today',
-    );
-    expect(screen.getByRole('link', { name: 'Программа' })).toHaveAttribute(
-      'href',
-      '/app?section=programs',
+      '/coach?tab=clients',
     );
     expect(
       Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
         (link) => link.textContent,
       ),
-    ).toEqual(['Сегодня', 'Программа', 'Питание', 'Прогресс']);
+    ).toEqual(['Сегодня', 'Клиенты', 'Программы', 'Ещё']);
     expect(screen.queryByRole('button', { name: 'Ещё' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('link', { name: 'Тренер' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Админ-панель' })).not.toBeInTheDocument();
     expect(screen.getByText('Ресурсы')).toBeInTheDocument();
     expect(screen.getByText('Михаил')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Быстро добавить' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Выйти из аккаунта' }));
     expect(logout).toHaveBeenCalledOnce();
+  });
+
+  it('показывает персональный dock и отдельный быстрый switch для trainer-capable аккаунта', () => {
+    navigation.path = '/app';
+    render(<AppShell section="today">Содержимое</AppShell>);
+
+    expect(
+      Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
+        (link) => link.textContent,
+      ),
+    ).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
+    expect(screen.getByRole('link', { name: 'Для себя' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'В кабинет тренера' })).toHaveAttribute(
+      'href',
+      '/coach',
+    );
+  });
+
+  it('сохраняет безопасный trainer tab при переходе по персональным разделам', () => {
+    navigation.path = '/app';
+    navigation.search = '?section=nutrition&trainer_return=%2Fcoach%3Ftab%3Dprograms';
+    render(<AppShell section="nutrition">Содержимое</AppShell>);
+
+    expect(screen.getByRole('link', { name: 'В кабинет тренера' })).toHaveAttribute(
+      'href',
+      '/coach?tab=programs',
+    );
+    expect(screen.getByRole('link', { name: 'Питание' })).toHaveAttribute(
+      'href',
+      '/app?section=nutrition&trainer_return=%2Fcoach%3Ftab%3Dprograms',
+    );
   });
 
   it('сохраняет active state для каждого прямого core route', () => {
     navigation.path = '/app';
     for (const [section, label] of [
       ['today', 'Сегодня'],
-      ['programs', 'Программа'],
+      ['programs', 'План'],
       ['nutrition', 'Питание'],
       ['progress', 'Прогресс'],
     ] as const) {
@@ -117,6 +172,81 @@ describe('AppShell', () => {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page');
       view.unmount();
     }
+  });
+
+  it('records section navigation without putting routes or private data in the event', () => {
+    navigation.path = '/app';
+    const events: unknown[] = [];
+    const listener = (event: Event) => events.push((event as CustomEvent).detail);
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+
+    render(<AppShell section="today">Содержимое</AppShell>);
+    fireEvent.click(screen.getByRole('link', { name: 'Прогресс' }));
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        name: 'section_navigation_selected',
+        from_section: 'today',
+        to_section: 'progress',
+      }),
+    );
+    expect(JSON.stringify(events)).not.toContain('/app');
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+  });
+
+  it('открывает единую панель быстрых действий и закрывает её Escape', () => {
+    navigation.path = '/app';
+    render(<AppShell section="today">Содержимое</AppShell>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Быстро добавить' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Что добавить?' });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Еда' })).toHaveAttribute(
+      'href',
+      '/app?section=nutrition&quick_add=food',
+    );
+    expect(
+      within(dialog)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Еда', 'Вода', 'Кардио', 'Замер', 'Самочувствие']);
+    expect(document.getElementById('appContent')?.inert).toBe(true);
+    expect(
+      within(dialog).queryByRole('link', { name: /Открыть AI Coach/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('link', { name: 'Еда' }));
+    expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
+  });
+
+  it('встраивает добавление пятым действием мобильного dock и возвращает на него фокус', () => {
+    stubViewport(390);
+    navigation.path = '/app';
+    render(<AppShell section="today">Содержимое</AppShell>);
+
+    const primary = document.querySelector('.app-bottom-nav__primary')!;
+    expect(Array.from(primary.children).map((item) => item.textContent)).toEqual([
+      'Сегодня',
+      'План',
+      'Питание',
+      'Прогресс',
+      'Добавить',
+    ]);
+    const add = within(primary as HTMLElement).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.querySelector('svg[data-icon="plus"]')).toBeInTheDocument();
+    expect(add).not.toHaveAttribute('aria-current');
+    expect(add).not.toHaveClass('is-active');
+    expect(document.querySelector('.app-quick-add-trigger--floating')).toBeNull();
+
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Что добавить?' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
+    expect(add).toHaveFocus();
   });
 
   it('открывает доступное mobile-меню с secondary navigation и завершает exit после возврата фокуса', async () => {
@@ -150,6 +280,7 @@ describe('AppShell', () => {
 
   it('показывает admin entry только аккаунту с соответствующей capability', () => {
     user.is_root = true;
+    user.is_coach = true;
     navigation.path = '/admin';
     render(<AppShell>Содержимое</AppShell>);
 
@@ -157,6 +288,9 @@ describe('AppShell', () => {
       'aria-current',
       'page',
     );
+    expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('href', '/coach');
+    expect(user.is_root).toBe(true);
+    expect(user.is_coach).toBe(true);
   });
 
   it('открывает и закрывает mobile-меню сразу при reduced motion', () => {
@@ -209,6 +343,36 @@ describe('AppShell', () => {
     expect(within(dialog).getByText('Отдельная сессия')).toBeInTheDocument();
   });
 
+  it('оставляет в минимальном demo utility только тему и полный выход из демо', () => {
+    authState.missing = true;
+    render(
+      <AppShell
+        demo={{
+          activeSection: 'today',
+          brandTo: '/demo?cabinet=1',
+          destinations: [{ key: 'today', label: 'Сегодня', icon: 'today', to: '/demo?cabinet=1' }],
+          displayName: 'Демо',
+          exitTo: '/',
+          menuTitle: 'Сценарии демо',
+          minimalUtility: true,
+          moreLinks: [{ label: 'Тренировка', to: '/demo?scenario=self_training' }],
+          onReset: vi.fn(),
+        }}
+      >
+        Демо-содержимое
+      </AppShell>,
+    );
+
+    expect(screen.queryByText('Отдельная сессия')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Your Fitness Coach — демо')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Выйти из демо' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сценарии' }));
+    const dialog = screen.getByRole('dialog', { name: 'Сценарии демо' });
+    expect(within(dialog).getByText('Выберите следующий сценарий')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Тренировка' })).toBeInTheDocument();
+  });
+
   it('не показывает библиотеку знаний в Web или Telegram Mini App navigation', () => {
     stubViewport(390);
     navigation.path = '/app';
@@ -255,16 +419,21 @@ describe('AppShell', () => {
       updated_at: '2030-01-02T12:00:00',
     };
     user.photo_url = 'https://provider.example.test/avatar.jpg';
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn(() => 'blob:private-avatar'),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static createObjectURL = vi.fn(() => `blob:${window.location.origin}/private-avatar`);
+        static revokeObjectURL = vi.fn();
+      },
+    );
 
     const { container } = render(<AppShell>Содержимое</AppShell>);
     const avatar = container.querySelector('.app-desktop-account-entry__avatar');
     await waitFor(() =>
-      expect(avatar?.querySelector('img')).toHaveAttribute('src', 'blob:private-avatar'),
+      expect(avatar?.querySelector('img')).toHaveAttribute(
+        'src',
+        `blob:${window.location.origin}/private-avatar`,
+      ),
     );
     const privateImage = avatar?.querySelector('img');
     expect(privateImage).not.toBeNull();

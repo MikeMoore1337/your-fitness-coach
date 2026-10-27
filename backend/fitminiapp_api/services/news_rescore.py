@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.news import NewsCluster, NewsItem, NewsSource
-from fitminiapp_api.services.news_freshness import is_current_month_publication
+from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_ingestion import latest_items_by_source, score_candidate, utcnow
 from fitminiapp_api.services.news_state import transition_news_cluster
 
@@ -32,7 +32,7 @@ def rescore_freshness_blocked_clusters(
         if "source_not_current_month" not in previous_risks:
             continue
         primary = db.get(NewsItem, cluster.primary_item_id)
-        if primary is None or not is_current_month_publication(primary.published_at, now=current):
+        if primary is None or not is_fresh_publication(primary.published_at, now=current):
             continue
         source = db.get(NewsSource, primary.source_id)
         if source is None:

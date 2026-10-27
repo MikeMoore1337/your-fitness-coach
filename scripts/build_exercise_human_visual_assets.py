@@ -98,7 +98,7 @@ def build(source_dir: Path, asset_dir: Path, lock_path: Path) -> dict:
     lock = load_review_lock(lock_path)
     source_records: list[tuple[str, str]] = []
     derivative_records: list[tuple[str, str]] = []
-    staging_parent = ROOT_DIR / ".artifacts" / "tmp"
+    staging_parent = ROOT_DIR / ".artifacts" / "runtime" / "tmp"
     staging_parent.mkdir(parents=True, exist_ok=True)
 
     with TemporaryDirectory(prefix="exercise-human-visuals-", dir=staging_parent) as temporary:

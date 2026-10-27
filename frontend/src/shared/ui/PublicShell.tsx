@@ -1,15 +1,20 @@
 import { useEffect, type ReactNode } from 'react';
 import { AppLink } from '../navigation/router';
 import { useWebTheme } from '../useWebTheme';
+import type { AppColorScheme } from '../theme';
 import { AppThemeToggle } from './AppThemeToggle';
 import { BrandLockup } from './BrandLogo';
+import { glassProps } from './Glass';
 import './public-shell.css';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 
 type PublicShellProps = {
   children: ReactNode;
   className?: string;
   headerAction?: ReactNode;
   headerNavigation?: ReactNode;
+  headerBrandSurface?: AppColorScheme;
   homeHref?: string;
   skipTarget: string;
 };
@@ -19,6 +24,7 @@ export function PublicShell({
   className = '',
   headerAction,
   headerNavigation,
+  headerBrandSurface,
   homeHref = '/',
   skipTarget,
 }: PublicShellProps) {
@@ -36,6 +42,7 @@ export function PublicShell({
     <BrandLockup
       className="public-shell__lockup"
       markClassName="public-shell__logo landing-brand__mark"
+      surface={headerBrandSurface}
     />
   );
 
@@ -51,6 +58,7 @@ export function PublicShell({
         К содержимому
       </a>
       <header
+        {...(skipTarget === 'landing-content' ? {} : glassProps('tinted'))}
         className={`public-shell__header landing-header${
           headerNavigation ? '' : ' public-shell__header--simple'
         }`}

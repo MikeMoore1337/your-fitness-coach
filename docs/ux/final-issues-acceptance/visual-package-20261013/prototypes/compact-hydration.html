@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>#869 · Компактная гидратация · кандидатский макет</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #f5f6f3;
+        --surface: #fff;
+        --soft: #eef0eb;
+        --text: #151515;
+        --muted: #606060;
+        --line: #d0d3cd;
+        --strong: #969b92;
+        --lime: #b2f520;
+        --lime-soft: #e7f9b9;
+        --ink: #161b13;
+        --radius: 16px;
+        --shadow: 0 12px 30px rgba(21, 31, 18, 0.08);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      body[data-theme="dark"] {
+        color-scheme: dark;
+        --canvas: #090b0b;
+        --surface: #141717;
+        --soft: #1b1f1f;
+        --text: #f5f5f5;
+        --muted: #b8b8b8;
+        --line: #404040;
+        --strong: #787878;
+        --lime-soft: #27351b;
+        --shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--canvas);
+        color: var(--text);
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:focus-visible,
+      summary:focus-visible,
+      input:focus-visible {
+        outline: 3px solid var(--lime);
+        outline-offset: 3px;
+      }
+      .app {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 20px 16px 48px;
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .brand {
+        display: grid;
+        gap: 3px;
+      }
+      .eyebrow {
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(1.25rem, 4vw, 1.75rem);
+        letter-spacing: -0.03em;
+      }
+      h2 {
+        font-size: 1.22rem;
+        letter-spacing: -0.025em;
+      }
+      h3 {
+        font-size: 0.98rem;
+      }
+      .date {
+        color: var(--muted);
+        font-size: 0.83rem;
+      }
+      .layout {
+        display: grid;
+        gap: 16px;
+      }
+      .surface {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+      .hydration {
+        overflow: hidden;
+      }
+      .hydration__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 20px;
+      }
+      .hydration__head p {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 0.93rem;
+      }
+      .orb {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 76px;
+        height: 76px;
+        overflow: hidden;
+        flex: 0 0 76px;
+        border: 1px solid var(--strong);
+        border-radius: 50%;
+        background: var(--soft);
+      }
+      .orb:after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          180deg,
+          transparent 0 36%,
+          var(--lime) 36% 100%
+        );
+      }
+      .orb strong {
+        position: relative;
+        z-index: 1;
+        color: #f5f5f5;
+        font-size: 1rem;
+        letter-spacing: 0.02em;
+        -webkit-text-stroke: 0.75px var(--ink);
+        paint-order: stroke fill;
+        text-shadow: 0 0 1px var(--ink);
+      }
+      .progress {
+        height: 7px;
+        margin: 0 20px;
+        overflow: hidden;
+        border-radius: 99px;
+        background: var(--soft);
+      }
+      .progress span {
+        display: block;
+        width: 58%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--lime);
+      }
+      .quick-add {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        padding: 16px 20px 20px;
+      }
+      .quick-add button,
+      .button {
+        min-height: 44px;
+        border: 1px solid var(--strong);
+        border-radius: 11px;
+        background: var(--soft);
+        color: var(--text);
+        font-weight: 750;
+      }
+      .quick-add button:hover,
+      .button:hover {
+        border-color: var(--text);
+      }
+      .quick-add button span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 600;
+      }
+      .quick-add button strong {
+        display: block;
+        margin-top: 2px;
+        font-size: 0.88rem;
+      }
+      .entry-form {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: end;
+        padding: 0 20px 20px;
+      }
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+      .field label {
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+      input {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid var(--strong);
+        border-radius: 10px;
+        padding: 0 12px;
+        background: var(--surface);
+        color: var(--text);
+      }
+      .button--primary {
+        padding: 0 16px;
+        border-color: var(--lime);
+        background: var(--lime);
+        color: #111;
+      }
+      .section {
+        padding: 18px 20px;
+        border-top: 1px solid var(--line);
+      }
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .section-head p {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+      .history {
+        display: grid;
+        gap: 8px;
+      }
+      .history-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 48px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .history-row:last-child {
+        border-bottom: 0;
+      }
+      .history-row__dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--lime);
+      }
+      .history-row strong {
+        display: block;
+        font-size: 0.88rem;
+      }
+      .history-row span {
+        color: var(--muted);
+        font-size: 0.77rem;
+      }
+      .history-row time {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .history-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .history-actions .button {
+        min-height: 40px;
+        padding: 0 12px;
+        background: transparent;
+      }
+      .history-actions .button--primary {
+        background: var(--lime);
+      }
+      .details {
+        display: grid;
+        gap: 10px;
+      }
+      details {
+        border-top: 1px solid var(--line);
+      }
+      details:first-child {
+        border-top: 0;
+      }
+      summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 56px;
+        cursor: pointer;
+        list-style: none;
+        font-weight: 800;
+      }
+      summary::-webkit-details-marker {
+        display: none;
+      }
+      .detail-body {
+        display: grid;
+        gap: 12px;
+        padding: 0 0 16px;
+      }
+      .detail-body p {
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+      .compact-fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .nutrition-link {
+        background: transparent;
+        box-shadow: none;
+      }
+      .nutrition-link summary {
+        padding: 0 16px;
+      }
+      .nutrition-link .detail-body {
+        padding: 0 16px 16px;
+      }
+      .nutrition-links {
+        display: grid;
+        gap: 10px;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+      @media (min-width: 760px) {
+        .app {
+          padding: 32px 32px 64px;
+        }
+        .layout {
+          grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
+          align-items: start;
+        }
+        .hydration {
+          grid-row: span 2;
+        }
+        .nutrition-links {
+          position: sticky;
+          top: 24px;
+        }
+        .entry-form {
+          grid-template-columns: 1fr 1fr auto;
+        }
+      }
+      @media (max-width: 380px) {
+        .app {
+          padding-inline: 12px;
+        }
+        .hydration__head,
+        .section {
+          padding-inline: 16px;
+        }
+        .quick-add,
+        .entry-form {
+          padding-inline: 16px;
+        }
+        .quick-add button {
+          padding-inline: 4px;
+        }
+        .quick-add button span {
+          font-size: 0.64rem;
+        }
+      }
+
+      /* Existing YFC font files and Icon chevron-down glyph; no new icon library. */
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url(../../../../../frontend/public/assets/fonts/inter-cyrillic.woff2)
+          format("woff2");
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+
+      @font-face {
+        font-family: "Inter";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url(../../../../../frontend/public/assets/fonts/inter-latin.woff2)
+          format("woff2");
+        unicode-range:
+          U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+          U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+          U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+
+      @font-face {
+        font-family: "Oswald";
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src: url(../../../../../frontend/public/assets/fonts/oswald-cyrillic.woff2)
+          format("woff2");
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+
+      @font-face {
+        font-family: "Oswald";
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src: url(../../../../../frontend/public/assets/fonts/oswald-latin.woff2)
+          format("woff2");
+        unicode-range:
+          U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+          U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+          U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: Oswald, sans-serif;
+        font-weight: 700;
+      }
+      :root {
+        --v2-space-2: 8px;
+        --v2-space-3: 12px;
+        --v2-space-4: 18px;
+        --v2-control-radius: 14px;
+        --v2-on-lime: #090b0b;
+      }
+      .yfc-icon {
+        display: inline-block;
+        vertical-align: middle;
+        flex: 0 0 16px;
+        width: 16px;
+        height: 16px;
+        pointer-events: none;
+      }
+      .yfc-disclosure-icon {
+        color: var(--muted);
+        transition: transform 160ms ease;
+      }
+      details[open] > summary .yfc-disclosure-icon,
+      [aria-expanded="true"] > .yfc-disclosure-icon {
+        transform: rotate(90deg);
+      }
+      summary::marker {
+        content: "";
+      }
+      summary > span {
+        min-width: 0;
+      }
+      .button[hidden] {
+        display: none;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--v2-space-2);
+      }
+      .history-actions .button--primary,
+      .button--primary {
+        color: var(--v2-on-lime);
+      }
+      .history-actions .button {
+        min-height: 44px;
+      }
+      .results__scope {
+        margin-bottom: var(--v2-space-3);
+        line-height: 1.5;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .yfc-disclosure-icon {
+          transition: none;
+        }
+      }
+
+      .quick-add button strong {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+    </style>
+  </head>
+  <body data-theme="dark">
+    <main class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="eyebrow">Сегодня</span>
+          <h1>Питание и гидратация</h1>
+          <span class="date">13 октября · вторник</span>
+        </div>
+        <span class="eyebrow">YFC</span>
+      </header>
+      <div class="layout">
+        <section class="surface hydration" aria-labelledby="hydration-title">
+          <header class="hydration__head">
+            <div>
+              <span class="eyebrow">Гидратация</span>
+              <h2 id="hydration-title">Напитки</h2>
+              <p id="hydration-amount">1 280 из 2 200 мл</p>
+            </div>
+            <div class="orb" aria-label="58 процентов цели">
+              <strong>58%</strong>
+            </div>
+          </header>
+          <div class="progress" aria-label="Прогресс гидратации">
+            <span></span>
+          </div>
+          <div class="quick-add" aria-label="Быстро добавить напиток">
+            <button type="button">
+              <span>Стакан</span
+              ><strong
+                ><svg
+                  class="yfc-icon yfc-icon--16"
+                  data-icon="plus"
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path></svg
+                >250 мл</strong
+              ></button
+            ><button type="button">
+              <span>Бутылка</span
+              ><strong
+                ><svg
+                  class="yfc-icon yfc-icon--16"
+                  data-icon="plus"
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path></svg
+                >350 мл</strong
+              ></button
+            ><button type="button">
+              <span>Большая</span
+              ><strong
+                ><svg
+                  class="yfc-icon yfc-icon--16"
+                  data-icon="plus"
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path></svg
+                >500 мл</strong
+              >
+            </button>
+          </div>
+          <div class="entry-form">
+            <div class="field">
+              <label for="amount">Другой объём, мл</label
+              ><input id="amount" value="400" inputmode="numeric" />
+            </div>
+            <div class="field">
+              <label for="drink">Напиток</label
+              ><input id="drink" value="Вода" />
+            </div>
+            <button class="button button--primary" type="button">
+              Добавить
+            </button>
+          </div>
+          <section class="section" aria-labelledby="history-title">
+            <div class="section-head">
+              <div>
+                <h3 id="history-title">История за день</h3>
+                <p>Последние записи сразу после добавления воды</p>
+              </div>
+              <span class="eyebrow" id="history-count"
+                >Последние 3 · всего 4</span
+              >
+            </div>
+            <div class="history" id="history" aria-live="polite"></div>
+            <div class="history-actions">
+              <button
+                class="button button--primary"
+                id="history-toggle"
+                type="button"
+                aria-controls="history"
+                aria-expanded="false"
+                hidden
+              >
+                Показать всю историю
+              </button>
+            </div>
+          </section>
+          <section class="section details" aria-label="Настройки гидратации">
+            <details>
+              <summary>Личный ориентир</summary>
+              <div class="detail-body">
+                <div class="compact-fields">
+                  <div class="field">
+                    <label for="goal">Ориентир, мл в день</label
+                    ><input id="goal" value="2200" />
+                  </div>
+                  <div class="field">
+                    <label for="goal-mode">Способ</label
+                    ><input id="goal-mode" value="Вручную" />
+                  </div>
+                </div>
+                <p>
+                  Ориентир относится к напиткам для здоровых взрослых в обычных
+                  условиях. При особых условиях нужен индивидуальный подход.
+                </p>
+                <button class="button button--primary" type="button">
+                  Сохранить ориентир
+                </button>
+              </div>
+            </details>
+            <details>
+              <summary>Мои кружки и бутылки</summary>
+              <div class="detail-body">
+                <div class="compact-fields">
+                  <div class="field">
+                    <label for="preset-name">Название</label
+                    ><input id="preset-name" value="Бутылка" />
+                  </div>
+                  <div class="field">
+                    <label for="preset-volume">Объём, мл</label
+                    ><input id="preset-volume" value="350" />
+                  </div>
+                </div>
+                <button class="button button--primary" type="button">
+                  Добавить ёмкость
+                </button>
+              </div>
+            </details>
+          </section>
+        </section>
+        <aside class="nutrition-links" aria-label="Компактные разделы питания">
+          <div class="surface nutrition-link">
+            <details>
+              <summary>План питания</summary>
+              <div class="detail-body">
+                <p>
+                  День, шаблоны и блюда остаются внутри раскрываемого раздела.
+                </p>
+              </div>
+            </details>
+          </div>
+          <div class="surface nutrition-link">
+            <details>
+              <summary>Список покупок</summary>
+              <div class="detail-body">
+                <p>
+                  Неделя, рецепты и ручные позиции доступны без смены маршрута.
+                </p>
+              </div>
+            </details>
+          </div>
+          <p class="note">
+            Кандидатский макет #869 · демонстрационные данные. Кнопки меняют
+            только данные макета.
+          </p>
+        </aside>
+      </div>
+    </main>
+    <script>
+      // Serialized existing Icon('disclosure-closed', 16), from frontend/src/shared/ui/iconGlyphs.tsx.
+      const chevron = () =>
+        '<svg class="yfc-icon yfc-icon--16 yfc-disclosure-icon" data-icon="disclosure-closed" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"></path></svg>';
+      document.querySelectorAll("details").forEach((details, index) => {
+        const summary = details.querySelector(":scope>summary"),
+          body = summary.nextElementSibling;
+        const label = document.createElement("span");
+        label.textContent = summary.textContent;
+        summary.replaceChildren(label);
+        summary.insertAdjacentHTML("beforeend", chevron());
+        if (body) {
+          body.id = "disclosure-body-" + index;
+          summary.setAttribute("aria-controls", body.id);
+        }
+        const sync = () =>
+          summary.setAttribute("aria-expanded", String(details.open));
+        details.addEventListener("toggle", sync);
+        sync();
+      });
+
+      const p = new URLSearchParams(location.search);
+      document.body.dataset.theme =
+        p.get("theme") === "light" ? "light" : "dark";
+      const seed = [
+        { ml: 350, drink: "Вода", container: "Бутылка", time: "18:42" },
+        { ml: 250, drink: "Чай", container: "Стакан", time: "15:10" },
+        { ml: 550, drink: "Вода", container: "Большая бутылка", time: "12:35" },
+        { ml: 130, drink: "Кофе", container: "До тренировки", time: "09:05" },
+        { ml: 200, drink: "Вода", container: "Стакан", time: "08:40" },
+      ];
+      const initial = p.has("entries")
+        ? Math.max(0, Math.min(seed.length, Number(p.get("entries")) || 0))
+        : 4;
+      let entries = seed.slice(0, initial),
+        expanded = false,
+        goal = 2200;
+      const history = document.querySelector("#history"),
+        count = document.querySelector("#history-count"),
+        toggle = document.querySelector("#history-toggle");
+      const escape = (value) =>
+        String(value).replace(
+          /[&<>"']/g,
+          (char) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[char],
+        );
+      const render = () => {
+        const total = entries.length,
+          visible = expanded ? entries : entries.slice(0, 3);
+        history.innerHTML =
+          visible
+            .map(
+              (entry) =>
+                '<div class="history-row"><span class="history-row__dot" aria-hidden="true"></span><div><strong>' +
+                entry.ml +
+                " мл · " +
+                escape(entry.drink) +
+                "</strong><span>" +
+                escape(entry.container) +
+                "</span></div><time>" +
+                entry.time +
+                "</time></div>",
+            )
+            .join("") || '<p class="note">Пока нет записей за этот день.</p>';
+        const plural =
+          total % 10 === 1 && total % 100 !== 11
+            ? "запись"
+            : total % 10 >= 2 &&
+                total % 10 <= 4 &&
+                (total % 100 < 12 || total % 100 > 14)
+              ? "записи"
+              : "записей";
+        count.textContent =
+          total > 3
+            ? (expanded ? "Вся история" : "Последние 3") + " · всего " + total
+            : total + " " + plural;
+        toggle.hidden = total <= 3;
+        toggle.setAttribute("aria-expanded", String(expanded));
+        toggle.innerHTML =
+          "<span>" +
+          (expanded ? "Свернуть историю" : "Показать всю историю") +
+          "</span>" +
+          chevron();
+        const amount = entries.reduce((sum, entry) => sum + entry.ml, 0),
+          percent = Math.round((amount * 100) / goal);
+        document.querySelector("#hydration-amount").textContent =
+          amount.toLocaleString("ru-RU") +
+          " из " +
+          goal.toLocaleString("ru-RU") +
+          " мл";
+        document
+          .querySelector(".orb")
+          .setAttribute("aria-label", percent + " процентов цели");
+        document.querySelector(".orb strong").textContent = percent + "%";
+        document.querySelector(".progress span").style.width =
+          Math.min(percent, 100) + "%";
+      };
+      toggle.addEventListener("click", () => {
+        expanded = !expanded;
+        render();
+      });
+      const add = (ml, drink, container) => {
+        if (!Number.isFinite(ml) || ml <= 0) return;
+        entries.unshift({ ml, drink, container, time: "19:00" });
+        render();
+      };
+      document
+        .querySelectorAll(".quick-add button")
+        .forEach((button) =>
+          button.addEventListener("click", () =>
+            add(
+              Number(
+                button.querySelector("strong").textContent.replace(/\D/g, ""),
+              ),
+              "Вода",
+              button.querySelector("span").textContent,
+            ),
+          ),
+        );
+      document
+        .querySelector(".entry-form button")
+        .addEventListener("click", () =>
+          add(
+            Number(document.querySelector("#amount").value),
+            document.querySelector("#drink").value.trim() || "Вода",
+            "Другой объём",
+          ),
+        );
+      document
+        .querySelector("#goal")
+        .closest("details")
+        .querySelector("button")
+        .addEventListener("click", () => {
+          const value = Number(document.querySelector("#goal").value);
+          if (value > 0) {
+            goal = value;
+            render();
+          }
+        });
+      document
+        .querySelector("#preset-name")
+        .closest("details")
+        .querySelector("button")
+        .addEventListener("click", () => {
+          const name = document.querySelector("#preset-name").value.trim(),
+            ml = Number(document.querySelector("#preset-volume").value);
+          if (!name || !Number.isFinite(ml) || ml <= 0) return;
+          const button = document.createElement("button");
+          button.type = "button";
+          const label = document.createElement("span"),
+            volume = document.createElement("strong");
+          label.textContent = name;
+          volume.innerHTML =
+            '<svg class="yfc-icon yfc-icon--16" data-icon="plus" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>';
+          volume.append(document.createTextNode(ml + " мл"));
+          button.append(label, volume);
+          button.addEventListener("click", () => add(ml, "Вода", name));
+          document.querySelector(".quick-add").append(button);
+        });
+      render();
+    </script>
+  </body>
+</html>

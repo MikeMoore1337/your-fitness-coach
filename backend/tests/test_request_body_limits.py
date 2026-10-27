@@ -6,11 +6,13 @@ from pathlib import Path
 
 import pytest
 
+from fitminiapp_api.core.config import settings
 from fitminiapp_api.main import app as production_app
 from fitminiapp_api.middleware.request_body_limit import (
     AUTH_BODY_LIMIT_BYTES,
     AVATAR_BODY_LIMIT_BYTES,
     DEFAULT_BODY_LIMIT_BYTES,
+    PROGRAM_IMPORT_PATH_PREFIX,
     RequestBodyLimitMiddleware,
 )
 
@@ -96,6 +98,7 @@ def _response_json(messages: list[dict]) -> dict:
     [
         ("/api/v1/auth/dev-login", AUTH_BODY_LIMIT_BYTES),
         ("/api/v1/me/avatar", AVATAR_BODY_LIMIT_BYTES),
+        (PROGRAM_IMPORT_PATH_PREFIX, settings.program_import_max_request_bytes),
         ("/api/v1/workouts", DEFAULT_BODY_LIMIT_BYTES),
     ],
 )
@@ -219,8 +222,10 @@ def test_edge_and_asgi_limits_share_the_reviewed_contract() -> None:
     assert configured_sizes == [
         AVATAR_BODY_LIMIT_BYTES,
         AUTH_BODY_LIMIT_BYTES,
+        settings.program_import_max_request_bytes,
         DEFAULT_BODY_LIMIT_BYTES,
     ]
+    assert "path /api/v1/programs/imports /api/v1/programs/imports/*" in caddyfile
     assert "reverse_proxy {$YFC_ACTIVE_UPSTREAM}" in caddyfile
     assert "reverse_proxy {$YFC_ASSET_FALLBACK_UPSTREAM}" in caddyfile
     assert 'Cache-Control "no-store, private"' in caddyfile

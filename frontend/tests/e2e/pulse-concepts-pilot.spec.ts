@@ -1,14 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { installTelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
-import { progressOverview } from './fixtures/locators';
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
 const captureVisualImpactFix = env?.YFC_CAPTURE_PULSE_VISUAL_IMPACT === '1';
 const capture = env?.YFC_CAPTURE_TASK_75C === '1' || captureVisualImpactFix;
 const screenshotRoot = captureVisualImpactFix
-  ? '../.artifacts/screenshots/bug-20260828-01-pulse-visual-impact/review'
-  : '../.artifacts/screenshots/task-75c/final';
+  ? '../.artifacts/runtime/tests/screenshots/bug-20260828-01-pulse-visual-impact/review'
+  : '../.artifacts/runtime/tests/screenshots/task-75c/final';
 
 interface PulseLabState {
   cls: number;
@@ -46,18 +45,42 @@ async function expectNoOverlap(first: Locator, second: Locator) {
   expect(overlaps).toBe(false);
 }
 
+function waitForSetPatch(page: Page, setId: number, completed?: boolean) {
+  return page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    if (
+      response.request().method() !== 'PATCH' ||
+      !url.pathname.endsWith(`/workouts/sets/${setId}`) ||
+      !response.ok()
+    ) {
+      return false;
+    }
+    try {
+      const isCompleted = response.request().postDataJSON()?.is_completed;
+      return completed === undefined || isCompleted === completed;
+    } catch {
+      return false;
+    }
+  });
+}
+
 async function completeWorkout(page: Page) {
   await page.goto('/app?section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
+  const valuesPatch = waitForSetPatch(page, 201, false);
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
-  await page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
+  await page.getByLabel('Вес, Приседания, подход 1').fill('40');
+  await valuesPatch;
+  await Promise.all([
+    waitForSetPatch(page, 201, true),
+    page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click(),
+  ]);
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
   return page.locator('.workout-completion');
 }
 
-test('selected current-action artwork and floating dock preserve the shared navigation contract', async ({
+test('current action and floating dock preserve the shared navigation contract', async ({
   page,
 }) => {
   await installPlatformApi(page, {
@@ -76,39 +99,13 @@ test('selected current-action artwork and floating dock preserve the shared navi
     const action = page.getByRole('button', { name: 'Начать тренировку' });
     const dock = page.locator('#appBottomNav');
     await expect(action).toBeVisible();
-    const currentActionArtwork = page.locator('.ui-semantic-artwork--current-action');
-    const currentActionSurface = page.locator('.today-workout-spotlight');
-    await expect(currentActionArtwork).toHaveCount(1);
-    await expect
-      .poll(() =>
-        currentActionArtwork.evaluate((element) =>
-          Number.parseFloat(getComputedStyle(element).opacity),
-        ),
-      )
-      .toBeGreaterThanOrEqual(0.9);
-    const visualImpact = await currentActionSurface.evaluate((element) => {
-      const surface = getComputedStyle(element);
-      const artwork = getComputedStyle(
-        element.querySelector<HTMLElement>('.ui-semantic-artwork--current-action')!,
-      );
-      return {
-        artworkShadow: artwork.boxShadow,
-        artworkWidth: Number.parseFloat(artwork.width),
-        background: surface.backgroundImage,
-        borderLeftWidth: Number.parseFloat(surface.borderLeftWidth),
-        stripeWidth: Number.parseFloat(getComputedStyle(element, '::before').width),
-      };
-    });
-    expect(visualImpact.borderLeftWidth).toBeLessThanOrEqual(2);
-    expect(visualImpact.stripeWidth).toBe(2);
-    expect(visualImpact.artworkWidth).toBeGreaterThanOrEqual(250);
-    expect(visualImpact.artworkShadow).not.toBe('none');
-    expect(visualImpact.background).toContain('radial-gradient');
-    await expect
-      .poll(() => currentActionArtwork.evaluate((element) => element.getAnimations().length))
-      .toBe(0);
+    await expect(page.locator('.ui-semantic-artwork')).toHaveCount(0);
+    await expect(page.locator('.today-workout-spotlight')).toHaveCSS('background-image', 'none');
     await expect(dock).toHaveCSS('position', 'fixed');
-    await expect(dock).toHaveCSS('border-radius', '20px');
+    const panelRadius = await dock.evaluate((element) =>
+      getComputedStyle(element).getPropertyValue('--v2-panel-radius').trim(),
+    );
+    await expect(dock).toHaveCSS('border-radius', panelRadius);
     await expectNoOverlap(action, dock);
     await expectNoHorizontalOverflow(page);
 
@@ -171,7 +168,11 @@ test('selected current-action artwork and floating dock preserve the shared navi
   const desktopNavigation = page.locator('#appBottomNav');
   await expect(desktopNavigation).toHaveCSS('width', '220px');
   await expect(desktopNavigation).toHaveCSS('border-radius', '0px');
-  await page.getByRole('button', { name: 'Добавить фактическое кардио' }).click();
+  await page.getByRole('button', { name: 'Быстро добавить' }).click();
+  await page
+    .getByRole('dialog', { name: 'Что добавить?' })
+    .getByRole('link', { name: 'Кардио', exact: true })
+    .click();
   const cardioFieldTops = await page.locator('.cardio-form__core').evaluate((form) => {
     const top = (selector: string) =>
       form.querySelector<HTMLElement>(selector)!.getBoundingClientRect().top;
@@ -194,40 +195,16 @@ test('selected current-action artwork and floating dock preserve the shared navi
   }
 });
 
-test('current-action artwork remains visible on a rest day', async ({ page }) => {
+test('rest-day action stays clear without decorative artwork', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 932 });
   await installPlatformApi(page, { browserSession: true, workoutStatus: 'none' });
   await page.goto('/app?section=today');
 
   await expect(page.getByRole('heading', { name: 'Сегодня без тренировки' })).toBeVisible();
   const surface = page.locator('.today-workout-spotlight');
-  const artwork = surface.locator('.ui-semantic-artwork--current-action');
   await expect(surface).toHaveClass(/today-workout-spotlight--rest-day/);
-  await expect(artwork).toHaveCount(1);
-
-  const visualImpact = await surface.evaluate((element) => {
-    const surfaceStyle = getComputedStyle(element);
-    const artworkStyle = getComputedStyle(
-      element.querySelector<HTMLElement>('.ui-semantic-artwork--current-action')!,
-    );
-    return {
-      artworkOpacity: Number.parseFloat(artworkStyle.opacity),
-      artworkShadow: artworkStyle.boxShadow,
-      artworkWidth: Number.parseFloat(artworkStyle.width),
-      background: surfaceStyle.backgroundImage,
-      stripeWidth: Number.parseFloat(getComputedStyle(element, '::before').width),
-    };
-  });
-
-  expect(visualImpact.artworkOpacity).toBeGreaterThanOrEqual(0.9);
-  expect(visualImpact.stripeWidth).toBe(2);
-  expect(visualImpact.artworkWidth).toBeGreaterThanOrEqual(250);
-  expect(visualImpact.artworkShadow).not.toBe('none');
-  expect(visualImpact.background).toContain('radial-gradient');
-  await expectNoOverlap(
-    page.getByRole('heading', { name: 'Сегодня без тренировки' }),
-    artwork.locator('i').last(),
-  );
+  await expect(surface.locator('.ui-semantic-artwork')).toHaveCount(0);
+  await expect(surface).toHaveCSS('background-image', 'none');
   await expectNoHorizontalOverflow(page);
 
   if (capture) {
@@ -321,7 +298,7 @@ test('frequent current action feedback is interruptible, repeatable and reduced-
   ).toBe(0);
 });
 
-test('weight bento trend keeps smooth truthful geometry, area fill and measurement alternative', async ({
+test('body trend keeps smooth truthful geometry, area fill and measurement alternative', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -330,8 +307,9 @@ test('weight bento trend keeps smooth truthful geometry, area fill and measureme
     measurementHistory: 'many',
     workoutStatus: 'completed',
   });
-  await page.goto('/app?section=progress');
-  const insight = progressOverview(page).locator('.progress-bento__trend');
+  await page.goto('/app?section=progress&progress_view=body');
+  const body = page.getByRole('region', { name: 'Тело', exact: true });
+  const insight = body.locator('.progress-trend-panel').first();
   await insight.scrollIntoViewIfNeeded();
   const chart = insight.locator('.data-viz-chart');
   await expect(chart).toBeVisible();
@@ -359,6 +337,7 @@ test('weight bento trend keeps smooth truthful geometry, area fill and measureme
   }
 
   const measurementHistory = page.locator('.measurement-history');
+  await page.locator('.progress-measurement-editor > summary').click();
   await measurementHistory.scrollIntoViewIfNeeded();
   await expect(measurementHistory).toBeVisible();
   await expectNoOverlap(
@@ -372,8 +351,9 @@ test('weight bento trend keeps smooth truthful geometry, area fill and measureme
   }
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/app?section=progress');
-  const desktopInsight = progressOverview(page).locator('.progress-bento__trend');
+  await page.goto('/app?section=progress&progress_view=body');
+  const desktopBody = page.getByRole('region', { name: 'Тело', exact: true });
+  const desktopInsight = desktopBody.locator('.progress-trend-panel').first();
   await desktopInsight.scrollIntoViewIfNeeded();
   await expect(desktopInsight.locator('.data-viz-chart__area')).toHaveCount(1);
   if (capture) {
@@ -392,9 +372,10 @@ test('mocked TMA dark uses the same chart and safe-area floating dock', async ({
     safeAreaInset: { top: 22, right: 2, bottom: 24, left: 2 },
   });
   await installPlatformApi(page, { measurementHistory: 'many', workoutStatus: 'completed' });
-  await page.goto('/app?section=progress');
+  await page.goto('/app?section=progress&progress_view=body');
   const dock = page.locator('#appBottomNav');
-  const insight = progressOverview(page).locator('.progress-bento__trend');
+  const body = page.getByRole('region', { name: 'Тело', exact: true });
+  const insight = body.locator('.progress-trend-panel').first();
   await insight.scrollIntoViewIfNeeded();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await expect(insight.locator('.data-viz-chart__area')).toHaveCount(1);
@@ -412,7 +393,7 @@ test('mocked TMA dark uses the same chart and safe-area floating dock', async ({
   });
   await expect
     .poll(() => dock.evaluate((element) => getComputedStyle(element).bottom))
-    .toBe('28px');
+    .toBe('40px');
   await expect(insight.locator('.data-viz-chart')).toHaveAttribute('data-motion-phase', 'idle');
   await expectNoHorizontalOverflow(page);
   if (capture) {
@@ -453,9 +434,14 @@ test('full Pulse completion motion exposes facts immediately and settles within 
   await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
   await page.goto('/app?section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
+  const valuesPatch = waitForSetPatch(page, 201, false);
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
-  await page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
+  await page.getByLabel('Вес, Приседания, подход 1').fill('40');
+  await valuesPatch;
+  await Promise.all([
+    waitForSetPatch(page, 201, true),
+    page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click(),
+  ]);
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.evaluate(() => {
     const lab = (window as PulseLabWindow).__pulseLab!;
@@ -503,33 +489,18 @@ test('full Pulse completion motion exposes facts immediately and settles within 
   expect(lab.longTasks).toEqual([]);
   expect(lab.cls).toBeLessThanOrEqual(0.01);
   expect(p95FrameGap).toBeLessThanOrEqual(34);
-  const completionImpact = await completion.evaluate((element) => {
-    const hero = getComputedStyle(element.querySelector<HTMLElement>('.workout-completion__hero')!);
-    const artwork = getComputedStyle(
-      element.querySelector<HTMLElement>('.ui-semantic-artwork--workout-completion')!,
-    );
-    const check = getComputedStyle(
-      element.querySelector<HTMLElement>('.workout-completion__check')!,
-    );
-    return {
-      artworkOpacity: Number.parseFloat(artwork.opacity),
-      artworkWidth: Number.parseFloat(artwork.width),
-      background: hero.backgroundImage,
-      borderLeftWidth: Number.parseFloat(hero.borderLeftWidth),
-      checkWidth: Number.parseFloat(check.width),
-    };
-  });
-  expect(completionImpact.artworkOpacity).toBeGreaterThanOrEqual(0.9);
-  expect(completionImpact.artworkWidth).toBeGreaterThanOrEqual(320);
-  expect(completionImpact.borderLeftWidth).toBeGreaterThanOrEqual(7);
-  expect(completionImpact.checkWidth).toBeGreaterThanOrEqual(64);
-  expect(completionImpact.background).toContain('radial-gradient');
+  await expect(completion.locator('.ui-semantic-artwork')).toHaveCount(0);
+  await expect(completion.locator('.workout-completion__hero')).toHaveCSS(
+    'background-image',
+    'none',
+  );
+  await expect(completion.locator('.workout-completion__check')).toBeVisible();
   if (capture) {
     await page.screenshot({ path: `${screenshotRoot}/completion-full-390-light-final.png` });
   }
 });
 
-test('reduced motion keeps the completion artwork and final values without travel', async ({
+test('reduced motion keeps completion confirmation and final values without travel', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -541,14 +512,12 @@ test('reduced motion keeps the completion artwork and final values without trave
   await expect(page.getByText(/максимальный вес 40 кг/)).toBeVisible();
   const finalState = await completion.evaluate((element) => ({
     animations: element.getAnimations({ subtree: true }).length,
-    artwork: getComputedStyle(
-      element.querySelector<HTMLElement>('.ui-semantic-artwork--workout-completion')!,
-    ).transform,
+    artworkCount: element.querySelectorAll('.ui-semantic-artwork').length,
     boundary: getComputedStyle(element.querySelector<HTMLElement>('.workout-completion__hero')!)
       .borderLeftColor,
   }));
   expect(finalState.animations).toBe(0);
-  expect(finalState.artwork).toBe('none');
+  expect(finalState.artworkCount).toBe(0);
   expect(finalState.boundary).not.toBe('rgba(0, 0, 0, 0)');
   await expectNoHorizontalOverflow(page);
   if (capture) {

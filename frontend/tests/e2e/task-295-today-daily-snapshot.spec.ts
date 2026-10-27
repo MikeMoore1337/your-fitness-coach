@@ -1,0 +1,469 @@
+import { expect, test, type Page } from '@playwright/test';
+import { resolve } from 'node:path';
+import { emptyHydrationDay, installPlatformApi } from './fixtures/platform-api';
+import { expectNoHorizontalOverflow } from './fixtures/mobile-tma';
+
+const FIXED_DATE = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
+const CAPTURE_EVIDENCE = process.env.YFC_CAPTURE_TASK_295_EVIDENCE === '1';
+const EVIDENCE_DIR = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  '..',
+  'tasks',
+  '295',
+  'evidence',
+  'screenshots',
+);
+
+async function openApp(page: Page, section: string): Promise<void> {
+  await page.goto(`/app?section=${section}`);
+  await expect(page.locator('.app-shell')).toBeVisible();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+}
+
+async function capture(page: Page, filename: string): Promise<void> {
+  if (!CAPTURE_EVIDENCE) return;
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, filename), fullPage: true });
+}
+
+function populatedDiary() {
+  const totals = {
+    energy_kcal: '1450.00',
+    protein_g: '96.000',
+    fat_g: '48.000',
+    carbs_g: '160.000',
+    fiber_g: '18.000',
+  };
+  const targets = {
+    energy_kcal: '2100.00',
+    protein_g: '140.000',
+    fat_g: '70.000',
+    carbs_g: '230.000',
+  };
+  const entry = {
+    id: 1,
+    diary_date: FIXED_DATE,
+    meal_type: 'breakfast',
+    food_id: null,
+    recipe_id: null,
+    entry_kind: 'quick_add',
+    logged_at: null,
+    food_name: 'Овсяная каша',
+    food_brand: null,
+    amount: '1',
+    amount_unit: 'serving',
+    weight_g: null,
+    nutrition_basis_kind: null,
+    nutrition_basis_amount: null,
+    nutrition_basis_unit: null,
+    serving_amount: null,
+    serving_unit: null,
+    serving_weight_g: null,
+    nutrition: totals,
+    created_at: `${FIXED_DATE}T08:00:00Z`,
+    updated_at: `${FIXED_DATE}T08:00:00Z`,
+  };
+  return {
+    diary_date: FIXED_DATE,
+    timezone: 'Europe/Moscow',
+    meals: [
+      { meal_type: 'breakfast', entries: [entry], totals },
+      { meal_type: 'lunch', entries: [], totals },
+      { meal_type: 'dinner', entries: [], totals },
+      { meal_type: 'snacks', entries: [], totals },
+    ],
+    totals,
+    targets,
+    remaining: {
+      energy_kcal: '650.00',
+      protein_g: '44.000',
+      fat_g: '22.000',
+      carbs_g: '70.000',
+    },
+    status: 'incomplete',
+    status_is_explicit: false,
+  };
+}
+
+function populatedHydration() {
+  return {
+    ...emptyHydrationDay(FIXED_DATE),
+    total_ml: 750,
+    goal: {
+      id: 1,
+      enabled: true,
+      target_ml: 2200,
+      source: 'manual',
+      method_version: 'task-295-fixture',
+      reference_scope: 'fixture',
+      sex: 'female',
+      adult_confirmed: true,
+      height_cm: 168,
+      weight_kg: 68,
+      activity_level: 'moderate',
+      climate: 'temperate',
+      calculated_at: `${FIXED_DATE}T07:00:00Z`,
+      created_at: `${FIXED_DATE}T07:00:00Z`,
+      updated_at: `${FIXED_DATE}T07:00:00Z`,
+    },
+    progress_percent: 34.1,
+    entries: [
+      {
+        id: 1,
+        volume_ml: 750,
+        beverage_type: 'water',
+        occurred_at: `${FIXED_DATE}T08:00:00Z`,
+        diary_date: FIXED_DATE,
+        timezone: 'Europe/Moscow',
+        source: 'manual',
+        created_at: `${FIXED_DATE}T08:00:00Z`,
+        updated_at: `${FIXED_DATE}T08:00:00Z`,
+      },
+    ],
+    last_logged_at: `${FIXED_DATE}T08:00:00Z`,
+  };
+}
+
+function completedCardio() {
+  return {
+    activity_type: 'walking',
+    duration_minutes: 30,
+    distance_km: null,
+    average_heart_rate_bpm: null,
+    heart_rate_zone: null,
+    note: 'Фактический результат',
+    scheduled_at: `${FIXED_DATE}T09:00:00+03:00`,
+    status: 'completed',
+    id: 659,
+    source: 'manual',
+    completed_at: `${FIXED_DATE}T09:30:00+03:00`,
+    created_at: `${FIXED_DATE}T08:00:00+03:00`,
+    updated_at: `${FIXED_DATE}T09:30:00+03:00`,
+  };
+}
+
+async function installPopulatedToday(page: Page): Promise<void> {
+  await installPlatformApi(page, {
+    browserSession: true,
+    fixedDate: FIXED_DATE,
+    measurementHistory: 'many',
+    cardioState: 'completed',
+  });
+  await page.route('**/api/v1/nutrition/diary**', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ json: populatedDiary() });
+  });
+  await page.route('**/api/v1/nutrition/hydration**', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ json: populatedHydration() });
+  });
+  await page.route('**/api/v1/workouts/cardio**', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ json: [completedCardio()] });
+  });
+}
+
+test('Task 295 keeps Today compact, factual and one-column on mobile', async ({ page }) => {
+  await installPopulatedToday(page);
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+
+  for (const surface of [
+    { name: 'today-390-populated-light', width: 390, height: 844, theme: 'light' as const },
+    { name: 'today-390-populated-dark', width: 390, height: 844, theme: 'dark' as const },
+    { name: 'today-1280-populated-light', width: 1280, height: 900, theme: 'light' as const },
+    { name: 'today-1440-populated-light', width: 1440, height: 900, theme: 'light' as const },
+    { name: 'today-1440-populated-dark', width: 1440, height: 900, theme: 'dark' as const },
+  ]) {
+    await page.emulateMedia({ colorScheme: surface.theme, reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: surface.width, height: surface.height });
+    await openApp(page, 'today');
+
+    await expect(page.getByRole('heading', { name: 'Силовая база' })).toBeVisible();
+    const nutrition = page.getByRole('region', { name: 'Питание на сегодня' });
+    await expect(nutrition).toContainText('1450 / 2100 ккал');
+    await expect(nutrition).toContainText('Осталось 650 ккал');
+    await expect(nutrition).toContainText('Белок');
+    await expect(nutrition).toContainText('96 / 140 г');
+    await expect(nutrition).toContainText('Вода 750 из 2200 мл');
+    await expect(page.getByRole('region', { name: 'Активность за сегодня' })).toContainText(
+      'Кардио · ходьба · 30 мин',
+    );
+    await expect(page.getByRole('link', { name: 'Открыть прогресс' })).toHaveAttribute(
+      'href',
+      '/app?section=progress',
+    );
+
+    const trainingBox = await page.locator('.today-dashboard__training').boundingBox();
+    const factsBox = await page.locator('.today-dashboard__facts').boundingBox();
+    expect(trainingBox).not.toBeNull();
+    expect(factsBox).not.toBeNull();
+    if (surface.width <= 899) {
+      const factBoxes = await page.locator('.today-dashboard__facts > *').evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return { x: box.x, width: box.width, y: box.y };
+        }),
+      );
+      expect(factBoxes.length).toBeGreaterThanOrEqual(3);
+      expect(new Set(factBoxes.map((box) => Math.round(box.x))).size).toBe(1);
+      expect(new Set(factBoxes.map((box) => Math.round(box.width))).size).toBe(1);
+      expect(trainingBox!.y).toBeLessThan(factBoxes[0]!.y);
+    } else {
+      expect(trainingBox!.width).toBeGreaterThan(factsBox!.width);
+    }
+    await expectNoHorizontalOverflow(page);
+    if (surface.name === 'today-390-populated-light') {
+      await capture(page, `${surface.name}.png`);
+    }
+  }
+});
+
+test('Task 295 keeps empty Today and Progress states distinct from zero', async ({ page }) => {
+  await installPlatformApi(page, {
+    browserSession: true,
+    fixedDate: FIXED_DATE,
+    workoutStatus: 'none',
+    measurementHistory: 'none',
+    cardioState: 'empty',
+    progressState: 'sparse',
+  });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openApp(page, 'today');
+
+  await expect(page.getByRole('region', { name: 'Питание на сегодня' })).toContainText(
+    'Записей за день пока нет',
+  );
+  await expect(page.getByRole('region', { name: 'Главное о прогрессе' })).toContainText(
+    'Появится после первых тренировок и замеров',
+  );
+  await expect(page.getByRole('region', { name: 'Активность за сегодня' })).toHaveCount(0);
+  const primaryNutritionAction = page.getByRole('link', {
+    name: 'Добавить питание',
+    exact: true,
+  });
+  await expect(primaryNutritionAction).toHaveAttribute('href', '/app?section=nutrition');
+  await expect(page.getByRole('link', { name: 'Открыть дневник питания' })).toHaveCount(0);
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  const [primaryNutritionActionBox, todayBottomNavBox, todayAddBox] = await Promise.all([
+    primaryNutritionAction.boundingBox(),
+    page.locator('#appBottomNav').boundingBox(),
+    page.locator('.app-bottom-nav__quick-add').boundingBox(),
+  ]);
+  expect(primaryNutritionActionBox).not.toBeNull();
+  expect(todayBottomNavBox).not.toBeNull();
+  expect(todayAddBox).not.toBeNull();
+  expect(primaryNutritionActionBox!.height).toBeGreaterThanOrEqual(44);
+  expect(todayAddBox!.x).toBeGreaterThanOrEqual(todayBottomNavBox!.x);
+  expect(todayAddBox!.x + todayAddBox!.width).toBeLessThanOrEqual(
+    todayBottomNavBox!.x + todayBottomNavBox!.width,
+  );
+  expect(primaryNutritionActionBox!.y + primaryNutritionActionBox!.height).toBeLessThanOrEqual(
+    todayBottomNavBox!.y + 1,
+  );
+  await expect(page.locator('.app-quick-add-trigger--floating')).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+  await capture(page, 'today-390-sparse-light.png');
+
+  for (const width of [360, 389, 390, 393, 400, 430, 439, 440, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    await openApp(page, 'today');
+    await page.mouse.wheel(0, 120);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const action = page.getByRole('link', { name: 'Добавить питание', exact: true });
+    const workoutActions = page.locator('.today-workout-actions').first();
+    const water = page.getByRole('link', { name: '+ Вода' });
+    const group = page.locator('.today-nutrition__food-group');
+    const nutrition = page.getByRole('region', { name: 'Питание на сегодня' });
+    const values = nutrition.locator('.today-nutrition__values');
+    const [actionBox, workoutActionsBox, waterBox, groupBox, nutritionBox, valuesBox] =
+      await Promise.all([
+        action.boundingBox(),
+        workoutActions.boundingBox(),
+        water.boundingBox(),
+        group.boundingBox(),
+        nutrition.boundingBox(),
+        values.boundingBox(),
+      ]);
+    expect(actionBox).not.toBeNull();
+    expect(workoutActionsBox).not.toBeNull();
+    expect(waterBox).not.toBeNull();
+    expect(groupBox).not.toBeNull();
+    expect(nutritionBox).not.toBeNull();
+    expect(valuesBox).not.toBeNull();
+    if (!actionBox || !workoutActionsBox || !waterBox || !groupBox || !nutritionBox || !valuesBox)
+      continue;
+    expect(actionBox.x).toBeGreaterThanOrEqual(workoutActionsBox.x);
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+      workoutActionsBox.x + workoutActionsBox.width + 1,
+    );
+    expect(groupBox.x).toBeGreaterThanOrEqual(nutritionBox.x);
+    expect(groupBox.x + groupBox.width).toBeLessThanOrEqual(
+      nutritionBox.x + nutritionBox.width + 1,
+    );
+    expect(valuesBox.x).toBeGreaterThanOrEqual(groupBox.x);
+    expect(valuesBox.x + valuesBox.width).toBeLessThanOrEqual(groupBox.x + groupBox.width + 1);
+    expect(waterBox.x).toBeGreaterThanOrEqual(nutritionBox.x);
+    expect(waterBox.x + waterBox.width).toBeLessThanOrEqual(
+      nutritionBox.x + nutritionBox.width + 1,
+    );
+    expect(actionBox!.height).toBeGreaterThanOrEqual(44);
+    expect(await action.evaluate((element) => (element as HTMLElement).innerText)).toBe(
+      'Добавить питание',
+    );
+    const [addBox, bottomNavBox] = await Promise.all([
+      page.locator('.app-bottom-nav__quick-add').boundingBox(),
+      page.locator('#appBottomNav').boundingBox(),
+    ]);
+    expect(addBox).not.toBeNull();
+    expect(bottomNavBox).not.toBeNull();
+    expect(addBox!.x).toBeGreaterThanOrEqual(bottomNavBox!.x);
+    expect(addBox!.x + addBox!.width).toBeLessThanOrEqual(bottomNavBox!.x + bottomNavBox!.width);
+    await expect(page.locator('.app-quick-add-trigger--floating')).toHaveCount(0);
+    if (width < 440) {
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(bottomNavBox!.y + 1);
+    }
+    await expectNoHorizontalOverflow(page);
+    if (CAPTURE_EVIDENCE && width !== 400) {
+      await page.screenshot({
+        path: resolve(EVIDENCE_DIR, `hotfix-today-nutrition-${width}.png`),
+        fullPage: false,
+      });
+    }
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openApp(page, 'progress');
+  const metrics = page.locator('.progress-overview__metrics .progress-overview__metric');
+  await expect(metrics).toHaveCount(4);
+  expect(
+    await metrics.evaluateAll((elements) =>
+      elements.every((element) => element.getAttribute('data-progress-state') === 'sparse'),
+    ),
+  ).toBe(true);
+  const sparseHeights = await metrics.evaluateAll((elements) =>
+    elements.map((element) => element.getBoundingClientRect().height),
+  );
+  expect(
+    await metrics.evaluateAll((elements) =>
+      elements.every((element) => !element.querySelector('small')),
+    ),
+  ).toBe(true);
+  expect(await metrics.first().evaluate((element) => (element as HTMLElement).innerText)).toContain(
+    'Тело\nМало данных',
+  );
+  expect(
+    await metrics.first().evaluate((element) => (element as HTMLElement).innerText),
+  ).not.toContain('Мало данных\nМало данных');
+  const sparseStyles = await metrics.evaluateAll((elements) =>
+    elements.map((element) => getComputedStyle(element).minHeight),
+  );
+  expect(sparseStyles.every((minHeight) => minHeight === '0px')).toBe(true);
+  expect(sparseHeights.every((height) => height >= 44 && height <= 120)).toBe(true);
+  const lastMetric = metrics.last();
+  await lastMetric.scrollIntoViewIfNeeded();
+  const [lastMetricBox, bottomNavBox, addBox] = await Promise.all([
+    lastMetric.boundingBox(),
+    page.locator('#appBottomNav').boundingBox(),
+    page.locator('.app-bottom-nav__quick-add').boundingBox(),
+  ]);
+  expect(lastMetricBox).not.toBeNull();
+  expect(bottomNavBox).not.toBeNull();
+  expect(addBox).not.toBeNull();
+  expect(addBox!.x).toBeGreaterThanOrEqual(bottomNavBox!.x);
+  expect(addBox!.x + addBox!.width).toBeLessThanOrEqual(bottomNavBox!.x + bottomNavBox!.width);
+  expect(lastMetricBox!.y + lastMetricBox!.height).toBeLessThanOrEqual(bottomNavBox!.y + 1);
+  await expect(page.locator('.app-quick-add-trigger--floating')).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+  await capture(page, 'progress-390-sparse-light.png');
+});
+
+test('Task 295 lets populated Progress cards use their content height on mobile and desktop', async ({
+  page,
+}) => {
+  await installPlatformApi(page, {
+    browserSession: true,
+    fixedDate: FIXED_DATE,
+    workoutStatus: 'completed',
+    measurementHistory: 'many',
+    cardioState: 'completed',
+    progressState: 'populated',
+  });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+
+  for (const surface of [
+    { name: 'progress-390-populated-light', width: 390, height: 844 },
+    { name: 'progress-1440-populated-light', width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize({ width: surface.width, height: surface.height });
+    await openApp(page, 'progress');
+    const metrics = page.locator('.progress-overview__metrics .progress-overview__metric');
+    await expect(metrics).toHaveCount(4);
+    expect(
+      await metrics.evaluateAll((elements) =>
+        elements.every((element) => element.getAttribute('data-progress-state') === 'populated'),
+      ),
+    ).toBe(true);
+    expect(
+      await metrics.evaluateAll((elements) =>
+        elements.every((element) => element.querySelector('small')),
+      ),
+    ).toBe(true);
+    await expectNoHorizontalOverflow(page);
+    if (surface.name === 'progress-390-populated-light') {
+      await capture(page, `${surface.name}.png`);
+    }
+  }
+});
+
+test('Task 295 keeps Profile disclosures readable at narrow widths', async ({ page }) => {
+  await installPlatformApi(page, { browserSession: true, fixedDate: FIXED_DATE });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+
+  for (const surface of [
+    { name: 'profile-320-light', width: 320, height: 568 },
+    { name: 'profile-360-light', width: 360, height: 800 },
+    { name: 'profile-390-light', width: 390, height: 844 },
+    { name: 'profile-1280-light', width: 1280, height: 900 },
+  ]) {
+    await page.setViewportSize({ width: surface.width, height: surface.height });
+    await openApp(page, 'profile');
+    await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
+    const profile = page.locator('.profile-settings');
+    const sections = profile.locator(':scope > details.card-disclosure');
+    await expect(sections).toHaveCount(5);
+    const expectedLabels = [
+      'Личные данные и фитнес-профиль',
+      'Тренировочные предпочтения',
+      'Тренер и приглашения',
+      'Уведомления',
+      'Доступ и безопасность',
+    ];
+    for (const [index, section] of (await sections.all()).entries()) {
+      const summary = section.locator(':scope > summary');
+      await expect(summary).toContainText(expectedLabels[index]!);
+      const box = await summary.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      if (surface.width <= 430) {
+        const titleStyle = await summary.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            overflow: style.overflow,
+            textOverflow: style.textOverflow,
+            whiteSpace: style.whiteSpace,
+          };
+        });
+        expect(titleStyle.overflow).not.toBe('hidden');
+        expect(titleStyle.textOverflow).not.toBe('ellipsis');
+      }
+    }
+    for (const sectionTitle of expectedLabels) {
+      await expect(profile).toContainText(sectionTitle);
+    }
+    await expectNoHorizontalOverflow(page);
+    await capture(page, `${surface.name}.png`);
+  }
+});

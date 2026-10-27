@@ -1,0 +1,14 @@
+{
+  "source_id": "journal-one",
+  "external_id": "fixture-source-packet",
+  "canonical_url": "https://example.com/task129/fixture",
+  "primary_url": null,
+  "title": "Исследование связало силовые тренировки с восстановлением",
+  "summary": "Авторы изучили силовые тренировки и восстановление у взрослых.",
+  "content": "Локальный fixture: исследователи описывают связь тренировочной нагрузки и восстановления.",
+  "author": null,
+  "publisher": "Journal One",
+  "published_at": "2026-09-03T00:00:00",
+  "updated_at": null,
+  "doi": null
+}

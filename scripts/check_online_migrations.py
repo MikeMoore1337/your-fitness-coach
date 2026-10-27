@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
+import json
 import re
 import subprocess
 from pathlib import Path
 
 MIGRATION_ROOT = Path("backend/alembic/versions")
-ALLOWED_PHASES = {"expand", "backfill"}
+ALLOWED_PHASES = {
+    "expand",
+    "backfill",
+    "constraint_swap",
+    "rest_unique_swap",
+    "numeric_precision",
+}
 DESTRUCTIVE_CALLS = {
     "alter_column",
     "drop_column",
@@ -46,6 +54,14 @@ SAFE_COLUMN_TYPES = {
     "String",
     "Text",
     "Time",
+}
+
+# 0118 was merged before the production online gate evaluated its source and
+# the first deployment stopped before applying it. Keep its compatibility
+# path exact and source-hash-pinned; every other migration remains subject to
+# the strict AST contract below.
+LEGACY_ONLINE_MIGRATION_SHA256 = {
+    "backend/alembic/versions/0118_measurement_eligibility.py": "13d4c9d6693d352b9ceb5b69b3a8713e124c505f65ba774620a8d5a12b3cdea8",
 }
 
 
@@ -94,6 +110,66 @@ def changed_migrations(active_revision: str, target_revision: str) -> list[tuple
     return changes
 
 
+def changed_migrations_from_manifest(
+    active_revision: str, target_revision: str, manifest: Path
+) -> list[tuple[str, Path]]:
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise OnlineMigrationError(
+            f"cannot read immutable migration manifest {manifest}: {exc}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise OnlineMigrationError("immutable migration manifest must be an object")
+    if payload.get("schema_version") != 1:
+        raise OnlineMigrationError("unsupported immutable migration manifest version")
+    if (
+        payload.get("active_revision") != active_revision
+        or payload.get("target_revision") != target_revision
+    ):
+        raise OnlineMigrationError(
+            "immutable migration manifest revision range does not match deployment"
+        )
+    changes: list[tuple[str, Path]] = []
+    raw_changes = payload.get("changes")
+    if not isinstance(raw_changes, list):
+        raise OnlineMigrationError("immutable migration manifest changes must be a list")
+    for item in raw_changes:
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("status"), str)
+            or not isinstance(item.get("path"), str)
+        ):
+            raise OnlineMigrationError("immutable migration manifest contains an invalid change")
+        path = Path(item["path"])
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or path.parts[: len(MIGRATION_ROOT.parts)] != MIGRATION_ROOT.parts
+        ):
+            raise OnlineMigrationError(
+                f"immutable migration manifest path is outside {MIGRATION_ROOT}: {path}"
+            )
+        if path.suffix == ".py" and path.name != "__init__.py":
+            changes.append((item["status"], path))
+    return changes
+
+
+def validate_legacy_migration_compatibility(path: Path) -> bool:
+    """Accept only the exact source of a reviewed, already-merged migration."""
+
+    expected = LEGACY_ONLINE_MIGRATION_SHA256.get(path.as_posix())
+    if expected is None:
+        return False
+    normalized_source = path.read_text(encoding="utf-8").replace("\r\n", "\n").encode("utf-8")
+    actual = hashlib.sha256(normalized_source).hexdigest()
+    if actual != expected:
+        raise OnlineMigrationError(
+            f"{path} legacy compatibility hash mismatch; refusing unverified migration source"
+        )
+    return True
+
+
 def _assignment(tree: ast.Module, name: str) -> object | None:
     for node in tree.body:
         if not isinstance(node, (ast.Assign, ast.AnnAssign)):
@@ -106,7 +182,9 @@ def _assignment(tree: ast.Module, name: str) -> object | None:
             return None
         try:
             return ast.literal_eval(value)
-        except ValueError, TypeError:
+        except ValueError:
+            return None
+        except TypeError:
             return None
     return None
 
@@ -133,7 +211,120 @@ def _op_calls(upgrade: ast.AST) -> list[ast.Call]:
     ]
 
 
+def _parent_links(root: ast.AST) -> dict[ast.AST, tuple[ast.AST, str]]:
+    links: dict[ast.AST, tuple[ast.AST, str]] = {}
+    for parent in ast.walk(root):
+        for field_name, value in ast.iter_fields(parent):
+            if isinstance(value, ast.AST):
+                links[value] = (parent, field_name)
+            elif isinstance(value, list):
+                for child in value:
+                    if isinstance(child, ast.AST):
+                        links[child] = (parent, field_name)
+    return links
+
+
+def _is_direct_op_call(call: ast.Call, attribute: str) -> bool:
+    return (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "op"
+        and call.func.attr == attribute
+    )
+
+
+def _has_true_keyword(call: ast.Call, name: str) -> bool:
+    return any(
+        keyword.arg == name
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is True
+        for keyword in call.keywords
+    )
+
+
+def _is_autocommit_block_call(call: ast.Call) -> bool:
+    return (
+        isinstance(call.func, ast.Attribute)
+        and call.func.attr == "autocommit_block"
+        and isinstance(call.func.value, ast.Call)
+        and _is_direct_op_call(call.func.value, "get_context")
+    )
+
+
+def _is_postgresql_dialect_name(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "name"
+        and isinstance(node.value, ast.Attribute)
+        and node.value.attr == "dialect"
+        and isinstance(node.value.value, ast.Name)
+        and node.value.value.id == "bind"
+    )
+
+
+def _is_postgresql_dialect_check(node: ast.AST) -> bool:
+    if (
+        not isinstance(node, ast.Compare)
+        or len(node.ops) != 1
+        or not isinstance(node.ops[0], ast.Eq)
+    ):
+        return False
+    if len(node.comparators) != 1:
+        return False
+    left, right = node.left, node.comparators[0]
+    return (
+        _is_postgresql_dialect_name(left)
+        and isinstance(right, ast.Constant)
+        and right.value == "postgresql"
+    ) or (
+        _is_postgresql_dialect_name(right)
+        and isinstance(left, ast.Constant)
+        and left.value == "postgresql"
+    )
+
+
+def _is_within_autocommit_block(call: ast.Call, links: dict[ast.AST, tuple[ast.AST, str]]) -> bool:
+    current: ast.AST = call
+    while current in links:
+        parent, _field_name = links[current]
+        if isinstance(parent, ast.With) and any(
+            _is_autocommit_block_call(item.context_expr) for item in parent.items
+        ):
+            return True
+        current = parent
+    return False
+
+
+def _is_in_non_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST, str]]) -> bool:
+    current: ast.AST = call
+    while current in links:
+        parent, field_name = links[current]
+        if (
+            isinstance(parent, ast.If)
+            and field_name == "orelse"
+            and _is_postgresql_dialect_check(parent.test)
+        ):
+            return True
+        current = parent
+    return False
+
+
+def _is_in_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST, str]]) -> bool:
+    current: ast.AST = call
+    while current in links:
+        parent, field_name = links[current]
+        if (
+            isinstance(parent, ast.If)
+            and field_name == "body"
+            and _is_postgresql_dialect_check(parent.test)
+        ):
+            return True
+        current = parent
+    return False
+
+
 def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object) -> None:
+    links = _parent_links(upgrade)
     created_tables = {
         call.args[0].value
         for call in _op_calls(upgrade)
@@ -149,18 +340,48 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
             owner = function.value.id
             if phase == "expand":
                 allowed = (
-                    owner == "op"
-                    and function.attr in {"add_column", "create_table", "create_index"}
-                ) or (
-                    owner == "sa"
-                    and (
-                        function.attr in SAFE_TABLE_CONSTRUCTORS
-                        or function.attr in SAFE_COLUMN_TYPES
-                        or function.attr == "text"
+                    (
+                        owner == "op"
+                        and function.attr
+                        in {"add_column", "create_table", "create_index", "get_bind", "get_context"}
                     )
+                    or (
+                        owner == "sa"
+                        and (
+                            function.attr in SAFE_TABLE_CONSTRUCTORS
+                            or function.attr in SAFE_COLUMN_TYPES
+                            or function.attr == "text"
+                        )
+                    )
+                    or (owner == "bind" and function.attr in {"in_transaction", "commit"})
                 )
             elif phase == "backfill":
                 allowed = owner == "op" and function.attr == "execute"
+            elif phase == "constraint_swap":
+                allowed = owner == "op" and function.attr in {"execute", "get_bind"}
+            elif phase == "rest_unique_swap":
+                allowed = (
+                    (
+                        owner == "op"
+                        and function.attr
+                        in {"execute", "get_bind", "batch_alter_table", "create_index"}
+                    )
+                    or (owner == "batch" and function.attr == "drop_constraint")
+                    or (owner == "sa" and function.attr == "text")
+                )
+            elif phase == "numeric_precision":
+                allowed = (
+                    (
+                        owner == "op"
+                        and function.attr in {"execute", "get_bind", "batch_alter_table"}
+                    )
+                    or (owner == "batch" and function.attr == "alter_column")
+                    or (owner == "sa" and function.attr in SAFE_COLUMN_TYPES)
+                )
+        elif phase == "numeric_precision" and isinstance(function, ast.Name):
+            allowed = function.id == "_ensure_upgrade_safe"
+        if _is_autocommit_block_call(call):
+            allowed = True
         if not allowed:
             raise OnlineMigrationError(
                 f"{path} calls a helper or operation outside the {phase!r} online allowlist"
@@ -177,11 +398,171 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 if len(call.args) > 1 and isinstance(call.args[1], ast.Constant)
                 else None
             )
-            if table_name not in created_tables:
+            if table_name not in created_tables and not (
+                _has_true_keyword(call, "postgresql_concurrently")
+                and _has_true_keyword(call, "if_not_exists")
+                and (
+                    _is_within_autocommit_block(call, links)
+                    or _is_in_non_postgresql_branch(call, links)
+                )
+            ):
                 raise OnlineMigrationError(
                     f"{path} contains lock-prone operations: create_index is allowed only for "
-                    "a new empty table in the same migration"
+                    "a new empty table in the same migration or a PostgreSQL-concurrent "
+                    "index in an autocommit block"
                 )
+
+
+def _validate_constraint_swap_sql(
+    path: Path,
+    statements: list[str],
+    *,
+    table_name: str,
+    constraint_name: str,
+    lock_timeout_seconds: int,
+    statement_timeout_seconds: int,
+) -> None:
+    expected_lock = f"SET LOCAL lock_timeout = '{lock_timeout_seconds}s'"
+    expected_statement = f"SET LOCAL statement_timeout = '{statement_timeout_seconds}s'"
+    expected_validate = f"ALTER TABLE {table_name} VALIDATE CONSTRAINT {constraint_name}"
+    if len(statements) != 4:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must contain exactly four static op.execute statements"
+        )
+    if statements[0].strip() != expected_lock:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must set the declared LOCAL lock_timeout first"
+        )
+    if statements[1].strip() != expected_statement:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must set the declared LOCAL statement_timeout second"
+        )
+
+    swap = re.sub(r"\s+", " ", statements[2]).strip()
+    prefix = (
+        f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name}, "
+        f"ADD CONSTRAINT {constraint_name} CHECK ("
+    )
+    if (
+        not swap.startswith(prefix)
+        or not swap.endswith(") NOT VALID")
+        or ";" in swap
+        or re.search(r"\b(REFERENCES|UNIQUE|PRIMARY KEY|FOREIGN KEY)\b", swap, re.IGNORECASE)
+    ):
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must replace only the declared CHECK constraint using NOT VALID"
+        )
+    if statements[3].strip() != expected_validate:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must validate the declared constraint after replacement"
+        )
+
+
+def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[str]) -> None:
+    """Accept only the atomic, bounded, single-slot rest uniqueness replacement."""
+    if path.name != "0132_rest_interval_unique_swap.py":
+        raise OnlineMigrationError(f"{path} unapproved rest uniqueness swap")
+    if statements != [
+        "SET LOCAL lock_timeout = '3s'",
+        "SET LOCAL statement_timeout = '30s'",
+        "CREATE UNIQUE INDEX uq_workout_rest_initial_source "
+        "ON workout_rest_sessions (source_set_id) WHERE predecessor_id IS NULL",
+        "CREATE UNIQUE INDEX uq_workout_rest_predecessor ON workout_rest_sessions (predecessor_id)",
+        "CREATE UNIQUE INDEX uq_workout_rest_start_mutation "
+        "ON workout_rest_sessions (workout_id, start_mutation_id)",
+        "CREATE UNIQUE INDEX uq_workout_rest_running_workout "
+        "ON workout_rest_sessions (workout_id) WHERE status = 'running'",
+        "ALTER TABLE workout_rest_sessions DROP CONSTRAINT uq_workout_rest_source_set",
+    ]:
+        raise OnlineMigrationError(f"{path} rest uniqueness swap SQL must be exact")
+    links = _parent_links(upgrade)
+    executions = [c for c in _op_calls(upgrade) if c.func.attr == "execute"]
+    if len(executions) != 7 or not all(_is_in_postgresql_branch(c, links) for c in executions):
+        raise OnlineMigrationError(f"{path} rest unique swap SQL must be PostgreSQL-only")
+    binds = [c for c in _op_calls(upgrade) if c.func.attr == "get_bind"]
+    batches = [c for c in _op_calls(upgrade) if c.func.attr == "batch_alter_table"]
+    index_calls = [c for c in _op_calls(upgrade) if c.func.attr == "create_index"]
+    drops = [
+        c
+        for c in ast.walk(upgrade)
+        if isinstance(c, ast.Call)
+        and isinstance(c.func, ast.Attribute)
+        and isinstance(c.func.value, ast.Name)
+        and c.func.value.id == "batch"
+        and c.func.attr == "drop_constraint"
+    ]
+    expected_indexes = [
+        ("uq_workout_rest_initial_source", ["source_set_id"], "predecessor_id IS NULL"),
+        ("uq_workout_rest_predecessor", ["predecessor_id"], None),
+        ("uq_workout_rest_start_mutation", ["workout_id", "start_mutation_id"], None),
+        ("uq_workout_rest_running_workout", ["workout_id"], "status = 'running'"),
+    ]
+    if (
+        len(binds) != 1
+        or len(batches) != 1
+        or len(drops) != 1
+        or len(index_calls) != 4
+        or not _is_in_non_postgresql_branch(batches[0], links)
+        or not _is_in_non_postgresql_branch(drops[0], links)
+        or len(batches[0].args) != 1
+        or not isinstance(batches[0].args[0], ast.Constant)
+        or batches[0].args[0].value != "workout_rest_sessions"
+        or batches[0].keywords
+        or len(drops[0].args) != 1
+        or not isinstance(drops[0].args[0], ast.Constant)
+        or drops[0].args[0].value != "uq_workout_rest_source_set"
+        or len(drops[0].keywords) != 1
+        or drops[0].keywords[0].arg != "type_"
+        or not isinstance(drops[0].keywords[0].value, ast.Constant)
+        or drops[0].keywords[0].value.value != "unique"
+    ):
+        raise OnlineMigrationError(f"{path} rest unique swap SQLite branch must be exact")
+    for call, (name, columns, where) in zip(index_calls, expected_indexes, strict=True):
+        if not _is_in_non_postgresql_branch(call, links):
+            raise OnlineMigrationError(f"{path} SQLite indexes must stay in fallback branch")
+        if len(call.args) != 3 or any(not isinstance(item, ast.Constant) for item in call.args[:2]):
+            raise OnlineMigrationError(f"{path} unexpected rest index signature")
+        if (
+            call.args[0].value != name
+            or call.args[1].value != "workout_rest_sessions"
+            or not isinstance(call.args[2], ast.List)
+            or [elt.value for elt in call.args[2].elts if isinstance(elt, ast.Constant)] != columns
+            or len(call.args[2].elts) != len(columns)
+        ):
+            raise OnlineMigrationError(f"{path} unexpected rest index columns")
+        kwargs = {item.arg: item.value for item in call.keywords}
+        if (
+            set(kwargs) != ({"unique", "sqlite_where"} if where is not None else {"unique"})
+            or not isinstance(kwargs["unique"], ast.Constant)
+            or kwargs["unique"].value is not True
+        ):
+            raise OnlineMigrationError(f"{path} rest index must be unique and exact")
+        if where is not None:
+            expr = kwargs["sqlite_where"]
+            if (
+                not isinstance(expr, ast.Call)
+                or not isinstance(expr.func, ast.Attribute)
+                or not isinstance(expr.func.value, ast.Name)
+                or expr.func.value.id != "sa"
+                or expr.func.attr != "text"
+                or len(expr.args) != 1
+                or not isinstance(expr.args[0], ast.Constant)
+                or expr.args[0].value != where
+                or expr.keywords
+            ):
+                raise OnlineMigrationError(f"{path} unexpected partial-index predicate")
+    batch_with = [
+        n
+        for n in ast.walk(upgrade)
+        if isinstance(n, ast.With)
+        and any(
+            isinstance(item.context_expr, ast.Call)
+            and _is_direct_op_call(item.context_expr, "batch_alter_table")
+            for item in n.items
+        )
+    ]
+    if len(batch_with) != 1 or drops[0] not in set(ast.walk(batch_with[0])):
+        raise OnlineMigrationError(f"{path} rest unique swap batch must contain only its drop")
 
 
 def _validate_nullable_add_column(path: Path, call: ast.Call) -> None:
@@ -222,12 +603,31 @@ def _validate_nullable_add_column(path: Path, call: ast.Call) -> None:
         )
     for unsafe_keyword in ("server_default", "unique", "index"):
         value = keywords.get(unsafe_keyword)
-        if value is not None and not (
-            isinstance(value, ast.Constant) and value.value in {None, False}
-        ):
+        if unsafe_keyword == "server_default":
+            safe = value is None or _is_constant_false_server_default(value)
+        else:
+            safe = value is None or (
+                isinstance(value, ast.Constant) and value.value in {None, False}
+            )
+        if not safe:
             raise OnlineMigrationError(
                 f"{path} add_column cannot use {unsafe_keyword} during an online expand"
             )
+
+
+def _is_constant_false_server_default(value: ast.AST | None) -> bool:
+    return (
+        isinstance(value, ast.Call)
+        and isinstance(value.func, ast.Attribute)
+        and isinstance(value.func.value, ast.Name)
+        and value.func.value.id == "sa"
+        and value.func.attr == "text"
+        and len(value.args) == 1
+        and not value.keywords
+        and isinstance(value.args[0], ast.Constant)
+        and isinstance(value.args[0].value, str)
+        and value.args[0].value.strip().upper() == "FALSE"
+    )
 
 
 def validate_added_migration(path: Path) -> None:
@@ -261,6 +661,47 @@ def validate_added_migration(path: Path) -> None:
                 f"{path} backfill must declare online_rollout_idempotent = True"
             )
 
+    constraint_swap_config: tuple[str, str, int, int] | None = None
+    if phase == "constraint_swap":
+        table_name = _assignment(tree, "online_rollout_constraint_table")
+        constraint_name = _assignment(tree, "online_rollout_constraint_name")
+        lock_timeout_seconds = _assignment(tree, "online_rollout_lock_timeout_seconds")
+        statement_timeout_seconds = _assignment(tree, "online_rollout_statement_timeout_seconds")
+        if not isinstance(table_name, str) or not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", table_name
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap must declare a static table identifier"
+            )
+        if not isinstance(constraint_name, str) or not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", constraint_name
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap must declare a static constraint identifier"
+            )
+        if (
+            not isinstance(lock_timeout_seconds, int)
+            or isinstance(lock_timeout_seconds, bool)
+            or not 1 <= lock_timeout_seconds <= 5
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap lock timeout must be between 1 and 5 seconds"
+            )
+        if (
+            not isinstance(statement_timeout_seconds, int)
+            or isinstance(statement_timeout_seconds, bool)
+            or not 1 <= statement_timeout_seconds <= 60
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap statement timeout must be between 1 and 60 seconds"
+            )
+        constraint_swap_config = (
+            table_name,
+            constraint_name,
+            lock_timeout_seconds,
+            statement_timeout_seconds,
+        )
+
     destructive = sorted(
         {
             node.func.attr
@@ -276,6 +717,7 @@ def validate_added_migration(path: Path) -> None:
             + ", ".join(destructive)
         )
 
+    links = _parent_links(upgrade)
     for node in ast.walk(upgrade):
         if (
             not isinstance(node, ast.Call)
@@ -289,7 +731,15 @@ def validate_added_migration(path: Path) -> None:
             and node.func.value.id == "op"
         ):
             raise OnlineMigrationError(
-                f"{path} uses SQL execution outside the verified op.execute backfill contract"
+                f"{path} uses SQL execution outside the verified op.execute online contract"
+            )
+        if phase in {
+            "constraint_swap",
+            "rest_unique_swap",
+            "numeric_precision",
+        } and not _is_in_postgresql_branch(node, links):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap SQL must be gated to the PostgreSQL branch"
             )
 
     forbidden = sorted(
@@ -309,7 +759,13 @@ def validate_added_migration(path: Path) -> None:
         operation = call.func.attr if isinstance(call.func, ast.Attribute) else ""
         if phase == "expand" and operation == "add_column":
             _validate_nullable_add_column(path, call)
-        elif phase == "expand" and operation not in {"add_column", "create_table", "create_index"}:
+        elif phase == "expand" and operation not in {
+            "add_column",
+            "create_table",
+            "create_index",
+            "get_bind",
+            "get_context",
+        }:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online expand"
             )
@@ -317,7 +773,29 @@ def validate_added_migration(path: Path) -> None:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online backfill"
             )
+        elif phase == "constraint_swap" and operation not in {"execute", "get_bind"}:
+            raise OnlineMigrationError(
+                f"{path} uses op.{operation}, which is not allowlisted for online constraint_swap"
+            )
+        elif phase == "rest_unique_swap" and operation not in {
+            "execute",
+            "get_bind",
+            "batch_alter_table",
+            "create_index",
+        }:
+            raise OnlineMigrationError(
+                f"{path} uses op.{operation}, which is not allowlisted for rest_unique_swap"
+            )
+        elif phase == "numeric_precision" and operation not in {
+            "execute",
+            "get_bind",
+            "batch_alter_table",
+        }:
+            raise OnlineMigrationError(
+                f"{path} uses op.{operation}, which is not allowlisted for numeric_precision"
+            )
 
+    execute_statements: list[str] = []
     for node in _op_calls(upgrade):
         if (
             isinstance(node, ast.Call)
@@ -332,7 +810,20 @@ def validate_added_migration(path: Path) -> None:
                 raise OnlineMigrationError(
                     f"{path} uses dynamic op.execute; online safety cannot be verified"
                 )
-            sql = re.sub(r"\s+", " ", node.args[0].value).strip().upper()
+            raw_sql = node.args[0].value
+            if phase in {"constraint_swap", "rest_unique_swap"}:
+                execute_statements.append(raw_sql)
+                continue
+            if phase == "numeric_precision":
+                sql = re.sub(r"\s+", " ", raw_sql).strip().upper()
+                if not sql.startswith(("SET LOCAL ", "ALTER TABLE ")) or re.search(
+                    r"\b(DROP|TRUNCATE|DELETE)\b", sql
+                ):
+                    raise OnlineMigrationError(
+                        f"{path} numeric_precision SQL must be bounded SET LOCAL or ALTER TABLE"
+                    )
+                continue
+            sql = re.sub(r"\s+", " ", raw_sql).strip().upper()
             if re.search(r"\b(DROP|ALTER|TRUNCATE|DELETE)\b", sql):
                 raise OnlineMigrationError(
                     f"{path} contains destructive SQL forbidden during an online rollout"
@@ -345,6 +836,20 @@ def validate_added_migration(path: Path) -> None:
                 raise OnlineMigrationError(
                     f"{path} backfill SQL must be one bounded UPDATE with an explicit WHERE"
                 )
+
+    if phase == "constraint_swap":
+        assert constraint_swap_config is not None
+        _validate_constraint_swap_sql(
+            path,
+            execute_statements,
+            table_name=constraint_swap_config[0],
+            constraint_name=constraint_swap_config[1],
+            lock_timeout_seconds=constraint_swap_config[2],
+            statement_timeout_seconds=constraint_swap_config[3],
+        )
+
+    if phase == "rest_unique_swap":
+        _validate_rest_unique_swap(path, upgrade, execute_statements)
 
     if phase == "backfill" and not any(
         isinstance(node, ast.Call)
@@ -359,8 +864,14 @@ def validate_added_migration(path: Path) -> None:
     _validate_upgrade_call_allowlist(path, upgrade, phase)
 
 
-def check_online_migrations(active_revision: str, target_revision: str) -> list[Path]:
-    changes = changed_migrations(active_revision, target_revision)
+def check_online_migrations(
+    active_revision: str, target_revision: str, *, manifest: Path | None = None
+) -> list[Path]:
+    changes = (
+        changed_migrations_from_manifest(active_revision, target_revision, manifest)
+        if manifest is not None
+        else changed_migrations(active_revision, target_revision)
+    )
     unsafe_history = [(status, path) for status, path in changes if status != "A"]
     if unsafe_history:
         details = ", ".join(f"{status}:{path}" for status, path in unsafe_history)
@@ -369,17 +880,49 @@ def check_online_migrations(active_revision: str, target_revision: str) -> list[
         )
     added = [path for _status, path in changes]
     for path in added:
-        validate_added_migration(path)
+        if not validate_legacy_migration_compatibility(path):
+            validate_added_migration(path)
     return added
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("active_revision")
-    parser.add_argument("target_revision")
+    parser.add_argument("active_revision", nargs="?")
+    parser.add_argument("target_revision", nargs="?")
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--write-manifest", action="store_true")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
-        migrations = check_online_migrations(args.active_revision, args.target_revision)
+        if not args.active_revision or not args.target_revision:
+            raise OnlineMigrationError("active and target revisions are required")
+        if args.write_manifest:
+            if args.manifest is not None or args.output is None:
+                raise OnlineMigrationError("--write-manifest requires only --output")
+            changes = changed_migrations(args.active_revision, args.target_revision)
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "active_revision": args.active_revision,
+                        "target_revision": args.target_revision,
+                        "changes": [
+                            {"status": status, "path": path.as_posix()} for status, path in changes
+                        ],
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            print(f"Migration manifest written: {args.output}")
+            return 0
+        if args.output is not None:
+            raise OnlineMigrationError("--output is valid only with --write-manifest")
+        migrations = check_online_migrations(
+            args.active_revision, args.target_revision, manifest=args.manifest
+        )
     except (OSError, SyntaxError, subprocess.CalledProcessError, OnlineMigrationError) as exc:
         print(f"Online migration gate failed: {exc}")
         return 1

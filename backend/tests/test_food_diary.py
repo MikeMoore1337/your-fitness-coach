@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from threading import Barrier
 
+import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import CheckConstraint, Column, Integer, MetaData, Table, create_engine, inspect
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Integer,
+    MetaData,
+    Table,
+    create_engine,
+    inspect,
+)
 from sqlalchemy.orm import joinedload
 
 from fitminiapp_api import main as main_module
@@ -17,9 +28,13 @@ from fitminiapp_api.db.performance import (
     current_sql_metrics,
     reset_sql_metrics,
 )
-from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food import Food
-from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.food_diary import (
+    FoodDiaryCopyOperation,
+    FoodDiaryEntry,
+    FoodDiaryRepeatPreview,
+)
 from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.schemas.food_diary import FoodDiaryEntryCreate
@@ -548,20 +563,166 @@ def test_quick_add_full_macros_remain_available_to_day_totals(client) -> None:
         "carbs_g": "52.000",
         "fiber_g": None,
     }
+    copy_request = {
+        "source_entry_id": response.json()["id"],
+        "source_date": selected_date.isoformat(),
+        "source_meal_type": "dinner",
+        "target_date": (selected_date + timedelta(days=1)).isoformat(),
+        "target_meal_type": "lunch",
+    }
+    preview = client.post(
+        "/api/v1/nutrition/diary/copy/product/preview",
+        headers=headers,
+        json=copy_request,
+    )
+    assert preview.status_code == 200, preview.text
     copied = client.post(
         "/api/v1/nutrition/diary/copy/product",
         headers={**headers, "Idempotency-Key": "copy-quick-entry-full-1"},
-        json={
-            "source_entry_id": response.json()["id"],
-            "source_date": selected_date.isoformat(),
-            "source_meal_type": "dinner",
-            "target_date": (selected_date + timedelta(days=1)).isoformat(),
-            "target_meal_type": "lunch",
-        },
+        json={**copy_request, "preview_token": preview.json()["preview_token"]},
     )
     assert copied.status_code == 201, copied.text
     assert copied.json()["entries"][0]["entry_kind"] == "quick_add"
     assert copied.json()["entries"][0]["nutrition"] == response.json()["nutrition"]
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_repeat_confirmations_consume_one_preview(client) -> None:
+    telegram_user_id = 16_044
+    headers = _auth(client, telegram_user_id)
+    selected_date = timezone_module.today_in_timezone("Europe/Moscow") - timedelta(days=2)
+    source = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "quick_add": {"energy_kcal": "520"},
+            "diary_date": selected_date.isoformat(),
+            "meal_type": "dinner",
+            "amount": "1",
+            "amount_unit": "serving",
+        },
+    )
+    assert source.status_code == 201, source.text
+    request = {
+        "source_entry_id": source.json()["id"],
+        "source_date": selected_date.isoformat(),
+        "source_meal_type": "dinner",
+        "target_date": (selected_date + timedelta(days=1)).isoformat(),
+        "target_meal_type": "lunch",
+    }
+    preview = client.post(
+        "/api/v1/nutrition/diary/copy/product/preview",
+        headers=headers,
+        json=request,
+    )
+    assert preview.status_code == 200, preview.text
+    payload = {**request, "preview_token": preview.json()["preview_token"]}
+
+    request_barrier = Barrier(2)
+
+    def confirm(key: str):
+        request_barrier.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/diary/copy/product",
+            headers={**headers, "Idempotency-Key": key},
+            json=payload,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(confirm, ("repeat-race-a", "repeat-race-b")))
+
+    assert sorted(response.status_code for response in responses) == [201, 409]
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_user_id).one()
+        stored_preview = db.query(FoodDiaryRepeatPreview).filter_by(user_id=user.id).one()
+        assert stored_preview.confirmed_at is not None
+        assert db.query(FoodDiaryCopyOperation).filter_by(user_id=user.id).count() == 1
+        assert (
+            db.query(FoodDiaryEntry)
+            .filter(
+                FoodDiaryEntry.user_id == user.id,
+                FoodDiaryEntry.diary_date == selected_date + timedelta(days=1),
+            )
+            .count()
+            == 1
+        )
+
+
+def test_quick_add_accepts_partial_macros_and_preserves_source_confidence(client) -> None:
+    headers = _auth(client, 16_042)
+    selected_date = timezone_module.today_in_timezone("Europe/Moscow") - timedelta(days=3)
+    response = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers={**headers, "Idempotency-Key": "quick-entry-partial-1"},
+        json={
+            "quick_add": {
+                "name": "Ужин в кафе",
+                "nutrition_source": "restaurant",
+                "energy_kcal": "680",
+                "protein_g": "24",
+            },
+            "diary_date": selected_date.isoformat(),
+            "meal_type": "dinner",
+            "amount": "1",
+            "amount_unit": "serving",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["nutrition_source"] == "restaurant"
+    assert response.json()["nutrition_confidence"] == "partial"
+    assert response.json()["nutrition"] == {
+        "energy_kcal": "680.00",
+        "protein_g": "24.000",
+        "fat_g": None,
+        "carbs_g": None,
+        "fiber_g": None,
+    }
+
+    day = client.get(
+        "/api/v1/nutrition/diary",
+        headers=headers,
+        params={"diary_date": selected_date.isoformat()},
+    )
+    assert day.status_code == 200
+    assert day.json()["totals"] == {
+        "energy_kcal": "680.00",
+        "protein_g": "24.000",
+        "fat_g": None,
+        "carbs_g": None,
+        "fiber_g": None,
+    }
+
+
+def test_diary_exposes_one_deterministic_prior_meal_repeat_candidate(client) -> None:
+    telegram_user_id = 16_043
+    headers = _auth(client, telegram_user_id)
+    food_id = _store_food(name="Повторяемая каша")
+    today = timezone_module.today_in_timezone("Europe/Moscow")
+    source_date = today - timedelta(days=1)
+    source = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": source_date.isoformat(),
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert source.status_code == 201, source.text
+
+    current = client.get(
+        "/api/v1/nutrition/diary",
+        headers=headers,
+        params={"diary_date": today.isoformat()},
+    )
+    assert current.status_code == 200, current.text
+    assert current.json()["repeat_candidate"] == {
+        "source_date": source_date.isoformat(),
+        "source_meal_type": "breakfast",
+        "entry_count": 1,
+    }
 
 
 def test_diary_day_query_count_is_constant() -> None:
@@ -598,7 +759,7 @@ def test_diary_day_query_count_is_constant() -> None:
             reset_sql_metrics(token)
 
     assert len(result.meals[-1].entries) == 25
-    assert metrics.query_count == 3
+    assert metrics.query_count == 4
 
 
 def test_food_diary_migration_upgrades_from_food_domain_head(tmp_path: Path) -> None:
@@ -637,6 +798,18 @@ def test_food_diary_migration_upgrades_from_food_domain_head(tmp_path: Path) -> 
             "quick_carbs_g",
             "idempotency_key",
             "request_fingerprint",
+            "nutrition_basis_kind",
+            "nutrition_basis_amount",
+            "nutrition_basis_unit",
+            "nutrition_snapshot",
+            "nutrition_amount",
+            "nutrition_weight_g",
+            "batch_operation_id",
+            "nutrition_energy_kcal_per_100g",
+            "nutrition_protein_g_per_100g",
+            "nutrition_fat_g_per_100g",
+            "nutrition_carbs_g_per_100g",
+            "nutrition_source",
         }
         assert {column["name"] for column in schema.get_columns("food_diary_entries")} == {
             column.name

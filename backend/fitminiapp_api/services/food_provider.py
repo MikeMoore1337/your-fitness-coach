@@ -146,6 +146,7 @@ def get_food_provider_registry() -> FoodProviderRegistry:
         usda = USDAFoodDataCentralProvider(
             api_key=settings.usda_fdc_api_key.get_secret_value(),
             timeout_seconds=settings.food_provider_timeout_seconds,
+            proxy_url=settings.usda_fdc_proxy_url or None,
         )
 
     return FoodProviderRegistry(

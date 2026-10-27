@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { addCalendarDays, calendarWeek, formatCalendarDate } from '../dateTime';
 import { AppLink } from '../navigation/router';
 import { ChevronIcon } from './common';
@@ -168,11 +168,31 @@ export function formatWeekRange(days: string[]): string {
 
 export function WeekStrip(props: WeekStripProps) {
   const headingId = useId();
+  const daysRef = useRef<HTMLOListElement>(null);
   const days = props.rangeStart
     ? Array.from({ length: 7 }, (_, index) => addCalendarDays(props.rangeStart!, index))
     : calendarWeek(props.anchorDate);
   const isPicker = props.mode === 'picker';
   const Root = isPicker ? 'nav' : 'section';
+  const selectedDate = isPicker ? props.selectedDate : undefined;
+
+  useEffect(() => {
+    const rail = daysRef.current;
+    if (!rail || !selectedDate) return;
+    const revealSelected = () => {
+      const selected = rail.querySelector('[aria-pressed="true"]');
+      if (!selected) return;
+      const bounds = rail.getBoundingClientRect();
+      const item = selected.getBoundingClientRect();
+      if (item.right > bounds.right - 4) rail.scrollLeft += item.right - bounds.right + 4;
+      else if (item.left < bounds.left + 4) rail.scrollLeft += item.left - bounds.left - 4;
+    };
+    revealSelected();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealSelected);
+    observer?.observe(rail);
+    return () => observer?.disconnect();
+  }, [selectedDate]);
 
   return (
     <Root
@@ -221,7 +241,7 @@ export function WeekStrip(props: WeekStripProps) {
         </div>
       </div>
 
-      <ol className="week-strip__days">
+      <ol className="week-strip__days" ref={daysRef}>
         {days.map((date) => {
           const isToday = date === props.today;
           const isSelected = isPicker && date === props.selectedDate;
@@ -264,6 +284,7 @@ export function WeekStrip(props: WeekStripProps) {
                   aria-current={isToday ? 'date' : undefined}
                   aria-label={label}
                   aria-pressed={isSelected}
+                  data-yfc-choice="compact"
                   className={dayClassName}
                   disabled={props.isDateDisabled?.(date)}
                   onClick={() => props.onSelect(date)}
@@ -298,7 +319,7 @@ export function WeekStrip(props: WeekStripProps) {
 
       {props.legend && props.legend.length > 0 && (
         <details className="week-strip__legend-disclosure">
-          <summary className="week-strip__legend-summary">
+          <summary className="week-strip__legend-summary yfc-disclosure-summary">
             <span className="week-strip__legend-summary-label">
               <Icon aria-hidden="true" className="week-strip__legend-info" name="info" size={20} />
               <span>Обозначения</span>

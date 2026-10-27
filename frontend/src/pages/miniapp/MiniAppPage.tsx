@@ -1,6 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { AppShell, type AppSection } from '../../app/AppShell';
+import { AppShell, type AppSection, type DemoAppShellConfig } from '../../app/AppShell';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
+import '../../styles/ux-ia-redesign.css';
 import { useAuth } from '../../app/AuthProvider';
+import { useQuickAddReturn } from '../../app/useQuickAddReturn';
 import {
   authRecoveryMessage,
   providerLabel,
@@ -10,14 +14,19 @@ import { TelegramLinkPrompt } from '../../features/account/TelegramLinkPrompt';
 import { TodayDashboard } from '../../features/dashboard/TodayDashboard';
 import type { WorkoutNavigationTarget } from '../../features/workouts/WorkoutHistory';
 import { AppLink, focusedContextReturn, useNavigation } from '../../shared/navigation/router';
-import { Badge, Card } from '../../shared/ui/common';
+import { Badge, Card, DisclosureIcon } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
+import { AiCoachSettingsCard, useAiCoachStatus } from '../../features/ai/AiCoachExperience';
+import { AiCoachContextualEntry } from '../../features/ai/AiCoachContextualEntry';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { programProfileReadiness } from '../../features/profile/programReadiness';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import { parseProgressView } from '../../features/workouts/progressPeriods';
 import '../../styles/pulse-concepts.css';
 import '../../styles/semantic-cards.css';
+import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 
 const NotificationsPanel = lazy(() =>
   import('../../features/account/NotificationsPanel').then((module) => ({
@@ -72,9 +81,24 @@ const TemplatesList = lazy(() =>
     default: module.TemplatesList,
   })),
 );
-const ProgressSchedule = lazy(() =>
+const ProgressExperience = lazy(() =>
+  import('../../features/workouts/ProgressExperience').then((module) => ({
+    default: module.ProgressExperience,
+  })),
+);
+const SchedulePanel = lazy(() =>
   import('../../features/workouts/ProgressSchedule').then((module) => ({
-    default: module.ProgressSchedule,
+    default: module.SchedulePanel,
+  })),
+);
+const WeeklyCheckInCard = lazy(() =>
+  import('../../features/workouts/WeeklyCheckInCard').then((module) => ({
+    default: module.WeeklyCheckInCard,
+  })),
+);
+const AssignedCheckInTemplates = lazy(() =>
+  import('../../features/workouts/AssignedCheckInTemplates').then((module) => ({
+    default: module.AssignedCheckInTemplates,
   })),
 );
 const WorkoutHistory = lazy(() =>
@@ -92,6 +116,14 @@ const sections: ReadonlyArray<AppSection> = [
   'profile',
 ];
 
+const PROFILE_HASH_TARGETS = new Set([
+  'profile-personal',
+  'profile-fitness',
+  'profile-trainer',
+  'profile-notifications',
+  'profile-security',
+]);
+
 function requestedSection(search: string): AppSection | null {
   const params = new URLSearchParams(search);
   const section = params.get('section');
@@ -99,9 +131,31 @@ function requestedSection(search: string): AppSection | null {
   return requestedWorkoutFeedback(search) ? 'progress' : null;
 }
 
+function requestedExerciseSlug(search: string): string | null {
+  const value = new URLSearchParams(search).get('exercise_slug');
+  return value && /^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(value) ? value : null;
+}
+
 function requestedNutritionDate(search: string): string | undefined {
   const value = new URLSearchParams(search).get('date');
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+type NutritionMealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+
+function requestedNutritionMeal(search: string): NutritionMealType | undefined {
+  const value = new URLSearchParams(search).get('meal');
+  return value === 'breakfast' || value === 'lunch' || value === 'dinner' || value === 'snacks'
+    ? value
+    : undefined;
+}
+
+function requestedHydrationQuick(search: string): boolean {
+  return new URLSearchParams(search).get('hydration') === 'quick';
+}
+
+function requestedNutritionQuickAdd(search: string): boolean {
+  return new URLSearchParams(search).get('quick_add') === 'food';
 }
 
 function requestedWellbeingDate(search: string): string | undefined {
@@ -112,6 +166,14 @@ function requestedWellbeingDate(search: string): string | undefined {
 function requestedProgramStart(search: string): 'create' | 'templates' | null {
   const value = new URLSearchParams(search).get('start');
   return value === 'create' || value === 'templates' ? value : null;
+}
+
+function requestedProgramView(search: string): 'summary' | 'manage' {
+  return new URLSearchParams(search).get('view') === 'manage' ? 'manage' : 'summary';
+}
+
+function requestedMeasurementsFocus(search: string): boolean {
+  return new URLSearchParams(search).get('focus') === 'measurements';
 }
 
 function requestedProgressReturn(search: string): string | undefined {
@@ -129,24 +191,18 @@ function requestedProgressReturn(search: string): string | undefined {
   }
 }
 
-function positiveId(value: string | null): number | null {
-  if (!value || !/^\d+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
 function requestedWorkoutFeedback(search: string): {
   workoutId: number;
   commentId: number | null;
   workoutExerciseId: number | null;
 } | null {
   const params = new URLSearchParams(search);
-  const workoutId = positiveId(params.get('workout_id'));
+  const workoutId = positiveIntegerParam(params, 'workout_id');
   if (!workoutId) return null;
   return {
     workoutId,
-    commentId: positiveId(params.get('comment_id')),
-    workoutExerciseId: positiveId(params.get('workout_exercise_id')),
+    commentId: positiveIntegerParam(params, 'comment_id'),
+    workoutExerciseId: positiveIntegerParam(params, 'workout_exercise_id'),
   };
 }
 
@@ -156,9 +212,9 @@ function requestedHistoricalProgramWorkout(search: string): {
   workoutId: number;
 } | null {
   const params = new URLSearchParams(search);
-  const workoutId = positiveId(params.get('workout_id'));
-  const programId = positiveId(params.get('program_history'));
-  const revisionNumber = positiveId(params.get('program_revision'));
+  const workoutId = positiveIntegerParam(params, 'workout_id');
+  const programId = positiveIntegerParam(params, 'program_history');
+  const revisionNumber = positiveIntegerParam(params, 'program_revision');
   return workoutId && programId && revisionNumber ? { workoutId, programId, revisionNumber } : null;
 }
 
@@ -171,9 +227,25 @@ function launchInviteToken(): string | null {
   return startParam?.startsWith('trainer_') ? startParam.slice('trainer_'.length) : null;
 }
 
-export default function MiniAppPage() {
+function revealDetails(details: HTMLDetailsElement | null) {
+  if (!details || details.open) return;
+  const summary = details.querySelector('summary');
+  if (summary instanceof HTMLElement) summary.click();
+}
+
+export default function MiniAppPage({
+  demo,
+  renderShell = true,
+  sectionOverride,
+}: {
+  demo?: DemoAppShellConfig;
+  renderShell?: boolean;
+  sectionOverride?: AppSection;
+} = {}) {
   const { user, reloadUser } = useAuth();
-  const { navigate, search } = useNavigation();
+  const runtime = useRuntime();
+  const capabilities = useRuntimeCapabilities();
+  const { hash, navigate, search } = useNavigation();
   const { toast } = useFeedback();
   const [initialInviteToken] = useState(launchInviteToken);
   const [fallbackSection] = useState<AppSection>(() => {
@@ -184,7 +256,17 @@ export default function MiniAppPage() {
       ? 'profile'
       : 'today';
   });
-  const section = requestedSection(search) ?? fallbackSection;
+  const section = sectionOverride ?? requestedSection(search) ?? fallbackSection;
+  const exerciseSlug = section === 'catalog' ? requestedExerciseSlug(search) : null;
+  const aiCoachStatus = useAiCoachStatus(section === 'profile');
+  const nutritionDate = requestedNutritionDate(search);
+  const nutritionMeal = requestedNutritionMeal(search);
+  const nutritionQuickAdd = requestedNutritionQuickAdd(search);
+  const nutritionHydrationOpen = requestedHydrationQuick(search);
+  const reportHandoffId =
+    section === 'progress'
+      ? positiveIntegerParam(new URLSearchParams(search), 'report_handoff_id')
+      : null;
   const sectionMotion = useSemanticMotion<HTMLDivElement>(section, {
     animateInitial: section === 'progress',
   });
@@ -194,6 +276,11 @@ export default function MiniAppPage() {
   const workoutReturnPath = requestedFeedback ? focusedContextReturn(search) : null;
   const focusWeeklyReview = new URLSearchParams(search).get('weekly_review') === '1';
   const focusDailyWellbeing = new URLSearchParams(search).get('wellbeing') === '1';
+  const focusCardio = new URLSearchParams(search).get('cardio') === '1';
+  const focusMeasurements = requestedMeasurementsFocus(search);
+  const exitQuickMeasurement = useQuickAddReturn('/app?section=progress');
+  const exitQuickWellbeing = useQuickAddReturn('/app?section=today');
+  const progressView = parseProgressView(search, window.location.hash);
   const dailyWellbeingDate = requestedWellbeingDate(search);
   const [focusedWorkout, setFocusedWorkout] = useState<{
     id: number;
@@ -206,6 +293,17 @@ export default function MiniAppPage() {
   const historyFocusId =
     requestedFeedback?.workoutId ??
     (focusedWorkout?.target === 'history' ? focusedWorkout.id : null);
+
+  useEffect(() => {
+    if (reportHandoffId === null) return;
+    const params = new URLSearchParams({ handoff_id: String(reportHandoffId) });
+    if (
+      new URLSearchParams(search).get('return_to') === '/app?section=profile#profile-notifications'
+    ) {
+      params.set('return_to', '/app?section=profile#profile-notifications');
+    }
+    navigate(`/app/report?${params}`, true);
+  }, [navigate, reportHandoffId, search]);
 
   useEffect(() => {
     if (analyticsSurface === 'tma') {
@@ -250,6 +348,12 @@ export default function MiniAppPage() {
     );
   }, [toast]);
   const programStart = section === 'programs' ? requestedProgramStart(search) : null;
+  const programHistoryId = positiveIntegerParam(new URLSearchParams(search), 'program_history');
+  const programManagementOpen =
+    section === 'programs' &&
+    (requestedProgramView(search) === 'manage' ||
+      programStart !== null ||
+      programHistoryId !== null);
   const profileReadiness = programProfileReadiness(user?.profile);
   const profileFormKey = JSON.stringify([
     user?.profile?.full_name,
@@ -262,132 +366,224 @@ export default function MiniAppPage() {
     user?.profile?.cardio_trainings_per_week,
     user?.profile?.timezone,
   ]);
-  const openProfileSection = (detailsId: string, targetId = detailsId) => {
-    const details = document.getElementById(detailsId);
-    if (details instanceof HTMLDetailsElement) details.open = true;
-    window.requestAnimationFrame(() =>
-      document.getElementById(targetId)?.scrollIntoView({ block: 'start' }),
-    );
-  };
-
   useEffect(() => {
     if (section !== 'profile') return;
-    const targetId = window.location.hash.slice(1);
-    if (!targetId.startsWith('profile-')) return;
-    const frame = window.requestAnimationFrame(() => {
+    const targetId = hash.slice(1);
+    if (targetId === 'profile-ai-coach') {
+      navigate('/app?section=profile', true);
+      return;
+    }
+    if (!PROFILE_HASH_TARGETS.has(targetId)) return;
+    const revealHashTarget = () => {
       const target = document.getElementById(targetId);
+      if (!target) return false;
       const details =
         target instanceof HTMLDetailsElement ? target : target?.closest('details.card-disclosure');
-      if (details instanceof HTMLDetailsElement) details.open = true;
+      revealDetails(details instanceof HTMLDetailsElement ? details : null);
       target?.scrollIntoView({ block: 'start' });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [section, search]);
+      return true;
+    };
 
-  return (
-    <AppShell section={section}>
-      <div
-        className={`page-stack app-section app-section--${section} app-section--design-v2`}
-        id={sectionMotion.elementId}
-        data-motion-phase={section === 'progress' ? sectionMotion.motionPhase : 'idle'}
-        data-motion-revision={sectionMotion.motionRevision}
-        data-motion-surface={section === 'progress' ? 'progress' : undefined}
-        onAnimationEnd={sectionMotion.onMotionAnimationEnd}
-      >
-        {section !== 'today' && section !== 'progress' && section !== 'nutrition' && (
-          <header className="card hero-card">
-            <div>
-              <span className="eyebrow">Your Fitness Coach</span>
-              <h1>
-                {section === 'profile'
-                  ? 'Профиль и настройки'
-                  : section === 'programs'
-                    ? 'Программа тренировок'
-                    : user?.profile?.full_name || user?.first_name || 'Мой фитнес'}
-              </h1>
-              <p className="muted">
-                {section === 'profile'
-                  ? 'Личные данные, связи, уведомления и безопасность аккаунта.'
-                  : section === 'programs'
-                    ? 'Текущая программа, тренировочные дни и создание своего плана.'
-                    : 'Тренировки, питание и прогресс в одном месте.'}
-              </p>
-            </div>
-          </header>
-        )}
-        {(section === 'programs' || section === 'catalog') && <TelegramLinkPrompt />}
-        <section className="page-stack">
-          <Suspense
-            fallback={
-              <p className="muted" role="status">
-                Загружаем раздел…
-              </p>
-            }
-          >
-            {section === 'today' && (
-              <TodayDashboard
-                initialWellbeingDate={dailyWellbeingDate}
-                initialWellbeingOpen={focusDailyWellbeing}
-              />
-            )}
-            {section === 'progress' && (
-              <>
-                {workoutReturnPath?.includes('section=programs') && (
-                  <AppLink className="program-history-return" to={workoutReturnPath}>
-                    К истории программы
-                  </AppLink>
+    if (revealHashTarget()) return;
+
+    const observer = new MutationObserver(() => {
+      if (revealHashTarget()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [hash, navigate, search, section]);
+
+  const content = (
+    <div
+      className={`page-stack app-section app-section--${section} app-section--design-v2`}
+      id={sectionMotion.elementId}
+      data-motion-phase={section === 'progress' ? sectionMotion.motionPhase : 'idle'}
+      data-motion-revision={sectionMotion.motionRevision}
+      data-motion-surface={section === 'progress' ? 'progress' : undefined}
+      onAnimationEnd={sectionMotion.onMotionAnimationEnd}
+    >
+      {section !== 'today' && section !== 'progress' && section !== 'nutrition' && (
+        <header className="card hero-card">
+          <div>
+            <span className="eyebrow">Your Fitness Coach</span>
+            <h1>
+              {section === 'profile'
+                ? 'Профиль и настройки'
+                : section === 'programs'
+                  ? 'План'
+                  : user?.profile?.full_name || user?.first_name || 'Мой фитнес'}
+            </h1>
+            <p className="muted">
+              {section === 'profile'
+                ? 'Личные данные, связи, уведомления и безопасность аккаунта.'
+                : section === 'programs'
+                  ? 'Активная программа, ближайшие тренировки и управление планом.'
+                  : 'Тренировки, питание и прогресс в одном месте.'}
+            </p>
+          </div>
+        </header>
+      )}
+      {capabilities.canMutatePrograms && (section === 'programs' || section === 'catalog') && (
+        <TelegramLinkPrompt />
+      )}
+      <section className="page-stack">
+        <Suspense
+          fallback={
+            <p className="muted" role="status">
+              Загружаем раздел…
+            </p>
+          }
+        >
+          {section === 'today' && (
+            <TodayDashboard
+              initialCardioOpen={focusCardio}
+              initialWellbeingDate={dailyWellbeingDate}
+              initialWellbeingOpen={focusDailyWellbeing}
+              onWellbeingExit={exitQuickWellbeing}
+            />
+          )}
+          {section === 'progress' && (
+            <>
+              {workoutReturnPath?.includes('section=programs') && (
+                <AppLink className="program-history-return" to={workoutReturnPath}>
+                  К истории программы
+                </AppLink>
+              )}
+              {historicalProgramWorkout && (
+                <HistoricalProgramWorkout {...historicalProgramWorkout} />
+              )}
+              <div className="stack progress-workout-stack">
+                <ProgressExperience
+                  canExport={capabilities.canExport}
+                  focusMeasurements={focusMeasurements}
+                  progressView={progressView}
+                  timeZone={user?.profile?.timezone}
+                  measurementDiary={
+                    <Diary
+                      embedded
+                      onExit={focusMeasurements ? exitQuickMeasurement : undefined}
+                      onSaved={async () => void (await reloadUser())}
+                      readOnly={!capabilities.canMutateProgress}
+                    />
+                  }
+                  detailContent={
+                    progressView === 'wellbeing' ? (
+                      <>
+                        {!capabilities.canMutateProgress && (
+                          <p className="muted demo-capability-notice" role="status">
+                            Проверка самочувствия доступна после входа. В демо показана
+                            production-поверхность без отправки персональных ответов.
+                          </p>
+                        )}
+                        <fieldset
+                          className="demo-capability-fieldset"
+                          disabled={!capabilities.canMutateProgress}
+                        >
+                          <WeeklyCheckInCard
+                            autoFocus={focusWeeklyReview}
+                            compact
+                            userId={user?.id ?? 'anonymous'}
+                          />
+                          <details className="progress-secondary-disclosure">
+                            <summary className="yfc-disclosure-summary">
+                              Дополнительные проверки
+                              <DisclosureIcon />
+                            </summary>
+                            <AssignedCheckInTemplates readOnly={!capabilities.canMutateProgress} />
+                          </details>
+                        </fieldset>
+                      </>
+                    ) : progressView === 'history' ? (
+                      <WorkoutHistory
+                        compact
+                        readOnly={!capabilities.canMutateProgress}
+                        timeZone={user?.profile?.timezone}
+                        focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
+                        focusedCommentId={requestedFeedback?.commentId}
+                        focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                        onWorkoutSelect={(id, target) => setFocusedWorkout({ id, target })}
+                      />
+                    ) : null
+                  }
+                />
+              </div>
+            </>
+          )}
+          {section === 'programs' && (
+            <>
+              <fieldset
+                className="demo-capability-fieldset"
+                disabled={!capabilities.canMutatePrograms}
+              >
+                {!capabilities.canMutatePrograms && (
+                  <p className="muted demo-capability-notice">
+                    Управление программой недоступно в демо-режиме. Просмотр использует ту же
+                    production-поверхность.
+                  </p>
                 )}
-                {historicalProgramWorkout && (
-                  <HistoricalProgramWorkout {...historicalProgramWorkout} />
+                {programManagementOpen ? (
+                  <TemplatesList
+                    key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
+                    defaultLibraryOpen={programStart === 'templates'}
+                    mode="full"
+                    readOnly={!capabilities.canMutatePrograms}
+                  >
+                    <ProgramBuilder
+                      key={programStart === 'create' ? 'create-start' : 'create-default'}
+                      defaultOpen={programStart === 'create'}
+                    />
+                  </TemplatesList>
+                ) : (
+                  <>
+                    <TemplatesList mode="summary" readOnly={!capabilities.canMutatePrograms} />
+                    <SchedulePanel
+                      focusedCommentId={requestedFeedback?.commentId}
+                      focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                      focusedWorkoutId={scheduleFocusId}
+                      timeZone={user?.profile?.timezone}
+                    />
+                  </>
                 )}
-                <div className="stack progress-workout-stack">
-                  <ProgressSchedule
-                    userId={user?.id}
-                    timeZone={user?.profile?.timezone}
-                    focusedWorkoutId={historicalProgramWorkout ? null : scheduleFocusId}
-                    focusedCommentId={requestedFeedback?.commentId}
-                    focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                    focusWeeklyReview={focusWeeklyReview}
-                    measurementDiary={
-                      <Diary embedded onSaved={async () => void (await reloadUser())} />
-                    }
-                  />
-                  <WorkoutHistory
-                    timeZone={user?.profile?.timezone}
-                    focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
-                    focusedCommentId={requestedFeedback?.commentId}
-                    focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                    onWorkoutSelect={(id, target) => setFocusedWorkout({ id, target })}
-                  />
-                </div>
-              </>
-            )}
-            {section === 'programs' && (
-              <>
-                <TemplatesList
-                  key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
-                  defaultLibraryOpen={programStart === 'templates'}
-                >
-                  <ProgramBuilder
-                    key={programStart === 'create' ? 'create-start' : 'create-default'}
-                    defaultOpen={programStart === 'create'}
-                  />
-                </TemplatesList>
-              </>
-            )}
-            {section === 'catalog' && <ExerciseCatalog canCreate={Boolean(user?.is_coach)} />}
-            {section === 'nutrition' && (
-              <NutritionPage
-                key={JSON.stringify(user?.profile?.kbju ?? null)}
-                initial={user?.profile?.kbju}
-                initialDate={requestedNutritionDate(search)}
-                returnPath={requestedProgressReturn(search)}
-                timeZone={user?.profile?.timezone}
-                onSaved={async () => void (await reloadUser())}
-              />
-            )}
-            {section === 'profile' && (
+              </fieldset>
+              <AiCoachContextualEntry context={{ surface: 'program' }} entryPoint="program" />
+            </>
+          )}
+          {section === 'catalog' && (
+            <ExerciseCatalog
+              canCreate={capabilities.canCreateCatalog}
+              initialExerciseSlug={exerciseSlug}
+            />
+          )}
+          {section === 'nutrition' && (
+            <NutritionPage
+              key={JSON.stringify([
+                user?.profile?.kbju ?? null,
+                nutritionDate,
+                nutritionMeal,
+                nutritionQuickAdd,
+              ])}
+              initial={user?.profile?.kbju}
+              initialDate={nutritionDate}
+              initialFoodQuickAdd={nutritionQuickAdd}
+              initialMealType={nutritionMeal}
+              initialHydrationOpen={nutritionHydrationOpen}
+              demoSafeMode={runtime.kind === 'demo'}
+              readOnlyEntries={!capabilities.canMutateNutritionEntries}
+              readOnlyTargets={!capabilities.canMutateProfile}
+              returnPath={requestedProgressReturn(search)}
+              timeZone={user?.profile?.timezone}
+              onSaved={async () => void (await reloadUser())}
+            />
+          )}
+          {section === 'profile' && (
+            <fieldset className="profile-settings-fieldset" disabled={runtime.kind === 'demo'}>
               <div className="profile-settings">
+                {runtime.kind === 'demo' && (
+                  <p className="muted demo-capability-notice" role="status">
+                    Изменение профиля, уведомлений и настроек аккаунта доступно после входа. В демо
+                    доступен только просмотр.
+                  </p>
+                )}
                 {!profileReadiness.isComplete && (
                   <section className="profile-status-shell" aria-labelledby="profile-status-title">
                     <div className="profile-status-shell__copy">
@@ -408,36 +604,6 @@ export default function MiniAppPage() {
                   </section>
                 )}
 
-                <nav className="profile-settings-nav" aria-label="Разделы профиля">
-                  <a
-                    href="#profile-personal"
-                    onClick={() => openProfileSection('profile-personal')}
-                  >
-                    <Icon name="nav-profile" size={16} /> Личные данные
-                  </a>
-                  <a
-                    href="#profile-fitness"
-                    onClick={() => openProfileSection('profile-personal', 'profile-fitness')}
-                  >
-                    <Icon name="nav-plan" size={16} /> Цели и параметры
-                  </a>
-                  <a href="#profile-trainer" onClick={() => openProfileSection('profile-trainer')}>
-                    <Icon name="nav-coach" size={16} /> Тренер и приглашения
-                  </a>
-                  <a
-                    href="#profile-notifications"
-                    onClick={() => openProfileSection('profile-notifications')}
-                  >
-                    <Icon name="nav-today" size={16} /> Уведомления
-                  </a>
-                  <a
-                    href="#profile-security"
-                    onClick={() => openProfileSection('profile-security')}
-                  >
-                    <Icon name="permission-denied" size={16} /> Доступ и безопасность
-                  </a>
-                </nav>
-
                 <ProfileForm key={profileFormKey} />
                 <Card
                   className="profile-settings-group"
@@ -457,10 +623,17 @@ export default function MiniAppPage() {
                   />
                   <TrainerCapabilityCard />
                 </Card>
+                {aiCoachStatus.data?.ui_enabled && (
+                  <AiCoachSettingsCard
+                    defaultOpen={window.location.hash === '#profile-ai-coach'}
+                    status={aiCoachStatus.data}
+                  />
+                )}
                 <Card
                   className="profile-settings-group"
                   family="neutral"
                   id="profile-notifications"
+                  defaultOpen={window.location.hash === '#profile-notifications'}
                   title={
                     <>
                       <Icon name="nav-today" size={20} /> Уведомления
@@ -481,7 +654,7 @@ export default function MiniAppPage() {
                   id="profile-security"
                   title={
                     <>
-                      <Icon name="permission-denied" size={20} /> Доступ и безопасность
+                      <Icon name="account-security" size={20} /> Доступ и безопасность
                     </>
                   }
                   description="Способы входа, копия ваших данных и действия с аккаунтом."
@@ -489,10 +662,17 @@ export default function MiniAppPage() {
                   <AccountPrivacy />
                 </Card>
               </div>
-            )}
-          </Suspense>
-        </section>
-      </div>
+            </fieldset>
+          )}
+        </Suspense>
+      </section>
+    </div>
+  );
+  return renderShell ? (
+    <AppShell demo={demo} section={section}>
+      {content}
     </AppShell>
+  ) : (
+    content
   );
 }

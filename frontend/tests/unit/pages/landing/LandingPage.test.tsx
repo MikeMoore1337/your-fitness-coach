@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import LandingPage, {
   appUrlForHostname,
@@ -9,13 +10,18 @@ import {
   PRODUCT_EVENT_NAME,
   type ProductEventEnvelope,
 } from '../../../../src/shared/analytics/productEvents';
+import { demoCabinetUrlForHostname } from '../../../../src/shared/navigation/appUrl';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
 
 function renderLanding() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
   return render(
-    <NavigationProvider>
-      <LandingPage />
-    </NavigationProvider>,
+    <QueryClientProvider client={queryClient}>
+      <NavigationProvider>
+        <LandingPage />
+      </NavigationProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -33,7 +39,7 @@ describe('LandingPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('follows the system dark theme and lets the visitor switch it', () => {
+  it('switches the page theme while keeping the dark-header brand readable', async () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn().mockReturnValue({
@@ -46,186 +52,73 @@ describe('LandingPage', () => {
     const { container } = renderLanding();
 
     expect(container.firstChild).toHaveClass('public-shell--dark');
+    expect(container.querySelector('.public-shell__logo')).toHaveAttribute(
+      'src',
+      '/assets/brand/yfc-mark-dark.svg',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Включить светлую тему' }));
     expect(container.firstChild).toHaveClass('public-shell--light');
     expect(localStorage.getItem('app-theme')).toBe('light');
+    await waitFor(() => expect(document.documentElement.dataset.colorScheme).toBe('light'));
+    expect(container.querySelector('.public-shell__logo')).toHaveAttribute(
+      'src',
+      '/assets/brand/yfc-mark-dark.svg',
+    );
   });
 
-  it('publishes a factual product story for self-training and trainer audiences', () => {
+  it('renders the approved photography and scroll story without manual tabs', () => {
+    const { container } = renderLanding();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('СИЛА В ДЕЙСТВИИ.');
+    expect(screen.getByRole('heading', { name: /Каждый подход/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Вошёл в ритм/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Питание без догадок.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Замечай своё движение.' })).toBeInTheDocument();
+    expect(container.querySelector('.strength-scene button')).toBeNull();
+    expect(screen.getByText(/Иллюстрация движения/)).toBeInTheDocument();
+    expect(screen.getByText(/Данные подготовленных демо-сценариев отделены/)).toBeInTheDocument();
+  });
+
+  it('binds secondary actions to their fixed visual surfaces', () => {
     const { container } = renderLanding();
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Знайте, что делать сегодня.',
+    expect(container.querySelector('.landing-feature--0 .landing-button')).toHaveClass(
+      'landing-button--secondary-on-light',
     );
-    expect(
-      screen.getByText(/yfc связывает план на сегодня.*питание и замеры/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', {
-        name: 'Начните сами. Тренера можно подключить позже.',
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('Один цикл — от плана до следующего шага.')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('group', { name: 'Почему YFC помогает действовать' }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText('План → факт → динамика → следующий шаг')).toBeInTheDocument();
-    expect(screen.getAllByText(/web.*telegram.*общие данные/i).length).toBeGreaterThan(0);
-    expect(
-      screen.getByRole('group', { name: 'Силовая тренировка и актуальный интерфейс YFC' }),
-    ).toHaveTextContent(/актуальный интерфейс.*подготовленные данные/i);
-    expect(screen.getByText('Актуальный интерфейс · подготовленные данные')).toBeInTheDocument();
-    expect(screen.queryByText('Демо · подготовленные данные')).not.toBeInTheDocument();
-
-    expect(
-      screen.getByRole('heading', { name: 'Сначала — одно понятное действие.' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Ориентир рядом с фактическими записями.' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Выводы только там, где хватает данных.' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'У каждого клиента — видимый контекст.' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/после входа пользователь может сразу включить режим тренера в профиле/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(/не заменяет crm, платежи, расписание бизнеса/i).length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText(/данные подготовленных демо-сценариев отделены/i).length,
-    ).toBeGreaterThan(0);
-
-    expect(screen.getByRole('heading', { name: /три сценария/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Откройте план на сегодня' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Фиксируйте факты' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /пройдите тренировку/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /добавьте питание/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /посмотрите кабинет тренера/i })).toBeInTheDocument();
-
-    expect(
-      screen.getByText(/telegram mini app не является отдельным приложением/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(/экспорт, отвязка способов входа и удаление аккаунта/i).length,
-    ).toBeGreaterThan(0);
-    expect(screen.queryByText(/после одобрения заявки/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/тариф/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/искусственн.*интеллект|\bai\b/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/отзыв/i)).not.toBeInTheDocument();
-
-    const telegramApps = screen.getAllByRole('link', { name: /Открыть.*в Telegram/ });
-    expect(telegramApps).toHaveLength(3);
-    for (const telegramApp of telegramApps) {
-      expect(telegramApp).toHaveAttribute('href', 'https://t.me/your_fitness_coach_bot?startapp');
-      expect(telegramApp).toHaveAttribute('target', '_blank');
-      expect(telegramApp).toHaveAttribute('rel', 'noreferrer');
-    }
-
-    const news = screen.getByRole('link', {
-      name: 'Telegram-канал о фитнесе и здоровье',
-    });
-    expect(news).toHaveAttribute('href', 'https://t.me/your_fitness_news');
-    expect(news).toHaveAttribute('target', '_blank');
-    expect(news).toHaveAttribute('rel', 'noreferrer');
-    expect(screen.queryByRole('link', { name: 'Приложение в Telegram' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Поддержка' })).not.toBeInTheDocument();
-
-    const support = screen.getByRole('link', { name: 'Поддержка в Telegram' });
-    expect(support).toHaveAttribute('href', 'https://t.me/your_fitness_coach_bot?start=support');
-    expect(support).toHaveAttribute('target', '_blank');
-    expect(support).toHaveAttribute('rel', 'noreferrer');
-    expect(container.querySelectorAll('img[src*="/assets/brand/yfc-mark-"]')).toHaveLength(3);
-    expect(container.querySelectorAll('img[src*="/assets/brand/yfc-logo-"]')).toHaveLength(0);
-
-    const energyFlow = container.querySelector<HTMLElement>('.energy-flow')!;
-    const desktopFilaments = Array.from(
-      energyFlow.querySelectorAll<SVGPathElement>(
-        '.energy-flow__scene--desktop .energy-flow__filament',
-      ),
+    expect(container.querySelector('.landing-feature--1 .landing-button')).toHaveClass(
+      'landing-button--secondary-on-dark',
     );
-    const mobileFilaments = Array.from(
-      energyFlow.querySelectorAll<SVGPathElement>(
-        '.energy-flow__scene--mobile .energy-flow__filament',
-      ),
+    expect(container.querySelector('.landing-trainer__actions')).toHaveClass(
+      'landing-trainer__actions',
     );
-    expect(energyFlow).toHaveAttribute('aria-hidden', 'true');
-    expect(desktopFilaments).toHaveLength(12);
-    expect(mobileFilaments).toHaveLength(8);
-    expect(new Set(desktopFilaments.map((path) => path.getAttribute('d'))).size).toBe(12);
-    expect(new Set(mobileFilaments.map((path) => path.getAttribute('d'))).size).toBe(8);
+    expect(container.querySelectorAll('.landing-trainer__actions .landing-button')).toHaveLength(2);
     expect(
-      [...desktopFilaments, ...mobileFilaments].every(
-        (path) => path.getAttribute('fill') === 'none',
-      ),
-    ).toBe(true);
-    expect(energyFlow.querySelectorAll('filter')).toHaveLength(2);
-    expect(energyFlow.querySelector('.energy-flow__volume')?.getAttribute('mask')).toMatch(
-      /^url\(#energy-flow-fade-/,
-    );
+      container.querySelector('.landing-contact__actions .landing-button--secondary'),
+    ).toHaveClass('landing-button--secondary-on-dark');
   });
 
-  it('uses responsive athlete derivatives, eager hero proof and lazy below-fold images', () => {
+  it('loads hero eagerly and the paired below-fold photographs lazily', () => {
     renderLanding();
-
-    const athlete = screen.getByAltText(/атлет выполняет.*становую тягу/i);
-    expect(athlete).toHaveAttribute(
-      'src',
-      '/assets/marketing/landing-athlete-deadlift-cutout-1280.webp',
+    expect(screen.getByAltText('Спортсменка толкает тренировочные сани')).toHaveAttribute(
+      'fetchpriority',
+      'high',
     );
-    expect(athlete).toHaveAttribute('width', '1280');
-    expect(athlete).toHaveAttribute('height', '1171');
-    expect(athlete).toHaveAttribute('loading', 'eager');
-    expect(athlete).toHaveAttribute('fetchpriority', 'high');
-    expect(athlete.closest('picture')?.querySelector('source[type="image/webp"]')).toHaveAttribute(
-      'srcset',
-      expect.stringContaining('landing-athlete-deadlift-cutout-640.webp 640w'),
+    expect(screen.getByAltText('Начало тяги гантели')).toHaveAttribute('loading', 'lazy');
+    expect(screen.getByAltText('Гантель у пояса в конце тяги')).toHaveAttribute('loading', 'lazy');
+    expect(screen.getByAltText('Тренер и спортсменка обсуждают план')).toHaveAttribute(
+      'loading',
+      'lazy',
     );
-    expect(athlete).not.toHaveClass('is-loaded');
-    fireEvent.load(athlete);
-    expect(athlete).toHaveClass('is-loaded');
-
-    const heroProof = screen.getByAltText(
-      'Актуальный экран Сегодня и текущей силовой тренировки в Mobile Web',
-    );
-    expect(heroProof).toHaveAttribute('src', '/assets/product/landing-workout-mobile-light.png');
-    expect(heroProof).toHaveAttribute('width', '390');
-    expect(heroProof).toHaveAttribute('height', '844');
-    expect(heroProof).toHaveAttribute('loading', 'eager');
-    expect(heroProof.closest('.landing-product-image')).not.toHaveClass('is-loaded');
-    fireEvent.load(heroProof);
-    expect(heroProof.closest('.landing-product-image')).toHaveClass('is-loaded');
-
-    const desktopProof = screen.getByAltText(/экран сегодня.*desktop web/i);
-    expect(desktopProof).toHaveAttribute('src', '/assets/product/landing-today-desktop-light.png');
-    expect(desktopProof).toHaveAttribute('width', '1440');
-    expect(desktopProof).toHaveAttribute('height', '900');
-    expect(desktopProof).toHaveAttribute('loading', 'lazy');
-
-    const mobileProof = screen.getByAltText('Актуальный экран Сегодня в Mobile Web');
-    expect(mobileProof).toHaveAttribute('src', '/assets/product/landing-today-mobile-light.png');
-    expect(mobileProof).toHaveAttribute('width', '390');
-    expect(mobileProof).toHaveAttribute('height', '844');
-    expect(mobileProof).toHaveAttribute('loading', 'lazy');
-
-    const trainerProof = screen.getByAltText(/актуальный кабинет тренера/i);
-    expect(trainerProof).toHaveAttribute('loading', 'lazy');
-    fireEvent.error(trainerProof);
-    expect(screen.queryByAltText(/актуальный кабинет тренера/i)).not.toBeInTheDocument();
-    expect(screen.getByText('Экран кабинета тренера временно недоступен.')).toBeInTheDocument();
   });
 
   it('links conversion actions to canonical app, demo and crawlable public routes', () => {
     renderLanding();
 
     expect(screen.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login');
-    expect(screen.getAllByRole('link', { name: 'Открыть приложение' })[0]).toHaveAttribute(
-      'href',
-      '/app',
-    );
+    const ownDataCtas = screen.getAllByRole('link', {
+      name: 'Начать со своими данными',
+    });
+    expect(ownDataCtas).toHaveLength(2);
+    ownDataCtas.forEach((link) => expect(link).toHaveAttribute('href', '/app'));
     expect(screen.getAllByRole('link', { name: 'Попробовать демо' })[0]).toHaveAttribute(
       'href',
       '/demo?cabinet=1&scenario=self_training&section=today',
@@ -234,18 +127,15 @@ describe('LandingPage', () => {
       'href',
       '/demo?cabinet=1&scenario=self_training&section=today',
     );
-    expect(screen.getByRole('link', { name: /добавьте питание/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Питание и прогресс/ })).toHaveAttribute(
       'href',
       '/demo?cabinet=1&scenario=nutrition&section=nutrition',
     );
-    expect(screen.getByRole('link', { name: /посмотрите кабинет тренера/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Работа тренера/ })).toHaveAttribute(
       'href',
       '/demo?cabinet=1&scenario=trainer&section=trainer',
     );
-    expect(screen.getByRole('link', { name: 'Как устроены тренировки' })).toHaveAttribute(
-      'href',
-      '/training',
-    );
+    expect(screen.getByRole('link', { name: 'Тренировки' })).toHaveAttribute('href', '/training');
     expect(screen.getByRole('link', { name: 'Подробнее о питании' })).toHaveAttribute(
       'href',
       '/nutrition',
@@ -254,9 +144,9 @@ describe('LandingPage', () => {
       'href',
       '/progress',
     );
-    expect(screen.getByRole('link', { name: /^Посмотреть кабинет тренера$/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Посмотреть демо кабинета$/ })).toHaveAttribute(
       'href',
-      '/for-trainers',
+      '/demo?cabinet=1&scenario=trainer&section=trainer',
     );
     expect(appUrlForHostname('your-fitness-coach.ru')).toBe(
       'https://app.your-fitness-coach.ru/app',
@@ -267,12 +157,65 @@ describe('LandingPage', () => {
     expect(demoUrlForHostname('your-fitness-coach.ru')).toBe(
       'https://app.your-fitness-coach.ru/demo',
     );
+    expect(demoCabinetUrlForHostname('your-fitness-coach.ru', 'trainer', 'trainer')).toBe(
+      'https://app.your-fitness-coach.ru/demo?cabinet=1&scenario=trainer&section=trainer',
+    );
     expect(screen.getByRole('link', { name: 'Приватность и данные' })).toHaveAttribute(
       'href',
       '#privacy',
     );
     expect(document.querySelector('#privacy')).toBeInTheDocument();
     expect(screen.getByText('Ваши данные остаются под вашим управлением.')).toBeInTheDocument();
+  });
+
+  it('distinguishes demo entry placement and selected scenario without personal data', () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) => {
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    };
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+    const { container } = renderLanding();
+
+    fireEvent.click(
+      container.querySelector<HTMLAnchorElement>(
+        '.landing-hero__actions .landing-button--secondary',
+      )!,
+    );
+    fireEvent.click(container.querySelector<HTMLAnchorElement>('.landing-start__demo-cta')!);
+    fireEvent.click(
+      container.querySelector<HTMLAnchorElement>('.landing-start__demo nav a:nth-child(2)')!,
+    );
+
+    expect(
+      events
+        .filter((event) => event.name === 'landing_demo_selected')
+        .map((event) =>
+          'placement' in event
+            ? { placement: event.placement, scenario: event.scenario }
+            : undefined,
+        ),
+    ).toEqual([
+      { placement: 'hero', scenario: 'self_training' },
+      { placement: 'section', scenario: 'self_training' },
+      { placement: 'section', scenario: 'nutrition' },
+    ]);
+
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+  });
+
+  it('keeps both own-data CTAs on the existing landing app-selection event', () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) => {
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    };
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+    const { container } = renderLanding();
+
+    fireEvent.click(container.querySelector('.landing-hero__actions .landing-button')!);
+    fireEvent.click(container.querySelector('.landing-contact__actions .landing-button')!);
+
+    expect(events.filter((event) => event.name === 'landing_app_selected')).toHaveLength(2);
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
   });
 
   it('tracks Telegram Mini App selections with their landing placement', () => {
@@ -350,5 +293,21 @@ describe('LandingPage', () => {
     expect(document.querySelector('#landing-content')).toHaveAttribute('tabindex', '-1');
 
     unmount();
+  });
+
+  it('keeps the athlete audience alias non-indexable with the root canonical', async () => {
+    window.history.replaceState({}, '', '/for-athletes?utm_source=owner#demo');
+    renderLanding();
+
+    await waitFor(() => expect(document.title).toMatch(/тренировки, питание и прогресс/i));
+    expect(document.querySelector('meta[name="robots"]')).toHaveAttribute(
+      'content',
+      'noindex, follow',
+    );
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      `${window.location.origin}/`,
+    );
+    expect(document.querySelector('script[type="application/ld+json"]')).toBeNull();
   });
 });

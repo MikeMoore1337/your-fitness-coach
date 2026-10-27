@@ -1,59 +1,58 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppShell, type DemoAppShellConfig } from '../../app/AppShell';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { AppShell, type AppSection, type DemoAppShellConfig } from '../../app/AppShell';
+import type { QuickAddAction } from '../../app/QuickAddSheet';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
+import '../../styles/ux-ia-redesign.css';
 import {
-  applyDemoAction,
   clearAllDemoSessions,
   clearDemoSession,
-  DemoApiError,
+  getDemoSessionToken,
   loadDemoSession,
   resetDemoSession,
   startDemoSession,
   type DemoScenario,
-  type DemoSelfTrainingState,
   type DemoSessionSnapshot,
 } from '../../features/demo/demoApi';
+import { DEMO_SCENARIOS } from '../../features/demo/demoContent';
+import {
+  getDemoRouteState,
+  isDemoRouteVisible,
+  setDemoRouteVisible,
+  type TrainerDemoStepKey,
+  type DemoRouteState,
+  type DemoRouteTarget,
+} from '../../features/demo/demoRoute';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
-import { calendarWeek, dateInputValue } from '../../shared/dateTime';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
-import { DataConfidence } from '../../shared/ui/DataConfidence';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
+import { DemoRuntimeProvider } from '../../shared/runtime/runtime';
+import { Button, ErrorState, LoadingState, Surface } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
-import { QuantitativeProgress, TaskProgress } from '../../shared/ui/DataViz';
-import {
-  TRAINING_WEEK_LEGEND,
-  WeekStrip,
-  type WeekStripActivity,
-  type WeekStripDayMeta,
-} from '../../shared/ui/WeekStrip';
-import {
-  Badge,
-  Button,
-  ErrorState,
-  Field,
-  LoadingState,
-  Metric,
-  Surface,
-} from '../../shared/ui/common';
+import DemoAuthProvider from './DemoAuthProvider';
+import MiniAppPage from '../miniapp/MiniAppPage';
+import CoachPage from '../coach/CoachPage';
 import './demo-cabinet.css';
 
-export type DemoCabinetSection = 'today' | 'nutrition' | 'progress' | 'trainer';
+export type DemoCabinetSection =
+  'today' | 'plan' | 'nutrition' | 'progress' | 'profile' | 'trainer';
 
-const SCENARIOS: ReadonlyArray<{
-  value: DemoScenario;
-  compactLabel: string;
-  label: string;
-}> = [
-  { value: 'self_training', compactLabel: 'Для себя', label: 'Тренировка для себя' },
-  { value: 'nutrition', compactLabel: 'Питание', label: 'Питание: дневник и итог' },
-  { value: 'trainer', compactLabel: 'Тренер', label: 'Тренер: разбор результата клиента' },
-];
+const TRAINER_DEMO_STEPS: ReadonlySet<TrainerDemoStepKey> = new Set([
+  'today',
+  'attention',
+  'client',
+  'workout',
+  'progress',
+  'operations',
+  'task',
+  'return',
+]);
 
 function scenarioFromSearch(search: string): DemoScenario {
   const value = new URLSearchParams(search).get('scenario');
   return value === 'nutrition' || value === 'trainer' ? value : 'self_training';
-}
-
-function isCurrentScenario(scenario: DemoScenario): boolean {
-  return scenarioFromSearch(window.location.search) === scenario;
 }
 
 function startSection(scenario: DemoScenario): DemoCabinetSection {
@@ -62,7 +61,15 @@ function startSection(scenario: DemoScenario): DemoCabinetSection {
 
 function sectionFromSearch(search: string, scenario: DemoScenario): DemoCabinetSection {
   const value = new URLSearchParams(search).get('section');
-  if (value === 'today' || value === 'nutrition' || value === 'progress') return value;
+  if (
+    value === 'today' ||
+    value === 'plan' ||
+    value === 'nutrition' ||
+    value === 'progress' ||
+    value === 'profile'
+  ) {
+    return value;
+  }
   if (value === 'trainer' && scenario === 'trainer') return value;
   return startSection(scenario);
 }
@@ -73,7 +80,8 @@ export function demoCabinetPath(
 ): string {
   const safeSection =
     section === 'trainer' && scenario !== 'trainer' ? startSection(scenario) : section;
-  return `/demo?cabinet=1&scenario=${scenario}&section=${safeSection}`;
+  const params = new URLSearchParams({ cabinet: '1', scenario, section: safeSection });
+  return `/demo?${params.toString()}`;
 }
 
 function loginPath(scenario: DemoScenario, section: DemoCabinetSection): string {
@@ -87,448 +95,295 @@ function loginPath(scenario: DemoScenario, section: DemoCabinetSection): string 
   return `/login?${params.toString()}`;
 }
 
-function trainingAction(state: DemoSelfTrainingState): { action: string; label: string } | null {
-  if (state.screen === 'today') return { action: 'start_workout', label: 'Продолжить тренировку' };
-  if (state.screen !== 'active_workout') return null;
-  if (state.completed_sets < state.total_sets) {
-    return { action: 'complete_set', label: 'Завершить текущий подход' };
+function productionPathInDemo(to: string, scenario: DemoScenario): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(to, window.location.origin);
+  } catch {
+    return to;
   }
-  return { action: 'finish_workout', label: 'Завершить тренировку' };
+  if (parsed.origin !== window.location.origin) return to;
+
+  if (parsed.pathname === '/coach') {
+    const target = new URL(
+      demoCabinetPath(scenario, scenario === 'trainer' ? 'trainer' : 'today'),
+      window.location.origin,
+    );
+    if (scenario === 'trainer') {
+      for (const key of ['client_id', 'workout_id'] as const) {
+        const value = parsed.searchParams.get(key);
+        if (value && positiveIntegerParam(parsed.searchParams, key) !== null)
+          target.searchParams.set(key, value);
+      }
+      if (parsed.searchParams.get('tab') === 'tools') target.searchParams.set('tab', 'tools');
+      const tool = parsed.searchParams.get('tool');
+      if (
+        tool &&
+        ['reviews', 'analytics', 'schedule', 'tasks', 'finance', 'invitations', 'catalog'].includes(
+          tool,
+        )
+      ) {
+        target.searchParams.set('tool', tool);
+      }
+      const focus = parsed.searchParams.get('focus');
+      if (focus === 'weekly_check_in') target.searchParams.set('focus', focus);
+      const demoStep = parsed.searchParams.get('demo_step');
+      if (demoStep && TRAINER_DEMO_STEPS.has(demoStep as TrainerDemoStepKey)) {
+        target.searchParams.set('demo_step', demoStep);
+      }
+    }
+    return `${target.pathname}?${target.searchParams.toString()}`;
+  }
+  if (parsed.pathname === '/app/report') return demoCabinetPath(scenario, 'progress');
+  if (parsed.pathname !== '/app') return to;
+
+  const requested = parsed.searchParams.get('section');
+  const mapped: DemoCabinetSection =
+    requested === 'programs' || requested === 'catalog'
+      ? 'plan'
+      : requested === 'nutrition'
+        ? 'nutrition'
+        : requested === 'progress'
+          ? 'progress'
+          : requested === 'profile'
+            ? 'profile'
+            : startSection(scenario);
+  return demoCabinetPath(scenario, mapped);
+}
+
+function isCurrentDemoLocation(scenario: DemoScenario): boolean {
+  return scenarioFromSearch(window.location.search) === scenario;
+}
+
+function demoQuickAddLinks(scenario: DemoScenario): ReadonlyArray<QuickAddAction> {
+  return [
+    {
+      key: 'food',
+      label: 'Добавить еду',
+      detail: 'Открыть дневник питания',
+      icon: 'calories',
+      to: `${demoCabinetPath(scenario, 'nutrition')}&quick_add=food`,
+    },
+    {
+      key: 'water',
+      label: 'Добавить воду',
+      detail: 'Открыть трекер жидкости',
+      icon: 'water',
+      to: `${demoCabinetPath(scenario, 'nutrition')}&hydration=quick`,
+    },
+    {
+      key: 'cardio',
+      label: 'Добавить кардио',
+      detail: 'Демо показывает подготовленную активность',
+      icon: 'week-cardio',
+      to: demoCabinetPath(scenario, 'today'),
+    },
+    {
+      key: 'measurement',
+      label: 'Добавить замер',
+      detail: 'Открыть прогресс',
+      icon: 'body-measurement',
+      to: `${demoCabinetPath(scenario, 'progress')}&focus=measurements`,
+    },
+    {
+      key: 'wellbeing',
+      label: 'Отметить самочувствие',
+      detail: 'Открыть сегодняшний экран',
+      icon: 'checklist',
+      to: demoCabinetPath(scenario, 'today'),
+    },
+  ];
+}
+
+function DemoRoute({
+  onContinue,
+  onHide,
+  onShow,
+  route,
+  visible,
+}: {
+  onContinue(target: DemoRouteTarget): void;
+  onHide(): void;
+  onShow(): void;
+  route: DemoRouteState;
+  visible: boolean;
+}) {
+  if (!visible) {
+    return (
+      <section className="demo-route demo-route--hidden" aria-label="Маршрут демо">
+        <Button aria-expanded={false} onClick={onShow} variant="secondary">
+          Показать маршрут
+          <Icon name="chevron-down" size={16} />
+        </Button>
+      </section>
+    );
+  }
+
+  return (
+    <section className="demo-route" aria-label="Маршрут демо">
+      <div className="demo-route__header">
+        <strong id="demoRouteTitle">
+          Маршрут демо · {route.currentStep} из {route.steps.length}
+        </strong>
+        <Button
+          aria-controls="demoRouteSteps"
+          aria-expanded={true}
+          onClick={onHide}
+          variant="secondary"
+        >
+          Скрыть маршрут
+          <Icon name="chevron-up" size={16} />
+        </Button>
+      </div>
+      <ol id="demoRouteSteps" className="demo-route__steps">
+        {route.steps.map((step, index) => (
+          <li
+            className={
+              step.complete ? 'is-complete' : index + 1 === route.currentStep ? 'is-current' : ''
+            }
+            key={step.key}
+            aria-current={index + 1 === route.currentStep ? 'step' : undefined}
+          >
+            <span aria-hidden="true">
+              {step.complete ? <Icon name="check" size={16} /> : index + 1}
+            </span>
+            <strong>{step.label}</strong>
+          </li>
+        ))}
+      </ol>
+      <div className="demo-route__next">
+        <p role="status">{route.nextHint}</p>
+        {route.target && !route.complete && (
+          <Button onClick={() => onContinue(route.target)}>Продолжить</Button>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function Conversion({
   scenario,
   section,
-  title,
 }: {
   scenario: DemoScenario;
   section: DemoCabinetSection;
-  title: string;
 }) {
+  const otherScenario =
+    DEMO_SCENARIOS.find((item) => item.value !== scenario) ?? DEMO_SCENARIOS[0]!;
   return (
     <section className="demo-cabinet-conversion" aria-labelledby="demoCabinetConversionTitle">
       <div>
-        <span className="eyebrow">После демо</span>
-        <h2 id="demoCabinetConversionTitle">{title}</h2>
-        <p>
-          Подготовленный пример останется в демо. После входа приложение откроется сразу, а свои
-          данные можно добавить позже.
-        </p>
+        <span className="eyebrow">Основной сценарий завершён</span>
+        <h2 id="demoCabinetConversionTitle">Готово. Вы посмотрели основной сценарий</h2>
+        <p>Теперь можно начать со своими тренировками, питанием и прогрессом.</p>
       </div>
-      <AppLink
-        className="ui-button demo-cabinet-conversion__action"
-        to={loginPath(scenario, section)}
-        onClick={() => {
-          clearAllDemoSessions();
-          trackProductEvent(
-            { name: 'demo_login_selected', surface: productEventSurface() },
-            { dedupe: 'session', dedupeKey: scenario },
-          );
-        }}
-      >
-        Войти в приложение
-      </AppLink>
+      <div className="demo-cabinet-conversion__actions">
+        <AppLink
+          className="ui-button demo-cabinet-conversion__action"
+          to={loginPath(scenario, section)}
+          onClick={() => {
+            clearAllDemoSessions();
+            trackProductEvent(
+              { name: 'demo_own_data_selected', surface: productEventSurface(), scenario },
+              { dedupe: 'session', dedupeKey: scenario },
+            );
+          }}
+        >
+          Начать со своими данными
+        </AppLink>
+        <AppLink
+          className="ui-button ui-button--secondary demo-cabinet-conversion__action"
+          to={demoCabinetPath(otherScenario.value)}
+        >
+          Попробовать другой сценарий
+        </AppLink>
+      </div>
     </section>
-  );
-}
-
-function TodaySection({
-  busy,
-  onAction,
-  scenario,
-  snapshot,
-}: {
-  busy: boolean;
-  onAction(action: string): void;
-  scenario: DemoScenario;
-  snapshot: DemoSessionSnapshot;
-}) {
-  const today = dateInputValue(new Date());
-  const week = calendarWeek(today);
-  const currentDay = week.indexOf(today);
-  const getDayMeta = (date: string): WeekStripDayMeta => {
-    const index = week.indexOf(date);
-    const activity: WeekStripActivity = [0, 3, 5].includes(index)
-      ? { key: 'strength', label: 'Силовая' }
-      : [1, 4].includes(index)
-        ? { key: 'cardio', label: 'Кардио' }
-        : { key: 'rest', label: 'Отдых' };
-    if (activity.key === 'rest') {
-      return { activities: [activity], status: { key: 'neutral', label: 'День отдыха' } };
-    }
-    if (date === today) {
-      return {
-        activities: [activity],
-        status: { key: 'in-progress', label: snapshot.cabinet.today.status_label },
-      };
-    }
-    if (index >= 0 && index < snapshot.cabinet.today.completed_days) {
-      return {
-        activities: [activity],
-        status: { key: 'completed', label: 'День завершён' },
-      };
-    }
-    if (index > currentDay && index < snapshot.cabinet.today.planned_days) {
-      return {
-        activities: [activity],
-        status: { key: 'planned', label: 'Есть план' },
-      };
-    }
-    return {
-      activities: [activity],
-      status: { key: 'neutral', label: 'Без обязательного действия' },
-    };
-  };
-  const state = snapshot.state;
-  const nextTrainingAction = state.kind === 'self_training' ? trainingAction(state) : null;
-
-  return (
-    <>
-      <header className="demo-cabinet-title">
-        <span className="eyebrow">Сегодня</span>
-        <h1>{snapshot.cabinet.today.title}</h1>
-        <p>{snapshot.cabinet.today.summary}</p>
-      </header>
-      <WeekStrip
-        anchorDate={today}
-        ariaLabel="Контекст текущей недели"
-        getDayMeta={getDayMeta}
-        legend={TRAINING_WEEK_LEGEND}
-        mode="overview"
-        title="Неделя"
-        today={today}
-      />
-      <div className="demo-cabinet-focus-grid">
-        <Surface className="demo-cabinet-primary">
-          <Badge tone={snapshot.cabinet.meaningful_action_completed ? 'success' : 'neutral'}>
-            {snapshot.cabinet.today.status_label}
-          </Badge>
-          {state.kind === 'self_training' ? (
-            <>
-              <TaskProgress
-                completed={state.completed_sets}
-                label="Выполнено подходов"
-                total={state.total_sets}
-              />
-              {nextTrainingAction && (
-                <Button
-                  disabled={busy}
-                  fullWidth
-                  onClick={() => onAction(nextTrainingAction.action)}
-                >
-                  {busy ? 'Обновляем…' : nextTrainingAction.label}
-                </Button>
-              )}
-              <div className="demo-cabinet-rows" aria-label="Упражнения">
-                {state.exercises.map((exercise) => (
-                  <article className={`demo-cabinet-row is-${exercise.status}`} key={exercise.name}>
-                    <div>
-                      <strong>{exercise.name}</strong>
-                      <span>{exercise.prescription}</span>
-                    </div>
-                    <small>
-                      {exercise.status === 'completed'
-                        ? 'Готово'
-                        : exercise.status === 'current'
-                          ? 'Сейчас'
-                          : 'Далее'}
-                    </small>
-                  </article>
-                ))}
-              </div>
-              {!nextTrainingAction && (
-                <AppLink className="ui-button" to={demoCabinetPath(scenario, 'progress')}>
-                  Посмотреть результат в прогрессе
-                </AppLink>
-              )}
-            </>
-          ) : state.kind === 'nutrition' ? (
-            <>
-              <p>Добавьте недавний продукт — итог изменится здесь и в разделе «Прогресс».</p>
-              <div className="demo-cabinet-metrics">
-                <Metric label="Калории" value={`${snapshot.cabinet.nutrition.calories} ккал`} />
-                <Metric label="Приёмы пищи" value={snapshot.cabinet.nutrition.meals_logged} />
-              </div>
-              <Button
-                disabled={busy || state.item_added}
-                fullWidth
-                onClick={() => onAction('add_recent')}
-              >
-                {busy
-                  ? 'Добавляем…'
-                  : state.item_added
-                    ? 'Продукт уже добавлен'
-                    : 'Добавить недавний продукт'}
-              </Button>
-            </>
-          ) : (
-            <>
-              <p>
-                Откройте подготовленный результат клиента и оставьте короткий комментарий к
-                тренировке.
-              </p>
-              <AppLink className="ui-button" to={demoCabinetPath(scenario, 'trainer')}>
-                Открыть контекст клиента
-              </AppLink>
-            </>
-          )}
-        </Surface>
-        <aside className="demo-cabinet-linked" aria-label="Связанные факты дня">
-          <div>
-            <span>Питание</span>
-            <strong>
-              {snapshot.cabinet.nutrition.calories} из {snapshot.cabinet.nutrition.calorie_target}{' '}
-              ккал
-            </strong>
-            <AppLink to={demoCabinetPath(scenario, 'nutrition')}>Открыть дневник</AppLink>
-          </div>
-          <div>
-            <span>Прогресс</span>
-            <strong>
-              {snapshot.cabinet.progress.latest_volume_kg.toLocaleString('ru-RU')} кг за тренировку
-            </strong>
-            <AppLink to={demoCabinetPath(scenario, 'progress')}>Посмотреть динамику</AppLink>
-          </div>
-        </aside>
-      </div>
-    </>
-  );
-}
-
-function NutritionSection({
-  busy,
-  onAction,
-  scenario,
-  snapshot,
-}: {
-  busy: boolean;
-  onAction(action: string): void;
-  scenario: DemoScenario;
-  snapshot: DemoSessionSnapshot;
-}) {
-  const nutrition = snapshot.cabinet.nutrition;
-  const isActionScenario = snapshot.state.kind === 'nutrition';
-  return (
-    <>
-      <header className="demo-cabinet-title">
-        <span className="eyebrow">Питание</span>
-        <h1>Дневной итог без вымышленных нулей</h1>
-        <p>Факты обновляются только после подтверждённого действия в текущей демо-сессии.</p>
-      </header>
-      <Surface className="demo-cabinet-nutrition">
-        <div className="demo-cabinet-metrics" aria-label="Итоги питания">
-          <Metric
-            label="Калории"
-            value={`${nutrition.calories} / ${nutrition.calorie_target}`}
-            hint="ккал"
-          />
-          <Metric
-            label="Белок"
-            value={`${nutrition.protein_g} / ${nutrition.protein_target_g}`}
-            hint="г"
-          />
-          <Metric label="Приёмы пищи" value={nutrition.meals_logged} />
-        </div>
-        <article className={`demo-cabinet-recent${nutrition.item_added ? ' is-added' : ''}`}>
-          <div>
-            <span>{nutrition.item_added ? 'Подтверждённая запись' : 'Недавний продукт'}</span>
-            <strong>{nutrition.recent_item.name}</strong>
-            <small>{nutrition.recent_item.serving}</small>
-          </div>
-          <strong>{nutrition.recent_item.calories} ккал</strong>
-        </article>
-        {isActionScenario ? (
-          <Button
-            disabled={busy || nutrition.item_added}
-            fullWidth
-            onClick={() => onAction('add_recent')}
-          >
-            {busy
-              ? 'Добавляем…'
-              : nutrition.item_added
-                ? 'Запись уже учтена'
-                : 'Добавить недавний продукт'}
-          </Button>
-        ) : (
-          <AppLink
-            className="ui-button ui-button--secondary"
-            to={demoCabinetPath(scenario, 'today')}
-          >
-            Вернуться к главному действию
-          </AppLink>
-        )}
-      </Surface>
-    </>
-  );
-}
-
-function ProgressSection({
-  scenario,
-  snapshot,
-}: {
-  scenario: DemoScenario;
-  snapshot: DemoSessionSnapshot;
-}) {
-  const progress = snapshot.cabinet.progress;
-  return (
-    <>
-      <header className="demo-cabinet-title">
-        <span className="eyebrow">Прогресс</span>
-        <h1>Подтверждённые действия становятся историей</h1>
-        <p>{progress.summary}</p>
-      </header>
-      <Surface className="demo-cabinet-progress">
-        <div className="demo-cabinet-metrics" aria-label="Факты прогресса">
-          <Metric label="Тренировки" value={progress.workouts_completed} hint="завершено" />
-          <Metric
-            label="Последний объём"
-            value={`${progress.latest_volume_kg.toLocaleString('ru-RU')} кг`}
-          />
-          <Metric
-            label="Динамика объёма"
-            value={`${progress.volume_change_percent > 0 ? '+' : ''}${progress.volume_change_percent}%`}
-            hint="за 4 недели"
-          />
-        </div>
-        <div className="demo-cabinet-progress__nutrition">
-          <QuantitativeProgress
-            label="Дневной итог питания"
-            maximum={100}
-            unit="%"
-            value={progress.nutrition_completion_percent}
-          />
-          <small>Заполнено дней: {progress.nutrition_days_logged} из 7</small>
-          <AppLink to={demoCabinetPath(scenario, 'nutrition')}>
-            Открыть подтверждённые записи
-          </AppLink>
-        </div>
-      </Surface>
-      <DataConfidence
-        kind="training"
-        signal={{
-          status: 'sufficient',
-          counters: {
-            working_set_count: progress.workouts_completed * 8,
-            workout_session_count: progress.workouts_completed,
-            required_working_set_count: 24,
-            required_workout_session_count: 3,
-          },
-          reason_keys: [],
-        }}
-      />
-    </>
-  );
-}
-
-function TrainerSection({
-  busy,
-  onComment,
-  snapshot,
-}: {
-  busy: boolean;
-  onComment(comment: string): void;
-  snapshot: DemoSessionSnapshot;
-}) {
-  const trainer = snapshot.cabinet.trainer;
-  const [comment, setComment] = useState('Техника стабильна. Сохраняем темп и добавляем 2,5 кг.');
-  if (!trainer) return null;
-  return (
-    <>
-      <header className="demo-cabinet-title">
-        <span className="eyebrow">Клиент тренера · демонстрационный пример</span>
-        <h1>{trainer.client_name}</h1>
-        <p>{trainer.context_label}</p>
-      </header>
-      <div className="demo-cabinet-focus-grid">
-        <Surface className="demo-cabinet-trainer">
-          <span>Тренировка</span>
-          <h2>{trainer.workout_title}</h2>
-          <dl>
-            {trainer.facts.map((fact) => (
-              <div key={fact.label}>
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </Surface>
-        <Surface className="demo-cabinet-comment">
-          {trainer.comment ? (
-            <div className="demo-cabinet-comment__saved" role="status">
-              <strong>Комментарий сохранён до конца демо-сессии</strong>
-              <p>{trainer.comment}</p>
-            </div>
-          ) : (
-            <>
-              <Field
-                label="Комментарий к этой тренировке"
-                labelFor="demoCabinetTrainerComment"
-                hint="Не вводите реальные имена, контакты или медицинские данные."
-              >
-                <textarea
-                  className="ui-input"
-                  id="demoCabinetTrainerComment"
-                  maxLength={280}
-                  onChange={(event) => setComment(event.currentTarget.value)}
-                  rows={5}
-                  value={comment}
-                />
-              </Field>
-              <Button
-                disabled={busy || !comment.trim()}
-                fullWidth
-                onClick={() => onComment(comment)}
-              >
-                {busy ? 'Сохраняем…' : 'Сохранить комментарий'}
-              </Button>
-            </>
-          )}
-          <div className="demo-cabinet-disabled-action">
-            <Button aria-describedby="demoCabinetInviteReason" disabled variant="secondary">
-              Пригласить нового клиента
-            </Button>
-            <span id="demoCabinetInviteReason">
-              В демо нет реальных приглашений и отношений тренер–клиент.
-            </span>
-          </div>
-        </Surface>
-      </div>
-    </>
   );
 }
 
 export default function DemoCabinet() {
   const { navigate, search } = useNavigation();
+  const queryClient = useQueryClient();
   const scenario = useMemo(() => scenarioFromSearch(search), [search]);
   const section = useMemo(() => sectionFromSearch(search, scenario), [scenario, search]);
   const [snapshot, setSnapshot] = useState<DemoSessionSnapshot | null>(null);
   const [loadedScenario, setLoadedScenario] = useState<DemoScenario | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<DemoApiError | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [routeVisibility, setRouteVisibility] = useState<Record<DemoScenario, boolean>>(() => ({
+    self_training: isDemoRouteVisible('self_training'),
+    nutrition: isDemoRouteVisible('nutrition'),
+    trainer: isDemoRouteVisible('trainer'),
+  }));
+  const [visitedSectionsByScenario, setVisitedSectionsByScenario] = useState<
+    Record<DemoScenario, ReadonlySet<string>>
+  >(() => ({
+    self_training: scenario === 'self_training' ? new Set([section]) : new Set(),
+    nutrition: scenario === 'nutrition' ? new Set([section]) : new Set(),
+    trainer: scenario === 'trainer' ? new Set([section]) : new Set(),
+  }));
+  const routeCompletedRef = useRef(false);
+
+  const markVisited = useCallback((nextScenario: DemoScenario, nextSection: string) => {
+    setVisitedSectionsByScenario((current) => {
+      const visited = current[nextScenario];
+      if (visited.has(nextSection)) return current;
+      return {
+        ...current,
+        [nextScenario]: new Set([...visited, nextSection]),
+      };
+    });
+  }, []);
+
+  const markNavigation = useCallback(
+    (to: string) => {
+      let parsed: URL | null = null;
+      try {
+        parsed = new URL(to, window.location.origin);
+      } catch {
+        parsed = null;
+      }
+      if (scenario === 'trainer' && parsed?.origin === window.location.origin) {
+        if (parsed.pathname === '/coach') {
+          const demoStep = parsed.searchParams.get('demo_step');
+          if (demoStep && TRAINER_DEMO_STEPS.has(demoStep as TrainerDemoStepKey)) {
+            markVisited(scenario, `trainer:${demoStep}`);
+          }
+          if (parsed.searchParams.get('client_id')) markVisited(scenario, 'trainer:client');
+          if (parsed.searchParams.get('workout_id')) markVisited(scenario, 'trainer:workout');
+        }
+      }
+      const mapped = productionPathInDemo(to, scenario);
+      if (!mapped.startsWith('/demo')) return;
+      const destination = new URL(mapped, window.location.origin);
+      markVisited(scenario, sectionFromSearch(destination.search, scenario));
+    },
+    [markVisited, scenario],
+  );
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
       try {
         const next = await loadDemoSession(scenario, signal);
-        if (!isCurrentScenario(scenario)) return;
+        if (!isCurrentDemoLocation(scenario)) return;
         setSnapshot(next);
         setError(null);
         trackProductEvent(
-          { name: 'demo_started', surface: productEventSurface() },
+          { name: 'demo_started', surface: productEventSurface(), scenario },
           { dedupe: 'session', dedupeKey: scenario },
         );
-      } catch (nextError) {
-        if (nextError instanceof DOMException && nextError.name === 'AbortError') return;
-        if (!isCurrentScenario(scenario)) return;
-        setSnapshot(null);
-        setError(
-          nextError instanceof DemoApiError
-            ? nextError
-            : new DemoApiError('Не удалось открыть демо.', 0),
+        trackProductEvent(
+          { name: 'demo_route_started', surface: productEventSurface(), scenario },
+          { dedupe: 'session', dedupeKey: `route:${scenario}` },
         );
+      } catch (reason) {
+        if (reason instanceof DOMException && reason.name === 'AbortError') return;
+        if (!isCurrentDemoLocation(scenario)) return;
+        setSnapshot(null);
+        setError(reason instanceof Error ? reason : new Error('Не удалось открыть демо.'));
       } finally {
-        if (!signal?.aborted && isCurrentScenario(scenario)) {
+        if (!signal?.aborted && isCurrentDemoLocation(scenario)) {
           setLoadedScenario(scenario);
           setLoading(false);
         }
@@ -539,107 +394,172 @@ export default function DemoCabinet() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadDemoSession(scenario, controller.signal)
-      .then((next) => {
-        if (!isCurrentScenario(scenario)) return;
-        setSnapshot(next);
-        setError(null);
-        trackProductEvent(
-          { name: 'demo_started', surface: productEventSurface() },
-          { dedupe: 'session', dedupeKey: scenario },
-        );
-      })
-      .catch((nextError) => {
-        if (nextError instanceof DOMException && nextError.name === 'AbortError') return;
-        if (!isCurrentScenario(scenario)) return;
-        setSnapshot(null);
-        setError(
-          nextError instanceof DemoApiError
-            ? nextError
-            : new DemoApiError('Не удалось открыть демо.', 0),
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted && isCurrentScenario(scenario)) {
-          setLoadedScenario(scenario);
-          setLoading(false);
-        }
-      });
+    void Promise.resolve().then(() => load(controller.signal));
     return () => controller.abort();
-  }, [scenario]);
+  }, [load]);
 
   useEffect(() => {
-    const normalized = demoCabinetPath(scenario, section);
+    const normalizedUrl = new URL(demoCabinetPath(scenario, section), window.location.origin);
+    if (scenario === 'trainer') {
+      const current = new URL(window.location.href);
+      for (const key of ['client_id', 'workout_id'] as const) {
+        const value = current.searchParams.get(key);
+        if (value && positiveIntegerParam(current.searchParams, key) !== null)
+          normalizedUrl.searchParams.set(key, value);
+      }
+      if (current.searchParams.get('tab') === 'tools') {
+        normalizedUrl.searchParams.set('tab', 'tools');
+        const tool = current.searchParams.get('tool');
+        if (
+          tool &&
+          [
+            'reviews',
+            'analytics',
+            'schedule',
+            'tasks',
+            'finance',
+            'invitations',
+            'catalog',
+          ].includes(tool)
+        ) {
+          normalizedUrl.searchParams.set('tool', tool);
+        }
+      }
+      if (current.searchParams.get('focus') === 'weekly_check_in') {
+        normalizedUrl.searchParams.set('focus', 'weekly_check_in');
+      }
+      const demoStep = current.searchParams.get('demo_step');
+      if (demoStep && TRAINER_DEMO_STEPS.has(demoStep as TrainerDemoStepKey)) {
+        normalizedUrl.searchParams.set('demo_step', demoStep);
+      }
+    }
+    const normalized = `${normalizedUrl.pathname}?${normalizedUrl.searchParams.toString()}`;
     if (`${window.location.pathname}${search}` !== normalized) navigate(normalized, true);
   }, [navigate, scenario, search, section]);
 
-  const updateSnapshot = async (operation: () => Promise<DemoSessionSnapshot>, action?: string) => {
-    const requestedScenario = scenario;
-    setBusy(true);
-    setError(null);
-    try {
-      const previousMeaningful = snapshot?.cabinet.meaningful_action_completed ?? false;
-      const next = await operation();
-      if (!isCurrentScenario(requestedScenario) || next.scenario !== requestedScenario) {
-        return;
-      }
-      setSnapshot(next);
-      if (!previousMeaningful && next.cabinet.meaningful_action_completed) {
-        trackProductEvent(
-          { name: 'demo_meaningful_action_completed', surface: productEventSurface() },
-          { dedupe: 'session', dedupeKey: scenario },
-        );
-      }
-      if (action === 'finish_workout') navigate(demoCabinetPath(scenario, 'progress'));
-    } catch (nextError) {
-      const normalized =
-        nextError instanceof DemoApiError
-          ? nextError
-          : new DemoApiError('Не удалось обновить демо.', 0);
-      if (normalized.status === 410) clearDemoSession(scenario);
-      if (!isCurrentScenario(requestedScenario)) return;
-      setError(normalized);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const refreshSnapshot = useCallback(async () => {
+    const next = await loadDemoSession(scenario);
+    if (isCurrentDemoLocation(scenario) && next.scenario === scenario) setSnapshot(next);
+  }, [scenario]);
 
-  const runAction = (action: string, comment?: string) => {
-    void updateSnapshot(() => applyDemoAction(scenario, action, comment), action);
-  };
-  const reset = () => void updateSnapshot(() => resetDemoSession(scenario));
-  const newSession = () => {
-    const requestedScenario = scenario;
+  const reset = useCallback(async () => {
+    const token = getDemoSessionToken(scenario);
+    if (!token) return;
+    routeCompletedRef.current = false;
+    setVisitedSectionsByScenario((current) => ({
+      ...current,
+      [scenario]: new Set([section]),
+    }));
+    setError(null);
+    queryClient.clear();
+    try {
+      const next = await resetDemoSession(scenario);
+      setSnapshot(next);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason : new Error('Не удалось начать демо заново.'));
+    }
+  }, [queryClient, scenario, section]);
+
+  const newSession = useCallback(async () => {
     clearDemoSession(scenario);
+    routeCompletedRef.current = false;
+    setVisitedSectionsByScenario((current) => ({
+      ...current,
+      [scenario]: new Set([section]),
+    }));
     setLoading(true);
     setError(null);
-    void startDemoSession(scenario)
-      .then((next) => {
-        if (isCurrentScenario(requestedScenario)) setSnapshot(next);
-      })
-      .catch((nextError) => {
-        if (!isCurrentScenario(requestedScenario)) return;
-        setError(
-          nextError instanceof DemoApiError
-            ? nextError
-            : new DemoApiError('Не удалось начать новую демо-сессию.', 0),
-        );
-      })
-      .finally(() => {
-        if (isCurrentScenario(requestedScenario)) setLoading(false);
-      });
+    queryClient.clear();
+    try {
+      const next = await startDemoSession(scenario);
+      setSnapshot(next);
+      setLoadedScenario(scenario);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason : new Error('Не удалось начать новую демо-сессию.'),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [queryClient, scenario, section]);
+
+  const selectScenario = (nextScenario: DemoScenario) => {
+    if (nextScenario === scenario || loading) return;
+    trackProductEvent({
+      name: 'demo_scenario_selected',
+      surface: productEventSurface(),
+      scenario: nextScenario,
+    });
+    queryClient.clear();
+    setSnapshot(null);
+    setError(null);
+    markVisited(nextScenario, startSection(nextScenario));
+    navigate(demoCabinetPath(nextScenario));
   };
+
+  const visitedSections = visitedSectionsByScenario[scenario] ?? new Set<string>();
+  const route =
+    snapshot?.scenario === scenario
+      ? getDemoRouteState(scenario, snapshot, section, visitedSections)
+      : null;
+
+  useEffect(() => {
+    if (!route || !snapshot || !route.complete || routeCompletedRef.current) return;
+    routeCompletedRef.current = true;
+    trackProductEvent(
+      { name: 'demo_route_completed', surface: productEventSurface(), scenario },
+      { dedupe: 'session', dedupeKey: `completed:${scenario}` },
+    );
+    if (scenario === 'trainer') {
+      trackProductEvent(
+        {
+          name: 'demo_meaningful_action_completed',
+          surface: productEventSurface(),
+          scenario,
+          action: 'trainer_route_completed',
+        },
+        { dedupe: 'session', dedupeKey: `meaningful:${scenario}` },
+      );
+    }
+  }, [route, scenario, snapshot]);
+
+  const onRouteContinue = (target: DemoRouteTarget) => {
+    if (!target) return;
+    if (target.kind === 'navigate') {
+      markVisited(scenario, target.section);
+      if (target.demoStep) markVisited(scenario, `trainer:${target.demoStep}`);
+      const targetPath = new URL(demoCabinetPath(scenario, target.section), window.location.origin);
+      if (target.demoStep) targetPath.searchParams.set('demo_step', target.demoStep);
+      navigate(`${targetPath.pathname}?${targetPath.searchParams.toString()}`);
+      return;
+    }
+    window.requestAnimationFrame(() => document.getElementById(target.targetId)?.focus());
+  };
+
+  const hideRoute = () => {
+    setRouteVisibility((current) => ({ ...current, [scenario]: false }));
+    setDemoRouteVisible(scenario, false);
+    trackProductEvent({ name: 'demo_route_hidden', surface: productEventSurface(), scenario });
+  };
+
+  const showRoute = () => {
+    setRouteVisibility((current) => ({ ...current, [scenario]: true }));
+    setDemoRouteVisible(scenario, true);
+    trackProductEvent({ name: 'demo_route_reopened', surface: productEventSurface(), scenario });
+  };
+
   const isLoading = loading || loadedScenario !== scenario;
   const cabinetMotion = useSemanticMotion<HTMLDivElement>(
     isLoading
       ? `loading:${scenario}`
       : error
-        ? `error:${scenario}:${error.status}`
+        ? `error:${scenario}`
         : `${scenario}:${section}:${snapshot?.revision ?? 'empty'}`,
     { animateInitial: false },
   );
   const destinations: DemoAppShellConfig['destinations'] = [
     { key: 'today', label: 'Сегодня', icon: 'today', to: demoCabinetPath(scenario, 'today') },
+    { key: 'plan', label: 'План', icon: 'plan', to: demoCabinetPath(scenario, 'plan') },
     {
       key: 'nutrition',
       label: 'Питание',
@@ -656,24 +576,44 @@ export default function DemoCabinet() {
       ? [
           {
             key: 'trainer',
-            label: 'Клиент',
+            label: 'Работа тренера',
             icon: 'coach' as const,
             to: demoCabinetPath(scenario, 'trainer'),
+            mobileHidden: true,
           },
         ]
       : []),
   ];
   const shellDemo: DemoAppShellConfig = {
-    activeSection: section,
+    activeSection: section === 'trainer' ? 'today' : section,
     brandTo: demoCabinetPath(scenario),
     destinations,
-    displayName: scenario === 'trainer' ? 'Демо тренера' : 'Демо-кабинет',
+    displayName: 'Демо',
     exitTo: '/',
-    menuTitle: 'Выберите демо-сценарий',
-    moreLinks: SCENARIOS.map((item) => ({ label: item.label, to: demoCabinetPath(item.value) })),
-    onReset: reset,
-    resetDisabled: busy || isLoading || !snapshot,
+    menuTitle: 'Сценарии демо',
+    minimalUtility: true,
+    moreLinks: DEMO_SCENARIOS.map((item) => ({
+      label: item.label,
+      to: demoCabinetPath(item.value),
+      onClick: () =>
+        trackProductEvent({
+          name: 'demo_scenario_selected',
+          surface: productEventSurface(),
+          scenario: item.value,
+        }),
+    })),
+    onReset: () => void reset(),
+    onNavigate: markNavigation,
+    quickAddLinks: demoQuickAddLinks(scenario),
+    resetDisabled: isLoading || !snapshot,
   };
+  const token = getDemoSessionToken(scenario);
+  const sectionOverride: AppSection =
+    section === 'trainer' ? 'today' : section === 'plan' ? 'programs' : section;
+  const mapNavigationPath = useCallback(
+    (to: string) => productionPathInDemo(to, scenario),
+    [scenario],
+  );
 
   return (
     <AppShell demo={shellDemo}>
@@ -686,37 +626,32 @@ export default function DemoCabinet() {
         onAnimationEnd={cabinetMotion.onMotionAnimationEnd}
       >
         <section className="demo-cabinet-boundary" aria-label="Граница демо-режима">
-          <div>
-            <Badge>Демо</Badge>
-            <p>
-              <strong>Подготовленные данные без сохранения</strong> · 30 минут.
-            </p>
-          </div>
+          <strong>Демо-режим · данные не сохраняются</strong>
           <label className="demo-cabinet-boundary__scenario">
-            <span className="demo-cabinet-boundary__scenario-label">Демо-сценарий:</span>
-            <span className="demo-cabinet-boundary__scenario-select">
-              <select
-                aria-label="Демо-сценарий"
-                disabled={busy || isLoading}
-                value={scenario}
-                onChange={(event) =>
-                  navigate(demoCabinetPath(event.currentTarget.value as DemoScenario))
-                }
-              >
-                {SCENARIOS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.compactLabel}
-                  </option>
-                ))}
-              </select>
-            </span>
+            <span className="demo-cabinet-boundary__scenario-label">Сценарий</span>
+            <select
+              aria-label="Сценарий демо"
+              disabled={isLoading}
+              value={scenario}
+              onChange={(event) => selectScenario(event.currentTarget.value as DemoScenario)}
+            >
+              {DEMO_SCENARIOS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="demo-cabinet-boundary__actions">
-            <Button disabled={shellDemo.resetDisabled} onClick={reset} variant="secondary">
-              Сбросить
+            <Button
+              disabled={shellDemo.resetDisabled}
+              onClick={() => void reset()}
+              variant="secondary"
+            >
+              Начать заново
             </Button>
             <AppLink className="ui-button ui-button--secondary" to="/">
-              Выйти
+              Выйти из демо
             </AppLink>
           </div>
         </section>
@@ -725,53 +660,44 @@ export default function DemoCabinet() {
           <Surface className="demo-cabinet-state">
             <LoadingState label="Готовим демо-кабинет…" />
           </Surface>
-        ) : error ? (
+        ) : error || !snapshot || !route || !token ? (
           <Surface className="demo-cabinet-state">
-            <ErrorState
-              message={error.message}
-              retry={error.status === 410 || error.status === 403 ? newSession : () => void load()}
-            />
-            <p>
-              {error.status === 410
-                ? 'Начните новую изолированную сессию.'
-                : 'Данные аккаунта и авторизация не затронуты.'}
-            </p>
+            <ErrorState message={error?.message ?? 'Демо-сессия недоступна.'} retry={newSession} />
+            <p>Рабочие аккаунты и их данные не затрагиваются.</p>
           </Surface>
-        ) : snapshot ? (
+        ) : (
           <>
-            {section === 'today' && (
-              <TodaySection
-                busy={busy}
-                onAction={runAction}
-                scenario={scenario}
-                snapshot={snapshot}
-              />
-            )}
-            {section === 'nutrition' && (
-              <NutritionSection
-                busy={busy}
-                onAction={runAction}
-                scenario={scenario}
-                snapshot={snapshot}
-              />
-            )}
-            {section === 'progress' && <ProgressSection scenario={scenario} snapshot={snapshot} />}
-            {section === 'trainer' && (
-              <TrainerSection
-                busy={busy}
-                onComment={(comment) => runAction('save_comment', comment)}
-                snapshot={snapshot}
-              />
-            )}
-            {snapshot.cabinet.meaningful_action_completed && (
-              <Conversion
-                scenario={scenario}
-                section={section}
-                title={snapshot.cabinet.conversion_title}
-              />
-            )}
+            <DemoRoute
+              onContinue={onRouteContinue}
+              onHide={hideRoute}
+              onShow={showRoute}
+              route={route}
+              visible={routeVisibility[scenario]}
+            />
+            <DemoRuntimeProvider
+              mapNavigationPath={mapNavigationPath}
+              onNavigate={markNavigation}
+              onMutation={refreshSnapshot}
+              sessionToken={token}
+            >
+              <DemoAuthProvider>
+                {section === 'trainer' ? (
+                  <CoachPage key={search} demo={shellDemo} renderShell={false} />
+                ) : (
+                  <MiniAppPage
+                    demo={shellDemo}
+                    renderShell={false}
+                    sectionOverride={sectionOverride}
+                  />
+                )}
+              </DemoAuthProvider>
+            </DemoRuntimeProvider>
+            {route.complete &&
+              (scenario === 'trainer' || snapshot.cabinet.meaningful_action_completed) && (
+                <Conversion scenario={scenario} section={section} />
+              )}
           </>
-        ) : null}
+        )}
       </div>
     </AppShell>
   );

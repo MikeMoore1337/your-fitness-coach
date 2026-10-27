@@ -1,6 +1,7 @@
-# YFC Codex skills v6 - focused contracts
+# YFC Codex skills v10 - focused contracts
 
-Skills задают профессиональный способ выполнения работы. Role задаёт ответственность прохода, task - scope и результат.
+Skills задают профессиональный способ выполнения работы. Optional role задаёт ответственность
+сессии, а GitHub Issue/PR задают scope и operational result.
 
 ## Базовые правила
 
@@ -8,8 +9,8 @@ Skills задают профессиональный способ выполне
 2. `Условные skills` открываются только при фактическом trigger.
 3. Skill не расширяет scope.
 4. Для обычной implementation task держи примерно 2-5 core skills.
-5. Review/QA: base skill роли + обычно не более 1-2 профильных skills.
-6. Не создавать отдельного агента на каждый skill.
+5. QA: `$qa-engineer` как strategy/router + обычно не более 1-2 профильных skills.
+6. Не создавать отдельного agent на каждый skill или QA-профиль.
 7. Большой end-to-end scope координирует role `orchestrator`, а не специальный meta-skill.
 8. `commercial-product-builder` удалён в v6 как дублирующий orchestration/lifecycle.
 9. Отдельного `ai-engineer` нет: AI/LLM/AI Coach scope принадлежит `$llm-engineer`.
@@ -20,8 +21,35 @@ Skills задают профессиональный способ выполне
     гарантией compliance и не принимает owner decision.
 13. Dedicated legal-risk audit использует primary role `product-lawyer`; remediation после owner
     decision возвращается в отдельную task с обычной implementation-ролью.
+14. QA work profiles описаны в `references/QA_AUTOMATION_ARCHITECTURE.md`; это modes существующих roles, а не отдельный lifecycle.
+15. Repository-native Security Review использует существующий `$security-engineer`, а не новый reviewer role:
+    `diff` для security-sensitive изменений и `full` только для отдельного аудита.
+16. Канонический threat model находится в `../security/THREAT_MODEL.md`; процедура и стандарт
+    доказательств - в `skills/security-engineer/references/SECURITY_REVIEW_PLAYBOOK.md`.
+17. Каждый PR автоматически проходит бесплатный deterministic security audit: CodeQL,
+    dependency audit и Trivy filesystem scan.
+18. Repository-native `$security-engineer` остаётся manual/conditional semantic review для
+    security-sensitive diff и отдельного `full` audit; автоматический OpenAI API вызов не нужен.
 
-## Design v6
+## QA v8
+
+`qa-engineer` отвечает за risk strategy и routing, а не пытается содержать весь test stack.
+
+Профильные контракты:
+
+- `playwright-testing` - browser/Web/TMA implementation;
+- `e2e-review` - false-green и test-intent review;
+- `pytest-test-design` - Python test design;
+- `api-testing`, `database-validation`, `pydantic-contracts` - boundary contracts;
+- `test-data-management` - deterministic fixtures/data/isolation;
+- `allure-reporting` - evidence/report quality;
+- `failure-triage` - конкретное падение;
+- `flaky-analysis` - intermittent failures;
+- `coverage-analysis` - risk/behavior gaps.
+
+UI visual/product audit остаётся отдельным `$ui-audit`.
+
+## Design v8
 
 Для обычных задач текущая production design system остаётся baseline, чтобы не создавать случайный visual drift.
 
@@ -49,3 +77,26 @@ Skills задают профессиональный способ выполне
 - `skills/ru-legal-risk/references/RU_LEGAL_SOURCE_POLICY.md` для юридической source freshness.
 
 Исторические overlap/release audits являются owner-only material и в public Git не публикуются.
+
+## Toolkit: условные проверочные методы (20.10.2026)
+
+Дополнены `change-impact-analysis` (затронутые потребители), `contract-testing` (межкомпонентные контракты), `cross-layer-debugging` (воспроизведённые сквозные сбои), `requirements-traceability` (связь критериев и тестов). Применять точечно по [маршрутизации](references/SKILL_ROUTING_GUIDE.md). Роли, существующая QA-стратегия, продуктовый дизайн и GitHub Flow неизменны. Источник: [AI Development Toolkit, 3a9bf14772ab579d37c6f4f9615db505ab6ac259](https://github.com/MikeMoore1337/ai-development-toolkit/tree/3a9bf14772ab579d37c6f4f9615db505ab6ac259).
+
+Существующие условные справочники `apple-design` и `clear-voice` теперь также перечислены в `MANIFEST.json`; их содержимое не изменялось.
+
+## Ограниченная оркестрация задач
+
+Для сложных cross-stack задач см. [playbook разработки и QA](../docs/development/feature-delivery-playbook.md#адаптивная-оркестрация-разработки-и-qa).
+Он использует существующие роли без нового controller/runtime: один исполнитель в
+одной Issue/PR, максимум три действительно независимых направления, последовательный
+режим без субагентов и evidence по фактическому SHA. Для обычной правки
+`orchestrator` не запускается; статус запуска агентов нельзя выводить из наличия skills.
+
+## Impeccable: основной дизайн-критик
+
+`impeccable` - project-scoped первичная UX/UI-критика для YFC, а не новый controller. Canonical `SKILL.md` находится в `skills/impeccable/`, upstream pinned 4.7.0 в `../.impeccable/`. Для рисования и улучшения UI сначала этот skill, для наблюдаемой QA-регрессии - `ui-audit`, для motion - `motion-design-engineer`, по фактической нужде. Подробности: `../docs/development/impeccable-adoption.md`. Вопросы согласования дизайна решает владелец.
+
+
+## UX/UI Design Orchestra (режим аудита по умолчанию)
+
+При запросе нескольких экспертных проверок **одного экрана** выбери `ux-ui-design-orchestra` как координирующую методику, затем `impeccable`, `ui-audit`, `accessibility-engineer` и `motion-design-engineer` строго по необходимости. Это не новая lifecycle-роль. Схема и приёмка: `../docs/development/ux-ui-design-orchestra.md`. До согласованной визуальной версии - только чтение приложения и концепты, не коммиты UI. Отсутствие доступных subagents = последовательный запуск, не утверждать обратное.

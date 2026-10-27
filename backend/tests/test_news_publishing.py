@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import secrets
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -18,19 +19,29 @@ from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.news import (
     NewsCluster,
     NewsDraftRevision,
+    NewsEditorialAction,
     NewsImageRevision,
     NewsItem,
     NewsPublicationSnapshot,
+    NewsReviewDecision,
     NewsReviewDelivery,
     NewsSource,
 )
-from fitminiapp_api.services import news_images, news_publication
-from fitminiapp_api.services.news_content import EditorialContent, parse_editorial_content
-from fitminiapp_api.services.news_drafts import create_draft_revision
+from fitminiapp_api.services import news_images, news_publication, news_worker
+from fitminiapp_api.services.news_content import (
+    EditorialContent,
+    parse_editorial_content,
+)
+from fitminiapp_api.services.news_drafts import (
+    _validated_fields,
+    evidence_packet,
+    render_draft,
+)
 from fitminiapp_api.services.news_editorial import (
     compose_review_artifact,
     edit_text_revision,
     enqueue_review_deliveries,
+    moderate_draft,
     review_message,
 )
 from fitminiapp_api.services.news_images import (
@@ -40,11 +51,10 @@ from fitminiapp_api.services.news_images import (
 )
 from fitminiapp_api.services.news_ingestion import (
     ParsedNewsItem,
-    SafeNewsFetcher,
-    SourceFetchResult,
     ingest_items,
     utcnow,
 )
+from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
 from fitminiapp_api.services.news_post_management import manage_published_post
 from fitminiapp_api.services.news_publication import (
     ARTIFACT_HASH_PREFIX_LENGTH,
@@ -56,7 +66,12 @@ from fitminiapp_api.services.news_publication import (
     reconcile_uncertain_publication,
     retry_uncertain_publication,
 )
-from fitminiapp_api.services.news_sources import apply_source_allowlist, parse_source_allowlist
+from fitminiapp_api.services.news_review_schedule import current_news_review_slot
+from fitminiapp_api.services.news_sources import (
+    apply_source_allowlist,
+    parse_source_allowlist,
+)
+from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_worker import (
     NewsCycleStats,
     deliver_review_queue,
@@ -69,7 +84,74 @@ from fitminiapp_api.services.worker import (
 )
 
 
-def _source_and_candidate(*, external_id: str = "publication-1") -> str:
+# Test-only stand-in for the state produced by the signed Hermes intake.
+# The production YFC-local create_draft_revision capability is intentionally retired.
+async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevision:
+    del client
+
+    packet = evidence_packet(db, cluster)
+    fields = _validated_fields(
+        {
+            "headline": "Исследование тренировок: результаты для изученной группы",
+            "summary": (
+                "Авторы описали результаты исследования тренировок и ограничения их интерпретации."
+            ),
+            "why_it_matters": ("Материал помогает оценивать применимость результатов на практике."),
+        }
+    )
+    revision = cluster.latest_draft_revision + 1
+    draft = NewsDraftRevision(
+        id=secrets.token_hex(16),
+        cluster_id=cluster.id,
+        primary_item_id=packet.primary_item_id,
+        revision=revision,
+        provider="groq-free-candidate",
+        model="test-hermes-model",
+        prompt_version="test-hermes-editorial-v1",
+        source_digest=packet.source_digest,
+        evidence_item_ids=list(packet.evidence_item_ids),
+        evidence_metadata={
+            "topic": packet.topic,
+            "score": packet.score,
+            "score_version": cluster.score_version,
+            "score_reasons": list(packet.score_reasons[:10]),
+            "risk_flags": list(packet.risk_flags[:10]),
+            "conflict_notes": list(cluster.conflict_notes[:10]),
+            "supporting_source_count": len(packet.supporting_sources),
+            "source_published_at": (
+                packet.published_at.isoformat() if packet.published_at is not None else None
+            ),
+            "source_publisher": packet.publisher or packet.source_name,
+            "image_context_headline": packet.title[:180],
+            "editorial_contract_version": "news-editorial-v2",
+            "editorial_fields": dict(fields),
+            "trusted_source_url": packet.primary_url or packet.canonical_url,
+            "publication_policy": "manual_required",
+            "submitted_by": HERMES_SUBMISSION_MARKER,
+        },
+        draft_text=render_draft(fields, packet),
+        warnings=[],
+        generation_latency_ms=0,
+    )
+    db.add(draft)
+
+    cluster.latest_draft_revision = revision
+    cluster.current_image_revision = 0
+    cluster.generation_attempt_count += 1
+
+    transition_news_cluster(
+        db,
+        cluster,
+        "image_pending",
+        reason_code="test_hermes_draft_received",
+    )
+    db.flush()
+    return draft
+
+
+def _source_and_candidate(
+    *, external_id: str = "publication-1", published_at: datetime | None = None
+) -> str:
     title = "Resistance training changed a measured strength outcome"
     summary = "A controlled study reported a specific strength outcome."
     if external_id == "daily-0":
@@ -109,7 +191,7 @@ def _source_and_candidate(*, external_id: str = "publication-1") -> str:
                     title=title,
                     summary=summary,
                     publisher="Publishing Journal",
-                    published_at=utcnow(),
+                    published_at=published_at or utcnow(),
                     doi=f"10.1000/{external_id}",
                 )
             ],
@@ -184,15 +266,7 @@ def test_review_artifact_blocks_source_outside_freshness_window() -> None:
     with get_session_context() as db:
         draft = db.get(NewsDraftRevision, draft_id)
         assert draft is not None
-        current_month_start = utcnow().replace(
-            day=1,
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-        previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
-        stale = previous_month_start - timedelta(seconds=1)
+        stale = utcnow() - timedelta(days=61)
         draft.evidence_metadata = {
             **draft.evidence_metadata,
             "source_published_at": stale.isoformat(),
@@ -216,7 +290,7 @@ def test_scheduling_cannot_cross_source_freshness_window(monkeypatch) -> None:
         enqueue_review_deliveries(db, {7001})
         draft.evidence_metadata = {
             **draft.evidence_metadata,
-            "source_published_at": "2026-07-04T00:00:00",
+            "source_published_at": "2026-06-28T12:00:00",
         }
 
         result = approve_publication(
@@ -249,7 +323,7 @@ def test_queued_publication_is_failed_after_freshness_window_rollover(monkeypatc
         enqueue_review_deliveries(db, {7001})
         draft.evidence_metadata = {
             **draft.evidence_metadata,
-            "source_published_at": "2026-07-04T00:00:00",
+            "source_published_at": "2026-06-30T00:00:00",
         }
         approved = approve_publication(
             db,
@@ -328,6 +402,43 @@ def test_news_card_headline_is_centered_between_rubric_and_review_label() -> Non
     top_gap = headline_bounds[1] - rubric_bounds[3]
     bottom_gap = review_label_bounds[1] - headline_bounds[3]
     assert abs(top_gap - bottom_gap) <= 1
+
+
+def test_news_card_headline_keeps_all_words_and_fits_available_area() -> None:
+    canvas = Image.new("RGB", news_images.CANVAS_SIZE, "#101310")
+    draw = news_images.ImageDraw.Draw(canvas)
+    rubric_font = news_images._font(24, bold=True)
+    review_label_font = news_images._font(22)
+    rubric_text = "РЕДАКЦИОННЫЙ РАЗБОР"
+    review_label_text = "Проверено редактором • Источник — в публикации"
+    headline = "Оценка воспринимаемой нагрузки (RPE) может отражать потерю скорости при приседе со средней нагрузкой"
+    rubric_bounds = draw.textbbox(news_images.RUBRIC_POSITION, rubric_text, font=rubric_font)
+    review_label_bounds = draw.textbbox(
+        news_images.REVIEW_LABEL_POSITION,
+        review_label_text,
+        font=review_label_font,
+    )
+
+    headline_text, headline_font, headline_y = news_images._fit_headline_layout(
+        draw,
+        headline,
+        rubric_bounds=rubric_bounds,
+        review_label_bounds=review_label_bounds,
+    )
+    headline_lines = headline_text.splitlines()
+    headline_bounds = draw.multiline_textbbox(
+        (news_images.HEADLINE_X, headline_y),
+        headline_text,
+        font=headline_font,
+        spacing=news_images.HEADLINE_SPACING,
+    )
+
+    assert " ".join(headline_text.split()) == headline
+    assert max(draw.textlength(line, font=headline_font) for line in headline_lines) <= (
+        news_images.HEADLINE_MAX_WIDTH
+    )
+    assert headline_bounds[1] >= rubric_bounds[3]
+    assert headline_bounds[3] <= review_label_bounds[1]
 
 
 def test_renderer_enforces_exact_telegram_photo_and_message_boundaries() -> None:
@@ -685,7 +796,7 @@ def test_exact_approval_is_idempotent_and_edit_revokes_schedule(monkeypatch) -> 
             expected_image_revision=image_revision,
             admin_telegram_user_id=7001,
             draft_text=draft.draft_text.replace(
-                "Новый материал о фитнесе и тренировках требует редакторской проверки",
+                "Исследование тренировок: результаты для изученной группы",
                 "Проверенный материал о фитнесе и тренировках",
             ),
         )
@@ -716,13 +827,15 @@ def test_exact_approval_is_idempotent_and_edit_revokes_schedule(monkeypatch) -> 
 
 
 def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -> None:
+    fixed_now = datetime(2026, 9, 25, 10, 5, 0)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
     monkeypatch.setattr(settings, "news_daily_publication_limit", 1)
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
     snapshot_ids: list[str] = []
     for index in range(2):
-        cluster_id = _source_and_candidate(external_id=f"daily-{index}")
+        cluster_id = _source_and_candidate(external_id=f"daily-{index}", published_at=fixed_now)
         draft_id, _ = _draft(cluster_id)
         with get_session_context() as db:
             cluster = db.get(NewsCluster, cluster_id)
@@ -759,8 +872,404 @@ def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -
         rejected_id = next(value for value in snapshot_ids if value != claimed_id)
         second = db.get(NewsPublicationSnapshot, rejected_id)
         assert second is not None
-        assert second.status == "failed"
-        assert second.last_error_code == "daily_cap_reached"
+        assert second.status == "queued"
+        assert second.last_error_code == "waiting_for_daily_capacity"
+        assert second.next_attempt_at == datetime(2026, 9, 26, 10, 5, 0)
+        second_cluster = db.get(NewsCluster, second.cluster_id)
+        assert second_cluster is not None
+        assert second_cluster.status == "publication_approved"
+        assert second_cluster.delivery_round == 0
+
+        next_day = datetime(2026, 9, 26, 10, 5, 0)
+        monkeypatch.setattr(news_publication, "utcnow", lambda: next_day)
+        assert claim_due_publications(db, limit=5) == [second.id]
+        assert second.status == "processing"
+        assert second.publication_local_date.isoformat() == "2026-09-26"
+
+
+def test_urgent_manual_publication_bypasses_daily_cap(monkeypatch) -> None:
+    fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "news_daily_publication_limit", 1)
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
+
+    first_cluster_id = _source_and_candidate(
+        external_id="daily-cap-existing",
+        published_at=fixed_now,
+    )
+    first_draft_id, _ = _draft(first_cluster_id)
+    with get_session_context() as db:
+        first_draft = db.get(NewsDraftRevision, first_draft_id)
+        assert first_draft is not None
+        first_draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        first = approve_publication(
+            db,
+            draft_id=first_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            expected_artifact_hash=_artifact_hash(db, first_draft),
+        )
+        assert first.snapshot_id is not None
+        assert claim_due_publications(db, limit=1) == [first.snapshot_id]
+
+    urgent_cluster_id = _source_and_candidate(
+        external_id="manual-publish-now",
+        published_at=fixed_now,
+    )
+    urgent_draft_id, _ = _draft(urgent_cluster_id)
+    with get_session_context() as db:
+        urgent_draft = db.get(NewsDraftRevision, urgent_draft_id)
+        assert urgent_draft is not None
+        urgent_draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        urgent = approve_publication(
+            db,
+            draft_id=urgent_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=_artifact_hash(db, urgent_draft),
+        )
+        assert urgent.status == "queued"
+        assert urgent.snapshot_id is not None
+        snapshot = db.get(NewsPublicationSnapshot, urgent.snapshot_id)
+        assert snapshot is not None
+        assert snapshot.urgent_override is True
+
+        assert claim_due_publications(db, limit=5) == [urgent.snapshot_id]
+        assert snapshot.status == "processing"
+        assert snapshot.last_error_code is None
+
+
+def test_publish_now_escalates_waiting_snapshot_without_duplicate_send(monkeypatch) -> None:
+    fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "news_daily_publication_limit", 1)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
+
+    capacity_cluster_id = _source_and_candidate(external_id="daily-0", published_at=fixed_now)
+    capacity_draft_id, _ = _draft(capacity_cluster_id)
+    with get_session_context() as db:
+        capacity_draft = db.get(NewsDraftRevision, capacity_draft_id)
+        assert capacity_draft is not None
+        capacity_draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        capacity = approve_publication(
+            db,
+            draft_id=capacity_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            expected_artifact_hash=_artifact_hash(db, capacity_draft),
+        )
+        assert capacity.snapshot_id is not None
+        assert claim_due_publications(db) == [capacity.snapshot_id]
+
+    target_cluster_id = _source_and_candidate(external_id="daily-1", published_at=fixed_now)
+    target_draft_id, _ = _draft(target_cluster_id)
+    with get_session_context() as db:
+        target_draft = db.get(NewsDraftRevision, target_draft_id)
+        assert target_draft is not None
+        target_draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        artifact_hash = _artifact_hash(db, target_draft)
+        normal = approve_publication(
+            db,
+            draft_id=target_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            expected_artifact_hash=artifact_hash,
+        )
+        assert normal.snapshot_id is not None
+        assert claim_due_publications(db) == []
+        old_snapshot = db.get(NewsPublicationSnapshot, normal.snapshot_id)
+        assert old_snapshot is not None
+        assert old_snapshot.status == "queued"
+        assert old_snapshot.last_error_code == "waiting_for_daily_capacity"
+        assert old_snapshot.next_attempt_at == datetime(2026, 10, 2, 10, 10, 0)
+        old_snapshot_id = old_snapshot.id
+        old_decision_id = old_snapshot.decision_id
+
+        escalated = approve_publication(
+            db,
+            draft_id=target_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=artifact_hash,
+        )
+
+        assert escalated.status == "queued"
+        assert escalated.snapshot_id is not None
+        assert escalated.snapshot_id != old_snapshot_id
+        urgent_snapshot = db.get(NewsPublicationSnapshot, escalated.snapshot_id)
+        assert urgent_snapshot is not None
+        assert urgent_snapshot.status == "queued"
+        assert urgent_snapshot.publication_mode == "immediate"
+        assert urgent_snapshot.urgent_override is True
+        assert urgent_snapshot.scheduled_for_utc == fixed_now
+        assert urgent_snapshot.next_attempt_at == fixed_now
+        assert urgent_snapshot.publication_local_date == fixed_now.date()
+        assert urgent_snapshot.last_error_code is None
+        assert old_snapshot.status == "cancelled"
+        assert old_snapshot.last_error_code == "superseded_by_publish_now"
+        old_decision = db.get(NewsReviewDecision, old_decision_id)
+        assert old_decision is not None
+        assert old_decision.status == "revoked"
+        assert old_decision.revocation_reason == "superseded_by_publish_now"
+
+        escalation_event = (
+            db.query(AuditEvent).filter(AuditEvent.action == "news.publication_escalated").one()
+        )
+        assert escalation_event.resource_id == urgent_snapshot.id
+        assert escalation_event.details == {
+            "old_snapshot_id": old_snapshot_id,
+            "new_snapshot_id": urgent_snapshot.id,
+            "old_mode": "immediate",
+            "new_mode": "immediate",
+            "prior_error_code": "waiting_for_daily_capacity",
+            "reason": "owner_publish_now",
+            "urgent_override": True,
+        }
+
+        assert claim_due_publications(db) == [urgent_snapshot.id]
+        assert urgent_snapshot.status == "processing"
+
+        repeated = approve_publication(
+            db,
+            draft_id=target_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=artifact_hash,
+        )
+        assert repeated.status == "already_queued"
+        assert repeated.snapshot_id == urgent_snapshot.id
+        active_snapshots = (
+            db.query(NewsPublicationSnapshot)
+            .filter(
+                NewsPublicationSnapshot.cluster_id == target_cluster_id,
+                NewsPublicationSnapshot.status.in_({"queued", "scheduled", "processing"}),
+            )
+            .all()
+        )
+        assert [(row.id, row.status) for row in active_snapshots] == [
+            (urgent_snapshot.id, "processing")
+        ]
+
+
+def test_publish_now_stale_hash_does_not_escalate_and_retries_converge(monkeypatch) -> None:
+    fixed_now = datetime(2026, 10, 2, 10, 10, 0)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_schedule_min_minutes", 5)
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
+
+    cluster_id = _source_and_candidate(
+        external_id="publish-now-idempotency", published_at=fixed_now
+    )
+    draft_id, _ = _draft(cluster_id)
+    with get_session_context() as db:
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert draft is not None
+        draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        artifact_hash = _artifact_hash(db, draft)
+        normal = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            expected_artifact_hash=artifact_hash,
+        )
+        assert normal.snapshot_id is not None
+
+        stale = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash="0" * ARTIFACT_HASH_PREFIX_LENGTH,
+        )
+        assert stale.status == "stale"
+        original = db.get(NewsPublicationSnapshot, normal.snapshot_id)
+        assert original is not None
+        assert original.status == "queued"
+        assert original.urgent_override is False
+
+        first = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=artifact_hash,
+        )
+        second = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=artifact_hash,
+        )
+        assert first.status == "queued"
+        assert second.status == "already_queued"
+        assert first.snapshot_id is not None
+        assert second.snapshot_id == first.snapshot_id
+        assert (
+            db.query(NewsPublicationSnapshot)
+            .filter(
+                NewsPublicationSnapshot.cluster_id == cluster_id,
+                NewsPublicationSnapshot.status.in_({"queued", "scheduled", "processing"}),
+            )
+            .count()
+            == 1
+        )
+
+
+def test_publish_now_supersedes_mutable_scheduled_snapshot(monkeypatch) -> None:
+    fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_schedule_min_minutes", 5)
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
+
+    cluster_id = _source_and_candidate(external_id="publish-now-scheduled", published_at=fixed_now)
+    draft_id, _ = _draft(cluster_id)
+    with get_session_context() as db:
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert draft is not None
+        draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        artifact_hash = _artifact_hash(db, draft)
+        scheduled = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="scheduled",
+            scheduled_local=datetime(2026, 10, 1, 16, 10, 0),
+            timezone_name="Europe/Moscow",
+            expected_artifact_hash=artifact_hash,
+        )
+        assert scheduled.status == "scheduled"
+        assert scheduled.snapshot_id is not None
+        old_snapshot = db.get(NewsPublicationSnapshot, scheduled.snapshot_id)
+        assert old_snapshot is not None
+        old_decision = db.get(NewsReviewDecision, old_snapshot.decision_id)
+        assert old_decision is not None
+
+        urgent = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=artifact_hash,
+        )
+        assert urgent.status == "queued"
+        assert urgent.snapshot_id is not None
+        assert urgent.snapshot_id != old_snapshot.id
+        current = db.get(NewsPublicationSnapshot, urgent.snapshot_id)
+        assert current is not None
+        assert current.publication_mode == "immediate"
+        assert current.urgent_override is True
+        assert current.next_attempt_at == fixed_now
+        assert old_snapshot.status == "cancelled"
+        assert old_snapshot.last_error_code == "superseded_by_publish_now"
+        assert old_decision.status == "revoked"
+        assert old_decision.revocation_reason == "superseded_by_publish_now"
+        assert claim_due_publications(db) == [current.id]
+
+
+@pytest.mark.parametrize("terminal_status", ["processing", "published", "uncertain"])
+def test_publish_now_does_not_create_send_for_nonmutable_snapshot(
+    monkeypatch, terminal_status: str
+) -> None:
+    fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
+
+    cluster_id = _source_and_candidate(
+        external_id=f"publish-now-{terminal_status}", published_at=fixed_now
+    )
+    draft_id, _ = _draft(cluster_id)
+    with get_session_context() as db:
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert draft is not None
+        draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        artifact_hash = _artifact_hash(db, draft)
+        approved = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            expected_artifact_hash=artifact_hash,
+        )
+        assert approved.snapshot_id is not None
+        assert claim_due_publications(db) == [approved.snapshot_id]
+        if terminal_status == "published":
+            mark_publication_succeeded(
+                db,
+                approved.snapshot_id,
+                message_id=700 + len(terminal_status),
+                message_date=fixed_now,
+            )
+        elif terminal_status == "uncertain":
+            mark_publication_failed(
+                db,
+                approved.snapshot_id,
+                error_code="telegram_send_timeout",
+                uncertain=True,
+            )
+        snapshot = db.get(NewsPublicationSnapshot, approved.snapshot_id)
+        assert snapshot is not None
+        assert snapshot.status == terminal_status
+
+        repeated = approve_publication(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=artifact_hash,
+        )
+        assert repeated.status == "already_queued"
+        assert repeated.snapshot_id == approved.snapshot_id
+        assert (
+            db.query(NewsPublicationSnapshot)
+            .filter(NewsPublicationSnapshot.cluster_id == cluster_id)
+            .count()
+            == 1
+        )
 
 
 def test_publisher_rejects_tampered_stored_snapshot(monkeypatch) -> None:
@@ -1032,10 +1541,13 @@ def test_uncertain_send_never_retries_until_owner_reconciles(monkeypatch) -> Non
             uncertain=True,
         )
         assert claim_due_publications(db) == []
-        assert retry_uncertain_publication(
-            db,
-            snapshot_id=approved.snapshot_id,
-            admin_telegram_user_id=7001,
+        assert (
+            retry_uncertain_publication(
+                db,
+                snapshot_id=approved.snapshot_id,
+                admin_telegram_user_id=7001,
+            )
+            == "queued"
         )
         assert claim_due_publications(db) == [approved.snapshot_id]
         mark_publication_failed(
@@ -1145,7 +1657,7 @@ def test_private_preview_matches_exact_artifact_and_retry_does_not_duplicate_it(
             }
         )
         if len(control_calls) == 1:
-            raise RuntimeError("simulated control-card failure")
+            raise TelegramPublicationError("telegram_network_error")
         return 202
 
     stats = NewsCycleStats()
@@ -1166,6 +1678,7 @@ def test_private_preview_matches_exact_artifact_and_retry_does_not_duplicate_it(
         delivery = db.query(NewsReviewDelivery).one()
         assert delivery.status == "queued"
         assert delivery.telegram_message_id == 101
+        assert delivery.last_error_code == "telegram_network_error"
         delivery.next_attempt_at = utcnow() - timedelta(seconds=1)
 
     assert asyncio.run(deliver()) == 1
@@ -1196,17 +1709,67 @@ def test_private_preview_matches_exact_artifact_and_retry_does_not_duplicate_it(
         assert event.details["control_message_id"] == 202
 
 
-def test_successful_pipeline_fetches_scores_drafts_and_delivers_for_approval(
+@pytest.mark.parametrize(
+    ("proxy_url", "expected_proxy"),
+    [
+        ("socks5://bot-proxy.test:1081", "socks5://bot-proxy.test:1081"),
+        ("", None),
+    ],
+)
+def test_news_pipeline_uses_explicit_telegram_transport(
     monkeypatch,
+    proxy_url: str,
+    expected_proxy: str | None,
 ) -> None:
+    captured: dict[str, object] = {}
+
+    class RecordingAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        async def __aenter__(self) -> RecordingAsyncClient:
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    async def no_images(_client: httpx.AsyncClient) -> int:
+        return 0
+
+    monkeypatch.setattr(settings, "telegram_bot_proxy_url", proxy_url)
+    monkeypatch.setattr(news_worker.httpx, "AsyncClient", RecordingAsyncClient)
+    monkeypatch.setattr(news_worker, "prune_news_editorial", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(news_worker, "quarantine_non_hermes_news_work", lambda *_args: None)
+    monkeypatch.setattr(news_worker, "generate_pending_images", no_images)
+    monkeypatch.setattr(news_worker, "enqueue_review_deliveries", lambda *_args: 0)
+
+    async def unused_sender(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("sender should not run in transport construction test")
+
+    asyncio.run(
+        run_news_pipeline_once(
+            send_message=unused_sender,
+            send_preview=unused_sender,
+            send_publication=unused_sender,
+            publication_ready=False,
+            review_delivery_due=False,
+        )
+    )
+
+    assert captured["trust_env"] is False
+    assert captured["follow_redirects"] is False
+    assert captured.get("proxy") == expected_proxy
+
+
+def test_scheduled_review_delivery_sends_twenty_in_two_waves(monkeypatch) -> None:
     definitions = parse_source_allowlist(
         [
             {
-                "id": "pipeline-journal",
-                "name": "Pipeline Journal",
+                "id": "batch-journal",
+                "name": "Batch Journal",
                 "type": "primary_research",
                 "fetch_kind": "rss",
-                "url": "https://pipeline-journal.example/feed",
+                "url": "https://batch-journal.example/feed",
                 "language": "en",
                 "enabled": True,
                 "fetch_interval_minutes": 60,
@@ -1215,111 +1778,466 @@ def test_successful_pipeline_fetches_scores_drafts_and_delivers_for_approval(
             }
         ]
     )
+    titles = (
+        "Resistance training changed measured strength outcome",
+        "Dietary protein review changed nutrition context",
+        "Sleep duration cohort reported recovery associations",
+        "Cardio interval study measured endurance outcome",
+        "Mobility exercise study reported flexibility outcome",
+        "Creatine supplement trial measured performance outcome",
+        "Hypertrophy volume study measured muscle growth",
+        "Powerlifting periodization trial measured strength outcome",
+        "Weightlifting velocity study measured training performance",
+        "Omega-3 supplement review measured exercise recovery",
+        "Electrolyte trial measured endurance performance",
+        "GLP-1 study measured body composition during weight management",
+        "Semaglutide study measured fat loss and muscle preservation",
+        "Bodybuilding contest preparation study measured physique outcomes",
+        "Anabolic steroid review assessed bodybuilding performance risks",
+        "Physical activity study measured sedentary behavior change",
+        "Pre-workout caffeine trial measured exercise performance",
+        "Protein intake study measured muscle preservation during fat loss",
+        "Sports injury prevention study measured athlete outcomes",
+        "Aerobic training study measured endurance performance",
+        "Training load study measured athlete recovery outcomes",
+    )
     with get_session_context() as db:
         apply_source_allowlist(db, definitions)
+        source = db.get(NewsSource, "batch-journal")
+        assert source is not None
+        for index, title in enumerate(titles):
+            counts = ingest_items(
+                db,
+                source,
+                [
+                    ParsedNewsItem(
+                        external_id=f"batch-{index}",
+                        canonical_url=f"https://batch-journal.example/batch-{index}",
+                        primary_url=f"https://batch-journal.example/batch-{index}",
+                        title=title,
+                        summary=f"A controlled study reported the {title.lower()}.",
+                        publisher="Batch Journal",
+                        published_at=utcnow(),
+                        doi=f"10.1000/batch-{index}",
+                    )
+                ],
+                candidate_threshold=55,
+            )
+            assert counts["candidate"] == 1
+            item = db.query(NewsItem).filter(NewsItem.external_id == f"batch-{index}").one()
+            assert item.cluster_id is not None
+            cluster = db.get(NewsCluster, item.cluster_id)
+            assert cluster is not None
+            draft = asyncio.run(create_draft_revision(db, cluster))
+            draft.evidence_metadata = {
+                **draft.evidence_metadata,
+                "submitted_by": "hermes_narrow_intake",
+            }
+            asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == len(titles)
 
-    async def fetch(_self, _source):
-        return SourceFetchResult(
-            status="fetched",
-            items=(
-                ParsedNewsItem(
-                    external_id="pipeline-study-1",
-                    canonical_url="https://pipeline-journal.example/pipeline-study-1",
-                    primary_url="https://pipeline-journal.example/pipeline-study-1",
-                    title="Resistance training improved measured strength in adults",
-                    summary=(
-                        "A randomized controlled exercise study measured strength and "
-                        "muscle recovery outcomes."
-                    ),
-                    publisher="Pipeline Journal",
-                    published_at=utcnow(),
-                    doi="10.1000/pipeline.1",
-                ),
-            ),
-        )
-
-    monkeypatch.setattr(SafeNewsFetcher, "fetch", fetch)
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
-    monkeypatch.setattr(settings, "news_daily_draft_limit", 3)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
-    preview_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(settings, "news_review_batch_size", 20)
+    monkeypatch.setattr(settings, "news_review_wave_size", 10)
+    monkeypatch.setattr(settings, "news_review_wave_pause_seconds", 2.5)
+    slot = current_news_review_slot(datetime(2026, 9, 8, 5, 5, 0, tzinfo=UTC))
+    assert slot is not None
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(news_worker.asyncio, "sleep", fake_sleep)
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=700 + len(preview_calls), message_date=utcnow())
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 800 + len(control_calls)
+
+    stats = NewsCycleStats()
+
+    async def deliver(*, cycle_stats: NewsCycleStats | None = None) -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+                cycle_stats=cycle_stats,
+                review_slot=slot,
+            )
+
+    assert asyncio.run(deliver(cycle_stats=stats)) == 20
+    assert len(preview_calls) == 20
+    assert len(control_calls) == 20
+    assert sleep_calls == [2.5]
+    assert stats.review_selected == 20
+    assert stats.review_delivered == 20
+    assert stats.review_awaiting_review == 21
+    assert stats.review_backlog == 1
+    with get_session_context() as db:
+        statuses = [
+            row.status for row in db.query(NewsReviewDelivery).order_by(NewsReviewDelivery.id)
+        ]
+        assert statuses.count("sent") == 20
+        assert statuses.count("queued") == 1
+
+    assert asyncio.run(deliver()) == 0
+    assert len(preview_calls) == 20
+    assert len(control_calls) == 20
+    assert sleep_calls == [2.5]
+    with get_session_context() as db:
+        assert (
+            db.query(NewsReviewDelivery).filter(NewsReviewDelivery.status == "queued").count() == 1
+        )
+
+
+def test_sensitive_hermes_warning_is_not_delivered_to_owner(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-sensitive-card")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = ["medical_prescription_language"]
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
     control_calls: list[dict[str, object]] = []
 
-    async def send_preview(
-        _client,
-        chat_id,
-        text,
-        image_data,
-        *,
-        parse_mode,
-        link_preview_disabled,
-    ):
-        preview_calls.append(
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "image_data": image_data,
-                "parse_mode": parse_mode,
-                "link_preview_disabled": link_preview_disabled,
-            }
-        )
-        return SimpleNamespace(message_id=301, message_date=utcnow())
+    async def send_preview(_client, _chat_id, *_args, **_kwargs):
+        raise AssertionError("blocked warning must not send preview")
 
-    async def send_control(_client, chat_id, text, *, reply_markup):
-        control_calls.append(
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "reply_markup": reply_markup,
-            }
-        )
-        return 302
+    async def send_control(_client, _chat_id, text, *, reply_markup):
+        control_calls.append({"text": text, "reply_markup": reply_markup})
+        raise AssertionError("blocked warning must not send control card")
 
-    async def unexpected_publication(*_args, **_kwargs):
-        raise AssertionError("approval pipeline must not publish without an owner action")
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
 
-    stats = asyncio.run(
-        run_news_pipeline_once(
-            send_message=send_control,
-            send_preview=send_preview,
-            send_publication=unexpected_publication,
-            publication_ready=True,
-            fetch_sources=True,
-        )
-    )
-
-    assert stats == NewsCycleStats(
-        sources_total=1,
-        sources_checked=1,
-        sources_success=1,
-        candidates_fetched=1,
-        candidates_new=1,
-        candidates_eligible=1,
-        drafts_created=1,
-    )
-    assert len(preview_calls) == 1
-    assert preview_calls[0]["chat_id"] == 7001
-    assert len(control_calls) == 1
-    assert control_calls[0]["chat_id"] == 7001
+    assert asyncio.run(deliver()) == 0
+    assert control_calls == []
     with get_session_context() as db:
-        draft = db.query(NewsDraftRevision).one()
+        assert db.query(NewsReviewDelivery).one().status == "queued"
+
+
+def test_hermes_draft_reaches_telegram_when_legacy_fetch_is_disabled(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-downstream-enabled")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = []
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=611, message_date=utcnow())
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 612
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    assert asyncio.run(deliver()) == 1
+    assert preview_calls == [7001]
+    assert control_calls == [7001]
+    with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        cluster = db.query(NewsCluster).one()
-        assert draft.provider == "deterministic"
         assert delivery.status == "sent"
-        assert delivery.telegram_message_id == 301
+        assert db.get(NewsDraftRevision, draft_id).evidence_metadata["submitted_by"] == (
+            "hermes_narrow_intake"
+        )
+
+
+def test_owner_edited_hermes_revision_keeps_delivery_eligibility(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-owner-edit-marker")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = []
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        cluster.status = "awaiting_review"
+        result = edit_text_revision(
+            db,
+            draft_id=draft.id,
+            expected_image_revision=cluster.current_image_revision,
+            admin_telegram_user_id=7001,
+            draft_text=draft.draft_text,
+        )
+        assert result.status == "queued"
+        edited = (
+            db.query(NewsDraftRevision)
+            .filter(NewsDraftRevision.cluster_id == cluster.id)
+            .order_by(NewsDraftRevision.revision.desc())
+            .first()
+        )
+        assert edited is not None and edited.id != draft.id
+        assert edited.evidence_metadata["submitted_by"] == "hermes_narrow_intake"
+        asyncio.run(create_image_revision(db, cluster, edited, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+
+def test_hermes_regenerate_never_requeues_same_immutable_revision(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-regenerate-disabled-legacy")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_ingestion_enabled", True)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = []
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+        result = moderate_draft(
+            db,
+            draft_id=draft.id,
+            admin_telegram_user_id=7001,
+            action="regenerate",
+        )
+        assert result.status == "unavailable"
+        assert result.cluster_status == "awaiting_review"
         assert cluster.status == "awaiting_review"
-        assert db.query(NewsPublicationSnapshot).count() == 0
-        event = db.query(AuditEvent).filter_by(action="news.preview_created").one()
-        assert event.details["preview_message_id"] == 301
-        assert event.details["control_message_id"] == 302
+        assert cluster.delivery_round == 0
+        assert db.query(NewsReviewDelivery).one().status == "queued"
+        db.flush()
+        action_record = db.query(NewsEditorialAction).filter_by(action="regenerate").one()
+        assert action_record.outcome == "generation_external"
 
 
-def test_over_limit_photo_control_card_shows_measurement_and_recovery_actions(
+def test_hermes_fallback_draft_is_not_delivered_or_requeued(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-fallback-delivery")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = [
+            "deterministic_fallback_requires_editor",
+            "provider_response_too_large",
+        ]
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=601, message_date=utcnow())
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 602
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    delivered = asyncio.run(deliver())
+    assert delivered == 0
+    assert preview_calls == []
+    assert control_calls == []
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None
+        assert db.query(AuditEvent).filter_by(action="news.preview_delivery_blocked").count() == 0
+        assert enqueue_review_deliveries(db, {7001}) == 0
+
+
+def test_overlong_hermes_preview_is_not_delivered_to_owner(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="overlong-delivery-guard")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+            "editorial_fields": {
+                "headline": "Тест",
+                "summary": "Я" * 1009,
+                "why_it_matters": "",
+            },
+        }
+        draft.warnings = []
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=603, message_date=utcnow())
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 604
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    delivered = asyncio.run(deliver())
+    assert delivered == 0
+    assert preview_calls == []
+    assert control_calls == []
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None
+
+
+def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-image-required")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    async def unexpected_send(*_args, **_kwargs):
+        raise AssertionError("Hermes delivery requires an image preview")
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                unexpected_send,
+                unexpected_send,
+                channel_ready=True,
+            )
+
+    assert asyncio.run(deliver()) == 0
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None
+
+
+def test_review_message_uses_cluster_scoring_when_hermes_metadata_omits_it() -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-review-canonical-score")
+    draft_id, _ = _draft(cluster_id)
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+
+        cluster.topic = "nutrition"
+        cluster.score = 85
+        cluster.score_version = "news-score-v1"
+        cluster.score_reasons = [
+            "source_quality:25",
+            "topic:nutrition",
+            "priority:new_research",
+        ]
+        metadata = dict(draft.evidence_metadata)
+        metadata.update({"submitted_by": "hermes_narrow_intake"})
+        for key in ("topic", "score", "score_version", "score_reasons", "supporting_source_count"):
+            metadata.pop(key, None)
+        draft.evidence_metadata = metadata
+
+        message, _, _ = review_message(db, draft)
+
+        assert "Topic: nutrition · score 85/100 (news-score-v1)" in message
+        assert "Причины: source_quality:25, topic:nutrition, priority:new_research" in message
+        assert "Sources: 1 total · supporting: 0" in message
+        assert "other · score 0/100" not in message
+
+
+def test_over_limit_photo_review_message_shows_not_ready_state(
     monkeypatch,
 ) -> None:
     cluster_id = _source_and_candidate(external_id="over-limit-control")
@@ -1348,7 +2266,6 @@ def test_over_limit_photo_control_card_shows_measurement_and_recovery_actions(
         assert "Опубликовать сейчас" not in labels
         assert {
             "Изменить текст",
-            "Перегенерировать текст",
             "Убрать изображение",
             "Отклонить",
         }.issubset(labels)
@@ -1403,3 +2320,63 @@ def test_legacy_plain_snapshot_does_not_block_html_renderer_approval(monkeypatch
         assert current.renderer_version == "news-publication-html-v1"
         assert current.parse_mode == "HTML"
         assert current.link_preview_disabled is True
+
+
+def test_hermes_unsupported_number_never_reaches_owner_review(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-unsupported-number-review")
+    draft_id, _ = _draft(cluster_id)
+
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = ["unsupported_number"]
+
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[dict[str, object]] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=901, message_date=utcnow())
+
+    async def send_control(_client, chat_id, text, *, reply_markup):
+        control_calls.append(
+            {
+                "chat_id": chat_id,
+                "text": text,
+                "reply_markup": reply_markup,
+            }
+        )
+        return 902
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    assert asyncio.run(deliver()) == 0
+    assert preview_calls == []
+    assert control_calls == []
+
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None

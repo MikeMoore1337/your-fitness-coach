@@ -8,6 +8,18 @@
     "language": "en",
     "enabled": true,
     "fetch_interval_minutes": 360,
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Research metadata is evidence for the studied question only; design, limitations and conflicts require review.",
     "trust_notes": "Научный журнал. Тип статьи, дизайн, ограничения и conflicts требуют редакционной проверки.",
     "licensing_notes": "Хранить только metadata и короткий audit excerpt; не копировать полный текст или изображения.",
     "allowed_redirect_hosts": [],
@@ -22,9 +34,737 @@
     "language": "en",
     "enabled": true,
     "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Research metadata is evidence for the studied question only; do not turn it into individualized medical or training advice.",
     "trust_notes": "Научный журнал. Материал должен иметь прямую связь с тренировками, восстановлением или спортивной медициной.",
     "licensing_notes": "Хранить только metadata и короткий audit excerpt; не копировать полный текст или изображения.",
     "allowed_redirect_hosts": [],
     "allowed_item_hosts": []
+  },
+  {
+    "id": "frontiers-physiology",
+    "name": "Frontiers in Physiology",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://www.frontiersin.org/journals/physiology/rss",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Research metadata is evidence for the studied question only; require direct training, performance, body-composition or recovery relevance.",
+    "trust_notes": "Scientific journal. The strict per-item gate must reject unrelated physiology and clinical material before provider generation.",
+    "licensing_notes": "Store citation metadata and a short audit excerpt only; do not copy full text or publisher images.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "frontiers-endocrinology",
+    "name": "Frontiers in Endocrinology",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://www.frontiersin.org/journals/endocrinology/rss",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "peptides",
+      "sports_bodybuilding_pharmacology",
+      "nutrition",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Clinical endocrinology is not sufficient for eligibility; require direct body-composition, weight-management, performance or sports relevance.",
+    "trust_notes": "Scientific journal. Generic disease/treatment items must fail the deterministic relevance gate.",
+    "licensing_notes": "Store citation metadata and a short audit excerpt only; do not copy full text or publisher images.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "frontiers-pharmacology",
+    "name": "Frontiers in Pharmacology",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://www.frontiersin.org/journals/pharmacology/rss",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "sports_bodybuilding_pharmacology",
+      "peptides",
+      "dietary_supplements"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Generic drug/clinical pharmacology is excluded. Sports/bodybuilding pharmacology and peptide material remains manual-review-only and non-prescriptive.",
+    "trust_notes": "Scientific journal. Only direct performance, physique, body-composition or target-audience supplement relevance may pass.",
+    "licensing_notes": "Store citation metadata and a short audit excerpt only; do not copy full text or publisher images.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "pubmed-fitness-health",
+    "name": "PubMed fitness and health research",
+    "type": "primary_research",
+    "fetch_kind": "json_feed",
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=10&sort=pub+date&tool=your-fitness-coach&email=news%40your-fitness-coach.ru&term=%28%22Resistance+Training%22%5BTitle%2FAbstract%5D+OR+%22Muscle+Hypertrophy%22%5BTitle%2FAbstract%5D+OR+%22Bodybuilding%22%5BTitle%2FAbstract%5D+OR+%22Sports+Nutritional+Sciences%22%5Bmajr%5D+OR+%22Dietary+Supplements%22%5Bmajr%5D+OR+%22Anabolic+Agents%22%5Bmajr%5D+OR+%22Sports+Medicine%22%5Bmajr%5D%29",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "dietary_supplements",
+      "sports_bodybuilding_pharmacology",
+      "peptides"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Programmatic PubMed discovery via NCBI E-utilities (ESearch + batched EFetch), not the browser RSS endpoint. Primary source, study design and limitations still require editorial verification.",
+    "licensing_notes": "Keep citation metadata and a short paraphrase only; do not copy abstracts or full text beyond permitted use.",
+    "health_claim_limitations": "Index metadata or abstract alone does not establish effectiveness, safety or clinical applicability; verify the primary source, study design, limitations and applicability before any health claim.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "pubmed.ncbi.nlm.nih.gov",
+      "doi.org"
+    ],
+    "adapter": "pubmed_eutils"
+  },
+  {
+    "id": "cochrane-systematic-reviews",
+    "name": "Cochrane systematic reviews",
+    "type": "systematic_review",
+    "fetch_kind": "rss",
+    "url": "https://www.cochranelibrary.com/cdsr/reviews/rss",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "fitness_training",
+      "nutrition",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Systematic-review publisher; review scope, certainty and applicability require editorial reading.",
+    "licensing_notes": "Store citation metadata and short paraphrase; respect publisher access and copyright terms.",
+    "health_claim_limitations": "Certainty of evidence and review limitations must be stated where material.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "cochranelibrary.com",
+      "www.cochranelibrary.com"
+    ]
+  },
+  {
+    "id": "nih-ods-supplements",
+    "name": "NIH Office of Dietary Supplements",
+    "type": "official_organization",
+    "fetch_kind": "html_metadata",
+    "url": "https://ods.od.nih.gov/News/",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "US"
+    ],
+    "trust_notes": "Official US government reference for dietary-supplement fact sheets and notices; jurisdiction is not universal.",
+    "licensing_notes": "Use public metadata and concise attribution; retain links to the official page.",
+    "health_claim_limitations": "US regulatory and health information must not be presented as universal classification or advice in another market.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "ods.od.nih.gov"
+    ]
+  },
+  {
+    "id": "fda-food-supplement-safety",
+    "name": "US FDA food and supplement safety",
+    "type": "official_organization",
+    "fetch_kind": "html_metadata",
+    "url": "https://www.fda.gov/food/dietary-supplements",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "dietary_supplements",
+      "sports_nutrition"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "US"
+    ],
+    "trust_notes": "Official US regulatory source for notices and enforcement context.",
+    "licensing_notes": "Link and paraphrase public notices; do not copy page text or media wholesale.",
+    "health_claim_limitations": "Regulatory status is market-specific and is not proof of product efficacy.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "fda.gov",
+      "www.fda.gov"
+    ]
+  },
+  {
+    "id": "who-health-news",
+    "name": "World Health Organization health news",
+    "type": "official_organization",
+    "fetch_kind": "html_metadata",
+    "url": "https://www.who.int/news",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "healthy_lifestyle",
+      "nutrition"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "International public-health source; statements remain context- and jurisdiction-sensitive.",
+    "licensing_notes": "Use link, attribution and concise paraphrase under applicable terms.",
+    "health_claim_limitations": "Public-health guidance is not individualized medical advice.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "who.int",
+      "www.who.int"
+    ]
+  },
+  {
+    "id": "efsa-food-safety",
+    "name": "European Food Safety Authority",
+    "type": "official_organization",
+    "fetch_kind": "html_metadata",
+    "url": "https://www.efsa.europa.eu/en/news",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "nutrition",
+      "dietary_supplements"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "EU"
+    ],
+    "trust_notes": "Official EU food-risk assessment source; conclusions and market rules are jurisdiction-specific.",
+    "licensing_notes": "Retain the official link and concise attribution; do not republish full assessments.",
+    "health_claim_limitations": "EU risk assessment or authorization does not automatically apply to other jurisdictions.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "efsa.europa.eu",
+      "www.efsa.europa.eu"
+    ]
+  },
+  {
+    "id": "examine-supplement-research",
+    "name": "Examine supplement research summaries",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://examine.com/feed/",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "fitness_training"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Secondary discovery source only; every effectiveness or safety claim must resolve to an authoritative primary source.",
+    "licensing_notes": "Use metadata for discovery and link to the secondary page; do not copy summaries.",
+    "health_claim_limitations": "Secondary interpretation is not sufficient as sole evidence for health or performance claims.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "examine.com",
+      "www.examine.com"
+    ]
+  },
+  {
+    "id": "rospotrebnadzor-public-health",
+    "name": "Rospotrebnadzor public-health notices",
+    "type": "official_organization",
+    "fetch_kind": "html_metadata",
+    "url": "https://rospotrebnadzor.ru/",
+    "language": "ru",
+    "enabled": false,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "healthy_lifestyle",
+      "dietary_supplements"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "RU"
+    ],
+    "trust_notes": "Official Russian public-health and consumer-protection source; verify the exact notice and date.",
+    "licensing_notes": "Use official link and concise attribution; do not copy full notices or images.",
+    "health_claim_limitations": "Russian regulatory information is jurisdiction-specific and does not establish efficacy.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "rospotrebnadzor.ru",
+      "www.rospotrebnadzor.ru"
+    ]
+  },
+  {
+    "id": "sciencedaily-fitness",
+    "name": "ScienceDaily Fitness",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.sciencedaily.com/rss/health_medicine/fitness.xml",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "fitness_training",
+      "nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle",
+      "peptides"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Secondary research-news coverage must be checked against the linked study before making health, efficacy or safety claims.",
+    "trust_notes": "Research-news aggregator. Use as discovery context only; verify the underlying primary study before publication.",
+    "licensing_notes": "Store metadata and short paraphrases only; link to the article and underlying source.",
+    "allowed_redirect_hosts": [
+      "sciencedaily.com",
+      "www.sciencedaily.com"
+    ],
+    "allowed_item_hosts": [
+      "sciencedaily.com",
+      "www.sciencedaily.com"
+    ]
+  },
+  {
+    "id": "sciencedaily-nutrition",
+    "name": "ScienceDaily Nutrition",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.sciencedaily.com/rss/health_medicine/nutrition.xml",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle",
+      "peptides"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Secondary research-news coverage must be checked against the linked study before making nutrition or supplement claims.",
+    "trust_notes": "Fast-moving nutrition research-news feed; underlying study quality and applicability require editorial verification.",
+    "licensing_notes": "Store metadata and short paraphrases only; link to the article and underlying source.",
+    "allowed_redirect_hosts": [
+      "sciencedaily.com",
+      "www.sciencedaily.com"
+    ],
+    "allowed_item_hosts": [
+      "sciencedaily.com",
+      "www.sciencedaily.com"
+    ]
+  },
+  {
+    "id": "sciencedaily-sports-medicine",
+    "name": "ScienceDaily Sports Medicine",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.sciencedaily.com/rss/health_medicine/sports_medicine.xml",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "healthy_lifestyle",
+      "sports_nutrition",
+      "dietary_supplements"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Secondary coverage is not sufficient for clinical or training recommendations; verify the linked research.",
+    "trust_notes": "Research-news discovery feed for exercise and sports medicine; strict relevance gate remains required.",
+    "licensing_notes": "Store metadata and short paraphrases only; link to the article and underlying source.",
+    "allowed_redirect_hosts": [
+      "sciencedaily.com",
+      "www.sciencedaily.com"
+    ],
+    "allowed_item_hosts": [
+      "sciencedaily.com",
+      "www.sciencedaily.com"
+    ]
+  },
+  {
+    "id": "medicalxpress-fitness",
+    "name": "Medical Xpress Fitness & Physical Activity",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://medicalxpress.com/rss-feed/fitness-news/",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "fitness_training",
+      "healthy_lifestyle",
+      "nutrition",
+      "bodybuilding"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Research-news reporting must be traced to the underlying study before health or performance claims are used.",
+    "trust_notes": "High-cadence medical research-news feed with substantial exercise coverage; strict per-item relevance filtering required.",
+    "licensing_notes": "Store metadata and short paraphrases only; retain links to Medical Xpress and the original research where available.",
+    "allowed_redirect_hosts": [
+      "medicalxpress.com",
+      "www.medicalxpress.com"
+    ],
+    "allowed_item_hosts": [
+      "medicalxpress.com",
+      "www.medicalxpress.com"
+    ]
+  },
+  {
+    "id": "medicalxpress-sports-medicine",
+    "name": "Medical Xpress Sports Medicine",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://medicalxpress.com/rss-feed/sports-medicine-news/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "healthy_lifestyle",
+      "sports_nutrition"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Research-news reporting must be checked against the underlying paper before individualized or clinical conclusions.",
+    "trust_notes": "Sports-medicine research-news feed; direct training/performance relevance is still enforced by the deterministic gate.",
+    "licensing_notes": "Store metadata and short paraphrases only; retain links to Medical Xpress and the original research where available.",
+    "allowed_redirect_hosts": [
+      "medicalxpress.com",
+      "www.medicalxpress.com"
+    ],
+    "allowed_item_hosts": [
+      "medicalxpress.com",
+      "www.medicalxpress.com"
+    ]
+  },
+  {
+    "id": "acsm-news",
+    "name": "American College of Sports Medicine",
+    "type": "official_organization",
+    "fetch_kind": "rss",
+    "url": "https://acsm.org/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "healthy_lifestyle",
+      "sports_nutrition",
+      "nutrition"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Professional-organization content may summarize guidance or research; verify scope, population and source document before applying claims.",
+    "trust_notes": "Official ACSM feed covering exercise science, sports medicine and professional guidance.",
+    "licensing_notes": "Store metadata and concise paraphrases; link to ACSM source material.",
+    "allowed_redirect_hosts": [
+      "acsm.org",
+      "www.acsm.org"
+    ],
+    "allowed_item_hosts": [
+      "acsm.org",
+      "www.acsm.org"
+    ]
+  },
+  {
+    "id": "stronger-by-science",
+    "name": "Stronger by Science",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.strongerbyscience.com/feed/",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "nutrition",
+      "sports_nutrition"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Evidence synthesis and commentary should not be treated as a primary study or individualized recommendation.",
+    "trust_notes": "Evidence-focused strength and hypertrophy analysis. Registered for reference, but disabled from hourly news discovery because the current feed cadence is too low for a daily news pipeline.",
+    "licensing_notes": "Store metadata and short paraphrases only; do not copy full articles or media.",
+    "allowed_redirect_hosts": [
+      "strongerbyscience.com",
+      "www.strongerbyscience.com"
+    ],
+    "allowed_item_hosts": [
+      "strongerbyscience.com",
+      "www.strongerbyscience.com"
+    ]
+  },
+  {
+    "id": "muscle-and-fitness",
+    "name": "Muscle & Fitness",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.muscleandfitness.com/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "bodybuilding",
+      "fitness_training",
+      "sports_nutrition",
+      "dietary_supplements"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Magazine content is secondary and may include entertainment or commercial framing; research and safety claims require independent verification.",
+    "trust_notes": "High-cadence bodybuilding and fitness publication; strict relevance and evidence checks remain mandatory.",
+    "licensing_notes": "Store metadata and short paraphrases only; do not reproduce full articles or publisher media.",
+    "allowed_redirect_hosts": [
+      "muscleandfitness.com",
+      "www.muscleandfitness.com"
+    ],
+    "allowed_item_hosts": [
+      "muscleandfitness.com",
+      "www.muscleandfitness.com"
+    ]
+  },
+  {
+    "id": "bjsm",
+    "name": "British Journal of Sports Medicine",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://bjsm.bmj.com/rss/current.xml",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "healthy_lifestyle",
+      "nutrition",
+      "sports_nutrition"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Journal metadata and abstracts do not establish universal clinical or training applicability; article design and population require review.",
+    "trust_notes": "Peer-reviewed sports medicine journal feed; retain strict per-item relevance and evidence review.",
+    "licensing_notes": "Store citation metadata and short paraphrases only; do not copy full text or figures.",
+    "allowed_redirect_hosts": [
+      "bjsm.bmj.com"
+    ],
+    "allowed_item_hosts": [
+      "bjsm.bmj.com"
+    ]
+  },
+  {
+    "id": "bmj-open-sport-exercise-medicine",
+    "name": "BMJ Open Sport & Exercise Medicine",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://bmjopensem.bmj.com/rss/current.xml",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "healthy_lifestyle",
+      "nutrition",
+      "sports_nutrition"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Journal metadata and abstracts require study-design and applicability review before health or training claims.",
+    "trust_notes": "Peer-reviewed sport and exercise medicine journal feed.",
+    "licensing_notes": "Store citation metadata and short paraphrases only; do not copy full text or figures.",
+    "allowed_redirect_hosts": [
+      "bmjopensem.bmj.com"
+    ],
+    "allowed_item_hosts": [
+      "bmjopensem.bmj.com"
+    ]
+  },
+  {
+    "id": "mens-health",
+    "name": "Men's Health",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.menshealth.com/rss/all.xml/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "healthy_lifestyle",
+      "nutrition",
+      "sports_bodybuilding_pharmacology"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Consumer health and fitness journalism is secondary evidence; medical, hormone and performance claims require primary-source verification.",
+    "trust_notes": "Popular consumer fitness publication. Deterministic relevance and evidence gates must reject lifestyle and entertainment noise.",
+    "licensing_notes": "Store metadata and short paraphrases only; do not reproduce full articles or media.",
+    "allowed_redirect_hosts": [
+      "menshealth.com",
+      "www.menshealth.com"
+    ],
+    "allowed_item_hosts": [
+      "menshealth.com",
+      "www.menshealth.com"
+    ]
+  },
+  {
+    "id": "breaking-muscle-fitness",
+    "name": "Breaking Muscle Fitness",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://breakingmuscle.com/feed/fitness.xml",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "nutrition"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Fitness journalism is secondary evidence; training, nutrition and health claims require independent verification before publication.",
+    "trust_notes": "Documented Breaking Muscle fitness RSS endpoint registered as a bounded reserve source; keep disabled until a live Hermes probe confirms a current reachable feed.",
+    "licensing_notes": "Store metadata and short paraphrases only; do not reproduce full articles or publisher media.",
+    "allowed_redirect_hosts": [
+      "breakingmuscle.com",
+      "www.breakingmuscle.com"
+    ],
+    "allowed_item_hosts": [
+      "breakingmuscle.com",
+      "www.breakingmuscle.com"
+    ]
+  },
+  {
+    "id": "fitness-volt",
+    "name": "Fitness Volt",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://fitnessvolt.com/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "nutrition",
+      "dietary_supplements"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Fitness and strength-sports journalism is secondary evidence; health, supplement and performance claims require primary-source verification.",
+    "trust_notes": "High-cadence fitness, strength-sports and bodybuilding feed. Strict deterministic relevance and evidence gates remain mandatory.",
+    "licensing_notes": "Store metadata and short paraphrases only; do not reproduce full articles or publisher media.",
+    "allowed_redirect_hosts": [
+      "fitnessvolt.com",
+      "www.fitnessvolt.com"
+    ],
+    "allowed_item_hosts": [
+      "fitnessvolt.com",
+      "www.fitnessvolt.com"
+    ]
   }
 ]

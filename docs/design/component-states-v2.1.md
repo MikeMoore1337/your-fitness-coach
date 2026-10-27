@@ -21,7 +21,7 @@
 | `Surface` / `Card` | One semantic region; border/spacing group content. Avoid nested card for mere spacing. | Skeleton follows title/body/action anatomy. | `EmptyState`/`ErrorState` live inside owning region; permission/offline do not blank surrounding page. | Success may use quiet inline status; disabled region keeps headings readable. |
 | `SectionHeader` | Title → description → optional local action; action moves below copy on narrow view. | Heading remains, content skeleton follows. | Error belongs to body, not hidden in heading. | Action disabled reason stays near action. |
 | `Metric` | Label, tabular value, unit/period/hint; related metrics may share one rule-based region. | Value-width skeleton. | `Нет данных` differs from `0`; partial value includes availability note. | Success/danger not encoded by number color alone. |
-| `SegmentedControl` | Selected state uses surface + lime underline/marker and `aria-selected`; keyboard arrow/tab behavior retained. | Keep period labels, block data request re-entry. | Failed period keeps prior data marked stale or shows local retry. | Unsupported periods disabled with explanation if needed. |
+| `SegmentedControl` | Shared selected capsule with raised surface, inner light edge and lime accent; `aria-selected` and keyboard arrow/tab behavior retained. | Keep period labels, block data request re-entry. | Failed period keeps prior data marked stale or shows local retry. | Unsupported periods disabled with explanation if needed. |
 | `Skeleton` | Matches content geometry; no misleading progress percentage. | Motion `1.3s` only in default preference. | On timeout transitions to explicit error/retry. | Reduced motion uses static secondary fill. |
 | `LoadingState` | Centered within owning region with meaningful label. | N/A | Must never persist indefinitely without timeout/recovery at flow level. | N/A |
 | `EmptyState` | Explains absence and next valid action, without fake data. | N/A | Distinct from permission/error/offline. | Primary only when there is a real next action. |
@@ -32,11 +32,92 @@
 
 | Component | Contract | Boundary states |
 | --- | --- | --- |
-| Desktop rail | `164px`, V2 logo/icons/type, active secondary surface + lime inline marker; grouped primary/secondary/workspace/account destinations. Account identity uses the full first row for the client name; role and logout share the second row. | Ordinary first/last names remain fully visible; genuinely long names use a single-line ellipsis without moving or hiding logout. Long navigation labels wrap to two lines only in secondary groups; permission-hidden destinations are not authorization boundary; loading user identity uses reserved geometry. |
-| Mobile bottom navigation | Five equal tracks, target `>=58px`, icon + label, fixed at stable viewport bottom. | Safe/content inset included; selected destination survives reload; offline does not disable navigation; keyboard flow may temporarily hide/collapse nav only if focused action remains reachable and state is restored after close. |
+| Desktop rail | `164px`, V2 logo/icons/type, shared selected capsule; grouped primary/secondary/workspace/account destinations. Account identity uses the full first row for the client name; role and logout share the second row. | Ordinary first/last names remain fully visible; genuinely long names use a single-line ellipsis without moving or hiding logout. Long navigation labels wrap to two lines only in secondary groups; permission-hidden destinations are not authorization boundary; loading user identity uses reserved geometry. |
+| Mobile bottom navigation | Personal dock: Сегодня / План / Питание / Прогресс / Добавить on one Liquid Glass plane. Four links and one action; 24px icons, targets `>=44×44px`, shared selected capsule only on the current link. Coach/Demo retain their own destinations. | Safe/content inset included; selected destination survives reload; offline does not disable navigation; keyboard flow may temporarily hide the whole dock until the input-blurring click completes. Active workout keeps navigation available and restores state. |
 | More sheet | Bottom sheet up to stable viewport minus safe top; focus moves to sheet and returns to `Ещё`; close/back both work. | Overflow scrolls inside sheet; network-independent destinations remain available offline; logout/destructive action separated. |
 | Dialog | Desktop centered; mobile bottom sheet/full-height only when content requires; title and close visible. | Loading action does not dismiss; recoverable error stays in dialog; escape/back restores focus; permission and expired session have explicit next step. |
 | Toast/status | Non-blocking, above nav/safe area, not sole confirmation. | Queued/offline and server-confirmed messages differ; errors with required action persist in-page instead. |
+
+## Unified YFC selected states
+
+Решение владельца от 11.10.2026 в PR #927: `DESIGN_RULE=UNIFIED_YFC_SELECTED_STATES`.
+Это ограниченная унификация Design V2.1, включённая в общий релиз #859/#867/#914/#915.
+Правило становится production baseline после успешной доставки этого релиза; отдельного
+повторного выбора визуального направления для следующих задач не требуется.
+
+Выбранный интерактивный элемент получает различимую поверхность с мягким рельефом,
+внутренней световой гранью, скруглением и лаймовым акцентом. Контрастные текст и пиктограмма
+сохраняют читаемость. Одного изменения цвета, слабой заливки или подчёркивания недостаточно.
+Невыбранные элементы нейтральны и не имитируют выбранную поверхность.
+
+### Канонический CSS-контракт
+
+Источник — `frontend/src/styles/design-system.css`, без отдельной библиотеки или React-обёртки.
+Явно помечай контрол `data-yfc-choice="capsule"` либо `data-yfc-choice="compact"`.
+Состояние берётся из существующего `aria-selected`, `aria-pressed`, `aria-current="page"` /
+`"location"` / `"true"` или непосредственного нативного `input:checked` внутри label. Не заводи вторую
+копию selected-состояния для стилизации и не применяй правило ко всем `.is-active`.
+
+Общие токены: `--v2-selected-surface`, `--v2-selected-outline`, `--v2-selected-ink`,
+`--v2-selected-relief`, `--v2-selected-radius`, `--v2-selected-radius-pill`, `--v2-selected-radius-compact`,
+`--v2-selected-motion`. Dark и Light определяют значения одних и тех же токенов.
+Выбранная поверхность вложена в существующий control; отдельного backdrop-filter у неё нет.
+Liquid Glass остаётся материалом общей панели, а информационные карточки сохраняют свои роли.
+Для нативных radio/checkbox options выбранное состояние должно быть заметно без утраты
+native checked semantics или focus-visible outline. В форме «Сон и настроение» (DailyWellbeing)
+используются selected surface, общая рамка и лаймовый native radio-индикатор, но **без нижней
+лаймовой полосы, особого bottom border и лаймовой тени в обеих темах**. Не переносить сюда
+декоративные нижние акценты из других компонентов без отдельного согласования владельца.
+
+Основная нижняя вкладка охватывает иконку и подпись полностью скруглённой капсулой:
+`--v2-selected-radius-pill: 9999px` на всех ширинах, без изменения формы в media queries.
+Дымчатая Dark-поверхность и мягкая Light-поверхность используют общие selected-токены;
+добавочная полоска или неоновое свечение запрещены. «Добавить» не получает постоянный выбор.
+
+Материал мобильной навигации задаётся в существующем `liquid-glass.css`: матовый Liquid Glass
+по принципу панели таймера отдыха, с семантическими `--glass-nav-opacity` и `--glass-nav-blur`.
+Подложка Dark 95%, Light 96%, blur 20px и общий saturation 112% приглушают конкретные детали
+текста, полей и ярких CTA за панелью, сохраняя размытые цвета и глубину. Сам таймер не меняется.
+Хедер landing-v10 остаётся самостоятельным материалом; его прозрачность не задаёт нижнюю панель.
+Opacity всей панели и второй backdrop-filter внутри капсулы запрещены. Без backdrop-filter и
+при reduced transparency используется читаемая сплошная база; forced colors сохраняет системные
+цвета и focus. Проверять материал поверх светлого/тёмного фона, текста, карточек и при прокрутке.
+Этот вариант ожидает отдельной визуальной приёмки и разрешённого релиза; до этого production
+baseline не меняется.
+
+| Назначение | Форма и семантика |
+| --- | --- |
+| Основная навигация, SegmentedControl, workspace switch | Полная капсула; текущий маршрут — `aria-current`, вкладка — `aria-selected`. «Добавить» остаётся действием без selected state. |
+| Локальная навигация, период, фильтр, режим, RIR, feedback | Компактная форма либо капсула shared SegmentedControl; `aria-pressed` для toggle, `aria-selected` для tab. Размеры и обработчики соответствуют исходному назначению. |
+| Выбор дня, радио- и checkbox-группы | Компактная форма; нативное checked либо `aria-pressed`. «Сегодня» и выбранная дата различаются. Узкая неделя прокручивается внутри своей области, выбранный день виден без вертикального прыжка страницы. |
+| Нативный Select, включая тип недели программы | Сохраняет нативный popup и выбранное option. Не заменяется капсульным меню и не получает вторую реализацию. |
+| Строка клиента, шаг выполнения, завершённый подход, график, badge, обычная карточка | Сохраняет собственную семантику данных, текущего контекста или статуса. Не превращается автоматически в капсулу. Явная группа выбора внутри такой поверхности использует общий контракт. |
+
+### Отличия состояний
+
+- Selected/current сохраняется после окончания жеста и имеет поверхность + рельеф + семантику.
+- Hover — временная нейтральная реакция для hover-capable pointer; не меняет выбор.
+- Pressed — временная реакция на нажатие; не создаёт выбранного состояния у обычной кнопки.
+- Focus-visible — отдельный контрастный outline, видимый и поверх выбранной поверхности.
+- Disabled сохраняет нативный запрет действия и читаемость; причина остаётся рядом при необходимости.
+- Success, warning и danger описывают результат/данные, а не выбор; их цвета и смысл сохраняются.
+
+Переход выбора использует shared motion, без перемещения контента. Reduced motion отключает
+декоративный переход. Forced colors использует системные Highlight/HighlightText и сохраняет
+фокус. Выбор не зависит от прозрачности или поддержки backdrop-filter.
+
+### Применение и проверка
+
+Для нового контрола сначала определи семантику, переиспользуй shared primitive, затем включи
+контракт и выбери подходящую форму. Случайные page-local selected-заливки, подчёркивания,
+тени и новые токены запрещены без конкретной функциональной причины. Существующие размеры
+и расположение меняются только ради читаемости, доступности или подтверждённого дефекта.
+
+Проверяй ARIA/native state, клавиатуру и восстановление фокуса; computed surface/ink/relief;
+контраст; минимум 44×44px; отсутствие overflow/перекрытия CTA; обе темы, 320/360/393/430px,
+desktop, Chromium/WebKit и mocked TMA; reduced motion и forced colors. Добавляй тесты этих
+инвариантов и реальные скриншоты разных типов. Не фиксируй декоративные пиксели новым тестом.
+Эмуляция, физическое устройство и проверка screen reader всегда обозначаются отдельно.
 
 ## Surface matrix
 

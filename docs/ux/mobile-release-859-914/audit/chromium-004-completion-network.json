@@ -1,0 +1,206 @@
+{
+  "patches": [
+    {
+      "setId": 201,
+      "method": "PATCH",
+      "endpoint": "/api/v1/workouts/sets/201",
+      "body": {
+        "actual_reps": null,
+        "actual_weight": null,
+        "rir": "2",
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "expected_version": 1,
+        "mutation_id": "4bab2cce-afbc-44a1-a422-8d36cc2cd5f3"
+      },
+      "receivedAt": 1791717483509,
+      "status": 409,
+      "response": {
+        "detail": {
+          "code": "workout_set_version_conflict",
+          "current": {
+            "id": 201,
+            "actual_reps": null,
+            "actual_weight": null,
+            "rir": null,
+            "set_kind": "working",
+            "reached_failure": null,
+            "is_completed": false,
+            "version": 2,
+            "planned_role": "top"
+          }
+        }
+      },
+      "respondedAt": 1791717483509
+    },
+    {
+      "setId": 201,
+      "method": "PATCH",
+      "endpoint": "/api/v1/workouts/sets/201",
+      "body": {
+        "actual_reps": null,
+        "actual_weight": null,
+        "rir": "2",
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "expected_version": 2,
+        "mutation_id": "4bab2cce-afbc-44a1-a422-8d36cc2cd5f3"
+      },
+      "receivedAt": 1791717483513,
+      "status": 200,
+      "response": {
+        "id": 201,
+        "set_number": 1,
+        "actual_reps": null,
+        "actual_weight": null,
+        "rir": "2",
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "version": 3,
+        "planned_role": "top",
+        "duration_minutes": null,
+        "distance_km": null,
+        "average_heart_rate_bpm": null,
+        "heart_rate_zone": null
+      },
+      "respondedAt": 1791717483513
+    }
+  ],
+  "events": [
+    {
+      "type": "pointerdown",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 844.5999755859375,
+      "y": 532.5700073242188,
+      "scrollY": 0,
+      "time": 416.8999999999942
+    },
+    {
+      "type": "pointerup",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 844.5999755859375,
+      "y": 532.5700073242188,
+      "scrollY": 0,
+      "time": 417.5
+    },
+    {
+      "type": "click",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 844,
+      "y": 532,
+      "scrollY": 0,
+      "time": 417.6000000000058
+    },
+    {
+      "type": "pointerdown",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 532.3200073242188,
+      "y": 446.17999267578125,
+      "scrollY": 0,
+      "time": 1215.3999999999942
+    },
+    {
+      "type": "pointerup",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 532.3200073242188,
+      "y": 446.17999267578125,
+      "scrollY": 0,
+      "time": 1216.3999999999942
+    },
+    {
+      "type": "click",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 532,
+      "y": 446,
+      "scrollY": 0,
+      "time": 1216.3999999999942
+    },
+    {
+      "type": "pointerdown",
+      "target": "BUTTON",
+      "label": "2 — ещё примерно 2 повтора",
+      "pressed": "false",
+      "setId": "201",
+      "x": 749.989990234375,
+      "y": 359.55999755859375,
+      "scrollY": 1175,
+      "time": 2151.2000000000116
+    },
+    {
+      "type": "pointerup",
+      "target": "BUTTON",
+      "label": "2 — ещё примерно 2 повтора",
+      "pressed": "false",
+      "setId": "201",
+      "x": 749.989990234375,
+      "y": 359.55999755859375,
+      "scrollY": 1175,
+      "time": 2152.2000000000116
+    },
+    {
+      "type": "click",
+      "target": "BUTTON",
+      "label": "2 — ещё примерно 2 повтора",
+      "pressed": "false",
+      "setId": "201",
+      "x": 749,
+      "y": 359,
+      "scrollY": 1175,
+      "time": 2152.399999999994
+    },
+    {
+      "type": "selection",
+      "from": "false",
+      "to": "true",
+      "time": 2153.8000000000175
+    },
+    {
+      "type": "pointerdown",
+      "target": "BUTTON",
+      "label": "Завершить: Жим штанги лёжа, подход 1",
+      "pressed": "false",
+      "setId": "201",
+      "x": 1000.5599975585938,
+      "y": 311.55999755859375,
+      "scrollY": 1352,
+      "time": 2533.8000000000175
+    },
+    {
+      "type": "pointerup",
+      "target": "BUTTON",
+      "label": "Завершить: Жим штанги лёжа, подход 1",
+      "pressed": "false",
+      "setId": "201",
+      "x": 1000.5599975585938,
+      "y": 311.55999755859375,
+      "scrollY": 1352,
+      "time": 2534.899999999994
+    },
+    {
+      "type": "click",
+      "target": "BUTTON",
+      "label": "Завершить: Жим штанги лёжа, подход 1",
+      "pressed": "false",
+      "setId": "201",
+      "x": 1000,
+      "y": 311,
+      "scrollY": 1352,
+      "time": 2534.899999999994
+    }
+  ]
+}

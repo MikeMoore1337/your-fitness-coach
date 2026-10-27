@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import re
@@ -5,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -17,11 +18,27 @@ from fitminiapp_api.api.router import api_router
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.logging_config import configure_logging
 from fitminiapp_api.core.rate_limit import limiter
-from fitminiapp_api.db.session import engine
+from fitminiapp_api.db.session import SessionLocal, engine
 from fitminiapp_api.middleware.canonical_host import redirect_landing_application_requests
 from fitminiapp_api.middleware.request_body_limit import RequestBodyLimitMiddleware
 from fitminiapp_api.middleware.request_context import RequestContextMiddleware
-from fitminiapp_api.seo import public_origin, public_page_paths, render_frontend_document
+from fitminiapp_api.models.news import WebArticle
+from fitminiapp_api.seo import (
+    ATHLETE_LANDING_ALIAS_PATH,
+    NOINDEX_ROBOTS,
+    SeoMetadata,
+    public_origin,
+    public_page_lastmod,
+    public_page_paths,
+    public_sitemap_paths,
+    render_frontend_document,
+)
+from fitminiapp_api.services.public_shares import (
+    PUBLIC_SHARE_PATH_PREFIX,
+    get_active_public_share,
+    public_share_seo,
+)
+from fitminiapp_api.services.web_articles import published_articles
 
 APP_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = APP_DIR.parent
@@ -50,9 +67,8 @@ def _application_sensitive_values() -> tuple[str, ...]:
         settings.yandex_oauth_client_secret,
         settings.apple_oauth_client_secret,
         settings.database_url,
-        settings.google_site_verification,
-        settings.yandex_verification,
-        settings.news_llm_api_key,
+        settings.groq_api_key.get_secret_value(),
+        settings.hermes_intake_shared_secret.get_secret_value(),
     )
 
 
@@ -150,11 +166,70 @@ def health_ready() -> dict[str, str]:
     return health()
 
 
-def _frontend_index(path: str) -> HTMLResponse:
+def _frontend_pwa_asset(filename: str, media_type: str) -> FileResponse:
+    asset = FRONTEND_DIST_DIR / filename
+    if not asset.is_file():
+        raise HTTPException(status_code=404, detail="Frontend PWA asset unavailable")
+    return FileResponse(
+        asset,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def pwa_manifest() -> FileResponse:
+    return _frontend_pwa_asset("manifest.webmanifest", "application/manifest+json")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def pwa_service_worker() -> FileResponse:
+    return _frontend_pwa_asset("sw.js", "application/javascript")
+
+
+def _frontend_public_asset(filename: str, media_type: str) -> FileResponse:
+    candidates = (
+        FRONTEND_DIST_DIR / filename,
+        BACKEND_DIR.parent / "frontend" / "public" / filename,
+    )
+    asset = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Frontend public asset unavailable")
+    return FileResponse(
+        asset,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Robots-Tag": NOINDEX_ROBOTS,
+        },
+    )
+
+
+@app.get("/yandex_bce1658cc6fe44e5.html", include_in_schema=False)
+def yandex_verification_file() -> FileResponse:
+    return _frontend_public_asset("yandex_bce1658cc6fe44e5.html", "text/html")
+
+
+def _frontend_index(
+    path: str,
+    *,
+    article: WebArticle | None = None,
+    articles: tuple[WebArticle, ...] = (),
+    metadata_override: SeoMetadata | None = None,
+) -> HTMLResponse:
     index = FRONTEND_DIST_DIR / "index.html"
     if not index.exists():
         raise RuntimeError("Frontend build is missing. Run `npm run build` in frontend/.")
-    document, metadata = render_frontend_document(index.read_text(encoding="utf-8"), path)
+    document, metadata = render_frontend_document(
+        index.read_text(encoding="utf-8"),
+        path,
+        article=article,
+        articles=articles,
+        metadata_override=metadata_override,
+    )
     return HTMLResponse(
         document,
         headers={
@@ -173,6 +248,7 @@ def robots_txt() -> PlainTextResponse:
         (
             "User-agent: *",
             "Allow: /",
+            "Allow: /api/v1/public/",
             "Disallow: /api/",
             f"Sitemap: {origin}/sitemap.xml",
             "",
@@ -184,12 +260,30 @@ def robots_txt() -> PlainTextResponse:
 @app.get("/sitemap.xml", include_in_schema=False)
 def sitemap() -> Response:
     origin = public_origin()
-    urls = [f"{origin}/" if path == "/" else f"{origin}{path}" for path in public_page_paths()]
-    entries = "\n".join(f"  <url>\n    <loc>{url}</loc>\n  </url>" for url in urls)
+    public_paths = public_sitemap_paths()
+    with SessionLocal() as db:
+        articles = published_articles(db)
+    entries: list[str] = []
+    for path in public_paths:
+        url = f"{origin}/" if path == "/" else f"{origin}{path}"
+        lastmod = public_page_lastmod(path)
+        lastmod_markup = f"\n    <lastmod>{lastmod}</lastmod>" if lastmod else ""
+        entries.append(
+            f"  <url>\n    <loc>{html.escape(url, quote=True)}</loc>{lastmod_markup}\n  </url>"
+        )
+    entries.extend(
+        "  <url>\n"
+        f"    <loc>{html.escape(f'{origin}/articles/{article.slug}', quote=True)}</loc>\n"
+        f"    <lastmod>{article.updated_at.date().isoformat()}</lastmod>\n"
+        "  </url>"
+        for article in articles
+        if article.updated_at is not None
+    )
+    entry_text = "\n".join(entries)
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        f"{entries}\n"
+        f"{entry_text}\n"
         "</urlset>\n"
     )
     return Response(
@@ -209,6 +303,33 @@ def progress_report_page() -> HTMLResponse:
     return _frontend_index("/app/report")
 
 
+@app.get("/share/{share_id}", include_in_schema=False)
+def public_share_page(share_id: str) -> HTMLResponse:
+    path = f"{PUBLIC_SHARE_PATH_PREFIX}{share_id}"
+    with SessionLocal() as db:
+        share = get_active_public_share(db, share_id)
+    if share is None:
+        response = _frontend_index(path)
+        response.status_code = 404
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Robots-Tag"] = NOINDEX_ROBOTS
+        return response
+    title, description = public_share_seo(share)
+    response = _frontend_index(
+        path,
+        metadata_override=SeoMetadata(
+            title=title,
+            description=description,
+            robots=NOINDEX_ROBOTS,
+            canonical_url=f"{settings.frontend_base_url.rstrip('/')}{PUBLIC_SHARE_PATH_PREFIX}{share.share_id}",
+            og_description=description,
+        ),
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = NOINDEX_ROBOTS
+    return response
+
+
 @app.get("/demo")
 def demo_page() -> HTMLResponse:
     return _frontend_index("/demo")
@@ -217,6 +338,44 @@ def demo_page() -> HTMLResponse:
 @app.get("/")
 def landing_page() -> HTMLResponse:
     return _frontend_index("/")
+
+
+@app.get(ATHLETE_LANDING_ALIAS_PATH)
+def athlete_landing_alias_page() -> HTMLResponse:
+    return _frontend_index(ATHLETE_LANDING_ALIAS_PATH)
+
+
+@app.get("/articles")
+def articles_index_page() -> HTMLResponse:
+    with SessionLocal() as db:
+        articles = tuple(published_articles(db))
+    return _frontend_index("/articles", articles=articles)
+
+
+@app.get("/articles/{slug}")
+def article_page(slug: str) -> HTMLResponse:
+    with SessionLocal() as db:
+        article = db.query(WebArticle).filter(WebArticle.slug == slug).one_or_none()
+        if article is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Article not found",
+                headers={"X-Robots-Tag": NOINDEX_ROBOTS},
+            )
+        if article.status in {"archived", "retracted"}:
+            raise HTTPException(
+                status_code=410,
+                detail="Article removed",
+                headers={"X-Robots-Tag": NOINDEX_ROBOTS},
+            )
+        if article.status != "published":
+            raise HTTPException(
+                status_code=404,
+                detail="Article not found",
+                headers={"X-Robots-Tag": NOINDEX_ROBOTS},
+            )
+        articles = tuple(published_articles(db))
+    return _frontend_index(f"/articles/{slug}", article=article, articles=articles)
 
 
 def public_content_page(request: Request) -> HTMLResponse:
@@ -233,6 +392,12 @@ for public_path in public_page_paths():
         include_in_schema=False,
         name=f"public_{public_path.strip('/').replace('/', '_').replace('-', '_')}",
     )
+
+
+@app.get("/admin/hermes-bridge", include_in_schema=False)
+def hermes_editorial_bridge_page() -> HTMLResponse:
+    """Serve the private YFC Root consent SPA shell, never a server-side Root grant."""
+    return _frontend_index("/admin/hermes-bridge")
 
 
 @app.get("/admin")

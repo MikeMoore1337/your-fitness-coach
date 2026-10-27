@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://your-fitness-coach.local/schemas/task129-hermes-worker-config-v1.json",
+  "title": "Task 129 bounded Hermes editorial worker configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "description": "Environment contract. local_mock accepts bounded localhost HTTP endpoints. external accepts only the pinned Groq and YFC HTTPS destinations and does not enable Telegram preview. Before HMAC intake the worker runs deterministic numeric-grounding and visible Telegram photo-caption preflight; the global provider-attempt budget includes YFC remediation and immutable revision repair.",
+  "properties": {
+    "HERMES_HOME": {"type": "string", "const": "/opt/data", "default": "/opt/data"},
+    "HERMES_SOURCE_ALLOWLIST": {"type": "string", "minLength": 1, "description": "Comma-separated YFC source IDs; the worker never fetches the URL."},
+    "HERMES_PROVIDER_MODE": {"type": "string", "enum": ["local_mock", "external"], "default": "local_mock"},
+    "HERMES_PROVIDER_BASE_URL": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+    "HERMES_PROVIDER_API_KEY": {"type": "string", "minLength": 1, "writeOnly": true},
+    "HERMES_PROVIDER_MODEL": {"type": "string", "pattern": "^[A-Za-z0-9_.:/@-]{1,128}$"},
+    "HERMES_PROVIDER_TIMEOUT_SECONDS": {"type": "number", "minimum": 0.1, "maximum": 30, "default": 3},
+    "HERMES_PROVIDER_MAX_ATTEMPTS": {"type": "integer", "minimum": 1, "maximum": 2, "default": 2, "description": "Global provider-attempt budget, including local preflight and YFC quality-remediation requests."},
+    "HERMES_PROVIDER_RETRY_BACKOFF_SECONDS": {"type": "number", "minimum": 0, "maximum": 2, "default": 0.25},
+    "YFC_INTAKE_URL": {"type": "string", "pattern": "^https?://[^\\s]+/api/v1/hermes/editorial/intake$"},
+    "YFC_HERMES_KEY_ID": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,64}$"},
+    "YFC_HERMES_SHARED_SECRET": {"type": "string", "minLength": 32, "writeOnly": true},
+    "YFC_INTAKE_TIMEOUT_SECONDS": {"type": "number", "minimum": 0.1, "maximum": 30, "default": 5},
+    "TELEGRAM_PREVIEW_URL": {"type": "string", "pattern": "^http://(127\\.0\\.0\\.1|localhost|host\\.docker\\.internal):[1-9][0-9]{1,5}/preview$"},
+    "TELEGRAM_PREVIEW_TIMEOUT_SECONDS": {"type": "number", "minimum": 0.1, "maximum": 30, "default": 5}
+  },
+  "required": [
+    "HERMES_SOURCE_ALLOWLIST",
+    "HERMES_PROVIDER_MODE",
+    "HERMES_PROVIDER_BASE_URL",
+    "HERMES_PROVIDER_API_KEY",
+    "HERMES_PROVIDER_MODEL",
+    "YFC_INTAKE_URL",
+    "YFC_HERMES_KEY_ID",
+    "YFC_HERMES_SHARED_SECRET"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {"HERMES_PROVIDER_MODE": {"const": "local_mock"}},
+        "required": ["HERMES_PROVIDER_MODE"]
+      },
+      "then": {
+        "properties": {
+          "HERMES_PROVIDER_BASE_URL": {"pattern": "^http://(127\\.0\\.0\\.1|localhost|host\\.docker\\.internal):[1-9][0-9]{1,5}/v1$"},
+          "YFC_INTAKE_URL": {"pattern": "^http://(127\\.0\\.0\\.1|localhost|host\\.docker\\.internal):[1-9][0-9]{1,5}/api/v1/hermes/editorial/intake$"}
+        },
+        "required": ["TELEGRAM_PREVIEW_URL"]
+      }
+    },
+    {
+      "if": {
+        "properties": {"HERMES_PROVIDER_MODE": {"const": "external"}},
+        "required": ["HERMES_PROVIDER_MODE"]
+      },
+      "then": {
+        "properties": {
+          "HERMES_PROVIDER_BASE_URL": {"const": "https://api.groq.com/openai/v1"},
+          "HERMES_PROVIDER_MODEL": {"const": "openai/gpt-oss-120b"},
+          "YFC_INTAKE_URL": {"const": "https://app.your-fitness-coach.ru/api/v1/hermes/editorial/intake"}
+        },
+        "not": {
+          "anyOf": [
+            {"required": ["TELEGRAM_PREVIEW_URL"]},
+            {"required": ["TELEGRAM_PREVIEW_TIMEOUT_SECONDS"]}
+          ]
+        }
+      }
+    }
+  ]
+}

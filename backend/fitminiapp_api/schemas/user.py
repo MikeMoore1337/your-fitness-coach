@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -126,8 +127,12 @@ class UserProfileUpdate(BaseModel):
     sex: Literal["male", "female"] | None = None
     goal: ProfileGoal | None = None
     level: Literal["beginner", "intermediate", "advanced"] | None = None
-    height_cm: int | None = Field(default=None, ge=100, le=250)
-    weight_kg: float | None = Field(default=None, ge=20, le=350, allow_inf_nan=False)
+    height_cm: Decimal | None = Field(
+        default=None, ge=100, le=250, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    weight_kg: Decimal | None = Field(
+        default=None, ge=20, le=350, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
     workouts_per_week: int | None = Field(default=None, ge=0, le=14)
     cardio_trainings_per_week: int | None = Field(default=None, ge=0, le=14)
     resting_heart_rate: int | None = Field(default=None, ge=30, le=120)
@@ -234,7 +239,7 @@ class UserProfileResponse(BaseModel):
     sex: Literal["male", "female"] | None = None
     goal: str | None = None
     level: str | None = None
-    height_cm: int | None = None
+    height_cm: float | None = Field(default=None, ge=100, le=250, allow_inf_nan=False)
     weight_kg: float | None = None
     workouts_per_week: int | None = None
     cardio_trainings_per_week: int | None = None
@@ -282,6 +287,7 @@ class UserResponse(BaseModel):
     is_root: bool = False
     has_active_program: bool = False
     has_workout_history: bool = False
+    has_food_history: bool | None = None
     auth_providers: list[str] = Field(default_factory=list)
     onboarding: OnboardingStateResponse
     profile: UserProfileResponse | None = None

@@ -3,20 +3,78 @@ import { installTelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
 
 type PerformanceWindow = typeof window & {
-  __yfcLabCls?: { value: number };
+  __yfcLabMetrics?: {
+    cls: number;
+    clsEntries: Array<{ value: number; sources: string[] }>;
+    lcp: number | null;
+    inp: number | null;
+    eventTimingSupported: boolean;
+  };
 };
 
-async function observeLabCls(page: Page) {
+async function observeLabMetrics(page: Page) {
   await page.addInitScript(() => {
-    const state = { value: 0 };
-    (window as PerformanceWindow).__yfcLabCls = state;
+    const state: NonNullable<PerformanceWindow['__yfcLabMetrics']> = {
+      cls: 0,
+      clsEntries: [],
+      lcp: null as number | null,
+      inp: null as number | null,
+      eventTimingSupported: false,
+    };
+    (window as PerformanceWindow).__yfcLabMetrics = state;
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        const shift = entry as PerformanceEntry & { hadRecentInput?: boolean; value?: number };
-        if (!shift.hadRecentInput) state.value += shift.value ?? 0;
+        const shift = entry as PerformanceEntry & {
+          hadRecentInput?: boolean;
+          value?: number;
+          sources?: Array<{ node?: Node | null }>;
+        };
+        if (!shift.hadRecentInput) {
+          const value = shift.value ?? 0;
+          state.cls += value;
+          state.clsEntries.push({
+            value,
+            sources: (shift.sources ?? []).map(({ node }) =>
+              node instanceof HTMLElement
+                ? `${node.tagName.toLowerCase()}.${node.className}`
+                : (node?.nodeName ?? 'unknown'),
+            ),
+          });
+        }
       }
     }).observe({ type: 'layout-shift', buffered: true });
+    new PerformanceObserver((list) => {
+      const entries = list.getEntries();
+      const lastEntry = entries.at(-1);
+      if (lastEntry) state.lcp = lastEntry.startTime;
+    }).observe({ type: 'largest-contentful-paint', buffered: true });
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const interaction = entry as PerformanceEntry & {
+            duration: number;
+            interactionId?: number;
+          };
+          if (interaction.interactionId && interaction.duration > (state.inp ?? 0)) {
+            state.inp = interaction.duration;
+          }
+        }
+      }).observe({
+        type: 'event',
+        buffered: true,
+        durationThreshold: 16,
+      } as PerformanceObserverInit & {
+        durationThreshold: number;
+      });
+      state.eventTimingSupported = true;
+    } catch {
+      state.eventTimingSupported = false;
+    }
   });
+}
+
+async function readLabMetrics(page: Page) {
+  return page.evaluate(() => (window as PerformanceWindow).__yfcLabMetrics);
 }
 
 async function settle(page: Page) {
@@ -39,6 +97,33 @@ async function loadedFrontendResources(page: Page) {
   );
 }
 
+// Vite's opaque 8-character hash can coincidentally contain "tma" or "telegram".
+function isDedicatedTmaAsset(file: string) {
+  const logicalName = file.replace(/-[A-Za-z0-9_-]{8}\.(css|js)$/i, '.$1');
+  return /(?:telegram|tma).*\.(?:css|js)$/i.test(logicalName);
+}
+
+test('TMA asset detection ignores opaque Vite hash suffixes', () => {
+  expect(isDedicatedTmaAsset('useQuery-D6X9tmA8.js')).toBe(false);
+  expect(isDedicatedTmaAsset('telegram-web-app-D6X9tmA8.js')).toBe(true);
+  expect(isDedicatedTmaAsset('tma-bridge-D6X9tmA8.css')).toBe(true);
+});
+
+test('Telegram demo handoff clears private demo tokens before entering the app', async ({
+  page,
+}) => {
+  await installTelegramHarness(page, { colorScheme: 'dark' });
+  await installPlatformApi(page);
+  await page.addInitScript(() => {
+    sessionStorage.setItem('fit_demo_sessions_v1', JSON.stringify({ trainer: 'a'.repeat(32) }));
+  });
+
+  await page.goto('/demo?tgWebAppPlatform=web');
+
+  await expect(page).toHaveURL(/\/app$/);
+  expect(await page.evaluate(() => sessionStorage.getItem('fit_demo_sessions_v1'))).toBeNull();
+});
+
 function captureConsoleFailures(page: Page) {
   const failures: string[] = [];
   page.on('console', (message) => {
@@ -48,6 +133,17 @@ function captureConsoleFailures(page: Page) {
   });
   page.on('pageerror', (error) => failures.push(`pageerror: ${error.message}`));
   return failures;
+}
+
+function captureUnexpectedApiRequests(page: Page, allowedPaths: readonly string[]) {
+  const unexpected: string[] = [];
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith('/api/v1/') && !allowedPaths.includes(path)) {
+      unexpected.push(`${request.method()} ${path}`);
+    }
+  });
+  return unexpected;
 }
 
 async function installLoginApi(page: Page) {
@@ -74,45 +170,78 @@ async function installLoginApi(page: Page) {
   });
 }
 
-test('Landing and login keep public/auth initial work bounded in mobile lab', async ({
+test('Landing and login keep public/auth initial work bounded in desktop and mobile lab', async ({
   browser,
-}) => {
-  for (const route of ['/', '/login'] as const) {
-    const context = await browser.newContext({
-      viewport: { width: 390, height: 844 },
-      hasTouch: true,
-      isMobile: true,
-      reducedMotion: 'reduce',
-    });
-    const page = await context.newPage();
-    const consoleFailures = captureConsoleFailures(page);
-    await observeLabCls(page);
-    if (route === '/login') await installLoginApi(page);
+}, testInfo) => {
+  for (const viewport of [
+    { name: 'mobile', width: 390, height: 844, hasTouch: true, isMobile: true },
+    { name: 'desktop', width: 1440, height: 900, hasTouch: false, isMobile: false },
+  ] as const) {
+    for (const route of ['/', '/login'] as const) {
+      const context = await browser.newContext({
+        viewport,
+        hasTouch: viewport.hasTouch,
+        isMobile: viewport.isMobile,
+        reducedMotion: 'reduce',
+      });
+      const page = await context.newPage();
+      const consoleFailures = captureConsoleFailures(page);
+      const unexpectedApiRequests = captureUnexpectedApiRequests(
+        page,
+        route === '/'
+          ? ['/api/v1/public/articles']
+          : ['/api/v1/public/config', '/api/v1/auth/refresh', '/api/v1/me'],
+      );
+      await observeLabMetrics(page);
+      if (route === '/') {
+        await page.route('**/api/v1/public/articles*', (request) => request.fulfill({ json: [] }));
+      }
+      if (route === '/login') await installLoginApi(page);
 
-    await page.goto(route);
-    await expect(
-      page.getByRole('heading', {
-        level: 1,
-        name: route === '/' ? 'Знайте, что делать сегодня.' : 'Войти и продолжить',
-      }),
-    ).toBeVisible();
-    await settle(page);
+      await page.goto(route);
+      await expect(
+        page.getByRole('heading', {
+          level: 1,
+          name:
+            route === '/'
+              ? 'СИЛА В ДЕЙСТВИИ.'
+              : viewport.name === 'mobile'
+                ? 'Войти и продолжить'
+                : 'Вернитесь к своему плану.',
+        }),
+      ).toBeVisible();
+      const themeToggle = page.getByRole('button', { name: /тёмную тему|светлую тему/ });
+      if (await themeToggle.count()) await themeToggle.click();
+      await settle(page);
 
-    const resources = await loadedFrontendResources(page);
-    expect(resources.some((file) => /DataViz/i.test(file))).toBe(false);
-    expect(resources.some((file) => /telegram-web-app/i.test(file))).toBe(false);
-    if (route === '/login') {
-      expect(resources.some((file) => /publicContent/i.test(file))).toBe(false);
+      const resources = await loadedFrontendResources(page);
+      expect(resources.some((file) => /DataViz/i.test(file))).toBe(false);
+      expect(resources.some((file) => /telegram-web-app/i.test(file))).toBe(false);
+      if (route === '/login') {
+        expect(resources.some((file) => /publicContent/i.test(file))).toBe(false);
+      }
+      const metrics = await readLabMetrics(page);
+      expect(metrics).not.toBeUndefined();
+      console.log(`H50_LAB_METRICS ${viewport.name} ${route} ${JSON.stringify(metrics)}`);
+      expect(metrics?.cls ?? 0).toBeLessThanOrEqual(0.1);
+      if (metrics?.lcp !== null && metrics?.lcp !== undefined) {
+        expect(metrics.lcp).toBeLessThanOrEqual(2500);
+      }
+      if (metrics?.inp !== null && metrics?.inp !== undefined) {
+        expect(metrics.inp).toBeLessThanOrEqual(200);
+      }
+      testInfo.annotations.push({
+        type: 'lab-metrics',
+        description: `${viewport.name} ${route}: ${JSON.stringify(metrics)}`,
+      });
+      expect(
+        consoleFailures.filter(
+          (message) => !message.includes('server responded with a status of 401'),
+        ),
+      ).toEqual([]);
+      expect(unexpectedApiRequests).toEqual([]);
+      await context.close();
     }
-    expect(
-      await page.evaluate(() => (window as PerformanceWindow).__yfcLabCls?.value ?? 0),
-    ).toBeLessThanOrEqual(0.1);
-    expect(
-      consoleFailures.filter(
-        (message) => !message.includes('server responded with a status of 401'),
-      ),
-    ).toEqual([]);
-    await context.close();
   }
 });
 
@@ -136,7 +265,7 @@ test('Mobile Web and mocked TMA share one frontend resource graph', async ({ bro
     await settle(page);
     const resources = await loadedFrontendResources(page);
     expect(resources.some((file) => /publicContent/i.test(file))).toBe(false);
-    expect(resources.some((file) => /(?:telegram|tma).*(?:css|js)$/i.test(file))).toBe(false);
+    expect(resources.some(isDedicatedTmaAsset)).toBe(false);
     expect(
       consoleFailures.filter(
         (message) => !message.includes('server responded with a status of 401'),
@@ -147,6 +276,42 @@ test('Mobile Web and mocked TMA share one frontend resource graph', async ({ bro
   }
 
   expect(resourceGraphs[1]).toEqual(resourceGraphs[0]);
+});
+
+test('Today initial queries settle without duplicate fetches', async ({ page }) => {
+  const requestCounts = new Map<string, number>();
+  page.on('request', (request) => {
+    if (request.method() !== 'GET') return;
+    const url = new URL(request.url());
+    if (!url.pathname.startsWith('/api/v1/')) return;
+    requestCounts.set(url.pathname, (requestCounts.get(url.pathname) ?? 0) + 1);
+  });
+  await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
+
+  await page.goto('/app?section=today');
+  await expect(page.getByRole('heading', { level: 1, name: /^Сегодня/ })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await settle(page);
+
+  const counts = Object.fromEntries(
+    [...requestCounts.entries()].sort(([left], [right]) => left.localeCompare(right)),
+  );
+  console.log(`H50_QUERY_COUNTS ${JSON.stringify(counts)}`);
+  const expectedPaths = [
+    '/api/v1/check-ins/weekly/current',
+    '/api/v1/me',
+    '/api/v1/nutrition/diary',
+    '/api/v1/nutrition/hydration',
+    '/api/v1/public/config',
+    '/api/v1/workouts/42/comments',
+    '/api/v1/workouts/cardio',
+    '/api/v1/workouts/progress/summary',
+    '/api/v1/workouts/recovery',
+    '/api/v1/workouts/today',
+    '/api/v1/workouts/week',
+  ];
+  expect(Object.keys(counts)).toEqual(expectedPaths);
+  expect(Object.values(counts)).toEqual(expectedPaths.map(() => 1));
 });
 
 test('Mocked TMA preserves 404 for an unknown nested public route', async ({ page }) => {
@@ -172,21 +337,27 @@ test('Telegram knowledge launch keeps the handoff when the SDK is unavailable', 
   await expect(page.getByRole('heading', { name: /База знаний/i })).not.toBeAttached();
 });
 
-test('Client navigation preserves metadata owned by a lazy public route', async ({ page }) => {
+test('Client navigation preserves metadata owned by a lazy public landing route', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/public/articles*', (request) => request.fulfill({ json: [] }));
   await page.goto('/');
 
-  await page.getByRole('link', { name: 'Начать с тренировок' }).click();
+  await page
+    .locator('.landing-v10-hero-audience')
+    .getByRole('link', { name: 'Для тренера', exact: true })
+    .click();
 
-  await expect(page).toHaveURL(/\/training$/);
+  await expect(page).toHaveURL(/\/for-trainers$/);
   await expect(
     page.getByRole('heading', {
       level: 1,
-      name: /план тренировки, который остаётся перед глазами/i,
+      name: 'ВАШ МЕТОД В ДЕЙСТВИИ.',
     }),
   ).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'http://127.0.0.1:4173/training',
+    new URL('/for-trainers', page.url()).href,
   );
 });

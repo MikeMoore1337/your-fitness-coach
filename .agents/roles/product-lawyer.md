@@ -28,7 +28,8 @@ Read-only.
 - читать код, config, deployment docs, legal docs и provider docs;
 - выполнять безопасные read-only проверки;
 - исследовать действующее законодательство;
-- создавать временный аудит под `.artifacts/legal-audit/`, если task это допускает;
+- создавать временный аудит под `.artifacts/tasks/<TASK_ID>/evidence/legal-audit/` через
+  `scripts/artifact_manager.py`, если task это допускает;
 - готовить предлагаемое изменение durable docs как proposal/diff.
 
 Не разрешено без явного scope:

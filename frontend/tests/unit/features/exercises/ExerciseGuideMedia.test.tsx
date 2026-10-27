@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExerciseGuideMedia } from '../../../../src/features/exercises/ExerciseGuideMedia';
 import type { ExerciseGuide } from '../../../../src/shared/api/types';
 
@@ -70,13 +70,154 @@ const media = [
 ] satisfies ExerciseGuide['media'];
 
 describe('ExerciseGuideMedia', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('uses the approved animation by default and the local poster for reduced motion', () => {
+    const animated: ExerciseGuide['media'] = [
+      {
+        type: 'animation',
+        url: '/static/exercise-guides/gymvisual/bench-press.gif',
+        poster: '/static/exercise-guides/gymvisual/bench-press.jpg',
+        phase_id: 'movement',
+        phase: 'Движение',
+        alt: 'Пример: движение',
+        source_name: 'Gym visual',
+        source_url: 'https://github.com/hasaneyldrm/exercises-dataset',
+        source_license: 'Owner-purchased GymVisual license',
+        source_license_url: 'https://gymvisual.com/',
+        width: 180,
+        height: 180,
+        byte_size: 120_000,
+        sort_order: 0,
+        sources: [
+          {
+            url: '/static/exercise-guides/gymvisual/bench-press.gif',
+            mime_type: 'image/gif',
+            width: 180,
+            height: 180,
+            byte_size: 120_000,
+          },
+        ],
+      },
+    ];
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+
+    render(<ExerciseGuideMedia items={animated} />);
+
+    const image = screen.getByAltText('Пример: движение');
+    expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/bench-press.jpg');
+    expect(image).toHaveAttribute('data-media-mode', 'static-poster');
+  });
+
+  it('keeps the GIF as the default animation source instead of selecting the poster', () => {
+    const animated: ExerciseGuide['media'] = [
+      {
+        type: 'animation',
+        url: '/static/exercise-guides/gymvisual/bench-press.gif',
+        poster: '/static/exercise-guides/gymvisual/bench-press.jpg',
+        phase_id: 'movement',
+        phase: 'Движение',
+        alt: 'Пример: движение',
+        source_name: 'Gym visual',
+        source_url: 'https://github.com/hasaneyldrm/exercises-dataset',
+        source_license: 'Owner-purchased GymVisual license',
+        source_license_url: 'https://gymvisual.com/',
+        width: 180,
+        height: 180,
+        byte_size: 120_000,
+        sort_order: 0,
+        sources: [
+          {
+            url: '/static/exercise-guides/gymvisual/bench-press.gif',
+            mime_type: 'image/gif',
+            width: 180,
+            height: 180,
+            byte_size: 120_000,
+          },
+          {
+            url: '/static/exercise-guides/gymvisual/bench-press.jpg',
+            mime_type: 'image/jpeg',
+            width: 180,
+            height: 180,
+            byte_size: 12_000,
+          },
+        ],
+      },
+    ];
+
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    render(<ExerciseGuideMedia items={animated} />);
+
+    const image = screen.getByAltText('Пример: движение');
+    expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/bench-press.gif');
+    expect(image).not.toHaveAttribute('srcset');
+    expect(image).toHaveAttribute('data-media-mode', 'animation');
+  });
+
+  it('falls back to the local poster when the approved animation fails', () => {
+    const animated: ExerciseGuide['media'] = [
+      {
+        type: 'animation',
+        url: '/static/exercise-guides/gymvisual/bench-press.gif',
+        poster: '/static/exercise-guides/gymvisual/bench-press.jpg',
+        phase_id: 'movement',
+        phase: 'Движение',
+        alt: 'Пример: движение',
+        source_name: 'Gym visual',
+        source_url: 'https://github.com/hasaneyldrm/exercises-dataset',
+        source_license: 'Owner-purchased GymVisual license',
+        source_license_url: 'https://gymvisual.com/',
+        width: 180,
+        height: 180,
+        byte_size: 120_000,
+        sort_order: 0,
+        sources: [
+          {
+            url: '/static/exercise-guides/gymvisual/bench-press.gif',
+            mime_type: 'image/gif',
+            width: 180,
+            height: 180,
+            byte_size: 120_000,
+          },
+        ],
+      },
+    ];
+
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    render(<ExerciseGuideMedia items={animated} />);
+
+    const image = screen.getByAltText('Пример: движение');
+    fireEvent.error(image);
+
+    expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/bench-press.jpg');
+    expect(image).toHaveAttribute('data-media-mode', 'static-poster');
+    expect(screen.queryByText('Изображение недоступно')).not.toBeInTheDocument();
+  });
 
   it('uses explicit phase ids and responsive sources without eagerly opening the lightbox', () => {
     render(<ExerciseGuideMedia items={media} />);
 
     expect(screen.getByText(/Изображение показывает положение/)).toBeVisible();
     const image = screen.getByAltText('Пример: конечное положение усилия');
+    expect(image.closest('.exercise-media-picture')).toBeInTheDocument();
+    expect(image.closest('.exercise-guide-image__frame')).toHaveClass(
+      'exercise-guide-image__frame',
+    );
     expect(image).toHaveAttribute('loading', 'lazy');
     expect(image).toHaveAttribute('decoding', 'async');
     expect(image).toHaveAttribute(
@@ -86,13 +227,25 @@ describe('ExerciseGuideMedia', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('keeps the expanded technique media inside the dedicated square surface', () => {
+    render(<ExerciseGuideMedia items={media} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Увеличить: Фаза усилия' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Увеличенное изображение: Фаза усилия' });
+    expect(dialog.querySelector('.exercise-lightbox__media')).toBeInTheDocument();
+    expect(
+      dialog.querySelector('.exercise-lightbox__media > .exercise-media-picture'),
+    ).toBeInTheDocument();
+  });
+
   it('selects the large source only after opening and preserves keyboard-accessible navigation', () => {
     render(<ExerciseGuideMedia items={media} />);
     fireEvent.click(screen.getByRole('button', { name: 'Увеличить: Фаза усилия' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Увеличенное изображение: Фаза усилия' });
     expect(dialog).toBeVisible();
-    expect(dialog.querySelector('img')).toHaveAttribute(
+    expect(dialog.querySelector('img[alt="Пример: конечное положение усилия"]')).toHaveAttribute(
       'src',
       '/static/exercise-guides/human-v1/example/concentric_end-1280w.webp',
     );
@@ -111,5 +264,92 @@ describe('ExerciseGuideMedia', () => {
     expect(
       screen.getByRole('img', { name: 'Пример: конечное положение усилия' }),
     ).toHaveTextContent('Изображение недоступно');
+  });
+});
+
+const h264Pilot: ExerciseGuide['media'] = [
+  {
+    type: 'animation',
+    url: '/static/exercise-guides/gymvisual/barbell-curl.gif',
+    poster: '/static/exercise-guides/exercises-media/barbell-curl-hq720.jpg',
+    poster_preferred: true,
+    phase_id: 'movement',
+    phase: 'Движение',
+    alt: 'Сгибание рук со штангой',
+    source_name: 'Gym visual',
+    source_url: 'https://gymvisual.com',
+    source_license: 'Owner-purchased GymVisual license',
+    source_license_url: null,
+    width: 180,
+    height: 180,
+    byte_size: 106020,
+    sort_order: 0,
+    sources: [
+      {
+        url: '/static/exercise-guides/gymvisual/barbell-curl.gif',
+        mime_type: 'image/gif',
+        width: 180,
+        height: 180,
+        byte_size: 106020,
+      },
+    ],
+    video_sources: [
+      {
+        url: '/static/exercise-guides/exercises-media/videos/barbell-curl-480p-h264.mp4',
+        mime_type: 'video/mp4',
+        width: 854,
+        height: 480,
+        byte_size: 80755,
+      },
+      {
+        url: '/static/exercise-guides/exercises-media/videos/barbell-curl-720p-h264.mp4',
+        mime_type: 'video/mp4',
+        width: 1280,
+        height: 720,
+        byte_size: 140896,
+      },
+    ],
+  },
+];
+
+describe('ExerciseGuideMedia H.264 delivery', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('uses 480p in card, 720p in expanded view and original GIF on video error', () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    render(<ExerciseGuideMedia items={h264Pilot} />);
+    const video = document.querySelector('.exercise-guide-image__frame video');
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute('src', h264Pilot[0]!.video_sources?.[0]?.url);
+    expect(video).toHaveAttribute('poster', h264Pilot[0]!.poster);
+    fireEvent.click(screen.getByRole('button', { name: 'Увеличить: Движение' }));
+    const enlarged = document.querySelector('.exercise-lightbox video');
+    expect(enlarged).toHaveAttribute('src', h264Pilot[0]!.video_sources?.[1]?.url);
+    if (video) fireEvent.error(video);
+    expect(screen.getAllByAltText('Сгибание рук со штангой')[0]).toHaveAttribute(
+      'src',
+      h264Pilot[0]!.url,
+    );
+  });
+
+  it('never constructs video element with reduced-motion preference', () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    render(<ExerciseGuideMedia items={h264Pilot} />);
+    expect(document.querySelector('video')).toBeNull();
+    expect(screen.getByAltText('Сгибание рук со штангой')).toHaveAttribute(
+      'src',
+      h264Pilot[0]!.poster,
+    );
   });
 });

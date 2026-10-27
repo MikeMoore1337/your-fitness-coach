@@ -87,6 +87,15 @@ Layout animation допустима, если она нужна UX и измер
 
 Feel проверяется в реальном контексте.
 
+## Apple physical interaction reference
+
+Для Apple-like fluid interaction - interruptible springs, velocity handoff, momentum projection,
+rubber-banding, direct manipulation, sheet/drawer physicality - подключай `$apple-design` как
+специализированный reference.
+
+Не загружай его для любой animation автоматически. YFC motion language и фактический product context
+остаются authoritative.
+
 ## Gestures
 
 Gesture-driven motion должно:

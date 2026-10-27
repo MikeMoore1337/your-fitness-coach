@@ -1,12 +1,50 @@
+import json
 from pathlib import Path
 
 import pytest
-from scripts.check_online_migrations import OnlineMigrationError, validate_added_migration
+from scripts.check_online_migrations import (
+    OnlineMigrationError,
+    changed_migrations_from_manifest,
+    validate_added_migration,
+    validate_legacy_migration_compatibility,
+)
 
 
 def _migration(path: Path, body: str) -> Path:
     path.write_text(body, encoding="utf-8")
     return path
+
+
+def test_production_migration_manifest_is_revision_bound(tmp_path: Path) -> None:
+    manifest = tmp_path / "deployment-migration-manifest.json"
+    active = "a" * 40
+    target = "b" * 40
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "active_revision": active,
+                "target_revision": target,
+                "changes": [{"status": "A", "path": "backend/alembic/versions/0064_expand.py"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert changed_migrations_from_manifest(active, target, manifest) == [
+        ("A", Path("backend/alembic/versions/0064_expand.py"))
+    ]
+    with pytest.raises(OnlineMigrationError, match="revision range"):
+        changed_migrations_from_manifest(active, "c" * 40, manifest)
+
+
+def test_merged_measurement_migration_uses_exact_legacy_compatibility() -> None:
+    assert validate_legacy_migration_compatibility(
+        Path("backend/alembic/versions/0118_measurement_eligibility.py")
+    )
+    assert not validate_legacy_migration_compatibility(
+        Path("backend/alembic/versions/0117_progress_weekly_action_constraint.py")
+    )
 
 
 def test_online_migration_accepts_declared_additive_expand(tmp_path: Path) -> None:
@@ -37,6 +75,85 @@ def test_online_migration_accepts_empty_table_and_its_index(tmp_path: Path) -> N
     validate_added_migration(path)
 
 
+def test_contextual_reminder_migrations_satisfy_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0074_contextual_reminder_templates.py"
+    )
+
+
+def test_nutrition_label_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    for name in (
+        "0081_nutrition_label_canonical_catalog.py",
+        "0082_basis_aware_food_diary.py",
+        "0083_nutrition_label_food_backfill.py",
+        "0084_nutrition_label_diary_backfill.py",
+    ):
+        validate_added_migration(root / "backend" / "alembic" / "versions" / name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "0098_program_lifecycle.py",
+        "0099_user_program_status_ck.py",
+        "0100_program_revision_kind_ck.py",
+    ],
+)
+def test_program_lifecycle_migrations_satisfy_production_online_contract(name: str) -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(root / "backend" / "alembic" / "versions" / name)
+
+
+def test_first_touch_attribution_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0085_first_touch_attribution.py"
+    )
+
+
+def test_ai_coach_conversations_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0086_ai_coach_conversations.py"
+    )
+
+
+def test_ai_coach_quota_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0088_ai_coach_durable_quota.py"
+    )
+
+
+def test_coach_crm_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(root / "backend" / "alembic" / "versions" / "0092_coach_crm_core.py")
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "0108_trainer_workspace_reviews.py",
+        "0109_coach_task_kind_backfill.py",
+        "0110_coach_task_kind_constraint.py",
+        "0111_coach_task_source_kind_constraint.py",
+    ],
+)
+def test_trainer_workspace_migrations_satisfy_production_online_contract(name: str) -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(root / "backend" / "alembic" / "versions" / name)
+
+
 def test_online_migration_rejects_index_on_existing_table(tmp_path: Path) -> None:
     path = _migration(
         tmp_path / "0065_existing_index.py",
@@ -48,6 +165,25 @@ def test_online_migration_rejects_index_on_existing_table(tmp_path: Path) -> Non
 
     with pytest.raises(OnlineMigrationError, match="new empty table"):
         validate_added_migration(path)
+
+
+def test_online_migration_accepts_concurrent_index_on_existing_table(tmp_path: Path) -> None:
+    path = _migration(
+        tmp_path / "0065_existing_concurrent_index.py",
+        'online_rollout_phase = "expand"\n'
+        'online_rollout_notes = "Concurrent index build avoids a table-wide write lock."\n\n'
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        '    if bind.dialect.name == "postgresql":\n'
+        "        with op.get_context().autocommit_block():\n"
+        '            op.create_index("ix_users_name", "users", ["name"], '
+        "postgresql_concurrently=True, if_not_exists=True)\n"
+        "    else:\n"
+        '        op.create_index("ix_users_name", "users", ["name"], '
+        "postgresql_concurrently=True, if_not_exists=True)\n",
+    )
+
+    validate_added_migration(path)
 
 
 @pytest.mark.parametrize("operation", ["drop_table", "drop_column", "alter_column"])
@@ -171,6 +307,7 @@ def test_online_expand_rejects_lock_prone_operations(tmp_path: Path, operation: 
     [
         'sa.Column("nickname", sa.String(), nullable=False)',
         'sa.Column("nickname", sa.String(), nullable=True, server_default="")',
+        'sa.Column("nickname", sa.String(), nullable=True, server_default=sa.text("TRUE"))',
         'sa.Column("nickname", sa.String(), nullable=True, unique=True)',
         'sa.Column("nickname", sa.String(), nullable=True, index=True)',
     ],
@@ -187,6 +324,19 @@ def test_online_expand_rejects_rewrite_or_constraint_add_column(
 
     with pytest.raises(OnlineMigrationError, match="add_column"):
         validate_added_migration(path)
+
+
+def test_online_expand_accepts_only_constant_false_server_default(tmp_path: Path) -> None:
+    path = _migration(
+        tmp_path / "0064_safe_default.py",
+        'online_rollout_phase = "expand"\n'
+        'online_rollout_notes = "constant false compatibility default"\n\n'
+        "def upgrade():\n"
+        '    op.add_column("users", sa.Column("enabled", sa.Boolean(), nullable=True, '
+        'server_default=sa.text("FALSE")))\n',
+    )
+
+    validate_added_migration(path)
 
 
 def test_online_expand_rejects_positional_foreign_key_in_add_column(tmp_path: Path) -> None:
@@ -215,3 +365,105 @@ def test_online_expand_rejects_two_argument_foreign_key_column(tmp_path: Path) -
 
     with pytest.raises(OnlineMigrationError, match="allowlisted static SQLAlchemy scalar type"):
         validate_added_migration(path)
+
+
+def test_online_constraint_swap_accepts_bounded_not_valid_check_replacement(
+    tmp_path: Path,
+) -> None:
+    path = _migration(
+        tmp_path / "0096_constraint_swap.py",
+        'online_rollout_phase = "constraint_swap"\n'
+        'online_rollout_notes = "bounded CHECK replacement"\n'
+        'online_rollout_constraint_table = "foods"\n'
+        'online_rollout_constraint_name = "ck_foods_active_catalog_trust"\n'
+        "online_rollout_lock_timeout_seconds = 3\n"
+        "online_rollout_statement_timeout_seconds = 30\n\n"
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        '    if bind.dialect.name == "postgresql":\n'
+        "        op.execute(\"SET LOCAL lock_timeout = '3s'\")\n"
+        "        op.execute(\"SET LOCAL statement_timeout = '30s'\")\n"
+        '        op.execute("ALTER TABLE foods DROP CONSTRAINT IF EXISTS '
+        "ck_foods_active_catalog_trust, ADD CONSTRAINT "
+        "ck_foods_active_catalog_trust CHECK (food_type = 'user' OR "
+        "catalog_quality = 'community_unverified') NOT VALID\")\n"
+        '        op.execute("ALTER TABLE foods VALIDATE CONSTRAINT '
+        'ck_foods_active_catalog_trust")\n',
+    )
+
+    validate_added_migration(path)
+
+
+def test_online_constraint_swap_rejects_unbounded_validating_replacement(
+    tmp_path: Path,
+) -> None:
+    path = _migration(
+        tmp_path / "0096_constraint_swap.py",
+        'online_rollout_phase = "constraint_swap"\n'
+        'online_rollout_notes = "unsafe CHECK replacement"\n'
+        'online_rollout_constraint_table = "foods"\n'
+        'online_rollout_constraint_name = "ck_foods_active_catalog_trust"\n'
+        "online_rollout_lock_timeout_seconds = 3\n"
+        "online_rollout_statement_timeout_seconds = 30\n\n"
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        '    if bind.dialect.name == "postgresql":\n'
+        "        op.execute(\"SET LOCAL lock_timeout = '3s'\")\n"
+        "        op.execute(\"SET LOCAL statement_timeout = '30s'\")\n"
+        '        op.execute("ALTER TABLE foods DROP CONSTRAINT IF EXISTS '
+        "ck_foods_active_catalog_trust, ADD CONSTRAINT "
+        "ck_foods_active_catalog_trust CHECK (food_type = 'user')\")\n"
+        '        op.execute("ALTER TABLE foods VALIDATE CONSTRAINT '
+        'ck_foods_active_catalog_trust")\n',
+    )
+
+    with pytest.raises(OnlineMigrationError, match="NOT VALID"):
+        validate_added_migration(path)
+
+
+def test_rest_interval_migrations_use_strict_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions"
+    validate_added_migration(root / "0131_rest_interval_expand.py")
+    validate_added_migration(root / "0132_rest_interval_unique_swap.py")
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("SET LOCAL lock_timeout = '3s'", "SET LOCAL lock_timeout = '30s'"),
+        (
+            "DROP CONSTRAINT uq_workout_rest_source_set",
+            "DROP CONSTRAINT uq_workout_rest_running_workout",
+        ),
+        ('type_="unique"', 'type_="foreignkey"'),
+        (
+            'op.batch_alter_table("workout_rest_sessions")',
+            'op.batch_alter_table("users")',
+        ),
+    ],
+)
+def test_rest_unique_swap_rejects_modified_scope(tmp_path: Path, old: str, new: str) -> None:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0132_rest_interval_unique_swap.py"
+    )
+    source = path.read_text(encoding="utf-8")
+    assert old in source
+    candidate = _migration(tmp_path / path.name, source.replace(old, new, 1))
+    with pytest.raises(OnlineMigrationError, match="rest unique"):
+        validate_added_migration(candidate)
+
+
+def test_rest_unique_swap_rejects_undeclared_migration_name(tmp_path: Path) -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0132_rest_interval_unique_swap.py"
+    ).read_text(encoding="utf-8")
+    with pytest.raises(OnlineMigrationError, match="unapproved"):
+        validate_added_migration(_migration(tmp_path / "9999_unrelated_unique_swap.py", source))

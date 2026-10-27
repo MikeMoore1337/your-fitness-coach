@@ -12,7 +12,7 @@ def main() -> int:
     root = Path(__file__).resolve().parent.parent
     backend = root / "backend"
     cfg = root / "pyproject.toml"
-    cache_dir = root / ".artifacts" / "cache" / "mypy"
+    cache_dir = root / ".artifacts" / "runtime" / "cache" / "mypy"
     env = {
         **os.environ,
         "MYPY_CACHE_DIR": str(cache_dir),

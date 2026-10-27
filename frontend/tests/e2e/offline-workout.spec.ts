@@ -115,6 +115,19 @@ test('active workout переживает offline edit, refresh и reconnect б�
           remaining: null,
         },
       });
+    if (path.endsWith('/nutrition/diary/suggestions'))
+      return route.fulfill({
+        json: {
+          mode: 'deterministic',
+          diary_date: '2030-01-10',
+          targets: null,
+          remaining: null,
+          remaining_confidence: null,
+          limitations: [],
+          max_candidates: 0,
+          candidates: [],
+        },
+      });
     if (path.endsWith('/workouts/sets/201')) {
       setPatchCalls += 1;
       if (workoutOffline) return route.abort('internetdisconnected');
@@ -142,7 +155,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
     window.dispatchEvent(new Event('offline'));
   });
   await page.getByRole('spinbutton', { name: 'Повторы, Жим штанги лежа, подход 1' }).fill('8');
-  await page.getByRole('spinbutton', { name: 'Вес, Жим штанги лежа, подход 1' }).fill('40');
+  await page.getByLabel('Вес, Жим штанги лежа, подход 1').fill('40');
   await expect(page.getByText('Сохранено на устройстве')).toBeVisible();
   await expect
     .poll(() =>
@@ -161,7 +174,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
   });
   await completeSet.focus();
   await completeSet.click();
-  await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toContainText('1:30');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toContainText('1:30');
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -177,17 +190,17 @@ test('active workout переживает offline edit, refresh и reconnect б�
   workoutMissing = true;
   await page.reload();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page.getByRole('button', { name: /Открыть упражнение|1 из 1 сохранено/ }).click();
   await expect(
     page.getByRole('spinbutton', { name: 'Повторы, Жим штанги лежа, подход 1' }),
   ).toHaveValue('8');
-  await expect(
-    page.getByRole('spinbutton', { name: 'Вес, Жим штанги лежа, подход 1' }),
-  ).toHaveValue('40');
+  await expect(page.getByLabel('Вес, Жим штанги лежа, подход 1')).toHaveValue('40');
 
   workoutOffline = false;
   workoutMissing = false;
   const callsBeforeReconnect = setPatchCalls;
-  await page.getByRole('button', { name: 'Повторить' }).click();
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   expect(setPatchCalls - callsBeforeReconnect).toBe(1);
   expect(setState).toEqual({ actual_reps: 8, actual_weight: 40, is_completed: true });

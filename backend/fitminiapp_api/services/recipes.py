@@ -11,8 +11,9 @@ from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.recipe import Recipe, RecipeIngredient
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.food import FoodNutrientsInput
-from fitminiapp_api.schemas.food_diary import DiaryAmountUnit, FoodDiaryNutrition
+from fitminiapp_api.schemas.food_diary import FoodDiaryNutrition
 from fitminiapp_api.schemas.recipe import (
+    RecipeAmountUnit,
     RecipeCreate,
     RecipeIngredientInput,
     RecipeIngredientResponse,
@@ -54,7 +55,7 @@ class RecipeCalculation:
 def _calculate_food_amount(
     food: Food,
     amount: Decimal,
-    amount_unit: DiaryAmountUnit,
+    amount_unit: RecipeAmountUnit,
 ):
     try:
         if amount_unit == "serving":
@@ -170,7 +171,7 @@ def _serialize_ingredient(ingredient: RecipeIngredient) -> RecipeIngredientRespo
         food_name=ingredient.food_name,
         food_brand=ingredient.food_brand,
         amount=ingredient.amount,
-        amount_unit=cast(DiaryAmountUnit, ingredient.amount_unit),
+        amount_unit=cast(RecipeAmountUnit, ingredient.amount_unit),
         weight_g=ingredient.weight_g,
         serving_amount=ingredient.serving_amount,
         serving_unit=ingredient.serving_unit,

@@ -1,12 +1,30 @@
 x-backend-image: &backend-image
-  image: ${BACKEND_IMAGE:-fit-mini-app-backend:local}
+  # OCR/export spill and worker heartbeat still need disk-backed /tmp.
+  # Defer read_only/tmpfs until peak usage and the VPS memory budget are verified.
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  image: ${BACKEND_IMAGE:-yfc-backend:local}
   build:
     context: .
     dockerfile: backend/Dockerfile
+    args:
+      VITE_PWA_ENABLED: ${VITE_PWA_ENABLED:-true}
 
 x-bot-image: &bot-image
-  image: ${BOT_IMAGE:-fit-mini-app-bot:local}
-  build: ./bot
+  # Polling locks and atomic profile-sync state stay on bot_polling_lock.
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  image: ${BOT_IMAGE:-yfc-bot:local}
+  build:
+    context: .
+    dockerfile: bot/Dockerfile
+
+x-yfc-application-logging: &yfc-application-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
   db:
@@ -28,12 +46,14 @@ services:
 
   backend:
     <<: *backend-image
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       FORWARDED_ALLOW_IPS: 172.29.0.3
+      YFC_DB_APPLICATION_NAME: yfc-backend
     depends_on:
       db:
         condition: service_healthy
@@ -59,14 +79,16 @@ services:
 
   backend-blue:
     <<: *backend-image
-    image: ${BACKEND_BLUE_IMAGE:-fit-mini-app-backend:local}
-    restart: unless-stopped
+    image: ${BACKEND_BLUE_IMAGE:-yfc-backend:local}
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       FORWARDED_ALLOW_IPS: 172.29.0.3
+      YFC_DB_APPLICATION_NAME: yfc-backend
     depends_on:
       db:
         condition: service_healthy
@@ -88,14 +110,16 @@ services:
 
   backend-green:
     <<: *backend-image
-    image: ${BACKEND_GREEN_IMAGE:-fit-mini-app-backend:local}
-    restart: unless-stopped
+    image: ${BACKEND_GREEN_IMAGE:-yfc-backend:local}
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       FORWARDED_ALLOW_IPS: 172.29.0.3
+      YFC_DB_APPLICATION_NAME: yfc-backend
     depends_on:
       db:
         condition: service_healthy
@@ -119,6 +143,9 @@ services:
     <<: *backend-image
     restart: "no"
     env_file: .env
+    environment:
+      YFC_MIGRATION_PGOPTIONS: ${YFC_MIGRATION_PGOPTIONS:-}
+      YFC_DB_APPLICATION_NAME: yfc-setup
     depends_on:
       db:
         condition: service_healthy
@@ -126,7 +153,8 @@ services:
 
   bot:
     <<: *bot-image
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -139,6 +167,7 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       BOT_POLLING_ENABLED: ${BOT_POLLING_ENABLED:-true}
       BOT_POLLING_LOCK_DIR: /var/lock/fitminiapp-bot
+      BOT_POLLING_HEALTH_PATH: ${BOT_POLLING_HEALTH_PATH:-}
       BOT_CONFLICT_RETRY_SECONDS: ${BOT_CONFLICT_RETRY_SECONDS:-300}
       BOT_PROFILE_SYNC_STATE_PATH: ${BOT_PROFILE_SYNC_STATE_PATH:-/var/lock/fitminiapp-bot/profile-sync-state.json}
       ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
@@ -147,9 +176,19 @@ services:
         condition: service_healthy
     volumes:
       - bot_polling_lock:/var/lock/fitminiapp-bot
+      # Optional host-owned, group-readable status directory; bot still runs
+      # read-only and emits no status until BOT_POLLING_HEALTH_PATH is set.
+      - type: bind
+        source: ${BOT_POLLING_HEALTH_HOST_DIR:-/var/lib/hermes-infra-read/polling}
+        target: /run/yfc-polling-status
+        bind:
+          create_host_path: true
 
   edge:
     image: ${CADDY_IMAGE:-caddy:2-alpine}
+    # Deployment copies candidate Caddyfiles to /tmp before validate/reload.
+    # Keep image capabilities: dropping ALL prevents executing file-capability Caddy.
+    security_opt: [no-new-privileges:true]
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/usr/local/bin/edge-entrypoint.sh"]
     environment:
@@ -180,6 +219,11 @@ services:
       # Optional for backward compatibility. When set, Caddy serves the same
       # backend on the public landing hostname as well as the app hostname.
       LANDING_DOMAIN: ${LANDING_DOMAIN:-}
+      # Optional private Allure hostname. The route is emitted only when the
+      # hostname is configured and requires a pre-hashed password.
+      ALLURE_PUBLIC_HOSTNAME: ${ALLURE_PUBLIC_HOSTNAME:-}
+      ALLURE_BASIC_AUTH_USER: ${ALLURE_BASIC_AUTH_USER:-}
+      ALLURE_BASIC_AUTH_HASH: ${ALLURE_BASIC_AUTH_HASH:-}
     entrypoint:
       - /bin/sh
       - -ec
@@ -190,6 +234,45 @@ services:
             SITE_ADDRESSES="$${APP_DOMAIN}, $${LANDING_CANONICAL}, www.$${LANDING_CANONICAL}"
         else
             SITE_ADDRESSES="$${APP_DOMAIN}"
+        fi
+        ALLURE_SITE=""
+        if [ -n "$${ALLURE_PUBLIC_HOSTNAME}" ]; then
+            : "$${ALLURE_BASIC_AUTH_USER:?ALLURE_BASIC_AUTH_USER is required when ALLURE_PUBLIC_HOSTNAME is set}"
+            : "$${ALLURE_BASIC_AUTH_HASH:?ALLURE_BASIC_AUTH_HASH is required when ALLURE_PUBLIC_HOSTNAME is set}"
+            case "$${ALLURE_PUBLIC_HOSTNAME}" in
+                *[!A-Za-z0-9.-]*)
+                    echo "ALLURE_PUBLIC_HOSTNAME must be a DNS hostname" >&2
+                    exit 1
+                    ;;
+            esac
+            case "$${ALLURE_BASIC_AUTH_USER}" in
+                *[!A-Za-z0-9._-]*)
+                    echo "ALLURE_BASIC_AUTH_USER contains unsupported characters" >&2
+                    exit 1
+                    ;;
+            esac
+            ALLURE_SITE="$$(cat <<ALLURE_CADDY_EOF
+        $${ALLURE_PUBLIC_HOSTNAME} {
+            encode zstd gzip
+
+            header {
+                Strict-Transport-Security "max-age=31536000; includeSubDomains"
+                X-Content-Type-Options "nosniff"
+                Referrer-Policy "no-referrer"
+                # Allure 2.43 injects its application stylesheet at runtime and
+                # contains a small inline bootstrap script in index.html. Keep
+                # the report isolated while allowing those report-local assets.
+                Content-Security-Policy "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'"
+            }
+
+            basic_auth argon2id {
+                $${ALLURE_BASIC_AUTH_USER} $${ALLURE_BASIC_AUTH_HASH}
+            }
+
+            reverse_proxy allure-report-origin:8080
+        }
+        ALLURE_CADDY_EOF
+        )"
         fi
         cat > /etc/caddy/Caddyfile <<EOF
         $${SITE_ADDRESSES} {
@@ -203,6 +286,8 @@ services:
 
             reverse_proxy edge:8080
         }
+
+        $${ALLURE_SITE}
         EOF
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     depends_on:
@@ -218,6 +303,7 @@ services:
     networks:
       proxy_net:
         ipv4_address: 172.28.0.10
+      allure_reports:
 
   cloudflared:
     image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
@@ -234,12 +320,54 @@ services:
       proxy_net:
         ipv4_address: 172.28.0.11
 
+  allure-report-origin:
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    restart: unless-stopped
+    profiles: ["allure-reports"]
+    user: "${ALLURE_REPORT_ORIGIN_UID:-1501}:${ALLURE_REPORT_ORIGIN_GID:-1501}"
+    mem_limit: ${ALLURE_REPORT_ORIGIN_MEMORY_LIMIT:-64m}
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - /srv/yfc-allure-reports:/srv/reports:ro
+      - ./deploy/allure-report-origin/Caddyfile:/etc/caddy/Caddyfile:ro
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      allure_reports:
+
+  cloudflared-allure:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
+    restart: unless-stopped
+    profiles: ["allure-reports"]
+    mem_limit: ${ALLURE_CLOUDFLARED_MEMORY_LIMIT:-64m}
+    environment:
+      # This connector token belongs only to the Allure Tunnel and is not the
+      # token used by the existing optional application tunnel.
+      TUNNEL_TOKEN: ${ALLURE_CLOUDFLARED_TUNNEL_TOKEN:-}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      allure-report-origin:
+        condition: service_healthy
+    networks:
+      allure_reports:
+      allure_egress:
+
   worker:
     <<: *backend-image
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      YFC_DB_APPLICATION_NAME: yfc-worker
     depends_on:
       backend:
         condition: service_healthy
@@ -260,12 +388,15 @@ services:
 
   worker-blue:
     <<: *backend-image
-    image: ${BACKEND_BLUE_IMAGE:-fit-mini-app-backend:local}
-    restart: unless-stopped
+    image: ${BACKEND_BLUE_IMAGE:-yfc-backend:local}
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      YFC_DB_APPLICATION_NAME: yfc-worker
     depends_on:
       db:
         condition: service_healthy
@@ -285,12 +416,15 @@ services:
 
   worker-green:
     <<: *backend-image
-    image: ${BACKEND_GREEN_IMAGE:-fit-mini-app-backend:local}
-    restart: unless-stopped
+    image: ${BACKEND_GREEN_IMAGE:-yfc-backend:local}
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      YFC_DB_APPLICATION_NAME: yfc-worker
     depends_on:
       db:
         condition: service_healthy
@@ -310,8 +444,9 @@ services:
 
   bot-blue:
     <<: *bot-image
-    image: ${BOT_BLUE_IMAGE:-fit-mini-app-bot:local}
-    restart: unless-stopped
+    image: ${BOT_BLUE_IMAGE:-yfc-bot:local}
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     profiles: ["production-slots"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -325,20 +460,29 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       BOT_POLLING_ENABLED: ${BOT_POLLING_ENABLED:-true}
       BOT_POLLING_LOCK_DIR: /var/lock/fitminiapp-bot
+      BOT_POLLING_HEALTH_PATH: ${BOT_POLLING_HEALTH_PATH:-}
       BOT_CONFLICT_RETRY_SECONDS: ${BOT_CONFLICT_RETRY_SECONDS:-300}
       BOT_PROFILE_SYNC_STATE_PATH: ${BOT_PROFILE_SYNC_STATE_PATH:-/var/lock/fitminiapp-bot/profile-sync-state.json}
       ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
     stop_grace_period: ${DEPLOY_BOT_DRAIN_SECONDS:-45s}
     volumes:
       - bot_polling_lock:/var/lock/fitminiapp-bot
+      # Optional host-owned, group-readable status directory; bot still runs
+      # read-only and emits no status until BOT_POLLING_HEALTH_PATH is set.
+      - type: bind
+        source: ${BOT_POLLING_HEALTH_HOST_DIR:-/var/lib/hermes-infra-read/polling}
+        target: /run/yfc-polling-status
+        bind:
+          create_host_path: true
     networks:
       default:
       app_edge:
 
   bot-green:
     <<: *bot-image
-    image: ${BOT_GREEN_IMAGE:-fit-mini-app-bot:local}
-    restart: unless-stopped
+    image: ${BOT_GREEN_IMAGE:-yfc-bot:local}
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
+    logging: *yfc-application-logging
     profiles: ["production-slots"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -352,12 +496,20 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       BOT_POLLING_ENABLED: ${BOT_POLLING_ENABLED:-true}
       BOT_POLLING_LOCK_DIR: /var/lock/fitminiapp-bot
+      BOT_POLLING_HEALTH_PATH: ${BOT_POLLING_HEALTH_PATH:-}
       BOT_CONFLICT_RETRY_SECONDS: ${BOT_CONFLICT_RETRY_SECONDS:-300}
       BOT_PROFILE_SYNC_STATE_PATH: ${BOT_PROFILE_SYNC_STATE_PATH:-/var/lock/fitminiapp-bot/profile-sync-state.json}
       ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
     stop_grace_period: ${DEPLOY_BOT_DRAIN_SECONDS:-45s}
     volumes:
       - bot_polling_lock:/var/lock/fitminiapp-bot
+      # Optional host-owned, group-readable status directory; bot still runs
+      # read-only and emits no status until BOT_POLLING_HEALTH_PATH is set.
+      - type: bind
+        source: ${BOT_POLLING_HEALTH_HOST_DIR:-/var/lib/hermes-infra-read/polling}
+        target: /run/yfc-polling-status
+        bind:
+          create_host_path: true
     networks:
       default:
       app_edge:
@@ -382,3 +534,6 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/24
+  allure_reports:
+    internal: true
+  allure_egress:

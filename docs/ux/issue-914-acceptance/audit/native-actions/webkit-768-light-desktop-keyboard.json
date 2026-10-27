@@ -1,0 +1,15 @@
+{
+  "engine": "webkit",
+  "width": 768,
+  "theme": "light",
+  "scene": "desktop-keyboard",
+  "box": {
+    "x": 14,
+    "y": 0,
+    "width": 680,
+    "height": 64
+  },
+  "outline": "2px",
+  "writes": [],
+  "status": "PASS"
+}

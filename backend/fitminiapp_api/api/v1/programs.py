@@ -14,16 +14,35 @@ from fitminiapp_api.schemas.program import (
     ExerciseCatalogItem,
     ExerciseGuide,
     ProgramAssignmentResponse,
+    ProgramLifecycleActionRequest,
+    ProgramLifecycleMutationResponse,
+    ProgramLifecycleResponse,
     ProgramRecommendationRequest,
     ProgramRecommendationResponse,
     ProgramRevisionResponse,
     ProgramTemplateCreate,
     ProgramTemplateCreateResponse,
     ProgramTemplateResponse,
+    TemplateExerciseReplacementRequest,
+    TrainingBlockActionRequest,
+    TrainingBlockAdvanceResponse,
     TrainingBlockCreate,
     TrainingBlockMutationResponse,
+    TrainingBlockRepeatResponse,
     TrainingBlockResponse,
     TrainingBlockUpdate,
+)
+from fitminiapp_api.schemas.program_generator import (
+    ProgramGeneratorConfirmRequest,
+    ProgramGeneratorConfirmResponse,
+    ProgramGeneratorPreviewResponse,
+    ProgramGeneratorRequest,
+)
+from fitminiapp_api.schemas.workout import (
+    ExerciseHistoryResponse,
+    ProgramProgressionProposalList,
+    ProgressionProposalReviewRequest,
+    ProgressionProposalReviewResponse,
 )
 from fitminiapp_api.services.exercise_catalog import (
     _effective_exercise_id,
@@ -42,13 +61,27 @@ from fitminiapp_api.services.exercise_domain import (
     exercise_equipment_payload,
     exercise_muscle_payload,
 )
+from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
+from fitminiapp_api.services.exercise_history import (
+    ExerciseHistoryNotFound,
+    build_exercise_history,
+)
 from fitminiapp_api.services.program_common import ProgramError, assignment_error_status
+from fitminiapp_api.services.program_generator import (
+    ProgramGeneratorError,
+    confirm_generated_program,
+    generate_program_preview,
+)
 from fitminiapp_api.services.program_recommendation import recommend_program_templates
 from fitminiapp_api.services.program_versioning import (
+    advance_training_block,
+    apply_program_lifecycle_action,
     create_training_block,
     list_program_revisions,
     list_training_blocks,
+    program_lifecycle_summary,
+    repeat_training_block,
     update_training_block,
     upsert_future_program_exercise,
 )
@@ -56,14 +89,21 @@ from fitminiapp_api.services.programs import (
     assign_template_to_self,
     build_template_response,
     build_template_responses,
+    clone_template_for_coach,
     create_and_optionally_assign_program,
+    delete_assigned_program_for_user,
     delete_template_for_user,
     get_template_for_user,
     list_clients,
     list_hidden_example_templates,
     list_user_templates,
+    replace_template_exercise_for_user,
     restore_example_template_for_user,
     update_template_for_user,
+)
+from fitminiapp_api.services.progression_guidance import (
+    list_assigned_program_progression_proposals,
+    review_assigned_program_progression_proposal,
 )
 from fitminiapp_api.services.workout_metrics import exercise_metric_type
 
@@ -76,7 +116,30 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
         return HTTPException(status_code=404, detail=detail)
     if detail in {
         "Program revision conflict",
+        "Progression proposal is stale",
+        "Progression proposal already rejected",
+        "Progression proposal already reviewed",
+        "Progression proposal target set changed",
+        "Progression proposal has no applicable exact load change",
+        "Progression proposal has no incomplete target sets",
+        "Progression proposal target set versions are incomplete",
+        "Progression proposal target set is no longer available",
+        "Progression proposal could not be applied",
         "Assigned program is not editable",
+        "Cannot delete a program while a workout is in progress",
+        "Cannot change program lifecycle while a workout is in progress",
+        "Cannot advance a block while a workout is in progress",
+        "Another active program must be completed or paused before resuming",
+        "Only an active or scheduled program can be paused",
+        "Only a paused program can be resumed",
+        "Only an active, scheduled, or paused program can be ended",
+        "Only the active training block can advance",
+        "There is no planned training block to advance to",
+        "Complete the training block before repeating it",
+        "Training block has no scheduled workouts to repeat",
+        "A current training block is required for this revision scope",
+        "No next planned workout for this revision",
+        "Program reached its 24-week limit; restart it to begin a new cycle",
         "Training blocks must not overlap",
         "Invalid training block status transition",
         "Complete the previous training block first",
@@ -84,6 +147,9 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
         "Completed or archived training blocks are immutable",
         "No future planned workouts for the selected day",
         "Superset position is already occupied",
+        "No upcoming workout for progression review",
+        "Progression workout is not available",
+        "Progression exercise is not available",
     }:
         return HTTPException(status_code=409, detail=detail)
     return HTTPException(status_code=422, detail=detail)
@@ -101,6 +167,7 @@ def _serialize_exercise(
     equipment = exercise_equipment_payload(exercise)
     source_slug = _source_exercise_slug(exercise)
     redirected_slug = CANONICAL_EXERCISE_REDIRECTS.get(source_slug)
+    media_preview = get_guide_media_preview(redirected_slug or source_slug)
     catalog_metadata = exercise_catalog_metadata(redirected_slug or source_slug)
     canonical_slug = redirected_slug
     if exercise.source_exercise_id is not None:
@@ -135,6 +202,14 @@ def _serialize_exercise(
         "created_by_user_id": exercise.created_by_user_id,
         "source_exercise_id": exercise.source_exercise_id,
         "has_guide": guide is not None,
+        "media_state": media_preview["state"],
+        "media_thumbnail_url": media_preview["thumbnail_url"],
+        "media_thumbnail_sources": media_preview["thumbnail_sources"],
+        "media_preferred_mode": media_preview["preferred_mode"],
+        # The catalog/picker only needs posters. Keep animated media on the
+        # detail response and workout payloads to avoid inflating the list.
+        "media_animation_url": media_preview["animation_url"] if include_guide else None,
+        "media_video_sources": media_preview["video_sources"] if include_guide else [],
         "guide": guide if include_guide else None,
     }
 
@@ -199,6 +274,18 @@ def get_exercise_details(
         include_guide=True,
         alternatives=alternatives.get(_effective_exercise_id(exercise), []),
     )
+
+
+@router.get("/exercises/{exercise_id}/history", response_model=ExerciseHistoryResponse)
+def get_exercise_history(
+    exercise_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return build_exercise_history(db, current_user, exercise_id)
+    except ExerciseHistoryNotFound as exc:
+        raise HTTPException(status_code=404, detail="Упражнение не найдено") from exc
 
 
 @router.post(
@@ -322,6 +409,44 @@ def my_templates(
 
 
 @router.post(
+    "/generator/preview",
+    response_model=ProgramGeneratorPreviewResponse,
+)
+def generate_program_generator_preview(
+    payload: ProgramGeneratorRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return generate_program_preview(db, current_user, payload)
+    except ProgramGeneratorError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except ProgramError as exc:
+        db.rollback()
+        raise HTTPException(status_code=assignment_error_status(str(exc)), detail=str(exc)) from exc
+
+
+@router.post(
+    "/generator/confirm",
+    response_model=ProgramGeneratorConfirmResponse,
+)
+def confirm_program_generator_preview(
+    payload: ProgramGeneratorConfirmRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return confirm_generated_program(db, current_user, payload)
+    except ProgramGeneratorError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except ProgramError as exc:
+        db.rollback()
+        raise HTTPException(status_code=assignment_error_status(str(exc)), detail=str(exc)) from exc
+
+
+@router.post(
     "/templates/recommendation",
     response_model=ProgramRecommendationResponse,
 )
@@ -407,6 +532,29 @@ def get_template(
     return build_template_response(template, db, current_user)
 
 
+@router.post(
+    "/templates/{template_id}/clone",
+    response_model=ProgramTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def clone_template(
+    template_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+):
+    try:
+        template = clone_template_for_coach(db, current_user, template_id)
+    except ProgramError as exc:
+        detail = str(exc)
+        if detail == "Template not found":
+            raise HTTPException(status_code=404, detail=detail) from exc
+        if detail in {"No permission to view template", "No permission to clone template"}:
+            raise HTTPException(status_code=403, detail=detail) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
+
+    return build_template_response(template, db, current_user)
+
+
 @router.patch("/templates/{template_id}", response_model=ProgramTemplateResponse)
 def edit_template(
     template_id: int,
@@ -415,20 +563,55 @@ def edit_template(
     db: Session = Depends(get_db),
 ):
     try:
-        template = update_template_for_user(
+        template, apply_result = update_template_for_user(
             db=db,
             current_user=current_user,
             template_id=template_id,
             payload=payload,
         )
     except ProgramError as exc:
+        db.rollback()
         detail = str(exc)
         if detail == "Template not found":
             raise HTTPException(status_code=404, detail=detail)
         if detail in {"No permission to edit template", "No permission to manage this user"}:
             raise HTTPException(status_code=403, detail=detail)
+        if detail == "Program revision conflict":
+            raise HTTPException(status_code=409, detail=detail)
         raise HTTPException(status_code=400, detail=detail)
 
+    response = build_template_response(template, db, current_user)
+    response.update(apply_result)
+    return response
+
+
+@router.post(
+    "/templates/{template_id}/exercises/{template_exercise_id}/replace",
+    response_model=ProgramTemplateResponse,
+)
+def replace_template_exercise(
+    template_id: int,
+    template_exercise_id: int,
+    payload: TemplateExerciseReplacementRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        template = replace_template_exercise_for_user(
+            db,
+            current_user,
+            template_id,
+            template_exercise_id,
+            payload.replacement_exercise_id,
+            payload.reason,
+        )
+    except ProgramError as exc:
+        detail = str(exc)
+        if detail in {"Template not found", "Template exercise not found"}:
+            raise HTTPException(status_code=404, detail=detail) from exc
+        if detail == "No permission to edit template":
+            raise HTTPException(status_code=403, detail=detail) from exc
+        raise HTTPException(status_code=422, detail=detail) from exc
     return build_template_response(template, db, current_user)
 
 
@@ -485,6 +668,63 @@ def delete_template(
         raise HTTPException(status_code=403, detail=detail)
 
 
+@router.delete("/assigned/{program_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_assigned_program(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        delete_assigned_program_for_user(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.get(
+    "/assigned/{program_id}/progression-proposals",
+    response_model=ProgramProgressionProposalList,
+)
+def assigned_program_progression_proposals(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return list_assigned_program_progression_proposals(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post(
+    "/assigned/{program_id}/progression-proposals/{proposal_id}/review",
+    response_model=ProgressionProposalReviewResponse,
+)
+def review_assigned_program_progression_proposal_endpoint(
+    program_id: int,
+    proposal_id: str,
+    payload: ProgressionProposalReviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        result = review_assigned_program_progression_proposal(
+            db,
+            current_user,
+            program_id,
+            proposal_id,
+            decision=payload.decision,
+            workout_id=payload.workout_id,
+            exercise_id=payload.exercise_id,
+            expected_revision_number=payload.expected_revision_number,
+            expected_set_versions=payload.expected_set_versions,
+            adjusted_weight=payload.adjusted_weight,
+        )
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    db.commit()
+    return result
+
+
 @router.get(
     "/assigned/{program_id}/revisions",
     response_model=list[ProgramRevisionResponse],
@@ -513,6 +753,37 @@ def assigned_program_revisions(
         }
         for row in rows
     ]
+
+
+@router.get(
+    "/assigned/{program_id}/lifecycle",
+    response_model=ProgramLifecycleResponse,
+)
+def assigned_program_lifecycle(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return program_lifecycle_summary(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post(
+    "/assigned/{program_id}/lifecycle",
+    response_model=ProgramLifecycleMutationResponse,
+)
+def mutate_assigned_program_lifecycle(
+    program_id: int,
+    payload: ProgramLifecycleActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return apply_program_lifecycle_action(db, current_user, program_id, payload)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
 
 
 @router.get(
@@ -566,6 +837,55 @@ def edit_assigned_program_block(
     except ProgramError as exc:
         raise _assigned_program_error(exc) from exc
     return {"block": block, "current_revision_number": revision_number}
+
+
+@router.post(
+    "/assigned/{program_id}/blocks/{block_id}/advance",
+    response_model=TrainingBlockAdvanceResponse,
+)
+def advance_assigned_program_block(
+    program_id: int,
+    block_id: int,
+    payload: TrainingBlockActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        block, completed_block_id, revision_number = advance_training_block(
+            db, current_user, program_id, block_id, payload
+        )
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    return {
+        "block": block,
+        "completed_block_id": completed_block_id,
+        "current_revision_number": revision_number,
+    }
+
+
+@router.post(
+    "/assigned/{program_id}/blocks/{block_id}/repeat",
+    response_model=TrainingBlockRepeatResponse,
+)
+def repeat_assigned_program_block(
+    program_id: int,
+    block_id: int,
+    payload: TrainingBlockActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        block, duration_weeks, revision_number = repeat_training_block(
+            db, current_user, program_id, block_id, payload
+        )
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    return {
+        "block": block,
+        "source_block_id": block_id,
+        "duration_weeks": duration_weeks,
+        "current_revision_number": revision_number,
+    }
 
 
 @router.post(

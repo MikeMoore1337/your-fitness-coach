@@ -7,20 +7,25 @@ type ProgressionOutcome = 'consider_progressing' | 'hold' | 'review' | 'consider
 
 export interface PlatformApiOptions {
   browserSession?: boolean;
+  fixedDate?: string;
   workoutStatus?: WorkoutStatus;
   activeProgram?: boolean;
   weeklyReviewAvailable?: boolean;
   weeklyCalibration?: 'insufficient' | 'pending';
   nutritionTargetSource?: 'manual' | 'trainer';
+  nutritionSuggestions?: 'empty';
+  nutritionRepeatCandidate?: boolean;
   programHistory?: 'empty' | 'one' | 'many';
   progressionOutcome?: ProgressionOutcome;
   longExerciseName?: boolean;
   notificationState?: 'empty' | 'populated' | 'unlinked' | 'stale';
   accountExportState?: 'none' | 'ready' | 'expired' | 'error';
+  aiAdaptation?: 'disabled' | 'available';
   authProviders?: string[];
   trainerActive?: boolean;
   measurementHistory?: 'none' | 'many';
-  cardioState?: 'empty' | 'planned' | 'completed';
+  cardioState?: 'empty' | 'planned' | 'completed' | 'many';
+  progressState?: 'sparse' | 'populated';
   avatarState?: 'default' | 'provider' | 'custom';
 }
 
@@ -105,11 +110,88 @@ export function emptyHydrationDay(diaryDate: string) {
   };
 }
 
+export const contextualReminderTemplates = [
+  {
+    template_key: 'meal_logging',
+    version: 'v1',
+    label: 'Записать приём пищи',
+    purpose: 'Мягко напомнить добавить запись, когда выбранное окно ещё пусто.',
+    schedule_kind: 'times',
+    allowed_schedule: 'До трёх выбранных окон в выбранные дни недели.',
+    quiet_hours_behavior: 'Окно внутри тихих часов пропускается без переноса на утро.',
+    deep_link: 'Питание → быстрый ввод за выбранный приём пищи.',
+    suppression: 'Пропускается, если в этом окне уже есть сохранённая запись питания.',
+    neutral_copy: 'Можно записать приём пищи. Подробности — в приложении.',
+    default_enabled: false,
+    enabled: false,
+    weekdays: [0, 1, 2, 3, 4, 5, 6],
+    times: ['08:00:00', '13:00:00', '19:00:00'],
+    window_start: null,
+    window_end: null,
+    interval_minutes: null,
+    max_per_day: 3,
+    minimum_spacing_minutes: 120,
+    telegram_linked: true,
+    telegram_enabled: true,
+    channel_note: 'Событие появится в приложении; в Telegram придёт нейтральный текст.',
+  },
+  {
+    template_key: 'hydration',
+    version: 'v1',
+    label: 'Выпить воду',
+    purpose: 'Напомнить отметить воду или другой напиток в дневнике.',
+    schedule_kind: 'interval',
+    allowed_schedule: 'Повтор в выбранном рабочем окне с ограничением числа напоминаний в день.',
+    quiet_hours_behavior: 'Слоты внутри тихих часов пропускаются без catch-up серии.',
+    deep_link: 'Питание → быстрый ввод воды за текущую дату.',
+    suppression: 'Ближайший слот пропускается после недавней записи гидратации.',
+    neutral_copy: 'Можно выпить воды. Подробности — в приложении.',
+    default_enabled: false,
+    enabled: false,
+    weekdays: [0, 1, 2, 3, 4, 5, 6],
+    times: [],
+    window_start: '09:00:00',
+    window_end: '21:00:00',
+    interval_minutes: 120,
+    max_per_day: 6,
+    minimum_spacing_minutes: 120,
+    telegram_linked: true,
+    telegram_enabled: true,
+    channel_note: 'Событие появится в приложении; в Telegram придёт нейтральный текст.',
+  },
+  {
+    template_key: 'movement_break',
+    version: 'v1',
+    label: 'Разминка / перерыв от сидения',
+    purpose: 'Предложить короткий перерыв и немного подвигаться по расписанию.',
+    schedule_kind: 'interval',
+    allowed_schedule: 'Плановые слоты в выбранном рабочем окне; приложение не измеряет сидение.',
+    quiet_hours_behavior: 'Слоты внутри тихих часов пропускаются без catch-up серии.',
+    deep_link: 'Сегодня → контекст приложения для короткого перерыва.',
+    suppression: 'Слот не переносится автоматически, если он был пропущен.',
+    neutral_copy:
+      'Пора сделать короткий перерыв и немного подвигаться. Подробности — в приложении.',
+    default_enabled: false,
+    enabled: false,
+    weekdays: [0, 1, 2, 3, 4],
+    times: [],
+    window_start: '10:00:00',
+    window_end: '18:00:00',
+    interval_minutes: 120,
+    max_per_day: 5,
+    minimum_spacing_minutes: 120,
+    telegram_linked: true,
+    telegram_enabled: true,
+    channel_note: 'Событие появится в приложении; в Telegram придёт нейтральный текст.',
+  },
+];
+
 export async function installPlatformApi(
   page: Page,
   options: PlatformApiOptions = {},
 ): Promise<PlatformApiController> {
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
+  const today =
+    options.fixedDate ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   const todayDate = new Date(`${today}T12:00:00Z`);
   const contextDate = new Date(todayDate);
   const nextWorkoutDate = new Date(todayDate);
@@ -186,35 +268,85 @@ export async function installPlatformApi(
   let failNextCardioSave = false;
   let cardioSaveCalls = 0;
   let cardioSessions: Array<Record<string, unknown>> =
-    options.cardioState && options.cardioState !== 'empty'
+    options.cardioState === 'many'
       ? [
           {
             id: 659,
-            activity_type: 'walking',
-            duration_minutes: 30,
+            activity_type: 'elliptical',
+            duration_minutes: 40,
             distance_km: null,
             average_heart_rate_bpm: null,
             heart_rate_zone: null,
-            note: options.cardioState === 'planned' ? 'План на сегодня' : 'Фактический результат',
-            scheduled_at: `${today}T09:00:00`,
-            completed_at: options.cardioState === 'completed' ? `${today}T09:30:00` : null,
-            status: options.cardioState,
+            note: null,
+            scheduled_at: `${today}T14:33:00`,
+            completed_at: `${today}T15:13:00`,
+            status: 'completed',
             source: 'manual',
-            created_at: `${today}T08:00:00`,
-            updated_at: `${today}T09:30:00`,
+            created_at: `${today}T15:13:00`,
+            updated_at: `${today}T15:13:00`,
+          },
+          {
+            id: 660,
+            activity_type: 'stationary_bike',
+            duration_minutes: 28,
+            distance_km: 8.1,
+            average_heart_rate_bpm: 136,
+            heart_rate_zone: 3,
+            note: 'Ровный темп без рывков',
+            scheduled_at: `${today}T12:05:00`,
+            completed_at: `${today}T12:33:00`,
+            status: 'completed',
+            source: 'manual',
+            created_at: `${today}T12:33:00`,
+            updated_at: `${today}T12:33:00`,
+          },
+          {
+            id: 661,
+            activity_type: 'running',
+            duration_minutes: 32,
+            distance_km: 4.8,
+            average_heart_rate_bpm: 142,
+            heart_rate_zone: 4,
+            note: null,
+            scheduled_at: `${today}T09:10:00`,
+            completed_at: `${today}T09:42:00`,
+            status: 'completed',
+            source: 'manual',
+            created_at: `${today}T09:42:00`,
+            updated_at: `${today}T09:42:00`,
           },
         ]
-      : [];
+      : options.cardioState && options.cardioState !== 'empty'
+        ? [
+            {
+              id: 659,
+              activity_type: 'walking',
+              duration_minutes: 30,
+              distance_km: null,
+              average_heart_rate_bpm: null,
+              heart_rate_zone: null,
+              note: options.cardioState === 'planned' ? 'План на сегодня' : 'Фактический результат',
+              scheduled_at: `${today}T09:00:00`,
+              completed_at: options.cardioState === 'completed' ? `${today}T09:30:00` : null,
+              status: options.cardioState,
+              source: 'manual',
+              created_at: `${today}T08:00:00`,
+              updated_at: `${today}T09:30:00`,
+            },
+          ]
+        : [];
   let completionFeedback: string | null = null;
   let completionNote: string | null = null;
   let adaptationApplyCalls = 0;
   let adaptationApplyMode: 'success' | 'conflict' | 'error' = 'success';
   const progressionOutcome = options.progressionOutcome ?? 'review';
-  const providerAvatar =
-    'data:image/svg+xml;charset=utf-8,' +
-    encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" fill="#d8f799"/><circle cx="64" cy="48" r="24" fill="#43631f"/><path d="M22 122c4-31 20-46 42-46s38 15 42 46" fill="#43631f"/></svg>',
-    );
+  const providerAvatar = 'https://provider.example.test/avatar.svg';
+  await page.route(providerAvatar, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" fill="#d8f799"/><circle cx="64" cy="48" r="24" fill="#43631f"/><path d="M22 122c4-31 20-46 42-46s38 15 42 46" fill="#43631f"/></svg>',
+    }),
+  );
   const customAvatarUpdatedAt = '2030-01-02T12:00:00Z';
   const currentUser = () => ({
     id: 7,
@@ -254,6 +386,7 @@ export async function installPlatformApi(
   const previousTargetDate = new Date(todayDate);
   previousTargetDate.setUTCDate(previousTargetDate.getUTCDate() - 30);
   const targetSource = options.nutritionTargetSource ?? 'manual';
+  const nutritionSuggestions = options.nutritionSuggestions;
   const targetAuthor =
     targetSource === 'trainer'
       ? { id: 11, telegram_user_id: 7011, full_name: 'Ирина Тренерова' }
@@ -356,6 +489,20 @@ export async function installPlatformApi(
     const requiredSessionCount =
       progressionOutcome === 'hold' ? 3 : progressionOutcome === 'review' ? 2 : 2;
     const reps = progressionOutcome === 'consider_reducing' ? [6, 7] : [10, 10];
+    const suggestedWeight =
+      progressionOutcome === 'consider_progressing'
+        ? 42.5
+        : progressionOutcome === 'consider_reducing'
+          ? 37.5
+          : null;
+    const reasonCodes =
+      progressionOutcome === 'consider_progressing'
+        ? ['top_range_repeated', 'full_rir_coverage']
+        : progressionOutcome === 'consider_reducing'
+          ? ['below_range_two_sessions']
+          : progressionOutcome === 'hold'
+            ? ['need_one_more_stable_session']
+            : ['too_few_comparable_sessions'];
     const messages = {
       consider_progressing: 'Можно рассмотреть небольшое увеличение веса',
       hold: 'Пока оставьте текущую нагрузку',
@@ -363,7 +510,7 @@ export async function installPlatformApi(
       consider_reducing: 'Можно рассмотреть небольшое снижение веса',
     } as const;
     return {
-      ruleset_version: 'progression-guidance-v1',
+      ruleset_version: 'progression-guidance-v2',
       outcome: progressionOutcome,
       message: messages[progressionOutcome],
       detail:
@@ -380,12 +527,7 @@ export async function installPlatformApi(
           : progressionOutcome === 'consider_reducing'
             ? -2.5
             : null,
-      suggested_weight:
-        progressionOutcome === 'consider_progressing'
-          ? 42.5
-          : progressionOutcome === 'consider_reducing'
-            ? 37.5
-            : null,
+      suggested_weight: suggestedWeight,
       load_unit: 'kg',
       evidence: {
         target_reps_min: 8,
@@ -395,14 +537,7 @@ export async function installPlatformApi(
         required_session_count: requiredSessionCount,
         working_set_count: sessionCount,
         rir_recorded_set_count: progressionOutcome === 'consider_progressing' ? sessionCount : 0,
-        reason_keys:
-          progressionOutcome === 'consider_progressing'
-            ? ['top_range_repeated', 'full_rir_coverage']
-            : progressionOutcome === 'consider_reducing'
-              ? ['below_range_two_sessions']
-              : progressionOutcome === 'hold'
-                ? ['need_one_more_stable_session']
-                : ['too_few_comparable_sessions'],
+        reason_keys: reasonCodes,
         sessions: Array.from({ length: sessionCount }, (_, index) => ({
           workout_id: 30 + index,
           scheduled_date: new Date(todayDate.getTime() - (index + 1) * 7 * 86_400_000)
@@ -420,6 +555,48 @@ export async function installPlatformApi(
           completion_feedback: index === 0 ? 'as_expected' : null,
         })),
       },
+      proposal:
+        suggestedWeight == null
+          ? null
+          : {
+              proposal_id: 'a'.repeat(64),
+              rule_id: 'b'.repeat(64),
+              rule_kind: 'double_progression',
+              rule_snapshot: {
+                kind: 'double_progression',
+                scope: 'exercise',
+                exercise_id: 11,
+                rep_target: { kind: 'range', min_reps: 8, max_reps: 10 },
+                increment_value: 2.5,
+                increment_unit: 'kg',
+              },
+              target_program_id: 77,
+              target_revision_number: currentRevisionNumber,
+              target_exercise_id: 11,
+              target_workout_id: 42,
+              current_weight: 40,
+              proposed_weight: suggestedWeight,
+              proposed_action: 'set_load',
+              target_set_updates: [
+                {
+                  set_id: 201,
+                  set_number: 1,
+                  planned_role: 'working',
+                  current_weight: 40,
+                  set_version: setVersion,
+                  relative_to_top: null,
+                  proposed_weight: suggestedWeight,
+                },
+              ],
+              source_evidence_ids: Array.from(
+                { length: sessionCount },
+                (_, index) => `workout:${30 + index}/set:${201 + index}`,
+              ),
+              comparable_session_count: sessionCount,
+              reason_codes: reasonCodes,
+              eligibility_status: 'eligible',
+              requires_confirmation: true,
+            },
     };
   };
 
@@ -455,7 +632,7 @@ export async function installPlatformApi(
             actual_weight: setValues.actualWeight,
             rir: null,
             set_kind: 'working',
-            reached_failure: false,
+            reached_failure: setValues.completed ? false : null,
             is_completed: setValues.completed,
             version: setVersion,
           },
@@ -526,6 +703,7 @@ export async function installPlatformApi(
     return value.toISOString().slice(0, 10);
   };
   const programHistory = options.programHistory ?? null;
+  const aiAdaptation = options.aiAdaptation ?? 'disabled';
   const archivedBlock = {
     id: 300,
     user_program_id: 77,
@@ -818,32 +996,34 @@ export async function installPlatformApi(
     period_start: today,
     period_end: today,
     training: {
-      planned_workouts: 1,
-      completed_workouts: workoutStatus === 'completed' ? 1 : 0,
+      planned_workouts: options.progressState === 'sparse' ? 0 : 1,
+      completed_workouts:
+        options.progressState === 'sparse' ? 0 : workoutStatus === 'completed' ? 1 : 0,
       skipped_workouts: 0,
       frequency_per_week: 0,
       volume_kg: 0,
       new_personal_records: 0,
-      last_completed_workout_on: workoutStatus === 'completed' ? today : null,
+      last_completed_workout_on:
+        options.progressState === 'sparse' || workoutStatus !== 'completed' ? null : today,
       next_workout: null,
     },
     nutrition: {
       visible: true,
-      logged_days: nutritionEntries.length ? 1 : 0,
-      complete_days: 0,
+      logged_days: options.progressState === 'populated' ? 1 : nutritionEntries.length ? 1 : 0,
+      complete_days: options.progressState === 'populated' ? 1 : 0,
       incomplete_days: nutritionEntries.length ? 1 : 0,
       fasted_days: 0,
-      unlogged_days: nutritionEntries.length ? 28 : 29,
+      unlogged_days: options.progressState === 'populated' ? 0 : nutritionEntries.length ? 28 : 29,
       adherence_evaluated_days: 0,
-      average_calories: null,
+      average_calories: options.progressState === 'populated' ? 1980 : null,
       target_calories: 2100,
       average_protein_g: null,
       target_protein_g: 140,
       target_effective_on: today,
     },
     body: {
-      latest_measurement: measurements[0] ?? null,
-      trends: measurementTrends(periodDays),
+      latest_measurement: options.progressState === 'sparse' ? null : (measurements[0] ?? null),
+      trends: options.progressState === 'sparse' ? [] : measurementTrends(periodDays),
       priority: { mode: 'balanced', muscle_group_ids: [] },
       guidance: {
         comparison_basis: 'self',
@@ -1173,6 +1353,128 @@ export async function installPlatformApi(
     if (path.endsWith('/auth/dev-login')) {
       return route.fulfill({ json: { access_token: 'dev-test-token', token_type: 'bearer' } });
     }
+    if (path.endsWith('/public/articles') && request.method() === 'GET') {
+      return route.fulfill({ json: [] });
+    }
+    if (
+      path.endsWith('/nutrition/diary/suggestions') &&
+      request.method() === 'GET' &&
+      nutritionSuggestions === undefined
+    ) {
+      return route.fulfill({
+        status: 503,
+        json: { detail: 'Not available in platform smoke: /api/v1/nutrition/diary/suggestions' },
+      });
+    }
+    if (
+      path.endsWith('/nutrition/diary/suggestions') &&
+      request.method() === 'GET' &&
+      nutritionSuggestions === 'empty'
+    ) {
+      return route.fulfill({
+        json: {
+          mode: 'deterministic',
+          diary_date: url.searchParams.get('diary_date') ?? today,
+          targets: null,
+          remaining: null,
+          remaining_confidence: null,
+          limitations: [],
+          max_candidates: 0,
+          candidates: [],
+        },
+      });
+    }
+    if (path.endsWith('/ai-coach/status')) {
+      return route.fulfill({
+        json:
+          aiAdaptation === 'available'
+            ? { ui_enabled: true, generic_available: true, personal_available: true }
+            : { ui_enabled: false, generic_available: false, personal_available: false },
+      });
+    }
+    if (aiAdaptation === 'available' && path.endsWith('/ai-coach/consent')) {
+      return route.fulfill({
+        json: {
+          status: 'granted',
+          scope: 'personal_ai_coach',
+          consent_version: 'v1',
+          categories: ['workout'],
+          purpose: 'bounded adaptation',
+          provider_name: 'controlled provider',
+          provider_policy_revision: 'v1',
+          retention_notice: 'short lived',
+          consent_source: 'settings',
+          granted_at: '2026-09-30T10:00:00Z',
+          revoked_at: null,
+        },
+      });
+    }
+    if (
+      aiAdaptation === 'available' &&
+      request.method() === 'POST' &&
+      path.endsWith('/ai-coach/adaptations/proposals')
+    ) {
+      return route.fulfill({
+        json: {
+          outcome: 'answer',
+          proposal: {
+            proposal_id: 'task-509-proposal',
+            proposal_type: 'volume_or_frequency_adjustment',
+            target_program_id: 77,
+            target_revision_id: 14,
+            target_revision_number: currentRevisionNumber,
+            target_block_id: 302,
+            target_exercise_id: 11,
+            explanation:
+              'Текущая прогрессия допускает аккуратное снижение объёма на ближайшей тренировке.',
+            suggested_change: {
+              operation: 'update_prescription',
+              replacement_candidate_ref: null,
+              prescribed_sets: 3,
+              prescribed_reps: '8–10',
+              rest_seconds: 90,
+              effective_scope: 'next_workout',
+            },
+            evidence_ids: ['evidence:progression', 'evidence:revision'],
+            deterministic_rule_relationship: 'supports_deterministic_rule',
+            limitations: ['Подтверждение пользователя обязательно.'],
+            requires_confirmation: true,
+          },
+          proposal_token: 'task-509-proposal-token',
+          limitations: [],
+          safety_category: 'clear',
+          prompt_version: 'ai-coach-adaptation-v1',
+          schema_version: 'ai-coach-adaptation-output-v1',
+          policy_version: 'ai-coach-adaptation-policy-v1',
+          request_id: 'task-509-request',
+          quota: null,
+        },
+      });
+    }
+    if (
+      aiAdaptation === 'available' &&
+      request.method() === 'POST' &&
+      path.endsWith('/ai-coach/adaptations/proposals/task-509-proposal/review')
+    ) {
+      const body = request.postDataJSON() as { decision?: string; proposal_id?: string };
+      const decision = body.decision === 'confirm' ? 'confirm' : 'reject';
+      return route.fulfill({
+        json: {
+          outcome: 'answer',
+          proposal_id: body.proposal_id ?? 'task-509-proposal',
+          decision,
+          applied: decision === 'confirm',
+          idempotent: false,
+          current_revision_number:
+            decision === 'confirm' ? currentRevisionNumber + 1 : currentRevisionNumber,
+          limitations: [],
+          quota: null,
+        },
+      });
+    }
+    if (path.endsWith('/me/acquisition') && request.method() === 'POST') {
+      return route.fulfill({ status: 204 });
+    }
     if (path.endsWith('/me/trainer-capability')) {
       if (request.method() === 'POST') {
         trainerActivationCalls += 1;
@@ -1302,6 +1604,43 @@ export async function installPlatformApi(
       });
     }
     if (path.endsWith('/coach/assigned-programs')) return route.fulfill({ json: [] });
+    if (path.endsWith('/coach/capacity'))
+      return route.fulfill({
+        json: {
+          active_client_count: 1,
+          pending_invite_count: 0,
+          open_task_count: 0,
+          attention_item_count: 0,
+          attention_client_count: 0,
+          attention_items_returned: 0,
+          attention_items_truncated: false,
+          clients_with_active_program_count: 0,
+          roster_coverage_percent: 0,
+          capacity_band: '0_9',
+          next_capacity_boundary: 10,
+          scale_boundaries: [10, 30, 100],
+          bottlenecks: [],
+          generated_at: '2026-08-20T10:00:00Z',
+        },
+      });
+    if (path.endsWith('/coach/inbox'))
+      return route.fulfill({
+        json: {
+          date: today,
+          timezone: 'Europe/Moscow',
+          items: [],
+          total: 0,
+          counts: {
+            attention: 0,
+            pending_reviews: 0,
+            tasks: 0,
+            sessions: 0,
+            packages: 0,
+            payments: 0,
+          },
+          generated_at: `${today}T10:00:00Z`,
+        },
+      });
     if (path.endsWith('/coach/client-summaries')) {
       return route.fulfill({ json: { items: [], total: 0, limit: 100, offset: 0 } });
     }
@@ -1325,8 +1664,71 @@ export async function installPlatformApi(
     if (programHistory && path.endsWith('/programs/templates/hidden')) {
       return route.fulfill({ json: [] });
     }
+    if (programHistory && path.endsWith('/programs/assigned/77/lifecycle')) {
+      return route.fulfill({
+        json: {
+          program_id: 77,
+          status: 'active',
+          is_active: true,
+          start_date: shiftedDay(-42),
+          duration_weeks: 10,
+          current_revision_number: currentRevisionNumber,
+          current_week_number: 3,
+          current_block: {
+            id: 302,
+            title: 'Рабочий объём',
+            start_date: shiftedDay(0),
+            end_date: shiftedDay(6),
+            week_start: 3,
+            week_end: 3,
+            is_deload: false,
+            status: 'active',
+          },
+          next_block: {
+            id: 303,
+            title: plannedBlock.title,
+            start_date: plannedBlock.start_date,
+            end_date: plannedBlock.end_date,
+            week_start: 4,
+            week_end: 4,
+            is_deload: true,
+            status: 'planned',
+          },
+          next_workout: {
+            id: 943,
+            scheduled_date: today,
+            week_number: 3,
+            day_number: 2,
+            title: 'Контекст версии',
+            status: 'planned',
+          },
+          next_deload: {
+            id: 303,
+            title: plannedBlock.title,
+            start_date: plannedBlock.start_date,
+            end_date: plannedBlock.end_date,
+            week_start: 4,
+            week_end: 4,
+            is_deload: true,
+            status: 'planned',
+          },
+          restarted_from_program_id: null,
+        },
+      });
+    }
     if (programHistory && path.endsWith('/programs/assigned/77/blocks')) {
       return route.fulfill({ json: programBlocks });
+    }
+    if (programHistory && path.endsWith('/programs/assigned/77/progression-proposals')) {
+      return route.fulfill({
+        json: {
+          target_program_id: 77,
+          target_revision_number: currentRevisionNumber,
+          target_workout_id: 943,
+          scheduled_date: today,
+          exercises: [],
+        },
+      });
     }
     if (programHistory && path.endsWith('/programs/assigned/77/revisions')) {
       return route.fulfill({ json: programRevisions });
@@ -1373,6 +1775,17 @@ export async function installPlatformApi(
     }
     if (path.endsWith('/workouts/schedule')) {
       return route.fulfill({ json: contextIsCompleted ? [] : [contextWorkout] });
+    }
+    if (path.endsWith('/workouts/recovery')) {
+      return route.fulfill({
+        json: {
+          status: activeProgram ? 'clear' : 'no_active_program',
+          missed_workouts: [],
+          next_workout: activeProgram && workoutStatus !== 'none' ? workout() : null,
+          paused_program_id: null,
+          paused_program_title: null,
+        },
+      });
     }
     if (path.endsWith('/workouts/history')) {
       return route.fulfill({
@@ -1798,6 +2211,9 @@ export async function installPlatformApi(
           workout_reminders_enabled: true,
           weekly_check_in_reminders_enabled: true,
           measurement_reminders_enabled: false,
+          meal_reminders_enabled: false,
+          hydration_reminders_enabled: false,
+          movement_reminders_enabled: false,
           telegram_enabled: true,
           telegram_linked: linked,
           reminder_hour: 9,
@@ -1805,6 +2221,25 @@ export async function installPlatformApi(
           quiet_hours_end: '08:00:00',
         },
       });
+    }
+    if (path.endsWith('/notifications/templates')) {
+      const linked = options.notificationState !== 'unlinked';
+      return route.fulfill({
+        json: contextualReminderTemplates.map((template) => ({
+          ...template,
+          telegram_linked: linked,
+          channel_note: linked
+            ? template.channel_note
+            : 'В приложении доступно всегда; Telegram появится после связывания аккаунта.',
+        })),
+      });
+    }
+    if (/\/notifications\/templates\/(meal_logging|hydration|movement_break)$/.test(path)) {
+      const templateKey = path.split('/').pop();
+      const template = contextualReminderTemplates.find(
+        (item) => item.template_key === templateKey,
+      );
+      return route.fulfill({ json: { ...template, ...request.postDataJSON() } });
     }
     if (path.endsWith('/notifications/read-all')) {
       notificationsRead = true;
@@ -1913,6 +2348,8 @@ export async function installPlatformApi(
     }
     if (path.endsWith('/nutrition/diary') && request.method() === 'GET') {
       const totals = nutritionTotals();
+      const repeatCandidateDate = new Date(todayDate);
+      repeatCandidateDate.setUTCDate(todayDate.getUTCDate() - 1);
       return route.fulfill({
         json: {
           diary_date: url.searchParams.get('diary_date') || today,
@@ -1938,11 +2375,34 @@ export async function installPlatformApi(
           },
           status: nutritionEntries.length ? 'incomplete' : 'unlogged',
           status_is_explicit: false,
+          ...(options.nutritionRepeatCandidate
+            ? {
+                repeat_candidate: {
+                  source_date: repeatCandidateDate.toISOString().slice(0, 10),
+                  source_meal_type: 'breakfast',
+                  entry_count: 1,
+                },
+              }
+            : {}),
         },
       });
     }
     if (path.endsWith('/nutrition/foods/recent') || path.endsWith('/nutrition/foods/favorites')) {
       return route.fulfill({ json: { items: [oatmeal], total: 1, limit: 12, offset: 0 } });
+    }
+    if (path.endsWith('/nutrition/foods/search') && request.method() === 'GET') {
+      const includeExternal = url.searchParams.get('include_external') === 'true';
+      const items = !includeExternal && url.searchParams.get('q') === 'овсянка' ? [oatmeal] : [];
+      return route.fulfill({
+        json: {
+          items,
+          external_items: [],
+          total: items.length,
+          limit: Number(url.searchParams.get('limit')) || 20,
+          offset: Number(url.searchParams.get('offset')) || 0,
+          provider_status: includeExternal ? 'available' : 'not_requested',
+        },
+      });
     }
     if (path.endsWith('/nutrition/foods/barcode/3017620422003')) {
       return route.fulfill({
@@ -2006,6 +2466,24 @@ export async function installPlatformApi(
       };
       nutritionEntries = [...nutritionEntries, entry];
       return route.fulfill({ status: 201, json: entry });
+    }
+    if (path.endsWith('/nutrition/diary/copy/product/preview') && request.method() === 'POST') {
+      const source = nutritionEntries.find(
+        (entry) => entry.id === request.postDataJSON().source_entry_id,
+      );
+      if (!source) return route.fulfill({ status: 404, json: { detail: 'Entry not found' } });
+      return route.fulfill({
+        json: {
+          copy_scope: 'product',
+          source_date: source.diary_date,
+          source_meal_type: source.meal_type,
+          target_date: request.postDataJSON().target_date,
+          target_meal_type: request.postDataJSON().target_meal_type,
+          entries: [source],
+          preview_token: 'platform-preview-token-1234567890',
+          previewed_at: `${today}T08:00:00Z`,
+        },
+      });
     }
     if (path.endsWith('/nutrition/diary/copy/product') && request.method() === 'POST') {
       const source = nutritionEntries.find(

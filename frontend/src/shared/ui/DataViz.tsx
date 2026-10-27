@@ -2,6 +2,7 @@ import { useId, useMemo, useState, type CSSProperties, type KeyboardEvent } from
 import { Icon } from './Icon';
 import { useSemanticMotion } from './useSemanticMotion';
 import '../../styles/data-viz.css';
+export { TaskProgress } from './TaskProgress';
 
 export interface TimeSeriesPoint {
   href?: string;
@@ -25,6 +26,7 @@ export interface TimeSeriesChartProps {
   targetLabel?: string;
   tableCaption?: string;
   unit: string;
+  valueFractionDigits?: number;
   valueLabel?: string;
 }
 
@@ -155,6 +157,7 @@ export function TimeSeriesChart({
   targetLabel = 'Цель',
   tableCaption,
   unit,
+  valueFractionDigits = 1,
   valueLabel = 'Факт',
 }: TimeSeriesChartProps) {
   const titleId = useId();
@@ -284,7 +287,7 @@ export function TimeSeriesChart({
         {points
           .map(
             (point) =>
-              `${point.label}: ${point.value == null ? 'нет значения' : `${formatValue(point.value)} ${unit}`}${point.target == null ? '' : `, цель ${formatValue(point.target)} ${unit}`}`,
+              `${point.label}: ${point.value == null ? 'нет значения' : `${formatValue(point.value, valueFractionDigits)} ${unit}`}${point.target == null ? '' : `, цель ${formatValue(point.target, valueFractionDigits)} ${unit}`}`,
           )
           .join('. ')}
       </p>
@@ -437,11 +440,12 @@ export function TimeSeriesChart({
           <strong>
             {selectedPoint.value == null
               ? 'Нет данных'
-              : `${formatValue(selectedPoint.value)} ${unit}`}
+              : `${formatValue(selectedPoint.value, valueFractionDigits)} ${unit}`}
           </strong>
           {selectedPoint.target != null && (
             <span>
-              {targetLabel.toLowerCase()} {formatValue(selectedPoint.target)} {unit}
+              {targetLabel.toLowerCase()} {formatValue(selectedPoint.target, valueFractionDigits)}{' '}
+              {unit}
             </span>
           )}
           {selectedPoint.href && (
@@ -468,10 +472,14 @@ export function TimeSeriesChart({
               <tr key={point.key}>
                 <th scope="row">{point.label}</th>
                 <td>
-                  {point.value == null ? 'Нет данных' : `${formatValue(point.value)} ${unit}`}
+                  {point.value == null
+                    ? 'Нет данных'
+                    : `${formatValue(point.value, valueFractionDigits)} ${unit}`}
                 </td>
                 <td>
-                  {point.target == null ? 'Не задана' : `${formatValue(point.target)} ${unit}`}
+                  {point.target == null
+                    ? 'Не задана'
+                    : `${formatValue(point.target, valueFractionDigits)} ${unit}`}
                 </td>
                 <td>{point.status ?? 'Подтверждено'}</td>
               </tr>
@@ -524,48 +532,6 @@ export function QuantitativeProgress({
       >
         <span style={{ width: `${percent}%` }} />
         <i style={{ insetInlineStart: `${percent}%` }} />
-      </div>
-    </div>
-  );
-}
-
-export function TaskProgress({
-  completed,
-  label,
-  total,
-}: {
-  completed: number;
-  label: string;
-  total: number;
-}) {
-  const safeTotal = Math.max(total, 1);
-  const motion = useSemanticMotion<HTMLDivElement>(`${label}|${safeTotal}|${completed}`, {
-    animateInitial: false,
-  });
-  return (
-    <div
-      className="data-viz-progress"
-      id={motion.elementId}
-      data-motion-phase={motion.motionPhase}
-      data-motion-revision={motion.motionRevision}
-      data-progress-kind="task"
-      onAnimationEnd={motion.onMotionAnimationEnd}
-    >
-      <div className="data-viz-progress__label">
-        <span>{label}</span>
-        <strong>
-          {completed} из {total}
-        </strong>
-      </div>
-      <div
-        aria-label={`${label}: ${completed} из ${total}`}
-        aria-valuemax={safeTotal}
-        aria-valuemin={0}
-        aria-valuenow={clamp(completed, 0, safeTotal)}
-        className="data-viz-progress__track"
-        role="progressbar"
-      >
-        <span style={{ width: `${clamp((completed / safeTotal) * 100, 0, 100)}%` }} />
       </div>
     </div>
   );

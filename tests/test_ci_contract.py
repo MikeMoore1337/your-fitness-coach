@@ -1,0 +1,803 @@
+import tomllib
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from scripts import ci_contract, local_checks
+
+
+def test_ci_contract_is_valid_and_profiles_are_non_empty() -> None:
+    ci_contract.validate_contract()
+    assert ci_contract.contract_digest()
+    assert all(ci_contract.PROFILE_GROUPS.values())
+
+
+def test_profiles_reference_shared_command_groups() -> None:
+    for groups in ci_contract.PROFILE_GROUPS.values():
+        assert set(groups) <= set(ci_contract.COMMAND_GROUPS)
+
+
+def test_commands_are_stable_and_have_unique_names() -> None:
+    for spec in ci_contract.COMMAND_GROUPS.values():
+        assert len({command.name for command in spec.commands}) == len(spec.commands)
+        assert all(command.argv for command in spec.commands)
+
+
+def test_contract_digest_changes_when_contract_changes(monkeypatch) -> None:
+    original_digest = ci_contract.contract_digest()
+    original = ci_contract.COMMAND_GROUPS["quality"]
+    monkeypatch.setitem(
+        ci_contract.COMMAND_GROUPS,
+        "quality",
+        ci_contract.GroupSpec(
+            name=original.name,
+            commands=(*original.commands, ci_contract.CommandSpec("sentinel", ("true",))),
+            prerequisites=original.prerequisites,
+        ),
+    )
+    assert ci_contract.contract_digest() != original_digest
+
+
+def test_uv_is_treated_as_an_executable_prerequisite(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        ci_contract.shutil,
+        "which",
+        lambda executable: "/usr/bin/uv" if executable == "uv" else None,
+    )
+
+    assert ci_contract._check_prerequisite(tmp_path, "uv", {}) is None
+
+
+def test_shards_parse_and_select_deterministically() -> None:
+    assert ci_contract.parse_shard("1/4") == (0, 4)
+    assert ci_contract.parse_shard("4/4") == (3, 4)
+    nodes = tuple(f"test_{index}" for index in range(8))
+    assert ci_contract.select_shard(nodes, shard_index=0, shard_count=4) == (
+        "test_0",
+        "test_4",
+    )
+    assert ci_contract.select_shard(nodes, shard_index=3, shard_count=4) == (
+        "test_3",
+        "test_7",
+    )
+    with pytest.raises(ci_contract.CIContractError):
+        ci_contract.parse_shard("5/4")
+
+
+def test_python_node_normalization_preserves_escaped_parameter_ids() -> None:
+    assert (
+        ci_contract._normalize_python_test_node(
+            r"backend\tests\test_app.py::test_public_content[\u041e]"
+        )
+        == r"backend/tests/test_app.py::test_public_content[\u041e]"
+    )
+
+
+def test_frontend_e2e_shard_is_forwarded_to_playwright(monkeypatch, tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        ci_contract,
+        "missing_prerequisites",
+        lambda group, *, root, env: [],
+    )
+
+    def fake_run(argv, **kwargs):
+        del kwargs
+        calls.append(list(argv))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(ci_contract.subprocess, "run", fake_run)
+    ci_contract.run_group("frontend-e2e", root=tmp_path, env={}, shard="2/4")
+
+    assert calls[0][-2:] == ["--", "--shard=2/4"]
+
+
+def test_python_shard_collects_and_runs_only_its_node_ids(monkeypatch, tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        ci_contract,
+        "missing_prerequisites",
+        lambda group, *, root, env: [],
+    )
+    collected = "\n".join(
+        [
+            "backend/tests/test_a.py::test_a",
+            "backend/tests/test_b.py::test_b",
+            "bot/tests/test_c.py::test_c",
+            "bot/tests/test_d.py::test_d",
+            "backend/tests/test_e.py::test_e",
+            "bot/tests/test_f.py::test_f",
+        ]
+    )
+
+    def fake_run(argv, **kwargs):
+        calls.append(list(argv))
+        if "--collect-only" in argv:
+            return SimpleNamespace(returncode=0, stdout=collected, stderr="")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(ci_contract.subprocess, "run", fake_run)
+    ci_contract.run_group(
+        "python-tests",
+        root=tmp_path,
+        env={"TEST_DATABASE_URL": "postgresql://test"},
+        shard="2/4",
+    )
+
+    assert len(calls) == 2  # uv lock + one pytest invocation, no collect-only subprocess.
+    assert "--collect-only" not in calls[1]
+    assert calls[1][2:6] == [
+        "backend/tests",
+        "bot/tests",
+        "tests/test_backup_manifest.py",
+        "tests/test_db_maintenance.py",
+    ]
+    assert calls[1][-4:] == ["-p", "scripts.pytest_shard", "--yfc-shard", "2/4"]
+
+
+def test_local_sqlite_python_checks_use_one_windows_worker(monkeypatch) -> None:
+    command = ci_contract.COMMAND_GROUPS["python-tests"].commands[1]
+    monkeypatch.setattr(ci_contract.os, "name", "nt")
+
+    local = ci_contract._local_command(
+        command,
+        group="python-tests",
+        env={"TEST_DATABASE_URL": "sqlite:///test.db"},
+    )
+    ci = ci_contract._local_command(
+        command,
+        group="python-tests",
+        env={"TEST_DATABASE_URL": "postgresql://test"},
+    )
+
+    assert local.argv[local.argv.index("-n") + 1] == "1"
+    assert ci == command
+
+
+def test_windows_node_commands_use_cmd_wrappers(monkeypatch) -> None:
+    monkeypatch.setattr(ci_contract.os, "name", "nt")
+    assert ci_contract._resolve_argv(("npm", "run", "test"))[0] == "npm.cmd"
+    assert ci_contract._resolve_argv(("npx", "vite", "build"))[0] == "npx.cmd"
+
+
+def test_migrations_use_the_selected_python_interpreter() -> None:
+    commands = ci_contract.COMMAND_GROUPS["migrated-stack"].commands
+    assert commands[0].argv[:3] == ("python", "-m", "alembic")
+    assert commands[1].argv[:3] == ("python", "-m", "alembic")
+
+
+def test_cross_browser_group_migrates_database_for_ready_backend() -> None:
+    spec = ci_contract.COMMAND_GROUPS["frontend-cross-browser"]
+    assert spec.commands[0].argv == ("python", "-m", "alembic", "upgrade", "head")
+    assert spec.commands[1].argv == ("python", "scripts/run_cross_browser_regression.py")
+    assert spec.commands[1].cwd == "."
+    assert {"python", "alembic", "DATABASE_URL"} <= set(spec.prerequisites)
+
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    job = workflow.split("  frontend-cross-browser:\n", maxsplit=1)[1].split(
+        "  python-tests:\n", maxsplit=1
+    )[0]
+    assert "postgres:" in job
+    assert 'PW_API_SERVER: "true"' in job
+    assert "timeout-minutes: 60" in job
+
+
+def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    for group in (
+        "quality",
+        "policy",
+        "external-skill-security",
+        "frontend-checks",
+        "frontend-e2e",
+        "frontend-mobile-regression",
+        "frontend-mobile-regression-extended",
+        "frontend-cross-browser",
+        "python-tests",
+        "migrated-stack",
+        "dependency-audit",
+        "frontend-dependency-audit",
+        "python-dependency-audit",
+        "critical-smoke",
+        "workflow-config",
+        "image-contract",
+        "deployment-contract",
+        "container-contract",
+    ):
+        assert f"scripts/ci_contract.py run-group {group}" in workflow
+    assert "npm run typecheck" not in workflow
+    assert "npm run e2e:ci" not in workflow
+    assert "scripts/run_pytest.py backend/tests" not in workflow
+
+
+def test_pr_ci_requires_free_deterministic_security_audit_without_llm_api() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    required = ci_contract.expected_jobs_for_groups(
+        ci_contract.PROFILE_GROUPS["frontend"], event="pull_request"
+    )
+    assert "task-provenance" not in required
+    assert "codeql-security" in required
+    assert "security-audit" in required
+    assert "dependency-audit" in required
+    assert "review-contract" not in required
+    assert "pull_request_review:" not in workflow
+    assert "review-contract:" not in workflow
+    assert 'validate-pr-review --event "$GITHUB_EVENT_PATH"' not in workflow
+    assert "github/codeql-action/init@v4" in workflow
+    assert "github/codeql-action/analyze@v4" in workflow
+    assert "python3 scripts/codeql_sarif_gate.py" in workflow
+    assert "queries: security-extended" in workflow
+    assert "python scripts/ci_contract.py run-group dependency-audit" in workflow
+    assert "scanners: vuln,misconfig,secret" in workflow
+    assert "CODEQL_SECURITY_RESULT: ${{ needs.codeql-security.result }}" in workflow
+    assert "SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}" in workflow
+    assert "openai/codex-action" not in workflow
+    assert "OPENAI_API_KEY" not in workflow
+
+
+def test_pr_dependency_audit_has_one_owner_and_keeps_trivy_security_gate() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    dependency_job = workflow.split("  dependency-audit:\n", maxsplit=1)[1].split(
+        "  critical-smoke:\n", maxsplit=1
+    )[0]
+    security_job = workflow.split("  security-audit:\n", maxsplit=1)[1].split(
+        "  checks:\n", maxsplit=1
+    )[0]
+
+    assert "needs: scope-router" in dependency_job
+    assert "needs.quality" not in dependency_job
+    assert dependency_job.count("run-group dependency-audit") == 1
+    assert "run-group dependency-audit" not in security_job
+    assert "actions/setup-node@v4" not in security_job
+    assert "actions/setup-python@v5" not in security_job
+    assert "astral-sh/setup-uv@" not in security_job
+    assert "aquasecurity/trivy-action@" in security_job
+    assert "scanners: vuln,misconfig,secret" in security_job
+
+
+def test_all_pr_profiles_require_dependency_audit_once() -> None:
+    profiles = (
+        "frontend",
+        "backend",
+        "migration",
+        "cross-stack",
+        "workflow-platform",
+        "documentation",
+    )
+
+    for profile in profiles:
+        groups = ci_contract.PROFILE_GROUPS[profile]
+        assert "dependency-audit" in groups
+        expected = ci_contract.expected_jobs_for_groups(groups, event="pull_request")
+        assert expected.count("dependency-audit") == 1
+        assert "security-audit" in expected
+
+
+def test_workflow_uses_lockfile_download_cache_without_audit_installation() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    audit_start = workflow.index("  dependency-audit:")
+    audit_end = workflow.index("  critical-smoke:", audit_start)
+    audit_job = workflow[audit_start:audit_end]
+
+    assert "NPM_CONFIG_CACHE" not in workflow
+    assert "cache: npm" in workflow
+    assert "cache-dependency-path: frontend/package-lock.json" in workflow
+    assert "node_modules" not in audit_job
+    assert "npm ci" not in audit_job
+    assert "run-group frontend-dependency-audit" in audit_job
+
+
+def test_allure_dependencies_are_scheduled_only() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    package = (root / "frontend" / "package.json").read_text(encoding="utf-8")
+    scheduled_package = (root / "frontend" / "scheduled-report" / "package.json").read_text(
+        encoding="utf-8"
+    )
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    development_dependencies = project["dependency-groups"]["dev"]
+    scheduled_dependencies = project["dependency-groups"]["scheduled-report"]
+
+    assert '"allure-vitest"' not in package
+    assert '"allure-playwright"' not in package
+    assert '"allure-commandline"' not in package
+    assert not any(item.startswith("allure-pytest") for item in development_dependencies)
+    assert '"allure-vitest": "3.12.0"' in scheduled_package
+    assert '"allure-playwright": "3.12.0"' in scheduled_package
+    assert '"allure-commandline": "2.43.0"' in scheduled_package
+    assert "allure-pytest==2.16.0" in scheduled_dependencies
+    assert workflow.count("npm ci --prefix scheduled-report") == 7
+    assert workflow.count("--omit=peer") == 7
+    assert workflow.count("--group scheduled-report") == 2
+    assert "./scheduled-report/node_modules/.bin/allure generate" in workflow
+    assert "python scripts/publish_allure_report.py publish" in workflow
+    assert "ALLURE_REPORT_SSH_PRIVATE_KEY" in workflow
+    assert "ALLURE_REPORT_SSH_KNOWN_HOSTS" in workflow
+    assert "ALLURE_R2" not in workflow
+    assert "allure-report-worker" not in workflow
+    python_job_start = workflow.index("  python-tests:")
+    python_steps_start = workflow.index("    steps:", python_job_start)
+    assert "ALLURE_RESULTS_DIR:" in workflow[python_job_start:python_steps_start]
+
+
+def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert "name: Frontend smoke (${{ matrix.shard }}/5)" in workflow
+    assert "name: Python tests (${{ matrix.shard }}/5)" in workflow
+    assert workflow.count("        shard: [1, 2, 3, 4, 5]") == 2
+    assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/5"' in workflow
+    assert 'run-group python-tests --shard "${{ matrix.shard }}/5"' in workflow
+    assert "name: Frontend (${{ matrix.lane }})" in workflow
+    assert "        lane: [checks, unit]" in workflow
+    assert "run-group frontend-checks" in workflow
+    assert "run-group frontend-unit" in workflow
+    assert workflow.count("          path: ~/.cache/ms-playwright") == 5
+    assert (
+        workflow.count(
+            "          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
+        )
+        == 2
+    )
+    assert (
+        "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/5)\n    needs: scope-router\n    if:"
+        in workflow
+    )
+    assert (
+        "  migrated-stack:\n    name: Migrated PostgreSQL stack\n    needs: scope-router\n    if:"
+        in workflow
+    )
+    assert "run-group frontend-mobile-regression" in workflow
+    assert "run-group frontend-mobile-regression-extended" in workflow
+    assert "run-group frontend-cross-browser" in workflow
+    assert 'cron: "17 2 * * *"' in workflow
+    assert 'cron: "43 3 * * 0"' in workflow
+    assert "run_kind:" in workflow
+    assert (
+        "playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
+        in workflow
+    )
+
+
+def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None:
+    payload = ci_contract.contract_payload()
+
+    assert payload["sharding"]["frontend-e2e"] == {
+        "count": ci_contract.FRONTEND_E2E_SHARD_COUNT,
+        "strategy": "playwright",
+    }
+    assert payload["sharding"]["python-tests"] == {
+        "count": ci_contract.PYTHON_TEST_SHARD_COUNT,
+        "strategy": "pytest-node-round-robin",
+    }
+    assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 5
+    assert ci_contract.PYTHON_TEST_SHARD_COUNT == 5
+
+
+def test_cross_stack_profile_includes_delivery_policy_gates() -> None:
+    groups = set(ci_contract.PROFILE_GROUPS["cross-stack"])
+    assert {"policy", "workflow-config", "deployment-contract"} <= groups
+    assert "frontend-mobile-regression" in groups
+    assert "frontend-mobile-regression-extended" not in groups
+
+
+def test_policy_group_executes_ci_timing_regressions() -> None:
+    policy_commands = ci_contract.COMMAND_GROUPS["policy"].commands
+    policy_argv = {argument for command in policy_commands for argument in command.argv}
+
+    assert "tests/test_ci_timing.py" in policy_argv
+
+
+def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
+    daily = set(ci_contract.PROFILE_GROUPS["daily-regression"])
+    weekly = set(ci_contract.PROFILE_GROUPS["weekly-exhaustive"])
+
+    assert set(ci_contract.PROFILE_GROUPS["cross-stack"]) - daily
+    assert daily < weekly
+    assert {"frontend-mobile-regression-extended", "frontend-cross-browser"} <= weekly
+
+
+@pytest.mark.parametrize(
+    ("paths", "profile", "required_groups", "forbidden_groups"),
+    [
+        (
+            ["docs/release-flow.md", "codex-backlog/tasks/140-scope.md"],
+            "documentation",
+            {"quality", "workflow-config", "dependency-audit"},
+            {
+                "frontend-e2e",
+                "python-tests",
+                "migrated-stack",
+                "container-contract",
+            },
+        ),
+        (
+            ["security/README.md"],
+            "documentation",
+            {"quality", "workflow-config", "dependency-audit"},
+            {"container-contract", "frontend-e2e", "python-tests"},
+        ),
+        (
+            ["frontend/src/App.tsx"],
+            "frontend",
+            {
+                "frontend-checks",
+                "frontend-unit",
+                "frontend-e2e",
+                "critical-smoke",
+                "dependency-audit",
+            },
+            {"python-tests", "migrated-stack", "container-contract"},
+        ),
+        (
+            ["backend/fitminiapp_api/services/example.py"],
+            "backend",
+            {"python-tests", "critical-smoke", "dependency-audit"},
+            {
+                "frontend-checks",
+                "frontend-unit",
+                "frontend-e2e",
+                "migrated-stack",
+                "container-contract",
+            },
+        ),
+        (
+            ["backend/fitminiapp_api/schemas/example.py"],
+            "cross-stack",
+            {
+                "frontend-e2e",
+                "python-tests",
+                "migrated-stack",
+                "dependency-audit",
+                "container-contract",
+            },
+            set(),
+        ),
+        (
+            ["backend/alembic/versions/0040_feature.py"],
+            "migration",
+            {
+                "python-tests",
+                "migrated-stack",
+                "critical-smoke",
+                "deployment-contract",
+                "dependency-audit",
+            },
+            {"frontend-e2e", "container-contract"},
+        ),
+        (
+            ["frontend/package-lock.json"],
+            "frontend",
+            {"dependency-audit"},
+            {"frontend-dependency-audit", "python-dependency-audit", "container-contract"},
+        ),
+        (
+            ["uv.lock"],
+            "backend",
+            {"dependency-audit", "container-contract"},
+            {"python-dependency-audit", "frontend-e2e", "migrated-stack"},
+        ),
+        (
+            ["pyproject.toml"],
+            "backend",
+            {"dependency-audit", "container-contract"},
+            {"python-dependency-audit", "frontend-e2e", "migrated-stack"},
+        ),
+        (
+            ["scripts/backup_manifest.py", "tests/test_backup_manifest.py"],
+            "cross-stack",
+            {"python-tests", "policy", "workflow-config", "deployment-contract"},
+            set(),
+        ),
+        (
+            [".github/workflows/ci.yml"],
+            "workflow-platform",
+            {
+                "policy",
+                "workflow-config",
+                "image-contract",
+                "deployment-contract",
+                "dependency-audit",
+            },
+            {
+                "frontend-e2e",
+                "python-tests",
+                "migrated-stack",
+                "container-contract",
+            },
+        ),
+        (
+            ["bot/.dockerignore"],
+            "cross-stack",
+            {"container-contract", "frontend-e2e", "python-tests", "migrated-stack"},
+            set(),
+        ),
+        (
+            [".trivyignore.yaml"],
+            "workflow-platform",
+            {"container-contract", "workflow-config", "image-contract", "deployment-contract"},
+            {"frontend-e2e", "python-tests", "migrated-stack"},
+        ),
+        (
+            ["scripts/ci_contract.py"],
+            "cross-stack",
+            {
+                "frontend-e2e",
+                "python-tests",
+                "migrated-stack",
+                "dependency-audit",
+                "container-contract",
+            },
+            set(),
+        ),
+        (
+            ["unknown/build-input.bin"],
+            "cross-stack",
+            {
+                "frontend-e2e",
+                "python-tests",
+                "migrated-stack",
+                "dependency-audit",
+                "container-contract",
+            },
+            set(),
+        ),
+    ],
+)
+def test_scope_router_is_conservative_and_profile_specific(
+    paths: list[str],
+    profile: str,
+    required_groups: set[str],
+    forbidden_groups: set[str],
+) -> None:
+    decision = ci_contract.classify_scope(paths)
+
+    assert decision["profile"] == profile
+    groups = set(decision["required_groups"])
+    assert required_groups <= groups
+    assert not forbidden_groups & groups
+
+
+def test_migrated_stack_browser_spec_routes_to_migration_profile() -> None:
+    decision = ci_contract.classify_scope(["frontend/tests/integration/migrated-stack.spec.ts"])
+
+    assert decision["profile"] == "migration"
+    assert "migrated-stack" in decision["required_groups"]
+    assert decision["outputs"]["run_migrated_stack"] is True
+
+
+def test_migrated_postgres_python_test_routes_to_migration_profile() -> None:
+    decision = ci_contract.classify_scope(["tests/integration/test_migrated_stack.py"])
+
+    assert decision["profile"] == "migration"
+    assert "migrated-stack" in decision["required_groups"]
+    assert decision["outputs"]["run_migrated_stack"] is True
+
+
+def test_python_sharding_script_requires_python_and_policy_gates() -> None:
+    decision = ci_contract.classify_scope(["scripts/pytest_shard.py"])
+
+    assert decision["profile"] == "cross-stack"
+    assert {"python-tests", "policy"} <= set(decision["required_groups"])
+
+
+def test_scope_router_preserves_dot_prefixed_workflow_paths() -> None:
+    decision = ci_contract.classify_scope(["./.github/workflows/ci.yml"])
+
+    assert decision["paths"] == [".github/workflows/ci.yml"]
+    assert decision["profile"] == "workflow-platform"
+
+
+def test_skill_change_adds_skillspector_policy_group_only_when_needed() -> None:
+    skill = ci_contract.classify_scope([".agents/skills/apple-design/SKILL.md"])
+    ordinary = ci_contract.classify_scope(["backend/fitminiapp_api/services/example.py"])
+
+    assert "external-skill-security" in skill["required_groups"]
+    assert skill["outputs"]["run_external_skill_security"] is True
+    assert "policy" in skill["required_jobs"]
+    assert "external-skill-security" not in ordinary["required_groups"]
+    assert ordinary["outputs"]["run_external_skill_security"] is False
+
+
+def test_skill_source_manifest_change_requires_skillspector() -> None:
+    decision = ci_contract.classify_scope([".agents/skills/apple-design/SOURCE.json"])
+
+    assert "external-skill-security" in decision["required_groups"]
+    assert decision["signals"]["external_skill"] is True
+
+
+def test_scope_router_writes_machine_readable_outputs(tmp_path: Path) -> None:
+    destination = tmp_path / "github-output"
+    decision = ci_contract.classify_scope(["frontend/package.json"])
+
+    ci_contract.write_router_outputs(decision, destination)
+
+    output = destination.read_text(encoding="utf-8")
+    assert "profile=frontend" in output
+    assert "run_frontend_dependency_audit=true" in output
+    assert "run_external_skill_security=false" in output
+    assert 'required_jobs=["' in output
+
+
+def test_repository_router_uses_exact_pull_request_diff(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        ci_contract,
+        "_git_changed_paths",
+        lambda root, base_sha, head_sha: ["backend/fitminiapp_api/main.py"],
+    )
+
+    decision = ci_contract.route_repository(
+        tmp_path,
+        event="pull_request",
+        base_sha="base",
+        head_sha="head",
+    )
+
+    assert decision["profile"] == "backend"
+    assert decision["base_sha"] == "base"
+    assert decision["head_sha"] == "head"
+
+
+def test_scheduled_and_manual_routes_resolve_distinct_regression_profiles() -> None:
+    daily = ci_contract.route_repository(Path.cwd(), event="schedule", schedule_cron="17 2 * * *")
+    weekly = ci_contract.route_repository(Path.cwd(), event="schedule", schedule_cron="43 3 * * 0")
+    manual = ci_contract.route_repository(Path.cwd(), event="workflow_dispatch", run_kind="weekly")
+
+    assert daily["profile"] == "daily-regression"
+    assert weekly["profile"] == "weekly-exhaustive"
+    assert manual["profile"] == weekly["profile"]
+    assert daily["outputs"]["run_full_dependency_audit"] is False
+    assert weekly["outputs"]["run_full_dependency_audit"] is True
+    assert daily["outputs"]["run_frontend_mobile_regression_extended"] is False
+    assert weekly["outputs"]["run_frontend_mobile_regression_extended"] is True
+    assert daily["outputs"]["run_scheduled_report"] is True
+
+
+def test_push_route_keeps_container_delivery() -> None:
+    decision = ci_contract.route_repository(Path.cwd(), event="push")
+
+    assert decision["required_jobs"] == ["containers", "scope-router"]
+    assert "run_merge_provenance" not in decision["outputs"]
+    assert decision["outputs"]["run_containers"] is True
+
+
+def test_post_merge_container_gate_allows_intentional_skipped_quality() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    container_start = workflow.index("  containers:")
+    container_end = workflow.index("\n  scheduled-report:", container_start)
+    container_job = workflow[container_start:container_end]
+    audit_start = workflow.index("  dependency-audit:")
+    audit_end = workflow.index("\n  critical-smoke:", audit_start)
+    audit_job = workflow[audit_start:audit_end]
+
+    assert "needs: [scope-router, quality]" in container_job
+    assert "always()" in container_job
+    assert "github.event_name == 'push' && needs.quality.result == 'skipped'" in container_job
+    assert "needs.quality.result == 'success'" in container_job
+    assert "needs: scope-router" in audit_job
+    assert "needs.quality" not in audit_job
+
+    assert "needs.scope-router.outputs.run_containers == 'true'" in container_job
+
+
+def test_expected_result_set_rejects_missing_or_skipped_required_jobs() -> None:
+    expected = ["scope-router", "quality"]
+    ci_contract.verify_results(expected, {"scope-router": "success", "quality": "success"})
+
+    with pytest.raises(ci_contract.CIContractError, match="did not succeed"):
+        ci_contract.verify_results(expected, {"scope-router": "success"})
+    with pytest.raises(ci_contract.CIContractError, match="did not succeed"):
+        ci_contract.verify_results(expected, {"scope-router": "success", "quality": "skipped"})
+    with pytest.raises(ci_contract.CIContractError, match="outside the router result set"):
+        ci_contract.verify_results(
+            expected,
+            {"scope-router": "success", "quality": "success", "policy": "success"},
+        )
+    with pytest.raises(ci_contract.CIContractError, match="Expected CI job set is empty"):
+        ci_contract.verify_results([], {})
+    with pytest.raises(ci_contract.CIContractError, match="must include scope-router"):
+        ci_contract.verify_results(["quality"], {"quality": "success"})
+
+
+def test_transient_dependency_failure_retries_with_bounded_backoff(
+    monkeypatch, tmp_path: Path
+) -> None:
+    calls = 0
+    sleeps: list[int] = []
+    command = ci_contract.CommandSpec(
+        name="audit",
+        argv=("audit",),
+        retry_on_transient=True,
+        retry_max_attempts=2,
+        retry_delays_seconds=(2,),
+    )
+
+    def fake_run(argv, **kwargs):
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(returncode=1, stdout="HTTP 503", stderr="")
+
+    monkeypatch.setattr(ci_contract.subprocess, "run", fake_run)
+    monkeypatch.setattr(ci_contract.time, "sleep", sleeps.append)
+
+    with pytest.raises(ci_contract.CIContractError, match="BLOCKED_INFRASTRUCTURE"):
+        ci_contract._run_command(command, argv=command.argv, cwd=tmp_path, env={}, group="audit")
+
+    assert calls == 2
+    assert sleeps == [2]
+
+
+def test_dependency_vulnerability_failure_is_not_retried(monkeypatch, tmp_path: Path) -> None:
+    calls = 0
+    command = ci_contract.CommandSpec(
+        name="audit",
+        argv=("audit",),
+        retry_on_transient=True,
+        retry_max_attempts=2,
+        retry_delays_seconds=(2,),
+    )
+
+    def fake_run(argv, **kwargs):
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(returncode=1, stdout="high severity vulnerability", stderr="")
+
+    monkeypatch.setattr(ci_contract.subprocess, "run", fake_run)
+
+    with pytest.raises(ci_contract.CIContractError, match="failed at audit"):
+        ci_contract._run_command(command, argv=command.argv, cwd=tmp_path, env={}, group="audit")
+
+    assert calls == 1
+    assert not ci_contract._is_transient_failure("CWE-500: high severity vulnerability")
+    assert not ci_contract._is_transient_failure("npm error CWE-500: high severity vulnerability")
+    assert ci_contract._is_transient_failure("npm error code E503")
+
+
+def test_workflow_routes_scope_cancels_only_pull_request_runs() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+
+    assert "scripts/ci_contract.py route" in workflow
+    assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
+    assert "schedule:" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert 'if [ "$EVENT_NAME" = schedule ]; then' in workflow
+    assert '[ "$TARGET_REF" != refs/heads/master ]' in workflow
+    assert 'elif [ "$EVENT_NAME" = workflow_dispatch ]; then' in workflow
+    assert "refs/heads/master" in workflow
+    assert "refs/heads/task/*" not in workflow
+    assert "refs/heads/recovery/*" not in workflow
+    assert 'test -n "$TARGET_REF"' in workflow
+    assert "group: production" in deploy
+    assert "cancel-in-progress: false" in deploy
+
+
+def test_optional_local_checks_use_ci_groups_without_release_evidence() -> None:
+    for groups in local_checks.FAST_GROUPS_BY_PROFILE.values():
+        assert set(groups) <= set(ci_contract.COMMAND_GROUPS)
+    assert "frontend-e2e" not in local_checks.FAST_GROUPS_BY_PROFILE["frontend"]
+    assert "migrated-stack" not in local_checks.FAST_GROUPS_BY_PROFILE["frontend"]
+    source = Path(__file__).parents[1] / "scripts" / "local_checks.py"
+    source_text = source.read_text(encoding="utf-8")
+    assert "task_session" not in source_text
+    assert "pre_push" not in source_text
+    assert ".artifacts/tasks" not in source_text
+
+
+def test_frontend_performance_budget_is_checked_after_build() -> None:
+    commands = ci_contract.COMMAND_GROUPS["frontend-checks"].commands
+    names = [command.name for command in commands]
+    index = names.index("frontend-build")
+    guard = commands[index + 1]
+    assert guard.name == "frontend-performance"
+    assert guard.cwd == "frontend"
+    assert guard.argv == ("npm", "run", "perf:check")

@@ -1,0 +1,2681 @@
+{
+  "version": "V10-OWNER-APPROVED-895-RELEASE-1",
+  "status": "OWNER_APPROVED_WITH_HISTORICAL_PIXEL_EXCEPTION",
+  "ownerCurrentWipApproval": "APPROVED",
+  "archiveVersion": "LANDING-ARCHIVE-2be733d3",
+  "finalCorrectionVersion": "FINAL-895-FROZEN",
+  "candidateVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+  "pixelPolicy": {
+    "threshold": 0.01,
+    "channelTolerance": 16,
+    "originalsImmutable": true,
+    "noAutomaticBaselineUpdate": true
+  },
+  "matrix": {
+    "audiences": ["athlete", "coach"],
+    "themes": ["light", "dark"],
+    "widths": [1440, 320, 390, 430]
+  },
+  "mandatoryCandidateStates": [
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-full-initial.png",
+        "sha256": "cb924142332fe4b5981e3261add181dc1077e53474a6cd7e6074dbadb5362b15",
+        "dimensions": [1440, 8493]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-cycle.png",
+        "sha256": "a7d0a2aa4c680976c9d8e5c86c6ff0562f2a679d157f57a8f401b8d025c3e2f2",
+        "dimensions": [1440, 278]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-connect-initial.png",
+        "sha256": "2bab06d2f2cc3da7ff294fbca6711a7e94253899cd648f72be0c3d4cea70114d",
+        "dimensions": [1440, 705]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-program-initial.png",
+        "sha256": "d45b550fcd382cf990c742cd1565eea1e8f66f38c16b2259926fb20051dbf3e7",
+        "dimensions": [1440, 715]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-facts-initial.png",
+        "sha256": "c54190516ebb9ebeab75a0dde85d08ffa396141ffde00fecc3a01c792a699a19",
+        "dimensions": [1440, 651]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-review-initial.png",
+        "sha256": "8650da43c4c659d919da08d0155aca21b0c94f22f95a8a229468bd4964135046",
+        "dimensions": [1440, 621]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-decision-initial.png",
+        "sha256": "b44a552d216cf2ac9d5401b85b35ac92de2267e4efaabefc8a9931f774cb52e4",
+        "dimensions": [1440, 552]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-followup-initial.png",
+        "sha256": "7d58a3372983934c792138a771518287d269b920707288325d82cde424c9c23b",
+        "dimensions": [1440, 506]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-connect-accepted.png",
+        "sha256": "2453f3718aac2d0df5ef6cf40c93d30fe395635260a113851ac794dda943c735",
+        "dimensions": [1440, 705]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-program-version-2.png",
+        "sha256": "8da8a8a1606e3fa7345e32cf7bdd844d9e72d4030f13e6cb1855aa5514ec24f4",
+        "dimensions": [1440, 715]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-program-assigned.png",
+        "sha256": "502a17ac0483bed4aadc10297eda675c8a0d3ebc76dab05c7f2fc4813c4b7e23",
+        "dimensions": [1440, 715]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-facts-client-360.png",
+        "sha256": "f608151407fe72dc46a7c951716dd2c7ff905b42693b2cd1d789c9cc378befd8",
+        "dimensions": [1440, 651]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-review-changes.png",
+        "sha256": "b5b43352b9451bb3b4153f1c9586199d81ee759a55fa12d2a546c5963efd7fc4",
+        "dimensions": [1440, 522]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-review-checked.png",
+        "sha256": "26a12c1caecea8ce9379eadd841b05a96ee976970f4e49561ee9dc3e0789bb50",
+        "dimensions": [1440, 522]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-decision-preview-one.png",
+        "sha256": "c64a8b06436aea8a1dba88935fa7a57ef5f2c07e929358de3a5170419b497573",
+        "dimensions": [1440, 660]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-decision-confirmed.png",
+        "sha256": "a3dc8f02b48b01fa4c1e0abb15f395cebe2d24db860cbd9f0714173be45a64af",
+        "dimensions": [1440, 660]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-followup-edited-draft.png",
+        "sha256": "e645f4e32f14258655aa97bc01f90b1ddaf40d001342f4a0674c96098dac2daf",
+        "dimensions": [1440, 570]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-coach-followup-confirmed.png",
+        "sha256": "00d7692e3b8a3c44889a998b5e8808d2a72496072c5567e42419d9cc71904af0",
+        "dimensions": [1440, 570]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 1440,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-1440-full-interacted.png",
+        "sha256": "01baf2f6961ae667d350c6d79bf43eead43f4bd582dfbe2a7e7c5bdf76c8f8d9",
+        "dimensions": [1440, 8566]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-full-initial.png",
+        "sha256": "aa2af62ac29c1fa9f2d7e6aaeb26c8e8ab265e223175f8f7c96d023fc0d00da2",
+        "dimensions": [320, 11875]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-cycle.png",
+        "sha256": "05621ae390aa05c24fcfbcd9d7e9dc2778976f899f5fc25a3bae7cb47d732588",
+        "dimensions": [320, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-connect-initial.png",
+        "sha256": "735cc746081279cdde52e1916fb22d12693cb26382cc494e12ae0c667aa9f5fc",
+        "dimensions": [320, 999]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-program-initial.png",
+        "sha256": "23e5338df79614d0c378a03d12f3c24ca438a5a83e400f817ec626354c467485",
+        "dimensions": [320, 1041]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-facts-initial.png",
+        "sha256": "11f89e7b91f5d85ea6f20a421c055b331c9e7d24e1d2408c233f2b6874bcd8cc",
+        "dimensions": [320, 841]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-review-initial.png",
+        "sha256": "57130d79cdab9856948257baa55c0f4855b8e204350d9d7ff913ee5a68c08dd0",
+        "dimensions": [320, 906]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-decision-initial.png",
+        "sha256": "8f2e89f68a55fdc1363c8beee64415e7bcd86cc431ece32275d7ad9d9bf159c6",
+        "dimensions": [320, 938]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-followup-initial.png",
+        "sha256": "26561bdc7fb7acc2bf4feef5db89fdf73c08738105a46965570b0d7efac567a5",
+        "dimensions": [320, 738]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-connect-accepted.png",
+        "sha256": "385604a6a9922c2ef594428e6fc1996d31f3fe24c7d4178f1a3ee2e57c99f8a3",
+        "dimensions": [320, 999]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-program-version-2.png",
+        "sha256": "9b9c8ea7a1d90f72289295addf2daab4ce6543890e820ca61e58cdf1806fce75",
+        "dimensions": [320, 1041]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-program-assigned.png",
+        "sha256": "7f16af5bd3f3fb3c391ff4784b656d5057c7ec225eec8c3029aca120c3afee00",
+        "dimensions": [320, 1047]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-facts-client-360.png",
+        "sha256": "f03b987cf4fd9d8ceeb2d36e8e1145087883b515d3ab98fa32e34f7a61782107",
+        "dimensions": [320, 963]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-review-changes.png",
+        "sha256": "c2e4d64fc8e66e9a69a11d8fe3f627edf2d7dc34b9cc064b238e72231dfbdca9",
+        "dimensions": [320, 829]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-review-checked.png",
+        "sha256": "6c638dbd1f2ab2b5dc880d5206415d11381af8cf82bedd7ee3e39f1f8be3edf4",
+        "dimensions": [320, 835]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-decision-preview-one.png",
+        "sha256": "cf7b2d077922e00a1cd0f0c68ec04967ab9904e7de3d576218254e0b801f072f",
+        "dimensions": [320, 1045]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-decision-confirmed.png",
+        "sha256": "2e91b83c1b71b2762d2266243b0758df23a5d41b903d909a16aa2721c19ecea3",
+        "dimensions": [320, 1074]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-followup-edited-draft.png",
+        "sha256": "daf43b6b3565106d075d9a4f550546e5b354b6e71a0eaf7d429f74687a3791c8",
+        "dimensions": [320, 894]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-coach-followup-confirmed.png",
+        "sha256": "2e221fc0c972d7d0987a66724fdaeaa2be2a1e882e0eb1bd0c71b40500d45003",
+        "dimensions": [320, 899]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 320,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-320-full-interacted.png",
+        "sha256": "662cda4aaaf772a763ab052bd8fc8dd54e8c47354489f21b84da13296bcebf1f",
+        "dimensions": [320, 12228]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-full-initial.png",
+        "sha256": "9b6118c299812e1f0ebd00d035882d2a2bf8eb1528c7b9b6922c91c486f63679",
+        "dimensions": [390, 11191]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-cycle.png",
+        "sha256": "1b8a2626b28f590935ef89c6452a213067cf2473ef75e52cf097f7f2dbf2ca63",
+        "dimensions": [390, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-connect-initial.png",
+        "sha256": "04c0bb0b94c2f202ce7a75c28c8efc887ff7704374c1d2ff6d9c9963f0ff6692",
+        "dimensions": [390, 928]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-program-initial.png",
+        "sha256": "77258cd0d6105ed7f550161a0de3c87c4c2f8c8eadfcdb10aaf0fa2943ae2c15",
+        "dimensions": [390, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-facts-initial.png",
+        "sha256": "6b2025b788817ce366c4b912e0e69ee6d45f1966a650f3649978807a1154656b",
+        "dimensions": [390, 832]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-review-initial.png",
+        "sha256": "4c7f379f2a6cdf15edb30177815630d2fe0c457ecdce50c70395eedcdc48ac6f",
+        "dimensions": [390, 887]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-decision-initial.png",
+        "sha256": "935718d8a499c9a17bb16e68a84ee0281781ff50fe14ce7a43e1ed6d91935dc1",
+        "dimensions": [390, 819]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-followup-initial.png",
+        "sha256": "33c37f04dfe427a1f1823788a84ae7354da802bc401872c8d421eede5252762a",
+        "dimensions": [390, 661]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-connect-accepted.png",
+        "sha256": "08563d1039424ef8300be8f315fe2b5df3c6df641b3003d6e9ad2f2bbbaa5469",
+        "dimensions": [390, 928]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-program-version-2.png",
+        "sha256": "69e8297265ea74ea4ace4db13cf915a6c5a1f5b69964fa8e5d39eaa605bc696c",
+        "dimensions": [390, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-program-assigned.png",
+        "sha256": "0dbda184685cf4ac0295c0c686b8838503377da54129ad7838393ba25fa43406",
+        "dimensions": [390, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-facts-client-360.png",
+        "sha256": "97e7229d0b665fb178d381f123b06a61bb06ca0fab786664b59370518b978e2c",
+        "dimensions": [390, 954]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-review-changes.png",
+        "sha256": "a284ac29d32bc9f81bc6f0ac773683061a1e4adf577ea183e379cefaffd67d95",
+        "dimensions": [390, 789]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-review-checked.png",
+        "sha256": "9f489a096aa63b8c0a03c68c03047a90c8d212f7133652990f6e72f2af127c75",
+        "dimensions": [390, 789]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-decision-preview-one.png",
+        "sha256": "e8ca98197aee77ee329a8a9309435e2d6cfcc648da5c9993ed5ab181aa4a9a38",
+        "dimensions": [390, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-decision-confirmed.png",
+        "sha256": "7a6d7e77f61d48a17414aeba7a7967207ff00bfbeb7b64e176374fd4dbcdf847",
+        "dimensions": [390, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-followup-edited-draft.png",
+        "sha256": "1c0586b5b9548081da67feeb445ebe69bf64928ddeaad9bf5f542cb49baadd9f",
+        "dimensions": [390, 817]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-coach-followup-confirmed.png",
+        "sha256": "0248c45fd30c7d94290fd2141e03de8bef08145da62d6c45c2692ecda9a275be",
+        "dimensions": [390, 838]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 390,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-390-full-interacted.png",
+        "sha256": "7cf4a5517fba16fda417aeb79c6972e26dd6b5f6a655d36964545746c9ca0960",
+        "dimensions": [390, 11499]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-full-initial.png",
+        "sha256": "2dce971e546b99f1bdae1867921091f6c19dd51761bc42d0254272494b46a335",
+        "dimensions": [430, 10968]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-cycle.png",
+        "sha256": "978c2276276d45299366fc19e69ca8010f73c780e0cda01bf57ed287c9109855",
+        "dimensions": [430, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-connect-initial.png",
+        "sha256": "871336bd8cd0fefe5431ebb5407aea881bb857c1138a634544af07e166546ee2",
+        "dimensions": [430, 905]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-program-initial.png",
+        "sha256": "a5fa685253d297868fe4249527a5b36b6d2132b057ba42f7fafceafae681296b",
+        "dimensions": [430, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-facts-initial.png",
+        "sha256": "50f49bc6059e657a6ab3be7276b4303c0c6c7097b02b21d687f7d4e0899997d7",
+        "dimensions": [430, 832]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-review-initial.png",
+        "sha256": "88db8da6b2e93d0b6dfc47e8c1bea998abb82c301301b4a8ace0fcea25ff0987",
+        "dimensions": [430, 843]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-decision-initial.png",
+        "sha256": "73201ed6ad145eeff0e302364ac4db3a710872fd28a88fe9ab980a72df6d41a5",
+        "dimensions": [430, 819]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-followup-initial.png",
+        "sha256": "8bce8ff89666ff16e62c79ec250f5b8853e3c29a1587b86f6687f01cc3a49bc3",
+        "dimensions": [430, 639]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-connect-accepted.png",
+        "sha256": "7e1bcc50a89f064f074165fdfa70006303aa8a2586114ac0d5ce654a04b256b0",
+        "dimensions": [430, 905]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-program-version-2.png",
+        "sha256": "bc1c6adb1cd6b618b4af64d33ba23b0f633e6410b901bd8bc427f04b6b7b31d4",
+        "dimensions": [430, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-program-assigned.png",
+        "sha256": "da9e6a2ae97d41cec0a8a8bc21d98719535541ee3eaf6dfbeeb3061500317750",
+        "dimensions": [430, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-facts-client-360.png",
+        "sha256": "fba6ad1f17c30b71aec7bf6be969409d345c82707f11679a13fb78f0631bc0e5",
+        "dimensions": [430, 954]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-review-changes.png",
+        "sha256": "0a2708c672832962a5711d4e21acef4ebae14724e59558361b801396b628845e",
+        "dimensions": [430, 725]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-review-checked.png",
+        "sha256": "1887dce95f0c4d052776038c328a6dd28fb2a149bc111f53ca20c8f35ff77035",
+        "dimensions": [430, 746]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-decision-preview-one.png",
+        "sha256": "e7bd693b03239e1d217a7cfea5a98901f037287aa24f29d9b09bbad7bea67937",
+        "dimensions": [430, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-decision-confirmed.png",
+        "sha256": "2cf0c8ef401ea7e3efac9a0dee35fdbe4bf6c1fc68e5c41e12c4f8e0b4dda624",
+        "dimensions": [430, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-followup-edited-draft.png",
+        "sha256": "4b4f753e02b01bc4f8d844e98a439401256645852a79fb5541af89d7654f4128",
+        "dimensions": [430, 794]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-coach-followup-confirmed.png",
+        "sha256": "a3fe0fa55a2132d0235b87e5746628b0ddfcf15b61f6d10b2fa24dcca1de77a3",
+        "dimensions": [430, 815]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "light",
+      "width": 430,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-light-430-full-interacted.png",
+        "sha256": "92ca298f64c017e99841fafe40701086abb5467f7d950fd8969d07d58a66327a",
+        "dimensions": [430, 11275]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-full-initial.png",
+        "sha256": "556eaaee172a07765a43707070c89832535937824426cc3105143681a4b806d4",
+        "dimensions": [1440, 8493]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-cycle.png",
+        "sha256": "80de6a1fa7df55f3dce79c051d1d56a88b29920bb2c5751e84f5b8d9b70d2c0e",
+        "dimensions": [1440, 278]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-connect-initial.png",
+        "sha256": "5c3b560db480552474949ad26c61dfa3f4533f72a700c4f4bc66ac00e01a4353",
+        "dimensions": [1440, 705]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-program-initial.png",
+        "sha256": "975f0b530a8850b1fdc2dd62ee3ed87746657384d8ee6140d3104af3fe0df403",
+        "dimensions": [1440, 715]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-facts-initial.png",
+        "sha256": "984e736caee4b1c0afcc12e60ab37a979f95d64fa7ac9bd5a7aced2e1c4a9bbb",
+        "dimensions": [1440, 651]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-review-initial.png",
+        "sha256": "7812102d65cafacd45370555efb0ed8a71b83f9fc6470a40c60b34d42416d6df",
+        "dimensions": [1440, 621]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-decision-initial.png",
+        "sha256": "646b0203d9e9056bc85d16a69587f1976471f76722371e2b03dbd46909c5b2ae",
+        "dimensions": [1440, 552]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-followup-initial.png",
+        "sha256": "3f409bbd3e07ac7d517b6d3c634275634be097ead41e7aa965d2ef74ab7c82c1",
+        "dimensions": [1440, 506]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-connect-accepted.png",
+        "sha256": "d905908af370a36cc3d130b969368c861933bec1824f1c389aa51a43af39c611",
+        "dimensions": [1440, 705]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-program-version-2.png",
+        "sha256": "54a8e05ba8635d915acd96daa364e9636d24134b5d529ae3fe42fd7dc8fa411f",
+        "dimensions": [1440, 715]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-program-assigned.png",
+        "sha256": "3b0e31be37dd5fbbea960dc6bf5ee43afa65fee0b2c6f77afbf8405f36e62f24",
+        "dimensions": [1440, 715]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-facts-client-360.png",
+        "sha256": "6f221d7267bd5a6c31c4dc28285e1ed045e1c1dcece481023f19ee15017845a1",
+        "dimensions": [1440, 651]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-review-changes.png",
+        "sha256": "27aabaa23bcf00e170d5938de16bd193c677ba7276bc089574a32bdc38eb8e1b",
+        "dimensions": [1440, 522]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-review-checked.png",
+        "sha256": "ac265dfbd6e7a499e9197d86239858583c219e58fa098e096d508ba059247c43",
+        "dimensions": [1440, 522]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-decision-preview-one.png",
+        "sha256": "1476a9245d6d6f5de66e4534bb38f1211537c6f471cb90d61cbcfc488b7b466a",
+        "dimensions": [1440, 660]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-decision-confirmed.png",
+        "sha256": "008b48e113b6e65c75d055f810d878eecbfd02692a69cb40b554c38592c3abcd",
+        "dimensions": [1440, 660]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-followup-edited-draft.png",
+        "sha256": "ef8fb03f81b9de87c8d33f01a3633227c1baa2e2c7bd49897b9da2ef1046bc68",
+        "dimensions": [1440, 570]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-coach-followup-confirmed.png",
+        "sha256": "f8057f0e04f4175a0b5d246dc5a2f88ab6de70b61cb41491d2c0c2f3fe432e5b",
+        "dimensions": [1440, 570]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 1440,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-1440-full-interacted.png",
+        "sha256": "f0f29456b70b7f21b1edeba122b536d2941158f360b9d8ddd6d356e9320f0caa",
+        "dimensions": [1440, 8566]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-full-initial.png",
+        "sha256": "c25c09e12dd6d7d3e7a3c122b82f774d03f550724f3e1a3e31d5267256a71aaa",
+        "dimensions": [320, 11875]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-cycle.png",
+        "sha256": "75e8f7256ac34c0949554fdb9059e2d9e2ab434b9ca41d1109547a52956741f5",
+        "dimensions": [320, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-connect-initial.png",
+        "sha256": "44132a8c8ac6ffa95c4b1f4a19f41753a956f3c23973338aee99c9481c9a0b1e",
+        "dimensions": [320, 999]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-program-initial.png",
+        "sha256": "106227db02bcfaa99c5c6c4ba0a81da04866f45fc90506a82463d7eba79b76ea",
+        "dimensions": [320, 1041]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-facts-initial.png",
+        "sha256": "4f18d968633a8865d727d3779657e28f1a836a24b030342f0fcc088f5aa1937c",
+        "dimensions": [320, 841]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-review-initial.png",
+        "sha256": "62e3d5daa916fb9c3017cf6622259dd8d3139cf20cc4e6cb70b3f8cb6dc9a4e5",
+        "dimensions": [320, 906]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-decision-initial.png",
+        "sha256": "f8f35711363d772deb3fb4abd4e26fc646c4d2f73df53e1e2b8ad0cbb0fe8227",
+        "dimensions": [320, 938]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-followup-initial.png",
+        "sha256": "35846dcbec5cf35a66e488234b69a38706d4f4a6fe7c9f3d3ca38a03cea8d449",
+        "dimensions": [320, 738]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-connect-accepted.png",
+        "sha256": "c5127a2a7fd0b01a79d859c1a54b636dc302b33f36c1fbcd5f8c8e665bd555b2",
+        "dimensions": [320, 999]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-program-version-2.png",
+        "sha256": "4636d4e0435571bf4c9196113bd032733fe5ebd6c611ef875c306a557183e27d",
+        "dimensions": [320, 1041]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-program-assigned.png",
+        "sha256": "ed6fcbfb1d5d495171d420755e63056a500ceeb418fa9aeb5ffe8459b092f782",
+        "dimensions": [320, 1047]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-facts-client-360.png",
+        "sha256": "119e6e0a5b10c64754be7c12f03a208418de9d6a813d2e90f9be1501086d4d40",
+        "dimensions": [320, 963]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-review-changes.png",
+        "sha256": "a788e2bab3ada04069081b9a304ae4b187db5f9c51e07680c1c8798dc6cb036c",
+        "dimensions": [320, 829]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-review-checked.png",
+        "sha256": "169435ff560c6b89325c1cca7c35b04b3724c100717aadce3717033bb9720052",
+        "dimensions": [320, 835]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-decision-preview-one.png",
+        "sha256": "d269992e3bee351c7fddcc84ce28e0239511877b2d2ecfb3aa80322b074d700f",
+        "dimensions": [320, 1045]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-decision-confirmed.png",
+        "sha256": "7671995ca389f22cb96ba1d814660491119fbc34d6838f4860d5da15ee0891e1",
+        "dimensions": [320, 1074]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-followup-edited-draft.png",
+        "sha256": "4efcd848d27fa1fdca931c9b712aa14491051cd3813aa235b1c81d1f724b87b8",
+        "dimensions": [320, 894]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-coach-followup-confirmed.png",
+        "sha256": "47839a3669933380b6fc10c2a76c8329b32a1278263c821ab314a9e15bb9b420",
+        "dimensions": [320, 899]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 320,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-320-full-interacted.png",
+        "sha256": "6448233b254fb945361ededb32ff2c722f66e6b5ff223578e3b74c4cbb8695d2",
+        "dimensions": [320, 12228]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-full-initial.png",
+        "sha256": "2a35917c4e8415a49e24442a9da74a1431b365382735d26e4d6ab7b88ed83175",
+        "dimensions": [390, 11191]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-cycle.png",
+        "sha256": "677570e0119daad1f3031055f6088010dc6b660ac2fefe10f2fd74012b43dd2d",
+        "dimensions": [390, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-connect-initial.png",
+        "sha256": "36f4124891d7138c8066dca0ea06fbe8873f24a23461846f0b2a3441e4f395da",
+        "dimensions": [390, 928]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-program-initial.png",
+        "sha256": "e6d5fcd3d62dd1bceee8343eb4615db76db8b9011f757fdaa5bcd0e29f79b8a1",
+        "dimensions": [390, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-facts-initial.png",
+        "sha256": "f7c737fcf607cf6571e6c86cc96a2f864546c3c428abd4ff62b0ed12f83d0c50",
+        "dimensions": [390, 832]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-review-initial.png",
+        "sha256": "c558334359b69e2930d737fad5829a8c4ca3b658bb233f3b497eaebd34c21a2d",
+        "dimensions": [390, 887]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-decision-initial.png",
+        "sha256": "81464dc0435f7ac95b3bbddfca5141400a200df94fa9322c07fcf1dc78e9ad89",
+        "dimensions": [390, 819]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-followup-initial.png",
+        "sha256": "5fee9f67a33c6afd3780579bd836e09f612db9f3a6c3599ae80fd60772f1344c",
+        "dimensions": [390, 661]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-connect-accepted.png",
+        "sha256": "be1ff59670d88c0f63679c329a8c141223cd0b1ff2508b80279f703854873f85",
+        "dimensions": [390, 928]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-program-version-2.png",
+        "sha256": "9b955b49c83199082843658da438cb33e801188a41d7ff7af4f55fcc51c92170",
+        "dimensions": [390, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-program-assigned.png",
+        "sha256": "346922754c924f13d85d8875e6fd32ebef767a865b30820d2956f46f30b759f7",
+        "dimensions": [390, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-facts-client-360.png",
+        "sha256": "5a84f31c1621ae63cca9a1669e292a02c53738314315a9aeff2eda107c77ed12",
+        "dimensions": [390, 954]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-review-changes.png",
+        "sha256": "c10ee5c8cbe270906b7ec754c3d056fb2c494d891e808279bce19b2bd334fd0d",
+        "dimensions": [390, 789]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-review-checked.png",
+        "sha256": "c51884a8798b32590a4ab340b31b6ee4aaa47d89bf499739bc7634dfafa7cf70",
+        "dimensions": [390, 789]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-decision-preview-one.png",
+        "sha256": "fdef456a37277caafad3f3500729648e77d9f8e93156a721904463e5e1583e8a",
+        "dimensions": [390, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-decision-confirmed.png",
+        "sha256": "8a4a23d24ff5e16a8d98779000a4d8a75130050253d32037d073e48b80d55988",
+        "dimensions": [390, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-followup-edited-draft.png",
+        "sha256": "675381003c78a425eca7f22212891b339f97e12e315e3fd7f6ca40daeb136856",
+        "dimensions": [390, 817]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-coach-followup-confirmed.png",
+        "sha256": "f51f698efa152b15f832de02350c14f45f4b102bc36abe57d047736800726f10",
+        "dimensions": [390, 838]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 390,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-390-full-interacted.png",
+        "sha256": "a98006d565ff9817a65854ddfcd57f0f980a97bbf821a3dbc9f9f2fe661176ee",
+        "dimensions": [390, 11499]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-full-initial.png",
+        "sha256": "349dc76aa2effe1c33a9982ea41a2b81695d34f920154fe0fbf1f3f17ccee084",
+        "dimensions": [430, 10968]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-cycle.png",
+        "sha256": "05841e7c058e047068bda1ef98a515c770e8ba63f4f6016170b43067ceb5c1a3",
+        "dimensions": [430, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-connect-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-connect-initial.png",
+        "sha256": "58811804f5e6068411e74da45e265d42e4f12a0ae7f1237a6b3392f524292fa3",
+        "dimensions": [430, 905]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-program-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-program-initial.png",
+        "sha256": "f75abb36598a75eea7a33478710bdcb78c86fc4e3944c6576644e5d7efa0a1fd",
+        "dimensions": [430, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-facts-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-facts-initial.png",
+        "sha256": "1643f6dcd1d7586364e536c01c3486a65956100d44fcac3093677c671c4965ef",
+        "dimensions": [430, 832]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-review-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-review-initial.png",
+        "sha256": "662ab96d812159cd868e3f7e09ba70cd6e6115cdc22bef56e45ab22e506d64a6",
+        "dimensions": [430, 843]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-decision-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-decision-initial.png",
+        "sha256": "1edef5d8bf0b791d62928cc4f17807f405d5b89ce8613a67e47ae014eb7e3375",
+        "dimensions": [430, 819]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-followup-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-followup-initial.png",
+        "sha256": "0e5a4d97d9bbab598c7e3386f98ae20e79b9059d4f58f4712a3b0be8a17e3e9e",
+        "dimensions": [430, 639]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-connect-accepted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-connect-accepted.png",
+        "sha256": "bb5294f7c3dbc568734dd54f84d599f8643d854391202c06f3178e44ef5b4a03",
+        "dimensions": [430, 905]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-program-version-2",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-program-version-2.png",
+        "sha256": "4f973f7dacfda43cf9cdd5c1abe3df991501f65601ad8e97d0d08711ae87b3aa",
+        "dimensions": [430, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-program-assigned",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-program-assigned.png",
+        "sha256": "175208bfe663797e16ff2131f0ad93d4130e7757b5f21e616e484d70e9e9ab4a",
+        "dimensions": [430, 1005]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-facts-client-360",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-facts-client-360.png",
+        "sha256": "bf5f23fbf3a363885226886fdded5e3462ed68b6ffcc48eefe0ccb6bde34a3c1",
+        "dimensions": [430, 954]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-review-changes",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-review-changes.png",
+        "sha256": "035d8c4df09bdcce3d982074cdf09e1f52aa95284dddff1f826f6c29f4a64913",
+        "dimensions": [430, 725]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-review-checked",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-review-checked.png",
+        "sha256": "07ef87d5db45e4bd7e94cb344bd1f6356020422e8394f89d974bd9ef46e462f0",
+        "dimensions": [430, 746]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-decision-preview-one",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-decision-preview-one.png",
+        "sha256": "22ad3905aead59bc480f2ca07c18814f296dedecff1ccb66ed06f7448b72f774",
+        "dimensions": [430, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-decision-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-decision-confirmed.png",
+        "sha256": "539771c04298b8a739ce29e4dd6e3ef5046dc2a0a33d54481884304a25f47e4d",
+        "dimensions": [430, 925]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-followup-edited-draft",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-followup-edited-draft.png",
+        "sha256": "0bfa7aa14234569ad9041852946e68940a69d5ce383e399cb290e4d8509bd763",
+        "dimensions": [430, 794]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "coach-followup-confirmed",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-coach-followup-confirmed.png",
+        "sha256": "660c7ccbdd035042b4bc2a78b197c4f46126edaf5ed2a21ef89011f33e3fc338",
+        "dimensions": [430, 815]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "coach",
+      "theme": "dark",
+      "width": 430,
+      "state": "full-interacted",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/coach-dark-430-full-interacted.png",
+        "sha256": "d03b753507cb3144002df1b7360815a079ef5911f97e54d99f7ba0525dae46e9",
+        "dimensions": [430, 11275]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 1440,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-1440-full-initial.png",
+        "sha256": "64792f19b98bb23fd07bf4c5b476a51fcac652838d6b882feed7880640f8b80b",
+        "dimensions": [1440, 7538]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 1440,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-1440-cycle.png",
+        "sha256": "9b85647f4fff4d7af2aa438fdfc36dee4af4d21a8c98f23680b4e9f4a34bbf86",
+        "dimensions": [1440, 278]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 1440,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-1440-progress-ready.png",
+        "sha256": "090710645ad85a18326ff9363f69ab35d9d01bea8a442cbdd2fdbacbe62609fd",
+        "dimensions": [1440, 846]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 320,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-320-full-initial.png",
+        "sha256": "d974bcd497c03c1461c1533b6225f69b9bdc0c4b945e772cec2869bcf26309d2",
+        "dimensions": [320, 10243]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 320,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-320-cycle.png",
+        "sha256": "7ef2c485c114930558d99243191f75571f255545e1a725da3e019a66511d6969",
+        "dimensions": [320, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 320,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-320-progress-ready.png",
+        "sha256": "ae54790bc09e45bbfc34b497fec5ecd48acb4def0a3b9b9dbc0f5cba604c7413",
+        "dimensions": [320, 1399]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 390,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-390-full-initial.png",
+        "sha256": "89db5f916f89982b5ef59124cd783a9aac295877beecff2e2561ffccef70507e",
+        "dimensions": [390, 9971]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 390,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-390-cycle.png",
+        "sha256": "293079bf84ee91d71fa42ed6fa9da29446cd5931b90a6d317e54c86c1d0a1164",
+        "dimensions": [390, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 390,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-390-progress-ready.png",
+        "sha256": "91a1043fcd8e363e3e579984ef82e849f069a0213f0bd97c482cc9d426f47b15",
+        "dimensions": [390, 1363]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 430,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-430-full-initial.png",
+        "sha256": "084239253616228147eae349268ffe0e746ca5810d4c8757bd2a4344c6a52d3c",
+        "dimensions": [430, 9796]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 430,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-430-cycle.png",
+        "sha256": "4709f858278d559d6e164ee8b8b01c3a7fb2c9e3340784388dcdadb68449ed10",
+        "dimensions": [430, 512]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "light",
+      "width": 430,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-light-430-progress-ready.png",
+        "sha256": "6a239fa2dda89ba7c6a10161b8b3d71d3ac61df735603c22dcb8874b993d8acf",
+        "dimensions": [430, 1363]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 1440,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-1440-full-initial.png",
+        "sha256": "aa732fcb8ac3bd9d97113c520312d731dec3309cde7b346fff657e414ab3d8b4",
+        "dimensions": [1440, 7538]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 1440,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-1440-cycle.png",
+        "sha256": "accf62cc2f6f2eebeb1e07f2964f0a2b363be8a2bb99a538b363544e52c798cc",
+        "dimensions": [1440, 278]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 1440,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-1440-progress-ready.png",
+        "sha256": "229d4f45349084414a2eea3e343301a8c995509110976ec590c46e3a2417e0a5",
+        "dimensions": [1440, 846]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 320,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-320-full-initial.png",
+        "sha256": "a85973c551ce856d7a5090ad06f8d80961bb07712c2496b1ceb1d8d150916039",
+        "dimensions": [320, 10243]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 320,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-320-cycle.png",
+        "sha256": "4cf2045a8448eb8da070d5e01a9418fd7db19a8a7ce195ae89294149a77692ec",
+        "dimensions": [320, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 320,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-320-progress-ready.png",
+        "sha256": "dccc66088673c177557e99df62635cfc80e56652cb4567a0f7448d541657e0b8",
+        "dimensions": [320, 1399]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 390,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-390-full-initial.png",
+        "sha256": "297c8cf2bb44b6968be6c0eaf1e4fb8c9a383ab9f8924440216ac669a791c805",
+        "dimensions": [390, 9971]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 390,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-390-cycle.png",
+        "sha256": "e32166a29e7148d8c55b432b63344cf1aa4251ffb95817e84bb6fefd7454f2df",
+        "dimensions": [390, 529]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 390,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-390-progress-ready.png",
+        "sha256": "eb1be1f9abf0db52a46c9ea8e68f89c50850603a3fb443bf7091334ca9f132f9",
+        "dimensions": [390, 1363]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 430,
+      "state": "full-initial",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-430-full-initial.png",
+        "sha256": "268de9672dbb7a8f7f3eaf90218ebef3e8b5ebab457fd76ccca000e1833f488a",
+        "dimensions": [430, 9796]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 430,
+      "state": "cycle",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-430-cycle.png",
+        "sha256": "9967311c7f10a17de88a77e42706e6d4aa40fd5dc6553f7f1debeb85e3590180",
+        "dimensions": [430, 512]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    },
+    {
+      "audience": "athlete",
+      "theme": "dark",
+      "width": 430,
+      "state": "progress-ready",
+      "currentBaselineVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+      "status": "APPROVED",
+      "approvedPixelReference": {
+        "version": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+        "file": ".artifacts/tasks/895/evidence/acceptance-reconciliation/review/athlete-dark-430-progress-ready.png",
+        "sha256": "66ca326d3762cfd5788fb79c4957c42dfc685d9b67e0229f476e0ebc0b9817e0",
+        "dimensions": [430, 1363]
+      },
+      "reason": "Explicit final owner approval of complete recovery WIP. Approval is not historical pixel-parity PASS; see release-scoped exception."
+    }
+  ],
+  "knownApprovedScopes": [
+    "Final #895 header / hero audience switch / Glass CTA; explicit approval in owner message TASK #895 OWNER VISUAL APPROVAL RECEIVED and handoff historical approval.",
+    "Canonical unchanged product regions remain required at archive version; no blanket waiver.",
+    "Six coach chapter design in #852 is approved as source; current restored implementation is not yet accepted."
+  ],
+  "approvalLedger": "docs/product-v10-landing-visual-acceptance.md",
+  "candidateManifest": ".artifacts/tasks/895/evidence/acceptance-reconciliation/candidate-baseline/MANIFEST.json",
+  "promotionPolicy": "A candidate is never a golden. An owner must explicitly select the version and approve identified states/hashes; then implement exact-state fresh comparisons before marking parity PASS.",
+  "ownerEvidence": "docs/product-v10-landing-release-895.md#owner-decision",
+  "releaseException": {
+    "issues": [895, 896, 897, 898, 899, 900],
+    "pullRequest": 902,
+    "scope": "Last complete recovery WIP verified against final owner-review report; no future design changes waived",
+    "archiveParity": "FAIL",
+    "historicalFailedRegions": 48,
+    "historicalFailedMobileFrozenFrames": 16,
+    "originalsThresholdsTestsUnchanged": true,
+    "functionalSecurityPrivacyReleaseChecks": "MANDATORY",
+    "policyAuthority": "Issue #900 permits a bounded explicit owner-approved exception; latest owner delivery directive accepts documented pixel differences for this release only"
+  }
+}

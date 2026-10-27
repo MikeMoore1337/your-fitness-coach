@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppShell } from '../../app/AppShell';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../shared/api/client';
 import type {
@@ -9,6 +11,7 @@ import type {
   AdminJob,
   AdminOperationReason,
   AdminRelationship,
+  AdminTrainerCapacity,
   AdminUserDetail,
   AdminUserSearchResult,
 } from '../../shared/api/types';
@@ -27,12 +30,13 @@ import {
 } from '../../shared/ui/common';
 import './admin.css';
 
-type AdminView = 'accounts' | 'jobs' | 'funnel' | 'audit';
+type AdminView = 'accounts' | 'jobs' | 'funnel' | 'trainer-capacity' | 'audit';
 
 const VIEW_LABELS: Record<AdminView, string> = {
   accounts: 'Аккаунты',
   jobs: 'Задачи',
   funnel: 'Агрегаты',
+  'trainer-capacity': 'Ёмкость тренеров',
   audit: 'Аудит',
 };
 
@@ -68,12 +72,31 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   error: 'Ошибка',
 };
 
-const FUNNEL_LABELS: Record<AdminFunnel['stages'][number]['key'], string> = {
-  registered: 'Создали аккаунт',
-  profile_ready: 'Заполнили основу профиля',
-  program_activated: 'Активировали программу',
-  core_value_reached: 'Зафиксировали первое полезное действие',
+const KPI_LABELS: Record<AdminFunnel['kpis'][number]['key'], string> = {
+  activation_rate: 'Начали программу в первые 24 часа',
+  time_to_first_useful_action: 'Время до первой начатой тренировки',
+  first_workout_completion_rate: 'Завершили первую тренировку',
+  first_week_value_rate: 'Получили ценность в первую неделю',
+  d1_meaningful_return: 'Вернулись на следующий день',
+  d7_meaningful_return: 'Вернулись через неделю',
+  d30_meaningful_return: 'Вернулись через 30 дней',
+  missed_workout_recovery_conversion: 'Отреагировали на пропуск тренировки',
+  recovery_to_completion_rate: 'Завершили восстановленную тренировку',
+  time_to_recovery: 'Время до восстановления тренировки',
+  nutrition_repeat_rate: 'Повторили запись питания',
+  progress_next_action_completion_rate: 'Завершили выбранный шаг после обзора',
+  weekly_loop_completion: 'Завершили недельный цикл',
 };
+
+function formatKpiValue(kpi: AdminFunnel['kpis'][number]): string {
+  if (typeof kpi.median_seconds === 'number') {
+    const minutes = Math.floor(kpi.median_seconds / 60);
+    if (minutes < 1) return 'меньше минуты';
+    if (minutes < 60) return `${minutes} мин`;
+    return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
+  }
+  return kpi.rate_percent == null ? 'Нет данных' : `${kpi.rate_percent}%`;
+}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
@@ -81,6 +104,23 @@ function formatDate(value: string | null | undefined): string {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+function formatDurationSeconds(value: number | null | undefined): string {
+  if (value == null) return 'Нет данных';
+  if (value < 60) return `${Math.round(value)} с`;
+  const minutes = Math.floor(value / 60);
+  if (minutes < 60) return `${minutes} мин`;
+  return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
+}
+
+function capacityBandLabel(band: AdminTrainerCapacity['capacity_bands'][number]['band']): string {
+  return {
+    '0_9': 'До 10 клиентов',
+    '10_29': '10–29 клиентов',
+    '30_99': '30–99 клиентов',
+    '100_plus': '100+ клиентов',
+  }[band];
 }
 
 function userName(user: AdminUserSearchResult | AdminUserDetail): string {
@@ -245,6 +285,11 @@ export default function AdminPage() {
     queryKey: ['root-admin', 'funnel', 30],
     queryFn: () => api<AdminFunnel>('/api/v1/admin/funnel?period_days=30'),
     enabled: Boolean(user?.is_root && view === 'funnel'),
+  });
+  const trainerCapacity = useQuery({
+    queryKey: ['root-admin', 'trainer-capacity', 30],
+    queryFn: () => api<AdminTrainerCapacity>('/api/v1/admin/trainer-capacity?period_days=30'),
+    enabled: Boolean(user?.is_root && view === 'trainer-capacity'),
   });
   const audit = useQuery({
     queryKey: ['root-admin', 'audit'],
@@ -693,10 +738,14 @@ export default function AdminPage() {
           <Surface className="admin-global-section" aria-labelledby="funnel-title">
             <div className="admin-section-heading">
               <div>
-                <span className="eyebrow">Когорта за 30 дней</span>
-                <h2 id="funnel-title">Приватные агрегаты активации</h2>
+                <span className="eyebrow">Новые аккаунты за 30 дней</span>
+                <h2 id="funnel-title">Ключевые показатели первой недели</h2>
               </div>
-              <Badge tone="warning">Provider не подключён</Badge>
+              <Badge tone={funnel.data?.data_quality.status === 'clean' ? 'success' : 'warning'}>
+                {funnel.data?.data_quality.status === 'clean'
+                  ? 'Данные проверены'
+                  : 'Нужна проверка данных'}
+              </Badge>
             </div>
             {funnel.isLoading ? (
               <LoadingState />
@@ -708,15 +757,99 @@ export default function AdminPage() {
             ) : funnel.data ? (
               <>
                 <p>{funnel.data.coverage_note}</p>
+                <p className="admin-global-section__meta">
+                  Аккаунтов в выборке: {funnel.data.cohort_size}. Полных недельных срезов:{' '}
+                  {funnel.data.complete_weekly_cohorts}. Аккаунтов для показателей восстановления:{' '}
+                  {funnel.data.recovery_eligible_real_account_count}. {funnel.data.effect_note}
+                </p>
                 <div className="admin-funnel" role="list">
-                  {funnel.data.stages.map((stage) => (
-                    <div className="admin-funnel__stage" key={stage.key} role="listitem">
-                      <span>{FUNNEL_LABELS[stage.key]}</span>
-                      <strong>{stage.account_count}</strong>
-                      <small>{stage.cohort_rate_percent}% от созданных аккаунтов</small>
+                  {funnel.data.kpis.map((kpi) => (
+                    <div className="admin-funnel__stage" key={kpi.key} role="listitem">
+                      <span>{KPI_LABELS[kpi.key]}</span>
+                      <strong>{formatKpiValue(kpi)}</strong>
+                      <small>
+                        {kpi.numerator} из {kpi.denominator}. {kpi.window}
+                      </small>
                     </div>
                   ))}
                 </div>
+              </>
+            ) : null}
+          </Surface>
+        )}
+
+        {view === 'trainer-capacity' && (
+          <Surface className="admin-global-section" aria-labelledby="trainer-capacity-title">
+            <div className="admin-section-heading">
+              <div>
+                <span className="eyebrow">Отдельный trainer-срез за 30 дней</span>
+                <h2 id="trainer-capacity-title">Ёмкость тренеров</h2>
+              </div>
+              <Badge tone="neutral">Не клиентский funnel</Badge>
+            </div>
+            {trainerCapacity.isLoading ? (
+              <LoadingState />
+            ) : trainerCapacity.error ? (
+              <ErrorState
+                message={(trainerCapacity.error as Error).message}
+                retry={() => void trainerCapacity.refetch()}
+              />
+            ) : trainerCapacity.data ? (
+              <>
+                <p>{trainerCapacity.data.coverage_note}</p>
+                <div className="admin-funnel" role="list">
+                  <div className="admin-funnel__stage" role="listitem">
+                    <span>Активация тренеров</span>
+                    <strong>
+                      {trainerCapacity.data.trainer_activation_rate_percent == null
+                        ? 'Нет данных'
+                        : `${trainerCapacity.data.trainer_activation_rate_percent}%`}
+                    </strong>
+                    <small>
+                      {trainerCapacity.data.activated_trainer_count} из{' '}
+                      {trainerCapacity.data.eligible_account_count} подтверждённых аккаунтов
+                    </small>
+                  </div>
+                  <div className="admin-funnel__stage" role="listitem">
+                    <span>До первого действия с клиентом</span>
+                    <strong>
+                      {formatDurationSeconds(
+                        trainerCapacity.data.time_to_first_client_action_median_seconds,
+                      )}
+                    </strong>
+                    <small>
+                      Тренеров с первым действием:{' '}
+                      {trainerCapacity.data.trainers_with_first_client_action}
+                    </small>
+                  </div>
+                  <div className="admin-funnel__stage" role="listitem">
+                    <span>Подтверждённые действия</span>
+                    <strong>{trainerCapacity.data.authorized_client_action_success_count}</strong>
+                    <small>Ошибки: не записываются · p50/p95: не измерены</small>
+                  </div>
+                  <div className="admin-funnel__stage" role="listitem">
+                    <span>Активный рабочий список</span>
+                    <strong>{trainerCapacity.data.active_client_count}</strong>
+                    <small>
+                      {trainerCapacity.data.active_trainer_count} активных тренеров ·{' '}
+                      {trainerCapacity.data.open_task_count} открытых задач
+                    </small>
+                  </div>
+                </div>
+                <div className="admin-funnel" role="list" aria-label="Границы ёмкости">
+                  {trainerCapacity.data.capacity_bands.map((band) => (
+                    <div className="admin-funnel__stage" key={band.band} role="listitem">
+                      <span>{capacityBandLabel(band.band)}</span>
+                      <strong>{band.trainer_count}</strong>
+                      <small>{band.active_client_count} активных клиентов</small>
+                    </div>
+                  ))}
+                </div>
+                <ul className="admin-global-section__notes">
+                  {trainerCapacity.data.exclusions.map((exclusion) => (
+                    <li key={exclusion}>{exclusion}</li>
+                  ))}
+                </ul>
               </>
             ) : null}
           </Surface>

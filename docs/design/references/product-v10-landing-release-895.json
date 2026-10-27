@@ -1,0 +1,245 @@
+{
+  "approval": "APPROVED",
+  "visualBaseline": "FROZEN",
+  "approvalSource": "Direct owner production-delivery instruction after FINAL VISUAL ACCEPTANCE RECONCILIATION",
+  "releaseScope": {
+    "pr": 902,
+    "issues": [895, 896, 897, 898, 899, 900],
+    "previousPrHead": "a4df49e80e1e15f1ab125ff7047d75f03f3890f2",
+    "all52ApprovedWipFilesVerified": true
+  },
+  "approvedWipFiles": [
+    {
+      "file": "docs/design/references/product-v10-landing-approved/README.md",
+      "sha256": "b0b66a30ed47d4794913ae454796358a7dab63efa70005637e99ca8d63116c16"
+    },
+    {
+      "file": "docs/product-v10-landing-final-handoff.md",
+      "sha256": "366d68251bf7231cc72368a69799b6bdf81c12e43e587ca124edf1b59f3a51e6"
+    },
+    {
+      "file": "docs/product-v10-landing-pre-delivery-gate.md",
+      "sha256": "790998642e70aa8b9d015cb26eedf5a1c53b780e304682867bbd511aff6bac6d"
+    },
+    {
+      "file": "frontend/package.json",
+      "sha256": "c34703be7203e5cf0995e8d556a4bf52c7028998836688a81d13be29b73eec56"
+    },
+    {
+      "file": "frontend/playwright.config.ts",
+      "sha256": "be25bb9ee0b8828bc668c48490af987f1bce0e56f932e7acceecea79779f1f7d"
+    },
+    {
+      "file": "frontend/playwright.landing-visual.config.ts",
+      "sha256": "157120a883bd79fe50e6c60dc7e3f3a0263f0d1d45b28619a88af3dd355533fe"
+    },
+    {
+      "file": "frontend/src/pages/landing/LandingProgress.tsx",
+      "sha256": "32934c7ba27b36a5f3735f86ec8837ed31604319682ea1e9c73f0a6d572e0772"
+    },
+    {
+      "file": "frontend/src/pages/landing/LandingV10CoachPage.tsx",
+      "sha256": "eb801df678d2afb792147bfeccc306389dd57e6dac37965923c788b0bd93fb9e"
+    },
+    {
+      "file": "frontend/src/pages/landing/LandingV10Faq.tsx",
+      "sha256": "5d7080191582e21eb9710712e59ac209b3c474584bf96ce6bd398a9037c6b6bd"
+    },
+    {
+      "file": "frontend/src/pages/landing/LandingV10Hero.tsx",
+      "sha256": "44406dcea8e10325eb61d94c4cfdcecc6d218e75071ccbf81ea8f278836dc9e0"
+    },
+    {
+      "file": "frontend/src/pages/landing/LandingV10Scenes.tsx",
+      "sha256": "1054f04c16a37745f95ea3658948190e739feadb2833e26ba79f116fa9035ba2"
+    },
+    {
+      "file": "frontend/src/pages/landing/LandingV10SharedSections.tsx",
+      "sha256": "d9335b1cd60eae71d890f0ab72cc5266a7d31974a3f637851a5648c1e87871fc"
+    },
+    {
+      "file": "frontend/src/pages/landing/landing-v10.css",
+      "sha256": "d13624078ab92004af613e5f85e970833cc9dfacd527e3aba77e9d4896f71ac2"
+    },
+    {
+      "file": "frontend/tests/e2e/landing-approved-visual.spec.ts",
+      "sha256": "1327b97d9eed327da1c6fd1fe2075527bac527a409a04d242a3cb29328b51a68"
+    },
+    {
+      "file": "frontend/tests/e2e/landing-production.spec.ts",
+      "sha256": "08fe11b460741fbf2c26b53f044a832a06c5dfdc65ba854ce7f9c4d2179ac77e"
+    },
+    {
+      "file": "frontend/tests/fixtures/landing-archive-disposition.json",
+      "sha256": "f55d5268daa5c9aa0efbb97720cf91f312072f04517d357250ed9a0c996fc92b"
+    },
+    {
+      "file": "frontend/tests/unit/pages/landing/LandingProgress.test.tsx",
+      "sha256": "f2b0ede47c980050a8f218d7bacd224a86bb152bf5dfcaa0743c73420bb028f2"
+    },
+    {
+      "file": "frontend/tests/unit/pages/landing/LandingV10AthletePage.test.tsx",
+      "sha256": "c77ba6f8f1b901f88a9d2d6f94ec38f0a286d3887040c18e4ba1e06962b3ce6e"
+    },
+    {
+      "file": "frontend/tests/unit/pages/landing/LandingV10CoachPage.test.tsx",
+      "sha256": "e0367cc6114bf221c908f16dd671bef15365c1666611c726cf4c63cc3a633208"
+    },
+    {
+      "file": ".github/workflows/landing-visual.yml",
+      "sha256": "78fef06ed34716d4000a8280102fd3c81ca05c91972f9cb3a4a762f7db5a1937"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-acceptance.json",
+      "sha256": "370365b19085376a87bfdfc9b57a883e0188f2bf5b315b4ca603eca52c3fa500"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/MANIFEST.json",
+      "sha256": "414043f21d21b3f4303357f867b5a46ff551bf8645b4c4138037d599046beb43"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/README.md",
+      "sha256": "1595132476b5785a46d81a6049a7ac5fdadd95fc3842e94be590299b4114cdfa"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-320-first-screen.png",
+      "sha256": "bf0ca1d2d689715390ed6d185f5bd689800c94d8b39b1dfabad8a1d8a4646b83"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-320-menu-open.png",
+      "sha256": "2ddd8eb583d1dd41d7f20ff26019eaec7748f751357599dbbf543d93fc5eb268"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-390-first-screen.png",
+      "sha256": "0257c2af2cfa114d1171c87880a5b0b3b16b095ed8af77fd09ff65861ae249f2"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-390-menu-open.png",
+      "sha256": "7849627c28b7c21f3b10d3e3c46c1dc19477375f0073a3d5694e773eaba1a7cb"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-dark-desktop-first-screen.png",
+      "sha256": "cf6f76617f854f689a380efb8da2d38e39e56198426ddeffc3a91c532358d6d7"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-light-320-first-screen.png",
+      "sha256": "54e656493fdf4911e33095c761f92500463b19f10621e062efaaa137df3e19a4"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-light-320-menu-open.png",
+      "sha256": "959c6a7852b2848f32826b0f72b8a72924584f84368dcab2522d0dbc7f403f3c"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-light-390-first-screen.png",
+      "sha256": "0cb5fce38807ab6c9b8cd40fba54b373df97f8c4f515a169bfab8e58c00056fe"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-light-390-menu-open.png",
+      "sha256": "444495f6c2fdff1df11708926da305f98c96180233e1d01b55824a6b9a0bb68c"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/athlete-light-desktop-first-screen.png",
+      "sha256": "71d6314df41c453efae4baa5bc342a6b24d503d70e754233d8c7b9023a9bfb34"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-dark-320-first-screen.png",
+      "sha256": "f515c5ed5505e4c8233bc66f795a0c16534798e6123a9be781862d5fa7e82e40"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-dark-320-menu-open.png",
+      "sha256": "317571629cfa1d51ed2115381fc79ca5fa18b4f0546c615438caccf1d6779a41"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-dark-390-first-screen.png",
+      "sha256": "70a76d637580b0d8a2fb7d60b28e3e93d4c3912ceab589663c6e1618418c5b25"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-dark-390-menu-open.png",
+      "sha256": "fe60e2852d198bb7ccf641fd2c295ad15f9608976f82b59cad60ec13d1c07ec7"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-dark-desktop-first-screen.png",
+      "sha256": "252031c6d9b60a7c019f8734211cecdc39a25408da7dd56362ba4381a001b865"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-light-320-first-screen.png",
+      "sha256": "e5b1a9c7d8d787545863dc461f0d8475cb1a75b00eb73bb1ec05c6da6639b56e"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-light-320-menu-open.png",
+      "sha256": "1466bef081790aa33ebb005c04d73a1aa375771a6cd01b13b67f1ba9ac0289d6"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-light-390-first-screen.png",
+      "sha256": "33d17352c17e9bb017625a04e18161ea1e94302959051b134e682534696030dc"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-light-390-menu-open.png",
+      "sha256": "6ae2505608bce239c165af4fff781933c997c22796cd68bb94c9b718d795cf69"
+    },
+    {
+      "file": "docs/design/references/product-v10-landing-approved/final-895/coach-light-desktop-first-screen.png",
+      "sha256": "e39721a0acc86e97283831edce2042dd9e26016a1e44bcd32363c02cb214a1ff"
+    },
+    {
+      "file": "docs/product-v10-landing-region-recovery.md",
+      "sha256": "74e641c7de884bf00800ed8c9e62650c946bcdd534ba62a1f718584d71512563"
+    },
+    {
+      "file": "docs/product-v10-landing-targeted-polish.md",
+      "sha256": "01f0cf1288d547cd9238b9707e5b7da67f9c8b7b690e9ef7d39ebe8e5ba63245"
+    },
+    {
+      "file": "docs/product-v10-landing-visual-acceptance.md",
+      "sha256": "4f9d5471379ed5dff18787bb1970d8e90369b30621c3f4c3cf6c88989530c445"
+    },
+    {
+      "file": "frontend/src/pages/landing/LandingV10CoachJourney.tsx",
+      "sha256": "bebe877896ca6658abb5cb36bb997de1a7b1526fad4ff66d671ceef62cb40722"
+    },
+    {
+      "file": "frontend/tests/e2e/fixtures/landing-pixels.ts",
+      "sha256": "3f17444dc07e04d3398f5bf85ec8343a56262d794e69cd03a00691069b1e9735"
+    },
+    {
+      "file": "frontend/tests/e2e/landing-coach-journey.spec.ts",
+      "sha256": "0aeaf5c9778642c9b8df7e8debbfb29b2aae4c3a19eda03e3adbde8aa7b31bf4"
+    },
+    {
+      "file": "frontend/tests/e2e/landing-frozen-visual.spec.ts",
+      "sha256": "96220d83f89b8f541d1ce10b580c98eb8de92453cba7185b83fffdd5b98de21d"
+    },
+    {
+      "file": "frontend/tests/fixtures/landing-archive-regions.json",
+      "sha256": "86c7b2cf4efe6cb5c00220eea3a2c61b99f3baff6fe3a72fa7387e122a426a09"
+    },
+    {
+      "file": "frontend/tests/unit/pages/landing/landingPixels.test.ts",
+      "sha256": "ce01ea60a06859bdd1924d8e67c6219de9ac8444ea1e0c9a8c5c4657046ee990"
+    }
+  ],
+  "candidateManifestSha256": "0fed7269e09945c562873d8fa9fe86360cd70b1a6175ff23baae545f0840807e",
+  "candidateVersion": "CANDIDATE-FINAL-RECONCILIATION-2026-10-09",
+  "candidateStates": 176,
+  "historicalArchiveResult": "FAIL",
+  "historicalVisualSuite": {
+    "passed": 7,
+    "failed": 40,
+    "skipped": 0,
+    "activeArchiveScenes": 13,
+    "failedRegions": 48,
+    "totalRegions": 50,
+    "frozenMobileFailures": 16
+  },
+  "historicalClassification": {
+    "CONFIRMED_REGRESSION": 2,
+    "SUPERSEDED_WITH_OWNER_EVIDENCE": 0,
+    "CAPTURE_OR_STATE_MISMATCH": 0,
+    "UNRESOLVED": 46
+  },
+  "releaseDisposition": "OWNER_ACCEPTED_DOCUMENTED_PIXEL_DIFFERENCES_FOR_PR_902_ONLY",
+  "pixelThreshold": 0.01,
+  "channelTolerance": 16,
+  "archiveZipSha256": "2be733d3539d98ecb575e9da0449978dfaf8ee993dda8bebbadb7d7e03d3acef",
+  "runtimeChangesAfterApproval": []
+}

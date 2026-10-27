@@ -154,7 +154,7 @@ describe('WorkoutCompletionSummary', () => {
     expect(completion).toHaveAttribute('data-motion-phase', expect.stringMatching(/pending|enter/));
     expect(
       completion?.querySelector('.ui-semantic-artwork--workout-completion'),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(screen.getByText('1 ч 15 мин')).toBeInTheDocument();
     expect(screen.getByText(/1 подход/)).toBeInTheDocument();
     expect(screen.getByText(/Следующая тренировка .* Верх тела/)).toBeInTheDocument();
@@ -288,5 +288,52 @@ describe('WorkoutCompletionSummary', () => {
     const cardioResult = screen.getByText('Велотренажёр').closest('li');
     expect(cardioResult).toHaveTextContent('27 мин · 6.4 км · средний пульс 138 · зона 3');
     expect(cardioResult).not.toHaveTextContent(/подход|повтор|вес/i);
+  });
+
+  it('keeps the owner-approved results, records, feedback and next-step DOM order', async () => {
+    const user = userEvent.setup();
+    renderSummary();
+    const completion = screen
+      .getByRole('heading', { name: 'Тренировка завершена' })
+      .closest('.workout-completion');
+    expect(completion).not.toBeNull();
+    const selectors = [
+      '.workout-completion__facts',
+      '.workout-completion__results',
+      '.workout-completion__records',
+      '.workout-completion__feedback',
+      '.workout-completion__next',
+    ];
+    const ordered = selectors.map((selector) => completion!.querySelector(selector));
+    for (const node of ordered) expect(node).not.toBeNull();
+    for (let index = 0; index < ordered.length - 1; index += 1) {
+      expect(
+        ordered[index]!.compareDocumentPosition(ordered[index + 1]!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+
+    const results = completion!.querySelector<HTMLDetailsElement>('.workout-completion__results');
+    expect(results).not.toBeNull();
+    expect(results!.open).toBe(false);
+    await user.click(screen.getByText('Записанные результаты'));
+    expect(results!.open).toBe(true);
+    expect(screen.getByText(/максимальный вес 50 кг/)).toBeInTheDocument();
+  });
+
+  it('does not render empty result or personal-record disclosures', () => {
+    const emptyWorkout: Workout = {
+      ...workout,
+      completion_summary: {
+        ...workout.completion_summary!,
+        exercises: [],
+        personal_records: [],
+      },
+    };
+    renderSummary(vi.fn(), emptyWorkout);
+    expect(screen.queryByText('Записанные результаты')).not.toBeInTheDocument();
+    expect(screen.queryByText('Новый лучший результат')).not.toBeInTheDocument();
+    expect(screen.getByText('План продолжается')).toBeInTheDocument();
+    expect(screen.getByText('Как ощущалась тренировка?')).toBeInTheDocument();
   });
 });

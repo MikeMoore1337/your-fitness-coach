@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Итог тренировки — предложенный макет #871</title>
+    <style>
+      @font-face {
+        font-family: Inter;
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/inter-cyrillic.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+      @font-face {
+        font-family: Inter;
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/inter-latin.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+          U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+          U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: Oswald;
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/oswald-cyrillic.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+      @font-face {
+        font-family: Oswald;
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/oswald-latin.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+          U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+          U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f1f2f0;
+        --surface-raised: #ffffff;
+        --text: #151515;
+        --muted: #686868;
+        --border: #cfd1ce;
+        --accent: #b2f520;
+        --accent-soft: #e8f9bd;
+        --on-accent: #111111;
+        --success: #4c751d;
+        --shadow: 0 10px 24px rgb(12 18 12 / 7%);
+        --control-radius: 14px;
+      }
+      body[data-theme='dark'] {
+        color-scheme: dark;
+        --bg: #090b0b;
+        --surface: #1b1f1f;
+        --surface-raised: #141717;
+        --text: #f4f4f2;
+        --muted: #b9bbb8;
+        --border: #414542;
+        --accent-soft: #29351d;
+        --success: #b9ea72;
+        --shadow: 0 10px 24px rgb(0 0 0 / 20%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        min-width: 320px;
+        background: var(--bg);
+      }
+      body {
+        min-width: 320px;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      button,
+      textarea {
+        font: inherit;
+      }
+      button:focus-visible,
+      summary:focus-visible,
+      textarea:focus-visible,
+      a:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: Oswald, 'Arial Narrow', Inter, sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+      }
+      .app {
+        width: min(100%, 760px);
+        margin: 0 auto;
+        padding: 12px 12px 116px;
+      }
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 56px;
+        margin-bottom: 18px;
+        border-bottom: 2px solid var(--accent);
+        font-size: 0.86rem;
+        font-weight: 800;
+      }
+      .app-header a {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .app-header a svg {
+        flex: 0 0 16px;
+        width: 16px;
+        height: 16px;
+      }
+      .eyebrow {
+        color: var(--success);
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+      .workout-completion {
+        display: grid;
+        gap: 16px;
+        min-width: 0;
+      }
+      .workout-completion__hero {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-width: 0;
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-inline-start: 4px solid var(--accent);
+        background: var(--surface-raised);
+        box-shadow: var(--shadow);
+      }
+      .workout-completion__hero > div {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+      .workout-completion__hero h1,
+      .workout-completion__hero h2 {
+        font-size: clamp(2rem, 7vw, 3.25rem);
+        line-height: 0.98;
+        overflow-wrap: anywhere;
+      }
+      .workout-completion__hero p {
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .workout-completion__check {
+        display: grid;
+        flex: 0 0 56px;
+        width: 56px;
+        height: 56px;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--on-accent);
+      }
+      .workout-completion__check svg {
+        width: 25px;
+        height: 25px;
+      }
+      .workout-completion__facts {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin: 0;
+        border-block: 1px solid var(--border);
+      }
+      .workout-completion__facts > div {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+        padding: 14px 10px;
+      }
+      .workout-completion__facts > div + div {
+        border-inline-start: 1px solid var(--border);
+      }
+      .workout-completion__facts dt {
+        color: var(--muted);
+        font-size: 0.7rem;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+      .workout-completion__facts dd {
+        margin: 0;
+        font-size: clamp(1rem, 4.5vw, 1.65rem);
+        font-variant-numeric: tabular-nums;
+        font-weight: 850;
+        white-space: nowrap;
+        overflow-wrap: anywhere;
+      }
+      .workout-completion__results,
+      .workout-completion__records,
+      .workout-completion__feedback,
+      .workout-completion__next {
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+      .workout-completion__results {
+        overflow: hidden;
+      }
+      .workout-completion__results > summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        min-height: 58px;
+        padding: 10px 16px;
+        cursor: pointer;
+        list-style: none;
+      }
+      .workout-completion__results > summary::-webkit-details-marker {
+        display: none;
+      }
+      .results-summary-copy {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+      }
+      .results-summary-copy strong {
+        overflow-wrap: anywhere;
+      }
+      .results-summary-copy small {
+        color: var(--muted);
+        font-size: 0.75rem;
+        font-weight: 650;
+        overflow-wrap: anywhere;
+      }
+      .results-summary-action {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 750;
+      }
+      .yfc-disclosure-icon {
+        flex: 0 0 18px;
+        width: 18px;
+        height: 18px;
+        color: var(--muted);
+        transition: transform 160ms ease;
+      }
+      details[open] > summary .yfc-disclosure-icon {
+        transform: rotate(90deg);
+      }
+      .results-list,
+      .records-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0 16px 16px;
+        list-style: none;
+      }
+      .result-row,
+      .record-row {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+        padding: 11px 12px;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: var(--surface-raised);
+      }
+      .result-row strong,
+      .record-row strong {
+        overflow-wrap: anywhere;
+      }
+      .result-row span,
+      .record-row span {
+        color: var(--muted);
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+      .record-row small {
+        color: var(--success);
+        font-weight: 750;
+        overflow-wrap: anywhere;
+      }
+      .empty-results-item {
+        display: grid;
+        gap: 3px;
+        padding: 14px 16px;
+      }
+      .empty-results-item p {
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+      .workout-completion__records,
+      .workout-completion__feedback,
+      .workout-completion__next {
+        display: grid;
+        gap: 12px;
+        padding: 18px 16px;
+      }
+      .section-heading {
+        display: grid;
+        gap: 3px;
+      }
+      .section-heading h2,
+      .workout-completion__next h2 {
+        font-size: clamp(1.35rem, 4.5vw, 1.8rem);
+        line-height: 1.05;
+        overflow-wrap: anywhere;
+      }
+      .section-heading p,
+      .workout-completion__next p {
+        color: var(--muted);
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+      .feedback-options {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .feedback-options button,
+      .action-button {
+        min-width: 0;
+        min-height: 48px;
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface-raised);
+        color: var(--text);
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+      .feedback-options button[aria-pressed='true'] {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--on-accent);
+      }
+      .feedback-label {
+        font-weight: 800;
+      }
+      textarea {
+        width: 100%;
+        min-height: 96px;
+        resize: vertical;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface-raised);
+        color: var(--text);
+      }
+      .feedback-footer,
+      .next-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+      .feedback-footer {
+        justify-content: space-between;
+      }
+      .feedback-footer span {
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+      .action-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+      }
+      .action-button--primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--on-accent);
+      }
+      .action-button--secondary {
+        background: transparent;
+      }
+      .next-actions > * {
+        flex: 1 1 220px;
+      }
+      .save-status {
+        min-height: 20px;
+        color: var(--success);
+        font-size: 0.76rem;
+        font-weight: 750;
+      }
+      .app-bottom-nav {
+        position: fixed;
+        z-index: 2;
+        right: 12px;
+        bottom: max(10px, env(safe-area-inset-bottom, 0px));
+        left: 12px;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 4px;
+        width: min(100% - 24px, 520px);
+        margin: 0 auto;
+        padding: 7px;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: color-mix(in srgb, var(--surface-raised) 90%, transparent);
+        box-shadow: 0 8px 30px rgb(0 0 0 / 18%);
+        backdrop-filter: blur(16px);
+      }
+      .app-bottom-nav span {
+        min-width: 0;
+        padding: 8px 2px;
+        border-radius: 14px;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 750;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .app-bottom-nav span:first-child {
+        background: var(--accent-soft);
+        color: var(--success);
+      }
+      body[data-keyboard='true'] {
+        padding-bottom: 24px;
+      }
+      body[data-keyboard='true'] .app {
+        padding-bottom: 24px;
+      }
+      body[data-keyboard='true'] .app-bottom-nav {
+        display: none;
+      }
+      @media (min-width: 900px) {
+        .app {
+          padding: 28px 24px 48px;
+        }
+        .app-bottom-nav {
+          display: none;
+        }
+        .workout-completion__hero {
+          padding: 28px;
+        }
+        .workout-completion__facts > div {
+          padding: 18px 16px;
+        }
+      }
+      @media (max-width: 359px) {
+        .app-header {
+          font-size: 0.78rem;
+        }
+        .workout-completion__hero {
+          gap: 11px;
+          padding: 16px 12px;
+        }
+        .workout-completion__check {
+          flex-basis: 48px;
+          width: 48px;
+          height: 48px;
+        }
+        .workout-completion__hero h1,
+        .workout-completion__hero h2 {
+          font-size: 2rem;
+        }
+        .workout-completion__facts dt {
+          font-size: 0.66rem;
+        }
+        .workout-completion__results > summary {
+          padding-inline: 12px;
+        }
+        .results-summary-action {
+          display: none;
+        }
+        .feedback-options {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body data-theme="dark">
+    <main class="app" id="today">
+      <header class="app-header">
+        <a href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          К сводке
+        </a>
+        <span>Итог тренировки</span>
+      </header>
+
+      <section class="workout-completion" aria-labelledby="workout-completion-title">
+        <header class="workout-completion__hero">
+          <span class="workout-completion__check" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 12h12M8 8v8M16 8v8M4 10v4M20 10v4" />
+            </svg>
+          </span>
+          <div>
+            <span class="eyebrow">Результат сохранён</span>
+            <h2 id="workout-completion-title" data-bind="title">Тренировка завершена</h2>
+            <p data-bind="workout-title">Смешанная тренировка</p>
+          </div>
+        </header>
+
+        <dl class="workout-completion__facts" aria-label="Ключевые факты тренировки">
+          <div><dt>Длительность</dt><dd data-bind="duration">1 ч 08 мин</dd></div>
+          <div><dt>Упражнений</dt><dd data-bind="exercise-count">4</dd></div>
+          <div><dt data-bind="sets-label">Подходов</dt><dd data-bind="sets-count">10</dd></div>
+        </dl>
+
+        <details class="workout-completion__results" data-section="results">
+          <summary class="yfc-disclosure-summary" aria-controls="recorded-results-body">
+            <span class="results-summary-copy">
+              <strong>Записанные результаты</strong>
+              <small data-bind="result-count">4 упражнения · 10 подходов</small>
+            </span>
+            <span class="results-summary-action" data-bind="results-action">Показать детали</span>
+            <svg class="yfc-disclosure-icon" data-icon="disclosure-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </summary>
+          <ul class="results-list" id="recorded-results-body" data-bind="results"></ul>
+        </details>
+
+        <section class="workout-completion__records" aria-labelledby="workout-records-title" data-section="records">
+          <div class="section-heading">
+            <span class="eyebrow">Личные результаты</span>
+            <h2 id="workout-records-title">Новый лучший результат</h2>
+          </div>
+          <ul class="records-list" data-bind="records"></ul>
+        </section>
+
+        <form class="workout-completion__feedback" data-section="feedback">
+          <div class="section-heading">
+            <h2>Как ощущалась тренировка?</h2>
+            <p>Необязательно. Введённая заметка останется в форме при раскрытии результатов.</p>
+          </div>
+          <div class="feedback-options" role="group" aria-label="Оценка тренировки">
+            <button type="button" aria-pressed="false">Легче ожидаемого</button>
+            <button type="button" aria-pressed="false">Нормально</button>
+            <button type="button" aria-pressed="false">Тяжелее ожидаемого</button>
+          </div>
+          <label class="feedback-label" for="completion-note">Заметка</label>
+          <textarea id="completion-note" maxlength="500" rows="3" placeholder="Что стоит учесть в следующий раз"></textarea>
+          <div class="feedback-footer">
+            <span data-bind="note-count">0 из 500</span>
+            <button class="action-button action-button--primary" type="submit">Сохранить</button>
+          </div>
+          <p class="save-status" aria-live="polite" data-bind="save-status"></p>
+        </form>
+
+        <section class="workout-completion__next" aria-labelledby="workout-next-title" data-section="next">
+          <span class="eyebrow">Следующий шаг</span>
+          <h2 id="workout-next-title">План продолжается</h2>
+          <p data-bind="next-workout">Следующая тренировка — через три дня. До неё — восстановление.</p>
+          <div class="next-actions">
+            <a class="action-button action-button--primary" href="#today">Вернуться в Сегодня</a>
+            <a class="action-button action-button--secondary" href="#progress">Посмотреть Прогресс</a>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <span id="progress" aria-hidden="true"></span>
+    <nav class="app-bottom-nav" aria-label="Основная навигация">
+      <span>Сегодня</span><span>План</span><span>Питание</span><span>Прогресс</span><span>Добавить</span>
+    </nav>
+
+    <script>
+      const scenarios = {
+        strength: {
+          title: 'Силовая база', duration: '1 ч 15 мин', exercises: 3, sets: 8, setsLabel: 'Подходов',
+          next: 'Следующая тренировка — воскресенье, 13 октября в 09:00: Верх тела. До неё — восстановление.',
+          records: [{ title: 'Приседания со штангой', value: 'максимальный вес 80 кг' }],
+          results: [
+            { title: 'Приседания со штангой', value: '3 подхода · 24 повторов · вес до 80 кг' },
+            { title: 'Румынская тяга', value: '3 подхода · 22 повторов · вес до 55 кг' },
+            { title: 'Планка', value: '2 подхода · 120 секунд' },
+          ],
+        },
+        cardio: {
+          title: 'Кардио · ровный темп', duration: '42 мин', exercises: 2, sets: 4, setsLabel: 'Этапов',
+          next: 'Дальше — восстановление. Следующее кардио пока не запланировано.', records: [],
+          results: [
+            { title: 'Беговая дорожка', value: '27 мин · 4.8 км · средний пульс 138 · зона 3' },
+            { title: 'Велотренажёр', value: '15 мин · 6.4 км · средний пульс 132 · зона 2' },
+          ],
+        },
+        mixed: {
+          title: 'Смешанная тренировка', duration: '1 ч 08 мин', exercises: 4, sets: 10, setsLabel: 'Подходов',
+          next: 'Следующая тренировка — через три дня в 19:00: Верх тела. До неё — восстановление.',
+          records: [{ title: 'Жим гантелей лёжа', value: 'лучший подход 32 кг (вес × повторы)' }],
+          results: [
+            { title: 'Приседания со штангой', value: '3 подхода · 24 повторов · вес до 80 кг' },
+            { title: 'Жим гантелей лёжа', value: '3 подхода · 22 повторов · вес до 32 кг' },
+            { title: 'Гребля в тренажёре', value: '2 подхода · 18 повторов · вес до 45 кг' },
+            { title: 'Велотренажёр', value: '22 мин · 8.1 км · средний пульс 141 · зона 3' },
+          ],
+        },
+        empty: {
+          title: 'Короткая тренировка', duration: '12 мин', exercises: 0, sets: 0, setsLabel: 'Подходов',
+          next: 'Дальше — восстановление. Ближайшая тренировка пока не запланирована.', records: [], results: [],
+        },
+        many: {
+          title: 'Объёмная тренировка', duration: '2 ч 04 мин', exercises: 8, sets: 24, setsLabel: 'Подходов',
+          next: 'Следующая тренировка — через два дня: Мобильность. До неё — восстановление.',
+          records: [{ title: 'Тяга верхнего блока', value: 'максимальный вес 62.5 кг' }],
+          results: [
+            { title: 'Приседания со штангой', value: '3 подхода · 24 повторов · вес до 80 кг' },
+            { title: 'Жим гантелей лёжа', value: '3 подхода · 22 повторов · вес до 32 кг' },
+            { title: 'Тяга верхнего блока', value: '3 подхода · 30 повторов · вес до 62.5 кг' },
+            { title: 'Румынская тяга', value: '3 подхода · 24 повторов · вес до 55 кг' },
+            { title: 'Разведения в кроссовере', value: '3 подхода · 36 повторов · вес до 15 кг' },
+            { title: 'Выпады с гантелями', value: '3 подхода · 24 повторов · вес до 20 кг' },
+            { title: 'Гиперэкстензия', value: '3 подхода · 30 повторов · вес до 10 кг' },
+            { title: 'Планка', value: '3 этапа · 180 секунд' },
+          ],
+        },
+        long: {
+          title: 'Силовая тренировка с контролируемой паузой в нижней точке', duration: '5 ч 24 мин', exercises: 5, sets: 14, setsLabel: 'Подходов',
+          next: 'Следующая тренировка — через три дня: Верх тела. До неё — восстановление.',
+          records: [{ title: 'Приседания со штангой с контролируемой паузой в нижней точке', value: 'максимальный вес 80 кг' }],
+          results: [
+            { title: 'Приседания со штангой с контролируемой паузой в нижней точке', value: '4 подхода · 28 повторов · вес до 80 кг' },
+            { title: 'Тяга верхнего блока нейтральным хватом', value: '3 подхода · 30 повторов · вес до 55 кг' },
+            { title: 'Жим гантелей лёжа с контролируемой паузой', value: '3 подхода · 22 повторов · вес до 32 кг' },
+            { title: 'Велотренажёр с постепенным снижением темпа', value: '22 мин · 8.1 км · средний пульс 141 · зона 3' },
+          ],
+        },
+      };
+
+      const query = new URLSearchParams(location.search);
+      const theme = query.get('theme') === 'light' ? 'light' : 'dark';
+      const scenario = scenarios[query.get('scenario')] || scenarios.mixed;
+      const body = document.body;
+      body.dataset.theme = theme;
+      if (query.get('keyboard') === '1') body.dataset.keyboard = 'true';
+
+      const bind = (name) => document.querySelector(`[data-bind="${name}"]`);
+      bind('workout-title').textContent = scenario.title;
+      bind('duration').textContent = scenario.duration;
+      bind('exercise-count').textContent = String(scenario.exercises);
+      bind('sets-label').textContent = scenario.setsLabel;
+      bind('sets-count').textContent = String(scenario.sets);
+      bind('next-workout').textContent = scenario.next;
+      bind('result-count').textContent = scenario.results.length
+        ? `${scenario.results.length} упражнений · ${scenario.sets} ${scenario.setsLabel.toLowerCase()}`
+        : 'Нет записанных результатов';
+
+      const resultsDetails = document.querySelector('[data-section="results"]');
+      const resultsList = bind('results');
+      if (!scenario.results.length) {
+        const empty = document.createElement('li');
+        empty.className = 'empty-results-item';
+        const text = document.createElement('p');
+        text.textContent = 'Подтверждённых результатов нет.';
+        empty.append(text);
+        resultsList.append(empty);
+      } else {
+        scenario.results.forEach((item) => {
+          const row = document.createElement('li');
+          row.className = 'result-row';
+          const title = document.createElement('strong');
+          title.textContent = item.title;
+          const value = document.createElement('span');
+          value.textContent = item.value;
+          row.append(title, value);
+          resultsList.append(row);
+        });
+      }
+      const summary = resultsDetails.querySelector('summary');
+      const action = bind('results-action');
+      const syncResults = () => {
+        summary.setAttribute('aria-expanded', String(resultsDetails.open));
+        action.textContent = resultsDetails.open ? 'Скрыть детали' : 'Показать детали';
+      };
+      resultsDetails.addEventListener('toggle', syncResults);
+      syncResults();
+
+      const recordsList = bind('records');
+      if (!scenario.records.length) {
+        document.querySelector('[data-section="records"]').remove();
+      } else {
+        scenario.records.forEach((item) => {
+          const row = document.createElement('li');
+          row.className = 'record-row';
+          const title = document.createElement('strong');
+          title.textContent = item.title;
+          const value = document.createElement('small');
+          value.textContent = item.value;
+          row.append(title, value);
+          recordsList.append(row);
+        });
+      }
+
+      const feedback = document.querySelector('[data-section="feedback"]');
+      const note = document.getElementById('completion-note');
+      const noteCount = bind('note-count');
+      const saveStatus = bind('save-status');
+      const updateNoteCount = () => { noteCount.textContent = `${note.value.length} из 500`; };
+      note.addEventListener('input', () => { saveStatus.textContent = ''; updateNoteCount(); });
+      updateNoteCount();
+      feedback.querySelectorAll('.feedback-options button').forEach((button) => {
+        button.addEventListener('click', () => {
+          feedback.querySelectorAll('.feedback-options button').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+        });
+      });
+      feedback.addEventListener('submit', (event) => {
+        event.preventDefault();
+        saveStatus.textContent = 'Обратная связь сохранена';
+      });
+      if (query.get('note')) {
+        note.value = query.get('note');
+        updateNoteCount();
+      }
+      if (query.get('focus') === 'results' && resultsDetails) {
+        resultsDetails.querySelector('summary').focus();
+      }
+      if (query.get('keyboard') === '1') note.focus();
+    </script>
+  </body>
+</html>

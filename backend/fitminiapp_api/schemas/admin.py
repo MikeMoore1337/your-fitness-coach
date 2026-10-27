@@ -87,15 +87,114 @@ class AdminUserDetail(AdminUserSearchRow):
     audit_history: list[AdminAuditRow] = Field(default_factory=list)
 
 
-class AdminFunnelStage(BaseModel):
-    key: Literal["registered", "profile_ready", "program_activated", "core_value_reached"]
-    account_count: int
-    cohort_rate_percent: float
+AdminLifecycleKpiKey = Literal[
+    "activation_rate",
+    "time_to_first_useful_action",
+    "first_workout_completion_rate",
+    "first_week_value_rate",
+    "d1_meaningful_return",
+    "d7_meaningful_return",
+    "d30_meaningful_return",
+    "missed_workout_recovery_conversion",
+    "recovery_to_completion_rate",
+    "time_to_recovery",
+    "nutrition_repeat_rate",
+    "progress_next_action_completion_rate",
+    "weekly_loop_completion",
+]
+
+
+class AdminLifecycleKpi(BaseModel):
+    key: AdminLifecycleKpiKey
+    numerator: int
+    denominator: int
+    cohort_size: int
+    rate_percent: float | None = None
+    median_seconds: float | None = None
+    window: str
+
+
+class AdminLifecycleDataQuality(BaseModel):
+    status: Literal["clean", "attention"]
+    total_milestones: int = Field(ge=0)
+    authoritative_success_count: int = Field(ge=0)
+    authoritative_success_rate_percent: float | None = Field(default=None, ge=0, le=100)
+    duplicate_milestones: int
+    duplicate_web_tma_outcomes: int = Field(ge=0)
+    impossible_order: int
+    demo_test_contamination: int = Field(ge=0)
+    client_success_without_server: int
+    post_deletion_milestones: int = Field(ge=0)
+    unauthorized_cross_account_outcomes: int = Field(ge=0)
+    malformed_schema_versions: int = Field(ge=0)
+    retention_expired_milestones: int = Field(ge=0)
+    invalid_milestones: int
+    excluded_role_accounts: int
+    timezone_fallback_accounts: int
+
+
+class AdminNutritionRepeatMetrics(BaseModel):
+    eligible_opportunities: int
+    confirmed_repeats: int
+    repeat_rate_percent: float | None = None
+    preview_count: int
+    confirmed_preview_count: int
+    preview_to_confirmed_percent: float | None = None
+    median_seconds: float | None = None
+    persistence_failures: int
+    persistence_failure_rate_percent: float | None = None
+    duplicate_prevention_count: int
 
 
 class AdminFunnelResponse(BaseModel):
     period_days: int
     cohort_since: datetime
+    cohort_until: datetime
+    as_of: datetime
+    milestone_retention_days: int = Field(ge=180, le=3650)
+    aggregate_retention_days: int = Field(ge=180, le=730)
+    cohort_size: int
+    complete_weekly_cohorts: int
+    sample_status: Literal["INSUFFICIENT_SAMPLE", "READY_FOR_EFFECT_REVIEW"]
+    sample_note: str
+    eligible_real_account_count: int
+    recovery_eligible_real_account_count: int
+    nutrition_repeat_metrics: AdminNutritionRepeatMetrics
     analytics_provider_status: Literal["not_connected"]
     coverage_note: str
-    stages: list[AdminFunnelStage]
+    effect_status: Literal["NOT_YET_PROVEN", "BASELINE_ONLY"]
+    effect_note: str
+    exclusions: list[str]
+    data_quality: AdminLifecycleDataQuality
+    kpis: list[AdminLifecycleKpi]
+
+
+class AdminTrainerCapacityBand(BaseModel):
+    band: Literal["0_9", "10_29", "30_99", "100_plus"]
+    trainer_count: int = Field(ge=0)
+    active_client_count: int = Field(ge=0)
+
+
+class AdminTrainerCapacityResponse(BaseModel):
+    period_days: int = Field(ge=7, le=730)
+    cohort_since: datetime
+    cohort_until: datetime
+    as_of: datetime
+    eligible_account_count: int = Field(ge=0)
+    activated_trainer_count: int = Field(ge=0)
+    trainer_activation_rate_percent: float | None = Field(default=None, ge=0, le=100)
+    trainers_with_first_client_action: int = Field(ge=0)
+    time_to_first_client_action_median_seconds: float | None = Field(default=None, ge=0)
+    active_trainer_count: int = Field(ge=0)
+    active_client_count: int = Field(ge=0)
+    pending_invite_count: int = Field(ge=0)
+    open_task_count: int = Field(ge=0)
+    authorized_client_action_success_count: int = Field(ge=0)
+    authorized_client_action_failure_count: int | None = Field(default=None, ge=0)
+    authorized_client_action_failure_status: Literal["not_recorded"]
+    response_time_p50_ms: float | None = Field(default=None, ge=0)
+    response_time_p95_ms: float | None = Field(default=None, ge=0)
+    response_time_status: Literal["not_measured"]
+    capacity_bands: list[AdminTrainerCapacityBand]
+    coverage_note: str
+    exclusions: list[str]

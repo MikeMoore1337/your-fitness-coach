@@ -6,10 +6,27 @@ from typing import TYPE_CHECKING
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from fitminiapp_api.models.acquisition import FirstTouchAttribution
+from fitminiapp_api.models.ai_coach import (
+    AiCoachConsent,
+    AiCoachConversation,
+    AiCoachConversationMessage,
+    AiCoachMemory,
+    AiCoachMemoryConsent,
+)
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity, LocalCredential
 from fitminiapp_api.models.cardio import CardioSession
 from fitminiapp_api.models.check_in import WeeklyCheckIn
+from fitminiapp_api.models.coach_crm import (
+    CoachBusinessSession,
+    CoachPackage,
+    CoachPackageLedgerEntry,
+    CoachPayment,
+    CoachSessionSeries,
+    CoachTask,
+)
+from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
     Exercise,
@@ -17,16 +34,31 @@ from fitminiapp_api.models.exercise import (
     ExerciseEquipment,
     ExerciseMuscle,
 )
+from fitminiapp_api.models.exercise_setup_memory import ExerciseSetupMemory
 from fitminiapp_api.models.feedback import WorkoutComment
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import (
+    FoodDiaryBatchOperation,
     FoodDiaryCopyOperation,
     FoodDiaryDayStatus,
     FoodDiaryEntry,
 )
+from fitminiapp_api.models.grocery_list import GroceryList, GroceryListItem
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
-from fitminiapp_api.models.notification import Notification, NotificationSetting
+from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
+from fitminiapp_api.models.notification import (
+    Notification,
+    NotificationDelivery,
+    NotificationSetting,
+    WebPushSubscription,
+)
 from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
+from fitminiapp_api.models.nutrition_plan import NutritionPlan
+from fitminiapp_api.models.nutrition_power import (
+    FoodSearchAlias,
+    NutritionMealTemplate,
+)
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
     ProgramTemplate,
@@ -38,37 +70,47 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutExercise,
 )
+from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.recipe import Recipe
+from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
+from fitminiapp_api.models.report_handoff import ReportHandoff
 from fitminiapp_api.models.user import (
     BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
     CoachClient,
     CoachRoleApplication,
     User,
 )
 from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery, WeeklyDigestPreference
+from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.services.profile import serialize_body_priority
 
 if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 7
+ACCOUNT_EXPORT_SCHEMA_VERSION = 24
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
 # domain cannot silently bypass an export/privacy decision.
 ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "users": "account",
+    "first_touch_attributions": "first_touch_attribution",
     "auth_identities": "auth_identities",
     "local_credentials": "local_credential",
     "user_profiles": "profile",
     "user_profile_priority_muscles": "profile",
     "body_measurements": "measurements",
+    "body_measurement_definitions": "measurements",
+    "body_measurement_custom_values": "measurements",
     "cardio_sessions": "cardio_sessions",
     "nutrition_targets": "nutrition",
     "hydration_goals": "hydration",
     "hydration_entries": "hydration",
     "hydration_presets": "hydration",
+    "lifecycle_milestones": "lifecycle_milestones",
     "energy_calibrations": "energy_calibrations",
     "weekly_check_ins": "weekly_check_ins",
     "daily_wellbeing_check_ins": "daily_wellbeing_check_ins",
@@ -76,12 +118,24 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "food_favorites": "food_favorites",
     "recipes": "recipes",
     "recipe_ingredients": "recipes",
+    "nutrition_meal_templates": "nutrition_meal_templates",
+    "nutrition_meal_template_items": "nutrition_meal_templates",
+    "nutrition_plans": "nutrition_plans",
+    "nutrition_plan_items": "nutrition_plans",
+    "grocery_lists": "grocery_lists",
+    "grocery_list_items": "grocery_lists",
+    "grocery_list_item_sources": "grocery_lists",
+    "food_search_aliases": "food_search_aliases",
     "food_diary_entries": "food_diary_entries",
     "food_diary_day_statuses": "food_diary_day_statuses",
     "food_diary_copy_operations": "food_diary_copy_operations",
+    "food_diary_batch_operations": "food_diary_batch_operations",
     "program_templates": "program_templates",
     "program_template_days": "program_templates",
     "program_template_exercises": "program_templates",
+    "program_template_exercise_weeks": "program_templates",
+    "public_shares": "public_shares",
+    "public_share_imports": "public_share_imports",
     "hidden_program_templates": "hidden_program_templates",
     "user_programs": "programs",
     "program_revisions": "programs",
@@ -91,20 +145,39 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "workout_adaptations": "programs",
     "user_workout_exercises": "programs",
     "user_workout_sets": "programs",
+    "workout_rest_sessions": "programs",
+    "exercise_setup_memories": "exercise_setup_memories",
     "exercises": "custom_exercises",
     "exercise_muscles": "custom_exercises",
     "exercise_equipment": "custom_exercises",
     "exercise_guide_metadata": "custom_exercises",
     "exercise_alternatives": "custom_exercises",
     "coach_clients": "coaching_relationships",
+    "coach_session_series": "coach_session_series",
+    "coach_business_sessions": "coach_business_sessions",
+    "coach_packages": "coach_packages",
+    "coach_package_ledger": "coach_package_ledger",
+    "coach_payments": "coach_payments",
+    "coach_tasks": "coach_tasks",
+    "coach_check_in_reviews": "coach_check_in_reviews",
     "coach_role_applications": "coach_role_applications",
     "workout_comments": "workout_comments",
     "workout_comment_revisions": "workout_comments",
     "notification_settings": "notification_settings",
+    "reminder_template_schedules": "reminder_template_schedules",
     "notifications": "notifications",
+    "web_push_subscriptions": "web_push_subscriptions",
+    "notification_deliveries": "notification_deliveries",
+    "report_handoffs": "report_handoffs",
     "weekly_digest_preferences": "weekly_digest_preference",
     "weekly_digest_deliveries": "weekly_digest_deliveries",
     "audit_events": "audit_events",
+    "ai_coach_consents": "ai_coach_consent",
+    "ai_coach_conversations": "ai_coach_conversations",
+    "ai_coach_conversation_messages": "ai_coach_conversation_messages",
+    "ai_coach_memory_consents": "ai_coach_memory_consent",
+    "ai_coach_memories": "ai_coach_memories",
+    "nutrition_catalog_contributions": "nutrition_catalog_contributions",
 }
 
 ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
@@ -116,11 +189,130 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "payments": "retired operational billing/provider records",
     "subscriptions": "retired operational billing records",
     "workout_set_mutations": "idempotency fingerprints used only for sync correctness",
+    "workout_rest_actions": "idempotency fingerprints and mutation ids used only for sync correctness",
+    "program_imports": (
+        "short-lived owner-scoped import drafts; source is never persisted and normalized content "
+        "is cleared on terminal state"
+    ),
+    "nutrition_label_drafts": (
+        "short-lived owner-scoped nutrition drafts; the source image and raw OCR are never persisted"
+    ),
+    "photo_meal_drafts": (
+        "short-lived owner-scoped meal photo drafts; the source image is never persisted"
+    ),
+    "food_diary_repeat_previews": (
+        "short-lived owner-scoped repeat preview capabilities and aggregate measurement metadata; "
+        "no diary content or raw nutrition facts are persisted"
+    ),
+    "ai_coach_quota_windows": "operational AI Coach quota window and usage metadata",
+    "ai_coach_quota_reservations": (
+        "short-lived AI Coach quota reservations and opaque idempotency metadata"
+    ),
+    "ai_coach_conversation_message_requests": (
+        "opaque AI Coach message request keys used only for idempotency"
+    ),
+    "nutrition_plan_operations": "idempotency fingerprints used only for planner write safety",
+    "coach_check_in_templates": "private trainer-owned check-in templates and helper text",
+    "coach_check_in_template_versions": "private trainer-owned check-in field definitions",
+    "coach_check_in_assignments": "coach-client check-in assignment metadata",
+    "coach_check_in_responses": "health-adjacent check-in responses kept out of generic archives",
+    "coach_workflow_templates": "private trainer-owned onboarding and communication templates",
+    "coach_workflow_template_versions": (
+        "private trainer-owned workflow versions and message content"
+    ),
+    "coach_workflow_assignments": (
+        "trainer-owned client assignment metadata kept out of generic archives"
+    ),
+    "coach_communication_drafts": (
+        "trainer-owned client message drafts and confirmation metadata kept out of generic archives"
+    ),
 }
 
 
 def _fields(row: object, names: tuple[str, ...]) -> dict[str, object]:
     return {name: getattr(row, name) for name in names}
+
+
+def _crm_business_session_fields(row: CoachBusinessSession) -> dict[str, object]:
+    names: tuple[str, ...] = (
+        "id",
+        "client_user_id",
+        "series_id",
+        "package_id",
+        "user_workout_id",
+        "occurrence_key",
+        "starts_at_utc",
+        "timezone",
+        "duration_minutes",
+        "format",
+        "location",
+        "status",
+        "created_at",
+        "updated_at",
+    )
+    return _fields(row, names)
+
+
+def _crm_package_fields(row: CoachPackage, user_id: int) -> dict[str, object]:
+    names: tuple[str, ...] = (
+        "id",
+        "client_user_id",
+        "name",
+        "counts_sessions",
+        "included_sessions",
+        "starts_on",
+        "expires_on",
+        "state",
+        "created_at",
+        "updated_at",
+    )
+    if row.coach_user_id == user_id:
+        names = (*names[:-2], "note", *names[-2:])
+    return _fields(row, names)
+
+
+def _crm_payment_fields(row: CoachPayment, user_id: int) -> dict[str, object]:
+    names: tuple[str, ...] = (
+        "id",
+        "client_user_id",
+        "package_id",
+        "expected_amount_minor",
+        "paid_amount_minor",
+        "currency",
+        "payment_date",
+        "method",
+        "status",
+        "created_at",
+        "updated_at",
+    )
+    if row.coach_user_id == user_id:
+        names = (*names[:-2], "note", *names[-2:])
+    return _fields(row, names)
+
+
+def _serialize_ai_coach_conversation_message(
+    message: AiCoachConversationMessage,
+) -> dict[str, object]:
+    payload = _fields(
+        message,
+        (
+            "id",
+            "conversation_id",
+            "role",
+            "content",
+            "status",
+            "outcome",
+            "safety_category",
+            "failure_category",
+            "request_id",
+            "citations",
+            "limitations",
+            "created_at",
+        ),
+    )
+    if message.content_overflow is not None:
+        payload["content"] = message.content_overflow
+    return payload
 
 
 FOOD_FIELDS = (
@@ -136,6 +328,13 @@ FOOD_FIELDS = (
     "standard_serving_amount",
     "standard_serving_unit",
     "standard_serving_weight_g",
+    "nutrition_basis_kind",
+    "nutrition_basis_amount",
+    "nutrition_basis_unit",
+    "canonical_facts",
+    "nutrition_provenance",
+    "canonical_complete",
+    "catalog_quality",
     "food_type",
     "provenance",
     "source_name",
@@ -161,6 +360,15 @@ SNAPSHOT_NUTRIENT_FIELDS = (
     "serving_amount",
     "serving_unit",
     "serving_weight_g",
+)
+
+DIARY_SNAPSHOT_NUTRIENT_FIELDS = (
+    *SNAPSHOT_NUTRIENT_FIELDS,
+    "nutrition_basis_kind",
+    "nutrition_basis_amount",
+    "nutrition_basis_unit",
+    "nutrition_snapshot",
+    "nutrition_amount",
 )
 
 NUTRITION_FIELDS = (
@@ -239,6 +447,8 @@ WEEKLY_CHECK_IN_FIELDS = (
     "hunger",
     "adherence_difficulty",
     "note",
+    "progress_action_kind",
+    "progress_action_completed_at",
     "created_at",
 )
 
@@ -285,6 +495,98 @@ def _serialize_recipe_ingredient(ingredient: RecipeIngredient) -> dict[str, obje
     }
 
 
+def _serialize_meal_template(template: NutritionMealTemplate) -> dict[str, object]:
+    return {
+        "id": template.id,
+        "name": template.name,
+        "created_at": template.created_at,
+        "updated_at": template.updated_at,
+        "items": [
+            {
+                "id": item.id,
+                "position": item.position,
+                "item_kind": item.item_kind,
+                "food_id": item.food_id,
+                "recipe_id": item.recipe_id,
+                "amount": item.amount,
+                "amount_unit": item.amount_unit,
+                "source_name": item.source_name,
+                "source_brand": item.source_brand,
+            }
+            for item in template.items
+        ],
+    }
+
+
+def _serialize_nutrition_plan(plan: NutritionPlan) -> dict[str, object]:
+    return {
+        "id": plan.id,
+        "plan_date": plan.plan_date,
+        "revision": plan.revision,
+        "created_at": plan.created_at,
+        "updated_at": plan.updated_at,
+        "items": [
+            {
+                "id": item.id,
+                "source_template_id": item.source_template_id,
+                "food_id": item.food_id,
+                "recipe_id": item.recipe_id,
+                "item_kind": item.item_kind,
+                "meal_type": item.meal_type,
+                "position": item.position,
+                "amount": item.amount,
+                "amount_unit": item.amount_unit,
+                "source_name": item.source_name,
+                "source_brand": item.source_brand,
+                "status": item.status or "planned",
+                "diary_entry_id": item.diary_entry_id,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+            }
+            for item in plan.items
+        ],
+    }
+
+
+def _serialize_grocery_list(grocery_list: GroceryList) -> dict[str, object]:
+    return {
+        "id": grocery_list.id,
+        "week_start": grocery_list.week_start,
+        "generated_at": grocery_list.generated_at,
+        "created_at": grocery_list.created_at,
+        "updated_at": grocery_list.updated_at,
+        "items": [
+            {
+                "id": item.id,
+                "source_kind": item.source_kind,
+                "food_id": item.food_id,
+                "aggregation_key": item.aggregation_key,
+                "name": item.name,
+                "brand": item.brand,
+                "amount": item.amount,
+                "amount_unit": item.amount_unit,
+                "checked": item.checked,
+                "owned": item.owned,
+                "position": item.position,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+                "sources": [
+                    {
+                        "id": source.id,
+                        "plan_item_id": source.plan_item_id,
+                        "recipe_id": source.recipe_id,
+                        "plan_date": source.plan_date,
+                        "meal_type": source.meal_type,
+                        "recipe_name": source.recipe_name,
+                    }
+                    for source in item.sources
+                ],
+            }
+            for item in grocery_list.items
+        ],
+    }
+
+
 def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
     return {
         "id": template.id,
@@ -294,6 +596,10 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
         "level": template.level,
         "split_type": template.split_type,
         "is_public": template.is_public,
+        "default_duration_weeks": template.effective_duration_weeks,
+        "provenance_type": template.provenance_type or "CUSTOM",
+        "provenance": template.provenance,
+        "program_metadata": template.program_metadata,
         "created_at": template.created_at,
         "days": [
             {
@@ -314,11 +620,31 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
                             "notes",
                             "superset_group",
                             "superset_order",
+                            "group_id",
+                            "group_kind",
+                            "group_order",
+                            "prescription",
                         ),
                     )
                     | {
                         "exercise_title": exercise.exercise.title,
                         "metric_type": exercise.exercise.metric_type or "strength",
+                        "weekly_prescriptions": [
+                            _fields(
+                                prescription,
+                                (
+                                    "id",
+                                    "exercise_id",
+                                    "week_number",
+                                    "prescribed_sets",
+                                    "prescribed_reps",
+                                    "prescribed_duration_minutes",
+                                    "rest_seconds",
+                                    "prescription",
+                                ),
+                            )
+                            for prescription in exercise.weekly_prescriptions
+                        ],
                     }
                     for exercise in day.exercises
                 ],
@@ -328,7 +654,9 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
     }
 
 
-def _serialize_program(program: UserProgram) -> dict[str, object]:
+def _serialize_program(
+    program: UserProgram, rest_by_workout: dict[int, list[dict[str, object]]]
+) -> dict[str, object]:
     return {
         "id": program.id,
         "title": program.template.title if program.template else "Архивная программа",
@@ -342,6 +670,7 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
         "completed_at": program.completed_at,
         "archived_at": program.archived_at,
         "current_revision_number": program.current_revision_number,
+        "restarted_from_program_id": program.restarted_from_program_id,
         "revisions": [
             _fields(
                 revision,
@@ -399,6 +728,7 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                         "completion_feedback_updated_at",
                     ),
                 ),
+                "rest_sessions": rest_by_workout.get(workout.id, []),
                 "adaptations": [
                     _fields(
                         adaptation,
@@ -429,6 +759,12 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                                 "notes",
                                 "superset_group",
                                 "superset_order",
+                                "source_template_exercise_id",
+                                "source_weekly_prescription_id",
+                                "group_id",
+                                "group_kind",
+                                "group_order",
+                                "prescription",
                             ),
                         ),
                         "title": exercise.exercise.title if exercise.exercise else None,
@@ -453,6 +789,11 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                                     "rir",
                                     "set_kind",
                                     "reached_failure",
+                                    "planned_role",
+                                    "planned_group_id",
+                                    "planned_group_kind",
+                                    "planned_position",
+                                    "planned_round",
                                     "is_completed",
                                     "version",
                                 ),
@@ -491,10 +832,45 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(UserProgram.assigned_at.asc(), UserProgram.id.asc())
         .all()
     )
+    rest_by_workout: dict[int, list[dict[str, object]]] = {}
+    for row in (
+        db.query(WorkoutRestSession)
+        .filter(WorkoutRestSession.user_id == user.id)
+        .order_by(WorkoutRestSession.workout_id, WorkoutRestSession.started_at)
+        .all()
+    ):
+        rest_by_workout.setdefault(row.workout_id, []).append(
+            _fields(
+                row,
+                (
+                    "id",
+                    "source_set_id",
+                    "started_at",
+                    "ended_at",
+                    "planned_seconds",
+                    "adjusted_seconds",
+                    "measured_seconds",
+                    "status",
+                    "source",
+                    "quality",
+                ),
+            )
+        )
     measurements = (
         db.query(BodyMeasurement)
+        .options(
+            selectinload(BodyMeasurement.custom_values).joinedload(
+                BodyMeasurementCustomValue.definition
+            )
+        )
         .filter(BodyMeasurement.user_id == user.id)
         .order_by(BodyMeasurement.measured_on.asc(), BodyMeasurement.id.asc())
+        .all()
+    )
+    measurement_definitions = (
+        db.query(BodyMeasurementDefinition)
+        .filter(BodyMeasurementDefinition.user_id == user.id)
+        .order_by(BodyMeasurementDefinition.created_at.asc(), BodyMeasurementDefinition.id.asc())
         .all()
     )
     cardio_sessions = (
@@ -540,6 +916,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(WeeklyCheckIn.week_start.asc(), WeeklyCheckIn.id.asc())
         .all()
     )
+    lifecycle_milestones = (
+        db.query(LifecycleMilestone)
+        .filter(LifecycleMilestone.user_id == user.id)
+        .order_by(LifecycleMilestone.occurred_at.asc(), LifecycleMilestone.id.asc())
+        .all()
+    )
     daily_wellbeing_check_ins = (
         db.query(DailyWellbeingCheckIn)
         .filter(DailyWellbeingCheckIn.user_id == user.id)
@@ -553,10 +935,20 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .all()
     )
     local_credential = db.query(LocalCredential).filter(LocalCredential.user_id == user.id).first()
+    first_touch_attribution = db.get(FirstTouchAttribution, user.id)
     private_foods = (
         db.query(Food)
         .filter(Food.owner_user_id == user.id)
         .order_by(Food.created_at.asc(), Food.id.asc())
+        .all()
+    )
+    nutrition_catalog_contributions = (
+        db.query(NutritionCatalogContribution)
+        .filter(NutritionCatalogContribution.contributor_user_id == user.id)
+        .order_by(
+            NutritionCatalogContribution.created_at.asc(),
+            NutritionCatalogContribution.id.asc(),
+        )
         .all()
     )
     favorite_foods = (
@@ -574,6 +966,33 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .options(selectinload(Recipe.ingredients))
         .filter(Recipe.owner_user_id == user.id)
         .order_by(Recipe.created_at.asc(), Recipe.id.asc())
+        .all()
+    )
+    meal_templates = (
+        db.query(NutritionMealTemplate)
+        .options(selectinload(NutritionMealTemplate.items))
+        .filter(NutritionMealTemplate.owner_user_id == user.id)
+        .order_by(NutritionMealTemplate.created_at.asc(), NutritionMealTemplate.id.asc())
+        .all()
+    )
+    nutrition_plans = (
+        db.query(NutritionPlan)
+        .options(selectinload(NutritionPlan.items))
+        .filter(NutritionPlan.user_id == user.id)
+        .order_by(NutritionPlan.plan_date.asc(), NutritionPlan.id.asc())
+        .all()
+    )
+    grocery_lists = (
+        db.query(GroceryList)
+        .options(selectinload(GroceryList.items).selectinload(GroceryListItem.sources))
+        .filter(GroceryList.user_id == user.id)
+        .order_by(GroceryList.week_start.asc(), GroceryList.id.asc())
+        .all()
+    )
+    food_search_aliases = (
+        db.query(FoodSearchAlias)
+        .filter(FoodSearchAlias.user_id == user.id)
+        .order_by(FoodSearchAlias.created_at.asc(), FoodSearchAlias.id.asc())
         .all()
     )
     diary_entries = (
@@ -594,15 +1013,36 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(FoodDiaryCopyOperation.created_at.asc(), FoodDiaryCopyOperation.id.asc())
         .all()
     )
+    diary_batch_operations = (
+        db.query(FoodDiaryBatchOperation)
+        .filter(FoodDiaryBatchOperation.user_id == user.id)
+        .order_by(FoodDiaryBatchOperation.created_at.asc(), FoodDiaryBatchOperation.id.asc())
+        .all()
+    )
     program_templates = (
         db.query(ProgramTemplate)
         .options(
             selectinload(ProgramTemplate.days)
             .selectinload(ProgramTemplateDay.exercises)
-            .joinedload(ProgramTemplateExercise.exercise)
+            .options(
+                joinedload(ProgramTemplateExercise.exercise),
+                selectinload(ProgramTemplateExercise.weekly_prescriptions),
+            )
         )
         .filter(ProgramTemplate.owner_user_id == user.id)
         .order_by(ProgramTemplate.created_at.asc(), ProgramTemplate.id.asc())
+        .all()
+    )
+    public_shares = (
+        db.query(PublicShare)
+        .filter(PublicShare.owner_user_id == user.id)
+        .order_by(PublicShare.created_at.asc(), PublicShare.id.asc())
+        .all()
+    )
+    public_share_imports = (
+        db.query(PublicShareImport)
+        .filter(PublicShareImport.recipient_user_id == user.id)
+        .order_by(PublicShareImport.created_at.asc(), PublicShareImport.id.asc())
         .all()
     )
     hidden_templates = (
@@ -623,6 +1063,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .all()
     )
     custom_exercise_ids = {row.id for row in custom_exercises}
+    exercise_setup_memories = (
+        db.query(ExerciseSetupMemory)
+        .filter(ExerciseSetupMemory.user_id == user.id)
+        .order_by(ExerciseSetupMemory.created_at.asc(), ExerciseSetupMemory.id.asc())
+        .all()
+    )
     visible_exercise_ids = {
         row.id
         for row in db.query(Exercise.id)
@@ -654,10 +1100,29 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         for exercise_id in custom_exercise_ids
     }
     setting = db.query(NotificationSetting).filter(NotificationSetting.user_id == user.id).first()
+    reminder_template_schedules = (
+        db.query(ReminderTemplateSchedule)
+        .filter(ReminderTemplateSchedule.user_id == user.id)
+        .order_by(ReminderTemplateSchedule.template_key.asc())
+        .all()
+    )
     notifications = (
         db.query(Notification)
         .filter(Notification.user_id == user.id)
         .order_by(Notification.created_at.asc(), Notification.id.asc())
+        .all()
+    )
+    web_push_subscriptions = (
+        db.query(WebPushSubscription)
+        .filter(WebPushSubscription.user_id == user.id)
+        .order_by(WebPushSubscription.created_at.asc(), WebPushSubscription.id.asc())
+        .all()
+    )
+    notification_deliveries = (
+        db.query(NotificationDelivery)
+        .join(Notification, Notification.id == NotificationDelivery.notification_id)
+        .filter(Notification.user_id == user.id)
+        .order_by(NotificationDelivery.created_at.asc(), NotificationDelivery.id.asc())
         .all()
     )
     digest_preference = (
@@ -675,6 +1140,72 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(CoachClient.created_at.asc(), CoachClient.id.asc())
         .all()
     )
+    session_series = (
+        db.query(CoachSessionSeries)
+        .filter(
+            or_(
+                CoachSessionSeries.coach_user_id == user.id,
+                CoachSessionSeries.client_user_id == user.id,
+            )
+        )
+        .order_by(CoachSessionSeries.start_date.asc(), CoachSessionSeries.id.asc())
+        .all()
+    )
+    business_sessions = (
+        db.query(CoachBusinessSession)
+        .filter(
+            or_(
+                CoachBusinessSession.coach_user_id == user.id,
+                CoachBusinessSession.client_user_id == user.id,
+            )
+        )
+        .order_by(CoachBusinessSession.starts_at_utc.asc(), CoachBusinessSession.id.asc())
+        .all()
+    )
+    packages = (
+        db.query(CoachPackage)
+        .filter(or_(CoachPackage.coach_user_id == user.id, CoachPackage.client_user_id == user.id))
+        .order_by(CoachPackage.created_at.asc(), CoachPackage.id.asc())
+        .all()
+    )
+    package_ids = [package.id for package in packages if package.coach_user_id == user.id]
+    package_ledger = (
+        db.query(CoachPackageLedgerEntry)
+        .filter(CoachPackageLedgerEntry.package_id.in_(package_ids))
+        .order_by(CoachPackageLedgerEntry.created_at.asc(), CoachPackageLedgerEntry.id.asc())
+        .all()
+        if package_ids
+        else []
+    )
+    payments = (
+        db.query(CoachPayment)
+        .filter(or_(CoachPayment.coach_user_id == user.id, CoachPayment.client_user_id == user.id))
+        .order_by(CoachPayment.created_at.asc(), CoachPayment.id.asc())
+        .all()
+    )
+    coach_tasks = (
+        db.query(CoachTask)
+        .filter(CoachTask.coach_user_id == user.id)
+        .order_by(CoachTask.created_at.asc(), CoachTask.id.asc())
+        .all()
+    )
+    coach_check_in_reviews = (
+        db.query(CoachCheckInReview)
+        .filter(CoachCheckInReview.coach_user_id == user.id)
+        .order_by(CoachCheckInReview.created_at.asc(), CoachCheckInReview.id.asc())
+        .all()
+    )
+    report_handoffs = (
+        db.query(ReportHandoff)
+        .filter(
+            or_(
+                ReportHandoff.sender_user_id == user.id,
+                ReportHandoff.trainer_user_id == user.id,
+            )
+        )
+        .order_by(ReportHandoff.created_at.asc(), ReportHandoff.id.asc())
+        .all()
+    )
     coach_applications = (
         db.query(CoachRoleApplication)
         .filter(CoachRoleApplication.user_id == user.id)
@@ -686,6 +1217,36 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .filter(or_(AuditEvent.actor_user_id == user.id, AuditEvent.target_user_id == user.id))
         .order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc())
         .all()
+    )
+    ai_coach_consent = (
+        db.query(AiCoachConsent).filter(AiCoachConsent.user_id == user.id).one_or_none()
+    )
+    ai_coach_memory_consent = (
+        db.query(AiCoachMemoryConsent).filter(AiCoachMemoryConsent.user_id == user.id).one_or_none()
+    )
+    ai_coach_memories = (
+        db.query(AiCoachMemory)
+        .filter(AiCoachMemory.user_id == user.id)
+        .order_by(AiCoachMemory.created_at.asc(), AiCoachMemory.id.asc())
+        .all()
+    )
+    ai_coach_conversations = (
+        db.query(AiCoachConversation)
+        .filter(AiCoachConversation.user_id == user.id)
+        .order_by(AiCoachConversation.created_at.asc(), AiCoachConversation.id.asc())
+        .all()
+    )
+    ai_coach_conversation_ids = [conversation.id for conversation in ai_coach_conversations]
+    ai_coach_conversation_messages = (
+        db.query(AiCoachConversationMessage)
+        .filter(AiCoachConversationMessage.conversation_id.in_(ai_coach_conversation_ids))
+        .order_by(
+            AiCoachConversationMessage.created_at.asc(),
+            AiCoachConversationMessage.id.asc(),
+        )
+        .all()
+        if ai_coach_conversation_ids
+        else []
     )
     workout_comments = (
         db.query(WorkoutComment)
@@ -745,6 +1306,27 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ("username_normalized", "created_at", "password_changed_at"),
             )
             if local_credential
+            else None
+        ),
+        "first_touch_attribution": (
+            _fields(
+                first_touch_attribution,
+                (
+                    "first_touch_source",
+                    "first_touch_medium",
+                    "first_touch_campaign",
+                    "first_landing_path",
+                    "first_referrer",
+                    "first_touch_at",
+                    "utm_source",
+                    "utm_medium",
+                    "utm_campaign",
+                    "utm_content",
+                    "utm_term",
+                    "created_at",
+                ),
+            )
+            if first_touch_attribution
             else None
         ),
         "profile": (
@@ -830,10 +1412,55 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             _fields(row, ENERGY_CALIBRATION_FIELDS) for row in energy_calibrations
         ],
         "weekly_check_ins": [_fields(row, WEEKLY_CHECK_IN_FIELDS) for row in weekly_check_ins],
+        "lifecycle_milestones": [
+            _fields(
+                row,
+                (
+                    "id",
+                    "milestone_type",
+                    "schema_version",
+                    "occurred_at",
+                    "workout_id",
+                    "program_id",
+                    "program_revision_number",
+                    "missed_at",
+                    "surface",
+                    "server_confirmed",
+                    "authoritative_outcome_status",
+                ),
+            )
+            for row in lifecycle_milestones
+        ],
         "daily_wellbeing_check_ins": [
             _fields(row, DAILY_WELLBEING_FIELDS) for row in daily_wellbeing_check_ins
         ],
-        "measurements": [_fields(row, MEASUREMENT_FIELDS) for row in measurements],
+        "measurement_definitions": [
+            {
+                "id": definition.id,
+                "label": definition.label,
+                "unit": definition.unit,
+                "archived": definition.archived_at is not None,
+                "created_at": definition.created_at,
+                "updated_at": definition.updated_at,
+            }
+            for definition in measurement_definitions
+        ],
+        "measurements": [
+            {
+                **_fields(row, MEASUREMENT_FIELDS),
+                "custom_values": [
+                    {
+                        "definition_id": value.definition_id,
+                        "value": value.value,
+                    }
+                    for value in sorted(
+                        row.custom_values,
+                        key=lambda item: (item.definition_id, item.id),
+                    )
+                ],
+            }
+            for row in measurements
+        ],
         "cardio_sessions": [
             _fields(
                 row,
@@ -860,6 +1487,23 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             {"created_at": favorite.created_at, "food": _serialize_food(food)}
             for favorite, food in favorite_foods
         ],
+        "nutrition_catalog_contributions": [
+            _fields(
+                contribution,
+                (
+                    "id",
+                    "food_id",
+                    "visibility",
+                    "state",
+                    "payload_digest",
+                    "canonical_payload",
+                    "source_version",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for contribution in nutrition_catalog_contributions
+        ],
         "recipes": [
             {
                 **_fields(recipe, ("id", "name", "final_weight_g", "created_at", "updated_at")),
@@ -868,6 +1512,16 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ],
             }
             for recipe in recipes
+        ],
+        "nutrition_meal_templates": [_serialize_meal_template(row) for row in meal_templates],
+        "nutrition_plans": [_serialize_nutrition_plan(row) for row in nutrition_plans],
+        "grocery_lists": [_serialize_grocery_list(row) for row in grocery_lists],
+        "food_search_aliases": [
+            _fields(
+                row,
+                ("id", "alias", "normalized_alias", "food_id", "created_at", "updated_at"),
+            )
+            for row in food_search_aliases
         ],
         "food_diary_entries": [
             {
@@ -878,11 +1532,13 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                         "food_id",
                         "recipe_id",
                         "copy_operation_id",
+                        "batch_operation_id",
                         "copied_from_entry_id",
                         "diary_date",
                         "meal_type",
                         "logged_at",
                         "entry_kind",
+                        "nutrition_source",
                         "amount",
                         "amount_unit",
                         "weight_g",
@@ -892,7 +1548,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                         "quick_carbs_g",
                     ),
                 ),
-                **_fields(row, SNAPSHOT_NUTRIENT_FIELDS),
+                **_fields(row, DIARY_SNAPSHOT_NUTRIENT_FIELDS),
                 "created_at": row.created_at,
                 "updated_at": row.updated_at,
             }
@@ -917,11 +1573,41 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             )
             for row in diary_copy_operations
         ],
+        "food_diary_batch_operations": [
+            _fields(
+                row,
+                ("id", "operation_kind", "template_id", "diary_date", "meal_type", "created_at"),
+            )
+            for row in diary_batch_operations
+        ],
         "program_templates": [_serialize_program_template(row) for row in program_templates],
+        "public_shares": [
+            {
+                "share_id": row.share_id,
+                "share_type": row.share_type,
+                "status": row.status,
+                "snapshot_hash": row.snapshot_hash,
+                "public_snapshot": row.public_snapshot,
+                "created_at": row.created_at,
+                "revoked_at": row.revoked_at,
+            }
+            for row in public_shares
+        ],
+        "public_share_imports": [
+            _fields(row, ("template_id", "user_program_id", "created_at"))
+            for row in public_share_imports
+        ],
         "hidden_program_templates": [
             _fields(row, ("id", "template_id", "hidden_at")) for row in hidden_templates
         ],
-        "programs": [_serialize_program(program) for program in programs],
+        "programs": [_serialize_program(program, rest_by_workout) for program in programs],
+        "exercise_setup_memories": [
+            _fields(
+                row,
+                ("id", "exercise_id", "body", "version", "created_at", "updated_at"),
+            )
+            for row in exercise_setup_memories
+        ],
         "custom_exercises": [
             {
                 **_fields(
@@ -976,12 +1662,120 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "id": relation.id,
                 "role": "coach" if relation.coach_user_id == user.id else "client",
                 "status": relation.status,
+                **(
+                    {"operational_status": relation.operational_status or "active"}
+                    if relation.coach_user_id == user.id
+                    else {}
+                ),
                 "created_at": relation.created_at,
                 "accepted_at": relation.accepted_at,
                 "ended_at": relation.ended_at,
                 "ended_reason": relation.ended_reason,
             }
             for relation in relations
+        ],
+        "coach_session_series": [
+            _fields(
+                series,
+                (
+                    "id",
+                    "client_user_id",
+                    "package_id",
+                    "recurrence_kind",
+                    "weekdays",
+                    "start_date",
+                    "start_time",
+                    "recurrence_end_date",
+                    "occurrence_count",
+                    "timezone",
+                    "duration_minutes",
+                    "format",
+                    "location",
+                    "status",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for series in session_series
+        ],
+        "coach_business_sessions": [
+            _crm_business_session_fields(session) for session in business_sessions
+        ],
+        "coach_packages": [_crm_package_fields(package, user.id) for package in packages],
+        "coach_package_ledger": [
+            _fields(
+                entry,
+                (
+                    "id",
+                    "package_id",
+                    "session_id",
+                    "entry_type",
+                    "quantity",
+                    "reason",
+                    "created_at",
+                ),
+            )
+            for entry in package_ledger
+        ],
+        "coach_payments": [_crm_payment_fields(payment, user.id) for payment in payments],
+        "coach_tasks": [
+            _fields(
+                task,
+                (
+                    "id",
+                    "client_user_id",
+                    "title",
+                    "due_at_utc",
+                    "timezone",
+                    "kind",
+                    "source_kind",
+                    "source_id",
+                    "reason",
+                    "state",
+                    "completed_at",
+                    "reopened_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for task in coach_tasks
+        ],
+        "coach_check_in_reviews": [
+            _fields(
+                review,
+                (
+                    "id",
+                    "client_user_id",
+                    "check_in_id",
+                    "follow_up_task_id",
+                    "status",
+                    "response",
+                    "reviewed_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for review in coach_check_in_reviews
+        ],
+        "report_handoffs": [
+            {
+                "id": handoff.id,
+                "role": "sender" if handoff.sender_user_id == user.id else "trainer",
+                "sender_user_id": handoff.sender_user_id,
+                "trainer_user_id": handoff.trainer_user_id,
+                "relationship_id": handoff.relationship_id,
+                "period": handoff.period,
+                "period_start": handoff.period_start,
+                "period_end": handoff.period_end,
+                "timezone": handoff.timezone,
+                "report_contract_version": handoff.report_contract_version,
+                "included_section_ids": handoff.included_section_ids,
+                "client_comment": handoff.client_comment,
+                "delivery_attempt": handoff.delivery_attempt,
+                "notification_id": handoff.notification_id,
+                "created_at": handoff.created_at,
+            }
+            for handoff in report_handoffs
         ],
         "workout_comments": [
             {
@@ -1017,6 +1811,9 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                     "workout_reminders_enabled",
                     "weekly_check_in_reminders_enabled",
                     "measurement_reminders_enabled",
+                    "meal_reminders_enabled",
+                    "hydration_reminders_enabled",
+                    "movement_reminders_enabled",
                     "telegram_enabled",
                     "reminder_hour",
                     "quiet_hours_start",
@@ -1026,6 +1823,25 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             if setting
             else None
         ),
+        "reminder_template_schedules": [
+            _fields(
+                schedule,
+                (
+                    "template_key",
+                    "template_version",
+                    "weekdays",
+                    "schedule_times",
+                    "window_start",
+                    "window_end",
+                    "interval_minutes",
+                    "max_per_day",
+                    "minimum_spacing_minutes",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for schedule in reminder_template_schedules
+        ],
         "notifications": [
             _fields(
                 row,
@@ -1045,6 +1861,39 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ),
             )
             for row in notifications
+        ],
+        # Browser capability URLs and encryption keys are intentionally excluded from exports.
+        "web_push_subscriptions": [
+            _fields(
+                subscription,
+                (
+                    "id",
+                    "created_at",
+                    "updated_at",
+                    "last_success_at",
+                    "last_failure_at",
+                    "failure_count",
+                    "last_error",
+                ),
+            )
+            for subscription in web_push_subscriptions
+        ],
+        "notification_deliveries": [
+            _fields(
+                delivery,
+                (
+                    "id",
+                    "notification_id",
+                    "subscription_id",
+                    "channel",
+                    "status",
+                    "attempt_count",
+                    "last_error",
+                    "created_at",
+                    "sent_at",
+                ),
+            )
+            for delivery in notification_deliveries
         ],
         "weekly_digest_preference": (
             _fields(
@@ -1082,5 +1931,70 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ("id", "action", "resource_type", "resource_id", "details", "created_at"),
             )
             for event in audit_events
+        ],
+        "ai_coach_consent": (
+            _fields(
+                ai_coach_consent,
+                (
+                    "status",
+                    "scope",
+                    "consent_version",
+                    "provider_name",
+                    "provider_policy_revision",
+                    "consent_source",
+                    "granted_at",
+                    "revoked_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            if ai_coach_consent is not None
+            else None
+        ),
+        "ai_coach_conversations": [
+            _fields(conversation, ("id", "title", "created_at", "updated_at"))
+            for conversation in ai_coach_conversations
+        ],
+        "ai_coach_conversation_messages": [
+            _serialize_ai_coach_conversation_message(message)
+            for message in ai_coach_conversation_messages
+        ],
+        "ai_coach_memory_consent": (
+            _fields(
+                ai_coach_memory_consent,
+                (
+                    "status",
+                    "scope",
+                    "consent_version",
+                    "consent_source",
+                    "granted_at",
+                    "paused_at",
+                    "revoked_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            if ai_coach_memory_consent is not None
+            else None
+        ),
+        "ai_coach_memories": [
+            _fields(
+                memory,
+                (
+                    "id",
+                    "category",
+                    "value_text",
+                    "source_kind",
+                    "confidence",
+                    "status",
+                    "source_ref",
+                    "version",
+                    "created_at",
+                    "updated_at",
+                    "last_used_at",
+                    "expires_at",
+                ),
+            )
+            for memory in ai_coach_memories
         ],
     }

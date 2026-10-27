@@ -8,113 +8,73 @@ import {
   type AnchorHTMLAttributes,
 } from 'react';
 import { hideTelegramBackButtonWhenIdle, registerTelegramBackButton } from '../telegram/backButton';
+import { getApiRuntime, useRuntime } from '../runtime/runtime';
+import * as routeContracts from './routeContracts';
 
 interface NavigationContextValue {
   path: string;
   search: string;
-  navigate(to: string, replace?: boolean): void;
+  hash: string;
+  navigate(to: string, replace?: boolean, historyState?: unknown): void;
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
-const DEMO_SCENARIOS = new Set(['self_training', 'nutrition', 'trainer']);
-const DEMO_CABINET_SECTIONS = new Set(['today', 'nutrition', 'progress', 'trainer']);
+export type { CoachTab } from './routeContracts';
+export const PERSONAL_WORKSPACE_RETURN_STATE = 'yfcPersonalWorkspaceReturn';
 
-export function demoReturnPathFromLogin(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const scenario = params.get('scenario');
-  if (params.get('from') !== 'demo' || !scenario || !DEMO_SCENARIOS.has(scenario)) return null;
-  const cabinet = params.get('cabinet') === '1';
-  const section = params.get('section');
-  if (cabinet) {
-    const safeSection =
-      section &&
-      DEMO_CABINET_SECTIONS.has(section) &&
-      (section !== 'trainer' || scenario === 'trainer')
-        ? section
-        : scenario === 'trainer'
-          ? 'trainer'
-          : 'today';
-    return `/demo?cabinet=1&scenario=${scenario}&section=${safeSection}`;
-  }
-  return `/demo?scenario=${scenario}`;
+export const coachTabFromSearch = routeContracts.coachTabFromSearch;
+export const coachPathForTab = routeContracts.coachPathForTab;
+export const demoReturnPathFromLogin = routeContracts.demoReturnPathFromLogin;
+
+export function safeTrainerReturnPath(value: string | null | undefined): string | null {
+  return routeContracts.safeTrainerReturnPath(value, window.location.origin);
 }
 
-function programHistoryReturn(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value, window.location.origin);
-    const programId = parsed.searchParams.get('program_history');
-    if (
-      parsed.origin !== window.location.origin ||
-      parsed.pathname !== '/app' ||
-      parsed.searchParams.get('section') !== 'programs' ||
-      !programId ||
-      !/^\d+$/.test(programId) ||
-      Number(programId) <= 0
-    ) {
-      return null;
-    }
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return null;
-  }
+function resolveNavigationPath(to: string): string {
+  const runtime = getApiRuntime();
+  return runtime.kind === 'demo' ? runtime.mapNavigationPath(to) : to;
 }
 
-function notificationCenterReturn(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value, window.location.origin);
-    return parsed.origin === window.location.origin &&
-      parsed.pathname === '/app' &&
-      parsed.searchParams.get('section') === 'profile' &&
-      parsed.hash === '#profile-notifications'
-      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function progressReportReturn(search: string): string {
-  const params = new URLSearchParams(search);
-  const clientId = params.get('client_id');
-  if (clientId && /^\d+$/.test(clientId) && Number(clientId) > 0) {
-    return `/coach?client_id=${clientId}`;
-  }
-  return '/app?section=progress';
+export function progressReportReturn(search: string): string {
+  return routeContracts.progressReportReturn(search, window.location.origin);
 }
 
 export function focusedContextReturn(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const workoutId = params.get('workout_id');
-  if (workoutId && /^\d+$/.test(workoutId) && Number(workoutId) > 0) {
-    return (
-      notificationCenterReturn(params.get('return_to')) ??
-      programHistoryReturn(params.get('return_to')) ??
-      '/app?section=progress'
-    );
-  }
-  if (params.get('weekly_review') === '1') return '/app';
-  return null;
+  return routeContracts.focusedContextReturn(search, window.location.origin);
 }
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useState(() => ({
     path: window.location.pathname,
     search: window.location.search,
+    hash: window.location.hash,
   }));
 
   useEffect(() => {
-    const onPopState = () =>
-      setLocation({ path: window.location.pathname, search: window.location.search });
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+    const onLocationChange = () =>
+      setLocation({
+        path: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      });
+    window.addEventListener('popstate', onLocationChange);
+    window.addEventListener('hashchange', onLocationChange);
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      window.removeEventListener('hashchange', onLocationChange);
+    };
   }, []);
 
-  const navigate = useCallback((to: string, replace = false) => {
-    if (replace) window.history.replaceState({}, '', to);
-    else window.history.pushState({}, '', to);
-    setLocation({ path: window.location.pathname, search: window.location.search });
+  const navigate = useCallback((to: string, replace = false, historyState?: unknown) => {
+    const destination = resolveNavigationPath(to);
+    const nextHistoryState = historyState === undefined ? {} : historyState;
+    if (replace) window.history.replaceState(nextHistoryState, '', destination);
+    else window.history.pushState(nextHistoryState, '', destination);
+    setLocation({
+      path: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+    });
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 
@@ -139,14 +99,16 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     }
     const goBack = () => {
       const returnPath = focusedReturn ?? publicReturn ?? demoHandoffReturn;
-      navigate(returnPath ?? '/app', Boolean(returnPath));
+      const historyState =
+        location.path === '/coach' ? { [PERSONAL_WORKSPACE_RETURN_STATE]: true } : undefined;
+      navigate(returnPath ?? '/app', Boolean(returnPath), historyState);
     };
     return registerTelegramBackButton(telegram, goBack, 'route');
   }, [navigate, location.path, location.search]);
 
   const value = useMemo(
-    () => ({ path: location.path, search: location.search, navigate }),
-    [location.path, location.search, navigate],
+    () => ({ path: location.path, search: location.search, hash: location.hash, navigate }),
+    [location.path, location.search, location.hash, navigate],
   );
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }
@@ -168,9 +130,11 @@ export function AppLink({
   children: React.ReactNode;
 } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>) {
   const { navigate } = useNavigation();
+  const runtime = useRuntime();
+  const href = runtime.kind === 'demo' ? runtime.mapNavigationPath(to) : to;
   return (
     <a
-      href={to}
+      href={href}
       className={className}
       {...anchorAttributes}
       onClick={(event) => {
@@ -179,6 +143,7 @@ export function AppLink({
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
           return;
         event.preventDefault();
+        if (runtime.kind === 'demo') runtime.onNavigate?.(to);
         navigate(to);
       }}
     >

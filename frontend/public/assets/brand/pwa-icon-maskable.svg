@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" shape-rendering="geometricPrecision">
+  <title>Your Fitness Coach</title>
+  <rect width="512" height="512" fill="#102015"/>
+  <defs>
+    <linearGradient id="c-dark" x1="76" y1="25" x2="302" y2="285" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.55" stop-color="#f7f7f5"/>
+      <stop offset="1" stop-color="#eeeeeb"/>
+    </linearGradient>
+    <linearGradient id="yf-dark" x1="30" y1="235" x2="330" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4bba00"/>
+      <stop offset="0.52" stop-color="#81cc00"/>
+      <stop offset="1" stop-color="#9ed900"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(103 135) scale(0.84)">
+    <path fill="none" stroke="url(#c-dark)" stroke-width="42" stroke-linecap="butt" d="M273.8 57.23A128 119 0 1 0 288.61 232.16"/>
+    <path fill="url(#yf-dark)" d="M12 13H75.5L178.5 121L284.5 16Q289 13 294.5 13H350.5L241 124.5L241.5 126H308L272.5 159Q267 164 261.5 167H199.5L198 168.5L188 234C171 228 160 221 151 210L144 200.5L150 161.5L68 73.5L20 23.5Z"/>
+  </g>
+</svg>

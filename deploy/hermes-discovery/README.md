@@ -1,0 +1,198 @@
+# Hermes discovery runner и scheduler (Task 415)
+
+`discovery_runner.py` — отдельный stdlib-only runtime для получения public RSS/JSON
+Feed/HTML metadata. Он не импортирует hardened editorial worker и не имеет provider key,
+YFC DB/intake secret, Telegram token, shell, browser, MCP, plugin или publish capability.
+Source text всегда data: prompt/source instructions не исполняются.
+
+Поток после отдельного Gate A:
+
+```text
+systemd timer (hourly recovery cadence; source fetch intervals remain authoritative)
+  -> hermes-network-anchor.service (keeps dedicated bridge datapath warm)
+  -> hermes-discovery.service (source-only container, bounded retry on failure)
+  -> versioned YFC source definitions
+  -> explicit HTTPS source hosts + DNS/redirect revalidation
+  -> /var/lib/hermes/outbox/<stable-key>.json
+  -> OnSuccess=hermes-worker-drain.service (up to 5 queued jobs per drain; secrets only here)
+  -> hardened editorial worker
+  -> approved provider + HMAC YFC intake
+```
+
+## Source of truth
+
+Canonical allowlist — `backend/fitminiapp_api/resources/news_sources.json`. Второго
+редактируемого списка источников нет. Команда
+`scripts/generate_hermes_source_definitions.py` проверяет canonical registry и рендерит
+детерминированный `hermes-source-definitions-v1` с SHA-256 исходного файла и
+`definitions_version=yfc-news-sources:<sha256>`. Этот файл является versioned deployment
+artifact, его нельзя редактировать вручную. Перед установкой его SHA-256 должен быть подставлен
+в оба systemd template как `HERMES_DISCOVERY_DEFINITIONS_SHA256`; external runtime отклоняет
+файл с отсутствующим или несовпадающим digest. На target host он монтируется read-only в
+`/etc/hermes/current/source-definitions.json`.
+
+Тестовый `local_mock` envelope может содержать только loopback/`host.docker.internal` URLs и
+существует исключительно в local E2E. Production/external mode принимает только HTTPS,
+точные hosts из этого versioned файла, без IP literal, wildcard и arbitrary URL.
+
+`pubmed-fitness-health` — включённый authoritative discovery/index source. Его RSS-запрос
+ограничен точными MeSH major-topic терминами для resistance training, muscle hypertrophy,
+bodybuilding, sports nutritional sciences, dietary supplements, anabolic agents и sports medicine.
+Запись PubMed и abstract остаются только входными данными
+для поиска: они не являются автоматически подтверждённым health claim. До редакционного
+использования нужно проверить primary source, study design, limitations и applicability;
+YFC intake сохраняет taxonomy/risk/manual_required boundary.
+
+При deployment setup YFC additive bootstrap добавляет отсутствующие enabled canonical source rows
+даже в непустую базу, но не перезаписывает существующие operator-managed source settings. Явное
+изменение уже существующей строки выполняется только отдельной owner-approved source-allowlist
+операцией.
+
+## Discovery bounds and safety
+
+- maximum 50 definitions, production unit ограничивает run 20 sources, 4 concurrent fetches;
+- per-source timeout 10 seconds in the unit, response maximum 512 KiB, maximum 20 items;
+- RSS/Atom, JSON Feed и HTML metadata имеют отдельные allowlisted MIME types;
+- every source URL и every redirect revalidate exact host, scheme, port и DNS result;
+  external DNS must resolve only to global addresses; localhost, RFC1918, loopback,
+  link-local, reserved и cloud-metadata targets fail closed;
+- redirects не следуются автоматически: максимум три hop с повторной allowlist/DNS проверкой;
+- нет JavaScript/browser, source URL worker самостоятельно не fetch'ит;
+- parser получает bounded bytes, а systemd `RuntimeMaxSec` прерывает зависший run;
+- source outage записывается в bounded state и не превращается в «нет новостей» или quota/filler.
+
+Discovery eligibility начинается с bounded relevance gate до outbox: материалы без связи с
+силовыми тренировками, гипертрофией, бодибилдингом, спортивным питанием, добавками,
+восстановлением или тренировочным процессом сохраняются только как bounded rejected state и
+не передаются worker/provider. Для фармакологии требуется спортивный контекст. `topics` и
+relevance provenance сохраняются в job; YFC intake повторно проверяет title/summary/content,
+а затем отдельно пересчитывает taxonomy, risk, `manual_required`, immutable draft revision и
+publication eligibility. Discovery не добавляет фиктивные источники или обязательную квоту
+публикаций.
+
+## State, dedupe и restart
+
+`/var/lib/hermes/state.json` хранит только version/hash, fetch metadata, error codes и bounded
+candidate metadata; полный source packet живёт в outbox только до accepted/duplicate handoff.
+Outbox пишется через fsync + atomic link/rename. Stable key вычисляется из
+`source_id + canonical URL + content hash + event date`; filename, job id, idempotency key и
+request nonce детерминированы этим key. Повторный timer run, crash/restart или uncertain worker
+state не создаёт новый idempotency key автоматически. Pending job остаётся для повторной попытки;
+после accepted/duplicate drain удаляет только этот outbox packet и отмечает state.
+
+Два lock-файла предотвращают overlap discovery и overlap drain. Stale lock восстанавливается
+только после bounded age threshold. Missed timer run не replay'ится (`Persistent=false`), а
+следующий запуск снова применяет dedupe без publication quota.
+
+## Установка и production topology Task 415
+
+Поддерживаются режимы `separate-vm` и `colocated-isolated`. Без явного `--mode` installer
+использует безопасный production default `separate-vm`: Hermes работает на выделенной Linux
+`x86_64` VM, а `COLOCATED_ISOLATED_HERMES=no`. Режим `colocated-isolated` оставлен только для
+отдельно owner-approved запуска и требует явного `--deployment-lock`; без этого параметра
+installer останавливается до изменения хоста и не может неявно выбрать RU YFC VPS.
+В `separate-vm` до pull/activation также проверяется отсутствие Docker Compose network с label
+`com.docker.compose.project=fit-mini-app`; при его наличии нужен явный co-location режим.
+Hermes изолируется каталогами `/opt/hermes`, `/etc/hermes`, `/var/lib/hermes`, пользователем
+`hermes` с UID/GID `10000:10000` и Docker-сетью `hermes-net`. В этой сети не должно быть
+YFC-контейнеров или пересекающихся подсетей; Hermes не публикует порты и не получает YFC
+volume, `.env`, БД, Redis, socket или host repository.
+
+Установка выполняется только из exact merged release bundle. `source-definitions.json` должен
+быть сгенерирован из canonical registry, а discovery и worker должны быть registry immutable
+refs вида `registry.example/name@sha256:<64 hex>`; local `sha256:<64>` image ID, `latest` и
+floating tags запрещены.
+Post-merge CI строит и сканирует `hermes-discovery` и `hermes-worker` images, публикуя refs,
+выведенные общим `scripts/deployment_contract.py`. На target installer сначала делает exact
+`docker pull` обоих refs и проверяет `RepoDigests`; локальный image ID не принимается.
+`scripts/hermes_colocation.py` копирует runtime и definitions в versioned
+`/opt/hermes/releases/<release_id>`, атомарно переключает `/opt/hermes/current`,
+`/etc/hermes/current` и systemd links, сохраняет manifest с YFC SHA, image refs,
+compatibility и rollback parent, устанавливает worker env с mode `0600`, рендерит units и
+запускает `systemd-analyze verify`. Installer устанавливает только repository-owned таблицу
+`inet hermes_egress`: policy действует на bridge `hermes-net`, разрешает DNS только к
+настроенным resolver'ам и оставляет scoped default-deny для новых пакетов Hermes. В явном
+`separate-vm` разрешён TCP/443 к public Internet только после отбрасывания loopback,
+private/RFC1918, link-local, carrier-grade NAT, documentation/reserved, multicast и других
+non-routable адресов; policy не привязывается к host-side DNS snapshot и переживает CDN rotation.
+В явном `colocated-isolated` сохраняется более строгая exact resolved destination allowlist и
+отдельный intake hairpin для Docker DNAT. Глобальные defaults и YFC traffic не меняются, timer
+остаётся disabled. Mode передаётся явно из rendered systemd contract; его отсутствие в
+`refresh`/`validate` является fail-closed ошибкой. При установке `separate-vm` legacy
+`hermes-egress-refresh.timer` и его `inet hermes_guard` stale-IP policy выводятся из dedicated
+контура, чтобы старый allowlist не мог перекрыть новый mode-aware профиль.
+
+На co-located YFC публичный intake может быть преобразован Docker DNAT в приватный адрес
+YFC до `forward` hook. Для этого единственного случая policy разрешает только пакет с
+`ct original daddr` текущего публичного intake IP и TCP/443; прямой доступ к приватным
+YFC/Docker subnet по-прежнему попадает под deny.
+
+Та же таблица имеет scoped `input` hook для `hermes-net`: от bridge разрешены только
+необходимые DNS-запросы и established/related state, остальные host-local порты (включая
+SSH) отбрасываются до общих YFC host rules.
+
+На каждом Hermes host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`,
+`load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Порог used swap зависит
+от deployment mode: `<= 1024 MiB` для выделенного `separate-vm` и `<= 512 MiB` для
+`colocated-isolated`. На `separate-vm` YFC deployment lock не читается и не требуется. Только
+для явного `colocated-isolated` используется переданный оператором canonical YFC deployment lock
+в shared-lock режиме без изменения его прав. При нарушении возвращаются reason codes `insufficient_memory`,
+`swap_pressure`, `high_load`, `insufficient_disk` или `yfc_deploy_active`; Hermes discovery и
+worker не запускаются одновременно. Фазы ограничены `256 MiB/0.25 CPU` и `512 MiB/0.50 CPU`.
+
+Пример установки (значения image и secret placeholders не являются production credentials):
+
+```sh
+python3 scripts/hermes_colocation.py install \
+  --source-root /opt/hermes/input/repository \
+  --source-definitions /opt/hermes/input/source-definitions.json \
+  --worker-env /etc/hermes/worker.env \
+  --yfc-sha <40-hex-merged-commit> \
+  --discovery-image registry.example/hermes-discovery@sha256:<64-hex> \
+  --worker-image registry.example/hermes-worker@sha256:<64-hex> \
+  --mode separate-vm
+```
+
+Для отдельного owner-approved co-location к этой команде нужно явно добавить
+`--mode colocated-isolated --deployment-lock <canonical-YFC-lock>`; отсутствие lock является
+fail-closed ошибкой.
+
+Перед включением timer проверить boundary без запуска job:
+
+```sh
+id hermes
+id -nG hermes
+docker network inspect hermes-net
+docker network ls
+systemd-analyze verify /etc/systemd/system/hermes-network-anchor.service /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
+systemctl cat hermes-network-anchor.service hermes-discovery.service hermes-worker-drain.service
+systemctl status hermes-discovery.timer --no-pager
+python3 /opt/hermes/current/hermes_egress.py validate --mode separate-vm
+nft list table inet hermes_egress
+python3 /opt/hermes/current/hermes_resource_guard.py check --phase discovery --mode separate-vm
+python3 scripts/hermes_colocation.py health
+```
+
+До credentials, доказанной scoped egress policy и ровно одного owner-approved external shadow
+timer можно только установить и проверить. `install` всегда оставляет timer disabled. После
+успешного shadow и проверки health/alerts активировать schedule одной командой:
+`systemctl enable --now hermes-discovery.timer`; timer запускает discovery. Успешный discovery
+через `OnSuccess` запускает bounded worker drain, поэтому неуспешный fetch не тратит provider
+quota и не блокирует последующий retry. Network anchor стартует как dependency discovery и
+остаётся активным, чтобы dedicated Docker bridge не терял datapath между короткими job.
+Missed runs не replay'ятся. Hourly timer является recovery cadence: собственные
+`fetch_interval_minutes` источников остаются source-of-truth и не превращаются в hourly fetch.
+Target остаётся доступен для ручного bounded orchestration.
+
+Для обновления используйте новый immutable release; `/var/lib/hermes/state.json` и
+`/var/lib/hermes/outbox/` не удаляются. Перед reset/rollback сохраняется host backup. Проверка
+`python3 scripts/hermes_colocation.py rollback` переключает только на validated `release_parent`,
+делает `daemon-reload` и вновь оставляет timer disabled; при ошибке links восстанавливаются.
+
+Если `/var/lib/hermes/state.json` был создан предыдущей дефектной версией от `root:root`, перед
+первым запуском после обновления восстановить владельца state для контейнерного UID/GID:
+`chown -R 10000:10000 /var/lib/hermes`.
+
+`hermes_worker_drain.py` — host-side launcher; secrets передаются только worker container.
+Discovery service не получает ни provider key, ни YFC HMAC secret. Рабочий runtime запускается
+non-root, с read-only rootfs, no-new-privileges, drop capabilities и bounded cgroup.

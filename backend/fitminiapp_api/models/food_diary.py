@@ -2,6 +2,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     Date,
     DateTime,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     String,
     Time,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,19 +29,23 @@ class FoodDiaryEntry(Base):
             name="ck_food_diary_entries_meal_type",
         ),
         CheckConstraint(
-            "amount_unit IN ('g', 'serving')",
+            "amount_unit IN ('g', 'ml', 'serving')",
             name="ck_food_diary_entries_amount_unit",
         ),
         CheckConstraint("amount > 0", name="ck_food_diary_entries_amount_positive"),
-        CheckConstraint("weight_g > 0", name="ck_food_diary_entries_weight_positive"),
         CheckConstraint(
-            "amount_unit <> 'g' OR amount = weight_g",
+            "weight_g IS NULL OR weight_g > 0", name="ck_food_diary_entries_weight_positive"
+        ),
+        CheckConstraint(
+            "amount_unit <> 'g' OR (weight_g IS NOT NULL AND amount = weight_g)",
             name="ck_food_diary_entries_gram_amount_weight",
         ),
         CheckConstraint(
-            "serving_amount IS NULL AND serving_unit IS NULL AND serving_weight_g IS NULL OR "
-            "serving_amount > 0 AND serving_unit IN ('g', 'ml', 'piece', 'serving') AND "
-            "serving_weight_g > 0",
+            "(serving_amount IS NULL AND serving_unit IS NULL AND serving_weight_g IS NULL) OR "
+            "(serving_amount > 0 AND serving_unit IN ('g', 'ml', 'piece', 'serving') AND "
+            "((serving_unit = 'g' AND serving_weight_g > 0) OR "
+            "(serving_unit IN ('ml', 'piece', 'serving') AND "
+            "(serving_weight_g IS NULL OR serving_weight_g > 0))))",
             name="ck_food_diary_entries_serving_complete",
         ),
         CheckConstraint(
@@ -81,9 +87,7 @@ class FoodDiaryEntry(Base):
             name="ck_food_diary_entries_quick_nutrition",
         ),
         CheckConstraint(
-            "(quick_protein_g IS NULL AND quick_fat_g IS NULL AND quick_carbs_g IS NULL) OR "
-            "(quick_protein_g IS NOT NULL AND quick_fat_g IS NOT NULL AND "
-            "quick_carbs_g IS NOT NULL)",
+            "entry_kind <> 'quick_add' OR quick_energy_kcal IS NOT NULL",
             name="ck_food_diary_entries_quick_macros_complete",
         ),
         CheckConstraint(
@@ -126,6 +130,7 @@ class FoodDiaryEntry(Base):
             "updated_at",
         ),
         Index("ix_food_diary_entries_copy_operation", "copy_operation_id", "id"),
+        Index("ix_food_diary_entries_batch_operation", "batch_operation_id", "id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -139,6 +144,10 @@ class FoodDiaryEntry(Base):
     copy_operation_id: Mapped[int | None] = mapped_column(
         ForeignKey("food_diary_copy_operations.id", ondelete="SET NULL"), nullable=True
     )
+    # The online expand migration adds this nullable lineage scalar without a foreign-key
+    # rewrite on the populated diary table. The trusted batch service validates the owner and
+    # operation before assigning it; a later maintenance migration may add the DB constraint.
+    batch_operation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     copied_from_entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("food_diary_entries.id", ondelete="SET NULL"), nullable=True
     )
@@ -146,18 +155,51 @@ class FoodDiaryEntry(Base):
     meal_type: Mapped[str] = mapped_column(String(16), nullable=False)
     logged_at: Mapped[time | None] = mapped_column(Time, nullable=True)
     entry_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="food")
+    nutrition_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
     amount_unit: Mapped[str] = mapped_column(String(16), nullable=False)
-    weight_g: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
+    # The historical weight_g column is NOT NULL and cannot be relaxed in the
+    # online expand phase.  Keep it as a compatibility-only column while the
+    # canonical/API value lives in the additive nullable nutrition_weight_g.
+    weight_g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_weight_g", Numeric(10, 3), nullable=True
+    )
+    legacy_weight_g: Mapped[Decimal] = mapped_column("weight_g", Numeric(10, 3), nullable=False)
 
     food_name: Mapped[str] = mapped_column(String(256), nullable=False)
     food_brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    energy_kcal_per_100g: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    protein_g_per_100g: Mapped[Decimal] = mapped_column(Numeric(8, 3), nullable=False)
-    fat_g_per_100g: Mapped[Decimal] = mapped_column(Numeric(8, 3), nullable=False)
-    carbs_g_per_100g: Mapped[Decimal] = mapped_column(Numeric(8, 3), nullable=False)
+    energy_kcal_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_energy_kcal_per_100g", Numeric(10, 2), nullable=True
+    )
+    protein_g_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_protein_g_per_100g", Numeric(8, 3), nullable=True
+    )
+    fat_g_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_fat_g_per_100g", Numeric(8, 3), nullable=True
+    )
+    carbs_g_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_carbs_g_per_100g", Numeric(8, 3), nullable=True
+    )
+    legacy_energy_kcal_per_100g: Mapped[Decimal] = mapped_column(
+        "energy_kcal_per_100g", Numeric(10, 2), nullable=False
+    )
+    legacy_protein_g_per_100g: Mapped[Decimal] = mapped_column(
+        "protein_g_per_100g", Numeric(8, 3), nullable=False
+    )
+    legacy_fat_g_per_100g: Mapped[Decimal] = mapped_column(
+        "fat_g_per_100g", Numeric(8, 3), nullable=False
+    )
+    legacy_carbs_g_per_100g: Mapped[Decimal] = mapped_column(
+        "carbs_g_per_100g", Numeric(8, 3), nullable=False
+    )
     fiber_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
+
+    nutrition_basis_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    nutrition_basis_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    nutrition_basis_unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    nutrition_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    nutrition_amount: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     quick_energy_kcal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     quick_protein_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
     quick_fat_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
@@ -180,6 +222,33 @@ class FoodDiaryEntry(Base):
         default=now_msk_naive,
         onupdate=now_msk_naive,
     )
+
+
+_LEGACY_UNKNOWN_WEIGHT_G = Decimal("1")
+
+
+@event.listens_for(FoodDiaryEntry, "before_insert")
+@event.listens_for(FoodDiaryEntry, "before_update")
+def _sync_legacy_weight_g(_mapper, _connection, target: FoodDiaryEntry) -> None:
+    if target.amount_unit == "g" and target.weight_g is None:
+        target.weight_g = target.amount
+    if target.weight_g is not None:
+        target.legacy_weight_g = target.weight_g
+    elif target.legacy_weight_g is None:
+        # Existing constraints require a positive legacy value.  This marker is
+        # never used for nutrition calculations; all application reads use the
+        # nullable canonical column above.
+        target.legacy_weight_g = _LEGACY_UNKNOWN_WEIGHT_G
+    for canonical_name, legacy_name in (
+        ("energy_kcal_per_100g", "legacy_energy_kcal_per_100g"),
+        ("protein_g_per_100g", "legacy_protein_g_per_100g"),
+        ("fat_g_per_100g", "legacy_fat_g_per_100g"),
+        ("carbs_g_per_100g", "legacy_carbs_g_per_100g"),
+    ):
+        canonical_value = getattr(target, canonical_name)
+        setattr(
+            target, legacy_name, canonical_value if canonical_value is not None else Decimal("0")
+        )
 
 
 class FoodDiaryDayStatus(Base):
@@ -211,6 +280,67 @@ class FoodDiaryDayStatus(Base):
     )
 
 
+class FoodDiaryRepeatPreview(Base):
+    """Short-lived server state for an authorized repeat preview.
+
+    The preview stores only the request shape and opaque source snapshot hashes. It
+    never stores food names, quantities, nutrient values, or recipe contents.
+    """
+
+    __tablename__ = "food_diary_repeat_previews"
+    __table_args__ = (
+        CheckConstraint(
+            "copy_scope IN ('product', 'meal', 'day')",
+            name="ck_food_diary_repeat_previews_scope",
+        ),
+        CheckConstraint(
+            "source_meal_type IS NULL OR "
+            "source_meal_type IN ('breakfast', 'lunch', 'dinner', 'snacks')",
+            name="ck_food_diary_repeat_previews_source_meal",
+        ),
+        CheckConstraint(
+            "target_meal_type IS NULL OR "
+            "target_meal_type IN ('breakfast', 'lunch', 'dinner', 'snacks')",
+            name="ck_food_diary_repeat_previews_target_meal",
+        ),
+        CheckConstraint(
+            "persistence_failure_count >= 0",
+            name="ck_food_diary_repeat_previews_failure_count",
+        ),
+        UniqueConstraint("token_hash", name="uq_food_diary_repeat_previews_token"),
+        Index(
+            "ix_food_diary_repeat_previews_user_created",
+            "user_id",
+            "created_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    copy_scope: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_date: Mapped[date] = mapped_column(Date, nullable=False)
+    source_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    target_date: Mapped[date] = mapped_column(Date, nullable=False)
+    target_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=now_msk_naive,
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    persistence_failure_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+
 class FoodDiaryCopyOperation(Base):
     __tablename__ = "food_diary_copy_operations"
     __table_args__ = (
@@ -237,6 +367,8 @@ class FoodDiaryCopyOperation(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Nullable for historical copy operations created before preview-first repeat.
+    preview_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     copy_scope: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -245,6 +377,48 @@ class FoodDiaryCopyOperation(Base):
     source_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     target_date: Mapped[date] = mapped_column(Date, nullable=False)
     target_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    replay_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=now_msk_naive,
+    )
+
+
+class FoodDiaryBatchOperation(Base):
+    __tablename__ = "food_diary_batch_operations"
+    __table_args__ = (
+        CheckConstraint(
+            "operation_kind IN ('meal_template', 'natural_input', 'suggestion', 'planned_item')",
+            name="ck_food_diary_batch_operations_kind",
+        ),
+        CheckConstraint(
+            "meal_type IN ('breakfast', 'lunch', 'dinner', 'snacks')",
+            name="ck_food_diary_batch_operations_meal_type",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="uq_food_diary_batch_operations_user_key",
+        ),
+        Index(
+            "ix_food_diary_batch_operations_user_created",
+            "user_id",
+            "created_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    operation_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("nutrition_meal_templates.id", ondelete="SET NULL"), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    diary_date: Mapped[date] = mapped_column(Date, nullable=False)
+    meal_type: Mapped[str] = mapped_column(String(16), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

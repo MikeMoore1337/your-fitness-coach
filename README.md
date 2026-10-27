@@ -1,12 +1,71 @@
-# Your Fitness Coach
+<p align="center">
+  <a href="https://your-fitness-coach.ru/" title="Your Fitness Coach - официальный сайт">
+    <img src="frontend/public/assets/brand/yfc-social-preview.png" width="960" alt="Your Fitness Coach - тренировки, питание и прогресс" />
+  </a>
+</p>
 
-Your Fitness Coach — единый продукт для самостоятельных пользователей и тренеров. Он доступен как
-адаптивное Web-приложение и Telegram Mini App, использует общий FastAPI backend и PostgreSQL, а
-Aiogram-бот отвечает за Telegram-вход, поддержку и разрешённые уведомления.
+<h1 align="center">Your Fitness Coach</h1>
 
-Публичный репозиторий содержит production-код, миграции, автоматические проверки и безопасные
-инструкции для разработчиков. Marketing-описание продукта живёт на публичном Landing; внутренние
-operator runbooks хранятся отдельно и доступны только владельцу/release operators.
+<p align="center">
+  <strong>Сила в действии.</strong><br />
+  Тренируйтесь по плану. Сопоставляйте питание, результаты и самочувствие,<br />
+  чтобы выбрать следующий шаг.
+</p>
+
+<p align="center">
+  <a href="https://app.your-fitness-coach.ru/"><strong>Открыть приложение</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://your-fitness-coach.ru/">О проекте</a>
+  &nbsp;·&nbsp;
+  <a href="https://your-fitness-coach.ru/for-trainers">Для тренеров</a>
+  &nbsp;·&nbsp;
+  <a href="https://your-fitness-coach.ru/knowledge">База знаний</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/MikeMoore1337/your-fitness-coach/actions/workflows/ci.yml"><img src="https://github.com/MikeMoore1337/your-fitness-coach/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI master" /></a>
+  <img src="https://img.shields.io/badge/Python-3.14-1E221E?logo=python&logoColor=A8E83A" alt="Python 3.14" />
+  <img src="https://img.shields.io/badge/React-19-1E221E?logo=react&logoColor=A8E83A" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-1E221E?logo=typescript&logoColor=A8E83A" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/FastAPI-1E221E?logo=fastapi&logoColor=A8E83A" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-1E221E?logo=postgresql&logoColor=A8E83A" alt="PostgreSQL 16" />
+</p>
+
+---
+
+## Продукт
+
+**Your Fitness Coach** - единое приложение для самостоятельных занятий и работы с тренером.
+Веб-версия и Telegram Mini App используют один аккаунт и общие данные.
+
+| Направление | Возможности |
+| :--- | :--- |
+| **[Тренировки](https://your-fitness-coach.ru/training)** | Готовые и собственные программы, план занятия, запись фактических подходов и история тренировок. |
+| **[Питание](https://your-fitness-coach.ru/nutrition)** | Расчёт ориентиров калорий и БЖУ с учётом цели и активности; данные для наблюдения за динамикой. |
+| **[Прогресс](https://your-fitness-coach.ru/progress)** | История занятий, рабочие веса, результаты подходов и дневник замеров без выдуманных данных. |
+| **[Кабинет тренера](https://your-fitness-coach.ru/for-trainers)** | Назначение программ, работа со связанными клиентами и просмотр доступных тренеру результатов. |
+| **[База знаний](https://your-fitness-coach.ru/knowledge)** | Материалы о тренировках и питании с проверяемыми источниками. |
+| **[Упражнения](https://your-fitness-coach.ru/exercises)** | Публичные карточки с техникой и основными рекомендациями. |
+
+Калькулятор питания даёт **стартовую оценку**, а не гарантированный результат или
+индивидуальное медицинское назначение. Выводы о прогрессе опираются на фактические записи.
+
+## Для разработчиков
+
+Открытый репозиторий содержит код приложения, миграции, тесты и публичные
+технические контракты. Продукт построен вокруг общего **FastAPI API** и **PostgreSQL**:
+React-интерфейс работает в браузере и Telegram Mini App, Aiogram-бот отвечает
+за Telegram-интеграцию и разрешённые уведомления.
+
+**Быстрая навигация**
+
+- [Архитектура и структура каталогов](#архитектура-репозитория)
+- [Системные требования](#требования) и [безопасная настройка](#безопасная-локальная-настройка)
+- [Запуск через Docker Compose](#быстрый-запуск-через-docker) и [разработка с hot reload](#разработка-с-hot-reload)
+- [Тесты и проверки](#проверки), [Mobile Web / TMA](#mobile-web-и-telegram-mini-app)
+- [Техническая документация](#документация) и [production delivery](#production-и-deployment)
+
+---
 
 ## Архитектура репозитория
 
@@ -18,9 +77,9 @@ deploy/         Caddy edge configuration
 scripts/        проверки, генераторы, backup/restore и deployment helpers
 tests/          cross-stack integration tests
 docs/           публичные русскоязычные product и architecture contracts
-codex-backlog/  публичные lifecycle rules и исторический release context
+codex-backlog/  roadmap/specification и исторический project context
 .agents/        роли, skills и verification references для Codex
-.artifacts/     только локальные caches, logs, screenshots, traces и reports; не коммитится
+.artifacts/     canonical task/runtime/operations artifacts; не коммитится
 ```
 
 Основные runtime-потоки:
@@ -100,8 +159,7 @@ Bot запускайте только с отдельным тестовым tok
 Создайте окружение и установите locked project dependencies:
 
 ```bash
-python3.14 -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements.txt -r bot/requirements.txt
+uv sync --locked --extra backend --extra bot --group dev
 npm --prefix frontend ci
 docker compose up -d db
 ```
@@ -168,8 +226,22 @@ git diff -- frontend/openapi.json frontend/src/shared/api/schema.d.ts
 
 ## Проверки
 
+Единая подготовка и быстрый route-aware набор локальных checks:
+
+```bash
+.venv/bin/python scripts/local_checks.py
+```
+
+В Windows PowerShell используйте `.\.venv\Scripts\python.exe scripts\local_checks.py`. Команда
+сама определяет Git worktree, активный Python, `PATH`/`PYTHONPATH`, безопасные test `APP_*` и
+изолированную SQLite-базу в отдельном каталоге запуска под `.artifacts/runtime`, который удаляется
+после завершения; переданный `TEST_DATABASE_URL` используется как изолированный test database URL.
+По умолчанию выполняется только relevant fast route. Полный
+GitHub route можно добровольно проверить через `--full`; его результат не создаёт release evidence
+и не заменяет required GitHub `checks`.
+
 Выбирайте targeted набор по изменённому риску. Скрипт Python складывает pytest cache и temp files в
-`.artifacts/`:
+`.artifacts/runtime/{cache,tmp,tests}/` согласно [lifecycle документации](docs/artifacts-lifecycle.md):
 
 ```bash
 .venv/bin/python scripts/run_pytest.py backend/tests/test_account_lifecycle.py -q
@@ -193,6 +265,8 @@ git diff --check
 
 Полная CI matrix определена в [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Она включает
 frontend checks, browser tests, Python tests, migrated PostgreSQL smoke и dependency audits.
+Scheduled Daily/Weekly scope и закрытые Allure-отчёты описаны в
+[`docs/scheduled-regression-allure.md`](docs/scheduled-regression-allure.md).
 
 ## Mobile Web и Telegram Mini App
 
@@ -213,34 +287,36 @@ keyboard, BackButton и lifecycle contracts, но не заменяют Telegram
 - contributor architecture и task boundaries: [`AGENTS.md`](AGENTS.md);
 - Mobile Web/TMA test contract: [`docs/mobile-tma-quality-gate.md`](docs/mobile-tma-quality-gate.md);
 - public content и SEO boundaries: [`docs/seo/public-content.md`](docs/seo/public-content.md);
-- blue/green production contract: [`docs/production-deployment.md`](docs/production-deployment.md);
+- production delivery contract: [`docs/deployment.md`](docs/deployment.md);
 - domain contracts: [`docs/exercise-domain.md`](docs/exercise-domain.md),
   [`docs/food-domain.md`](docs/food-domain.md) и
   [`docs/training-analytics.md`](docs/training-analytics.md);
-- активная UI-система: [`docs/design/design-direction-v2.1.md`](docs/design/design-direction-v2.1.md).
+- активная UI-система: [`docs/design/design-direction-v2.1.md`](docs/design/design-direction-v2.1.md);
+  lifecycle локальных artifacts: [`docs/artifacts-lifecycle.md`](docs/artifacts-lifecycle.md).
 
 Документы под `docs/` ведутся на русском. Детальные временные audit reports, screenshots и test
-traces хранятся в `.artifacts/` и не коммитятся. Внутренние operational, security, provider,
+traces хранятся в `.artifacts/tasks/<TASK_ID>/evidence/` или `.artifacts/runtime/tests/` и не
+коммитятся. Внутренние operational, security, provider,
 legal-risk и owner-only документы также не публикуются в Git.
 
 ## Production и deployment
 
 Новая production revision попадает в удалённый `master` только как результат merged pull request.
-Ruleset требует green check `checks`, запрещает direct push, force-push и удаление `master`; workflow
-дополнительно проверяет provenance exact SHA и его соответствие текущему `origin/master`.
+Ruleset требует green check `checks`, запрещает direct push и force-push. После успешного CI на
+`master` `.github/workflows/deploy.yml` получает изменённые пути из Git: application-affecting
+изменения запускают deploy, а docs/governance-only изменения завершаются без application deploy.
 
-Merge PR является release authorization. После него человек не участвует в normal deployment path:
-post-merge CI публикует проверенные immutable images и автоматически запускает
-`.github/workflows/deploy.yml`; `production` environment не содержит reviewers или wait timer.
-Fail-closed `scripts/deploy_production.sh` выполняет preflight, PostgreSQL backup, migrations,
-blue/green rollout, smoke/observation gates и автоматический возврат прежнего slot при ошибке до
-commit state.
+Production serialization выполняется GitHub Actions `concurrency` с группой `production`.
+Workflow собирает bundle из exact merge SHA, передаёт immutable image refs и migration manifest,
+а `scripts/deploy_production.sh` выполняет preflight, backup, migrations, rollout, smoke и
+rollback при ошибке. Deployment evidence и активная revision сохраняются на production host и
+читаются следующим запуском; локальный controller state не нужен.
 
-`workflow_dispatch` не используется, поэтому normal path не выбирает произвольный SHA и не требует
-ручного подтверждения после merge. History rewrite, direct/force push, ручные production-команды,
-bootstrap, восстановление инфраструктуры, DNS/Cloudflare/secrets и deployment SHA вне текущего
-merged `master` остаются exceptional production actions и требуют отдельного owner approval,
-проверенной backup-ветки и operator preflight.
+`workflow_dispatch` в release workflow поддерживает owner-authorized deploy проверенной revision и
+rollback активной revision. Обычный recovery продолжается по Git/GitHub: `git status`, branch/log,
+`gh pr view` и `gh run list`. History rewrite, direct/force push, secrets, ручные production-команды,
+bootstrap инфраструктуры и опасные data operations остаются exceptional actions и требуют
+отдельного owner approval.
 
 ## Ограничения
 

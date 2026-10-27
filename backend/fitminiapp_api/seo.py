@@ -5,21 +5,41 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import cast
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.services.public_exercises import public_exercise
+from fitminiapp_api.models.news import WebArticle
+from fitminiapp_api.services.public_exercises import (
+    public_exercise,
+    validate_public_exercise_quality,
+)
+from fitminiapp_api.services.public_programs import (
+    public_program,
+    validate_public_program,
+)
 
 INDEX_ROBOTS = "index, follow"
 NOINDEX_ROBOTS = "noindex, nofollow"
+NOINDEX_FOLLOW_ROBOTS = "noindex, follow"
 SOCIAL_IMAGE_PATH = "/assets/brand/yfc-social-preview.png"
 SOCIAL_IMAGE_ALT = "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram"
+ARTICLE_INDEX_TITLE = "Статьи о тренировках, питании и прогрессе — Your Fitness Coach"
+ARTICLE_INDEX_DESCRIPTION = (
+    "Понятные статьи о тренировках, питании, спортивном питании и прогрессе: "
+    "источники, ограничения и практический смысл без громких обещаний."
+)
+ATHLETE_LANDING_ALIAS_PATH = "/for-athletes"
 _PUBLIC_FALLBACK_PATTERN = re.compile(
     r"<!-- public-fallback-start -->.*?<!-- public-fallback-end -->",
     re.DOTALL,
+)
+_YANDEX_METRICA_NOSCRIPT = (
+    '<noscript><div><img src="https://mc.yandex.ru/watch/112530718" '
+    'style="position:absolute; left:-9999px;" alt="" /></div></noscript>'
 )
 
 
@@ -54,6 +74,26 @@ def _required_string(value: object, *, field: str) -> str:
     return value
 
 
+def _validate_public_workflow(value: object, *, path: str) -> None:
+    if not isinstance(value, dict):
+        raise RuntimeError(f"Public content workflow for {path!r} must be an object")
+    _required_string(value.get("heading"), field="workflow.heading")
+    raw_steps = value.get("steps")
+    if not isinstance(raw_steps, list) or not raw_steps:
+        raise RuntimeError(f"Public content workflow for {path!r} must contain steps")
+    if path in {"/training", "/for-trainers"} and len(raw_steps) != 5:
+        raise RuntimeError(f"Public workflow for {path} must contain exactly five steps")
+    for index, raw_step in enumerate(raw_steps):
+        if not isinstance(raw_step, dict):
+            raise RuntimeError(f"Public content workflow step {index} must be an object")
+        _required_string(raw_step.get("label"), field=f"workflow.steps[{index}].label")
+        _required_string(raw_step.get("title"), field=f"workflow.steps[{index}].title")
+        _required_string(raw_step.get("description"), field=f"workflow.steps[{index}].description")
+    intro = value.get("intro")
+    if intro is not None:
+        _required_string(intro, field="workflow.intro")
+
+
 @lru_cache
 def public_pages() -> tuple[dict[str, object], ...]:
     payload = json.loads(_public_content_path().read_text(encoding="utf-8"))
@@ -82,11 +122,22 @@ def public_pages() -> tuple[dict[str, object], ...]:
         if status not in {"draft", "review", "published", "archived"}:
             raise RuntimeError(f"Unsupported public content status: {status!r}")
         kind = page["kind"]
-        if kind in {"guide", "exercise", "exercise-index"}:
+        if kind in {"guide", "exercise", "exercise-index", "program"}:
             _required_string(content_id, field="id")
             _required_string(page.get("slug"), field="slug")
             if "status" not in page:
                 raise RuntimeError(f"Public content {content_id!r} must declare a status")
+        if kind == "program":
+            raw_program = page.get("program")
+            if not isinstance(raw_program, dict):
+                raise RuntimeError(
+                    f"Public program {content_id!r} must declare a program reference"
+                )
+            program_ref = cast(dict[str, object], raw_program)
+            program_slug = _required_string(program_ref.get("slug"), field="program.slug")
+            page_slug = _required_string(page.get("slug"), field="slug")
+            if program_slug != page_slug:
+                raise RuntimeError(f"Public program {content_id!r} slug must match its page slug")
         if kind == "guide":
             for field in ("published", "updated", "reviewed"):
                 _required_string(page.get(field), field=field)
@@ -114,6 +165,18 @@ def public_pages() -> tuple[dict[str, object], ...]:
                     raise RuntimeError(
                         f"Public content field '{field}.type' must be Organization or Person"
                     )
+        workflow = page.get("workflow")
+        if workflow is not None:
+            _validate_public_workflow(workflow, path=path)
+        cta = page.get("cta")
+        if cta is not None:
+            if not isinstance(cta, dict):
+                raise RuntimeError(f"Public content CTA for {path!r} must be an object")
+            _required_string(cta.get("label"), field="cta.label")
+            _required_string(cta.get("description"), field="cta.description")
+            placement = cta.get("placement", "footer")
+            if placement not in {"footer", "hero-and-footer"}:
+                raise RuntimeError(f"Unsupported public content CTA placement: {placement!r}")
         seen_paths.add(path)
         pages.append(page)
     return tuple(pages)
@@ -125,6 +188,25 @@ def public_page_paths() -> tuple[str, ...]:
         for page in public_pages()
         if page.get("status", "published") == "published"
     )
+
+
+def public_sitemap_paths() -> tuple[str, ...]:
+    """Return the published manifest paths plus the published article index."""
+
+    return tuple(dict.fromkeys((*public_page_paths(), "/articles")))
+
+
+def public_page_lastmod(path: str) -> str | None:
+    """Return a source-controlled last modification date when the manifest has one."""
+
+    page = public_page_for_path(path)
+    raw_updated = page.get("updated") if page else None
+    if not isinstance(raw_updated, str):
+        return None
+    try:
+        return date.fromisoformat(raw_updated).isoformat()
+    except ValueError:
+        return None
 
 
 def canonical_landing_domain() -> str:
@@ -160,6 +242,222 @@ def public_page_for_path(path: str) -> dict[str, object] | None:
 
 def _absolute_public_url(path: str) -> str:
     return f"{public_origin()}/" if path == "/" else f"{public_origin()}{path}"
+
+
+def public_article_cta_url(destination: object) -> str:
+    """Resolve the allowlisted article CTA destinations for server-rendered HTML."""
+
+    if destination == "landing":
+        return _absolute_public_url("/")
+    if destination == "tma":
+        username = settings.telegram_bot_username.strip().removeprefix("@")
+        if not username:
+            username = "your_fitness_coach_bot"
+        return f"https://t.me/{quote(username, safe='')}?startapp"
+    return f"{settings.frontend_base_url.rstrip('/')}/app"
+
+
+def _safe_https_url(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip()
+    if any(ord(character) < 0x20 for character in normalized):
+        return None
+    parsed = urlparse(normalized)
+    if parsed.scheme.lower() != "https" or not parsed.netloc or parsed.username or parsed.password:
+        return None
+    return normalized
+
+
+def _required_string_list(value: object, *, field: str) -> list[str]:
+    if not isinstance(value, list) or not value:
+        raise RuntimeError(f"Public exercise field {field!r} must be a non-empty list")
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        raise RuntimeError(f"Public exercise field {field!r} must contain non-empty strings")
+    return cast(list[str], value)
+
+
+def _public_asset_url(value: object, *, field: str) -> str:
+    normalized = _required_string(value, field=field).strip()
+    if normalized.startswith("//") or not normalized.startswith("/static/"):
+        raise RuntimeError(f"Public exercise asset URL {field!r} must be same-origin")
+    if any(ord(character) < 0x20 for character in normalized):
+        raise RuntimeError(f"Public exercise asset URL {field!r} contains control characters")
+    return normalized
+
+
+def _positive_dimension(value: object, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise RuntimeError(f"Public exercise media field {field!r} must be a positive integer")
+    return value
+
+
+def _public_exercise_media_markup(exercise: dict[str, object]) -> str:
+    raw_media = exercise.get("media")
+    if raw_media is None:
+        return ""
+    if not isinstance(raw_media, list):
+        raise RuntimeError("Public exercise media must be a list")
+
+    figures: list[str] = []
+    for index, raw_item in enumerate(raw_media):
+        if not isinstance(raw_item, dict):
+            raise RuntimeError(f"Public exercise media item {index} must be an object")
+        item = cast(dict[str, object], raw_item)
+        url = _public_asset_url(item.get("url"), field=f"media[{index}].url")
+        alt = _required_string(item.get("alt"), field=f"media[{index}].alt")
+        phase = _required_string(item.get("phase"), field=f"media[{index}].phase")
+        width = _positive_dimension(item.get("width"), field=f"media[{index}].width")
+        height = _positive_dimension(item.get("height"), field=f"media[{index}].height")
+        raw_sources = item.get("sources")
+        poster_preferred = item.get("poster_preferred") is True
+        poster_sources = item.get("poster_sources") if poster_preferred else None
+        if isinstance(poster_sources, list) and poster_sources:
+            raw_sources = poster_sources
+            width = _positive_dimension(
+                item.get("poster_width"), field=f"media[{index}].poster_width"
+            )
+            height = _positive_dimension(
+                item.get("poster_height"), field=f"media[{index}].poster_height"
+            )
+            url = _public_asset_url(item.get("poster"), field=f"media[{index}].poster")
+        srcset: list[str] = []
+        webp_srcset: list[str] = []
+        if isinstance(raw_sources, list):
+            for source_index, raw_source in enumerate(raw_sources):
+                if not isinstance(raw_source, dict):
+                    raise RuntimeError(
+                        f"Public exercise media source {index}:{source_index} must be an object"
+                    )
+                source = cast(dict[str, object], raw_source)
+                source_url = _public_asset_url(
+                    source.get("url"), field=f"media[{index}].sources[{source_index}].url"
+                )
+                source_width = _positive_dimension(
+                    source.get("width"), field=f"media[{index}].sources[{source_index}].width"
+                )
+                srcset.append(f"{html.escape(source_url, quote=True)} {source_width}w")
+                if source.get("mime_type") == "image/webp":
+                    webp_srcset.append(f"{html.escape(source_url, quote=True)} {source_width}w")
+        srcset_attribute = f' srcset="{", ".join(srcset)}"' if srcset else ""
+        media_markup = (
+            f'<img src="{html.escape(url, quote=True)}"{srcset_attribute} '
+            'sizes="(max-width: 620px) calc(100vw - 48px), '
+            f'(max-width: 1040px) 44vw, 470px" alt="{html.escape(alt, quote=True)}" '
+            f'width="{width}" height="{height}" loading="lazy" decoding="async" />'
+        )
+        if poster_preferred and webp_srcset:
+            media_markup = (
+                f'<picture><source type="image/webp" srcset="{", ".join(webp_srcset)}" '
+                'sizes="(max-width: 620px) calc(100vw - 48px), (max-width: 1040px) 44vw, 470px" />'
+                f"{media_markup}</picture>"
+            )
+        figures.append(
+            f'<figure class="exercise-guide-image">{media_markup}'
+            f"<figcaption>{html.escape(phase)}</figcaption></figure>"
+        )
+    if not figures:
+        return ""
+    return (
+        '<section class="public-exercise-media"><h2>Положения в движении</h2>'
+        "<p>Используйте изображения как визуальную подсказку к шагам, а не как замену "
+        'контролируемому выполнению.</p><div class="exercise-guide-images" '
+        'aria-label="Положения упражнения">' + "".join(figures) + "</div></section>"
+    )
+
+
+def _published_exercise_for_page(page: dict[str, object]) -> dict[str, object]:
+    slug = _required_string(page.get("slug"), field="slug")
+    exercise = public_exercise(slug)
+    if exercise is None:
+        raise RuntimeError(f"Published exercise {slug!r} has no domain record")
+    validate_public_exercise_quality(exercise)
+    return exercise
+
+
+def _published_program_for_page(page: dict[str, object]) -> dict[str, object]:
+    raw_program = page.get("program")
+    if not isinstance(raw_program, dict):
+        raise RuntimeError("Published program page has no program reference")
+    program_ref = cast(dict[str, object], raw_program)
+    slug = _required_string(program_ref.get("slug"), field="program.slug")
+    program = public_program(slug)
+    if program is None:
+        raise RuntimeError(f"Published program {slug!r} has no canonical domain record")
+    validate_public_program(program)
+    return program
+
+
+def _rest_label(value: object) -> str:
+    if isinstance(value, int) and value % 60 == 0:
+        return f"{value // 60} мин"
+    return f"{value} сек"
+
+
+def _public_program_markup(program: dict[str, object]) -> str:
+    title = _required_string(program.get("title"), field="program.title")
+    raw_days = program.get("days")
+    if not isinstance(raw_days, list):
+        raise RuntimeError("Public program days must be a list")
+
+    day_markup: list[str] = []
+    for raw_day in raw_days:
+        if not isinstance(raw_day, dict):
+            raise RuntimeError("Public program day must be an object")
+        day = cast(dict[str, object], raw_day)
+        day_number = day.get("day_number")
+        day_title = html.escape(_required_string(day.get("title"), field="program.day.title"))
+        raw_exercises = day.get("exercises")
+        if not isinstance(raw_exercises, list):
+            raise RuntimeError("Public program exercises must be a list")
+        exercise_markup: list[str] = []
+        for raw_exercise in raw_exercises:
+            if not isinstance(raw_exercise, dict):
+                raise RuntimeError("Public program exercise must be an object")
+            exercise = cast(dict[str, object], raw_exercise)
+            slug = _required_string(exercise.get("slug"), field="program.exercise.slug")
+            exercise_title = _required_string(exercise.get("title"), field="program.exercise.title")
+            exercise_path = f"/exercises/{slug}"
+            escaped_title = html.escape(exercise_title)
+            if public_page_for_path(exercise_path):
+                name_markup = (
+                    f'<a href="{html.escape(exercise_path, quote=True)}">{escaped_title}</a>'
+                )
+            else:
+                name_markup = f"<strong>{escaped_title}</strong>"
+            exercise_markup.append(
+                "<li>"
+                f"{name_markup}"
+                '<span class="seo-fallback-program__facts">'
+                f"{html.escape(str(exercise.get('prescribed_sets')))} подхода · "
+                f"{html.escape(_required_string(exercise.get('prescribed_reps'), field='program.exercise.prescribed_reps'))} повторений · "
+                f"Отдых: {html.escape(_rest_label(exercise.get('rest_seconds')))}"
+                "</span>"
+                "</li>"
+            )
+        day_markup.append(
+            '<article class="seo-fallback-program__day">'
+            f"<p>День {html.escape(str(day_number))}</p>"
+            f"<h3>{day_title}</h3>"
+            f"<ol>{''.join(exercise_markup)}</ol>"
+            "</article>"
+        )
+
+    goal = _required_string(program.get("goal"), field="program.goal")
+    level = _required_string(program.get("level"), field="program.level")
+    split_type = _required_string(program.get("split_type"), field="program.split_type")
+    return (
+        '<section class="seo-fallback-program" aria-labelledby="seo-fallback-program-title">'
+        '<p class="landing-kicker">Канонический шаблон</p>'
+        f'<h2 id="seo-fallback-program-title">{html.escape(title)}</h2>'
+        "<dl>"
+        f"<div><dt>Цель</dt><dd>{html.escape(goal)}</dd></div>"
+        f"<div><dt>Уровень</dt><dd>{html.escape(level)}</dd></div>"
+        f"<div><dt>Схема</dt><dd>{html.escape(split_type)}</dd></div>"
+        "</dl>"
+        f'<div class="seo-fallback-program__days">{"".join(day_markup)}</div>'
+        "</section>"
+    )
 
 
 def _breadcrumbs_schema(page: dict[str, object]) -> dict[str, object] | None:
@@ -261,7 +559,23 @@ def metadata_for_path(path: str) -> SeoMetadata:
     """Keep indexability decisions in one place for browser and crawler responses."""
 
     page = public_page_for_path(path)
+    if path == ATHLETE_LANDING_ALIAS_PATH:
+        landing = public_page_for_path("/")
+        if landing:
+            return SeoMetadata(
+                title=_required_string(landing["title"], field="title"),
+                description=_required_string(landing["description"], field="description"),
+                robots=NOINDEX_FOLLOW_ROBOTS,
+                canonical_url=_absolute_public_url("/"),
+                og_description=_required_string(landing["ogDescription"], field="ogDescription"),
+            )
     if page:
+        if page.get("kind") == "exercise":
+            # An allowlisted manifest entry is indexable only when its canonical domain
+            # record passes the public exercise quality gate.
+            _published_exercise_for_page(page)
+        if page.get("kind") == "program":
+            _published_program_for_page(page)
         return SeoMetadata(
             title=_required_string(page["title"], field="title"),
             description=_required_string(page["description"], field="description"),
@@ -278,6 +592,76 @@ def metadata_for_path(path: str) -> SeoMetadata:
     )
 
 
+def metadata_for_articles() -> SeoMetadata:
+    return SeoMetadata(
+        title=ARTICLE_INDEX_TITLE,
+        description=ARTICLE_INDEX_DESCRIPTION,
+        robots=INDEX_ROBOTS,
+        canonical_url=_absolute_public_url("/articles"),
+        og_description=ARTICLE_INDEX_DESCRIPTION,
+        structured_data=(
+            {
+                "@context": "https://schema.org",
+                "@type": "CollectionPage",
+                "name": ARTICLE_INDEX_TITLE,
+                "description": ARTICLE_INDEX_DESCRIPTION,
+                "url": _absolute_public_url("/articles"),
+                "isPartOf": {
+                    "@type": "WebSite",
+                    "name": "Your Fitness Coach",
+                    "url": _absolute_public_url("/"),
+                },
+            },
+        ),
+    )
+
+
+def metadata_for_article(article: WebArticle) -> SeoMetadata:
+    if article.status != "published" or article.published_at is None or article.updated_at is None:
+        return metadata_for_path("/articles")
+    canonical_url = _absolute_public_url(f"/articles/{article.slug}")
+    author = article.author if isinstance(article.author, dict) else {}
+    editor = article.editor if isinstance(article.editor, dict) else {}
+    reviewer = article.domain_reviewer if isinstance(article.domain_reviewer, dict) else None
+    entity: dict[str, object] = {
+        "@type": "Article",
+        "headline": article.title,
+        "description": article.description,
+        "url": canonical_url,
+        "mainEntityOfPage": canonical_url,
+        "datePublished": article.published_at.date().isoformat(),
+        "dateModified": article.updated_at.date().isoformat(),
+        "author": {
+            "@type": author.get("type", "Organization"),
+            "name": author.get("name", "Your Fitness Coach"),
+        },
+        "editor": {
+            "@type": editor.get("type", "Organization"),
+            "name": editor.get("name", "YFC Editorial Desk"),
+        },
+        "publisher": {"@type": "Organization", "name": "Your Fitness Coach"},
+    }
+    if reviewer:
+        entity["reviewedBy"] = {
+            "@type": reviewer.get("type", "Organization"),
+            "name": reviewer.get("name", "YFC Domain Review"),
+        }
+    return SeoMetadata(
+        title=article.title,
+        description=article.description,
+        robots=INDEX_ROBOTS,
+        canonical_url=canonical_url,
+        og_description=article.description,
+        og_type="article",
+        structured_data=(
+            {
+                "@context": "https://schema.org",
+                **entity,
+            },
+        ),
+    )
+
+
 def render_metadata(metadata: SeoMetadata) -> str:
     """Render only server-controlled metadata; no user content is inserted here."""
 
@@ -287,16 +671,6 @@ def render_metadata(metadata: SeoMetadata) -> str:
         f'<meta name="robots" content="{metadata.robots}" />',
         f'<meta name="yandex" content="{metadata.robots}" />',
     ]
-    if metadata.canonical_url and settings.google_site_verification.strip():
-        tags.append(
-            '<meta name="google-site-verification" content="'
-            f'{html.escape(settings.google_site_verification.strip(), quote=True)}" />'
-        )
-    if metadata.canonical_url and settings.yandex_verification.strip():
-        tags.append(
-            '<meta name="yandex-verification" content="'
-            f'{html.escape(settings.yandex_verification.strip(), quote=True)}" />'
-        )
     if metadata.canonical_url:
         canonical = html.escape(metadata.canonical_url, quote=True)
         social_image = html.escape(_absolute_public_url(SOCIAL_IMAGE_PATH), quote=True)
@@ -338,9 +712,119 @@ def _link_markup(item: dict[str, object]) -> str:
     return f'<li><a href="{path}">{label}</a>{detail}</li>'
 
 
+def _article_person_markup(label: str, person: object) -> str:
+    if not isinstance(person, dict):
+        return ""
+    name = person.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return ""
+    return f"<dt>{html.escape(label)}</dt><dd>{html.escape(name)}</dd>"
+
+
+def render_article_fallback(article: WebArticle, related: tuple[WebArticle, ...] = ()) -> str:
+    """Render published article meaningfully before React hydration."""
+
+    published_at = article.published_at
+    updated_at = article.updated_at
+    if article.status != "published" or published_at is None or updated_at is None:
+        return ""
+    parts = [
+        '<main class="seo-fallback seo-article-fallback">',
+        '<nav aria-label="Публичные разделы"><a href="/">Главная</a> '
+        '<a href="/articles">Статьи</a></nav>',
+        f'<p class="landing-kicker">{html.escape(article.article_kind)}</p>',
+        f"<h1>{html.escape(article.title)}</h1>",
+        f'<p class="public-hero__lead">{html.escape(article.lead)}</p>',
+        '<dl class="public-guide-meta">',
+        _article_person_markup("Автор", article.author),
+        _article_person_markup("Редактор", article.editor),
+        _article_person_markup("Проверил", article.domain_reviewer),
+        f'<dt>Опубликовано</dt><dd><time datetime="{published_at.date().isoformat()}">'
+        f"{published_at.date().isoformat()}</time></dd>",
+        f'<dt>Обновлено</dt><dd><time datetime="{updated_at.date().isoformat()}">'
+        f"{updated_at.date().isoformat()}</time></dd>",
+        "</dl>",
+    ]
+    for raw_section in article.body_sections:
+        if not isinstance(raw_section, dict):
+            continue
+        heading = raw_section.get("heading")
+        paragraphs = raw_section.get("paragraphs", [])
+        if not isinstance(heading, str) or not isinstance(paragraphs, list):
+            continue
+        parts.append(f"<section><h2>{html.escape(heading)}</h2>")
+        parts.extend(
+            f"<p>{html.escape(value)}</p>" for value in paragraphs if isinstance(value, str)
+        )
+        points = raw_section.get("points", [])
+        if isinstance(points, list):
+            items = "".join(
+                f"<li>{html.escape(value)}</li>" for value in points if isinstance(value, str)
+            )
+            if items:
+                parts.append(f"<ul>{items}</ul>")
+        parts.append("</section>")
+    sources = article.sources if isinstance(article.sources, list) else []
+    if sources:
+        parts.append("<section><h2>Источники</h2><ol>")
+        for source in sources:
+            if not isinstance(source, dict):
+                continue
+            url = _safe_https_url(source.get("url"))
+            title = source.get("title")
+            publisher = source.get("publisher")
+            if not (isinstance(url, str) and isinstance(title, str) and isinstance(publisher, str)):
+                continue
+            parts.append(
+                f'<li><a href="{html.escape(url, quote=True)}">{html.escape(title)}</a>'
+                f" — {html.escape(publisher)}</li>"
+            )
+        parts.append("</ol></section>")
+    if related:
+        parts.append("<section><h2>Связанные статьи</h2><ul>")
+        for item in related:
+            parts.append(
+                f'<li><a href="/articles/{html.escape(item.slug, quote=True)}">'
+                f"{html.escape(item.title)}</a></li>"
+            )
+        parts.append("</ul></section>")
+    cta = article.cta if isinstance(article.cta, dict) else {}
+    cta_label = cta.get("label", "Открыть Your Fitness Coach")
+    cta_description = cta.get("description", "Продолжите работу с фактами в приложении.")
+    cta_destination = cta.get("destination", "web")
+    if isinstance(cta_label, str) and isinstance(cta_description, str):
+        cta_href = public_article_cta_url(cta_destination)
+        parts.append(
+            f"<section><h2>{html.escape(cta_label)}</h2><p>{html.escape(cta_description)}</p>"
+            f'<a href="{html.escape(cta_href, quote=True)}">{html.escape(cta_label)}</a></section>'
+        )
+    parts.append("</main>")
+    return "".join(parts)
+
+
+def render_articles_index_fallback(articles: tuple[WebArticle, ...]) -> str:
+    parts = [
+        '<main class="seo-fallback seo-articles-index-fallback">',
+        '<nav aria-label="Публичные разделы"><a href="/">Главная</a> '
+        '<a href="/articles">Статьи</a></nav>',
+        f"<h1>{html.escape(ARTICLE_INDEX_TITLE)}</h1>",
+        f"<p>{html.escape(ARTICLE_INDEX_DESCRIPTION)}</p>",
+        "<section><h2>Опубликованные статьи</h2><ul>",
+    ]
+    for article in articles:
+        parts.append(
+            f'<li><a href="/articles/{html.escape(article.slug, quote=True)}">'
+            f"{html.escape(article.title)}</a> — {html.escape(article.description)}</li>"
+        )
+    parts.extend(("</ul></section>", "</main>"))
+    return "".join(parts)
+
+
 def render_public_fallback(path: str) -> str:
     """Render the public page's meaningful text and links without requiring JavaScript."""
 
+    if path == ATHLETE_LANDING_ALIAS_PATH:
+        path = "/"
     page = public_page_for_path(path)
     if not page:
         return ""
@@ -366,6 +850,37 @@ def render_public_fallback(path: str) -> str:
             f"<p>{html.escape(_required_string(page['intro'], field='intro'))}</p>",
         )
     )
+    cta = page.get("cta")
+    app_url = f"{settings.frontend_base_url.rstrip('/')}/app"
+    if page.get("kind") == "program":
+        app_url += "?section=programs"
+    if isinstance(cta, dict) and cta.get("placement") == "hero-and-footer":
+        typed_cta = cast(dict[str, object], cta)
+        cta_label = _required_string(typed_cta.get("label"), field="cta.label")
+        parts.append(
+            f'<p><a href="{html.escape(app_url, quote=True)}">{html.escape(cta_label)}</a></p>'
+        )
+    raw_workflow = page.get("workflow")
+    if isinstance(raw_workflow, dict):
+        workflow = cast(dict[str, object], raw_workflow)
+        parts.append(
+            '<section class="seo-fallback-workflow" aria-labelledby="seo-fallback-workflow-title">'
+            f'<h2 id="seo-fallback-workflow-title">{html.escape(_required_string(workflow.get("heading"), field="workflow.heading"))}</h2>'
+        )
+        workflow_intro = workflow.get("intro")
+        if isinstance(workflow_intro, str):
+            parts.append(f"<p>{html.escape(workflow_intro)}</p>")
+        parts.append("<ol>")
+        for raw_step in cast(list[object], workflow["steps"]):
+            step = cast(dict[str, object], raw_step)
+            parts.append(
+                "<li>"
+                f"<span>{html.escape(_required_string(step.get('label'), field='workflow.step.label'))}</span>"
+                f"<h3>{html.escape(_required_string(step.get('title'), field='workflow.step.title'))}</h3>"
+                f"<p>{html.escape(_required_string(step.get('description'), field='workflow.step.description'))}</p>"
+                "</li>"
+            )
+        parts.append("</ol></section>")
     if isinstance(page.get("author"), dict) and isinstance(page.get("updated"), str):
         author = cast(dict[str, object], page["author"])
         parts.append(
@@ -432,33 +947,70 @@ def render_public_fallback(path: str) -> str:
             f"<section><h2>Опубликованные карточки упражнений</h2><ul>{exercise_links}</ul></section>"
         )
     if page.get("kind") == "exercise" and isinstance(page.get("slug"), str):
-        exercise = public_exercise(cast(str, page["slug"]))
-        if exercise is None:
-            raise RuntimeError(f"Published exercise {page['slug']!r} has no domain record")
+        exercise = _published_exercise_for_page(page)
+        primary = _required_string(exercise.get("primary_muscle"), field="primary_muscle")
+        secondary = _required_string_list(
+            exercise.get("secondary_muscles"), field="secondary_muscles"
+        )
+        equipment = _required_string(exercise.get("equipment"), field="equipment")
+        difficulty = _required_string(exercise.get("difficulty_level"), field="difficulty_level")
+        difficulty_labels = {
+            "beginner": "Начальный уровень",
+            "intermediate": "Средний уровень",
+            "advanced": "Продвинутый уровень",
+        }
+        difficulty_label = difficulty_labels.get(difficulty, difficulty)
         facts = (
-            f"Основная группа: {html.escape(cast(str, exercise['primary_muscle']))}. "
-            f"Оборудование: {html.escape(cast(str, exercise['equipment']))}."
+            f"Основная группа: {html.escape(primary)}. "
+            f"Дополнительные мышцы: {html.escape(', '.join(secondary))}. "
+            f"Оборудование: {html.escape(equipment)}. "
+            f"Сложность: {html.escape(difficulty_label)}."
         )
         parts.append(f"<section><h2>Краткие сведения</h2><p>{facts}</p></section>")
+        media_markup = _public_exercise_media_markup(exercise)
+        if media_markup:
+            parts.append(media_markup)
         steps = "".join(
-            f"<li>{html.escape(step)}</li>" for step in cast(list[str], exercise["technique_steps"])
+            f"<li>{html.escape(step)}</li>"
+            for step in _required_string_list(
+                exercise.get("technique_steps"), field="technique_steps"
+            )
         )
         parts.append(f"<section><h2>Техника выполнения</h2><ol>{steps}</ol></section>")
         parts.append(
             "<section><h2>Дыхание</h2><p>"
-            f"{html.escape(cast(str, exercise['breathing']))}</p></section>"
+            f"{html.escape(_required_string(exercise.get('breathing'), field='breathing'))}</p></section>"
         )
         mistakes = "".join(
-            f"<li>{html.escape(item)}</li>" for item in cast(list[str], exercise["common_mistakes"])
+            f"<li>{html.escape(item)}</li>"
+            for item in _required_string_list(
+                exercise.get("common_mistakes"), field="common_mistakes"
+            )
         )
         parts.append(f"<section><h2>Частые ошибки</h2><ul>{mistakes}</ul></section>")
-        source_url = html.escape(cast(str, exercise["source_url"]), quote=True)
-        source_name = html.escape(cast(str, exercise["source_name"]))
-        source_license = html.escape(cast(str, exercise["source_license"]))
-        parts.append(
-            "<footer><strong>Источник данных и лицензия</strong> "
-            f'<a href="{source_url}">{source_name}</a> — {source_license}</footer>'
+        safety = "".join(
+            f"<li>{html.escape(item)}</li>"
+            for item in _required_string_list(exercise.get("safety_notes"), field="safety_notes")
         )
+        parts.append(f"<section><h2>Что важно для безопасности</h2><ul>{safety}</ul></section>")
+        source_url = _safe_https_url(exercise.get("source_url"))
+        source_name = _required_string(exercise.get("source_name"), field="source_name")
+        source_license = _required_string(exercise.get("source_license"), field="source_license")
+        source_markup = html.escape(source_name)
+        if source_url:
+            source_markup = f'<a href="{html.escape(source_url, quote=True)}">{source_markup}</a>'
+        license_url = _safe_https_url(exercise.get("source_license_url"))
+        license_markup = html.escape(source_license)
+        if license_url:
+            license_markup = (
+                f'<a href="{html.escape(license_url, quote=True)}">{license_markup}</a>'
+            )
+        parts.append(
+            '<footer class="public-exercise-source"><strong>Источник данных и лицензия</strong> '
+            f"{source_markup} — {license_markup}</footer>"
+        )
+    if page.get("kind") == "program":
+        parts.append(_public_program_markup(_published_program_for_page(page)))
     sources = page.get("sources")
     if isinstance(sources, list) and sources:
         parts.append("<section><h2>Источники</h2><ol>")
@@ -481,10 +1033,8 @@ def render_public_fallback(path: str) -> str:
             if isinstance(item, dict)
         )
         parts.append(f"<section><h2>Связанные страницы</h2><ul>{links}</ul></section>")
-    cta = page.get("cta")
     if isinstance(cta, dict):
         typed_cta = cast(dict[str, object], cta)
-        app_url = f"{settings.frontend_base_url.rstrip('/')}/app"
         parts.append(
             "<section><h2>"
             f"{html.escape(_required_string(typed_cta.get('label'), field='cta.label'))}"
@@ -496,18 +1046,41 @@ def render_public_fallback(path: str) -> str:
     return "".join(parts)
 
 
-def render_frontend_document(template: str, path: str) -> tuple[str, SeoMetadata]:
+def render_frontend_document(
+    template: str,
+    path: str,
+    *,
+    article: WebArticle | None = None,
+    articles: tuple[WebArticle, ...] = (),
+    metadata_override: SeoMetadata | None = None,
+) -> tuple[str, SeoMetadata]:
     """Inject route metadata and public fallback into the Vite HTML entry."""
 
-    metadata = metadata_for_path(path)
+    if metadata_override is not None:
+        metadata = metadata_override
+        fallback = ""
+    elif article is not None:
+        metadata = metadata_for_article(article)
+        fallback = render_article_fallback(
+            article, tuple(item for item in articles if item.slug in article.related_slugs)
+        )
+    elif path == "/articles":
+        metadata = metadata_for_articles()
+        fallback = render_articles_index_fallback(articles)
+    else:
+        metadata = metadata_for_path(path)
+        fallback = render_public_fallback(path)
     rendered = template.replace("<!-- seo-head -->", render_metadata(metadata))
     if rendered == template:
         rendered = template.replace("</head>", f"    {render_metadata(metadata)}\n  </head>")
 
-    fallback = render_public_fallback(path)
     marked_fallback = f"<!-- public-fallback-start -->{fallback}<!-- public-fallback-end -->"
     if _PUBLIC_FALLBACK_PATTERN.search(rendered):
         rendered = _PUBLIC_FALLBACK_PATTERN.sub(marked_fallback, rendered, count=1)
     elif fallback:
         rendered = rendered.replace('<div id="root"></div>', f'<div id="root">{fallback}</div>')
+    rendered = rendered.replace(
+        "<!-- yandex-metrica-noscript -->",
+        _YANDEX_METRICA_NOSCRIPT if metadata.canonical_url else "",
+    )
     return rendered, metadata

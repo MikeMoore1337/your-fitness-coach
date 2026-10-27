@@ -1,0 +1,143 @@
+{
+  "slug": "rastitelnye-produkty-i-boleznennost-posle-trenirovki",
+  "title": "Могут ли растительные продукты уменьшить болезненность после тренировки?",
+  "description": "Что известно о вишне, гранате и субъективной болезненности после нагрузки. Обзор ограниченных научных данных без советов по дозировке.",
+  "lead": "После непривычной или интенсивной нагрузки мышцы могут болеть. Некоторые исследования растительных продуктов с полифенолами сообщают об уменьшении субъективной болезненности, но результаты непостоянны. Это ещё не означает более быстрое восстановление силы или спортивной работоспособности.",
+  "body_sections": [
+    {
+      "heading": "Что изучали",
+      "paragraphs": [
+        "В систематическом обзоре Nguyen и соавторов рассмотрены разные продукты и формы их применения: от пищевых продуктов до концентратов. Участники, тренировочные нагрузки и способы измерения восстановления заметно различались. Поэтому выводы нельзя автоматически переносить на любой продукт или любую тренировку.",
+        "В более узком сетевом метаанализе Xu и соавторов изучались богатые антоцианами и флаванолами продукты и добавки. Эти обзоры могли включать часть одних и тех же исследований, поэтому их результаты нельзя считать полностью независимыми."
+      ]
+    },
+    {
+      "heading": "Что известно о болезненности",
+      "paragraphs": [
+        "В отдельных исследованиях вишни и граната участники сообщали о меньшей мышечной болезненности после нагрузки. Сила этого свидетельства ограничена: боль оценивается самими участниками, выборки нередко небольшие, а результаты зависят от условий испытания.",
+        "Не все исследования приходят к одинаковым выводам. Например, небольшое перекрёстное испытание гранатового сока среди мужчин-волейболистов не показало убедительного преимущества перед плацебо по групповой оценке болезненности."
+      ]
+    },
+    {
+      "heading": "Болезненность и восстановление силы — разные вещи",
+      "paragraphs": [
+        "Меньшая субъективная болезненность не доказывает, что мышцы быстрее вернули силу или что следующая тренировка пройдёт результативнее. Рассмотренные обзоры не выявили последовательного и убедительного улучшения силы или спортивной работоспособности.",
+        "Поэтому корректнее говорить об ограниченных данных о самочувствии после нагрузки, а не об установленном ускорении восстановления."
+      ]
+    },
+    {
+      "heading": "Что это означает для читателя",
+      "paragraphs": [
+        "Эти наблюдения относятся прежде всего к физически активным взрослым в исследованных условиях. Их нельзя без отдельного обоснования переносить на подростков, людей с заболеваниями и иные группы.",
+        "Данные пока не позволяют рекомендовать всем конкретный продукт, добавку, дозировку или время приёма для восстановления. Материал знакомит с состоянием исследований, а не назначает питание или лечение."
+      ]
+    }
+  ],
+  "topics": [
+    "sports_nutrition",
+    "mobility_recovery_sleep"
+  ],
+  "article_kind": "evidence_review",
+  "search_intent": "evidence",
+  "primary_query": "растительные продукты мышечная болезненность после тренировки доказательства",
+  "secondary_queries": [
+    "вишня и гранат восстановление после тренировки исследования",
+    "растительные продукты DOMS научный обзор"
+  ],
+  "risk_level": "moderate",
+  "evidence_level": "limited",
+  "claims": [
+    {
+      "claim_id": "claim-soreness",
+      "claim_text": "Некоторые исследования богатых полифенолами растительных продуктов сообщают о возможном уменьшении субъективной мышечной болезненности после нагрузки.",
+      "normalized_claim": "Some trials of polyphenol-rich foods report possible lower subjective post-exercise muscle soreness."
+    },
+    {
+      "claim_id": "claim-function",
+      "claim_text": "Доказательства устойчивого улучшения мышечной силы или спортивной работоспособности остаются недостаточно убедительными.",
+      "normalized_claim": "Current evidence does not establish consistent improvement in muscle strength or physical performance."
+    },
+    {
+      "claim_id": "claim-dosing",
+      "claim_text": "Рассмотренные данные не позволяют предложить универсальную рекомендацию по конкретному продукту, дозе или времени приёма.",
+      "normalized_claim": "Available evidence does not support universal product, dose or timing prescriptions."
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "source-nguyen",
+      "title": "Plant-Derived Whole Foods and Food-Based Supplements on Post-Exercise Recovery in Physically Active Individuals",
+      "publisher": "Nutrients",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13610232/",
+      "source_type": "systematic_review",
+      "limitations": "36 неоднородных вмешательств, нарративный синтез без общего эффекта; методологические ограничения, PROSPERO и полное пересечение выборок не проверены независимым экспертом."
+    },
+    {
+      "source_id": "source-xu",
+      "title": "Comparative effects of plant-derived anthocyanin- and flavanol-rich supplements on recovery outcomes after exercise-induced muscle damage",
+      "publisher": "Frontiers in Nutrition",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13522125/",
+      "source_type": "systematic_review",
+      "limitations": "Сетевой метаанализ с низкой определённостью доказательств; выборки и оценки отличаются от широкого обзора Nguyen; пересечение первичных испытаний не подсчитано."
+    },
+    {
+      "source_id": "source-rezaei",
+      "title": "Individual responses to pomegranate juice on recovery from exercise-induced muscle damage in collegiate male volleyball players",
+      "publisher": "Journal of the International Society of Sports Nutrition",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13104005/",
+      "source_type": "randomized_trial",
+      "limitations": "Малое перекрёстное испытание 14 мужчин-волейболистов; нет убедительного межусловного преимущества, результат нельзя переносить на всех занимающихся."
+    }
+  ],
+  "claim_source_matrix": [
+    {
+      "claim_id": "claim-soreness",
+      "source_ids": [
+        "source-nguyen",
+        "source-xu",
+        "source-rezaei"
+      ],
+      "support_level": "partially_supports",
+      "limitations": "Сигнал неоднороден, субъективен; отдельное РКИ не обнаружило группового преимущества; низкая определённость; независимый научный эксперт не подтвердил этот конкретный текст.",
+      "review_status": "pending"
+    },
+    {
+      "claim_id": "claim-function",
+      "source_ids": [
+        "source-nguyen",
+        "source-xu",
+        "source-rezaei"
+      ],
+      "support_level": "partially_supports",
+      "limitations": "Отсутствие убедительного преимущества не равно доказанному отсутствию эффекта; популяции и исходы исследований различаются.",
+      "review_status": "pending"
+    },
+    {
+      "claim_id": "claim-dosing",
+      "source_ids": [
+        "source-nguyen",
+        "source-xu"
+      ],
+      "support_level": "partially_supports",
+      "limitations": "Обобщение ограничено изученными продуктами и условиями, не является персональной рекомендацией. Нужна предметная редакторская оценка.",
+      "review_status": "pending"
+    }
+  ],
+  "author": {
+    "name": "Your Fitness Coach",
+    "type": "Organization"
+  },
+  "editor": {
+    "name": "Your Fitness Coach",
+    "type": "Organization"
+  },
+  "domain_reviewer": null,
+  "related_slugs": [],
+  "cta": {},
+  "evergreen_score": 50,
+  "product_relevance": 50,
+  "editorial_value": 50,
+  "web_article_potential_reasons": [
+    "source_based_educational_review"
+  ]
+}

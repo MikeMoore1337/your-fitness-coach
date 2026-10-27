@@ -10,6 +10,7 @@ import { QuantitativeProgress, TimeSeriesChart } from '../../shared/ui/DataViz';
 import { Icon } from '../../shared/ui/Icon';
 import { NUTRITION_WEEK_LEGEND, WeekStrip, type WeekStripDayMeta } from '../../shared/ui/WeekStrip';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   EmptyState,
@@ -183,6 +184,10 @@ function CoverageSummary({ report }: { report: NutritionReport }) {
         {summary.incomplete_days} не завершено · {summary.missing_days} без данных ·{' '}
         {summary.fasted_days} отмечено без приёмов пищи
       </p>
+      <p className="nutrition-report-coverage__details">
+        Записи: {summary.exact_entry_count ?? 0} точных · {summary.approximate_entry_count ?? 0}{' '}
+        приблизительных · {summary.partial_entry_count ?? 0} с неполными БЖУ
+      </p>
     </div>
   );
 }
@@ -204,18 +209,18 @@ function MetricRow({
       <dt>{label}</dt>
       <dd>
         <strong>
-          {formatNumber(metric.average, 0)} <span>{unit}</span>
+          {formatNumber(metric.average, 2)} <span>{unit}</span>
         </strong>
         <small>
           {metric.sample_days
-            ? `минимум ${formatNumber(metric.minimum, 0)} · максимум ${formatNumber(metric.maximum, 0)} · по ${metric.sample_days} дн.`
+            ? `минимум ${formatNumber(metric.minimum, 2)} · максимум ${formatNumber(metric.maximum, 2)} · по ${metric.sample_days} дн.`
             : 'Нет данных по показателю'}
         </small>
       </dd>
       <dd>
         <span>Ориентир в среднем</span>
         <strong>
-          {formatNumber(comparison.average_target, 0)}{' '}
+          {formatNumber(comparison.average_target, 2)}{' '}
           {comparison.average_target == null ? '' : <span>{unit}</span>}
         </strong>
         <small>
@@ -228,7 +233,7 @@ function MetricRow({
         <span>Отклонение</span>
         <strong>
           {deviation != null && deviation > 0 ? '+' : ''}
-          {formatNumber(deviation, 0)} {deviation == null ? '' : <span>{unit}</span>}
+          {formatNumber(deviation, 2)} {deviation == null ? '' : <span>{unit}</span>}
         </strong>
       </dd>
     </div>
@@ -258,6 +263,30 @@ function ReportMetrics({ report }: { report: NutritionReport }) {
         comparison={summary.carbs_comparison}
         unit="г"
       />
+      {summary.fiber_g && (
+        <div className="nutrition-report-metric">
+          <dt>Клетчатка</dt>
+          <dd>
+            <strong>
+              {formatNumber(summary.fiber_g.average, 2)} <span>г</span>
+            </strong>
+            <small>
+              {summary.fiber_g.sample_days
+                ? `по ${summary.fiber_g.sample_days} дн. с известными данными`
+                : 'Данных о клетчатке недостаточно'}
+            </small>
+          </dd>
+          <dd>
+            <span>Ориентир</span>
+            <strong>Не задан</strong>
+            <small>Без выдуманной нормы</small>
+          </dd>
+          <dd>
+            <span>Сопоставление</span>
+            <strong>—</strong>
+          </dd>
+        </div>
+      )}
     </dl>
   );
 }
@@ -297,24 +326,109 @@ function NutritionChart({
   );
 }
 
+function NutritionReportInsights({
+  report,
+  canOpenDiary,
+}: {
+  report: NutritionReport;
+  canOpenDiary: boolean;
+}) {
+  const insights = report.insights ?? [];
+  if (!insights.length) return null;
+  const metricLabels = {
+    calories: 'Калории',
+    protein_g: 'Белок',
+    fat_g: 'Жиры',
+    carbs_g: 'Углеводы',
+  };
+  return (
+    <section aria-labelledby="nutrition-report-insights-title" className="nutrition-report-targets">
+      <h3 id="nutrition-report-insights-title">Повторяющиеся отклонения</h3>
+      <div className="nutrition-report-adherence">
+        {insights.map((insight) => (
+          <p key={insight.metric}>
+            <strong>{metricLabels[insight.metric]}</strong>
+            <span>{insight.message}</span>
+            {canOpenDiary && <AppLink to="/app?section=nutrition">Открыть питание</AppLink>}
+          </p>
+        ))}
+      </div>
+      <p className="progress-note">
+        Выводы основаны только на завершённых днях с подтверждёнными значениями и действовавшими
+        тогда целями. Они не меняют дневник или план питания.
+      </p>
+    </section>
+  );
+}
+
 function TargetChanges({ report }: { report: NutritionReport }) {
-  if (!report.target_changes.length) return null;
+  if (!report.target_changes.length) {
+    return (
+      <p className="nutrition-report-target-history__empty progress-note">
+        За выбранный период изменений целей питания не было.
+      </p>
+    );
+  }
   return (
     <div className="nutrition-report-targets">
       <h3>Изменения цели в периоде</h3>
       <ol>
         {report.target_changes.map((target) => (
           <li key={`${target.effective_from}-${target.source}`}>
-            <time dateTime={target.effective_from}>{formatDate(target.effective_from, true)}</time>
-            <strong>{targetSourceLabels[target.source]}</strong>
-            <span>
-              {target.calories} ккал · Б {target.protein_g} · Ж {target.fat_g} · У {target.carbs_g}{' '}
-              г
+            <time dateTime={target.effective_from}>
+              <span className="nutrition-report-targets__mobile-label">Дата</span>
+              <span className="nutrition-report-targets__content">
+                {formatDate(target.effective_from, true)}
+              </span>
+            </time>
+            <strong>
+              <span className="nutrition-report-targets__mobile-label">Источник</span>
+              <span className="nutrition-report-targets__content nutrition-report-targets__content--source">
+                {targetSourceLabels[target.source]}
+              </span>
+            </strong>
+            <span className="nutrition-report-targets__values">
+              <span className="nutrition-report-targets__value">
+                <span className="nutrition-report-targets__mobile-label">Калории</span>
+                <span className="nutrition-report-targets__content">{target.calories} ккал</span>
+              </span>
+              <span className="nutrition-report-targets__value">
+                <span className="nutrition-report-targets__mobile-label">Б / Ж / У</span>
+                <span className="nutrition-report-targets__content">
+                  Б {target.protein_g} · Ж {target.fat_g} · У {target.carbs_g} г
+                </span>
+              </span>
             </span>
           </li>
         ))}
       </ol>
     </div>
+  );
+}
+
+function TargetHistory({ report }: { report: NutritionReport }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="nutrition-report-target-history"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary
+        className="yfc-disclosure-summary"
+        aria-controls="nutrition-report-target-history-content"
+        aria-expanded={open}
+      >
+        <span>История целей питания</span>
+        <DisclosureIcon />
+      </summary>
+      <div
+        className="nutrition-report-target-history__body"
+        id="nutrition-report-target-history-content"
+      >
+        <TargetChanges report={report} />
+      </div>
+    </details>
   );
 }
 
@@ -325,13 +439,23 @@ function DailyTable({
   dayLink: ((date: string) => string) | null;
   report: NutritionReport;
 }) {
+  // A 30-day table is too long to expand automatically on a mobile screen.
+  const [open, setOpen] = useState(false);
   return (
     <details
       className="nutrition-report-days"
-      open={report.daily.length <= 30 && report.summary.logged_days > 0}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>Дни периода: {report.daily.length}</summary>
-      <div className="nutrition-report-days__table-wrap">
+      <summary
+        className="yfc-disclosure-summary"
+        aria-controls="nutrition-report-days-content"
+        aria-expanded={open}
+      >
+        <span>Дни периода: {report.daily.length}</span>
+        <DisclosureIcon />
+      </summary>
+      <div className="nutrition-report-days__table-wrap" id="nutrition-report-days-content">
         <table>
           <caption className="sr-only">
             Дневные КБЖУ, статус заполнения и действовавшая цель
@@ -362,12 +486,15 @@ function DailyTable({
                 </td>
                 <td data-label="Статус">{statusLabels[point.status]}</td>
                 <td data-label="Калории">
-                  {point.calories == null ? '—' : `${formatNumber(point.calories, 0)} ккал`}
+                  {point.calories == null ? '—' : `${formatNumber(point.calories, 2)} ккал`}
                 </td>
                 <td data-label="Б / Ж / У">
                   {point.protein_g == null
                     ? '—'
-                    : `${formatNumber(point.protein_g, 0)} / ${formatNumber(point.fat_g, 0)} / ${formatNumber(point.carbs_g, 0)} г`}
+                    : `${formatNumber(point.protein_g, 2)} / ${formatNumber(point.fat_g, 2)} / ${formatNumber(point.carbs_g, 2)} г`}
+                  {point.fiber_g != null && (
+                    <small>Клетчатка: {formatNumber(point.fiber_g, 2)} г</small>
+                  )}
                 </td>
                 <td data-label="Цель">
                   {point.target_calories == null ? 'Не задана' : `${point.target_calories} ккал`}
@@ -398,10 +525,12 @@ export type ControlledNutritionPeriod = {
 };
 
 export function NutritionPeriodReport({
+  canExport = true,
   clientId,
   controlledPeriod,
   showSelector = true,
 }: {
+  canExport?: boolean;
   clientId?: number;
   controlledPeriod?: ControlledNutritionPeriod;
   showSelector?: boolean;
@@ -518,7 +647,7 @@ export function NutritionPeriodReport({
           <p>Полнота данных, КБЖУ и цели, которые действовали в каждый день периода.</p>
         </div>
         <Button
-          disabled={!report.data || exportState === 'loading'}
+          disabled={!canExport || !report.data || exportState === 'loading'}
           onClick={() => void downloadCsv()}
           type="button"
           variant="secondary"
@@ -532,6 +661,11 @@ export function NutritionPeriodReport({
           )}
         </Button>
       </header>
+      {!canExport && (
+        <p className="muted demo-capability-notice" role="status">
+          Выгрузка отчёта доступна после входа.
+        </p>
+      )}
 
       {showSelector && (
         <>
@@ -671,6 +805,7 @@ export function NutritionPeriodReport({
           ) : (
             <>
               <ReportMetrics report={report.data} />
+              <NutritionReportInsights report={report.data} canOpenDiary={clientId == null} />
               <div className="nutrition-report-adherence" aria-label="Сравнение с целью">
                 <p>
                   <strong>
@@ -694,12 +829,16 @@ export function NutritionPeriodReport({
               />
             </>
           )}
-          <TargetChanges report={report.data} />
-          <DailyTable dayLink={dayLink} report={report.data} />
+          <TargetHistory report={report.data} />
+          <DailyTable
+            dayLink={dayLink}
+            key={`${report.data.period}-${report.data.period_start}-${report.data.period_end}`}
+            report={report.data}
+          />
           <p className="progress-note nutrition-period-report__methodology">
-            Отчёт описывает только записи КБЖУ. Он не оценивает качество рациона, витамины, здоровье
-            или причины изменения веса. Неполные дни видны в списке, но не входят в средние и
-            сравнение с целью.
+            Отчёт описывает записи КБЖУ и известную клетчатку. Отсутствующие значения не считаются
+            нулём. Он не оценивает качество рациона, витамины, здоровье или причины изменения веса.
+            Неполные дни видны в списке, но не входят в средние и сравнение с целью.
           </p>
         </>
       ) : null}
