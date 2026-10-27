@@ -13,7 +13,7 @@ dependencies = []
 [project.optional-dependencies]
 backend = [
     "fastapi",
-    "msgpack>=1.2.1",
+    "msgpack>=1.2.3",
     "uvicorn[standard]",
     "sqlalchemy",
     "psycopg[binary]",
