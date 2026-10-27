@@ -38,9 +38,11 @@ from fitminiapp_api.models.user import (
     UserProfile,
 )
 from fitminiapp_api.services.auth_identities import ensure_telegram_identity
+from fitminiapp_api.services.weekly_check_ins import SUMMARY_VERSION, build_weekly_summary
 
 FIXTURE_VERSION = "yfc-local-dev-v1"
 TIMEZONE = "Europe/Moscow"
+CHECK_IN_NOTE = "Синтетический еженедельный отчёт для панели тренера."
 
 # Per 100 g: kcal, protein, fat, carbohydrates, fibre. Illustrative values,
 # NOT medical advice or a verified nutrition database.
@@ -391,7 +393,28 @@ def _nutrition(db: Session, *, user_id: int, coach_id: int, today: date, days: i
 
 
 def _check_ins(db: Session, *, user_id: int, today: date) -> None:
-    if db.query(WeeklyCheckIn).filter_by(user_id=user_id).first():
+    db.flush()
+    user = db.query(User).filter_by(id=user_id).one()
+    existing = db.query(WeeklyCheckIn).filter_by(user_id=user_id).all()
+    if existing:
+        legacy_summaries = [
+            {
+                "training": {"planned_workouts": 3, "completed_workouts": 3},
+                "nutrition": {"logged_days": 7, "complete_days": 6},
+                "weight_trend": {"latest_value": 78.2 + index * 0.17},
+            }
+            for index in range(1, 9)
+        ]
+        for row in existing:
+            if (
+                row.summary_version == FIXTURE_VERSION
+                and row.note == CHECK_IN_NOTE
+                and row.summary in legacy_summaries
+            ):
+                row.summary = build_weekly_summary(
+                    db, user, week_start=row.week_start, period_end=row.submitted_on
+                )
+                row.summary_version = SUMMARY_VERSION
         return
     monday = today - timedelta(days=today.weekday())
     for index in range(8, 0, -1):
@@ -404,17 +427,15 @@ def _check_ins(db: Session, *, user_id: int, today: date) -> None:
                 submitted_on=week_start + timedelta(days=6),
                 timezone=TIMEZONE,
                 status="completed",
-                summary_version=FIXTURE_VERSION,
-                summary={
-                    "training": {"planned_workouts": 3, "completed_workouts": 3},
-                    "nutrition": {"logged_days": 7, "complete_days": 6},
-                    "weight_trend": {"latest_value": 78.2 + index * 0.17},
-                },
+                summary_version=SUMMARY_VERSION,
+                summary=build_weekly_summary(
+                    db, user, week_start=week_start, period_end=week_start + timedelta(days=6)
+                ),
                 training_load=2 + (index % 3),
                 recovery=3 + (index % 2),
                 hunger=3,
                 adherence_difficulty=2,
-                note="Синтетический еженедельный отчёт для панели тренера.",
+                note=CHECK_IN_NOTE,
             )
         )
 

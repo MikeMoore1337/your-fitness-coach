@@ -15,10 +15,13 @@ from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.hydration import HydrationEntry
 from fitminiapp_api.models.program import UserProgram, UserWorkout, UserWorkoutSet
 from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User
+from fitminiapp_api.schemas.check_in import WeeklyCheckInResponse
 from fitminiapp_api.services.local_dev_fixtures import (
+    FIXTURE_VERSION,
     maybe_seed_local_dev_data,
     seed_local_dev_data,
 )
+from fitminiapp_api.services.weekly_check_ins import SUMMARY_VERSION, serialize_weekly_check_in
 
 
 def _login(client, telegram_user_id: int, coach: bool, admin: bool = False) -> dict:
@@ -141,6 +144,11 @@ def test_fixed_dev_roles_authorization_and_coach_tenant_scope(client, monkeypatc
     coaching = client.get("/api/v1/coach/clients", headers=coach_headers)
     assert coaching.status_code == 200, coaching.text
     assert {item["id"] for item in coaching.json()} >= {trainee_id, other_id}
+    check_ins = client.get(
+        f"/api/v1/coach/clients/{trainee_id}/weekly-check-ins", headers=coach_headers
+    )
+    assert check_ins.status_code == 200, check_ins.text
+    assert len(check_ins.json()["items"]) == 8
 
     admin_endpoint = "/api/v1/admin/users?q=2001"
     assert client.get(admin_endpoint, headers=client_headers).status_code == 403
@@ -175,3 +183,48 @@ def test_fixed_dev_fixture_refuses_non_local_database(monkeypatch) -> None:
     )
     with get_session_context() as db, pytest.raises(RuntimeError, match="isolated yfc_dev"):
         maybe_seed_local_dev_data(db)
+
+
+def test_legacy_synthetic_check_ins_repair_only_unchanged_payloads() -> None:
+    with get_session_context() as db:
+        seed_local_dev_data(db)
+        db.flush()
+        user_id = db.query(User.id).filter_by(telegram_user_id=2001).scalar()
+        rows = (
+            db.query(WeeklyCheckIn)
+            .filter_by(user_id=user_id)
+            .order_by(WeeklyCheckIn.week_start.desc())
+            .all()
+        )
+        legacy = {
+            "training": {"planned_workouts": 3, "completed_workouts": 3},
+            "nutrition": {"logged_days": 7, "complete_days": 6},
+            "weight_trend": {"latest_value": 78.2 + 0.17},
+        }
+        for row in rows[:3]:
+            row.summary_version = FIXTURE_VERSION
+            row.summary = dict(legacy)
+        rows[1].note = "Owner-edited check-in"
+        edited_summary = {**legacy, "owner_edit": True}
+        rows[2].summary = edited_summary
+        ids = [row.id for row in rows[:3]]
+        db.flush()
+
+        seed_local_dev_data(db)
+        db.flush()
+        db.expire_all()
+        repaired, edited_note, edited_payload = [db.get(WeeklyCheckIn, value) for value in ids]
+        assert repaired.summary_version == SUMMARY_VERSION
+        WeeklyCheckInResponse.model_validate(serialize_weekly_check_in(repaired))
+        assert edited_note.note == "Owner-edited check-in"
+        assert edited_note.summary == legacy
+        assert edited_note.summary_version == FIXTURE_VERSION
+        assert edited_payload.summary == edited_summary
+        assert edited_payload.summary_version == FIXTURE_VERSION
+        snapshot = [serialize_weekly_check_in(db.get(WeeklyCheckIn, value)) for value in ids]
+        seed_local_dev_data(db)
+        db.flush()
+        db.expire_all()
+        assert snapshot == [
+            serialize_weekly_check_in(db.get(WeeklyCheckIn, value)) for value in ids
+        ]
