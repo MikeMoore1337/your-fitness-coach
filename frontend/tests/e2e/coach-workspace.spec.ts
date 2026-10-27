@@ -2128,7 +2128,7 @@ test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces'
   await page.getByRole('button', { name: 'Тренер', exact: true }).click();
   await expect(page).toHaveURL('/coach');
 
-  const dockGeometry = async ()
+  const dockGeometry = async () =>
     page.locator('#appBottomNav').evaluate((element) => {
       const box = element.getBoundingClientRect();
       const viewport = window.visualViewport;
