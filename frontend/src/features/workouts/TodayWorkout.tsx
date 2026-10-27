@@ -816,7 +816,9 @@ function WorkoutSetRow({
         </p>
       )}
 
-      <div className={`active-workout-set__controls${isCurrent ? ' active-workout-set__controls--with-rir' : ''}`}>
+      <div
+        className={`active-workout-set__controls${isCurrent ? ' active-workout-set__controls--with-rir' : ''}`}
+      >
         <label className="active-workout-input">
           <span>Вес, кг</span>
           <input
