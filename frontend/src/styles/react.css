@@ -5128,6 +5128,22 @@ button.today-text-link {
 .active-workout-set__rir-row {
   min-width: 0;
 }
+/* #1272: add the optional RIR row without pushing current-set controls
+   behind the pinned rest timer or iOS dock on narrow mobile viewports.
+   Preserve 44px touch targets for the inputs, RIR chips and finish action. */
+@media (max-width: 899px) {
+  .active-workout-set__controls.has-rir {
+    row-gap: 4px;
+  }
+  .active-workout-set.is-current .active-workout-set__controls.has-rir .active-workout-input input,
+  .active-workout-set.is-current .active-workout-set__controls.has-rir .active-workout-set__done,
+  .active-workout-set__controls.has-rir .active-workout-rir__options button {
+    min-height: 44px;
+  }
+  .active-workout-set__controls.has-rir .active-workout-rir legend {
+    margin-bottom: 2px;
+  }
+}
 .active-workout-input {
   display: grid;
   gap: 6px;
