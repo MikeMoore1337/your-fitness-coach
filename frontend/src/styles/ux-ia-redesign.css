@@ -2057,9 +2057,10 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   cursor: pointer;
 }
 
-/* Card body already supplies the header separator; the schedule list owns only internal dividers. */
+/* Use a legible four-sided contour even while the schedule disclosure is collapsed on iOS.
+   The body owns its header separator; list rows own internal separators. */
 .app-section--programs .workout-schedule-card {
-  border: 1px solid var(--v2-border);
+  border: 1px solid var(--v2-border-strong);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
 }
