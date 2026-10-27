@@ -2638,6 +2638,10 @@ export function TodayWorkout({
           ),
         );
       }
+      // The adjacent set must never push the current controls beneath the sticky timer.
+      // On short viewports, prioritize the active controls over the next set.
+      const maxScrollBeforeTopCollision = box.top - safeTop;
+      delta = Math.min(delta, maxScrollBeforeTopCollision);
       window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frame);
