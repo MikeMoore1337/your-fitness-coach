@@ -184,10 +184,13 @@ export function formatPlannedGroupKind(kind: WorkoutSet['planned_group_kind']): 
   return kind ? plannedGroupKindLabels[kind] : null;
 }
 
-function focusWorkoutControl(row: HTMLDivElement | null, field: 'reps' | 'distance' | 'rir' | 'done') {
+function focusWorkoutControl(
+  row: HTMLDivElement | null,
+  field: 'reps' | 'distance' | 'rir' | 'done',
+) {
   if (field === 'rir') {
     row
-      ?.querySelector<HTMLElement>('.active-workout-set__rir-row .active-workout-rir__options button')
+      ?.querySelector<HTMLElement>('.active-workout-set__rir-row button')
       ?.focus({ preventScroll: true });
     return;
   }
@@ -816,9 +819,7 @@ function WorkoutSetRow({
         </p>
       )}
 
-      <div
-        className={`active-workout-set__controls${isCurrent ? ' active-workout-set__controls--with-rir' : ''}`}
-      >
+      <div className={`active-workout-set__controls${isCurrent ? ' has-rir' : ''}`}>
         <label className="active-workout-input">
           <span>Вес, кг</span>
           <input
