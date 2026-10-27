@@ -2606,38 +2606,38 @@ export function TodayWorkout({
     let layoutFrame: number | null = null;
     const frame = window.requestAnimationFrame(() => {
       layoutFrame = window.requestAnimationFrame(() => {
-      navigatedCompletion.current = completionNavigation;
-      // Only acceptance owns navigation; autosave and later queue acknowledgements do not.
-      const focused = document.activeElement;
-      if (
-        focused instanceof HTMLElement &&
-        focused.closest(`[data-workout-set-id="${completionNavigation.setId}"]`)
-      )
-        focused.blur();
-      if (!currentSetId || editingWorkoutField()) return;
-      const row = document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
-      const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
-      if (!controls) return;
-      const viewport = window.visualViewport;
-      const top = viewport?.offsetTop ?? 0;
-      const bottom = top + (viewport?.height ?? window.innerHeight);
-      const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
-      const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
-      const safeTop =
-        Math.max(top, timer && timer.top < bottom && timer.bottom > top ? timer.bottom : top) + 8;
-      const safeBottom = Math.min(bottom, dock && dock.height > 0 ? dock.top : bottom) - 8;
-      const box = controls.getBoundingClientRect();
-      const targetTop = safeTop + Math.max(0, (safeBottom - safeTop - box.height) / 2);
-      let delta = box.top - targetTop;
-      // Keep the newly active controls fully within the available viewport.
-      // Taller RIR controls must not be pushed under the sticky timer just to
-      // clear the following (non-current) set from the dock.
-      const minScroll = box.bottom - safeBottom;
-      const maxScroll = box.top - safeTop;
-      if (minScroll <= maxScroll) {
-        delta = Math.max(minScroll, Math.min(delta, maxScroll));
-      }
-      window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
+        navigatedCompletion.current = completionNavigation;
+        // Only acceptance owns navigation; autosave and later queue acknowledgements do not.
+        const focused = document.activeElement;
+        if (
+          focused instanceof HTMLElement &&
+          focused.closest(`[data-workout-set-id="${completionNavigation.setId}"]`)
+        )
+          focused.blur();
+        if (!currentSetId || editingWorkoutField()) return;
+        const row = document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
+        const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
+        if (!controls) return;
+        const viewport = window.visualViewport;
+        const top = viewport?.offsetTop ?? 0;
+        const bottom = top + (viewport?.height ?? window.innerHeight);
+        const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+        const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
+        const safeTop =
+          Math.max(top, timer && timer.top < bottom && timer.bottom > top ? timer.bottom : top) + 8;
+        const safeBottom = Math.min(bottom, dock && dock.height > 0 ? dock.top : bottom) - 8;
+        const box = controls.getBoundingClientRect();
+        const targetTop = safeTop + Math.max(0, (safeBottom - safeTop - box.height) / 2);
+        let delta = box.top - targetTop;
+        // Keep the newly active controls fully within the available viewport.
+        // Taller RIR controls must not be pushed under the sticky timer just to
+        // clear the following (non-current) set from the dock.
+        const minScroll = box.bottom - safeBottom;
+        const maxScroll = box.top - safeTop;
+        if (minScroll <= maxScroll) {
+          delta = Math.max(minScroll, Math.min(delta, maxScroll));
+        }
+        window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
       });
     });
     return () => {
