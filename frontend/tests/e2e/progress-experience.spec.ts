@@ -1385,21 +1385,33 @@ test('schedule card keeps one contour and only internal dividers across mobile s
           (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
         const foreground = channels(style.borderTopColor);
         const background = channels(style.backgroundColor);
+        const luminance = (rgb: number[]) => {
+          const linear = rgb.map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.04045
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) +
+            0.0722 * (linear[2] ?? 0);
+        };
+        const foregroundLuminance = luminance(foreground);
+        const backgroundLuminance = luminance(background);
+        const contrastRatio =
+          (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+          (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
         return {
           borderColors,
           borderWidths,
           radius: style.borderTopLeftRadius,
-          contrastDistance: foreground.reduce(
-            (sum, channel, index) => sum + Math.abs(channel - (background[index] ?? 0)),
-            0,
-          ),
+          contrastRatio,
         };
       });
       expect(collapsedContour.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
       expect(new Set(collapsedContour.borderColors).size).toBe(1);
       expect(collapsedContour.radius).not.toBe('0px');
-      // CSS RGB channel distance catches a painted but barely visible border on both themes.
-      expect(collapsedContour.contrastDistance).toBeGreaterThanOrEqual(180);
+      // A >=3:1 non-text contrast ratio makes a painted outline meaningfully distinguishable.
+      expect(collapsedContour.contrastRatio).toBeGreaterThanOrEqual(3);
       if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
         await card.screenshot({
           path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-collapsed.png`),
