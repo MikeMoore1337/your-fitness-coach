@@ -2429,6 +2429,74 @@ for (const width of [320, 360, 393, 430]) {
   }
 }
 
+// #1306: do not mistake a sticky end-of-scroll position for viewport stability.
+// Check the panel on each animation frame while the workout itself actually moves.
+for (const width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#1306 rest panel does not move during mobile scroll at ${width}px ${theme}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => {
+        localStorage.setItem('app-theme', value);
+        const viewport = new EventTarget();
+        Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+        Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+      }, theme);
+      const server = await mockActiveWorkout(page, false, 'approved_animated', false, null, true);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const first = page.locator('[data-workout-set-id="201"]');
+      await first.getByLabel(/^Вес,/).fill('40');
+      await first.getByLabel(/^Повторы,/).fill('10');
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+
+      const panel = page.locator('.active-workout-rest');
+      await expect(panel).toHaveCSS('position', 'fixed');
+      await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+
+      const probe = async () =>
+        page.evaluate(async () => {
+          const element = document.querySelector<HTMLElement>('.active-workout-rest');
+          if (!element) throw new Error('Missing rest panel');
+          const scrolling = document.scrollingElement ?? document.documentElement;
+          const maxScroll = Math.max(0, scrolling.scrollHeight - innerHeight);
+          const samples: Array<{ scrollY: number; top: number; left: number }> = [];
+          for (const progress of [0, 0.3, 0.65, 1, 0.8, 0.45, 0.1, 0.95, 0.2]) {
+            window.scrollTo({ top: Math.round(maxScroll * progress), behavior: 'instant' });
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+            const rect = element.getBoundingClientRect();
+            samples.push({ scrollY: window.scrollY, top: rect.top, left: rect.left });
+          }
+          return samples;
+        });
+
+      for (const phase of ['running', 'collapsed']) {
+        if (phase === 'collapsed') {
+          await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
+          await expect(panel.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+        }
+        const samples = await probe();
+        const tops = samples.map((sample) => sample.top);
+        const lefts = samples.map((sample) => sample.left);
+        const scrollPositions = samples.map((sample) => sample.scrollY);
+        expect(
+          Math.max(...scrollPositions) - Math.min(...scrollPositions),
+          JSON.stringify({ width, theme, phase, samples }),
+        ).toBeGreaterThan(100);
+        expect(
+          Math.max(...tops) - Math.min(...tops),
+          JSON.stringify({ width, theme, phase, samples }),
+        ).toBeLessThanOrEqual(1);
+        expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1);
+      }
+    });
+  }
+}
+
 test.describe('#1001 completion navigation', () => {
   test.use({
     isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
