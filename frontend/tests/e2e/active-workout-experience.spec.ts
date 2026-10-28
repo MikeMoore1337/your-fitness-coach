@@ -8039,6 +8039,10 @@ test.describe('#1292 compact rest panel', () => {
           expect(geometry.status.bottom).toBeLessThanOrEqual(geometry.buttons[0]!.top + 1);
         else expect(geometry.status.right).toBeLessThanOrEqual(geometry.buttons[0]!.left);
         expect(geometry.buttons[0]!.right).toBeLessThanOrEqual(geometry.buttons[1]!.left);
+        if (width < 681) {
+          expect(geometry.buttons[0]!.left - geometry.panel.left).toBeCloseTo(13, 0);
+          expect(geometry.panel.right - geometry.buttons[1]!.right).toBeCloseTo(13, 0);
+        }
         for (const button of geometry.buttons) {
           expect(button.width).toBeGreaterThanOrEqual(44);
           expect(button.height).toBeGreaterThanOrEqual(44);

@@ -5906,6 +5906,7 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--v2-space-2, 8px);
   min-width: 0;
 }
