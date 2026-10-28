@@ -123,11 +123,34 @@ export function applyMobileViewportSnapshot(
 export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () => void {
   let previousActive: boolean | null = null;
   let editablePointerInFlight = false;
+  let workoutFocusHeight: number | null = null;
+  let workoutKeyboardReduced = false;
   const update = () => {
     const keepDockHidden =
       editablePointerInFlight && document.documentElement.dataset.yfcKeyboard === 'visible';
     const snapshot = readMobileViewportSnapshot(telegram);
+    const focused = document.activeElement;
+    const workoutInput = editableTarget(focused) && Boolean(focused?.closest('.active-workout'));
+    // Keep the dock clear while a keyboard-shrunk workout viewport recovers after blur.
+    if (workoutInput && workoutFocusHeight === null) workoutFocusHeight = snapshot.viewportHeight;
+    if (workoutInput && workoutFocusHeight && snapshot.viewportHeight < workoutFocusHeight * 0.8)
+      workoutKeyboardReduced = true;
+    const workoutKeyboardClosing = Boolean(
+      !workoutInput &&
+      workoutKeyboardReduced &&
+      workoutFocusHeight &&
+      snapshot.viewportHeight < workoutFocusHeight * 0.9 &&
+      document.querySelector('.active-workout'),
+    );
+    if (!workoutInput && !workoutKeyboardClosing) {
+      workoutFocusHeight = null;
+      workoutKeyboardReduced = false;
+    }
     applyMobileViewportSnapshot(snapshot, telegram);
+    document.documentElement.toggleAttribute(
+      'data-yfc-workout-keyboard-closing',
+      workoutKeyboardClosing,
+    );
     // Keep the dock out of the pointer path until the input-blurring click completes.
     if (keepDockHidden) document.documentElement.dataset.yfcKeyboard = 'visible';
     if (previousActive === false && snapshot.active) {
@@ -178,5 +201,6 @@ export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () 
     document.removeEventListener('click', onPointerEnd, true);
     document.removeEventListener('pointercancel', onPointerEnd, true);
     window.removeEventListener('blur', onPointerEnd);
+    document.documentElement.removeAttribute('data-yfc-workout-keyboard-closing');
   };
 }
