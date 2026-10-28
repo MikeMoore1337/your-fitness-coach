@@ -76,7 +76,8 @@ def test_scheduler_executable_is_pythonw_not_interactive_powershell() -> None:
     assert "dev_update_silent.pyw" in source
     assert "New-ScheduledTaskAction -Execute $pythonw" in source
     assert "Get-TaskHost" not in source
-    assert "wscript.exe" not in source
+    # Legacy migration may mention WScript; fresh Register must never launch it.
+    assert "wscript.exe" not in register.lower()
 
 
 def test_existing_task_can_be_silenced_without_resetting_auto_apply() -> None:
@@ -116,3 +117,52 @@ def test_launcher_is_restricted_to_windows_and_no_shell_interpolation() -> None:
     assert "SystemRoot" in source
     assert "stdout=subprocess.DEVNULL" in source
     assert "stderr=subprocess.DEVNULL" in source
+
+
+def test_exact_legacy_vbs_action_can_migrate_without_resetting_scheduler() -> None:
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+    migration = source.split("        'InstallSilentAction' {", 1)[1].split(
+        "        'Unregister' {", 1
+    )[0]
+
+    # Regression: previous locally-installed silent workaround used precisely:
+    # C:\\WINDOWS\\System32\\wscript.exe //B //Nologo "<repo>\\.artifacts\\runtime\\dev-update\\silent-update.vbs"
+    assert "$oldWscript" in migration
+    assert "'System32\\wscript.exe'" in migration
+    assert "'silent-update.vbs'" in migration
+    assert "'//B //Nologo" in migration
+    assert "$arguments.Trim() -ieq $expectedLegacyArgs" in migration
+    assert "$executable -ieq $systemWscript" in migration
+    assert "'scripts\\update_dev.ps1'" in migration
+    assert "Get-Content -LiteralPath $legacyVbsPath -Raw" in migration
+    assert "IndexOf($expectedUpdater" in migration
+    assert "WScript\\.Shell" in migration
+    assert "($oldPowerShell -or $newPythonw -or $oldWscript)" in migration
+
+    # No direct execution of the legacy VBS; the migration simply replaces
+    # the trusted task action, keeping principal, trigger and auto-apply state.
+    assert "Set-ScheduledTask -TaskName $script:TaskName -Action $action" in migration
+    for forbidden in (
+        "Register-ScheduledTask",
+        "Unregister-ScheduledTask",
+        "Remove-Item -LiteralPath $script:AutoApplyPath",
+        "Start-Process",
+        "shell.Run(",
+    ):
+        assert forbidden not in migration
+
+
+def test_legacy_vbs_migration_rejects_unrecognized_scripts() -> None:
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+    migration = source.split("        'InstallSilentAction' {", 1)[1].split(
+        "        'Unregister' {", 1
+    )[0]
+
+    # Must reject unknown VBS location, content or executable instead of
+    # silently accepting arbitrary script-host commands.
+    assert "$systemWscript = Join-Path $env:WINDIR" in migration
+    assert "$legacyVbsPath = Join-Path $script:StateRoot" in migration
+    assert "Test-Path -LiteralPath $legacyVbsPath -PathType Leaf" in migration
+    assert "$legacyContent -notmatch '(?i)-Mode\\s+Check\\s+-Automatic'" in migration
+    assert "$legacyContent -notmatch '(?i)WScript\\.Shell'" in migration
+    assert migration.count("Stop-Update -Code 'TASK_ACTION_UNEXPECTED'") >= 4

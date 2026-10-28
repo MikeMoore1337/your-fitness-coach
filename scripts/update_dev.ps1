@@ -814,7 +814,27 @@ function Invoke-TaskAction {
                 $arguments = [string]$existing[0].Arguments
                 $oldPowerShell = $executable -match '(?i)(?:^|[\\/])(powershell|pwsh)\.exe$' -and $arguments -match '(?i)update_dev\.ps1'
                 $newPythonw = $executable -match '(?i)(?:^|[\\/])pythonw\.exe$' -and $arguments -match '(?i)dev_update_silent\.pyw'
-                if (-not ($oldPowerShell -or $newPythonw)) {
+                # Legacy temporary workaround created a dedicated WScript wrapper in the
+                # *same DEV repository*. Accept that exact task action for one-time
+                # migration; never accept an arbitrary .vbs path or WScript command.
+                $legacyVbsPath = Join-Path $script:StateRoot 'silent-update.vbs'
+                $expectedLegacyArgs = ('//B //Nologo "{0}"' -f $legacyVbsPath)
+                $systemWscript = Join-Path $env:WINDIR 'System32\wscript.exe'
+                $oldWscript = $executable -ieq $systemWscript -and
+                    $arguments.Trim() -ieq $expectedLegacyArgs
+                if ($oldWscript) {
+                    if (-not (Test-Path -LiteralPath $legacyVbsPath -PathType Leaf)) {
+                        Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Устаревший WScript launcher отсутствует; миграция отменена.'
+                    }
+                    $legacyContent = Get-Content -LiteralPath $legacyVbsPath -Raw -ErrorAction Stop
+                    $expectedUpdater = Join-Path $script:RepoRoot 'scripts\update_dev.ps1'
+                    if ($legacyContent.IndexOf($expectedUpdater, [StringComparison]::OrdinalIgnoreCase) -lt 0 -or
+                        $legacyContent -notmatch '(?i)-Mode\s+Check\s+-Automatic' -or
+                        $legacyContent -notmatch '(?i)WScript\.Shell') {
+                        Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Устаревший WScript launcher не соответствует ожидаемому DEV updater; миграция отменена.'
+                    }
+                }
+                if (-not ($oldPowerShell -or $newPythonw -or $oldWscript)) {
                     Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Действие задания не принадлежит DEV updater; изменение отменено.'
                 }
                 $action = New-SilentUpdaterAction
