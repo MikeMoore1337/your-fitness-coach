@@ -4992,6 +4992,12 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
     visibility: hidden;
     pointer-events: none;
   }
+
+  html[data-yfc-workout-keyboard-closing]
+    .app-shell--design-v2:has(.active-workout)
+    .app-bottom-nav {
+    display: none;
+  }
 }
 
 @media (max-width: 680px) {

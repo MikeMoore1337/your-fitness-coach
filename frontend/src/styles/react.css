@@ -5123,7 +5123,7 @@ button.today-text-link {
 }
 .active-workout-set__controls.has-rir {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  row-gap: var(--yfc-current-set-row-gap, 10px);
+  row-gap: var(--v2-space-3);
 }
 .active-workout-set__rir-row,
 .active-workout-set__controls.has-rir > .active-workout-set__done {
@@ -5132,12 +5132,10 @@ button.today-text-link {
 .active-workout-set__rir-row {
   min-width: 0;
 }
-/* #1272: compact post-completion controls to stay between timer and dock.
-   First set keeps its approved visual baseline; every button stays >=44px. */
+/* Keep post-completion controls at the existing 44px minimum. */
 @media (max-width: 899px) {
   .active-workout-set.is-current:not(:first-child) {
     --yfc-current-set-control-height: 44px;
-    --yfc-current-set-row-gap: 0px;
     --yfc-current-set-label-gap: 0px;
   }
 }

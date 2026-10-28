@@ -308,6 +308,100 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   });
 });
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`@critical #1272 keeps RIR separated and stable on mobile in ${theme}`, async ({
+    page,
+  }, info) => {
+    await preparePage(page, theme, 'browser', { workoutStatus: 'in_progress' });
+    await page.goto('/app?section=today');
+    await waitForSurface(page, 'today');
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const set = page.locator('.active-workout-set.is-current');
+    const controls = set.locator('.active-workout-set__controls');
+    const rir = controls.locator('.active-workout-set__rir-row');
+    const choices = rir.getByRole('button');
+    await expect(choices).toHaveCount(5);
+
+    const gaps: Array<{ width: number; above: number; below: number }> = [];
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(controls).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      await controls.scrollIntoViewIfNeeded();
+      const geometry = () =>
+        controls.evaluate((element) => {
+          const weight = element
+            .querySelector('[data-workout-field="weight"]')!
+            .getBoundingClientRect();
+          const reps = element
+            .querySelector('[data-workout-field="reps"]')!
+            .getBoundingClientRect();
+          const rir = element
+            .querySelector('.active-workout-set__rir-row')!
+            .getBoundingClientRect();
+          const done = element
+            .querySelector('[data-workout-field="done"]')!
+            .getBoundingClientRect();
+          const card = element.closest('.active-workout-set')!.getBoundingClientRect();
+          return {
+            above: rir.top - Math.max(weight.bottom, reps.bottom),
+            below: done.top - rir.bottom,
+            height: element.getBoundingClientRect().height,
+            cardHeight: card.height,
+            controlsOffset: element.getBoundingClientRect().top - card.top,
+            rirHeight: rir.height,
+            doneOffset: done.top - element.getBoundingClientRect().top,
+          };
+        });
+      if (process.env.YFC_1272_CAPTURE_DIR) {
+        await mkdir(process.env.YFC_1272_CAPTURE_DIR, { recursive: true });
+        await controls.screenshot({
+          path: resolve(
+            process.env.YFC_1272_CAPTURE_DIR,
+            `${info.project.name}-${width}-${theme}-first.png`,
+          ),
+          animations: 'disabled',
+          scale: 'css',
+        });
+      }
+      const before = await geometry();
+      gaps.push({ width, above: before.above, below: before.below });
+      for (const choice of await choices.all()) {
+        await choice.click();
+        await expect(choice).toHaveAttribute('aria-pressed', 'true');
+        expect(await geometry()).toEqual(before);
+        await choice.click();
+        await expect(choice).toHaveAttribute('aria-pressed', 'false');
+      }
+      if (width === 320) {
+        const legend = rir.locator('legend');
+        const original = await legend.textContent();
+        await legend.evaluate((element) => {
+          element.textContent = 'Повторы в запасе после выполнения этого рабочего подхода (RIR)';
+        });
+        const longLabel = await geometry();
+        expect(longLabel.rirHeight).toBeGreaterThan(before.rirHeight);
+        expect(longLabel.above).toBeGreaterThanOrEqual(12);
+        expect(longLabel.below).toBeGreaterThanOrEqual(12);
+        await expectNoHorizontalOverflow(page);
+        await choices.last().click();
+        expect(await geometry()).toEqual(longLabel);
+        await choices.last().click();
+        await legend.evaluate((element, text) => {
+          element.textContent = text;
+        }, original);
+      }
+    }
+    for (const gap of gaps) {
+      expect(gap.above, `${gap.width}px: input to RIR`).toBeGreaterThanOrEqual(12);
+      expect(gap.above, `${gap.width}px: input to RIR`).toBeLessThanOrEqual(16);
+      expect(gap.below, `${gap.width}px: RIR to CTA`).toBeGreaterThanOrEqual(12);
+      expect(gap.below, `${gap.width}px: RIR to CTA`).toBeLessThanOrEqual(16);
+    }
+  });
+}
+
 test('@critical active workout keeps the current set primary across mobile widths', async ({
   page,
 }) => {
