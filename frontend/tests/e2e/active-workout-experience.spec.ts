@@ -7519,14 +7519,19 @@ for (const theme of ['light', 'dark'] as const) {
           inOrder: boxes
             .slice(0, -1)
             .every((box, index) => boxes[index + 1]!.top >= box.bottom - 1),
+          rowGap: Number.parseFloat(
+            getComputedStyle(element.querySelector('.active-workout-set__controls')!).rowGap,
+          ),
           beforeRir: rirRow.getBoundingClientRect().top - input.getBoundingClientRect().bottom,
           afterRir: completion.getBoundingClientRect().top - rirRow.getBoundingClientRect().bottom,
           scrollWidth: document.documentElement.scrollWidth,
         };
       });
       expect(geometry.inOrder).toBe(true);
-      expect(geometry.beforeRir).toBeGreaterThanOrEqual(11);
-      expect(geometry.afterRir).toBeGreaterThanOrEqual(11);
+      // #1272 keeps later current sets compact while the timer/dock are active.
+      expect(geometry.rowGap === 0 || geometry.rowGap >= 11).toBe(true);
+      expect(geometry.beforeRir).toBeGreaterThanOrEqual(geometry.rowGap - 1);
+      expect(geometry.afterRir).toBeGreaterThanOrEqual(geometry.rowGap - 1);
       expect(geometry.scrollWidth).toBeLessThanOrEqual(width + 1);
     }
     await page.setViewportSize({ width: 1280, height: 1000 });
@@ -7646,6 +7651,26 @@ test('Issue #1293 has no prefill container without a previous result', async ({ 
   const row = page.locator('[data-workout-set-id="201"]');
   await expect(row).toHaveAttribute('aria-current', 'step');
   await expect(row.locator('.active-workout-set__prefill-actions')).toHaveCount(0);
+  for (const width of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    const spacing = await row.evaluate((element) => {
+      const input = element.querySelector('[data-workout-field="weight"]')!.parentElement!;
+      const rir = element.querySelector('.active-workout-set__rir-row')!;
+      const done = element.querySelector('[data-workout-field="done"]')!;
+      return {
+        rowGap: Number.parseFloat(
+          getComputedStyle(element.querySelector('.active-workout-set__controls')!).rowGap,
+        ),
+        beforeRir: rir.getBoundingClientRect().top - input.getBoundingClientRect().bottom,
+        afterRir: done.getBoundingClientRect().top - rir.getBoundingClientRect().bottom,
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+    expect(spacing.rowGap).toBeGreaterThanOrEqual(11);
+    expect(spacing.beforeRir).toBeGreaterThanOrEqual(11);
+    expect(spacing.afterRir).toBeGreaterThanOrEqual(11);
+    expect(spacing.scrollWidth).toBeLessThanOrEqual(width + 1);
+  }
   const done = row.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' });
   await done.focus();
   for (const label of ['Что такое RIR?', 'Разминка и блины', 'Дополнительно']) {
