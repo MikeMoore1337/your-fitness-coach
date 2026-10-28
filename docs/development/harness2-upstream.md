@@ -12,6 +12,9 @@
 
 ```powershell
 .\scripts\harness2_dev.ps1 -Action Status
+.\scripts\harness2_dev.ps1 -Action SetupPreview -Benchmark lab
+# Только если штатный оригинальный LAB уже подготовлен:
+# .\scripts\harness2_dev.ps1 -Action RunPreview -Benchmark lab
 # Только при наличии отдельно подготовленного исходного benchmark:
 # .\scripts\harness2_dev.ps1 -Action Check -Benchmark lab
 # Только если оригинальный upstream уже создал и оценил результат:
