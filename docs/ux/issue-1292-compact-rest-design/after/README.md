@@ -1,6 +1,6 @@
 # Issue #1292 — real AFTER review package
 
-Код: [`5ff2418c`](https://github.com/MikeMoore1337/your-fitness-coach/commit/5ff2418c) · PR: [#1299](https://github.com/MikeMoore1337/your-fitness-coach/pull/1299) · `Refs #1292`
+Код: [`e91708c0`](https://github.com/MikeMoore1337/your-fitness-coach/commit/e91708c0) · PR: [#1299](https://github.com/MikeMoore1337/your-fitness-coach/pull/1299) · `Refs #1292`
 
 Это пакет финального AFTER для проверки владельцем после реализации согласованного макета. Снимки сделаны из реально отрисованного приложения на синтетической тренировке (`Клиент`, без production-данных) с тем же кодом, что и в указанном SHA. BEFORE — сохранённый снимок текущего `dev`; содержимое поля в AFTER намеренно заполнено `42.5 / 9`, чтобы одновременно показать сохранённый активный подход.
 
