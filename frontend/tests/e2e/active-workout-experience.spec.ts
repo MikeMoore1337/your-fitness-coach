@@ -7637,8 +7637,8 @@ for (const theme of ['light', 'dark'] as const) {
         };
       });
       expect(geometry.inOrder).toBe(true);
-      // #1272 keeps later current sets compact while the timer/dock are active.
-      expect(geometry.rowGap === 0 || geometry.rowGap >= 11).toBe(true);
+      // #1272 keeps the RIR row separated from inputs and completion at every width.
+      expect(geometry.rowGap).toBeGreaterThanOrEqual(11);
       expect(geometry.beforeRir).toBeGreaterThanOrEqual(geometry.rowGap - 1);
       expect(geometry.afterRir).toBeGreaterThanOrEqual(geometry.rowGap - 1);
       expect(geometry.scrollWidth).toBeLessThanOrEqual(width + 1);
