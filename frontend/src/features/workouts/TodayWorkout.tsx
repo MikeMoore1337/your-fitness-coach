@@ -1611,11 +1611,6 @@ export function RestTimer({
     measuredRest && !measuredRest.needs_review
       ? Math.max(0, Math.floor((now - Date.parse(measuredRest.started_at)) / 1000))
       : 0;
-  const elapsedRestLabel = measuredRest?.needs_review
-    ? '—'
-    : formatWorkoutDuration(measuredElapsedSeconds);
-  const terminalRestLabel =
-    completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён');
   const captureLayoutAnchor = useCallback(() => {
     const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
     if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
@@ -1945,7 +1940,7 @@ export function RestTimer({
           <div>
             <strong aria-live="polite">{collapsedRestStatus}</strong>
             <span>
-              ФАКТ {elapsedRestLabel}
+              ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
             </span>
           </div>
           <Button
@@ -1965,11 +1960,7 @@ export function RestTimer({
         <>
           <div className="active-workout-rest__time" hidden={showCompact}>
             <span>Отдых</span>
-            <strong
-              role={completedNotice ? undefined : 'timer'}
-              aria-label="Отдых"
-              aria-live="off"
-            >
+            <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
               {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
             </strong>
           </div>
@@ -1994,7 +1985,7 @@ export function RestTimer({
               <div className="active-workout-rest__actual-value">
                 <span>ФАКТ</span>
                 <strong aria-label="Время по отметке пользователя" aria-live="off">
-                  {elapsedRestLabel}
+                  {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
                 </strong>
               </div>
               {!measuredRest.needs_review && (
@@ -2036,8 +2027,7 @@ export function RestTimer({
             >
               <strong>Вы забыли завершить отдых?</strong>
               <p>
-                Приложение было неактивно, поэтому прошедшее время не считается
-                достоверным замером.
+                Приложение было неактивно, поэтому прошедшее время не считается достоверным замером.
               </p>
               <label htmlFor={`rest-recovery-${workoutId}`}>
                 Сколько вы фактически отдыхали (минуты)?
@@ -2080,9 +2070,7 @@ export function RestTimer({
                       correctedSeconds,
                     );
                     if (result?.status !== 'completed') {
-                      setRecoveryValidation(
-                        'Не удалось сохранить уточнение. Попробуйте ещё раз.',
-                      );
+                      setRecoveryValidation('Не удалось сохранить уточнение. Попробуйте ещё раз.');
                       return;
                     }
                     setMeasuredRest(null);
@@ -2137,8 +2125,7 @@ export function RestTimer({
                       )
                     : null;
                   const nextDeadline =
-                    nextSession?.deadline ??
-                    Math.max(deadline, currentTime) + extraSeconds * 1000;
+                    nextSession?.deadline ?? Math.max(deadline, currentTime) + extraSeconds * 1000;
                   if (nextSession) setMeasuredRest(nextSession);
                   setNow(currentTime);
                   setDeadline(nextDeadline);
@@ -2190,7 +2177,7 @@ export function RestTimer({
               {!terminalNoticeDismissed && (
                 <div className="active-workout-rest__complete-summary">
                   <span className="active-workout-rest__complete-copy">
-                    {terminalRestLabel}
+                    {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
                   </span>
                   {isCompletedLatestRest && latestRest?.measured_seconds != null && (
                     <span className="active-workout-rest__complete-copy">
