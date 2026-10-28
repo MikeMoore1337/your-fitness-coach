@@ -1600,6 +1600,10 @@ export function RestTimer({
     'active-workout-rest',
     completedNotice || restoredTerminal ? 'active-workout-rest--complete' : null,
     showCompact || collapsed ? 'is-compact' : null,
+    showCompact && !(collapsed && isRunningRest) ? 'active-workout-rest--terminal' : null,
+    showCompact && !restartCandidate && !terminalNoticeDismissed
+      ? 'active-workout-rest--terminal-single'
+      : null,
   ]
     .filter(Boolean)
     .join(' ');
@@ -2154,62 +2158,67 @@ export function RestTimer({
           {showCompact && (
             <>
               {!terminalNoticeDismissed && (
-                <span className="active-workout-rest__complete-copy">
-                  {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
-                </span>
-              )}
-              {!terminalNoticeDismissed &&
-                isCompletedLatestRest &&
-                latestRest?.measured_seconds != null && (
+                <div className="active-workout-rest__complete-summary">
                   <span className="active-workout-rest__complete-copy">
-                    ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+                    {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
                   </span>
-                )}
-              {restartCandidate && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  glass="clear"
-                  onClick={() => {
-                    if (!restartCandidate || restRecords.some((row) => row.status === 'running'))
-                      return;
-                    const started = restartMeasuredRest(
-                      userId,
-                      workoutId,
-                      restartCandidate.start_mutation_id,
-                      Date.now(),
-                    );
-                    if (!started) return;
-                    setNow(Date.now());
-                    setMeasuredRest(started);
-                    setDeadline(started.deadline);
-                    setCompletedNotice(null);
-                    setTerminalNoticeDismissed(false);
-                    setCompact(false);
-                    setCollapsed(false);
-                    setRestSaveError(null);
-                    setAnnouncement('Новый интервал отдыха');
-                    writeStorage(storageKey, started.deadline);
-                    writeStorage(`${storageKey}:panel-collapsed`, false);
-                  }}
-                >
-                  Начать отдых
-                </Button>
+                  {isCompletedLatestRest && latestRest?.measured_seconds != null && (
+                    <span className="active-workout-rest__complete-copy">
+                      ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+                    </span>
+                  )}
+                </div>
               )}
-              {!terminalNoticeDismissed && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  glass="clear"
-                  onClick={() => {
-                    captureLayoutAnchor();
-                    setTerminalNoticeDismissed(Boolean(restartCandidate));
-                    setCompletedNotice(null);
-                    setCompact(false);
-                  }}
-                >
-                  Скрыть
-                </Button>
+              {(restartCandidate || !terminalNoticeDismissed) && (
+                <div className="active-workout-rest__complete-actions">
+                  {restartCandidate && (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          !restartCandidate ||
+                          restRecords.some((row) => row.status === 'running')
+                        )
+                          return;
+                        const started = restartMeasuredRest(
+                          userId,
+                          workoutId,
+                          restartCandidate.start_mutation_id,
+                          Date.now(),
+                        );
+                        if (!started) return;
+                        setNow(Date.now());
+                        setMeasuredRest(started);
+                        setDeadline(started.deadline);
+                        setCompletedNotice(null);
+                        setTerminalNoticeDismissed(false);
+                        setCompact(false);
+                        setCollapsed(false);
+                        setRestSaveError(null);
+                        setAnnouncement('Новый интервал отдыха');
+                        writeStorage(storageKey, started.deadline);
+                        writeStorage(`${storageKey}:panel-collapsed`, false);
+                      }}
+                    >
+                      Начать отдых
+                    </Button>
+                  )}
+                  {!terminalNoticeDismissed && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      glass="clear"
+                      onClick={() => {
+                        captureLayoutAnchor();
+                        setTerminalNoticeDismissed(Boolean(restartCandidate));
+                        setCompletedNotice(null);
+                        setCompact(false);
+                      }}
+                    >
+                      Скрыть
+                    </Button>
+                  )}
+                </div>
               )}
             </>
           )}
