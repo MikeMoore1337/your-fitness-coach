@@ -508,6 +508,14 @@ class ProgramTemplateDayCreate(BaseModel):
         return self
 
 
+class ProgramWeekCycle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    week_types: list[Literal["light", "medium", "heavy"]] = Field(min_length=1)
+    repeat: bool = Field(strict=True)
+
+
 class ProgramTemplateCreate(BaseModel):
     title: str = Field(min_length=1, max_length=128)
     goal: ProgramRecommendationGoal
@@ -522,6 +530,7 @@ class ProgramTemplateCreate(BaseModel):
     duration_weeks: int = Field(default=1, ge=1, le=24)
     schedule_weekdays: list[int] | None = Field(default=None, min_length=1, max_length=7)
     replace_active: bool = False
+    week_cycle: ProgramWeekCycle | None = None
 
     @model_validator(mode="after")
     def validate_assignment_schedule(self):

@@ -373,7 +373,9 @@ def create_template(
         is_public=is_public,
         provenance_type="CUSTOM",
         provenance=None,
-        program_metadata=None,
+        program_metadata=(
+            {"week_cycle": payload.week_cycle.model_dump()} if payload.week_cycle else None
+        ),
     )
     db.add(template)
     db.flush()
@@ -473,6 +475,8 @@ def assign_template_to_user(
     schedule_weekdays: list[int] | None = None,
     replace_active: bool = False,
 ) -> tuple[UserProgram, int]:
+    if (template.program_metadata or {}).get("week_cycle") is not None:
+        raise ProgramError("Назначение программы с циклом недель пока недоступно")
     # Сериализуем конкурирующие назначения для одного пользователя. Частичный
     # unique index остаётся последней линией защиты на уровне БД.
     db.query(User).filter(User.id == target_user.id).with_for_update().one()
@@ -1181,6 +1185,9 @@ def update_template_for_user(
 
     if not _can_manage_template(db, current_user, template):
         raise ProgramError("No permission to edit template")
+
+    if payload.week_cycle is not None:
+        raise ProgramError("Изменение цикла недель пока недоступно")
 
     validate_program_payload(
         payload,

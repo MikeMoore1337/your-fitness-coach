@@ -14909,6 +14909,7 @@ export interface components {
              * @default false
              */
             replace_active: boolean;
+            week_cycle?: components["schemas"]["ProgramWeekCycle"] | null;
         };
         /** ProgramTemplateCreateResponse */
         ProgramTemplateCreateResponse: {
@@ -15123,6 +15124,19 @@ export interface components {
             } | null;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayResponse"][];
+        };
+        /** ProgramWeekCycle */
+        ProgramWeekCycle: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Week Types */
+            week_types: ("light" | "medium" | "heavy")[];
+            /** Repeat */
+            repeat: boolean;
         };
         /** ProgressDataSufficiency */
         ProgressDataSufficiency: {

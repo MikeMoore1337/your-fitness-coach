@@ -138,6 +138,8 @@ def _program_snapshot_and_payload(
         raise PublicShareError("Программа недоступна для публикации", 404) from exc
     if template.owner_user_id != current_user.id:
         raise PublicShareError("Программа недоступна для публикации", 404)
+    if (template.program_metadata or {}).get("week_cycle") is not None:
+        raise PublicShareError("Публикация программы с циклом пока недоступна", 422)
 
     days: list[dict] = []
     private_days: list[dict] = []
