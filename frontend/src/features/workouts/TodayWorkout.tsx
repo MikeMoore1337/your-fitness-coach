@@ -1869,17 +1869,34 @@ export function RestTimer({
     const updateClearance = () => {
       const height = element.getBoundingClientRect().height;
       if (height > 0) {
-        // Focus scrolling positions the input, so reserve the label/control offset too.
+        // A viewport-fixed mobile timer still reserves its full height in the workout grid.
+        // The focus clearance remains larger than the visible panel for keyboard access.
         parent.style.setProperty('--yfc-active-workout-rest-clearance', `${height + 20}px`);
+        parent.style.setProperty('--yfc-active-workout-rest-spacer-height', `${height}px`);
+      }
+      // Measure the workout column rather than the viewport: the panel must keep the
+      // same horizontal alignment without tracking vertical scroll frame by frame.
+      const bounds = parent.getBoundingClientRect();
+      if (bounds.width > 0) {
+        element.style.setProperty('--yfc-active-workout-rest-fixed-left', `${bounds.left}px`);
+        element.style.setProperty('--yfc-active-workout-rest-fixed-width', `${bounds.width}px`);
       }
     };
     updateClearance();
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateClearance);
     observer?.observe(element);
+    observer?.observe(parent);
+    window.addEventListener('resize', updateClearance);
+    window.visualViewport?.addEventListener('resize', updateClearance);
     return () => {
       observer?.disconnect();
+      window.removeEventListener('resize', updateClearance);
+      window.visualViewport?.removeEventListener('resize', updateClearance);
       parent.style.removeProperty('--yfc-active-workout-rest-clearance');
+      parent.style.removeProperty('--yfc-active-workout-rest-spacer-height');
+      element.style.removeProperty('--yfc-active-workout-rest-fixed-left');
+      element.style.removeProperty('--yfc-active-workout-rest-fixed-width');
     };
   }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
@@ -1907,7 +1924,8 @@ export function RestTimer({
 
   if (!deadline && !completedNotice && !restartCandidate) return null;
   return (
-    <aside
+    <>
+      <aside
       ref={panel}
       {...glassProps('tinted')}
       className={restPanelClassName}
@@ -2240,7 +2258,9 @@ export function RestTimer({
           </span>
         </>
       )}
-    </aside>
+      </aside>
+      <div className="active-workout-rest-spacer" aria-hidden="true" />
+    </>
   );
 }
 
