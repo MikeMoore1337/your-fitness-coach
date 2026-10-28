@@ -209,3 +209,54 @@ describe('Issue 395 canonical exercise search', () => {
     expect(rankExercisesForSearch(approvedCanonicalExercises, query)[0]?.slug).toBe(expectedSlug);
   });
 });
+
+describe('Issue 1202 typo suggestions', () => {
+  const rows = [
+    { id: 1, title: 'Жим гантелей лёжа', aliases: ['dumbbell bench press'] },
+    { id: 2, title: 'Жим штанги лёжа', aliases: ['barbell bench press'] },
+    { id: 3, title: 'Жим гантелей на наклонной скамье', aliases: ['incline dumbbell press'] },
+    { id: 4, title: 'Ягодичный мост в рычажном тренажёре', aliases: ['glute drive'] },
+    { id: 5, title: 'Жим в машине Смита', aliases: ['smith press'] },
+    { id: 6, title: 'Тяга обратным хватом', aliases: ['reverse grip row'] },
+    { id: 7, title: 'Тяга прямым хватом', aliases: ['straight grip row'] },
+    { id: 8, title: 'Жим одной ногой', aliases: ['unilateral leg press'] },
+    { id: 9, title: 'Жим двумя ногами', aliases: ['bilateral leg press'] },
+  ];
+
+  it.each([
+    ['жим гантелй', 1],
+    ['рычажнй', 4],
+    ['гантелей жим лёжа', 1],
+    ['dumbell bench press', 1],
+    ['жим лежа', 1],
+    ['глют', null],
+  ])('finds %s without changing canonical identity', (query, id) => {
+    const results = rankExercisesForSearch(rows, query);
+    if (id === null) expect(results).toEqual([]);
+    else expect(results.some((item) => item.id === id)).toBe(true);
+  });
+
+  it.each([
+    ['barbel bench press', 2, 1],
+    ['inclne dumbbell press', 3, 1],
+    ['smtih press', 5, 2],
+    ['revrse grip row', 6, 7],
+    ['unilaterl leg press', 8, 9],
+  ])('does not suggest a conflicting variant for %s', (query, intended, excluded) => {
+    const ids = rankExercisesForSearch(rows, query).map((item) => item.id);
+    expect(ids).toContain(intended);
+    expect(ids).not.toContain(excluded);
+  });
+
+  it('ranks exact, alias, prefix and typo matches in that order', () => {
+    const candidates = [
+      { id: 1, title: 'bench press' },
+      { id: 2, title: 'A', aliases: ['bench press'] },
+      { id: 3, title: 'bench press wide' },
+      { id: 4, title: 'bench presx wide' },
+    ];
+    expect(rankExercisesForSearch(candidates, 'bench press').map((item) => item.id)).toEqual([
+      1, 2, 3, 4,
+    ]);
+  });
+});
