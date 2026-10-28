@@ -16,6 +16,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_REVISION = "7a3ace53c5e910c2185f22df803726c5838a99ae"
 SOURCE_PATH = "catalogue/exercises"
+YFC_INPUT_PATHS = (
+    "backend/fitminiapp_api/services/program_seed_data.py",
+    "backend/fitminiapp_api/services/exercise_catalog_metadata.py",
+    "backend/fitminiapp_api/services/exercise_domain.py",
+    "backend/fitminiapp_api/services/exercise_guides.py",
+    "backend/fitminiapp_api/schemas/program.py",
+    "backend/assets/exercise-guides/manifest.json",
+)
 sys.path.insert(0, str(ROOT / "backend"))
 from fitminiapp_api.services.exercise_catalog_metadata import (  # noqa: E402
     CANONICAL_EXERCISE_REDIRECTS,
@@ -149,8 +157,19 @@ def main():
     ):
         raise ValueError("source filename and ID mismatch")
     manifest_path = ROOT / "backend/assets/exercise-guides/manifest.json"
-    manifest_bytes = manifest_path.read_bytes()
-    manifest = json.loads(manifest_bytes)
+    subprocess.run(
+        ["git", "-C", str(ROOT), "diff", "--quiet", "HEAD", "--", *YFC_INPUT_PATHS], check=True
+    )
+    yfc_blobs = {
+        path: subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", f"HEAD:{path}"], text=True
+        ).strip()
+        for path in YFC_INPUT_PATHS
+    }
+    manifest_bytes = subprocess.check_output(
+        ["git", "-C", str(ROOT), "show", f"HEAD:{YFC_INPUT_PATHS[-1]}"]
+    )
+    manifest = json.loads(manifest_path.read_bytes())
     rows, canonical, media_ids, dimensions = compare(
         records,
         blobs,
@@ -179,9 +198,7 @@ def main():
             )
     summary = {
         "source_revision": SOURCE_REVISION,
-        "yfc_revision": subprocess.check_output(
-            ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
-        ).strip(),
+        "yfc_input_git_blobs": yfc_blobs,
         "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
         "canonical_count": len(canonical),
         "source_count": len(rows),

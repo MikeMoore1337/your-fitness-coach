@@ -80,7 +80,7 @@
     }
   },
   "licensed_inventory": "UNAVAILABLE_LICENSED_INVENTORY",
-  "manifest_sha256": "72e34d49dba44aa390326b0d61a927069d3a48d72b126b451ec294c590ec728a",
+  "manifest_sha256": "2678f2fe167d9497be8f372ec58805565413ba2231b93bd6ccb66cf318b3204b",
   "reasons": {
     "AMBIGUOUS_CANDIDATES": 2,
     "CANDIDATE_IDENTITY_UNVERIFIED": 172,
@@ -97,5 +97,12 @@
   "status": {
     "REVIEW": 6554
   },
-  "yfc_revision": "e6585c25e9351fa761fc987243a054a8fbba4175"
+  "yfc_input_git_blobs": {
+    "backend/assets/exercise-guides/manifest.json": "4014e860734c85884575880f4bde1c9d1fcd9442",
+    "backend/fitminiapp_api/schemas/program.py": "e0b6bc6de3ecd46599615cd15e70388bf25c2b48",
+    "backend/fitminiapp_api/services/exercise_catalog_metadata.py": "a98747b9b523c17fd1f1445422cd8393272edc4b",
+    "backend/fitminiapp_api/services/exercise_domain.py": "953ca0a7d6ce899cb499694ee4e2abf51a245a46",
+    "backend/fitminiapp_api/services/exercise_guides.py": "ed1708c81ca1a1d1e3db8dc825d107850fb5524b",
+    "backend/fitminiapp_api/services/program_seed_data.py": "37cf1c9cf8722f32201a3d6007385c225af22029"
+  }
 }
