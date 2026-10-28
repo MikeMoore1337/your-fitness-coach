@@ -2,6 +2,55 @@ import { expect, test } from '@playwright/test';
 import { expectNoHorizontalOverflow, MOBILE_CONTEXTS } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
 
+test('#1202 catalog offers a typo result without changing exercise identity', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await installPlatformApi(page, { browserSession: true });
+  await page.route('**/api/v1/programs/exercises', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          title: 'Жим гантелей лёжа',
+          slug: 'dumbbell-press',
+          primary_muscle: 'Грудь',
+          equipment: 'Гантели',
+          primary_muscle_ids: [],
+          secondary_muscle_ids: [],
+          equipment_ids: [],
+          alternatives: [],
+          difficulty_level: 'beginner',
+          is_custom: false,
+          is_personalized: false,
+          has_guide: false,
+        },
+        {
+          id: 2,
+          title: 'Жим штанги лёжа',
+          slug: 'barbell-press',
+          primary_muscle: 'Грудь',
+          equipment: 'Штанга',
+          primary_muscle_ids: [],
+          secondary_muscle_ids: [],
+          equipment_ids: [],
+          alternatives: [],
+          difficulty_level: 'beginner',
+          is_custom: false,
+          is_personalized: false,
+          has_guide: false,
+        },
+      ],
+    }),
+  );
+  await page.goto('/app?section=catalog');
+  const search = page.getByRole('searchbox', { name: 'Поиск' });
+  await search.fill('жим гантелй');
+  await expect(page.locator('.exercise-catalog-item')).toHaveCount(1);
+  await expect(page.locator('.exercise-catalog-item')).toContainText('Жим гантелей лёжа');
+  await expectNoHorizontalOverflow(page);
+  await search.fill('неттакогоупражнения');
+  await expect(page.locator('.exercise-catalog-item')).toHaveCount(0);
+});
+
 test('client exercise rows stay compact-first across supported mobile widths', async ({ page }) => {
   await installPlatformApi(page, { browserSession: true, longExerciseName: true });
   await page.route('**/api/v1/programs/exercises', async (route) => {

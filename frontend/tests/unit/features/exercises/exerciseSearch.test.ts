@@ -221,6 +221,7 @@ describe('Issue 1202 typo suggestions', () => {
     { id: 7, title: 'Тяга прямым хватом', aliases: ['straight grip row'] },
     { id: 8, title: 'Жим одной ногой', aliases: ['unilateral leg press'] },
     { id: 9, title: 'Жим двумя ногами', aliases: ['bilateral leg press'] },
+    { id: 10, title: 'Жим гантелей с отрицательным наклоном', aliases: ['decline dumbbell press'] },
   ];
 
   it.each([
@@ -242,6 +243,8 @@ describe('Issue 1202 typo suggestions', () => {
     ['smtih press', 5, 2],
     ['revrse grip row', 6, 7],
     ['unilaterl leg press', 8, 9],
+    ['declne dumbbell press', 10, 1],
+    ['declne dumbbell press', 10, 3],
   ])('does not suggest a conflicting variant for %s', (query, intended, excluded) => {
     const ids = rankExercisesForSearch(rows, query).map((item) => item.id);
     expect(ids).toContain(intended);
