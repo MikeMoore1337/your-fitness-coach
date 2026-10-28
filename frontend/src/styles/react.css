@@ -5081,6 +5081,9 @@ button.today-text-link {
   margin: -3px 0 0 48px;
   order: 1;
 }
+.active-workout-set__controls.has-rir + .active-workout-set__prefill-actions {
+  order: 0;
+}
 .active-workout-set__prefill-actions.is-hidden {
   display: none;
   visibility: hidden;

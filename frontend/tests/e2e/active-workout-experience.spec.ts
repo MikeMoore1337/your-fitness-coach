@@ -7540,6 +7540,275 @@ for (const theme1166 of ['dark', 'light'] as const) {
     });
   }
 }
+for (const theme of ['light', 'dark'] as const) {
+  test(`Issue #1293 keeps active set order and helpers usable in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    test.slow();
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page);
+    Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, is_completed: true });
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const row = page.locator('[data-workout-set-id="202"]');
+    await expect(row).toHaveAttribute('aria-current', 'step');
+    const weight = row.getByLabel('Вес, Жим штанги лёжа, подход 2');
+    const reps = row.getByLabel('Повторы, Жим штанги лёжа, подход 2');
+    const done = row.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' });
+    const prefill = row.getByRole('button', { name: 'Подставить предыдущий результат' });
+    const quick = row.getByRole('button', { name: 'Подставить и завершить' });
+    const help = row.getByText('Что такое RIR?', { exact: true });
+    const helpers = row.getByText('Разминка и блины', { exact: true });
+    const advanced = row.getByText('Дополнительно', { exact: true });
+    await expect(prefill).toBeVisible();
+    await expect(quick).toBeVisible();
+
+    const order = await row.evaluate((element) => {
+      const selectors = [
+        '.active-workout-set__previous',
+        '.active-workout-set__context',
+        '[data-workout-field="weight"]',
+        '[data-workout-field="reps"]',
+        '.active-workout-set__rir-row button',
+        '[data-workout-field="done"]',
+        '.active-workout-set__prefill-actions button:first-child',
+        '.active-workout-set__prefill-actions button:last-child',
+        '.active-workout-set__contextual-help summary',
+        '.active-workout-set__helpers > summary',
+        '.active-workout-set__advanced > summary',
+      ];
+      const nodes = selectors.map((selector) => element.querySelector(selector));
+      if (nodes.some((node) => !node)) throw new Error('Active set element missing');
+      return nodes
+        .slice(0, -1)
+        .every((node, index) =>
+          Boolean(
+            node!.compareDocumentPosition(nodes[index + 1]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+          ),
+        );
+    });
+    expect(order).toBe(true);
+
+    const capture = async (state: string) => {
+      if (process.env.YFC_1293_CAPTURE !== '1' || testInfo.project.name !== 'chromium') return;
+      const directory = resolve(
+        process.cwd(),
+        '..',
+        '.artifacts',
+        'tasks',
+        '1293',
+        'evidence',
+        'after',
+      );
+      await mkdir(directory, { recursive: true });
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      await page.screenshot({
+        path: resolve(directory, `${theme}-${page.viewportSize()!.width}-${state}.png`),
+        fullPage: true,
+      });
+    };
+
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      const geometry = await row.evaluate((element) => {
+        const selectors = [
+          '.active-workout-set__previous',
+          '.active-workout-set__context',
+          '.active-workout-set__controls',
+          '.active-workout-set__prefill-actions',
+          '.active-workout-set__contextual-help',
+          '.active-workout-set__helpers',
+          '.active-workout-set__advanced',
+        ];
+        const regions = selectors.map((selector) => element.querySelector(selector));
+        const input = element.querySelector('[data-workout-field="weight"]')?.parentElement;
+        const rirRow = element.querySelector('.active-workout-set__rir-row');
+        const completion = element.querySelector('[data-workout-field="done"]');
+        if (regions.some((region) => !region) || !input || !rirRow || !completion) {
+          throw new Error('Active set geometry missing');
+        }
+        const boxes = regions.map((region) => region!.getBoundingClientRect());
+        return {
+          inOrder: boxes
+            .slice(0, -1)
+            .every((box, index) => boxes[index + 1]!.top >= box.bottom - 1),
+          rowGap: Number.parseFloat(
+            getComputedStyle(element.querySelector('.active-workout-set__controls')!).rowGap,
+          ),
+          beforeRir: rirRow.getBoundingClientRect().top - input.getBoundingClientRect().bottom,
+          afterRir: completion.getBoundingClientRect().top - rirRow.getBoundingClientRect().bottom,
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      });
+      expect(geometry.inOrder).toBe(true);
+      // #1272 keeps the RIR row separated from inputs and completion at every width.
+      expect(geometry.rowGap).toBeGreaterThanOrEqual(11);
+      expect(geometry.beforeRir).toBeGreaterThanOrEqual(geometry.rowGap - 1);
+      expect(geometry.afterRir).toBeGreaterThanOrEqual(geometry.rowGap - 1);
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(width + 1);
+    }
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await capture('prefill-collapsed');
+    await page.setViewportSize({ width: 393, height: 844 });
+    await capture('prefill-collapsed');
+
+    await done.focus();
+    for (const next of [prefill, quick, help, helpers, advanced]) {
+      await page.keyboard.press('Tab');
+      await expect(next).toBeFocused();
+    }
+
+    const openWithoutJump = async (summary: Locator) => {
+      await summary.evaluate((element) =>
+        element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+      );
+      const before = await page.evaluate(() => window.scrollY);
+      await summary.click();
+      await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+      );
+      expect(Math.abs((await page.evaluate(() => window.scrollY)) - before)).toBeLessThanOrEqual(2);
+    };
+    await openWithoutJump(help);
+    await expect(row.locator('.active-workout-set__contextual-help details')).toHaveAttribute(
+      'open',
+      '',
+    );
+    await expect(row.getByRole('link', { name: 'Подробнее на сайте' })).toHaveAttribute(
+      'href',
+      /\/knowledge\/training\/repetitions-in-reserve/,
+    );
+    await openWithoutJump(helpers);
+    await expect(row.locator('.active-workout-set__helpers')).toHaveAttribute('open', '');
+    await row.getByLabel('Целевой вес, кг').fill('80');
+    await expect(row.locator('.active-workout-plate-result')).toContainText('25 кг + 5 кг');
+    const inventory = row.locator('.active-workout-plate-inventory');
+    const overlap = await inventory.evaluate((element) => {
+      const hint = element.querySelector(':scope > p')!.getBoundingClientRect();
+      const reset = element
+        .querySelector('.active-workout-plate-inventory__reset button')!
+        .getBoundingClientRect();
+      return (
+        reset.top < hint.bottom &&
+        reset.bottom > hint.top &&
+        reset.left < hint.right &&
+        reset.right > hint.left
+      );
+    });
+    expect(overlap).toBe(false);
+    expect(server.readSet(202).is_completed).toBe(false);
+    await capture('prefill-open');
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await capture('prefill-open');
+    await page.setViewportSize({ width: 393, height: 844 });
+
+    await prefill.click();
+    await expect(weight).toHaveValue('40');
+    await expect(reps).toHaveValue('8');
+    await expect(row.locator('.active-workout-set__prefill-actions')).toBeHidden();
+    const gap = await row.evaluate((element) => {
+      const controls = element
+        .querySelector('.active-workout-set__controls')!
+        .getBoundingClientRect();
+      const helpBox = element
+        .querySelector('.active-workout-set__contextual-help')!
+        .getBoundingClientRect();
+      return helpBox.top - controls.bottom;
+    });
+    expect(gap).toBeGreaterThanOrEqual(0);
+    expect(gap).toBeLessThanOrEqual(24);
+    const selectedRir = row.getByRole('button', { name: '2 — ещё примерно 2 повтора' });
+    await selectedRir.click();
+    await expect.poll(() => server.readSet(202).rir).toBe('2');
+    const count = inventory.getByLabel('Количество блинов 25 кг на сторону');
+    const originalCount = await count.inputValue();
+    await count.fill(originalCount === '0' ? '1' : '0');
+    await inventory.getByRole('button', { name: 'Сбросить' }).click();
+    await expect(count).toHaveValue(originalCount);
+    await expect(weight).toHaveValue('40');
+    await expect(reps).toHaveValue('8');
+    await expect(selectedRir).toHaveAttribute('aria-pressed', 'true');
+    expect(server.readSet(202).is_completed).toBe(false);
+    await capture('no-prefill-open');
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await capture('no-prefill-open');
+    await page.setViewportSize({ width: 393, height: 844 });
+    await row.getByRole('button', { name: 'Подготовить разминку' }).click();
+    await page.getByRole('button', { name: 'Рассчитать предложение' }).click();
+    await expect(page.getByRole('heading', { name: 'Проверьте подходы' })).toBeVisible();
+    await page.getByRole('button', { name: 'Отмена' }).click();
+    await advanced.click();
+    await expect(row.getByLabel('Вид подхода')).toBeVisible();
+    await row.getByLabel('Вид подхода').selectOption('drop');
+    await expect.poll(() => server.readSet(202).set_kind).toBe('drop');
+    await row.getByLabel('Вид подхода').selectOption('working');
+    await expect.poll(() => server.readSet(202).set_kind).toBe('working');
+    await advanced.click();
+    await helpers.click();
+    await help.click();
+    await capture('no-prefill-collapsed');
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await capture('no-prefill-collapsed');
+    await page.setViewportSize({ width: 393, height: 844 });
+    await done.click();
+    await expect.poll(() => server.readSet(202).is_completed).toBe(true);
+    expect(server.readSet(202)).toMatchObject({ actual_weight: 40, actual_reps: 8, rir: '2' });
+  });
+}
+
+test('Issue #1293 has no prefill container without a previous result', async ({ page }) => {
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await expect(row).toHaveAttribute('aria-current', 'step');
+  await expect(row.locator('.active-workout-set__prefill-actions')).toHaveCount(0);
+  for (const width of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    const spacing = await row.evaluate((element) => {
+      const input = element.querySelector('[data-workout-field="weight"]')!.parentElement!;
+      const rir = element.querySelector('.active-workout-set__rir-row')!;
+      const done = element.querySelector('[data-workout-field="done"]')!;
+      return {
+        rowGap: Number.parseFloat(
+          getComputedStyle(element.querySelector('.active-workout-set__controls')!).rowGap,
+        ),
+        beforeRir: rir.getBoundingClientRect().top - input.getBoundingClientRect().bottom,
+        afterRir: done.getBoundingClientRect().top - rir.getBoundingClientRect().bottom,
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+    expect(spacing.rowGap).toBeGreaterThanOrEqual(11);
+    expect(spacing.beforeRir).toBeGreaterThanOrEqual(11);
+    expect(spacing.afterRir).toBeGreaterThanOrEqual(11);
+    expect(spacing.scrollWidth).toBeLessThanOrEqual(width + 1);
+  }
+  const done = row.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' });
+  await done.focus();
+  for (const label of ['Что такое RIR?', 'Разминка и блины', 'Дополнительно']) {
+    await page.keyboard.press('Tab');
+    await expect(row.getByText(label, { exact: true })).toBeFocused();
+  }
+});
+
+test('Issue #1293 keeps quick completion and optional RIR', async ({ page }) => {
+  const server = await mockActiveWorkout(page);
+  Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, is_completed: true });
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="202"]');
+  await row.getByRole('button', { name: '4+ — осталось много сил' }).click();
+  await expect.poll(() => server.readSet(202).rir).toBe('4+');
+  await row.getByRole('button', { name: 'Подставить и завершить' }).click();
+  await expect.poll(() => server.readSet(202).is_completed).toBe(true);
+  expect(server.readSet(202)).toMatchObject({ actual_weight: 40, actual_reps: 8, rir: '4+' });
+});
 
 async function readRestJournal(page: Page) {
   return page.evaluate(() =>
