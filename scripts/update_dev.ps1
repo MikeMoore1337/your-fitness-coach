@@ -14,6 +14,7 @@ param(
         'Lock',
         'Unlock',
         'SchedulerStatus',
+        'InstallSilentAction',
         'ClearIncomplete'
     )]
     [string]$TaskAction = 'None',
@@ -73,6 +74,35 @@ $script:GitHubRepository = 'MikeMoore1337/your-fitness-coach'
 $script:ExpectedOrigin = 'https://github.com/mikemoore1337/your-fitness-coach'
 $script:ApiBaseUrl = $GitHubApiBaseUrl.TrimEnd('/')
 $script:CurrentResult.repository = $script:RepoRoot
+
+function ConvertTo-SafeErrorText {
+    param(
+        [AllowNull()][object]$Value,
+        [string]$Fallback = 'NO_DATA'
+    )
+    $text = if ($null -eq $Value) { '' } else { [string]$Value }
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $Fallback
+    }
+    $text = $text -replace '[\r\n]+', ' '
+    $text = $text -replace '(?i)(password|passwd|secret|token|api[_-]?key|authorization|cookie)\s*[:=]\s*[^\s,;]+', '$1=[REDACTED]'
+    $text = $text -replace '(?i)(https?://[^/\s:@]+:)[^@\s]+@', '$1[REDACTED]@'
+    $text = $text -replace '(?i)((?:\?|&)(?:password|passwd|secret|token|api[_-]?key|authorization|cookie)=)[^&\s]+', '$1[REDACTED]'
+    return $text.Trim()
+}
+
+function Get-ScheduledTaskErrorSummary {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord
+    )
+    $exception = $ErrorRecord.Exception
+    $reason = if ($null -ne $exception) { $exception.Message } else { 'Неизвестная ошибка' }
+    $errorId = ConvertTo-SafeErrorText -Value $ErrorRecord.FullyQualifiedErrorId
+    $hresult = if ($null -ne $exception) { [string]$exception.HResult } else { 'NO_DATA' }
+    return ('Регистрация задания завершилась ошибкой: причина="{0}"; error_id={1}; hresult={2}.' -f `
+        (ConvertTo-SafeErrorText -Value $reason), $errorId, $hresult)
+}
 
 function Stop-Update {
     param(
@@ -725,31 +755,75 @@ function Invoke-Status {
     }
 }
 
-function Get-TaskHost {
-    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
-    if ($null -ne $pwsh) { return $pwsh.Source }
-    $powershell = Get-Command powershell -ErrorAction Stop
-    return $powershell.Source
+function Get-DevPythonwHost {
+    if ($null -eq (Get-Command py -ErrorAction SilentlyContinue)) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'Для скрытого запуска требуется установленный Python 3.14 с pythonw.exe.'
+    }
+    $python = @(& py -3.14 -c 'import sys; print(sys.executable)' 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $python.Count -ne 1 -or [string]::IsNullOrWhiteSpace($python[0])) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'Невозможно определить путь Python 3.14.'
+    }
+    $pythonw = Join-Path (Split-Path -Parent ([string]$python[0]).Trim()) 'pythonw.exe'
+    if (-not (Test-Path -LiteralPath $pythonw -PathType Leaf)) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'pythonw.exe отсутствует рядом с Python 3.14; видимый PowerShell не используется как запасной вариант.'
+    }
+    return $pythonw
+}
+
+function New-SilentUpdaterAction {
+    $launcherPath = Join-Path $script:RepoRoot 'scripts\dev_update_silent.pyw'
+    if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
+        Stop-Update -Code 'SILENT_LAUNCHER_MISSING' -Summary 'Не найден scripts/dev_update_silent.pyw.'
+    }
+    $pythonw = Get-DevPythonwHost
+    # pythonw.exe uses the Windows GUI subsystem and never allocates a console.
+    # The launcher starts PowerShell with CREATE_NO_WINDOW and forwards exit codes.
+    return New-ScheduledTaskAction -Execute $pythonw -Argument ('-I -B "{0}"' -f $launcherPath)
 }
 
 function Invoke-TaskAction {
     New-Item -ItemType Directory -Path $script:StateRoot -Force | Out-Null
     switch ($TaskAction) {
         'Register' {
-            $scriptPath = Join-Path $script:RepoRoot 'scripts\update_dev.ps1'
-            $hostPath = Get-TaskHost
-            $escapedScript = $scriptPath.Replace('"', '\"')
-            $action = New-ScheduledTaskAction -Execute $hostPath -Argument ('-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Mode Check -Automatic' -f $escapedScript)
-            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
-                -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
-            $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
-                -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
-            $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType InteractiveToken -RunLevel Limited
-            Register-ScheduledTask -TaskName $script:TaskName -Action $action -Trigger $trigger `
-                -Settings $settings -Principal $principal -Force | Out-Null
-            Enable-ScheduledTask -TaskName $script:TaskName | Out-Null
-            Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
-            Write-Host 'Планировщик зарегистрирован: проверка каждые 5 минут; автоустановка выключена.'
+            try {
+                $action = New-SilentUpdaterAction
+                $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
+                    -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
+                $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
+                    -ExecutionTimeLimit (New-TimeSpan -Minutes 30)
+                $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+                Register-ScheduledTask -TaskName $script:TaskName -Action $action -Trigger $trigger `
+                    -Settings $settings -Principal $principal -Force | Out-Null
+                Enable-ScheduledTask -TaskName $script:TaskName | Out-Null
+                Remove-Item -LiteralPath $script:AutoApplyPath -Force -ErrorAction SilentlyContinue
+                Write-Host 'Планировщик зарегистрирован: проверка каждые 5 минут; автоустановка выключена.'
+            } catch {
+                Stop-Update -Code 'TASK_REGISTER_FAILED' -Summary (Get-ScheduledTaskErrorSummary -ErrorRecord $_)
+            }
+        }
+        'InstallSilentAction' {
+            # Upgrade only the executable of an existing task; keep its schedule,
+            # principal, manual lock and auto-apply enabled marker unchanged.
+            try {
+                $task = Get-ScheduledTask -TaskName $script:TaskName -ErrorAction Stop
+                $existing = @($task.Actions)
+                if ($existing.Count -ne 1) {
+                    Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Ожидалось ровно одно действие задания; изменение отменено.'
+                }
+                $executable = [string]$existing[0].Execute
+                $arguments = [string]$existing[0].Arguments
+                $oldPowerShell = $executable -match '(?i)(?:^|[\\/])(powershell|pwsh)\.exe$' -and $arguments -match '(?i)update_dev\.ps1'
+                $newPythonw = $executable -match '(?i)(?:^|[\\/])pythonw\.exe$' -and $arguments -match '(?i)dev_update_silent\.pyw'
+                if (-not ($oldPowerShell -or $newPythonw)) {
+                    Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Действие задания не принадлежит DEV updater; изменение отменено.'
+                }
+                $action = New-SilentUpdaterAction
+                Set-ScheduledTask -TaskName $script:TaskName -Action $action -ErrorAction Stop | Out-Null
+                Write-Host 'Задание переведено на скрытый pythonw.exe; расписание и auto_apply сохранены.'
+            } catch {
+                if ($script:FailureCode) { throw }
+                Stop-Update -Code 'TASK_ACTION_UPDATE_FAILED' -Summary (Get-ScheduledTaskErrorSummary -ErrorRecord $_)
+            }
         }
         'Unregister' {
             Unregister-ScheduledTask -TaskName $script:TaskName -Confirm:$false -ErrorAction SilentlyContinue
@@ -851,6 +925,6 @@ try {
     }
     $script:CurrentResult.result = if ($script:ExitCode -eq 2) { 'DEFERRED' } else { 'FAIL' }
     try { Save-Result } catch { }
-    Write-Error $script:FailureSummary
+    Write-Error ('[{0}] {1}' -f $script:FailureCode, $script:FailureSummary)
     exit $script:ExitCode
 }

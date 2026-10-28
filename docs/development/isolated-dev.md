@@ -162,6 +162,7 @@ Set-Location D:\Pet-projects\yfc-dev
 
 ```powershell
 .\scripts\update_dev.ps1 -TaskAction Register
+.\scripts\update_dev.ps1 -TaskAction InstallSilentAction
 .\scripts\update_dev.ps1 -TaskAction EnableCheck
 .\scripts\update_dev.ps1 -TaskAction DisableCheck
 .\scripts\update_dev.ps1 -TaskAction EnableAutoApply
@@ -171,6 +172,33 @@ Set-Location D:\Pet-projects\yfc-dev
 .\scripts\update_dev.ps1 -TaskAction SchedulerStatus
 .\scripts\update_dev.ps1 -TaskAction Unregister
 ```
+
+**Без видимой консоли:** Task Scheduler запускает штатный Python 3.14 `pythonw.exe`
+(GUI subsystem) → `scripts/dev_update_silent.pyw`; дочерний Windows PowerShell
+запускается с `CREATE_NO_WINDOW` и передаёт собственный код завершения Планировщику.
+Нужен установленный Python 3.14 с `pythonw.exe`; при его отсутствии регистрация
+отклоняется, а не заменяется мигающим `powershell.exe`. VBScript/WSH не используются.
+
+Если задание `YFC-DEV-Update-Check` **уже зарегистрировано старой версией**,
+после автоматической установки новой ревизии один раз выполните:
+
+```powershell
+Set-Location D:\Pet-projects\yfc-dev
+.\scripts\update_dev.ps1 -TaskAction InstallSilentAction
+.\scripts\update_dev.ps1 -TaskAction SchedulerStatus
+Start-ScheduledTask -TaskName 'YFC-DEV-Update-Check'
+Get-ScheduledTaskInfo -TaskName 'YFC-DEV-Update-Check' |
+    Select-Object LastRunTime, LastTaskResult, NextRunTime
+```
+
+`InstallSilentAction` заменяет **только действие** существующего задания и
+сохраняет расписание, запуск от текущего пользователя, `RunLevel Limited`,
+`auto_apply=ON` и блокировку ручной приёмки. После окончания тестового запуска
+`LastTaskResult=0` при отсутствии обновления; проверка реального отсутствия
+всплывающего окна на Windows проводится отдельно от Linux CI.
+При недостаточных правах не менять учётную запись и не повышать `RunLevel`:
+запустить команду под владельцем задания с необходимыми правами. Не используйте
+повторную `Register` ради миграции, поскольку она намеренно отключает автоустановку.
 
 `Register` создаёт локальное интерактивное задание `YFC-DEV-Update-Check` с интервалом пять
 минут, оставляя автоустановку выключенной. `Lock` предназначен для ручной DEV-приёмки и всегда
