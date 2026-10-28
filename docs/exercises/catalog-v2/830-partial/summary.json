@@ -89,9 +89,13 @@
     "UPSTREAM_VARIANT_IDENTITY_UNVERIFIED": 922
   },
   "source_count": 6554,
+  "source_relation": {
+    "NOT_VARIANT_REFERENCE": 5632,
+    "VARIANT": 922
+  },
   "source_revision": "7a3ace53c5e910c2185f22df803726c5838a99ae",
   "status": {
     "REVIEW": 6554
   },
-  "yfc_revision": "5041b77c8b29cfc4da26586154165aa734ffa6ef"
+  "yfc_revision": "e6585c25e9351fa761fc987243a054a8fbba4175"
 }

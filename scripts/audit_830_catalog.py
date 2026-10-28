@@ -53,12 +53,15 @@ def compare(records, blobs, catalog, metadata, redirects, manifest):
     ids_set = set(ids)
     if any(record.get("variantOf") and record["variantOf"] not in ids_set for record in records):
         raise ValueError("unresolved variantOf")
+    records_by_id = {record["id"]: record for record in records}
     rows = []
     dimensions = {field: Counter() for field in ("bodyPart", "equipment", "target", "textSource")}
     for record in sorted(records, key=lambda item: item["id"]):
         sid = record["id"]
         media = sorted(media_ids.get(sid, ()))
         names = sorted(lookup.get(normalize(record.get("name", "")), ()))
+        variant = record.get("variantOf")
+        reciprocal = bool(variant and records_by_id[variant].get("femaleVariant") == sid)
         for field in dimensions:
             dimensions[field][record.get(field) or "UNKNOWN"] += 1
         if media and names and not set(media).intersection(names):
@@ -79,6 +82,16 @@ def compare(records, blobs, catalog, metadata, redirects, manifest):
                 "source_blob_sha1": blobs[sid],
                 "text_source": record.get("textSource") or "UNKNOWN",
                 "variant_of": record.get("variantOf") or "",
+                "source_relation": "VARIANT"
+                if reciprocal
+                else "REVIEW"
+                if variant
+                else "NOT_VARIANT_REFERENCE",
+                "source_relation_evidence": "variantOf+reciprocal_femaleVariant"
+                if reciprocal
+                else "variantOf_without_reciprocal"
+                if variant
+                else "none",
                 "media_source": "Gym visual (upstream claim)",
                 "media_id_candidates": "|".join(media),
                 "name_candidates": "|".join(names),
@@ -172,6 +185,7 @@ def main():
         "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
         "canonical_count": len(canonical),
         "source_count": len(rows),
+        "source_relation": dict(sorted(Counter(row["source_relation"] for row in rows).items())),
         "status": dict(sorted(Counter(row["status"] for row in rows).items())),
         "reasons": dict(sorted(Counter(row["reason"] for row in rows).items())),
         "dimensions": {key: dict(sorted(value.items())) for key, value in dimensions.items()},

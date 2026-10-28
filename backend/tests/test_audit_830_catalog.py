@@ -17,7 +17,7 @@ spec.loader.exec_module(module)
 def fixture():
     records = [
         {"id": "0002", "variantOf": "0001"},
-        {"id": "0001", "name": "SHARED", "textSource": "opengym"},
+        {"id": "0001", "name": "SHARED", "textSource": "opengym", "femaleVariant": "0002"},
         {"id": "0003", "name": "Other"},
     ]
     blobs = {row["id"]: row["id"] * 10 for row in records}
@@ -47,6 +47,8 @@ def test_candidates_remain_review_and_order_is_stable():
         "UPSTREAM_VARIANT_IDENTITY_UNVERIFIED",
         "NAME_MEDIA_CONFLICT",
     ]
+    assert rows[1]["source_relation"] == "VARIANT"
+    assert rows[1]["source_relation_evidence"] == "variantOf+reciprocal_femaleVariant"
     assert rows[0]["media_id_candidates"] == "a|b"
     assert all(row["status"] == "REVIEW" for row in rows)
     assert canonical == ["a", "b"]
@@ -71,3 +73,11 @@ def test_manifest_must_cover_exact_canonical_set():
     del args[-1]["exercises"]["b"]
     with pytest.raises(ValueError, match="canonical and manifest entries differ"):
         module.compare(*args)
+
+
+def test_unreciprocated_source_variant_is_review():
+    args = fixture()
+    del args[0][1]["femaleVariant"]
+    rows, *_ = module.compare(*args)
+    assert rows[1]["source_relation"] == "REVIEW"
+    assert rows[1]["source_relation_evidence"] == "variantOf_without_reciprocal"
