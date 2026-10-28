@@ -67,6 +67,9 @@ test('#861 modeled TMA keyboard respects safe areas and Back restores the editor
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   await expect(dialog.getByRole('searchbox')).toBeFocused();
+  await dialog.getByRole('searchbox').fill('присд');
+  await expect(dialog.locator('.exercise-picker__option')).toHaveCount(exercises.length);
+  await expect(trigger).toContainText('Выбрать упражнение');
   await dialog.getByRole('searchbox').fill('присед');
   await setModeledVisualViewport(page, 420, 48);
   await telegram.setViewport(420, 844, false);
