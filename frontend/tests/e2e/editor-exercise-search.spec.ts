@@ -100,11 +100,8 @@ test('#1202 suggests a typo match without selecting an exercise', async ({ page 
       ],
     }),
   );
-  await page.goto('/app?section=programs&view=manage&start=templates');
-  await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
-  const editor = page.locator('.program-editor-modal');
-  await editor.getByRole('button', { name: 'Добавить упражнение', exact: true }).click();
-  const trigger = editor.getByRole('button', { name: 'Поиск упражнения', exact: true });
+  await page.goto('/app?section=programs&view=manage');
+  const trigger = page.getByRole('button', { name: 'Поиск упражнения', exact: true }).first();
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   await dialog.getByRole('searchbox').fill('жим гантелй');
