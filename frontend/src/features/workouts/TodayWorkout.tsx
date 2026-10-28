@@ -184,7 +184,16 @@ export function formatPlannedGroupKind(kind: WorkoutSet['planned_group_kind']): 
   return kind ? plannedGroupKindLabels[kind] : null;
 }
 
-function focusWorkoutControl(row: HTMLDivElement | null, field: 'reps' | 'distance' | 'done') {
+function focusWorkoutControl(
+  row: HTMLDivElement | null,
+  field: 'reps' | 'distance' | 'rir' | 'done',
+) {
+  if (field === 'rir') {
+    row
+      ?.querySelector<HTMLElement>('.active-workout-set__rir-row button')
+      ?.focus({ preventScroll: true });
+    return;
+  }
   const control = row?.querySelector<HTMLElement>(`[data-workout-field="${field}"]`);
   control?.focus();
 }
@@ -755,6 +764,113 @@ function WorkoutSetRow({
       {isCurrent && previousResult && (
         <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
       )}
+      {isCurrent && (
+        <p className="active-workout-set__context">
+          <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
+          <span aria-hidden="true">·</span>
+          <span>Отдых {restSeconds} с</span>
+        </p>
+      )}
+
+      <div className={`active-workout-set__controls${isCurrent ? ' has-rir' : ''}`}>
+        <label className="active-workout-input">
+          <span>Вес, кг</span>
+          <input
+            data-workout-field="weight"
+            disabled={completedFieldsDisabled}
+            aria-label={`Вес, ${exerciseTitle}, подход ${set.set_number}`}
+            enterKeyHint="next"
+            inputMode="decimal"
+            type="text"
+            min="0"
+            step="0.01"
+            value={weight}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                focusWorkoutControl(rowRef.current, 'reps');
+              }
+            }}
+            onChange={(event) => {
+              const nextWeight = event.target.value;
+              editing.current = true;
+              setPrefillDismissed(nextWeight !== '' && reps !== '');
+              setWeight(nextWeight);
+              if (!editingCompleted) enqueueSave({ weight: nextWeight });
+            }}
+          />
+        </label>
+        <label className="active-workout-input">
+          <span>Повторы</span>
+          <input
+            data-workout-field="reps"
+            disabled={completedFieldsDisabled}
+            aria-label={`Повторы, ${exerciseTitle}, подход ${set.set_number}`}
+            enterKeyHint="done"
+            inputMode="numeric"
+            type="number"
+            min="0"
+            step="1"
+            value={reps}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                focusWorkoutControl(rowRef.current, 'rir');
+              }
+            }}
+            onChange={(event) => {
+              const nextReps = event.target.value;
+              editing.current = true;
+              setPrefillDismissed(nextReps !== '' && weight !== '');
+              setReps(nextReps);
+              if (!editingCompleted) enqueueSave({ reps: nextReps });
+            }}
+          />
+        </label>
+        {isCurrent && (
+          <div className="active-workout-set__rir-row">
+            <RirSelector
+              compact
+              disabled={completedFieldsDisabled}
+              value={rir}
+              onChange={(nextRir) => {
+                editing.current = true;
+                setRir(nextRir);
+                if (!editingCompleted) enqueueSave({ rir: nextRir });
+              }}
+            />
+          </div>
+        )}
+        <Button
+          type="button"
+          disabled={disabled || completing || (completed && !retryCompletion)}
+          aria-busy={completing || undefined}
+          aria-label={`${completing ? 'Сохраняем…' : retryCompletion ? 'Повторить сохранение' : completed ? 'Выполнен' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
+          aria-pressed={completed}
+          className="active-workout-set__done"
+          data-workout-field="done"
+          variant={completed ? 'secondary' : 'primary'}
+          onClick={(event) => {
+            if (event.detail > 1) return;
+            const nextCompleted = retryCompletion || !completed;
+            editing.current = true;
+            enqueueSave({ completed: nextCompleted }, true);
+          }}
+        >
+          {completing ? (
+            'Сохраняем…'
+          ) : retryCompletion ? (
+            'Повторить сохранение'
+          ) : completed ? (
+            <>
+              <CheckIcon /> Готово
+            </>
+          ) : (
+            'Завершить подход'
+          )}
+        </Button>
+      </div>
+
       {(canPrefill || prefillSpaceReserved) && (
         <div
           className={`active-workout-set__prefill-actions${prefillSpaceReserved ? ' is-hidden' : ''}`}
@@ -801,112 +917,6 @@ function WorkoutSetRow({
           </button>
         </div>
       )}
-
-      {isCurrent && (
-        <p className="active-workout-set__context">
-          <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
-          <span aria-hidden="true">·</span>
-          <span>Отдых {restSeconds} с</span>
-        </p>
-      )}
-
-      {isCurrent && (
-        <RirSelector
-          compact
-          disabled={completedFieldsDisabled}
-          value={rir}
-          onChange={(nextRir) => {
-            editing.current = true;
-            setRir(nextRir);
-            if (!editingCompleted) enqueueSave({ rir: nextRir });
-          }}
-        />
-      )}
-
-      <div className="active-workout-set__controls">
-        <label className="active-workout-input">
-          <span>Вес, кг</span>
-          <input
-            data-workout-field="weight"
-            disabled={completedFieldsDisabled}
-            aria-label={`Вес, ${exerciseTitle}, подход ${set.set_number}`}
-            enterKeyHint="next"
-            inputMode="decimal"
-            type="text"
-            min="0"
-            step="0.01"
-            value={weight}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                focusWorkoutControl(rowRef.current, 'reps');
-              }
-            }}
-            onChange={(event) => {
-              const nextWeight = event.target.value;
-              editing.current = true;
-              setPrefillDismissed(nextWeight !== '' && reps !== '');
-              setWeight(nextWeight);
-              if (!editingCompleted) enqueueSave({ weight: nextWeight });
-            }}
-          />
-        </label>
-        <label className="active-workout-input">
-          <span>Повторы</span>
-          <input
-            data-workout-field="reps"
-            disabled={completedFieldsDisabled}
-            aria-label={`Повторы, ${exerciseTitle}, подход ${set.set_number}`}
-            enterKeyHint="done"
-            inputMode="numeric"
-            type="number"
-            min="0"
-            step="1"
-            value={reps}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                focusWorkoutControl(rowRef.current, 'done');
-              }
-            }}
-            onChange={(event) => {
-              const nextReps = event.target.value;
-              editing.current = true;
-              setPrefillDismissed(nextReps !== '' && weight !== '');
-              setReps(nextReps);
-              if (!editingCompleted) enqueueSave({ reps: nextReps });
-            }}
-          />
-        </label>
-        <Button
-          type="button"
-          disabled={disabled || completing || (completed && !retryCompletion)}
-          aria-busy={completing || undefined}
-          aria-label={`${completing ? 'Сохраняем…' : retryCompletion ? 'Повторить сохранение' : completed ? 'Выполнен' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
-          aria-pressed={completed}
-          className="active-workout-set__done"
-          data-workout-field="done"
-          variant={completed ? 'secondary' : 'primary'}
-          onClick={(event) => {
-            if (event.detail > 1) return;
-            const nextCompleted = retryCompletion || !completed;
-            editing.current = true;
-            enqueueSave({ completed: nextCompleted }, true);
-          }}
-        >
-          {completing ? (
-            'Сохраняем…'
-          ) : retryCompletion ? (
-            'Повторить сохранение'
-          ) : completed ? (
-            <>
-              <CheckIcon /> Готово
-            </>
-          ) : (
-            'Завершить подход'
-          )}
-        </Button>
-      </div>
 
       {isCurrent && (
         <div className="active-workout-set__contextual-help">
@@ -1590,6 +1600,10 @@ export function RestTimer({
     'active-workout-rest',
     completedNotice || restoredTerminal ? 'active-workout-rest--complete' : null,
     showCompact || collapsed ? 'is-compact' : null,
+    showCompact && !(collapsed && isRunningRest) ? 'active-workout-rest--terminal' : null,
+    showCompact && !restartCandidate && !terminalNoticeDismissed
+      ? 'active-workout-rest--terminal-single'
+      : null,
   ]
     .filter(Boolean)
     .join(' ');
@@ -1840,6 +1854,44 @@ export function RestTimer({
     };
   }, [compactNotice, deadline, measuredRest, nextLabel, storageKey, userId, workoutId]);
   useLayoutEffect(() => {
+    const element = panel.current;
+    const parent = element?.parentElement;
+    if (!element || !parent) return;
+    const updateClearance = () => {
+      const height = element.getBoundingClientRect().height;
+      if (height > 0) {
+        // A viewport-fixed mobile timer still reserves its full height in the workout grid.
+        // The focus clearance remains larger than the visible panel for keyboard access.
+        parent.style.setProperty('--yfc-active-workout-rest-clearance', `${height + 20}px`);
+        parent.style.setProperty('--yfc-active-workout-rest-spacer-height', `${height}px`);
+      }
+      // Measure the workout column rather than the viewport: the panel must keep the
+      // same horizontal alignment without tracking vertical scroll frame by frame.
+      const bounds = parent.getBoundingClientRect();
+      if (bounds.width > 0) {
+        element.style.setProperty('--yfc-active-workout-rest-fixed-left', `${bounds.left}px`);
+        element.style.setProperty('--yfc-active-workout-rest-fixed-width', `${bounds.width}px`);
+      }
+    };
+    updateClearance();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateClearance);
+    observer?.observe(element);
+    observer?.observe(parent);
+    window.addEventListener('resize', updateClearance);
+    window.visualViewport?.addEventListener('resize', updateClearance);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateClearance);
+      window.visualViewport?.removeEventListener('resize', updateClearance);
+      parent.style.removeProperty('--yfc-active-workout-rest-clearance');
+      parent.style.removeProperty('--yfc-active-workout-rest-spacer-height');
+      element.style.removeProperty('--yfc-active-workout-rest-fixed-left');
+      element.style.removeProperty('--yfc-active-workout-rest-fixed-width');
+    };
+  }, [hasDeadline, collapsed, showCompact, completedNotice]);
+
+  useLayoutEffect(() => {
     const anchor = layoutAnchor.current;
     layoutAnchor.current = null;
     if (anchor?.element.isConnected) {
@@ -1847,27 +1899,6 @@ export function RestTimer({
       if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
     }
   }, [collapsed, showCompact, completedNotice]);
-
-  useLayoutEffect(() => {
-    const element = panel.current;
-    const parent = element?.parentElement;
-    if (!element || !parent) return;
-    const updateClearance = () => {
-      const height = element.getBoundingClientRect().height;
-      if (height > 0) {
-        // Focus scrolling positions the input, so reserve the label/control offset too.
-        parent.style.setProperty('--yfc-active-workout-rest-clearance', `${height + 20}px`);
-      }
-    };
-    updateClearance();
-    const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateClearance);
-    observer?.observe(element);
-    return () => {
-      observer?.disconnect();
-      parent.style.removeProperty('--yfc-active-workout-rest-clearance');
-    };
-  }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
   useEffect(() => {
     const element = panel.current;
@@ -1892,7 +1923,7 @@ export function RestTimer({
   }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
   if (!deadline && !completedNotice && !restartCandidate) return null;
-  return (
+  const restPanel = (
     <aside
       ref={panel}
       {...glassProps('tinted')}
@@ -2137,69 +2168,74 @@ export function RestTimer({
                   writeStorage(`${storageKey}:panel-collapsed`, true);
                 }}
               >
-                <Icon name="chevron-down" size={20} />
+                <Icon name="chevron-up" size={20} />
               </button>
             )}
           </div>
           {showCompact && (
             <>
               {!terminalNoticeDismissed && (
-                <span className="active-workout-rest__complete-copy">
-                  {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
-                </span>
-              )}
-              {!terminalNoticeDismissed &&
-                isCompletedLatestRest &&
-                latestRest?.measured_seconds != null && (
+                <div className="active-workout-rest__complete-summary">
                   <span className="active-workout-rest__complete-copy">
-                    ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+                    {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
                   </span>
-                )}
-              {restartCandidate && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  glass="clear"
-                  onClick={() => {
-                    if (!restartCandidate || restRecords.some((row) => row.status === 'running'))
-                      return;
-                    const started = restartMeasuredRest(
-                      userId,
-                      workoutId,
-                      restartCandidate.start_mutation_id,
-                      Date.now(),
-                    );
-                    if (!started) return;
-                    setNow(Date.now());
-                    setMeasuredRest(started);
-                    setDeadline(started.deadline);
-                    setCompletedNotice(null);
-                    setTerminalNoticeDismissed(false);
-                    setCompact(false);
-                    setCollapsed(false);
-                    setRestSaveError(null);
-                    setAnnouncement('Новый интервал отдыха');
-                    writeStorage(storageKey, started.deadline);
-                    writeStorage(`${storageKey}:panel-collapsed`, false);
-                  }}
-                >
-                  Начать отдых
-                </Button>
+                  {isCompletedLatestRest && latestRest?.measured_seconds != null && (
+                    <span className="active-workout-rest__complete-copy">
+                      ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+                    </span>
+                  )}
+                </div>
               )}
-              {!terminalNoticeDismissed && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  glass="clear"
-                  onClick={() => {
-                    captureLayoutAnchor();
-                    setTerminalNoticeDismissed(Boolean(restartCandidate));
-                    setCompletedNotice(null);
-                    setCompact(false);
-                  }}
-                >
-                  Скрыть
-                </Button>
+              {(restartCandidate || !terminalNoticeDismissed) && (
+                <div className="active-workout-rest__complete-actions">
+                  {restartCandidate && (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          !restartCandidate ||
+                          restRecords.some((row) => row.status === 'running')
+                        )
+                          return;
+                        const started = restartMeasuredRest(
+                          userId,
+                          workoutId,
+                          restartCandidate.start_mutation_id,
+                          Date.now(),
+                        );
+                        if (!started) return;
+                        setNow(Date.now());
+                        setMeasuredRest(started);
+                        setDeadline(started.deadline);
+                        setCompletedNotice(null);
+                        setTerminalNoticeDismissed(false);
+                        setCompact(false);
+                        setCollapsed(false);
+                        setRestSaveError(null);
+                        setAnnouncement('Новый интервал отдыха');
+                        writeStorage(storageKey, started.deadline);
+                        writeStorage(`${storageKey}:panel-collapsed`, false);
+                      }}
+                    >
+                      Начать отдых
+                    </Button>
+                  )}
+                  {!terminalNoticeDismissed && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      glass="clear"
+                      onClick={() => {
+                        captureLayoutAnchor();
+                        setTerminalNoticeDismissed(Boolean(restartCandidate));
+                        setCompletedNotice(null);
+                        setCompact(false);
+                      }}
+                    >
+                      Скрыть
+                    </Button>
+                  )}
+                </div>
               )}
             </>
           )}
@@ -2222,6 +2258,12 @@ export function RestTimer({
         </>
       )}
     </aside>
+  );
+  return (
+    <>
+      {restPanel}
+      <div className="active-workout-rest-spacer" aria-hidden="true" />
+    </>
   );
 }
 
@@ -2591,46 +2633,49 @@ export function TodayWorkout({
   useLayoutEffect(() => {
     if (!completionNavigation?.accepted || navigatedCompletion.current === completionNavigation)
       return;
+    // Let the newly-current RIR row and the rest timer settle before taking
+    // the one allowed completion-navigation scroll measurement.
+    let layoutFrame: number | null = null;
     const frame = window.requestAnimationFrame(() => {
-      navigatedCompletion.current = completionNavigation;
-      // Only acceptance owns navigation; autosave and later queue acknowledgements do not.
-      const focused = document.activeElement;
-      if (
-        focused instanceof HTMLElement &&
-        focused.closest(`[data-workout-set-id="${completionNavigation.setId}"]`)
-      )
-        focused.blur();
-      if (!currentSetId || editingWorkoutField()) return;
-      const row = document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
-      const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
-      if (!controls) return;
-      const viewport = window.visualViewport;
-      const top = viewport?.offsetTop ?? 0;
-      const bottom = top + (viewport?.height ?? window.innerHeight);
-      const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
-      const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
-      const safeTop =
-        Math.max(top, timer && timer.top < bottom && timer.bottom > top ? timer.bottom : top) + 8;
-      const safeBottom = Math.min(bottom, dock && dock.height > 0 ? dock.top : bottom) - 8;
-      const box = controls.getBoundingClientRect();
-      const targetTop = safeTop + Math.max(0, (safeBottom - safeTop - box.height) / 2);
-      let delta = box.top - targetTop;
-      const nextRow = row?.nextElementSibling;
-      const nextDone = nextRow?.querySelector<HTMLElement>('[data-workout-field="done"]');
-      const rir = row?.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
-      if (nextDone) {
-        // Clear the adjacent set only within the space that keeps the current inputs visible.
-        delta = Math.max(
-          delta,
-          Math.min(
-            nextDone.getBoundingClientRect().bottom - safeBottom,
-            Math.min(box.top, rir?.top ?? box.top) - safeTop,
-          ),
-        );
-      }
-      window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
+      layoutFrame = window.requestAnimationFrame(() => {
+        navigatedCompletion.current = completionNavigation;
+        // Only acceptance owns navigation; autosave and later queue acknowledgements do not.
+        const focused = document.activeElement;
+        if (
+          focused instanceof HTMLElement &&
+          focused.closest(`[data-workout-set-id="${completionNavigation.setId}"]`)
+        )
+          focused.blur();
+        if (!currentSetId || editingWorkoutField()) return;
+        const row = document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
+        const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
+        if (!controls) return;
+        const viewport = window.visualViewport;
+        const top = viewport?.offsetTop ?? 0;
+        const bottom = top + (viewport?.height ?? window.innerHeight);
+        const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+        const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
+        const safeTop =
+          Math.max(top, timer && timer.top < bottom && timer.bottom > top ? timer.bottom : top) + 8;
+        const safeBottom = Math.min(bottom, dock && dock.height > 0 ? dock.top : bottom) - 8;
+        const box = controls.getBoundingClientRect();
+        const targetTop = safeTop + Math.max(0, (safeBottom - safeTop - box.height) / 2);
+        let delta = box.top - targetTop;
+        // Keep the newly active controls fully within the available viewport.
+        // Taller RIR controls must not be pushed under the sticky timer just to
+        // clear the following (non-current) set from the dock.
+        const minScroll = box.bottom - safeBottom;
+        const maxScroll = box.top - safeTop;
+        if (minScroll <= maxScroll) {
+          delta = Math.max(minScroll, Math.min(delta, maxScroll));
+        }
+        window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
+      });
     });
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (layoutFrame !== null) window.cancelAnimationFrame(layoutFrame);
+    };
   }, [completionNavigation, currentSetId]);
 
   useEffect(() => {
@@ -2866,6 +2911,8 @@ export function TodayWorkout({
               started &&
               capabilities.canMutatePrograms &&
               !hasWorkoutExecutionEvidence(exercise, activeSync.pendingBySet);
+            const replacementBlockedByExecution =
+              started && capabilities.canMutatePrograms && !canReplaceExercise;
             const isPersistedComplete = shouldCollapseCompletedExercise(exercise.sets, (setId) =>
               activeSync.pendingBySet.has(setId),
             );
@@ -3011,6 +3058,14 @@ export function TodayWorkout({
                         safetyOnly={false}
                         workout={data}
                       />
+                    )}
+                    {replacementBlockedByExecution && (
+                      <span
+                        className="ui-button ui-button--secondary ui-button--full active-workout-exercise__replacement-slot"
+                        aria-hidden="true"
+                      >
+                        Заменить только в этой тренировке
+                      </span>
                     )}
                   </div>
                 </header>

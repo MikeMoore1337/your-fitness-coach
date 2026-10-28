@@ -554,6 +554,8 @@ function git(args) {
     cwd: REPO_ROOT,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Initial master-to-dev bootstrap can include >1 MiB of source diffs.
+    maxBuffer: 32 * 1024 * 1024,
   });
 }
 

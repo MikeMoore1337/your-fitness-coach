@@ -298,7 +298,9 @@ describe('RestTimer', () => {
         }),
       );
     });
+    act(() => vi.advanceTimersByTime(12_000));
     fireEvent.click(screen.getByRole('button', { name: 'Завершить отдых' }));
+    const previous = loadRestJournal(7, 42)[0]!;
     expect(
       screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy'),
     ).toHaveTextContent('Отдых завершён по отметке');
@@ -308,10 +310,94 @@ describe('RestTimer', () => {
       screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy'),
     ).toBeNull();
     expect(screen.queryByRole('button', { name: 'Скрыть' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(loadRestJournal(7, 42)).toEqual([previous]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+    const restart = screen.getByRole('button', { name: 'Начать отдых' });
+    expect(restart).toBeVisible();
+    act(() => {
+      fireEvent.click(restart);
+      fireEvent.click(restart);
+    });
     expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+    const records = loadRestJournal(7, 42);
+    expect(records).toHaveLength(2);
+    expect(records[0]).toEqual(previous);
+    expect(records[1]).toMatchObject({
+      status: 'running',
+      restart_of_start_mutation_id: previous.start_mutation_id,
+    });
+  });
+
+  it('dismisses an omitted rest without starting or changing it, then starts only one new interval', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    fireEvent(window, new Event('pagehide'));
+    vi.setSystemTime(initialTime + 17 * 60_000);
+    fireEvent(window, new Event('pageshow'));
+    fireEvent.click(screen.getByRole('button', { name: 'Не учитывать' }));
+    const panel = screen.getByRole('complementary');
+    expect(panel.querySelector('.active-workout-rest__complete-copy')).toHaveTextContent(
+      'Отдых не учитывается',
+    );
+    const previous = loadRestJournal(7, 42)[0]!;
+    expect(previous.status).toBe('skipped');
+    expect(previous.measured_seconds).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Скрыть' }));
+    expect(panel.querySelector('.active-workout-rest__complete-copy')).toBeNull();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(loadRestJournal(7, 42)).toEqual([previous]);
+
+    const restart = screen.getByRole('button', { name: 'Начать отдых' });
+    act(() => {
+      fireEvent.click(restart);
+      fireEvent.click(restart);
+    });
+    const records = loadRestJournal(7, 42);
+    expect(records).toHaveLength(2);
+    expect(records[0]).toEqual(previous);
+    expect(records[1]).toMatchObject({
+      status: 'running',
+      started_at: new Date(initialTime + 17 * 60_000).toISOString(),
+      restart_of_start_mutation_id: previous.start_mutation_id,
+    });
+  });
+
+  it('keeps the corrected fact when the user starts another interval', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    fireEvent(window, new Event('pagehide'));
+    vi.setSystemTime(initialTime + 17 * 60_000);
+    fireEvent(window, new Event('pageshow'));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' }),
+      {
+        target: { value: '2,5' },
+      },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить время' }));
+    const previous = loadRestJournal(7, 42)[0]!;
+    expect(previous).toMatchObject({
+      status: 'completed',
+      measured_seconds: 150,
+      source: 'USER_CORRECTED',
+    });
+    expect(screen.getByRole('complementary')).toHaveTextContent('ФАКТ 2:30');
+    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+    expect(loadRestJournal(7, 42)[0]).toEqual(previous);
     expect(loadRestJournal(7, 42)).toHaveLength(2);
   });
 

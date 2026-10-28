@@ -1,0 +1,114 @@
+# Standalone local/dev stack. Never merge this file with docker-compose.yml.
+# Invoke only with: docker compose --env-file .env.dev -f compose.dev.yml ...
+name: yfc-dev
+
+x-app-image: &app-image
+  image: yfc-dev-backend:local
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+    args:
+      VITE_PWA_ENABLED: "false"
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+
+x-dev-env: &dev-env
+  APP_ENV: dev
+  APP_NAME: Your Fitness Coach DEV
+  APP_DEBUG: "false"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  REFRESH_TOKEN_EXPIRE_DAYS: "1"
+  ENABLE_DEV_AUTH: "true"
+  DEV_AUTH_FIXED_ACCOUNTS_ONLY: "true"
+  ENABLE_WEB_AUTH: "false"
+  ENABLE_EMAIL_AUTH: "false"
+  ADMIN_TELEGRAM_USER_IDS: "1001"
+  FRONTEND_BASE_URL: ${YFC_DEV_BASE_URL:-http://127.0.0.1:18080}
+  SECRET_KEY: ${YFC_DEV_SECRET_KEY:?Generate .env.dev with scripts/bootstrap_dev_env.py}
+  DATABASE_URL: postgresql+psycopg://yfc_dev:${YFC_DEV_POSTGRES_PASSWORD:?Missing separate dev password}@db:5432/yfc_dev
+  DB_POOL_SIZE: "2"
+  DB_MAX_OVERFLOW: "1"
+  TELEGRAM_BOT_TOKEN: "123456:dev-not-a-real-bot-token"
+  BOT_INTERNAL_TOKEN: ${YFC_DEV_INTERNAL_TOKEN:?Missing separate dev internal token}
+  BOT_POLLING_ENABLED: "false"
+  FOOD_PROVIDER: disabled
+  FOOD_USDA_ENABLED: "false"
+  NUTRITION_LABEL_SCAN_ENABLED: "false"
+  NUTRITION_LABEL_VISION_ENABLED: "false"
+  AI_COACH_ENABLED: "false"
+  NEWS_INGESTION_ENABLED: "false"
+
+x-logs: &dev-logs
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: "no"
+    mem_limit: 384m
+    pids_limit: 128
+    logging: *dev-logs
+    environment:
+      POSTGRES_DB: yfc_dev
+      POSTGRES_USER: yfc_dev
+      POSTGRES_PASSWORD: ${YFC_DEV_POSTGRES_PASSWORD:?Missing separate dev password}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yfc_dev -d yfc_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - dev_postgres_data:/var/lib/postgresql/data
+    networks: [dev_internal]
+
+  setup:
+    <<: *app-image
+    restart: "no"
+    mem_limit: 768m
+    logging: *dev-logs
+    environment:
+      <<: *dev-env
+      YFC_DB_APPLICATION_NAME: yfc-setup
+    depends_on:
+      db:
+        condition: service_healthy
+    command: /app/setup-entrypoint.sh
+    networks: [dev_internal]
+
+  backend:
+    <<: *app-image
+    restart: "no"
+    mem_limit: 768m
+    logging: *dev-logs
+    environment:
+      <<: *dev-env
+      YFC_DB_APPLICATION_NAME: yfc-backend
+    depends_on:
+      db:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${YFC_DEV_PORT:-18080}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4)\""]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 60s
+    # Docker Desktop forwards the loopback-published port through this normal
+    # bridge. PostgreSQL and the one-shot setup remain on dev_internal only.
+    networks: [dev_internal, dev_access]
+
+volumes:
+  dev_postgres_data:
+
+networks:
+  dev_internal:
+    internal: true
+  dev_access:
+    driver: bridge

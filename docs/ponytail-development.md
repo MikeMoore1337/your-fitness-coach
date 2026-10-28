@@ -1,5 +1,29 @@
-# Optional Ponytail host tooling
+# Ponytail - необязательные оригинальные навыки агента разработки
 
-Ponytail is optional host-side minimalism guidance. It is not a YFC dependency, CI gate, branch
-owner or release mechanism. Never auto-install it or start review/audit loops. If unavailable,
-apply the repository minimalism ladder directly.
+[Issue #1289](https://github.com/MikeMoore1337/your-fitness-coach/issues/1289) | [Исходное внедрение #357](https://github.com/MikeMoore1337/your-fitness-coach/issues/357) | [Официальный Ponytail](https://github.com/DietrichGebert/ponytail)
+
+Ponytail - инструмент для **агента разработки**, а не зависимость YFC, CI-gate, владелец веток или механизм релиза. Не устанавливать его автоматически и не запускать дополнительные review/audit LLM-циклы. Без Ponytail применять минималистичную лестницу из `AGENTS.md`.
+
+## Что уже есть в YFC
+
+`scripts/agent_flow.py` передаёт выбранный режим через `PONYTAIL_DEFAULT_MODE`: обычная реализация - `full`, архитектура/безопасность/деплой - `lite`, без исполнителя - `off`. Явное поле задачи `Ponytail` / `Ponytail mode` принимает `off|lite|full|ultra` и имеет приоритет. `ultra` **никогда не выводится автоматически**. `tests/test_agent_flow.py` проверяет эту локальную маршрутизацию, но не доказывает установку или выполнение внешнего плагина.
+
+`PONYTAIL_TESTED_VERSION = "4.10.0"` - **исторически проверенная версия интеграционного контракта #357**. Нельзя менять константу на 5.3.2 только по README: это ложно заявит пройденную приёмку с Codex Desktop.
+
+## Версия 5 и оригинал «как есть»
+
+Состояние upstream на 27.10.2026: официальный тег [v5.3.2](https://github.com/DietrichGebert/ponytail/releases/tag/v5.3.2), SHA `16352ac229eb08a9598dcae48fe9f2b342567d86`, MIT. В нём по-прежнему документирован `PONYTAIL_DEFAULT_MODE` и режимы `lite/full/ultra/off`, поэтому исходный контракт YFC **предварительно совместим по документированным параметрам**; поведение hooks в живом Codex Desktop **NOT_VERIFIED**.
+
+Использовать только оригинальный upstream plugin/skill без fork, переписывания `SKILL.md` или собственных hooks. Проверяемый неизменённый снимок шести навыков оформлен в [Toolkit PR #428](https://github.com/MikeMoore1337/ai-development-toolkit/pull/428) для добровольного ручного подключения; пока PR не объединён, это не релиз. Не копировать снимок и в YFC, и в глобальный каталог клиента: достаточно одного официального источника.
+
+У владельца запрещены Codex CLI, Claude CLI и дополнительные платные API. Если оригинальный полный plugin нельзя активировать через поддерживаемую возможность Codex Desktop без CLI, допустим только оригинальный **skill-only** путь через ручное копирование шести каталогов `SKILL.md` в `%USERPROFILE%\.agents\skills\` с последующим перезапуском клиента. Это не даёт lifecycle hooks, не гарантирует постоянной активации и не заменяет полноценный плагин.
+
+## Критерии локальной проверки
+
+1. На ПК проверить, есть ли уже установленный оригинальный Ponytail. Не перезаписывать существующие навыки и не устанавливать второй экземпляр.
+2. Проверить видимость и явный вызов `ponytail`, `ponytail-review`, `ponytail-audit` в **Codex Desktop**, затем выполнить безопасный тест на синтетическом изменении без секретов/публикации. Отдельно проверить режим `off` и отсутствие автоматического вызова `review/audit`.
+3. Сопоставить выбранный режим `PONYTAIL_DEFAULT_MODE` с реальным поведением v5; записать фактический host/plugin version и статус L4/L5. При отсутствии такого наблюдения оставлять `HOST_NOT_VERIFIED`, а `PONYTAIL_TESTED_VERSION` не изменять.
+4. Для отката удалить только навыки, добавленные данным оператором. Сохранять `AGENTS.md`, проверки безопасности, тесты, правила UI-одобрения и GitHub Flow.
+5. Любые изменения YFC сначала проводить через `dev` и зелёные checks. Ни `master`, ни production не изменять без отдельного разрешения.
+
+**Вывод:** версия v5.3.2 подтверждена только как upstream-источник; текущая интеграция YFC не блокируется при отсутствии plugin. Реальная установка/активация на Windows владельца **НЕ ПРОВЕРЕНА**.

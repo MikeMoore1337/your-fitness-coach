@@ -53,7 +53,7 @@ def _embedded_function(workflow_text: str, name: str, **globals_: object) -> Cal
 def test_ci_runs_application_checks_without_controller_gates() -> None:
     ci = _sources()["ci"]
 
-    assert "branches: [master]" in ci
+    assert "branches: [master, dev]" in ci
     assert "branches: [dev" not in ci
     assert "if: github.event_name == 'pull_request'" in ci
     assert "task-provenance:" not in ci

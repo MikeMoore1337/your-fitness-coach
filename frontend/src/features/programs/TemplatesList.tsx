@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type { ProgramTemplate } from '../../shared/api/types';
@@ -127,6 +127,8 @@ export function TemplatesList({
   const [previewSelectionId, setPreviewSelectionId] = useState<number | null>(null);
   const [previewStale, setPreviewStale] = useState(false);
   const [previewChecking, setPreviewChecking] = useState(false);
+  const templateDeleteLock = useRef(false);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<ProgramTemplate | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
@@ -196,6 +198,32 @@ export function TemplatesList({
     },
     onError: (reason) => toast((reason as Error).message, 'error'),
   });
+
+  const deleteTemplate = async (item: ProgramTemplate) => {
+    // Lock the full confirmation + request flow, including rapid taps before React renders.
+    if (templateDeleteLock.current || mutation.isPending) return;
+    templateDeleteLock.current = true;
+    setDeletingTemplateId(item.id);
+    try {
+      if (
+        !(await confirm({
+          title: item.is_example ? 'Скрыть шаблон?' : 'Удалить программу?',
+          message: item.title,
+          confirmText: item.is_example ? 'Скрыть' : 'Удалить',
+        }))
+      )
+        return;
+      await mutation.mutateAsync({
+        path: `/api/v1/programs/templates/${item.id}`,
+        method: 'DELETE',
+      });
+    } catch {
+      // The mutation's onError handler displays the failure; do not duplicate the toast.
+    } finally {
+      templateDeleteLock.current = false;
+      setDeletingTemplateId(null);
+    }
+  };
 
   const assignmentMutation = useMutation({
     mutationFn: ({ templateId, replaceActive }: { templateId: number; replaceActive: boolean }) =>
@@ -393,7 +421,13 @@ export function TemplatesList({
             : 'Посмотреть состав'}
         </span>
       </button>
-      <div className="program-template-card__actions">
+      <div
+        className={
+          item.is_example
+            ? 'program-template-card__actions program-template-card__actions--example'
+            : 'program-template-card__actions'
+        }
+      >
         <button
           type="button"
           className="secondary"
@@ -404,34 +438,37 @@ export function TemplatesList({
         >
           {shouldSaveTemplateAsCopy(item) ? 'Настроить копию' : 'Редактировать'}
         </button>
-        <button onClick={() => openAssignment(item)}>Запустить</button>
+        <button type="button" onClick={() => openAssignment(item)}>
+          Запустить
+        </button>
+        {item.is_example && (
+          <button
+            type="button"
+            className="btn-danger"
+            disabled={deletingTemplateId !== null || mutation.isPending}
+            onClick={() => void deleteTemplate(item)}
+          >
+            Скрыть шаблон
+          </button>
+        )}
       </div>
       {item.owner_user_id === user?.id && <PublicProgramSharePanel template={item} />}
-      <details className="program-danger-menu">
-        <summary className="yfc-disclosure-summary">
-          Другие действия
-          <DisclosureIcon />
-        </summary>
-        <button
-          type="button"
-          className="btn-danger"
-          onClick={async () => {
-            if (
-              await confirm({
-                title: item.is_example ? 'Скрыть шаблон?' : 'Удалить программу?',
-                message: item.title,
-                confirmText: item.is_example ? 'Скрыть' : 'Удалить',
-              })
-            )
-              mutation.mutate({
-                path: `/api/v1/programs/templates/${item.id}`,
-                method: 'DELETE',
-              });
-          }}
-        >
-          {item.is_example ? 'Скрыть шаблон' : 'Удалить программу'}
-        </button>
-      </details>
+      {!item.is_example && (
+        <details className="program-danger-menu">
+          <summary className="yfc-disclosure-summary">
+            Другие действия
+            <DisclosureIcon />
+          </summary>
+          <button
+            type="button"
+            className="btn-danger"
+            disabled={deletingTemplateId !== null || mutation.isPending}
+            onClick={() => void deleteTemplate(item)}
+          >
+            Удалить программу
+          </button>
+        </details>
+      )}
     </article>
   );
 

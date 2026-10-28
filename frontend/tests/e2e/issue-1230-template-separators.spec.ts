@@ -60,15 +60,14 @@ test.describe('Issue #1230: ready-template separators', () => {
       await expect
         .poll(async () => card.evaluate((element) => getComputedStyle(element).borderTopWidth))
         .toBe('1px');
-      const dangerMenu = card.locator('details.program-danger-menu');
-      const otherActions = dangerMenu.locator(':scope > summary');
-      await expect(otherActions).toBeVisible();
-      await otherActions.focus();
-      await otherActions.press('Space');
-      await expect(dangerMenu).toHaveAttribute('open', '');
-      await expect(card.getByRole('button', { name: 'Скрыть шаблон' })).toBeVisible();
-      await otherActions.press('Space');
-      await expect(dangerMenu).not.toHaveAttribute('open', '');
+      for (const readyCard of await cards.all()) {
+        await expect(readyCard.locator('details.program-danger-menu')).toHaveCount(0);
+        await expect(readyCard.locator('.program-template-card__actions button')).toHaveText([
+          'Настроить копию',
+          'Запустить',
+          'Скрыть шаблон',
+        ]);
+      }
 
       await library.locator(':scope > summary').click();
       await expect(grid).toBeHidden();
@@ -137,7 +136,7 @@ test.describe('Issue #1230: ready-template separators', () => {
           expect(snapshot.grid.borderTopStyle).toBe('none');
           expect(Number.parseFloat(snapshot.grid.gap)).toBeGreaterThan(0);
           expect(snapshot.actionsBorder).toEqual({ top: '0px', bottom: '0px' });
-          expect(snapshot.dangerMenuBorder).toEqual({ top: '0px', bottom: '0px' });
+          expect(snapshot.dangerMenuBorder).toBeNull();
           expect(snapshot.cards).toHaveLength(count);
           for (const card of snapshot.cards) {
             expect(card.borderTopWidth).toBe('1px');
