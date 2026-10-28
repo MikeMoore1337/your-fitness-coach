@@ -368,7 +368,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   white-space: nowrap;
 }
 
-.app-section--programs .demo-capability-fieldset {
+.app-section--programs .programs-content {
   display: grid;
   gap: var(--v2-space-5);
 }
