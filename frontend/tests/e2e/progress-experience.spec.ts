@@ -1447,6 +1447,10 @@ test('schedule card keeps one contour and only internal dividers across mobile s
       });
       expect(bounds.cardBottom).toBeLessThanOrEqual(bounds.parentBottom + 0.5);
       expect(await paintedScheduleBottom(card)).toBe(7);
+      await page.evaluate(() =>
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }),
+      );
+      await expectNoOverlap(card, page.locator('#appBottomNav'));
       if (width === 320 && colorScheme === 'light') {
         await fieldset.evaluate((element) => {
           element.style.clipPath = 'inset(0 0 3px 0)';
