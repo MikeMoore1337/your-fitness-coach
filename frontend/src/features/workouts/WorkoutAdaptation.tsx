@@ -17,6 +17,7 @@ import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import type { ActiveWorkoutMutation } from './activeWorkoutQueue';
 import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
+import { rankExercisesForSearch } from '../exercises/exerciseSearch';
 
 type AdaptationReason = WorkoutAdaptationRequest['reason'];
 type EquipmentId = NonNullable<WorkoutAdaptationRequest['available_equipment_ids']>[number];
@@ -204,14 +205,19 @@ export function WorkoutAdaptation({
     [alternatives.data],
   );
   const visibleAlternatives = useMemo(() => {
-    const query = alternativeSearch.trim().toLocaleLowerCase('ru');
-    return (alternatives.data ?? []).filter((item) => {
-      const matchesSearch =
-        !query ||
-        `${item.title} ${item.equipment_ids.join(' ')}`.toLocaleLowerCase('ru').includes(query);
-      const matchesEquipment = alternativeFilters.every((id) => item.equipment_ids.includes(id));
-      return matchesSearch && matchesEquipment;
-    });
+    const filtered = (alternatives.data ?? []).filter((item) =>
+      alternativeFilters.every((id) => item.equipment_ids.includes(id)),
+    );
+    if (!alternativeSearch.trim()) return filtered;
+    return rankExercisesForSearch(
+      filtered.map((item) => ({
+        id: item.exercise_id,
+        title: item.title,
+        equipment: item.equipment_ids.join(' '),
+        item,
+      })),
+      alternativeSearch,
+    ).map(({ item }) => item);
   }, [alternativeFilters, alternativeSearch, alternatives.data]);
   const displayedAlternatives = alternativesExpanded
     ? visibleAlternatives
