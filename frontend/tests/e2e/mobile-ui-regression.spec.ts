@@ -321,6 +321,7 @@ for (const theme of ['light', 'dark'] as const) {
     const controls = set.locator('.active-workout-set__controls');
     const rir = controls.locator('.active-workout-set__rir-row');
     const choices = rir.getByRole('button');
+    const exercise = page.locator('.active-workout-exercise').filter({ has: set }).first();
     await expect(choices).toHaveCount(5);
 
     const gaps: Array<{ width: number; above: number; below: number }> = [];
@@ -366,11 +367,33 @@ for (const theme of ['light', 'dark'] as const) {
         });
       }
       const before = await geometry();
+      const exerciseBefore = await exercise.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const controls = element
+          .querySelector('.active-workout-set__controls')
+          ?.getBoundingClientRect();
+        return {
+          height: rect.height,
+          controlsOffset: controls ? controls.top - rect.top : null,
+        };
+      });
       gaps.push({ width, above: before.above, below: before.below });
       for (const choice of await choices.all()) {
         await choice.click();
         await expect(choice).toHaveAttribute('aria-pressed', 'true');
         expect(await geometry()).toEqual(before);
+        expect(
+          await exercise.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            const controls = element
+              .querySelector('.active-workout-set__controls')
+              ?.getBoundingClientRect();
+            return {
+              height: rect.height,
+              controlsOffset: controls ? controls.top - rect.top : null,
+            };
+          }),
+        ).toEqual(exerciseBefore);
         await choice.click();
         await expect(choice).toHaveAttribute('aria-pressed', 'false');
       }

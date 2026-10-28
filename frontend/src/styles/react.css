@@ -4616,6 +4616,12 @@ button.today-text-link {
   width: 100%;
   min-width: 0;
 }
+.active-workout-exercise__replacement-slot {
+  flex: 1 1 100%;
+  min-width: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 .active-workout-exercise__toggle {
   min-height: 44px;
 }
