@@ -2066,6 +2066,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   border: 1px solid var(--v2-border-strong);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
+  backdrop-filter: none;
 }
 
 .app-section--programs .workout-schedule-list {
