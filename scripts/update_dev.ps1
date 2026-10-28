@@ -14,6 +14,7 @@ param(
         'Lock',
         'Unlock',
         'SchedulerStatus',
+        'InstallSilentAction',
         'ClearIncomplete'
     )]
     [string]$TaskAction = 'None',
@@ -754,11 +755,30 @@ function Invoke-Status {
     }
 }
 
-function Get-TaskHost {
-    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
-    if ($null -ne $pwsh) { return $pwsh.Source }
-    $powershell = Get-Command powershell -ErrorAction Stop
-    return $powershell.Source
+function Get-DevPythonwHost {
+    if ($null -eq (Get-Command py -ErrorAction SilentlyContinue)) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'Для скрытого запуска требуется установленный Python 3.14 с pythonw.exe.'
+    }
+    $python = @(& py -3.14 -c 'import sys; print(sys.executable)' 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $python.Count -ne 1 -or [string]::IsNullOrWhiteSpace($python[0])) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'Невозможно определить путь Python 3.14.'
+    }
+    $pythonw = Join-Path (Split-Path -Parent ([string]$python[0]).Trim()) 'pythonw.exe'
+    if (-not (Test-Path -LiteralPath $pythonw -PathType Leaf)) {
+        Stop-Update -Code 'PYTHONW_UNAVAILABLE' -Summary 'pythonw.exe отсутствует рядом с Python 3.14; видимый PowerShell не используется как запасной вариант.'
+    }
+    return $pythonw
+}
+
+function New-SilentUpdaterAction {
+    $launcherPath = Join-Path $script:RepoRoot 'scripts\dev_update_silent.pyw'
+    if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
+        Stop-Update -Code 'SILENT_LAUNCHER_MISSING' -Summary 'Не найден scripts/dev_update_silent.pyw.'
+    }
+    $pythonw = Get-DevPythonwHost
+    # pythonw.exe uses the Windows GUI subsystem and never allocates a console.
+    # The launcher starts PowerShell with CREATE_NO_WINDOW and forwards exit codes.
+    return New-ScheduledTaskAction -Execute $pythonw -Argument ('-I -B "{0}"' -f $launcherPath)
 }
 
 function Invoke-TaskAction {
@@ -766,10 +786,7 @@ function Invoke-TaskAction {
     switch ($TaskAction) {
         'Register' {
             try {
-                $scriptPath = Join-Path $script:RepoRoot 'scripts\update_dev.ps1'
-                $hostPath = Get-TaskHost
-                $escapedScript = $scriptPath.Replace('"', '\"')
-                $action = New-ScheduledTaskAction -Execute $hostPath -Argument ('-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -Mode Check -Automatic' -f $escapedScript)
+                $action = New-SilentUpdaterAction
                 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
                     -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
                 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable `
@@ -782,6 +799,50 @@ function Invoke-TaskAction {
                 Write-Host 'Планировщик зарегистрирован: проверка каждые 5 минут; автоустановка выключена.'
             } catch {
                 Stop-Update -Code 'TASK_REGISTER_FAILED' -Summary (Get-ScheduledTaskErrorSummary -ErrorRecord $_)
+            }
+        }
+        'InstallSilentAction' {
+            # Upgrade only the executable of an existing task; keep its schedule,
+            # principal, manual lock and auto-apply enabled marker unchanged.
+            try {
+                $task = Get-ScheduledTask -TaskName $script:TaskName -ErrorAction Stop
+                $existing = @($task.Actions)
+                if ($existing.Count -ne 1) {
+                    Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Ожидалось ровно одно действие задания; изменение отменено.'
+                }
+                $executable = [string]$existing[0].Execute
+                $arguments = [string]$existing[0].Arguments
+                $oldPowerShell = $executable -match '(?i)(?:^|[\\/])(powershell|pwsh)\.exe$' -and $arguments -match '(?i)update_dev\.ps1'
+                $newPythonw = $executable -match '(?i)(?:^|[\\/])pythonw\.exe$' -and $arguments -match '(?i)dev_update_silent\.pyw'
+                # Legacy temporary workaround created a dedicated WScript wrapper in the
+                # *same DEV repository*. Accept that exact task action for one-time
+                # migration; never accept an arbitrary .vbs path or WScript command.
+                $legacyVbsPath = Join-Path $script:StateRoot 'silent-update.vbs'
+                $expectedLegacyArgs = ('//B //Nologo "{0}"' -f $legacyVbsPath)
+                $systemWscript = Join-Path $env:WINDIR 'System32\wscript.exe'
+                $oldWscript = $executable -ieq $systemWscript -and
+                    $arguments.Trim() -ieq $expectedLegacyArgs
+                if ($oldWscript) {
+                    if (-not (Test-Path -LiteralPath $legacyVbsPath -PathType Leaf)) {
+                        Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Устаревший WScript launcher отсутствует; миграция отменена.'
+                    }
+                    $legacyContent = Get-Content -LiteralPath $legacyVbsPath -Raw -ErrorAction Stop
+                    $expectedUpdater = Join-Path $script:RepoRoot 'scripts\update_dev.ps1'
+                    if ($legacyContent.IndexOf($expectedUpdater, [StringComparison]::OrdinalIgnoreCase) -lt 0 -or
+                        $legacyContent -notmatch '(?i)-Mode\s+Check\s+-Automatic' -or
+                        $legacyContent -notmatch '(?i)WScript\.Shell') {
+                        Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Устаревший WScript launcher не соответствует ожидаемому DEV updater; миграция отменена.'
+                    }
+                }
+                if (-not ($oldPowerShell -or $newPythonw -or $oldWscript)) {
+                    Stop-Update -Code 'TASK_ACTION_UNEXPECTED' -Summary 'Действие задания не принадлежит DEV updater; изменение отменено.'
+                }
+                $action = New-SilentUpdaterAction
+                Set-ScheduledTask -TaskName $script:TaskName -Action $action -ErrorAction Stop | Out-Null
+                Write-Host 'Задание переведено на скрытый pythonw.exe; расписание и auto_apply сохранены.'
+            } catch {
+                if ($script:FailureCode) { throw }
+                Stop-Update -Code 'TASK_ACTION_UPDATE_FAILED' -Summary (Get-ScheduledTaskErrorSummary -ErrorRecord $_)
             }
         }
         'Unregister' {

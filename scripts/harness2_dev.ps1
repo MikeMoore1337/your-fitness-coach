@@ -7,7 +7,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("Status", "Check", "Report")]
+    [ValidateSet("Status", "SetupPreview", "Check", "RunPreview", "Report")]
     [string]$Action = "Status",
     [ValidateSet("lab", "jb", "wb")]
     [string]$Benchmark = "lab"
@@ -28,11 +28,16 @@ bin="$dir/.venv/bin"
 [[ -f "$dir/.adt-original-harness2" && "$(cat "$dir/.adt-original-harness2")" == "$pin" ]] || { echo "HARNESS2_MARKER_MISMATCH" >&2; exit 2; }
 [[ "$(git -C "$src" rev-parse HEAD 2>/dev/null)" == "$pin" ]] || { echo "HARNESS2_SHA_MISMATCH" >&2; exit 2; }
 [[ "$(git -C "$src" remote get-url origin 2>/dev/null)" == "$upstream" ]] || { echo "HARNESS2_ORIGIN_MISMATCH" >&2; exit 2; }
-[[ -x "$bin/harness2-check" && -x "$bin/harness2-report" ]] || { echo "HARNESS2_INCOMPLETE" >&2; exit 2; }
+[[ -x "$bin/python" && -x "$bin/harness2" && -x "$bin/harness2-setup" && -x "$bin/harness2-check" && -x "$bin/harness2-report" ]] || { echo "HARNESS2_INCOMPLETE" >&2; exit 2; }
+"$bin/python" -c 'import importlib.metadata; assert importlib.metadata.version("harness2") == "0.1.0"' || { echo "HARNESS2_VERSION_MISMATCH" >&2; exit 2; }
+git -C "$src" diff --quiet || { echo "HARNESS2_MODIFIED_SOURCE" >&2; exit 2; }
+git -C "$src" diff --cached --quiet || { echo "HARNESS2_MODIFIED_SOURCE" >&2; exit 2; }
 cd -- "$src"
 case "$1" in
   Status) printf "HARNESS2_ORIGINAL=VERIFIED\nUPSTREAM_SHA=%s\nMODEL_RUNS=NOT_REQUESTED\n" "$pin" ;;
+  SetupPreview) exec "$bin/harness2-setup" "$2" --dry-run ;;
   Check) exec "$bin/harness2-check" --bench "$2" ;;
+  RunPreview) exec "$bin/harness2" --bench "$2" --k 1 --mode parallel --max-tasks 1 --dry-run ;;
   Report) exec "$bin/harness2-report" --bench "$2" --k 1 --mode parallel ;;
   *) echo "UNSUPPORTED_ACTION" >&2; exit 2 ;;
 esac

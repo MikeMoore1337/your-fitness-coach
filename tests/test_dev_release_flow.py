@@ -288,7 +288,9 @@ def test_local_dev_updater_parser_and_scheduler_contract() -> None:
     source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
     assert "New-ScheduledTaskTrigger" in source
     assert "New-TimeSpan -Minutes 5" in source
-    assert "-Mode Check -Automatic" in source
+    assert "New-SilentUpdaterAction" in source
+    launcher = (ROOT / "scripts/dev_update_silent.pyw").read_text(encoding="utf-8")
+    assert '"-Mode",' in launcher and '"Check",' in launcher and '"-Automatic",' in launcher
     assert "Remove-Item -LiteralPath $script:AutoApplyPath" in source
 
 
