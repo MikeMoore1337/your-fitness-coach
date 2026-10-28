@@ -2879,6 +2879,8 @@ export function TodayWorkout({
               started &&
               capabilities.canMutatePrograms &&
               !hasWorkoutExecutionEvidence(exercise, activeSync.pendingBySet);
+            const replacementBlockedByExecution =
+              started && capabilities.canMutatePrograms && !canReplaceExercise;
             const isPersistedComplete = shouldCollapseCompletedExercise(exercise.sets, (setId) =>
               activeSync.pendingBySet.has(setId),
             );
@@ -3024,6 +3026,14 @@ export function TodayWorkout({
                         safetyOnly={false}
                         workout={data}
                       />
+                    )}
+                    {replacementBlockedByExecution && (
+                      <span
+                        className="ui-button ui-button--secondary ui-button--full active-workout-exercise__replacement-slot"
+                        aria-hidden="true"
+                      >
+                        Заменить только в этой тренировке
+                      </span>
                     )}
                   </div>
                 </header>

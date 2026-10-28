@@ -1709,6 +1709,20 @@ test.describe('#1099 standalone PWA keyboard path', () => {
       verifyPwaServiceWorker: false,
     });
     await focusWithPointer(weight);
+    // The mocked visual viewport cannot perform iOS's native focus pan.
+    await weight.evaluate((input) => {
+      const viewport = window.visualViewport!;
+      const field = input.getBoundingClientRect();
+      const rest = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+      const top = Math.max(viewport.offsetTop, rest?.bottom ?? 0) + 8;
+      const bottom = viewport.offsetTop + viewport.height - 8;
+      const delta = field.top < top ? field.top - top : Math.max(0, field.bottom - bottom);
+      (window as Window & { __yfc1099NativeScrollTo?: typeof window.scrollTo })
+        .__yfc1099NativeScrollTo!({
+        top: window.scrollY + delta,
+        behavior: 'instant',
+      });
+    });
     await settleViewport(page);
     await settleViewport(page);
     const initialScrollY = await page.evaluate(() => window.scrollY);
@@ -1815,7 +1829,7 @@ test.describe('#1099 standalone PWA keyboard path', () => {
       ),
     ).toBeLessThanOrEqual(1);
     expect(server.readSet(202).is_completed).toBe(false);
-    expect(row).toBeVisible();
+    await expect(row).toBeVisible();
   });
 
   test('#1099 PWA does not scroll when a blurred input receives its ACK', async ({ page }) => {
@@ -2538,6 +2552,13 @@ test.describe('#1001 completion navigation', () => {
             'data-workout-set-id',
             String(nextId),
           );
+          if (id === 202 || id === 203) {
+            await expect(page.locator('html')).toHaveAttribute(
+              'data-yfc-workout-keyboard-closing',
+              '',
+            );
+            await expect(page.locator('#appBottomNav')).toBeHidden();
+          }
           const next = page.locator(`[data-workout-set-id="${nextId}"]`);
           await expect
             .poll(() =>
@@ -2569,6 +2590,11 @@ test.describe('#1001 completion navigation', () => {
             Object.assign(window.visualViewport!, { height: 844 });
             window.visualViewport!.dispatchEvent(new Event('resize'));
           });
+          await expect(page.locator('html')).not.toHaveAttribute(
+            'data-yfc-workout-keyboard-closing',
+            '',
+          );
+          await expect(page.locator('#appBottomNav')).toBeVisible();
           await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
           await page.evaluate(
             () =>
@@ -4394,9 +4420,21 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Tab');
     await expect(done).toBeFocused();
 
+    await expect
+      .poll(() => server.readSet(201))
+      .toMatchObject({ actual_weight: 42.5, actual_reps: 8 });
+    await choices.nth(4).scrollIntoViewIfNeeded();
+    const topBeforeRir = await first.evaluate(
+      (element) => element.getBoundingClientRect().top + scrollY,
+    );
+    const scrollBeforeRir = await stableScrollY(page);
     await choices.nth(4).click();
     await expect(choices.nth(4)).toHaveAttribute('aria-pressed', 'true');
     await expect.poll(() => server.readSet(201).rir).toBe('4+');
+    expect(await first.evaluate((element) => element.getBoundingClientRect().top + scrollY)).toBe(
+      topBeforeRir,
+    );
+    await expectScrollYStable(page, scrollBeforeRir);
     await choices.nth(4).click();
     await expect.poll(() => server.readSet(201).rir).toBeNull();
     await choices.first().click();
@@ -4407,6 +4445,32 @@ for (const theme of ['light', 'dark'] as const) {
     expect(server.readSet(201)).toMatchObject({ actual_weight: 42.5, actual_reps: 8, rir: '0' });
     const nextSet = page.locator('[data-workout-set-id="202"]');
     await expect(nextSet).toHaveAttribute('aria-current', 'step');
+  });
+}
+
+for (const value of [null, '0', '1', '2', '3', '4+'] as const) {
+  test(`#1272 completes a set with RIR ${value ?? 'null'}`, async ({ page }) => {
+    const server = await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const set = page.locator('[data-workout-set-id="201"]');
+    await set.getByLabel(/^Вес,/).fill('42.5');
+    await set.getByLabel(/^Повторы,/).fill('8');
+    if (value !== null) {
+      await set
+        .locator('.active-workout-set__rir-row')
+        .getByRole('button', { name: new RegExp(`^${value.replace('+', '\\+')} —`) })
+        .click();
+    }
+    await set.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    expect(server.readSet(201)).toMatchObject({
+      actual_weight: 42.5,
+      actual_reps: 8,
+      rir: value,
+    });
   });
 }
 
@@ -4609,7 +4673,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
       events.push((event as CustomEvent).detail);
     });
   });
-  await mockActiveWorkout(page);
+  const server = await mockActiveWorkout(page);
   const secondSetPatchBodies: unknown[] = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
@@ -4699,6 +4763,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   const thirdSet = page.locator('[data-workout-set-id="203"]');
   await expect(thirdSet).toHaveAttribute('aria-current', 'step');
+  await thirdSet.getByRole('button', { name: /^4\+ —/ }).click();
   const thirdDone = thirdSet.getByRole('button', {
     name: 'Подставить и завершить',
   });
@@ -4707,6 +4772,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   );
   await expect(thirdDone).toBeVisible();
   await Promise.all([waitForCompletedSetPatch(page, 203), thirdDone.click()]);
+  expect(server.readSet(203)).toMatchObject({ is_completed: true, rir: '4+' });
 
   await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
   await expect(page.getByText('Синхронизировано')).toBeVisible();
@@ -5131,7 +5197,7 @@ for (const width of [320, 360, 393, 430]) {
       try {
         await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
         await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
-        await mockActiveWorkout(page);
+        const server = await mockActiveWorkout(page);
         await page.goto('/app');
         await page.getByRole('button', { name: 'Клиент', exact: true }).click();
         await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
@@ -5147,9 +5213,51 @@ for (const width of [320, 360, 393, 430]) {
         await currentSet.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
         await currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
         await currentSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+        await expect
+          .poll(() => server.readSet(202))
+          .toMatchObject({
+            actual_weight: 42.5,
+            actual_reps: 9,
+            rir: '2',
+          });
+        await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
         await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
         await expect(page.locator('.active-workout-rest')).toBeVisible();
         await expect(currentSet.locator('.active-workout-set__contextual-help')).toBeHidden();
+        const controls = currentSet.locator('.active-workout-set__controls');
+        const rirGaps = await controls.evaluate((element) => {
+          const weight = element
+            .querySelector('[data-workout-field="weight"]')!
+            .getBoundingClientRect();
+          const reps = element
+            .querySelector('[data-workout-field="reps"]')!
+            .getBoundingClientRect();
+          const rir = element
+            .querySelector('.active-workout-set__rir-row')!
+            .getBoundingClientRect();
+          const done = element
+            .querySelector('[data-workout-field="done"]')!
+            .getBoundingClientRect();
+          return {
+            above: rir.top - Math.max(weight.bottom, reps.bottom),
+            below: done.top - rir.bottom,
+          };
+        });
+        if (process.env.YFC_1272_CAPTURE_DIR) {
+          await mkdir(process.env.YFC_1272_CAPTURE_DIR, { recursive: true });
+          await controls.screenshot({
+            path: resolve(
+              process.env.YFC_1272_CAPTURE_DIR,
+              `${testInfo.project.name}-${width}-${theme}-next.png`,
+            ),
+            animations: 'disabled',
+            scale: 'css',
+          });
+        }
+        expect(rirGaps.above, `${width}px: input to RIR`).toBeGreaterThanOrEqual(12);
+        expect(rirGaps.above, `${width}px: input to RIR`).toBeLessThanOrEqual(16);
+        expect(rirGaps.below, `${width}px: RIR to CTA`).toBeGreaterThanOrEqual(12);
+        expect(rirGaps.below, `${width}px: RIR to CTA`).toBeLessThanOrEqual(16);
         await page.evaluate(
           () =>
             new Promise<void>((resolve) =>
@@ -5522,6 +5630,7 @@ test('#980 completed strength sets require an explicit edit or reopen action', a
   expect(server.readSet(201)).toMatchObject({
     actual_weight: 42.5,
     actual_reps: 9,
+    rir: '2',
     is_completed: true,
   });
 
@@ -5533,7 +5642,7 @@ test('#980 completed strength sets require an explicit edit or reopen action', a
   await expect.poll(() => server.readSet(201).actual_weight).toBe(45);
   await expect.poll(() => server.readSet(201).actual_reps).toBe(10);
   await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
-  expect(server.readSet(201).is_completed).toBe(true);
+  expect(server.readSet(201)).toMatchObject({ is_completed: true, rir: '2' });
   await expect(first.getByRole('button', { name: 'Редактировать' })).toBeVisible();
   await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toBeDisabled();
 
