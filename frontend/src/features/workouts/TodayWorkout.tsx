@@ -764,53 +764,6 @@ function WorkoutSetRow({
       {isCurrent && previousResult && (
         <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
       )}
-      {(canPrefill || prefillSpaceReserved) && (
-        <div
-          className={`active-workout-set__prefill-actions${prefillSpaceReserved ? ' is-hidden' : ''}`}
-          aria-hidden={prefillSpaceReserved || undefined}
-        >
-          <button
-            className="active-workout-set__prefill"
-            disabled={completing}
-            type="button"
-            onClick={() => {
-              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
-              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
-              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
-              editing.current = true;
-              setReps(nextReps);
-              setWeight(nextWeight);
-              trackProductEvent({
-                name: 'previous_set_reuse_used',
-                surface: productEventSurface(),
-              });
-            }}
-          >
-            Подставить предыдущий результат
-          </button>
-          <button
-            className="active-workout-set__prefill active-workout-set__prefill--commit"
-            disabled={completing}
-            type="button"
-            onClick={() => {
-              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
-              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
-              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
-              editing.current = true;
-              setReps(nextReps);
-              setWeight(nextWeight);
-              enqueueSave({ reps: nextReps, weight: nextWeight, completed: true }, true);
-              trackProductEvent({
-                name: 'previous_set_reuse_used',
-                surface: productEventSurface(),
-              });
-            }}
-          >
-            Подставить и завершить
-          </button>
-        </div>
-      )}
-
       {isCurrent && (
         <p className="active-workout-set__context">
           <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
@@ -917,6 +870,53 @@ function WorkoutSetRow({
           )}
         </Button>
       </div>
+
+      {(canPrefill || prefillSpaceReserved) && (
+        <div
+          className={`active-workout-set__prefill-actions${prefillSpaceReserved ? ' is-hidden' : ''}`}
+          aria-hidden={prefillSpaceReserved || undefined}
+        >
+          <button
+            className="active-workout-set__prefill"
+            disabled={completing}
+            type="button"
+            onClick={() => {
+              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
+              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
+              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
+              editing.current = true;
+              setReps(nextReps);
+              setWeight(nextWeight);
+              trackProductEvent({
+                name: 'previous_set_reuse_used',
+                surface: productEventSurface(),
+              });
+            }}
+          >
+            Подставить предыдущий результат
+          </button>
+          <button
+            className="active-workout-set__prefill active-workout-set__prefill--commit"
+            disabled={completing}
+            type="button"
+            onClick={() => {
+              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
+              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
+              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
+              editing.current = true;
+              setReps(nextReps);
+              setWeight(nextWeight);
+              enqueueSave({ reps: nextReps, weight: nextWeight, completed: true }, true);
+              trackProductEvent({
+                name: 'previous_set_reuse_used',
+                surface: productEventSurface(),
+              });
+            }}
+          >
+            Подставить и завершить
+          </button>
+        </div>
+      )}
 
       {isCurrent && (
         <div className="active-workout-set__contextual-help">
