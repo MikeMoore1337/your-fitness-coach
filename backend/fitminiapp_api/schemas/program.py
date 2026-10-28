@@ -512,8 +512,15 @@ class ProgramWeekCycle(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: Literal[1] = 1
-    week_types: list[Literal["light", "medium", "heavy"]] = Field(min_length=1)
+    length_weeks: int = Field(ge=1, strict=True)
+    week_types: list[Literal["light", "medium", "heavy"]] | None = None
     repeat: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def validate_week_types(self):
+        if self.week_types is not None and len(self.week_types) != self.length_weeks:
+            raise ValueError("week_types must contain one value per cycle week")
+        return self
 
 
 class ProgramTemplateCreate(BaseModel):

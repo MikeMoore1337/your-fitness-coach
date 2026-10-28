@@ -15133,8 +15133,10 @@ export interface components {
              * @constant
              */
             schema_version: 1;
+            /** Length Weeks */
+            length_weeks: number;
             /** Week Types */
-            week_types: ("light" | "medium" | "heavy")[];
+            week_types?: ("light" | "medium" | "heavy")[] | null;
             /** Repeat */
             repeat: boolean;
         };

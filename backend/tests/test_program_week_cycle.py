@@ -42,7 +42,11 @@ def _payload(client, headers):
 def test_week_cycle_persists_without_materializing_workouts(client, weeks):
     headers = _auth(client, 916000 + weeks)
     payload = _payload(client, headers)
-    cycle = {"week_types": ["heavy", "light", "medium"] * weeks, "repeat": False}
+    cycle = {
+        "length_weeks": weeks,
+        "week_types": ["heavy", "light", "medium"] * weeks,
+        "repeat": False,
+    }
     cycle["week_types"] = cycle["week_types"][:weeks]
     payload["week_cycle"] = cycle
     response = client.post("/api/v1/programs/templates", headers=headers, json=payload)
@@ -70,10 +74,13 @@ def test_invalid_cycles_and_assignment_are_rejected_without_partial_creation(cli
     payload = _payload(client, headers)
     before = client.get("/api/v1/programs/templates/mine", headers=headers).json()
     for cycle in (
-        {"week_types": [], "repeat": False},
-        {"week_types": ["deload"], "repeat": False},
-        {"week_types": ["light"], "repeat": "true"},
-        {"week_types": ["heavy"], "repeat": False, "unknown": 1},
+        {"length_weeks": 0, "repeat": True},
+        {"length_weeks": True, "repeat": True},
+        {"length_weeks": 3, "week_types": ["light", "heavy"], "repeat": True},
+        {"length_weeks": 1, "week_types": [], "repeat": False},
+        {"length_weeks": 1, "week_types": ["deload"], "repeat": False},
+        {"length_weeks": 1, "week_types": ["light"], "repeat": "true"},
+        {"length_weeks": 1, "week_types": ["heavy"], "repeat": False, "unknown": 1},
     ):
         response = client.post(
             "/api/v1/programs/templates", headers=headers, json={**payload, "week_cycle": cycle}
@@ -85,7 +92,7 @@ def test_invalid_cycles_and_assignment_are_rejected_without_partial_creation(cli
         json={
             **payload,
             "assign_after_create": True,
-            "week_cycle": {"week_types": ["light"], "repeat": False},
+            "week_cycle": {"length_weeks": 1, "week_types": ["light"], "repeat": False},
         },
     )
     assert response.status_code == 400
@@ -93,11 +100,24 @@ def test_invalid_cycles_and_assignment_are_rejected_without_partial_creation(cli
     assert client.get("/api/v1/programs/templates/mine", headers=headers).json() == before
 
 
+def test_cycle_without_week_types_is_preserved_and_not_assigned(client):
+    headers = _auth(client, 916105)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 3, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    assert created.status_code == 200, created.text
+    cycle = created.json()["template"]["program_metadata"]["week_cycle"]
+    assert cycle == {"schema_version": 1, "length_weeks": 3, "week_types": None, "repeat": True}
+    template_id = created.json()["template"]["id"]
+    blocked = client.post(f"/api/v1/programs/templates/{template_id}/assign-to-me", headers=headers)
+    assert blocked.status_code == 403
+
+
 def test_other_user_cannot_read_cycle_and_edit_cannot_replace_it(client):
     owner = _auth(client, 916101)
     other = _auth(client, 916102)
     payload = _payload(client, owner)
-    payload["week_cycle"] = {"week_types": ["heavy", "light"], "repeat": True}
+    payload["week_cycle"] = {"length_weeks": 2, "week_types": ["heavy", "light"], "repeat": True}
     created = client.post("/api/v1/programs/templates", headers=owner, json=payload)
     assert created.status_code == 200, created.text
     template_id = created.json()["template"]["id"]
@@ -143,7 +163,7 @@ def test_legacy_template_remains_assignable_without_week_cycle(client):
 def test_coach_clone_preserves_cycle_and_cannot_assign_it(client):
     headers = _auth(client, 916103, is_coach=True)
     payload = _payload(client, headers)
-    payload["week_cycle"] = {"week_types": ["light", "heavy"], "repeat": True}
+    payload["week_cycle"] = {"length_weeks": 2, "week_types": ["light", "heavy"], "repeat": True}
     created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
     assert created.status_code == 200, created.text
     template_id = created.json()["template"]["id"]
@@ -151,6 +171,7 @@ def test_coach_clone_preserves_cycle_and_cannot_assign_it(client):
     assert clone.status_code == 201, clone.text
     assert clone.json()["program_metadata"]["week_cycle"] == {
         "schema_version": 1,
+        "length_weeks": 2,
         "week_types": ["light", "heavy"],
         "repeat": True,
     }
