@@ -515,35 +515,37 @@ export default function MiniAppPage({
                 className="demo-capability-fieldset"
                 disabled={!capabilities.canMutatePrograms}
               >
-                {!capabilities.canMutatePrograms && (
-                  <p className="muted demo-capability-notice">
-                    Управление программой недоступно в демо-режиме. Просмотр использует ту же
-                    production-поверхность.
-                  </p>
-                )}
-                {programManagementOpen ? (
-                  <TemplatesList
-                    key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
-                    defaultLibraryOpen={programStart === 'templates'}
-                    mode="full"
-                    readOnly={!capabilities.canMutatePrograms}
-                  >
-                    <ProgramBuilder
-                      key={programStart === 'create' ? 'create-start' : 'create-default'}
-                      defaultOpen={programStart === 'create'}
-                    />
-                  </TemplatesList>
-                ) : (
-                  <>
-                    <TemplatesList mode="summary" readOnly={!capabilities.canMutatePrograms} />
-                    <SchedulePanel
-                      focusedCommentId={requestedFeedback?.commentId}
-                      focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                      focusedWorkoutId={scheduleFocusId}
-                      timeZone={user?.profile?.timezone}
-                    />
-                  </>
-                )}
+                <div className="programs-content">
+                  {!capabilities.canMutatePrograms && (
+                    <p className="muted demo-capability-notice">
+                      Управление программой недоступно в демо-режиме. Просмотр использует ту же
+                      интерфейс приложения.
+                    </p>
+                  )}
+                  {programManagementOpen ? (
+                    <TemplatesList
+                      key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
+                      defaultLibraryOpen={programStart === 'templates'}
+                      mode="full"
+                      readOnly={!capabilities.canMutatePrograms}
+                    >
+                      <ProgramBuilder
+                        key={programStart === 'create' ? 'create-start' : 'create-default'}
+                        defaultOpen={programStart === 'create'}
+                      />
+                    </TemplatesList>
+                  ) : (
+                    <>
+                      <TemplatesList mode="summary" readOnly={!capabilities.canMutatePrograms} />
+                      <SchedulePanel
+                        focusedCommentId={requestedFeedback?.commentId}
+                        focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                        focusedWorkoutId={scheduleFocusId}
+                        timeZone={user?.profile?.timezone}
+                      />
+                    </>
+                  )}
+                </div>
               </fieldset>
               <AiCoachContextualEntry context={{ surface: 'program' }} entryPoint="program" />
             </>

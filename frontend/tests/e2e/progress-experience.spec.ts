@@ -95,6 +95,28 @@ type DateVisualMetrics = {
 
 type DecodedPng = { data: Uint8Array; height: number; width: number };
 
+async function paintedScheduleBottom(card: Locator): Promise<number> {
+  const png = decodePng(await card.screenshot({ animations: 'disabled', scale: 'css' }));
+  const pixel = (x: number, y: number) =>
+    png.data.slice((y * png.width + x) * 4, (y * png.width + x) * 4 + 3);
+  let visible = 0;
+  for (let i = 2; i <= 8; i += 1) {
+    const x = Math.floor((png.width * i) / 10);
+    const inside = pixel(x, png.height - 8);
+    if (
+      [1, 2, 3].some(
+        (offset) =>
+          pixel(x, png.height - offset).reduce(
+            (sum, value, channel) => sum + Math.abs(value - inside[channel]!),
+            0,
+          ) > 45,
+      )
+    )
+      visible += 1;
+  }
+  return visible;
+}
+
 function decodePng(buffer: Buffer): DecodedPng {
   if (buffer.readUInt32BE(0) !== 0x89504e47 || buffer.readUInt32BE(4) !== 0x0d0a1a0a) {
     throw new Error('Date visual regression expected a PNG screenshot');
@@ -1347,10 +1369,24 @@ test('schedule card keeps one contour and only internal dividers across mobile s
     'evidence',
     'after',
   );
-  if (captureEvidence && testInfo.project.name === 'chromium') {
+  if (captureEvidence) {
     await mkdir(evidenceDir, { recursive: true });
   }
   await mockProgress(page);
+  await page.route('**/api/v1/programs/templates/mine', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 700,
+          title: 'Силовая программа на восемь недель',
+          goal: 'recomposition',
+          level: 'intermediate',
+          is_active_for_current_user: true,
+          days: [],
+        },
+      ],
+    }),
+  );
   await page.route('**/api/v1/workouts/schedule', async (route) =>
     route.fulfill({ json: scheduleFixture }),
   );
@@ -1365,12 +1401,17 @@ test('schedule card keeps one contour and only internal dividers across mobile s
       await expect(clientButton.or(planHeading)).toBeVisible();
       if (await clientButton.isVisible()) await clientButton.click();
       await expect(planHeading).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Силовая программа на восемь недель' }),
+      ).toBeVisible();
 
       const card = page.locator('details.workout-schedule-card');
+      const fieldset = page.locator('fieldset.demo-capability-fieldset');
       const cardSummary = card.locator(':scope > summary');
       await expect(card).toHaveCount(1);
       await expect(card).not.toHaveAttribute('open', '');
       await expect(cardSummary).toBeVisible();
+      await expect(card).toHaveCSS('backdrop-filter', 'none');
       await expectTouchTargets(cardSummary);
       if (width === 320 && colorScheme === 'light') {
         await page.addStyleTag({ content: 'html { font-size: 125%; }' });
@@ -1400,9 +1441,32 @@ test('schedule card keeps one contour and only internal dividers across mobile s
       expect(collapsedContour.radius).not.toBe('0px');
       // CSS RGB channel distance catches a painted but barely visible border on both themes.
       expect(collapsedContour.contrastDistance).toBeGreaterThanOrEqual(180);
-      if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
+      const bounds = await card.evaluate((element) => {
+        const cardRect = element.getBoundingClientRect();
+        const parentRect = element.closest('fieldset')!.getBoundingClientRect();
+        return { cardBottom: cardRect.bottom, parentBottom: parentRect.bottom };
+      });
+      expect(bounds.cardBottom).toBeLessThanOrEqual(bounds.parentBottom + 0.5);
+      expect(await paintedScheduleBottom(card)).toBe(7);
+      await page.evaluate(() =>
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }),
+      );
+      await expectNoOverlap(card, page.locator('#appBottomNav'));
+      if (width === 320 && colorScheme === 'light') {
+        await fieldset.evaluate((element) => {
+          element.style.clipPath = 'inset(0 0 3px 0)';
+        });
+        expect(await paintedScheduleBottom(card)).toBe(0);
+        await fieldset.evaluate((element) => {
+          element.style.removeProperty('clip-path');
+        });
+      }
+      if (captureEvidence && [320, 393, 430].includes(width)) {
         await card.screenshot({
-          path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-collapsed.png`),
+          path: resolve(
+            evidenceDir,
+            `schedule-${testInfo.project.name}-${colorScheme}-${width}-collapsed.png`,
+          ),
         });
       }
 
@@ -1481,13 +1545,17 @@ test('schedule card keeps one contour and only internal dividers across mobile s
       expect(cardStyles.borderStyles).toEqual(['solid', 'solid', 'solid', 'solid']);
       expect(cardStyles.borderRadius).not.toBe('0px');
       expect(cardStyles.overflow).toBe('visible');
+      expect(await paintedScheduleBottom(card)).toBe(7);
 
       await expectNoHorizontalOverflow(page);
       await innerRows.last().scrollIntoViewIfNeeded();
       await expectNoOverlap(innerRows.last(), page.locator('#appBottomNav'));
-      if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
+      if (captureEvidence && [320, 393, 430].includes(width)) {
         await card.screenshot({
-          path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-expanded.png`),
+          path: resolve(
+            evidenceDir,
+            `schedule-${testInfo.project.name}-${colorScheme}-${width}-expanded.png`,
+          ),
         });
       }
 
