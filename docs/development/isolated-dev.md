@@ -191,6 +191,13 @@ Get-ScheduledTaskInfo -TaskName 'YFC-DEV-Update-Check' |
     Select-Object LastRunTime, LastTaskResult, NextRunTime
 ```
 
+Если старое задание запускает `wscript.exe //B //Nologo` с
+`.artifacts\\runtime\\dev-update\\silent-update.vbs` (предыдущий временный
+вариант без всплывающей консоли), `InstallSilentAction` также принимает его,
+но **только** при совпадении системного `wscript.exe`, точного пути
+`silent-update.vbs` и содержимого файла с вызовом этого `update_dev.ps1`
+в режиме `Check -Automatic`. Произвольные VBS-действия отклоняются.
+
 `InstallSilentAction` заменяет **только действие** существующего задания и
 сохраняет расписание, запуск от текущего пользователя, `RunLevel Limited`,
 `auto_apply=ON` и блокировку ручной приёмки. После окончания тестового запуска
