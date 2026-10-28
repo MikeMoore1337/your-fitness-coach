@@ -21,6 +21,7 @@ describe('Mobile Web/TMA layout adapter', () => {
     document.body.replaceChildren();
     document.documentElement.removeAttribute('style');
     delete document.documentElement.dataset.yfcKeyboard;
+    document.documentElement.removeAttribute('data-yfc-workout-keyboard-closing');
     delete document.documentElement.dataset.yfcLayoutSurface;
     delete document.documentElement.dataset.yfcViewportActive;
     vi.unstubAllGlobals();
@@ -135,6 +136,51 @@ describe('Mobile Web/TMA layout adapter', () => {
     button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     frames.at(-1)?.(0);
     expect(document.documentElement.dataset.yfcKeyboard).toBe('hidden');
+    cleanup();
+  });
+
+  it('keeps the workout dock out of a shrinking keyboard viewport until it recovers', () => {
+    vi.stubGlobal('innerHeight', 844);
+    const viewport = Object.assign(new EventTarget(), { height: 844, offsetTop: 0 });
+    vi.stubGlobal('visualViewport', viewport);
+    const workout = document.createElement('div');
+    workout.className = 'active-workout';
+    const input = document.createElement('input');
+    const button = document.createElement('button');
+    workout.append(input, button);
+    document.body.append(workout);
+    const cleanup = installMobileLayoutAdapter(null);
+
+    input.focus();
+    viewport.height = 420;
+    viewport.dispatchEvent(new Event('resize'));
+    button.focus();
+    viewport.dispatchEvent(new Event('resize'));
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('hidden');
+    expect(document.documentElement.hasAttribute('data-yfc-workout-keyboard-closing')).toBe(true);
+
+    viewport.height = 844;
+    viewport.dispatchEvent(new Event('resize'));
+    expect(document.documentElement.hasAttribute('data-yfc-workout-keyboard-closing')).toBe(false);
+    cleanup();
+  });
+
+  it('does not hide the workout dock after focus when the viewport was already short', () => {
+    vi.stubGlobal('innerHeight', 844);
+    const viewport = Object.assign(new EventTarget(), { height: 420, offsetTop: 0 });
+    vi.stubGlobal('visualViewport', viewport);
+    const workout = document.createElement('div');
+    workout.className = 'active-workout';
+    const input = document.createElement('input');
+    const button = document.createElement('button');
+    workout.append(input, button);
+    document.body.append(workout);
+    const cleanup = installMobileLayoutAdapter(null);
+
+    input.focus();
+    button.focus();
+    viewport.dispatchEvent(new Event('resize'));
+    expect(document.documentElement.hasAttribute('data-yfc-workout-keyboard-closing')).toBe(false);
     cleanup();
   });
 
