@@ -1717,9 +1717,8 @@ test.describe('#1099 standalone PWA keyboard path', () => {
       const top = Math.max(viewport.offsetTop, rest?.bottom ?? 0) + 8;
       const bottom = viewport.offsetTop + viewport.height - 8;
       const delta = field.top < top ? field.top - top : Math.max(0, field.bottom - bottom);
-      (
-        window as Window & { __yfc1099NativeScrollTo: typeof window.scrollTo }
-      ).__yfc1099NativeScrollTo({
+      (window as Window & { __yfc1099NativeScrollTo?: typeof window.scrollTo })
+        .__yfc1099NativeScrollTo!({
         top: window.scrollY + delta,
         behavior: 'instant',
       });
