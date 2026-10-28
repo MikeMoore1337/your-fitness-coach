@@ -5747,6 +5747,24 @@ button.today-text-link {
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius-control);
 }
+/* The native iOS sticky compositor can lag by a few device pixels during kinetic
+   scrolling. A mobile viewport-fixed layer avoids that movement while a measured
+   spacer preserves the workout grid and its existing focus/scroll clearance. */
+.active-workout-rest-spacer {
+  display: none;
+}
+@media (max-width: 680px) {
+  .active-workout-rest {
+    position: fixed;
+    left: var(--yfc-active-workout-rest-fixed-left, 0px);
+    width: var(--yfc-active-workout-rest-fixed-width, 100%);
+  }
+  .active-workout-rest-spacer {
+    display: block;
+    height: var(--yfc-active-workout-rest-spacer-height, 110px);
+    pointer-events: none;
+  }
+}
 .active-workout-rest [hidden] {
   display: none;
 }
