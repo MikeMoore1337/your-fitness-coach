@@ -1411,6 +1411,7 @@ test('schedule card keeps one contour and only internal dividers across mobile s
       await expect(card).toHaveCount(1);
       await expect(card).not.toHaveAttribute('open', '');
       await expect(cardSummary).toBeVisible();
+      await expect(card).toHaveCSS('backdrop-filter', 'none');
       await expectTouchTargets(cardSummary);
       if (width === 320 && colorScheme === 'light') {
         await page.addStyleTag({ content: 'html { font-size: 125%; }' });
