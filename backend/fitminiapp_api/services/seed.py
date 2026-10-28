@@ -380,6 +380,12 @@ def seed_demo_data(db: Session, include_demo_users: bool = True) -> None:
     _seed_strength_templates(db)
     if settings.news_ingestion_enabled:
         reconcile_default_news_sources(db)
+
+    # Only the separately configured Windows DEV stack can create rich test
+    # fixtures. This gate must stay before commit and never run in production.
+    from fitminiapp_api.services.local_dev_fixtures import maybe_seed_local_dev_data
+
+    maybe_seed_local_dev_data(db)
     db.commit()
 
 

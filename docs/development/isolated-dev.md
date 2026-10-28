@@ -1,0 +1,221 @@
+# Изолированный DEV YFC на Windows (Issue #1237)
+
+**Решение владельца от 26.10.2026:** DEV работает только на личном Windows-ПК. Новый VPS, увеличение текущего VPS и размещение DEV рядом с production полностью исключены. Production не трогать.
+
+## 1. Подготовка
+
+- Windows 11, Docker Desktop + WSL2; дождаться работающего Docker Engine.
+- Python 3.14 (`py -3.14`) только для первоначальной генерации секретов.
+- Текущая рабочая ветка YFC с поддержкой DEV (PR #1238).
+- Не переносить production `.env`, базу, дампы или API-токены.
+
+В PowerShell из корня репозитория:
+
+```powershell
+.\scripts\dev.ps1 -Action start
+```
+
+Команда создаст отдельный `.env.dev` (при первом запуске), проверит Docker Engine и Compose, соберёт приложение, выполнит миграции PostgreSQL и дождётся API readiness. Приложение открывается на **http://127.0.0.1:18080/login**.
+
+Готовые роли в существующем dev-login: клиент (2001), тренер (1002), администратор/Root (1001). Дополнительные неинтерактивные клиенты 2002 и 2003 нужны для проверки тренерской панели и разделения данных; зайти через публичный dev-login под ними нельзя.
+
+В режиме `DEV_AUTH_FIXED_ACCOUNTS_ONLY=true` менять роли через API профиля или Root запрещено: клиент не может включить кабинет тренера, тренер и Root не могут отключить свою фиксированную роль. Обычное поведение продукта при выключенном флаге сохраняется.
+
+При повторном DEV-входе имя и логин существующего аккаунта сохраняются: значения по умолчанию из кнопок входа не заменяют данные, введённые вручную. Отсутствующий профиль по-прежнему создаётся.
+
+### Наполнение данных DEV (#1237)
+
+Отдельный `local_dev_fixtures.py` работает **только** при `APP_ENV=dev`, `DEV_AUTH_FIXED_ACCOUNTS_ONLY=true` и строго локальной базе `postgresql://yfc_dev@db/yfc_dev`. На других подключениях прекращает запуск с ошибкой. Данные синтетические, никак не связаны с настоящими пользователями; метка аккаунтов `measurement_eligibility=synthetic`.
+
+- Один тренер 1002 с тремя клиентами; Root 1001 не подменяет тренера, имеет отдельную роль.
+- Каждый из трёх клиентов получает активную 16-недельную программу, до десяти недель истории завершённых тренировок и до шести недель предстоящих занятий, упражнения и записанные рабочие подходы с весами до сотых.
+- Для каждого клиента 13 еженедельных антропометрических измерений, включая собственный замер «Шея», и 8 еженедельных check-in.
+- Для клиента 2001 - 35 дней дневника (4 приёма пищи), около 385 продуктовых записей, 175 записей воды; для клиентов 2002 и 2003 - по 14 дней. Каталог - 16 персональных демонстрационных продуктов на клиента; есть избранное, цель КБЖУ, цель воды.
+- CRM тренера: завершённые/запланированные занятия, приватные заметки и история check-in.
+
+На повторном старте генератор не перезаписывает существующие тренировки, замеры, пищевые журналы, цели или заметки; повторный запуск проверяется на отсутствие дублирования. **Уже созданная локальная база не удаляется** - новые записи добавляются в пустые для этой категории наборы. Точные количества могут быть меньше, если ты уже вносил данные вручную.
+
+Сводки недельных отчётов создаются штатным builder в актуальном API-формате. У старого синтетического формата исправляются только `summary` и `summary_version`, если совпадают прежняя версия, точная служебная заметка и исходный сгенерированный JSON. Записи с изменённой заметкой или сводкой остаются нетронутыми; ID и ответы анкеты сохраняются.
+
+После обновления исходной ветки, без сброса данных:
+
+```powershell
+.\scripts\dev.ps1 -Action start
+.\scripts\dev.ps1 -Action status
+```
+
+Проверять реальную готовность по обоим `/health/live` и `/health/ready` (HTTP 200).
+
+После локального запуска отдельно выполни **проверку прав на настоящем Windows API**:
+
+```powershell
+py -3.14 scripts/verify_dev_roles.py
+```
+
+Smoke вызывает только `127.0.0.1:18080`, проверяет вход 2001/1002/1001, разграничение клиентских, тренерских и Root-прав, три привязанных тестовых клиента, запрет входа за дополнительного клиента и запрет повышения прав. Токены в терминале не печатаются. Результат `LOCAL_DEV_ROLE_SMOKE=PASS` означает фактическую локальную авторизацию, а не Playwright-мок.
+
+Другие команды:
+
+```powershell
+.\scripts\dev.ps1 -Action status
+.\scripts\dev.ps1 -Action logs
+.\scripts\dev.ps1 -Action stop
+.\scripts\dev.ps1 -Action reset -ConfirmReset
+```
+
+`stop` сохраняет данные, `reset` удаляет тома **только** отдельного проекта `yfc-dev`. Не путать с production `docker-compose.yml`.
+
+## Диагностика запуска (Windows)
+
+Если Compose собрал образы и PostgreSQL стала Healthy, но скрипт не дождался `/health/ready`, сначала проверьте контейнеры и HTTP-статус без удаления базы:
+
+```powershell
+docker compose --env-file .env.dev -f compose.dev.yml ps -a
+docker compose --env-file .env.dev -f compose.dev.yml logs --tail 100 backend setup
+curl.exe -i --max-time 10 http://127.0.0.1:18080/health/live
+curl.exe -i --max-time 10 http://127.0.0.1:18080/health/ready
+```
+
+`/health/live` проверяет HTTP-сервер, а `/health/ready` дополнительно выполняет `SELECT 1` в локальной PostgreSQL. Если сервер отвечает внутри контейнера, но не с Windows, проверить привязку порта:
+
+```powershell
+docker compose --env-file .env.dev -f compose.dev.yml port backend 8000
+docker compose --env-file .env.dev -f compose.dev.yml exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read().decode())"
+```
+
+Сценарий сброса тестовой базы для этой диагностики **не нужен**.
+
+## 2. Реальный iPhone: приватный HTTPS через Tailscale Serve
+
+Tailscale Serve обеспечивает доступ **только устройствам в вашей приватной сети Tailscale** (tailnet), в отличие от публичного Tailscale Funnel. Для личного использования доступен бесплатный тариф. Не требуется дополнительный VPS, общедоступный IP или проброс портов роутера.
+
+1. Установить Tailscale на Windows-ПК и iPhone; войти в **один и тот же** tailnet. Активировать приложение Tailscale на обоих устройствах.
+2. Проверить локальный DEV в браузере Windows: http://127.0.0.1:18080/health/ready.
+3. В PowerShell на Windows запустить:
+
+```powershell
+tailscale status
+tailscale serve --bg 18080
+tailscale serve status
+```
+
+4. Разрешить HTTPS в настройках tailnet, если Tailscale предложит. Команда выведет приватный URL `https://<windows-host>.<tailnet>.ts.net`.
+5. На настоящем iPhone открыть этот URL с `/login` в Safari. Проверить сценарии клиента, тренера и администратора.
+6. Для проверки доступа извне отключить Wi-Fi на iPhone, оставить мобильный интернет и включённый Tailscale: тот же HTTPS-адрес должен работать, **пока Windows-ПК включён, Docker и Tailscale доступны**.
+
+При необходимости выключить только созданный доступ: проверьте `tailscale serve status`; команда `tailscale serve off` отключает Serve и может затронуть **другие Serve-маршруты на том же устройстве**. Не применять её, если там работают другие сервисы, не проверив их настройки. **Никогда не использовать `tailscale funnel`**: он открывает приложение в публичный интернет.
+
+- Документация: https://tailscale.com/docs/features/tailscale-serve
+- Windows: https://tailscale.com/docs/install/windows
+- CLI: https://tailscale.com/docs/reference/tailscale-cli/serve
+
+**Безопасность:** порт приложения Docker остаётся строго на `127.0.0.1`. Доступ с iPhone обеспечивается только через Tailscale Serve. В этом Compose включён `DEV_AUTH_FIXED_ACCOUNTS_ONLY=true`: сервер разрешает только 2001/клиент, 1002/тренер и 1001/администратор с фиксированными правами. Telegram initData-вход отключён. Сам выбор тестовой роли всё равно не является самостоятельной защитой - доступ должен оставаться внутри личной Tailscale-сети. Не открывать его всем пользователям локальной сети, не включать публичный URL, не расшаривать tailnet посторонним. Серверная фиксация тестовых аккаунтов уже добавлена в этот PR. Не предоставляйте доступ к DEV другим участникам tailnet без отдельной проверки прав.
+
+**Важно:** HTTPS Safari с настоящего устройства тестирует реальный мобильный Web, а не Telegram Mini App WebView. Поскольку `VITE_PWA_ENABLED=false`, отдельные PWA/Push и Telegram-native сценарии требуют независимого тестирования.
+
+## 3. Приёмка на реальном устройстве
+
+На iPhone проверить: вход и смену всех трёх ролей; клавиатуру с числами/дробями; прокрутку форм с открытой клавиатурой; safe-area и нижнюю навигацию; тренировку с таймером; предыдущие веса и сохранение подходов; замеры/питание; работу тренера с клиентом; права админа; восстановление после сворачивания Safari; портретную/альбомную ориентацию и переключение Wi-Fi/мобильного интернета.
+
+Проверки `Playwright`/эмуляция устройства дополняют, но **не заменяют** проверку реального Safari. Результаты реальной проверки фиксируются отдельно от CI, вместе с проверяемым PR SHA.
+
+## 4. Изоляция и доставка
+
+`compose.dev.yml` - отдельный Compose project `yfc-dev`, база PostgreSQL 16, свой Docker volume, собственные ключи, сеть и отдельный образ. PostgreSQL и setup подключены исключительно к закрытой `dev_internal` сети. Backend дополнительно подключён к отдельной мостовой сети `dev_access`, необходимой Docker Desktop для доступа к опубликованному localhost-порту. Bot и worker не запускаются, PWA выключена. У приложения нет публичных портов.
+
+Изменения направляются через PR в защищённую `dev`. После успешного CI точный SHA проверяют на Windows DEV и физическом iPhone. Выпуск возможен только через отдельный, одобренный владельцем PR `dev → master`; существующий production pipeline запускается после успешного CI на `master`. Полный порядок обновления без потери базы: [двухэтапная доставка](two-stage-release.md).
+
+**Подтверждено владельцем 26.10.2026:** запуск Windows Docker, оба health endpoint HTTP 200, `LOCAL_DEV_ROLE_SMOKE=PASS` и базовая работа Safari на физическом iPhone через Tailscale. Это историческая проверка предыдущего SHA. Для каждой новой проверяемой ревизии повторить CI, обновление DEV с сохранением данных, smoke и применимые сценарии iPhone.
+
+
+## Решение по доставке
+
+PR #1238 направлен только в `dev`. Он остаётся Draft до успешных exact-head CI, локальной приёмки Windows DEV и обязательной физической приёмки iPhone. После выполнения этих условий допустимо слияние в защищённую `dev`, затем post-push CI и повторный Windows health/RBAC smoke на итоговом SHA. Слияние в `master`, PR `dev → master` и production release в эту задачу не входят. Задача #1266 остаётся открытой до полной проверки процесса и первого отдельно одобренного продвижения `dev → master`.
+
+## 5. Безопасное обновление локального DEV
+
+Для локального Windows-ПК используется `scripts/update_dev.ps1`. Скрипт работает только с
+веткой `dev`, публичным GitHub API и локальным Compose-проектом `yfc-dev`. Production `.env`,
+production Compose и production credentials не читаются.
+
+Ручная проверка и установка:
+
+```powershell
+Set-Location D:\Pet-projects\yfc-dev
+.\scripts\update_dev.ps1 -Mode Check
+.\scripts\update_dev.ps1 -Mode Apply
+.\scripts\update_dev.ps1 -Mode Status
+```
+
+`Check` не пересобирает приложение. `Apply` продолжает работу только при чистой ветке `dev`,
+ожидаемом `origin`, fast-forward, успешном exact-head post-push CI для целевого SHA и отсутствии
+блокировки ручной приёмки. Затем он вызывает существующий `scripts/dev.ps1 -Action start`,
+проверяет оба health endpoint и `verify_dev_roles.py`. Ошибка останавливает процесс с ненулевым
+кодом; Git не сбрасывается и база автоматически не откатывается.
+
+При изменении Alembic-миграций перед обновлением запускается штатный
+`scripts/check_online_migrations.py`, затем создаётся локальный SQL-бэкап в
+`.artifacts\runtime\dev-update\backups\`. Этот бэкап может содержать данные локального DEV;
+журналы содержат только дату, SHA и статусы, без токенов, паролей и содержимого базы.
+
+Планировщик Windows по умолчанию не устанавливается и автоустановку не включает. Явные команды:
+
+```powershell
+.\scripts\update_dev.ps1 -TaskAction Register
+.\scripts\update_dev.ps1 -TaskAction InstallSilentAction
+.\scripts\update_dev.ps1 -TaskAction EnableCheck
+.\scripts\update_dev.ps1 -TaskAction DisableCheck
+.\scripts\update_dev.ps1 -TaskAction EnableAutoApply
+.\scripts\update_dev.ps1 -TaskAction DisableAutoApply
+.\scripts\update_dev.ps1 -TaskAction Lock
+.\scripts\update_dev.ps1 -TaskAction Unlock
+.\scripts\update_dev.ps1 -TaskAction SchedulerStatus
+.\scripts\update_dev.ps1 -TaskAction Unregister
+```
+
+**Без видимой консоли:** Task Scheduler запускает штатный Python 3.14 `pythonw.exe`
+(GUI subsystem) → `scripts/dev_update_silent.pyw`; дочерний Windows PowerShell
+запускается с `CREATE_NO_WINDOW` и передаёт собственный код завершения Планировщику.
+Нужен установленный Python 3.14 с `pythonw.exe`; при его отсутствии регистрация
+отклоняется, а не заменяется мигающим `powershell.exe`. VBScript/WSH не используются.
+
+Если задание `YFC-DEV-Update-Check` **уже зарегистрировано старой версией**,
+после автоматической установки новой ревизии один раз выполните:
+
+```powershell
+Set-Location D:\Pet-projects\yfc-dev
+.\scripts\update_dev.ps1 -TaskAction InstallSilentAction
+.\scripts\update_dev.ps1 -TaskAction SchedulerStatus
+Start-ScheduledTask -TaskName 'YFC-DEV-Update-Check'
+Get-ScheduledTaskInfo -TaskName 'YFC-DEV-Update-Check' |
+    Select-Object LastRunTime, LastTaskResult, NextRunTime
+```
+
+Если старое задание запускает `wscript.exe //B //Nologo` с
+`.artifacts\\runtime\\dev-update\\silent-update.vbs` (предыдущий временный
+вариант без всплывающей консоли), `InstallSilentAction` также принимает его,
+но **только** при совпадении системного `wscript.exe`, точного пути
+`silent-update.vbs` и содержимого файла с вызовом этого `update_dev.ps1`
+в режиме `Check -Automatic`. Произвольные VBS-действия отклоняются.
+
+`InstallSilentAction` заменяет **только действие** существующего задания и
+сохраняет расписание, запуск от текущего пользователя, `RunLevel Limited`,
+`auto_apply=ON` и блокировку ручной приёмки. После окончания тестового запуска
+`LastTaskResult=0` при отсутствии обновления; проверка реального отсутствия
+всплывающего окна на Windows проводится отдельно от Linux CI.
+При недостаточных правах не менять учётную запись и не повышать `RunLevel`:
+запустить команду под владельцем задания с необходимыми правами. Не используйте
+повторную `Register` ради миграции, поскольку она намеренно отключает автоустановку.
+
+`Register` создаёт локальное интерактивное задание `YFC-DEV-Update-Check` с интервалом пять
+минут, оставляя автоустановку выключенной. `Lock` предназначен для ручной DEV-приёмки и всегда
+сохраняет текущую версию; отсутствие обращений к API не используется как признак отсутствия
+пользователя. Параллельный запуск и незавершённое предыдущее обновление блокируются mutex и
+маркером состояния. Зависший маркер разрешается очищать только после проверки `Status`:
+
+```powershell
+.\scripts\update_dev.ps1 -TaskAction ClearIncomplete -ConfirmClearIncomplete
+```
+
+Не используйте для этого процесса `scripts/dev.ps1 -Action reset`, `docker compose down --volumes`,
+удаление volume или `git reset --hard`.

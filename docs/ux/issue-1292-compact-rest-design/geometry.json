@@ -1,0 +1,765 @@
+{
+  "scope": "Browser-only proposed layout; omitted notice with restart and dismiss",
+  "cases": [
+    {
+      "scenario": "chromium-1440-dark",
+      "geometry": {
+        "status": {
+          "x": 393,
+          "y": 23,
+          "right": 804.5,
+          "bottom": 39
+        },
+        "buttons": [
+          {
+            "x": 812.5,
+            "y": 9,
+            "width": 138.625,
+            "height": 44,
+            "right": 951.125,
+            "bottom": 53
+          },
+          {
+            "x": 959.125,
+            "y": 9,
+            "width": 87.875,
+            "height": 44,
+            "right": 1047,
+            "bottom": 53
+          }
+        ],
+        "panel": {
+          "x": 380,
+          "y": 0,
+          "right": 1060,
+          "bottom": 62,
+          "height": 62
+        },
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "scenario": "chromium-1440-light",
+      "geometry": {
+        "status": {
+          "x": 393,
+          "y": 23,
+          "right": 804.5,
+          "bottom": 39
+        },
+        "buttons": [
+          {
+            "x": 812.5,
+            "y": 9,
+            "width": 138.625,
+            "height": 44,
+            "right": 951.125,
+            "bottom": 53
+          },
+          {
+            "x": 959.125,
+            "y": 9,
+            "width": 87.875,
+            "height": 44,
+            "right": 1047,
+            "bottom": 53
+          }
+        ],
+        "panel": {
+          "x": 380,
+          "y": 0,
+          "right": 1060,
+          "bottom": 62,
+          "height": 62
+        },
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "scenario": "chromium-320-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 295,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 174.125,
+            "height": 44,
+            "right": 199.125,
+            "bottom": 77
+          },
+          {
+            "x": 207.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 295,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 308,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 320,
+        "clientWidth": 320
+      }
+    },
+    {
+      "scenario": "chromium-320-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 295,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 174.125,
+            "height": 44,
+            "right": 199.125,
+            "bottom": 77
+          },
+          {
+            "x": 207.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 295,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 308,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 320,
+        "clientWidth": 320
+      }
+    },
+    {
+      "scenario": "chromium-360-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 335,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 214.125,
+            "height": 44,
+            "right": 239.125,
+            "bottom": 77
+          },
+          {
+            "x": 247.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 335,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 348,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 360,
+        "clientWidth": 360
+      }
+    },
+    {
+      "scenario": "chromium-360-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 335,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 214.125,
+            "height": 44,
+            "right": 239.125,
+            "bottom": 77
+          },
+          {
+            "x": 247.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 335,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 348,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 360,
+        "clientWidth": 360
+      }
+    },
+    {
+      "scenario": "chromium-393-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 368,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 247.125,
+            "height": 44,
+            "right": 272.125,
+            "bottom": 77
+          },
+          {
+            "x": 280.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 368,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 381,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 393,
+        "clientWidth": 393
+      }
+    },
+    {
+      "scenario": "chromium-393-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 368,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 247.125,
+            "height": 44,
+            "right": 272.125,
+            "bottom": 77
+          },
+          {
+            "x": 280.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 368,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 381,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 393,
+        "clientWidth": 393
+      }
+    },
+    {
+      "scenario": "chromium-430-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 405,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 284.125,
+            "height": 44,
+            "right": 309.125,
+            "bottom": 77
+          },
+          {
+            "x": 317.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 405,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 418,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 430,
+        "clientWidth": 430
+      }
+    },
+    {
+      "scenario": "chromium-430-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 405,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 284.125,
+            "height": 44,
+            "right": 309.125,
+            "bottom": 77
+          },
+          {
+            "x": 317.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 405,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 418,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 430,
+        "clientWidth": 430
+      }
+    },
+    {
+      "scenario": "webkit-1440-dark",
+      "geometry": {
+        "status": {
+          "x": 393,
+          "y": 23,
+          "right": 805,
+          "bottom": 39
+        },
+        "buttons": [
+          {
+            "x": 813,
+            "y": 9,
+            "width": 138.125,
+            "height": 44,
+            "right": 951.125,
+            "bottom": 53
+          },
+          {
+            "x": 959.125,
+            "y": 9,
+            "width": 87.875,
+            "height": 44,
+            "right": 1047,
+            "bottom": 53
+          }
+        ],
+        "panel": {
+          "x": 380,
+          "y": 0,
+          "right": 1060,
+          "bottom": 62,
+          "height": 62
+        },
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "scenario": "webkit-1440-light",
+      "geometry": {
+        "status": {
+          "x": 393,
+          "y": 23,
+          "right": 805,
+          "bottom": 39
+        },
+        "buttons": [
+          {
+            "x": 813,
+            "y": 9,
+            "width": 138.125,
+            "height": 44,
+            "right": 951.125,
+            "bottom": 53
+          },
+          {
+            "x": 959.125,
+            "y": 9,
+            "width": 87.875,
+            "height": 44,
+            "right": 1047,
+            "bottom": 53
+          }
+        ],
+        "panel": {
+          "x": 380,
+          "y": 0,
+          "right": 1060,
+          "bottom": 62,
+          "height": 62
+        },
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "scenario": "webkit-320-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 295,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 174.125,
+            "height": 44,
+            "right": 199.125,
+            "bottom": 77
+          },
+          {
+            "x": 207.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 295,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 308,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 320,
+        "clientWidth": 320
+      }
+    },
+    {
+      "scenario": "webkit-320-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 295,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 174.125,
+            "height": 44,
+            "right": 199.125,
+            "bottom": 77
+          },
+          {
+            "x": 207.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 295,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 308,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 320,
+        "clientWidth": 320
+      }
+    },
+    {
+      "scenario": "webkit-360-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 335,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 214.125,
+            "height": 44,
+            "right": 239.125,
+            "bottom": 77
+          },
+          {
+            "x": 247.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 335,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 348,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 360,
+        "clientWidth": 360
+      }
+    },
+    {
+      "scenario": "webkit-360-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 335,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 214.125,
+            "height": 44,
+            "right": 239.125,
+            "bottom": 77
+          },
+          {
+            "x": 247.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 335,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 348,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 360,
+        "clientWidth": 360
+      }
+    },
+    {
+      "scenario": "webkit-393-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 368,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 247.125,
+            "height": 44,
+            "right": 272.125,
+            "bottom": 77
+          },
+          {
+            "x": 280.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 368,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 381,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 393,
+        "clientWidth": 393
+      }
+    },
+    {
+      "scenario": "webkit-393-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 368,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 247.125,
+            "height": 44,
+            "right": 272.125,
+            "bottom": 77
+          },
+          {
+            "x": 280.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 368,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 381,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 393,
+        "clientWidth": 393
+      }
+    },
+    {
+      "scenario": "webkit-430-dark",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 405,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 284.125,
+            "height": 44,
+            "right": 309.125,
+            "bottom": 77
+          },
+          {
+            "x": 317.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 405,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 418,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 430,
+        "clientWidth": 430
+      }
+    },
+    {
+      "scenario": "webkit-430-light",
+      "geometry": {
+        "status": {
+          "x": 25,
+          "y": 9,
+          "right": 405,
+          "bottom": 25
+        },
+        "buttons": [
+          {
+            "x": 25,
+            "y": 33,
+            "width": 284.125,
+            "height": 44,
+            "right": 309.125,
+            "bottom": 77
+          },
+          {
+            "x": 317.125,
+            "y": 33,
+            "width": 87.875,
+            "height": 44,
+            "right": 405,
+            "bottom": 77
+          }
+        ],
+        "panel": {
+          "x": 12,
+          "y": 0,
+          "right": 418,
+          "bottom": 86,
+          "height": 86
+        },
+        "scrollWidth": 430,
+        "clientWidth": 430
+      }
+    }
+  ]
+}

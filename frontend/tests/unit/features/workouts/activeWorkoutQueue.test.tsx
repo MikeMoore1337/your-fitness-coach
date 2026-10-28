@@ -503,6 +503,56 @@ describe('active workout durable queue', () => {
     expect(loadCurrentActiveWorkoutSnapshot(7)?.exercises[0]?.metric_type).toBe('cardio');
   });
 
+  it.each([null, '0', '1', '2', '3', '4+'] as const)(
+    'сохраняет RIR %s вместе с завершённым подходом в offline-очереди',
+    (rir) => {
+      const state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, rir, is_completed: true },
+        now: 1,
+      });
+
+      expect(saveActiveWorkoutQueue(state)).toBe(true);
+      expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values).toEqual({
+        actual_reps: 8,
+        actual_weight: 40,
+        rir,
+        is_completed: true,
+      });
+    },
+  );
+
+  it('восстанавливает завершённый подход без поля RIR', () => {
+    const state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+
+    expect(saveActiveWorkoutQueue(state)).toBe(true);
+    expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values).toEqual({
+      actual_reps: 8,
+      actual_weight: 40,
+      is_completed: true,
+    });
+  });
+
+  it('не принимает 4 вместо отдельного значения 4+ в сохранённой очереди', () => {
+    const state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, rir: '4+', is_completed: true },
+    });
+    expect(saveActiveWorkoutQueue(state)).toBe(true);
+    const key = activeWorkoutQueueKey(7, 42);
+    const stored = JSON.parse(localStorage.getItem(key)!);
+    stored.queue[0].values.rir = '4';
+    localStorage.setItem(key, JSON.stringify(stored));
+
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual([]);
+  });
+
   it('сохраняет расширенные поля подхода в offline-очереди', () => {
     const state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
       setId: 201,

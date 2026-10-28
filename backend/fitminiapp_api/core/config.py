@@ -78,6 +78,7 @@ class Settings(BaseSettings):
         ),
     )
     enable_dev_auth: bool = False
+    dev_auth_fixed_accounts_only: bool = False
     enable_web_auth: bool = False
     enable_email_auth: bool = False
     admin_telegram_user_ids: str = ""

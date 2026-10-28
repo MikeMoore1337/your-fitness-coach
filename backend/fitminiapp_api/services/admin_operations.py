@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.models.account import AccountDataExport
 from fitminiapp_api.models.audit import AuditEvent
@@ -357,6 +358,8 @@ def update_trainer_capability(
     is_active: bool,
     reason: str,
 ) -> dict:
+    if settings.dev_auth_fixed_accounts_only:
+        raise HTTPException(status_code=403, detail="Роли изолированного DEV фиксированы")
     target = get_user_or_404(db, target_user_id, lock=True)
     require_mutable_target(target)
     changed = target.is_coach != is_active

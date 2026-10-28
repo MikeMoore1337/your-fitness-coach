@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from fitminiapp_api.core.config import settings
 from fitminiapp_api.models.user import CoachClient, CoachClientInvite, User
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.coach_clients import close_user_coaching_relationships
@@ -10,6 +11,8 @@ TRAINER_CAPABILITY_TERMS_VERSION = "trainer-capability-v1"
 
 
 def _locked_user(db: Session, user: User) -> User:
+    if settings.dev_auth_fixed_accounts_only:
+        raise HTTPException(status_code=403, detail="Роли изолированного DEV фиксированы")
     # Auth already loaded this row; refresh it after waiting for a concurrent lock holder.
     return db.query(User).filter(User.id == user.id).populate_existing().with_for_update().one()
 
@@ -48,7 +51,9 @@ def trainer_capability_state(
         "activated_now": activated_now,
         "active_client_count": active_client_count,
         "pending_invite_count": pending_invite_count,
-        "can_disable": user.is_coach and active_client_count == 0,
+        "can_disable": user.is_coach
+        and active_client_count == 0
+        and not settings.dev_auth_fixed_accounts_only,
         "terms_version": TRAINER_CAPABILITY_TERMS_VERSION,
     }
 

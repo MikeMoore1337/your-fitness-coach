@@ -415,6 +415,156 @@ describe('TemplatesList editing', () => {
     resolveDelete(new Response(null, { status: 204 }));
   });
 
+  it('shows ready-template actions in order without the owner deletion menu', async () => {
+    renderList();
+    const readyCard = (
+      await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
+    ).closest('article')!;
+    const actions = readyCard.querySelector<HTMLElement>('.program-template-card__actions')!;
+
+    const actionLabels = within(actions)
+      .getAllByRole('button')
+      .map((button) => button.textContent?.trim());
+    expect(actionLabels).toEqual(['Настроить копию', 'Запустить', 'Скрыть шаблон']);
+    expect(actions).toHaveClass('program-template-card__actions--example');
+    expect(readyCard.querySelector('details.program-danger-menu')).toBeNull();
+
+    const ownCard = (
+      await screen.findByRole('button', { name: 'Посмотреть программу «Моя программа»' })
+    ).closest('article')!;
+    expect(within(ownCard).getByText('Другие действия')).toBeInTheDocument();
+    expect(
+      within(ownCard).getByRole('region', { name: 'Поделиться программой' }),
+    ).toBeInTheDocument();
+    expect(
+      within(ownCard).queryByRole('button', { name: 'Скрыть шаблон' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not hide a ready template when confirmation is cancelled', async () => {
+    renderList();
+    const card = (
+      await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
+    ).closest('article')!;
+    fireEvent.click(within(card).getByRole('button', { name: 'Скрыть шаблон' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Скрыть шаблон?' });
+    expect(within(dialog).getByText('Готовый шаблон')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(
+          ([input, init]) => String(input).includes('/templates/10') && init?.method === 'DELETE',
+        ),
+    ).toHaveLength(0);
+  });
+
+  it('hides only the selected ready template through its existing DELETE endpoint', async () => {
+    renderList();
+    const card = (
+      await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
+    ).closest('article')!;
+    fireEvent.click(within(card).getByRole('button', { name: 'Скрыть шаблон' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Скрыть шаблон?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Скрыть' }));
+
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.filter(
+            ([input, init]) =>
+              String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE',
+          ),
+      ).toHaveLength(1),
+    );
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(
+          ([input, init]) =>
+            String(input) === '/api/v1/programs/templates/11' && init?.method === 'DELETE',
+        ),
+    ).toHaveLength(0);
+  });
+
+  it('blocks repeat taps during a pending hide and unlocks after completion', async () => {
+    let resolveDelete!: (response: Response) => void;
+    const originalFetch = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    vi.mocked(globalThis.fetch).mockImplementation((input, init) => {
+      if (String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE') {
+        return new Promise<Response>((resolve) => {
+          resolveDelete = resolve;
+        });
+      }
+      return originalFetch(input, init);
+    });
+
+    renderList();
+    const card = (
+      await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
+    ).closest('article')!;
+    const hideButton = within(card).getByRole('button', { name: 'Скрыть шаблон' });
+    fireEvent.click(hideButton);
+    const dialog = await screen.findByRole('dialog', { name: 'Скрыть шаблон?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Скрыть' }));
+    await waitFor(() => expect(hideButton).toBeDisabled());
+    fireEvent.click(hideButton);
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(
+          ([input, init]) =>
+            String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE',
+        ),
+    ).toHaveLength(1);
+
+    resolveDelete(new Response(null, { status: 204 }));
+    await waitFor(() => expect(hideButton).not.toBeDisabled());
+  });
+
+  it('shows network errors and allows retrying the same ready-template action', async () => {
+    let attempts = 0;
+    const originalFetch = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    vi.mocked(globalThis.fetch).mockImplementation((input, init) => {
+      if (String(input) === '/api/v1/programs/templates/10' && init?.method === 'DELETE') {
+        attempts += 1;
+        return Promise.resolve(
+          new Response(JSON.stringify({ detail: 'Сбой удаления шаблона' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
+      return originalFetch(input, init);
+    });
+
+    renderList();
+    const card = (
+      await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
+    ).closest('article')!;
+    const hideButton = within(card).getByRole('button', { name: 'Скрыть шаблон' });
+    fireEvent.click(hideButton);
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Скрыть шаблон?' })).getByRole('button', {
+        name: 'Скрыть',
+      }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Сервис временно недоступен. Попробуйте ещё раз.',
+    );
+    await waitFor(() => expect(hideButton).not.toBeDisabled());
+    fireEvent.click(hideButton);
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Скрыть шаблон?' })).getByRole('button', {
+        name: 'Скрыть',
+      }),
+    );
+    await waitFor(() => expect(attempts).toBe(2));
+  });
+
   it('keeps template deletion on the template endpoint', async () => {
     renderList();
     const card = (

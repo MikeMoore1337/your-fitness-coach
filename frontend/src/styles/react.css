@@ -3548,6 +3548,9 @@ details:not([open]) > :not(summary) {
   min-width: 0;
   padding-inline: 9px;
 }
+.program-template-card__actions--example {
+  grid-template-columns: minmax(0, 1fr);
+}
 .program-danger-menu,
 .exercise-catalog-item__danger {
   color: var(--muted);
@@ -4613,6 +4616,12 @@ button.today-text-link {
   width: 100%;
   min-width: 0;
 }
+.active-workout-exercise__replacement-slot {
+  flex: 1 1 100%;
+  min-width: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 .active-workout-exercise__toggle {
   min-height: 44px;
 }
@@ -5072,6 +5081,9 @@ button.today-text-link {
   margin: -3px 0 0 48px;
   order: 1;
 }
+.active-workout-set__controls.has-rir + .active-workout-set__prefill-actions {
+  order: 0;
+}
 .active-workout-set__prefill-actions.is-hidden {
   display: none;
   visibility: hidden;
@@ -5118,9 +5130,27 @@ button.today-text-link {
   align-items: end;
   gap: 10px;
 }
+.active-workout-set__controls.has-rir {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: var(--v2-space-3);
+}
+.active-workout-set__rir-row,
+.active-workout-set__controls.has-rir > .active-workout-set__done {
+  grid-column: 1 / -1;
+}
+.active-workout-set__rir-row {
+  min-width: 0;
+}
+/* Keep post-completion controls at the existing 44px minimum. */
+@media (max-width: 899px) {
+  .active-workout-set.is-current:not(:first-child) {
+    --yfc-current-set-control-height: 44px;
+    --yfc-current-set-label-gap: 0px;
+  }
+}
 .active-workout-input {
   display: grid;
-  gap: 6px;
+  gap: var(--yfc-current-set-label-gap, 6px);
   min-width: 0;
 }
 .active-workout-input > span,
@@ -5149,7 +5179,7 @@ button.today-text-link {
 }
 .active-workout-set.is-current .active-workout-input input,
 .active-workout-set.is-current .active-workout-set__done {
-  min-height: 56px;
+  min-height: var(--yfc-current-set-control-height, 56px);
 }
 .active-workout-set.is-current .active-workout-input input {
   font-size: 1.22rem;
@@ -5207,7 +5237,7 @@ button.today-text-link {
   border: 0;
 }
 .active-workout-rir legend {
-  margin-bottom: 6px;
+  margin-bottom: var(--yfc-current-set-label-gap, 6px);
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 800;
@@ -5219,7 +5249,7 @@ button.today-text-link {
 }
 .active-workout-rir__options button {
   min-width: 0;
-  min-height: 48px;
+  min-height: var(--yfc-current-set-control-height, 48px);
   padding: 6px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -5738,6 +5768,13 @@ html[data-yfc-pwa-focus-placement='true']:has(#appContent .active-workout) {
 html[data-yfc-pwa-focus-placement='true'] .active-workout {
   overflow-anchor: none;
 }
+/* Keep native PWA keyboard panning in charge: reclaim card spacing above
+   focused weight/reps without scripted scrolling on focus or while typing. */
+html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
+  .active-workout-set.is-current {
+  gap: 2px;
+  padding-top: 7px;
+}
 .active-workout:has(.active-workout-rest:not(.is-compact)) .active-workout-set__contextual-help {
   display: none;
 }
@@ -5827,6 +5864,49 @@ html[data-yfc-pwa-focus-placement='true'] .active-workout {
   padding-block: 8px;
   flex-wrap: wrap;
 }
+.active-workout-rest--terminal.is-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--v2-space-2, 8px);
+  padding: var(--v2-space-2, 8px) var(--v2-space-3, 12px);
+}
+.active-workout-rest--terminal-single.is-compact {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.active-workout-rest__complete-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.active-workout-rest__complete-summary .active-workout-rest__complete-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.active-workout-rest__complete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-2, 8px);
+  min-width: 0;
+}
+.active-workout-rest__complete-actions .ui-button {
+  min-width: var(--touch-target, 44px);
+  min-height: var(--touch-target, 44px);
+  padding-inline: var(--v2-space-3, 12px);
+  white-space: nowrap;
+}
+.active-workout-rest__complete-actions .ui-button--primary {
+  flex: 0 1 auto;
+  min-width: max-content;
+}
+.active-workout-rest__complete-actions .ui-button--secondary {
+  flex: none;
+}
+.active-workout-rest--terminal-single .active-workout-rest__complete-actions {
+  justify-self: end;
+}
 .active-workout-rest__collapsed {
   display: flex;
   width: 100%;
@@ -5890,6 +5970,12 @@ html[data-yfc-pwa-focus-placement='true'] .active-workout {
   .active-workout-rest__actions {
     grid-column: auto;
     grid-template-columns: repeat(3, minmax(88px, 1fr)) var(--touch-target, 44px);
+  }
+  .active-workout-rest--terminal.is-compact {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .active-workout-rest__complete-actions .ui-button--primary {
+    flex: none;
   }
 }
 
