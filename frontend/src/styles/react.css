@@ -5891,7 +5891,7 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   white-space: nowrap;
 }
 .active-workout-rest__complete-actions .ui-button--primary {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: max-content;
 }
 .active-workout-rest__complete-actions .ui-button--secondary {
