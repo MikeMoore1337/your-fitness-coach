@@ -1854,15 +1854,6 @@ export function RestTimer({
     };
   }, [compactNotice, deadline, measuredRest, nextLabel, storageKey, userId, workoutId]);
   useLayoutEffect(() => {
-    const anchor = layoutAnchor.current;
-    layoutAnchor.current = null;
-    if (anchor?.element.isConnected) {
-      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
-      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
-    }
-  }, [collapsed, showCompact, completedNotice]);
-
-  useLayoutEffect(() => {
     const element = panel.current;
     const parent = element?.parentElement;
     if (!element || !parent) return;
@@ -1899,6 +1890,15 @@ export function RestTimer({
       element.style.removeProperty('--yfc-active-workout-rest-fixed-width');
     };
   }, [hasDeadline, collapsed, showCompact, completedNotice]);
+
+  useLayoutEffect(() => {
+    const anchor = layoutAnchor.current;
+    layoutAnchor.current = null;
+    if (anchor?.element.isConnected) {
+      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
+      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+    }
+  }, [collapsed, showCompact, completedNotice]);
 
   useEffect(() => {
     const element = panel.current;
