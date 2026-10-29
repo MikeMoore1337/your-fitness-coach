@@ -146,6 +146,8 @@ npm run test -- tests/unit/features/programs/ProgramRecommendation.test.tsx test
 npm run lint
 npm run build
 npx playwright test app.spec.ts --grep '#1335|детерминированный подбор' --project=chromium --workers=1
+# При подготовленной одноразовой PostgreSQL 16 / fitminiapp_test и RUN_MIGRATED_STACK_TEST=1:
+npm run e2e:migrated-stack
 ```
 
 Playwright проверяет 360/390/430 px в обеих темах, применение предложения, повторный запрос,
@@ -153,8 +155,24 @@ Playwright проверяет 360/390/430 px в обеих темах, прим�
 Его API-фикстуры синтетические; это браузерная регрессия, а не проверка физического iPhone.
 Схема FastAPI и TypeScript обновлены вместе. Конкретный CI-статус привязан к head PR в `dev`.
 
+Дополнительно проверен отдельный локальный PostgreSQL 16 с миграцией
+`0133_profile_height_numeric`: 7 тестов `tests/integration/test_migrated_stack.py` и 4 браузерных
+сценария `frontend/tests/integration/migrated-stack.spec.ts` прошли без подмены API.
+Перед браузерным прогоном на такой БД выполняется
+`python -m pytest tests/integration/test_migrated_stack.py -q` с `RUN_MIGRATED_STACK_TEST=1`:
+этот набор подготавливает проверенный каталог, как и группа migrated-stack в CI.
+Явный seed-fixture мигрированной тестовой БД проверяет ровно 16 публичных источников.
+Браузерный сценарий #1335 проходит отказ → применение проверенного предложения → новый
+предпросмотр без записей → отдельный confirm → идемпотентный повтор → чтение сохранённого
+шаблона. Эта БД создана только для проверки; она не является опубликованным DEV или production.
+
+Полный CI выявил устаревшие тестовые ссылки после компоновки Плана: импорт искался в библиотеке,
+а кнопки редактора — в старом файле до выделения `ProgramDayEditor`. Падения воспроизведены на
+чистой базе `fe0662a3`. Исправлены адреса экрана и проверяемый компонент; проверки импорта,
+повторного открытия, добавления упражнений и ограничения числа дней сохранены.
+
 Опубликованный DEV/PostgreSQL и его migration/seed drift: `NOT_RUN` локальной матрицей;
-проверки миграций в CI учитываются отдельно. Ручные iPhone Safari/PWA и VoiceOver владельца:
+локальная проверка PostgreSQL и миграционные проверки CI учитываются отдельно. Ручные iPhone Safari/PWA и VoiceOver владельца:
 `NOT_RUN`. Production merge/deploy и закрытие Issue этой работой не выполняются.
 
 ## Provenance

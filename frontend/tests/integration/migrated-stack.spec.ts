@@ -149,7 +149,7 @@ for (const scenario of programImportViewports) {
       row.map(csvCell).join(','),
     ].join('\n');
 
-    await page.goto('/app?section=programs&view=manage&start=templates');
+    await page.goto('/app?section=programs&view=manage&panel=create');
     await expect(page.getByRole('heading', { name: 'Импорт программы' })).toBeVisible();
 
     const accessToken = await page.evaluate(() => sessionStorage.getItem('fit_access_token'));
@@ -223,7 +223,115 @@ for (const scenario of programImportViewports) {
     expect((await response.json()).template.title).toBe(programTitle);
     await expect(page.getByText('Программа импортирована в личные шаблоны')).toBeVisible();
 
+    await page.goto('/app?section=programs&view=manage&panel=library');
     await page.reload();
     await expect(page.getByText(programTitle, { exact: true })).toBeVisible();
   });
 }
+
+test('#1335 real PostgreSQL generator rechecks an explicit suggestion before confirmation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
+  const login = await page.request.post('/api/v1/auth/dev-login', {
+    data: { telegram_user_id: 13_350_001, full_name: 'Проверка подбора' },
+  });
+  expect(login.status()).toBe(200);
+  const accessToken = (await login.json()).access_token as string;
+  const headers = { Authorization: `Bearer ${accessToken}` };
+  await page.addInitScript(
+    (token) => sessionStorage.setItem('fit_access_token', token),
+    accessToken,
+  );
+  const beforeResponse = await page.request.get('/api/v1/programs/templates/mine', { headers });
+  expect(beforeResponse.status()).toBe(200);
+  const beforeIds = (await beforeResponse.json()).map((item: { id: number }) => item.id);
+  let browserConfirms = 0;
+  page.on('request', (request) => {
+    if (
+      request.method() === 'POST' &&
+      new URL(request.url()).pathname === '/api/v1/programs/generator/confirm'
+    )
+      browserConfirms++;
+  });
+  await page.goto('/app?section=programs&view=manage&start=generator');
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('radio', { name: /Рекомпозиция/ }).check();
+  await dialog.getByRole('button', { name: 'Далее' }).click();
+  await dialog.getByRole('radio', { name: /Начинаю или возвращаюсь/ }).check();
+  await dialog.getByRole('button', { name: 'Далее' }).click();
+  await dialog.locator('input[name="generator-frequency"][value="2"]').check();
+  await dialog.getByRole('button', { name: 'Далее' }).click();
+  await dialog.getByRole('radio', { name: /60 минут/ }).check();
+  await dialog.getByRole('button', { name: 'Далее' }).click();
+  await dialog.getByRole('radio', { name: /Дома/ }).check();
+  await dialog.getByRole('checkbox', { name: 'Собственный вес' }).check();
+  const firstPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/programs/generator/preview',
+  );
+  await dialog.getByRole('button', { name: 'Показать программу' }).click();
+  const first = await firstPromise;
+  expect(first.status()).toBe(200);
+  expect(first.request().postDataJSON()).toMatchObject({
+    goal: 'recomposition',
+    experience: 'beginner',
+    days_per_week: 2,
+    training_location: 'home',
+    available_equipment_ids: ['bodyweight'],
+  });
+  const rejected = await first.json();
+  expect(rejected.status).toBe('no_compatible');
+  expect(rejected.draft_token).toBeNull();
+  expect(rejected.suggestions.length).toBeGreaterThan(0);
+  const suggestion = rejected.suggestions[0];
+  const secondPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/programs/generator/preview',
+  );
+  await dialog.getByRole('button', { name: 'Применить предложенное изменение' }).first().click();
+  const second = await secondPromise;
+  expect(second.status()).toBe(200);
+  expect(second.request().postDataJSON()).toEqual(suggestion.inputs);
+  const checked = await second.json();
+  expect(checked.status).toBe('preview');
+  expect(checked.program.goal).toBe(suggestion.inputs.goal);
+  expect(checked.program.days_per_week).toBe(suggestion.inputs.days_per_week);
+  const afterPreview = await page.request.get('/api/v1/programs/templates/mine', { headers });
+  expect(afterPreview.status()).toBe(200);
+  expect((await afterPreview.json()).map((item: { id: number }) => item.id)).toEqual(beforeIds);
+  expect(browserConfirms).toBe(0);
+  const confirmPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/programs/generator/confirm',
+  );
+  await dialog.getByRole('button', { name: 'Подтвердить программу' }).click();
+  const confirmation = await confirmPromise;
+  expect(confirmation.status()).toBe(200);
+  const saved = await confirmation.json();
+  expect(saved.idempotent).toBe(false);
+  expect(saved.workouts_created).toBeGreaterThan(0);
+  expect(browserConfirms).toBe(1);
+  await expect(
+    dialog.getByRole('heading', { name: saved.template.title, exact: true }),
+  ).toBeVisible();
+  const retry = await page.request.post('/api/v1/programs/generator/confirm', {
+    headers,
+    data: { draft_token: checked.draft_token },
+  });
+  expect(retry.status()).toBe(200);
+  expect(await retry.json()).toMatchObject({
+    idempotent: true,
+    assigned_program_id: saved.assigned_program_id,
+    workouts_created: 0,
+  });
+  const persisted = await page.request.get('/api/v1/programs/templates/mine', { headers });
+  expect(persisted.status()).toBe(200);
+  expect(
+    (await persisted.json()).filter((item: { id: number }) => item.id === saved.template.id),
+  ).toHaveLength(1);
+});
