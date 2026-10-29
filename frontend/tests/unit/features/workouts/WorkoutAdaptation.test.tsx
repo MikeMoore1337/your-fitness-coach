@@ -341,6 +341,7 @@ describe('WorkoutAdaptation', () => {
             {
               exercise_id: 13,
               title: 'Жим гантелей лежа',
+              aliases: ['dumbbell bench press'],
               equipment_ids: ['dumbbell', 'bench'],
               media_thumbnail_url: '/static/exercise-guides/dumbbell-bench-press.jpg',
               media_thumbnail_sources: [],
@@ -390,10 +391,19 @@ describe('WorkoutAdaptation', () => {
 
     await user.click(screen.getByRole('button', { name: 'Все подходящие' }));
     const search = screen.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+    await user.type(search, 'dumbell bench press');
+    expect(screen.getByRole('radio', { name: /Жим гантелей лежа/ })).toBeInTheDocument();
+    await user.clear(search);
     await user.type(search, 'Смита');
     expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: /Жим в тренажере Смита/ }));
     await user.clear(search);
+    await user.type(search, 'жим гантелй');
+    expect(screen.getByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeChecked();
+    expect(screen.queryByRole('radio', { name: /Жим в тренажере Смита/ })).not.toBeInTheDocument();
+    await user.clear(search);
+    expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Тренажёры' }));
     expect(screen.getByRole('radio', { name: /Жим в тренажере от груди/ })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();

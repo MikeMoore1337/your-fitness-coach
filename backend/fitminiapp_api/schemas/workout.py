@@ -135,6 +135,7 @@ class WorkoutAdaptationPreviewResponse(BaseModel):
 class WorkoutAlternativeItem(BaseModel):
     exercise_id: int
     title: str
+    aliases: list[str] = Field(default_factory=list)
     equipment_ids: list[str]
     score: int | None = None
     reason_keys: list[str] = Field(default_factory=list)

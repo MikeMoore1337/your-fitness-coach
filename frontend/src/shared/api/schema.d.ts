@@ -17938,6 +17938,8 @@ export interface components {
             exercise_id: number;
             /** Title */
             title: string;
+            /** Aliases */
+            aliases?: string[];
             /** Equipment Ids */
             equipment_ids: string[];
             /** Score */
