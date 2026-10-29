@@ -1712,10 +1712,9 @@ def list_coach_assigned_programs(db: Session, coach: User) -> list[dict]:
         is_cycle = any(row.source_cycle_week is not None for row in workouts)
         today = today_for_user(client)
         if is_cycle and program.is_active and program.status in {"active", "scheduled"}:
-            from fitminiapp_api.services.program_versioning import materialize_cycle_schedule
+            from fitminiapp_api.services.program_versioning import materialize_cycle_read_window
 
-            if materialize_cycle_schedule(db, program, today, today + timedelta(days=27)):
-                db.commit()
+            if materialize_cycle_read_window(db, [program.id], today, today + timedelta(days=27)):
                 db.expire(program, ["workouts"])
                 workouts = list(program.workouts)
         completed = sum(workout.status == "completed" for workout in workouts)

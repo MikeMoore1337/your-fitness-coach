@@ -491,15 +491,14 @@ def build_progress_summaries(
     if cycle_programs:
         from fitminiapp_api.services.program_versioning import (
             cycle_workout_count,
-            materialize_cycle_schedule,
+            materialize_cycle_read_window,
         )
 
-        changed = 0
         for program in cycle_programs:
             current_day = actual_today_by_user[program.user_id]
             if program.is_active and program.status in {"active", "scheduled"}:
-                changed += materialize_cycle_schedule(
-                    db, program, current_day, current_day + timedelta(days=27)
+                materialize_cycle_read_window(
+                    db, [program.id], current_day, current_day + timedelta(days=27)
                 )
                 db.expire(program, ["workouts"])
             missing_workouts_by_user[program.user_id] += cycle_workout_count(
@@ -509,8 +508,6 @@ def build_progress_summaries(
                 end=min(today_by_user[program.user_id], current_day - timedelta(days=1)),
                 missing_only=True,
             )
-        if changed:
-            db.commit()
 
     cardio_rows = (
         db.query(CardioSession)

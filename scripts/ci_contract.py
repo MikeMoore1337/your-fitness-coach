@@ -269,6 +269,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "python",
                 "scripts/run_pytest.py",
                 "backend/tests/test_program_cycle_concurrency.py",
+                "backend/tests/test_program_cycle_read_acceptance.py",
                 "-q",
                 "-n",
                 "1",

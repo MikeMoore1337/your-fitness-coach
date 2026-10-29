@@ -596,6 +596,7 @@ class UserWorkoutSet(Base):
     planned_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    plan_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     workout_exercise: Mapped[UserWorkoutExercise] = relationship(
         "UserWorkoutExercise", back_populates="sets"

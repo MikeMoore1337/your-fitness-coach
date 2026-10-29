@@ -59,6 +59,10 @@ def test_cycle_storage_upgrade_preserves_facts_and_enforces_opt_in_identity(
         assert connection.exec_driver_sql(
             "SELECT actual_weight, actual_reps, is_completed FROM user_workout_sets"
         ).one() == (42.25, 8, 1)
+        assert (
+            connection.exec_driver_sql("SELECT plan_version FROM user_workout_sets").scalar_one()
+            is None
+        )
         connection.exec_driver_sql(
             "UPDATE program_templates SET default_duration_weeks=30 WHERE id=1"
         )
@@ -106,6 +110,10 @@ def test_cycle_storage_downgrade_fails_closed_and_safe_roundtrip_preserves_rows(
             with pytest.raises(RuntimeError, match="Unsafe downgrade"):
                 _load("0134").downgrade()
             connection.exec_driver_sql("UPDATE user_workouts SET source_cycle_week=NULL WHERE id=1")
+            connection.exec_driver_sql("UPDATE user_workout_sets SET plan_version=2 WHERE id=1")
+            with pytest.raises(RuntimeError, match="Unsafe downgrade"):
+                _load("0134").downgrade()
+            connection.exec_driver_sql("UPDATE user_workout_sets SET plan_version=NULL WHERE id=1")
             for number in ("0136", "0135", "0134"):
                 _load(number).downgrade()
         assert "ck_program_templates_default_duration_weeks" not in {

@@ -561,6 +561,7 @@ def _write_cycle_exercises(db: Session, workout: UserWorkout, plan: dict) -> Non
                     setattr(item, key, value)
                 if changed:
                     item.version += 1
+                    item.plan_version = item.version
         for item in old_sets.values():
             db.delete(item)
     for slot, exercise in by_slot.items():
@@ -695,6 +696,55 @@ def materialize_next_cycle_window(
     )
 
 
+def materialize_cycle_read_window(
+    db: Session, program_ids: list[int], start: date, end: date | None = None
+) -> int:
+    if not program_ids:
+        return 0
+    # Read projections own their transaction; never flush or commit the caller's work.
+    with Session(bind=db.get_bind().engine, autoflush=False) as projection:
+        programs = (
+            projection.query(UserProgram)
+            .filter(
+                UserProgram.id.in_(program_ids),
+                UserProgram.is_active.is_(True),
+                UserProgram.status.in_({"active", "scheduled"}),
+            )
+            .order_by(UserProgram.id)
+            .all()
+        )
+        changed = 0
+        for program in programs:
+            changed += (
+                materialize_next_cycle_window(projection, program, through_date=start)
+                if end is None
+                else materialize_cycle_schedule(projection, program, start, end)
+            )
+        projection.commit()
+        return changed
+
+
+def hydrate_cycle_read_workout(db: Session, workout: UserWorkout) -> bool:
+    if workout.source_cycle_week is None or workout.status != "planned":
+        return False
+    with Session(bind=db.get_bind().engine, autoflush=False) as projection:
+        current = projection.get(UserWorkout, workout.id)
+        changed = current is not None and hydrate_cycle_workout(projection, current)
+        projection.commit()
+    if changed:
+        db.expire(
+            workout,
+            [
+                "exercises",
+                "plan_materialized",
+                "source_cycle_week",
+                "cycle_iteration",
+                "plan_revision_number",
+            ],
+        )
+    return changed
+
+
 def revise_program_cycle(
     db: Session, actor: User, program_id: int, payload: ProgramCycleRevisionRequest
 ) -> int:
@@ -783,18 +833,12 @@ def revise_program_cycle(
         }
     elif not cycle["repeat"] and duration - _old_boundary + 1 > cycle["length_weeks"]:
         raise ProgramError("Длительность программы превышает длину цикла без повторения")
-    cancelled_by_duration = {
+    cancelled_by_plan = {
         workout_id
         for event in db.query(ProgramRevision).filter_by(user_program_id=program.id)
-        for workout_id in event.changed_fields.get("duration_cancelled_workout_ids", [])
+        for key in ("duration_cancelled_workout_ids", "structure_cancelled_workout_ids")
+        for workout_id in event.changed_fields.get(key, [])
     }
-    for workout in affected:
-        if (
-            workout.id in cancelled_by_duration
-            and workout.status == "cancelled"
-            and workout.week_number <= duration
-        ):
-            workout.status = "planned"
     program.duration_weeks = duration
     revision = record_program_revision(
         db,
@@ -817,12 +861,20 @@ def revise_program_cycle(
         if workout.week_number > duration:
             workout.status = "cancelled"
             cancel_workout_reminder(db, workout.id)
-        elif workout.status == "planned":
+        elif workout.status == "planned" or (
+            workout.status == "cancelled" and workout.id in cancelled_by_plan
+        ):
             plan = next(
-                item
-                for item in _cycle_workout_plans(db, program, workout.week_number)
-                if item["day_number"] == workout.day_number
+                (
+                    item
+                    for item in _cycle_workout_plans(db, program, workout.week_number)
+                    if item["day_number"] == workout.day_number
+                ),
+                None,
             )
+            if plan is None:
+                continue
+            workout.status = "planned"
             if workout.plan_materialized is not False:
                 count = sum(len(item["sets"]) for item in plan["exercises"])
                 if revised_sets + count > MAX_GENERATED_SETS:
@@ -916,18 +968,19 @@ def program_lifecycle_summary(db: Session, actor: User, program_id: int) -> dict
     program, _role = get_program_for_actor(db, actor, program_id)
     owner = db.query(User).filter(User.id == program.user_id).one()
     today = today_for_user(owner)
-    if (
-        program.is_active
-        and program.status in {"scheduled", "active"}
-        and materialize_cycle_schedule(db, program, today, today + timedelta(days=27))
-    ):
-        db.commit()
-    workouts = (
+    workouts_query = (
         db.query(UserWorkout)
         .filter(UserWorkout.user_program_id == program.id)
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
-        .all()
     )
+    workouts = workouts_query.all()
+    if (
+        any(row.source_cycle_week is not None for row in workouts)
+        and program.is_active
+        and program.status in {"scheduled", "active"}
+        and materialize_cycle_read_window(db, [program.id], today, today + timedelta(days=27))
+    ):
+        workouts = workouts_query.all()
     in_progress = next((workout for workout in workouts if workout.status == "in_progress"), None)
     planned = [workout for workout in workouts if workout.status == "planned"]
     next_workout = in_progress or next(
@@ -1416,7 +1469,7 @@ def _workout_has_recorded_data(workout: UserWorkout) -> bool:
         return True
     return any(
         workout_set.is_completed
-        or workout_set.version > 1
+        or (workout_set.version > 1 and workout_set.version != workout_set.plan_version)
         or any(
             value is not None
             for value in (
@@ -1730,10 +1783,20 @@ def _import_cycle_revision(
     db.flush()
     updated = 0
     revised_sets = 0
+    structure_cancelled = {
+        workout_id
+        for event in db.query(ProgramRevision).filter_by(user_program_id=program.id)
+        for workout_id in event.changed_fields.get("structure_cancelled_workout_ids", [])
+    }
+    cancelled_ids = []
     for workout in db.query(UserWorkout).filter(
         UserWorkout.user_program_id == program.id,
         UserWorkout.week_number >= boundary,
-        UserWorkout.status == "planned",
+        UserWorkout.week_number <= program.duration_weeks,
+        or_(
+            UserWorkout.status == "planned",
+            and_(UserWorkout.status == "cancelled", UserWorkout.id.in_(structure_cancelled)),
+        ),
     ):
         if _workout_has_recorded_data(workout) or workout.started_at is not None:
             raise ProgramError(
@@ -1748,9 +1811,14 @@ def _import_cycle_revision(
             None,
         )
         if effective is None:
+            if workout.status == "cancelled":
+                continue
             workout.status = "cancelled"
+            cancelled_ids.append(workout.id)
             cancel_workout_reminder(db, workout.id)
-        elif workout.plan_materialized is not False:
+        else:
+            workout.status = "planned"
+        if effective is not None and workout.plan_materialized is not False:
             count = sum(len(item["sets"]) for item in effective["exercises"])
             if revised_sets + count > MAX_GENERATED_SETS:
                 continue
@@ -1758,6 +1826,10 @@ def _import_cycle_revision(
             revised_sets += count
         workout.plan_revision_number = revision.revision_number
         updated += 1
+    revision.changed_fields = {
+        **revision.changed_fields,
+        "structure_cancelled_workout_ids": cancelled_ids,
+    }
     program.template_id = template.id
     program.schedule_weekdays = weekdays
     revision.snapshot = _build_program_snapshot(db, program)
@@ -2598,6 +2670,7 @@ def upsert_future_program_exercise(
                 raise ProgramError(
                     "Область ближайшей тренировки нельзя совмещать с повторением изменений"
                 )
+            materialize_cycle_schedule(db, program, today, today + timedelta(days=27))
             upcoming = (
                 db.query(UserWorkout)
                 .filter(
@@ -2609,19 +2682,6 @@ def upsert_future_program_exercise(
                 .order_by(UserWorkout.scheduled_date, UserWorkout.id)
                 .first()
             )
-            if upcoming is None:
-                materialize_cycle_schedule(db, program, today, today + timedelta(days=27))
-                upcoming = (
-                    db.query(UserWorkout)
-                    .filter(
-                        UserWorkout.user_program_id == program.id,
-                        UserWorkout.status == "planned",
-                        UserWorkout.day_number == selected_day,
-                        UserWorkout.scheduled_date >= today,
-                    )
-                    .order_by(UserWorkout.scheduled_date, UserWorkout.id)
-                    .first()
-                )
             if upcoming is None:
                 raise ProgramError("No next planned workout for this revision")
             scope = {"weeks": [upcoming.week_number]}

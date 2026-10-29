@@ -21,6 +21,11 @@ def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         op.add_column(
+            "user_workout_sets",
+            sa.Column("plan_version", sa.Integer(), nullable=True),
+            if_not_exists=True,
+        )
+        op.add_column(
             "user_workouts",
             sa.Column("plan_materialized", sa.Boolean(), nullable=True),
             if_not_exists=True,
@@ -61,6 +66,7 @@ def upgrade() -> None:
                     "Incomplete cycle occurrence index; repair it before retrying migration"
                 )
     else:
+        op.add_column("user_workout_sets", sa.Column("plan_version", sa.Integer(), nullable=True))
         op.add_column("user_workouts", sa.Column("plan_materialized", sa.Boolean(), nullable=True))
         op.add_column("user_workouts", sa.Column("source_cycle_week", sa.Integer(), nullable=True))
         op.add_column("user_workouts", sa.Column("cycle_iteration", sa.Integer(), nullable=True))
@@ -82,6 +88,13 @@ def downgrade() -> None:
     bind = op.get_bind()
     if (
         bind.execute(
+            sa.text("SELECT 1 FROM user_workout_sets WHERE plan_version IS NOT NULL LIMIT 1")
+        ).first()
+        is not None
+    ):
+        raise RuntimeError("Unsafe downgrade: cycle plan version lineage exists; use forward-fix")
+    if (
+        bind.execute(
             sa.text(
                 "SELECT 1 FROM user_workouts WHERE source_cycle_week IS NOT NULL "
                 "OR cycle_iteration IS NOT NULL OR plan_revision_number IS NOT NULL "
@@ -96,3 +109,4 @@ def downgrade() -> None:
     op.drop_column("user_workouts", "cycle_iteration")
     op.drop_column("user_workouts", "source_cycle_week")
     op.drop_column("user_workouts", "plan_materialized")
+    op.drop_column("user_workout_sets", "plan_version")
