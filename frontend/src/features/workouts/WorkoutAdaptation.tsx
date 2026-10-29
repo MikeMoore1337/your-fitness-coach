@@ -213,6 +213,7 @@ export function WorkoutAdaptation({
       filtered.map((item) => ({
         id: item.exercise_id,
         title: item.title,
+        aliases: item.aliases,
         equipment: item.equipment_ids.join(' '),
         item,
       })),
