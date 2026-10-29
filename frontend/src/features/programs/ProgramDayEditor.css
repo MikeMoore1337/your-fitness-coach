@@ -210,6 +210,13 @@
 .copy-editor__danger {
   color: var(--v2-danger, #e88d86);
 }
+.copy-editor__detail-fields .copy-editor__danger {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+}
 .copy-editor__mobile-days {
   display: none;
 }
