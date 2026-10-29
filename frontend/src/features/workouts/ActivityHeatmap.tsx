@@ -1,5 +1,6 @@
-import { useId, useRef, useState, type KeyboardEvent } from 'react';
-import { Button, DisclosureIcon } from '../../shared/ui/common';
+import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Button, DisclosureIcon, IconButton } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import './ActivityHeatmap.css';
 
 export type ActivityDay = {
@@ -32,6 +33,174 @@ function monthLabel(value: string, calendarYear: boolean) {
 
 function valueLabel(value: number | null) {
   return value === null ? 'Нет данных' : String(value);
+}
+
+function MobileActivityCalendar({
+  groups,
+  timezone,
+  selected,
+  onSelect,
+}: {
+  groups: ActivityDay[][];
+  timezone: string;
+  selected?: string;
+  onSelect: (date: string) => void;
+}) {
+  const today = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    timeZone: timezone,
+  }).formatToParts(new Date());
+  const currentMonth = `${today.find((part) => part.type === 'year')?.value}-${today.find((part) => part.type === 'month')?.value}`;
+  const initial = Math.max(
+    0,
+    groups.findIndex((group) => group[0]?.date.startsWith(currentMonth)),
+  );
+  const [visible, setVisible] = useState(initial);
+  const viewport = useRef<HTMLDivElement>(null);
+  const visibleRef = useRef(initial);
+  const id = useId();
+  useLayoutEffect(() => {
+    const node = viewport.current;
+    if (!node) return;
+    const resize = new ResizeObserver(() => {
+      if (node.clientWidth)
+        node.scrollTo({ left: visibleRef.current * node.clientWidth, behavior: 'instant' });
+    });
+    node.scrollTo({ left: initial * node.clientWidth, behavior: 'instant' });
+    resize.observe(node);
+    return () => resize.disconnect();
+  }, [initial]);
+  function navigate(index: number) {
+    const node = viewport.current;
+    if (!node) return;
+    node.scrollTo({
+      left: Math.max(0, Math.min(groups.length - 1, index)) * node.clientWidth,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    });
+  }
+  function dayKeys(event: KeyboardEvent<HTMLDivElement>) {
+    if (!(event.target instanceof HTMLButtonElement) || !event.target.dataset.date) return;
+    const buttons = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-date]:enabled'),
+    );
+    const index = buttons.indexOf(event.target);
+    const weekday = (new Date(`${event.target.dataset.date}T00:00:00Z`).getUTCDay() + 6) % 7;
+    const offset = (
+      {
+        ArrowLeft: -1,
+        ArrowRight: 1,
+        ArrowUp: -7,
+        ArrowDown: 7,
+        Home: -weekday,
+        End: 6 - weekday,
+      } as Record<string, number>
+    )[event.key];
+    if (offset === undefined) return;
+    event.preventDefault();
+    buttons[Math.max(0, Math.min(buttons.length - 1, index + offset))]?.focus();
+  }
+  return (
+    <div
+      className="activity-heatmap__mobile"
+      role="region"
+      aria-label="Календарь активности по месяцам"
+      aria-roledescription="карусель"
+    >
+      <div className="activity-heatmap__month-nav">
+        <IconButton
+          aria-label="Предыдущий месяц"
+          disabled={visible === 0}
+          onClick={() => navigate(visible - 1)}
+          aria-controls={id}
+        >
+          <Icon name="chevron-left" />
+        </IconButton>
+        <div aria-live="polite" aria-atomic="true">
+          <h3>{groups[visible]?.[0] && monthLabel(groups[visible][0].date, false)}</h3>
+          <span>
+            {visible + 1} / {groups.length}
+          </span>
+        </div>
+        <IconButton
+          aria-label="Следующий месяц"
+          disabled={visible === groups.length - 1}
+          onClick={() => navigate(visible + 1)}
+          aria-controls={id}
+        >
+          <Icon name="chevron-right" />
+        </IconButton>
+      </div>
+      <div
+        className="activity-heatmap__carousel"
+        id={id}
+        ref={viewport}
+        onScroll={(event) => {
+          const node = event.currentTarget;
+          if (!node.clientWidth) return;
+          const index = Math.max(
+            0,
+            Math.min(groups.length - 1, Math.round(node.scrollLeft / node.clientWidth)),
+          );
+          visibleRef.current = index;
+          setVisible(index);
+        }}
+      >
+        {groups.map((group, index) => (
+          <div
+            key={group[0]?.date}
+            className="activity-heatmap__slide"
+            inert={index !== visible}
+            aria-hidden={index !== visible}
+            role="group"
+            aria-label={group[0] && monthLabel(group[0].date, false)}
+            onKeyDown={dayKeys}
+          >
+            <div className="activity-heatmap__days">
+              {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (
+                <span key={day} aria-hidden="true">
+                  {day}
+                </span>
+              ))}
+              {Array.from(
+                {
+                  length: group[0]
+                    ? (new Date(`${group[0].date}T00:00:00Z`).getUTCDay() + 6) % 7
+                    : 0,
+                },
+                (_, i) => (
+                  <span key={`pad-${i}`} />
+                ),
+              )}
+              {group.map((day) => (
+                <button
+                  key={day.date}
+                  type="button"
+                  data-date={day.date}
+                  data-yfc-choice="compact"
+                  data-level={
+                    day.is_future
+                      ? 'future'
+                      : day.completed_workouts === null
+                        ? 'unknown'
+                        : Math.min(day.completed_workouts, 3)
+                  }
+                  disabled={day.is_future}
+                  aria-pressed={selected === day.date}
+                  aria-label={`${dateLabel(day.date)}: ${day.is_future ? 'будущий день' : `тренировки — ${valueLabel(day.completed_workouts)}, рабочие подходы — ${valueLabel(day.working_sets)}`}`}
+                  onClick={() => onSelect(day.date)}
+                >
+                  {Number(day.date.slice(-2))}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function ActivityHeatmap(props: Parameters<typeof ActivityHeatmapContent>[0]) {
@@ -156,105 +325,117 @@ function ActivityHeatmapContent({
           <p>За этот период нет завершённых тренировок.</p>
         )}
       <p>Будущие дни не содержат данных об активности.</p>
-      <div className="activity-heatmap__groups activity-heatmap__groups--months">
-        {groups.map((group, index) => (
-          <div className="activity-heatmap__group" key={group?.[0]?.date ?? index}>
-            <button
-              type="button"
-              className="activity-heatmap__month-button"
-              ref={(node) => {
-                const month = group[0]?.date.slice(0, 7);
-                if (month) {
-                  if (node) monthButtons.current.set(month, node);
-                  else monthButtons.current.delete(month);
-                }
-              }}
-              aria-expanded={openMonth === group[0]?.date.slice(0, 7)}
-              aria-controls={
-                openMonth === group[0]?.date.slice(0, 7) ? `${id}-calendar` : undefined
-              }
-              onClick={() => group[0] && openCalendar(group[0].date.slice(0, 7))}
-            >
-              <span>{group[0] && monthLabel(group[0].date, Boolean(year))}</span>
-              <span className="activity-heatmap__grid" aria-hidden="true">
-                {Array.from(
-                  {
-                    length: group?.[0]
-                      ? (new Date(`${group[0].date}T00:00:00Z`).getUTCDay() + 6) % 7
-                      : 0,
-                  },
-                  (_, index) => (
-                    <span key={`padding-${index}`} />
-                  ),
-                )}
-                {group?.map((day) => (
-                  <span
-                    key={day.date}
-                    className="activity-heatmap__cell"
-                    data-level={
-                      day.is_future
-                        ? 'future'
-                        : day.completed_workouts === null
-                          ? 'unknown'
-                          : Math.min(day.completed_workouts, 3)
-                    }
-                  />
-                ))}
-              </span>
-            </button>
-          </div>
-        ))}
-      </div>
-      {openMonth && (
-        <div
-          id={`${id}-calendar`}
-          ref={calendar}
-          tabIndex={-1}
-          className="activity-heatmap__calendar"
-          role="region"
-          aria-label={`Выбор дня: ${monthLabel(`${openMonth}-01`, Boolean(year))}`}
-          onKeyDown={moveDay}
-        >
-          <h3>{monthLabel(`${openMonth}-01`, Boolean(year))}</h3>
-          <p>Стрелки — переход по дням. Выбор — клавишей ввода, сворачивание — клавишей отмены.</p>
-          <div className="activity-heatmap__days">
-            {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (
-              <span key={day} aria-hidden="true">
-                {day}
-              </span>
-            ))}
-            {Array.from(
-              { length: (new Date(`${openMonth}-01T00:00:00Z`).getUTCDay() + 6) % 7 },
-              (_, index) => (
-                <span key={`empty-${index}`} />
-              ),
-            )}
-            {data.days
-              .filter((day) => day.date.startsWith(openMonth))
-              .map((day) => (
-                <button
-                  key={day.date}
-                  data-date={day.date}
-                  type="button"
-                  data-yfc-choice="compact"
-                  disabled={day.is_future}
-                  aria-pressed={selectedDay?.date === day.date}
-                  aria-label={`${dateLabel(day.date)}: ${day.is_future ? 'будущий день' : `тренировки — ${valueLabel(day.completed_workouts)}, рабочие подходы — ${valueLabel(day.working_sets)}`}`}
-                  tabIndex={selection.focused === day.date ? 0 : -1}
-                  onFocus={() => setSelection((current) => ({ ...current, focused: day.date }))}
-                  onClick={() =>
-                    setSelection({ scope, date: day.date, month: openMonth, focused: day.date })
-                  }
-                >
-                  {Number(day.date.slice(-2))}
-                </button>
-              ))}
-          </div>
-          <Button type="button" variant="secondary" onClick={closeMonth}>
-            Свернуть месяц
-          </Button>
-        </div>
+      {groups.length > 0 && (
+        <MobileActivityCalendar
+          groups={groups}
+          timezone={data.timezone}
+          selected={selectedDay?.date}
+          onSelect={(date) => setSelection((current) => ({ ...current, date }))}
+        />
       )}
+      <div className="activity-heatmap__desktop">
+        <div className="activity-heatmap__groups activity-heatmap__groups--months">
+          {groups.map((group, index) => (
+            <div className="activity-heatmap__group" key={group?.[0]?.date ?? index}>
+              <button
+                type="button"
+                className="activity-heatmap__month-button"
+                ref={(node) => {
+                  const month = group[0]?.date.slice(0, 7);
+                  if (month) {
+                    if (node) monthButtons.current.set(month, node);
+                    else monthButtons.current.delete(month);
+                  }
+                }}
+                aria-expanded={openMonth === group[0]?.date.slice(0, 7)}
+                aria-controls={
+                  openMonth === group[0]?.date.slice(0, 7) ? `${id}-calendar` : undefined
+                }
+                onClick={() => group[0] && openCalendar(group[0].date.slice(0, 7))}
+              >
+                <span>{group[0] && monthLabel(group[0].date, Boolean(year))}</span>
+                <span className="activity-heatmap__grid" aria-hidden="true">
+                  {Array.from(
+                    {
+                      length: group?.[0]
+                        ? (new Date(`${group[0].date}T00:00:00Z`).getUTCDay() + 6) % 7
+                        : 0,
+                    },
+                    (_, index) => (
+                      <span key={`padding-${index}`} />
+                    ),
+                  )}
+                  {group?.map((day) => (
+                    <span
+                      key={day.date}
+                      className="activity-heatmap__cell"
+                      data-level={
+                        day.is_future
+                          ? 'future'
+                          : day.completed_workouts === null
+                            ? 'unknown'
+                            : Math.min(day.completed_workouts, 3)
+                      }
+                    />
+                  ))}
+                </span>
+              </button>
+            </div>
+          ))}
+        </div>
+        {openMonth && (
+          <div
+            id={`${id}-calendar`}
+            ref={calendar}
+            tabIndex={-1}
+            className="activity-heatmap__calendar"
+            role="region"
+            aria-label={`Выбор дня: ${monthLabel(`${openMonth}-01`, Boolean(year))}`}
+            onKeyDown={moveDay}
+          >
+            <h3>{monthLabel(`${openMonth}-01`, Boolean(year))}</h3>
+            <p>
+              Стрелки — переход по дням. Выбор — клавишей ввода, сворачивание — клавишей отмены.
+            </p>
+            <div className="activity-heatmap__days">
+              {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (
+                <span key={day} aria-hidden="true">
+                  {day}
+                </span>
+              ))}
+              {Array.from(
+                { length: (new Date(`${openMonth}-01T00:00:00Z`).getUTCDay() + 6) % 7 },
+                (_, index) => (
+                  <span key={`empty-${index}`} />
+                ),
+              )}
+              {data.days
+                .filter((day) => day.date.startsWith(openMonth))
+                .map((day) => (
+                  <button
+                    key={day.date}
+                    data-date={day.date}
+                    type="button"
+                    data-yfc-choice="compact"
+                    disabled={day.is_future}
+                    aria-pressed={selectedDay?.date === day.date}
+                    aria-label={`${dateLabel(day.date)}: ${day.is_future ? 'будущий день' : `тренировки — ${valueLabel(day.completed_workouts)}, рабочие подходы — ${valueLabel(day.working_sets)}`}`}
+                    tabIndex={selection.focused === day.date ? 0 : -1}
+                    onFocus={() => setSelection((current) => ({ ...current, focused: day.date }))}
+                    onClick={() =>
+                      setSelection({ scope, date: day.date, month: openMonth, focused: day.date })
+                    }
+                  >
+                    {Number(day.date.slice(-2))}
+                  </button>
+                ))}
+            </div>
+            <Button type="button" variant="secondary" onClick={closeMonth}>
+              Свернуть месяц
+            </Button>
+          </div>
+        )}
+      </div>
       <div className="activity-heatmap__legend" aria-label="Легенда: количество тренировок">
         {[
           ['unknown', 'Нет данных'],
