@@ -368,7 +368,7 @@ test('approved B mobile picker preserves editor draft and supports keyboard sear
   const title = editor.getByLabel('Название', { exact: true });
   await title.fill('Мой сохранённый черновик');
   await editor.getByRole('button', { name: 'Добавить упражнение', exact: true }).click();
-  const picker = editor.getByRole('button', { name: 'Поиск упражнения', exact: true });
+  const picker = page.getByRole('dialog', { name: 'Параметры упражнения' }).getByRole('button', { name: 'Поиск упражнения', exact: true });
   await picker.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   const search = dialog.getByRole('searchbox');
