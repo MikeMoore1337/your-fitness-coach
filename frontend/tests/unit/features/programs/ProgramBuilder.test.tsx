@@ -388,11 +388,13 @@ describe('ProgramBuilder type-aware prescription', () => {
     await waitFor(() => expect(chooser).not.toBeInTheDocument());
     expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 2');
 
-    await user.click(screen.getByRole('button', { name: 'Сохранить программу' }));
+    await user.click(screen.getByRole('button', { name: 'Проверить и сохранить' }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
         '/api/v1/programs/templates/9',
         expect.objectContaining({
+          method: 'PATCH',
           body: expect.objectContaining({
             days: [
               expect.objectContaining({ title: 'Тренировка 2' }),
