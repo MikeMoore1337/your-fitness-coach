@@ -4944,6 +4944,8 @@ button.today-text-link {
   background: var(--surface-subtle);
 }
 .active-workout-set.is-current {
+  /* #1318: reserve room for the 3px focus outline and its 3px offset above the input. */
+  --yfc-current-set-label-gap: 10px;
   gap: 15px;
   padding: clamp(15px, 2.4vw, 22px);
   border: 2px solid var(--accent);
@@ -5145,7 +5147,6 @@ button.today-text-link {
 @media (max-width: 899px) {
   .active-workout-set.is-current:not(:first-child) {
     --yfc-current-set-control-height: 44px;
-    --yfc-current-set-label-gap: 0px;
   }
 }
 .active-workout-input {
