@@ -438,16 +438,54 @@ def build_progress_summaries(
             raise ValueError("period end must not be before period start")
     actual_today_by_user = {user.id: today_for_user(user) for user in users}
 
+    workout_rows = (
+        db.query(
+            UserProgram.user_id,
+            UserProgram.id.label("program_id"),
+            and_(
+                UserProgram.status.in_({"active", "scheduled", "paused"}),
+                UserProgram.workouts.any(UserWorkout.source_cycle_week.is_not(None)),
+            ).label("is_cycle"),
+            UserWorkout.id,
+            UserWorkout.scheduled_date,
+            UserWorkout.scheduled_time,
+            UserWorkout.title,
+            UserWorkout.status,
+        )
+        .select_from(UserProgram)
+        .outerjoin(
+            UserWorkout,
+            and_(
+                UserProgram.id == UserWorkout.user_program_id,
+                _user_date_filter(
+                    user_ids,
+                    start_by_user,
+                    today_by_user,
+                    UserProgram.user_id,
+                    UserWorkout.scheduled_date,
+                ),
+            ),
+        )
+        .filter(UserProgram.user_id.in_(user_ids))
+        .order_by(UserProgram.user_id, UserWorkout.scheduled_date, UserWorkout.id)
+        .all()
+    )
+    workouts_by_user: dict[int, list] = defaultdict(list)
+    for workout_row in workout_rows:
+        if workout_row.id is not None:
+            workouts_by_user[workout_row.user_id].append(workout_row)
+    cycle_program_ids = {row.program_id for row in workout_rows if row.is_cycle}
+
     cycle_programs = (
         db.query(UserProgram)
         .options(selectinload(UserProgram.workouts))
         .filter(
-            UserProgram.user_id.in_(user_ids),
-            UserProgram.status.in_({"active", "scheduled", "paused"}),
-            UserProgram.workouts.any(UserWorkout.source_cycle_week.is_not(None)),
+            UserProgram.id.in_(cycle_program_ids),
         )
         .order_by(UserProgram.id)
         .all()
+        if cycle_program_ids
+        else []
     )
     missing_workouts_by_user: dict[int, int] = defaultdict(int)
     if cycle_programs:
@@ -473,32 +511,6 @@ def build_progress_summaries(
             )
         if changed:
             db.commit()
-
-    workout_rows = (
-        db.query(
-            UserProgram.user_id,
-            UserWorkout.id,
-            UserWorkout.scheduled_date,
-            UserWorkout.scheduled_time,
-            UserWorkout.title,
-            UserWorkout.status,
-        )
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
-        .filter(
-            _user_date_filter(
-                user_ids,
-                start_by_user,
-                today_by_user,
-                UserProgram.user_id,
-                UserWorkout.scheduled_date,
-            )
-        )
-        .order_by(UserProgram.user_id, UserWorkout.scheduled_date, UserWorkout.id)
-        .all()
-    )
-    workouts_by_user: dict[int, list] = defaultdict(list)
-    for workout_row in workout_rows:
-        workouts_by_user[workout_row.user_id].append(workout_row)
 
     cardio_rows = (
         db.query(CardioSession)
