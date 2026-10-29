@@ -37,6 +37,21 @@ ExerciseProgressionEventKind = Literal["confirm", "adjust", "reject"]
 WORKOUT_COMPLETION_NOTE_MAX_LENGTH = 500
 
 
+class ActivityHeatmapDay(BaseModel):
+    date: date
+    completed_workouts: int | None
+    working_sets: int | None
+
+
+class ActivityHeatmapResponse(BaseModel):
+    timezone: str
+    start_date: date
+    end_date: date
+    history_complete: bool
+    undated_workouts: int
+    days: list[ActivityHeatmapDay]
+
+
 class WorkoutAdaptationRequest(BaseModel):
     reason: WorkoutAdaptationReason
     time_budget_minutes: int | None = Field(default=None, ge=10, le=240)

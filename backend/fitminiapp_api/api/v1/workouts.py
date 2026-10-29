@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import case, func
@@ -36,6 +36,7 @@ from fitminiapp_api.schemas.progress import (
     ProgressSummaryResponse,
 )
 from fitminiapp_api.schemas.workout import (
+    ActivityHeatmapResponse,
     BodyMeasurementDefinitionCreate,
     BodyMeasurementDefinitionResponse,
     BodyMeasurementDefinitionUpdate,
@@ -67,6 +68,7 @@ from fitminiapp_api.schemas.workout import (
     WorkoutStatusResponse,
     WorkoutTodayResponse,
 )
+from fitminiapp_api.services.activity_heatmap import build_activity_heatmap
 from fitminiapp_api.services.analytics import (
     build_training_analytics_for_range,
     build_user_progress,
@@ -173,6 +175,14 @@ from fitminiapp_api.services.workouts import (
 )
 
 router = APIRouter()
+
+
+@router.get("/progress/activity-heatmap", response_model=ActivityHeatmapResponse)
+def workout_activity_heatmap(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return build_activity_heatmap(db, current_user)
 
 
 def now_for_user_naive(user: User):
@@ -1291,6 +1301,7 @@ def finish_workout(
         )
 
     workout.completed_at = now_for_user_naive(current_user)
+    workout.completed_at_utc = datetime.now(UTC).replace(tzinfo=None)
     workout.status = "completed"
     if workout.completed_at is not None:
         record_lifecycle_milestone(

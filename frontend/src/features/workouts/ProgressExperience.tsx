@@ -36,6 +36,7 @@ import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MuscleWorkloadList as SharedMuscleWorkloadList } from './MuscleWorkload';
+import { ActivityHeatmap, type ActivityHeatmapData } from './ActivityHeatmap';
 import {
   nutritionPeriodForProgress,
   parseProgressSelection,
@@ -1549,6 +1550,11 @@ export function ProgressExperience({
     enabled: view === 'overview',
   });
   const analytics = useTrainingAnalytics(selection, view === 'training');
+  const activity = useQuery({
+    queryKey: ['workout', 'activity-heatmap'],
+    queryFn: () => api<ActivityHeatmapData>('/api/v1/workouts/progress/activity-heatmap'),
+    enabled: view === 'training',
+  });
   const controlledNutritionPeriod = useMemo<ControlledNutritionPeriod>(
     () => nutritionPeriodForProgress(selection),
     [selection],
@@ -1656,7 +1662,19 @@ export function ProgressExperience({
               <ProgressDetailHeader search={search} view={view} />
               <div className="progress-details" aria-label="Подробности прогресса">
                 {view === 'training' && (
-                  <TrainingSection analytics={analytics} summary={summary.data} />
+                  <>
+                    {activity.isLoading ? (
+                      <LoadingState label="Загружаем календарь активности…" />
+                    ) : activity.error ? (
+                      <ErrorState
+                        message={(activity.error as Error).message}
+                        retry={() => void activity.refetch()}
+                      />
+                    ) : activity.data ? (
+                      <ActivityHeatmap data={activity.data} />
+                    ) : null}
+                    <TrainingSection analytics={analytics} summary={summary.data} />
+                  </>
                 )}
                 {view === 'cardio' && (
                   <CardioHistory

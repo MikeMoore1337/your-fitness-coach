@@ -1,0 +1,84 @@
+.activity-heatmap {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.activity-heatmap__groups {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+.activity-heatmap__groups--months {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.activity-heatmap__grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 0.65rem);
+  grid-auto-columns: 0.65rem;
+  gap: 0.2rem;
+  width: max-content;
+}
+
+.activity-heatmap__cell {
+  display: inline-block;
+  width: 0.65rem;
+  height: 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  background: var(--color-surface-subtle);
+}
+
+.activity-heatmap__cell[data-level='unknown'] {
+  background: repeating-linear-gradient(135deg, transparent 0 2px, var(--color-text-muted) 2px 3px);
+}
+
+.activity-heatmap__cell[data-level='1'] {
+  background: var(--color-accent-subtle);
+}
+.activity-heatmap__cell[data-level='2'] {
+  background: var(--color-accent);
+  opacity: 0.65;
+}
+.activity-heatmap__cell[data-level='3'] {
+  background: var(--color-accent);
+}
+
+.activity-heatmap__group > span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.activity-heatmap__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.activity-heatmap__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.activity-heatmap select {
+  display: block;
+  max-width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -196,6 +198,7 @@ def complete_workout(db: Session, workout: UserWorkout) -> UserWorkout:
     if workout.started_at is None:
         workout.started_at = now_msk_naive()
     workout.completed_at = now_msk_naive()
+    workout.completed_at_utc = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
     db.refresh(workout)
     return workout
