@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useId,
   useRef,
   useState,
   type Dispatch,
@@ -49,12 +48,21 @@ export function ProgramDayEditor({
   onOpenGuide,
 }: Props) {
   const { confirm } = useFeedback();
-  const id = useId();
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedExercise, setSelectedExercise] = useState(0);
   const [allDaysOpen, setAllDaysOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [mobileView, setMobileView] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1099px)').matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1099px)');
+    const update = () => setMobileView(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const carouselRef = useRef<HTMLDivElement>(null);
   const scrollTimerRef = useRef<number | null>(null);
   const allDaysTriggerRef = useRef<HTMLButtonElement>(null);
@@ -115,14 +123,14 @@ export function ProgramDayEditor({
     }, 120);
   };
 
-  const closeAllDays = () => {
+  const closeAllDays = useCallback(() => {
     setAllDaysOpen(false);
     window.requestAnimationFrame(() => allDaysTriggerRef.current?.focus());
-  };
-  const closeDetail = () => {
+  }, []);
+  const closeDetail = useCallback(() => {
     setDetailOpen(false);
     window.requestAnimationFrame(() => exerciseTriggerRef.current?.focus());
-  };
+  }, []);
 
   useEffect(() => {
     if (!allDaysOpen && !detailOpen) return;
@@ -160,7 +168,7 @@ export function ProgramDayEditor({
       document.body.style.overflow = previous;
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [allDaysOpen, detailOpen]);
+  }, [allDaysOpen, detailOpen, closeAllDays, closeDetail]);
 
   if (!day) return <p className="muted">Добавьте первый тренировочный день.</p>;
 
@@ -259,7 +267,7 @@ export function ProgramDayEditor({
             </button>
           )}
         </div>
-        <label className="field">
+        <div className="field">
           <span>Упражнение</span>
           <SearchableExercisePicker
             mobileSheet
@@ -269,7 +277,7 @@ export function ProgramDayEditor({
             onOpenGuide={onOpenGuide}
             onChange={(id) => selectExerciseId(exerciseIndex, typeof id === 'number' ? id : 0)}
           />
-        </label>
+        </div>
         {selected && (
           <button type="button" className="text-button" onClick={() => onOpenGuide(selected)}>
             {selected.has_guide ? 'Техника и детали' : 'Подробнее об упражнении'}
@@ -504,11 +512,11 @@ export function ProgramDayEditor({
               const cardio = details?.metric_type === 'cardio';
               return (
                 <button key={index} type="button" className="copy-editor__exercise"
-                  aria-selected={index === exerciseIndex}
+                  aria-pressed={index === exerciseIndex}
                   onClick={(event) => {
                     exerciseTriggerRef.current = event.currentTarget;
                     setSelectedExercise(index);
-                    setDetailOpen(true);
+                    setDetailOpen(mobileView);
                   }}>
                   <span className="copy-editor__ordinal">{index + 1}</span>
                   <span className="copy-editor__exercise-info">
@@ -540,7 +548,7 @@ export function ProgramDayEditor({
                   exercises: [...current.exercises, newExercise(defaultRestSeconds)],
                 }));
                 setSelectedExercise(day.exercises.length);
-                setDetailOpen(true);
+                setDetailOpen(mobileView);
               }}>
               <Icon name="plus" size={18} /> Добавить упражнение
             </button>
@@ -554,7 +562,8 @@ export function ProgramDayEditor({
                     ...current,
                     { title: simpleTrainingTitle(current.length + 1), exercises: [newExercise(defaultRestSeconds)] },
                   ]);
-                  selectDay(dayCount);
+                  setSelectedDay(dayCount);
+                  setSelectedExercise(0);
                 }}>
                 <Icon name="plus" size={18} /> Добавить день
               </button>
@@ -563,7 +572,7 @@ export function ProgramDayEditor({
         </div>
 
         <aside className="copy-editor__detail-rail" aria-label="Параметры упражнения">
-          {renderDetails(false)}
+          {!mobileView && renderDetails(false)}
         </aside>
       </section>
 
@@ -585,7 +594,7 @@ export function ProgramDayEditor({
         </div>,
         document.body,
       )}
-      {detailOpen && createPortal(
+      {detailOpen && mobileView && createPortal(
         <div className="copy-editor__overlay copy-editor__detail-overlay" onMouseDown={(event) => {
           if (event.target === event.currentTarget) closeDetail();
         }}>
