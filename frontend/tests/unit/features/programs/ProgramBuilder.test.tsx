@@ -212,7 +212,7 @@ describe('ProgramBuilder type-aware prescription', () => {
     const user = userEvent.setup();
     renderBuilder({ editingTemplate: activeTemplate });
 
-    await user.click(await screen.findByRole('button', { name: 'Сохранить изменения' }));
+    await user.click(await screen.findByRole('button', { name: 'Сохранить программу' }));
 
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -228,24 +228,26 @@ describe('ProgramBuilder type-aware prescription', () => {
     ).toBeInTheDocument();
   });
 
-  it('синхронизирует picker после перестановки и удаления строк, сохраняя назначения', async () => {
+  it('редактирует только выбранное упражнение и сохраняет порядок без потери назначений', async () => {
     const user = userEvent.setup();
     renderBuilder({ editingTemplate: activeTemplate });
     await screen.findByRole('combobox', { name: 'Поиск упражнения' });
     await user.click(screen.getByRole('button', { name: 'Добавить упражнение' }));
-    const pickers = screen.getAllByRole('combobox', { name: 'Поиск упражнения' });
-    await user.click(pickers[1]!);
+    await user.click(screen.getByRole('combobox', { name: 'Поиск упражнения' }));
     await user.click(screen.getByRole('option', { name: /Велотренажёр/ }));
-    await user.clear(screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' }));
-    await user.type(screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' }), '25');
-    await user.click(screen.getByRole('button', { name: 'Переместить упражнение 2 выше' }));
-    expect(pickers[0]).toHaveValue('Велотренажёр');
-    expect(pickers[1]).toHaveValue('Жим штанги лёжа');
-    await user.click(screen.getByRole('button', { name: 'Удалить упражнение 2 из дня 1' }));
+
+    const duration = screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' });
+    await user.clear(duration);
+    await user.type(duration, '25');
+    await user.click(screen.getByRole('button', { name: 'Изменить порядок' }));
+    await user.click(screen.getByRole('button', { name: 'Выше' }));
+
+    const rows = document.querySelectorAll('.copy-editor__exercise');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Велотренажёр');
+    expect(rows[1]).toHaveTextContent('Жим штанги лёжа');
     expect(screen.getAllByRole('combobox', { name: 'Поиск упражнения' })).toHaveLength(1);
-    expect(pickers[0]).toHaveValue('Велотренажёр');
-    expect(screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' })).toHaveValue(25);
-    await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить программу' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
         '/api/v1/programs/templates/9',
@@ -255,9 +257,46 @@ describe('ProgramBuilder type-aware prescription', () => {
               expect.objectContaining({
                 exercises: [
                   expect.objectContaining({ exercise_id: 12, prescribed_duration_minutes: 25 }),
+                  expect.objectContaining({ exercise_id: 11, prescribed_reps: '8-10' }),
                 ],
               }),
             ],
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('переключает дни без потери несохранённых изменений', async () => {
+    const user = userEvent.setup();
+    const editingTemplate = {
+      ...activeTemplate,
+      days: [1, 2, 3].map((number) => ({
+        ...activeTemplate.days[0],
+        id: 90 + number,
+        day_number: number,
+        title: 'Тренировка ' + number,
+        exercises: activeTemplate.days[0]!.exercises.map((exercise) => ({ ...exercise })),
+      })),
+    } as ProgramTemplate;
+    renderBuilder({ editingTemplate });
+    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    const rail = document.querySelector('.copy-editor__rail') as HTMLElement;
+    await user.click(within(rail).getByRole('tab', { name: /День 2/ }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 2');
+    const titleInput = screen.getByRole('textbox', { name: 'Название дня' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'День с прогрессией');
+    await user.click(within(rail).getByRole('tab', { name: /День 3/ }));
+    await user.click(within(rail).getByRole('tab', { name: /День 2/ }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('День с прогрессией');
+    await user.click(screen.getByRole('button', { name: 'Сохранить программу' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/programs/templates/9',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            days: expect.arrayContaining([expect.objectContaining({ title: 'День с прогрессией' })]),
           }),
         }),
       ),
