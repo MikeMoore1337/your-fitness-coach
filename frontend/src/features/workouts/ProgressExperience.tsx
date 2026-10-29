@@ -1,5 +1,15 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
+import { QuickAddPlacementContext } from '../../app/QuickAddPlacementContext';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -137,8 +147,8 @@ function SectionHeading({
   trailing,
 }: {
   description: string;
-  eyebrow: string;
-  title: string;
+  eyebrow: ReactNode;
+  title: ReactNode;
   titleId: string;
   trailing?: ReactNode;
 }) {
@@ -842,11 +852,16 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
 
 function TrainingSection({
   analytics,
+  selection,
   summary,
 }: {
   analytics: ReturnType<typeof useTrainingAnalytics>;
+  selection: ProgressSelection;
   summary?: ProgressSummary;
 }) {
+  const quickAddTarget = useContext(QuickAddPlacementContext);
+  const presetPeriod = selection.kind === 'preset';
+  const periodLabel = presetPeriod ? `${selection.days} дней` : 'свой период';
   return (
     <section
       className="progress-section"
@@ -854,22 +869,38 @@ function TrainingSection({
       aria-labelledby="progress-training-title"
     >
       <SectionHeading
-        eyebrow="Нагрузка"
-        title="Тренировки"
+        eyebrow={
+          <>
+            <span className="progress-training-heading__mobile">Нагрузка</span>
+            <span className="progress-training-heading__desktop">Тренировки · {periodLabel}</span>
+          </>
+        }
+        title={
+          <>
+            <span className="progress-training-heading__mobile">Тренировки</span>
+            <span className="progress-training-heading__desktop">Показатели за период</span>
+          </>
+        }
         titleId="progress-training-title"
         description="Фактические подходы, нагрузка и история упражнений — без расчётных коэффициентов."
         trailing={
-          summary && (
-            <Badge>
-              {summary.training.new_personal_records}{' '}
-              {plural(
-                summary.training.new_personal_records,
-                'новый рекорд',
-                'новых рекорда',
-                'новых рекордов',
-              )}
-            </Badge>
-          )
+          <div className="progress-training-actions">
+            {summary && (
+              <Badge>
+                {summary.training.new_personal_records}{' '}
+                {plural(
+                  summary.training.new_personal_records,
+                  'новый рекорд',
+                  'новых рекорда',
+                  'новых рекордов',
+                )}
+              </Badge>
+            )}
+            <div
+              className="progress-training-actions__quick-add"
+              ref={quickAddTarget ?? undefined}
+            />
+          </div>
         }
       />
       {analytics.isLoading ? (
@@ -1491,7 +1522,9 @@ function ProgressDetailHeader({
     history: 'История тренировок',
   };
   return (
-    <header className="progress-detail-header">
+    <header
+      className={`progress-detail-header${view === 'training' ? ' progress-detail-header--training' : ''}`}
+    >
       <AppLink className="progress-detail-header__back" to={progressViewPath(search, 'overview')}>
         <Icon name="arrow-left" size={16} /> Обзор
       </AppLink>
@@ -1550,6 +1583,7 @@ export function ProgressExperience({
     enabled: view === 'overview',
   });
   const analytics = useTrainingAnalytics(selection, view === 'training');
+  const showTrainingFallback = Boolean(summary.error && view === 'training');
   const [activityYear, setActivityYear] = useState(Number(today.slice(0, 4)));
   const activity = useQuery({
     queryKey: ['workout', 'activity-heatmap', activityYear],
@@ -1687,7 +1721,11 @@ export function ProgressExperience({
                         onYearChange={setActivityYear}
                       />
                     ) : null}
-                    <TrainingSection analytics={analytics} summary={summary.data} />
+                    <TrainingSection
+                      analytics={analytics}
+                      selection={selection}
+                      summary={summary.data}
+                    />
                   </>
                 )}
                 {view === 'cardio' && (
@@ -1732,7 +1770,7 @@ export function ProgressExperience({
         </>
       ) : null}
 
-      {summary.error && view === 'training' && <TrainingSection analytics={analytics} />}
+      {showTrainingFallback && <TrainingSection analytics={analytics} selection={selection} />}
       <AiCoachContextualEntry
         context={{
           surface: 'progress',

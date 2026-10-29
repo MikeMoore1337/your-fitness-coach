@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -367,6 +368,15 @@ function ActivityHeatmapContent({
   const id = useId();
   const initialDay = data.days.filter((day) => !day.is_future).at(-1);
   const [selection, setSelection] = useState(initialDay?.date ?? '');
+  const [desktopTable, setDesktopTable] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia?.('(min-width: 768px)');
+    if (!media) return;
+    const update = () => setDesktopTable(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, []);
   const selectedDay =
     data.days.find((day) => day.date === selection && !day.is_future) || initialDay;
   const groups: ActivityDay[][] = [];
@@ -409,6 +419,11 @@ function ActivityHeatmapContent({
         )}
       </div>
       <p className="activity-heatmap__timezone">Часовой пояс: {data.timezone}</p>
+      {year && (
+        <p className="activity-heatmap__desktop activity-heatmap__context">
+          Календарный год · не зависит от выбранного периода
+        </p>
+      )}
       {data.days[0] && data.days.at(-1) && (
         <p className="activity-heatmap__mobile-only">
           {dateLabel(data.days[0].date)} — {dateLabel(data.days.at(-1)!.date)}
@@ -445,36 +460,67 @@ function ActivityHeatmapContent({
           onSelect={setSelection}
         />
       )}
-      <div className="activity-heatmap__desktop">
-        {data.days.length > 0 && (
-          <DesktopActivityCalendar
-            days={data.days}
-            selected={selectedDay?.date}
-            onSelect={setSelection}
-          />
+      <div className="activity-heatmap__layout">
+        <div className="activity-heatmap__map">
+          <div className="activity-heatmap__desktop">
+            {data.days.length > 0 && (
+              <DesktopActivityCalendar
+                days={data.days}
+                selected={selectedDay?.date}
+                onSelect={setSelection}
+              />
+            )}
+          </div>
+          <div className="activity-heatmap__legend" aria-label="Легенда: количество тренировок">
+            {[
+              ['unknown', 'Нет данных'],
+              ['future', 'Будущий день'],
+              ['0', '0'],
+              ['1', '1'],
+              ['2', '2'],
+              ['3', '3 и более'],
+            ].map(([level, label]) => (
+              <span key={level} className="activity-heatmap__legend-item">
+                <span className="activity-heatmap__cell" data-level={level} aria-hidden="true" />
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+        {selectedDay && (
+          <aside
+            className="activity-heatmap__desktop activity-heatmap__selected"
+            aria-label="Данные выбранного дня"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <h3>Выбранный день</h3>
+            <p className="activity-heatmap__selected-date">{dateLabel(selectedDay.date)}</p>
+            {selectedDay.completed_workouts === null && selectedDay.working_sets === null ? (
+              <p className="activity-heatmap__selected-unknown">
+                Нет достоверных данных за этот день.
+              </p>
+            ) : (
+              <dl className="activity-heatmap__selected-facts">
+                <div>
+                  <dt>Тренировок</dt>
+                  <dd>{valueLabel(selectedDay.completed_workouts)}</dd>
+                </div>
+                <div>
+                  <dt>Рабочих подходов</dt>
+                  <dd>{valueLabel(selectedDay.working_sets)}</dd>
+                </div>
+              </dl>
+            )}
+          </aside>
         )}
-      </div>
-      <div className="activity-heatmap__legend" aria-label="Легенда: количество тренировок">
-        {[
-          ['unknown', 'Нет данных'],
-          ['future', 'Будущий день'],
-          ['0', '0'],
-          ['1', '1'],
-          ['2', '2'],
-          ['3', '3 и более'],
-        ].map(([level, label]) => (
-          <span key={level} className="activity-heatmap__legend-item">
-            <span className="activity-heatmap__cell" data-level={level} aria-hidden="true" />
-            {label}
-          </span>
-        ))}
       </div>
       {data.days.length === 0 ? (
         <p>Данных об активности пока нет.</p>
       ) : (
         <>
           {selectedDay && (
-            <p aria-live="polite">
+            <p className="activity-heatmap__mobile-only" aria-live="polite">
               {selectedDay.is_future
                 ? `${dateLabel(selectedDay.date)}: этот день ещё не наступил.`
                 : `${dateLabel(selectedDay.date)}: тренировки — ${valueLabel(selectedDay.completed_workouts)}, рабочие подходы — ${valueLabel(selectedDay.working_sets)}.`}
@@ -484,24 +530,31 @@ function ActivityHeatmapContent({
             <summary className="yfc-disclosure-summary">
               Данные по дням <DisclosureIcon />
             </summary>
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Дата</th>
-                  <th scope="col">Тренировки</th>
-                  <th scope="col">Рабочие подходы</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.days.map((day) => (
-                  <tr key={day.date}>
-                    <th scope="row">{dateLabel(day.date)}</th>
-                    <td>{day.is_future ? 'Будущий день' : valueLabel(day.completed_workouts)}</td>
-                    <td>{day.is_future ? 'Будущий день' : valueLabel(day.working_sets)}</td>
+            <div
+              className="activity-heatmap__table-scroll"
+              role={desktopTable ? 'region' : undefined}
+              aria-label={desktopTable ? 'Таблица активности по дням' : undefined}
+              tabIndex={desktopTable ? 0 : undefined}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Дата</th>
+                    <th scope="col">Тренировки</th>
+                    <th scope="col">Рабочие подходы</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.days.map((day) => (
+                    <tr key={day.date}>
+                      <th scope="row">{dateLabel(day.date)}</th>
+                      <td>{day.is_future ? 'Будущий день' : valueLabel(day.completed_workouts)}</td>
+                      <td>{day.is_future ? 'Будущий день' : valueLabel(day.working_sets)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </details>
         </>
       )}

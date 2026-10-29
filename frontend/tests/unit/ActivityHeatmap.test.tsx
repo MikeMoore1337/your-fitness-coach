@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ActivityHeatmap } from '../../src/features/workouts/ActivityHeatmap';
 
@@ -201,4 +201,39 @@ it('navigates the year grid by weeks, selects with one tab stop and shows factua
   expect(grid.querySelectorAll('button[tabindex="0"]')).toHaveLength(1);
   fireEvent.keyDown(document.activeElement!, { key: 'Home', ctrlKey: true });
   expect(first).toHaveFocus();
+});
+
+it('keeps known facts visible when only one activity value is unknown', () => {
+  render(
+    <ActivityHeatmap
+      data={{
+        ...data,
+        days: [{ date: '2026-01-02', completed_workouts: 1, working_sets: null }],
+      }}
+    />,
+  );
+  const details = screen.getByLabelText('Данные выбранного дня');
+  expect(within(details).getByText('1')).toBeInTheDocument();
+  expect(within(details).getByText('Нет данных')).toBeInTheDocument();
+  expect(details).toHaveAttribute('aria-live', 'polite');
+});
+
+it('explains fully unknown days and preserves confirmed zero', () => {
+  const view = render(
+    <ActivityHeatmap
+      data={{
+        ...data,
+        days: [{ date: '2026-01-01', completed_workouts: null, working_sets: null }],
+      }}
+    />,
+  );
+  expect(screen.getByLabelText('Данные выбранного дня')).toHaveTextContent(
+    'Нет достоверных данных за этот день.',
+  );
+  view.rerender(
+    <ActivityHeatmap
+      data={{ ...data, days: [{ date: '2026-01-01', completed_workouts: 0, working_sets: 0 }] }}
+    />,
+  );
+  expect(within(screen.getByLabelText('Данные выбранного дня')).getAllByText('0')).toHaveLength(2);
 });

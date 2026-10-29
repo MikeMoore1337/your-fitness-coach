@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react';
+import { createPortal } from 'react-dom';
+import { QuickAddPlacementContext } from './QuickAddPlacementContext';
 import {
   AppLink,
   coachTabFromSearch,
@@ -221,6 +230,27 @@ export function AppShell({
   const [moreOpen, setMoreOpen] = useState(false);
   const moreOpenRef = useRef(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddTarget, setQuickAddTarget] = useState<HTMLDivElement | null>(null);
+  const quickAddAnchor = useRef<HTMLDivElement>(null);
+  const [quickAddHost] = useState(() => {
+    const host = document.createElement('div');
+    host.style.display = 'contents';
+    return host;
+  });
+  const pendingQuickAddFocus = useRef<HTMLElement | null>(null);
+  const registerQuickAddTarget = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (
+        !node &&
+        document.activeElement instanceof HTMLElement &&
+        quickAddHost.contains(document.activeElement)
+      ) {
+        pendingQuickAddFocus.current = document.activeElement;
+      }
+      setQuickAddTarget(node);
+    },
+    [quickAddHost],
+  );
   const morePresence = useMotionPresence({
     closingAnimationName: 'app-more-backdrop-out',
     openingAnimationName: 'app-more-panel-in',
@@ -252,6 +282,26 @@ export function AppShell({
   const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
   const embeddedQuickAddVisible = quickAddVisible && mobileNavigation && !demo;
   const floatingQuickAddVisible = quickAddVisible && !embeddedQuickAddVisible;
+  const inlineQuickAdd = Boolean(quickAddTarget && !demo && section === 'progress');
+  useLayoutEffect(() => {
+    if (!floatingQuickAddVisible) {
+      quickAddHost.remove();
+      return;
+    }
+    const target = inlineQuickAdd && quickAddTarget ? quickAddTarget : quickAddAnchor.current;
+    if (!target || target.contains(quickAddHost)) return;
+    const focused = quickAddHost.contains(document.activeElement)
+      ? document.activeElement
+      : document.activeElement === document.body
+        ? pendingQuickAddFocus.current
+        : null;
+    target.appendChild(quickAddHost);
+    if (focused instanceof HTMLElement && document.activeElement !== focused) {
+      focused.focus({ preventScroll: true });
+    }
+    pendingQuickAddFocus.current = null;
+  }, [floatingQuickAddVisible, inlineQuickAdd, quickAddHost, quickAddTarget]);
+  useEffect(() => () => quickAddHost.remove(), [quickAddHost]);
   const morePresent = moreOpen || morePresence.present;
   const moreSurfacePresent = morePresent && (Boolean(demo) || mobileNavigation);
   const accountDestinations = [
@@ -445,7 +495,12 @@ export function AppShell({
           </header>
         )}
         {showPwaInstallPrompt && <PwaInstallPrompt />}
-        {floatingQuickAddVisible && <QuickAddTrigger onOpen={openQuickAdd} />}
+        {floatingQuickAddVisible && (
+          <>
+            <div ref={quickAddAnchor} style={{ display: 'contents' }} />
+            {createPortal(<QuickAddTrigger onOpen={openQuickAdd} />, quickAddHost)}
+          </>
+        )}
         {quickAddVisible && (
           <QuickAddSheet
             actions={quickAddLinks}
@@ -457,7 +512,9 @@ export function AppShell({
           {personalWorkspace && (
             <TrainerModeSwitch mode="personal" returnTo={trainerReturnTo ?? undefined} />
           )}
-          {children}
+          <QuickAddPlacementContext.Provider value={demo ? null : registerQuickAddTarget}>
+            {children}
+          </QuickAddPlacementContext.Provider>
         </main>
         {shellVisible && (
           <>

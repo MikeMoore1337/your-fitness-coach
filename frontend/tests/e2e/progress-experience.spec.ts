@@ -4232,6 +4232,51 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
   );
 });
 
+for (const menuOpen of [false, true]) {
+  test(`#835 quick add keeps focus when the training section loads${menuOpen ? ' with its menu open' : ''}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockProgress(page);
+    let releaseSummary!: () => void;
+    let markSummaryStarted!: () => void;
+    const summaryGate = new Promise<void>((resolve) => {
+      releaseSummary = resolve;
+    });
+    const summaryStarted = new Promise<void>((resolve) => {
+      markSummaryStarted = resolve;
+    });
+    await page.route('**/workouts/progress/summary**', async (route) => {
+      markSummaryStarted();
+      await summaryGate;
+      await route.fallback();
+    });
+    await page.goto('/app?section=progress&progress_view=training');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await summaryStarted;
+    const add = page.getByRole('button', { name: 'Быстро добавить' });
+    await expect(add).toBeVisible();
+    const original = await add.elementHandle();
+    if (!original) throw new Error('quick-add trigger missing');
+    if (menuOpen) {
+      await add.click();
+      await expect(page.getByRole('dialog', { name: 'Что добавить?' })).toBeVisible();
+    } else {
+      await add.focus();
+      await expect(add).toBeFocused();
+    }
+    releaseSummary();
+    const slot = page.locator('.progress-training-actions__quick-add');
+    await expect(slot.locator('[data-testid="quick-add-trigger"]')).toHaveCount(1);
+    expect(await original.evaluate((node) => node.isConnected)).toBe(true);
+    if (menuOpen) {
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog', { name: 'Что добавить?' })).toBeHidden();
+    }
+    await expect(add).toBeFocused();
+  });
+}
+
 test.use({ video: process.env.CAPTURE_835_VIDEO === '1' ? 'on' : 'off' });
 test.describe('#835 carousel', () => {
   for (const width of [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920]) {
@@ -4427,7 +4472,21 @@ test.describe('#835 carousel', () => {
           const grid = calendar.getByRole('grid', { name: 'Годовая карта активности' });
           await expect(grid.getByRole('row')).toHaveCount(7);
           await expect(grid.locator('button[tabindex="0"]')).toHaveCount(1);
-          expect((await calendar.boundingBox())?.height).toBeLessThan(420);
+          const panel = calendar.getByLabel('Данные выбранного дня');
+          await expect(panel).toBeVisible();
+          expect((await calendar.boundingBox())?.height).toBeLessThan(width <= 1280 ? 480 : 420);
+          const gridBounds = await grid.boundingBox();
+          const panelBounds = await panel.boundingBox();
+          expect(gridBounds).not.toBeNull();
+          expect(panelBounds).not.toBeNull();
+          if (width >= 1440) {
+            expect(panelBounds!.x).toBeGreaterThanOrEqual(gridBounds!.x + gridBounds!.width);
+          } else {
+            expect(panelBounds!.y).toBeGreaterThanOrEqual(gridBounds!.y + gridBounds!.height);
+          }
+          expect(
+            await grid.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+          ).toBeGreaterThanOrEqual(13);
           await capture('overview');
           const warning = calendar.getByText('История неполная', { exact: true });
           await warning.click();
@@ -4450,12 +4509,21 @@ test.describe('#835 carousel', () => {
           await capture('hover');
           await calendar.getByRole('tooltip').hover();
           await expect(calendar.getByRole('tooltip')).toBeVisible();
-          expect((await chosen.boundingBox())?.width).toBeGreaterThanOrEqual(10);
-          expect((await chosen.boundingBox())?.width).toBeLessThanOrEqual(14);
+          expect((await chosen.boundingBox())?.width).toBeGreaterThanOrEqual(11);
+          expect((await chosen.boundingBox())?.width).toBeLessThanOrEqual(16);
           await chosen.click();
           await expect(calendar.getByRole('tooltip')).toHaveCount(0);
           await expect(chosen).toHaveAttribute('aria-pressed', 'true');
-          await expect(calendar.locator('[aria-live]').last()).toContainText('рабочие подходы — 4');
+          await expect(panel).toContainText('Тренировок');
+          await expect(panel).toContainText('Рабочих подходов');
+          await expect(panel).toContainText('4');
+          if (width === 1440) {
+            await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
+            await expect(calendar.getByLabel('Год', { exact: true })).toHaveValue('2024');
+            await expect(page.locator('#progress-training')).toContainText('Тренировки · 7 дней');
+            await page.locator('.progress-hero').getByRole('tab', { name: '30 дней' }).click();
+            await expect(calendar.getByLabel('Год', { exact: true })).toHaveValue('2024');
+          }
           await capture('selected');
           await chosen.focus();
           await chosen.press('Escape');
@@ -4465,7 +4533,7 @@ test.describe('#835 carousel', () => {
           await page.keyboard.press('ArrowDown');
           await expect(grid.locator('button[data-date="2024-02-04"]')).toBeFocused();
           await page.keyboard.press('Enter');
-          await expect(calendar.locator('[aria-live]').last()).toContainText('Нет данных');
+          await expect(panel).toContainText('Нет достоверных данных за этот день.');
           await capture('unknown');
           await grid.locator('button[data-date="2024-02-29"]').click();
           await expect(calendar.locator('[aria-live]').last()).toContainText('29 февраля 2024');
@@ -4480,9 +4548,28 @@ test.describe('#835 carousel', () => {
           const add = page.getByTestId('quick-add-trigger');
           await calendar.scrollIntoViewIfNeeded();
           await expectNoOverlap(calendar, add);
+          if (width >= 900) {
+            await expect(
+              page.locator('#progress-training').getByTestId('quick-add-trigger'),
+            ).toHaveCount(1);
+            await add.click();
+            await expect(page.getByRole('dialog', { name: 'Что добавить?' })).toBeVisible();
+            await page.keyboard.press('Escape');
+            await expect(page.getByRole('dialog', { name: 'Что добавить?' })).toHaveCount(0);
+            await expect(add).toBeFocused();
+          }
         }
         await calendar.getByText('Данные по дням', { exact: true }).click();
         await expect(calendar.getByRole('table')).toBeVisible();
+        if (width >= 768) {
+          const tableRegion = calendar.getByRole('region', { name: 'Таблица активности по дням' });
+          await expect(tableRegion).toHaveAttribute('tabindex', '0');
+          await tableRegion.focus();
+          await page.keyboard.press('End');
+          await expect
+            .poll(() => tableRegion.evaluate((element) => element.scrollTop))
+            .toBeGreaterThan(0);
+        }
         await capture('table');
         await calendar.getByLabel('Год', { exact: true }).selectOption('2023');
         await expect(
@@ -4500,3 +4587,49 @@ test.describe('#835 carousel', () => {
     }
   }
 });
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#835 desktop activity levels are distinguishable in ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockProgress(page);
+    await page.route('**/workouts/progress/activity-heatmap**', async (route) => {
+      const year = Number(new URL(route.request().url()).searchParams.get('year'));
+      const count = (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / 86_400_000;
+      await route.fulfill({
+        json: {
+          timezone: 'Europe/Moscow',
+          history_complete: true,
+          undated_workouts: 0,
+          days: Array.from({ length: count }, (_, index) => ({
+            date: new Date(Date.UTC(year, 0, 1 + index)).toISOString().slice(0, 10),
+            is_future: year === new Date().getFullYear() && index > 29,
+            completed_workouts: index < 4 ? index : 0,
+            working_sets: index < 4 ? index * 4 : 0,
+          })),
+        },
+      });
+    });
+    await page.goto('/app?section=progress');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .getByRole('link', { name: 'Прогресс' })
+      .click();
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Тренировки/ })
+      .click();
+    const calendar = page.locator('.activity-heatmap');
+    await calendar.getByLabel('Год', { exact: true }).selectOption('2022');
+    const grid = calendar.getByRole('grid', { name: 'Годовая карта активности' });
+    for (let level = 0; level <= 3; level += 1) {
+      const day = grid.locator(`button[data-date="2022-01-0${level + 1}"]`);
+      await expect(day).toHaveAttribute('data-level', String(level));
+      await expect(day).toHaveAccessibleName(new RegExp(`тренировки — ${level}`));
+    }
+    await expect(grid.locator('button[data-date="2022-01-03"]')).toHaveCSS('opacity', '0.65');
+    await expect(grid.locator('button[data-date="2022-01-04"]')).toHaveCSS('opacity', '1');
+  });
+}

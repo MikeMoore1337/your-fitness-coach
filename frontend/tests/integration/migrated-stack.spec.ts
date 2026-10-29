@@ -149,7 +149,13 @@ for (const scenario of programImportViewports) {
       row.map(csvCell).join(','),
     ].join('\n');
 
-    await page.goto('/app?section=programs&view=manage&start=templates');
+    await page.goto('/app?section=programs&view=manage');
+    const management = page.getByRole('navigation', { name: 'Управление программой' });
+    const emptyCreate = page.getByRole('button', { name: 'Создать свою программу', exact: true });
+    const activeCreate = management.getByRole('button', { name: /Создать или импортировать/ });
+    await expect(emptyCreate.or(activeCreate)).toBeVisible();
+    if (await emptyCreate.isVisible()) await emptyCreate.click();
+    else await activeCreate.click();
     await expect(page.getByRole('heading', { name: 'Импорт программы' })).toBeVisible();
 
     const accessToken = await page.evaluate(() => sessionStorage.getItem('fit_access_token'));
@@ -224,6 +230,12 @@ for (const scenario of programImportViewports) {
     await expect(page.getByText('Программа импортирована в личные шаблоны')).toBeVisible();
 
     await page.reload();
+    await page.getByRole('button', { name: 'К центру управления', exact: true }).click();
+    const emptyLibrary = page.getByRole('button', { name: 'Выбрать готовую', exact: true });
+    const activeLibrary = management.getByRole('button', { name: /Программы и шаблоны/ });
+    await expect(emptyLibrary.or(activeLibrary)).toBeVisible();
+    if (await emptyLibrary.isVisible()) await emptyLibrary.click();
+    else await activeLibrary.click();
     await expect(page.getByText(programTitle, { exact: true })).toBeVisible();
   });
 }
