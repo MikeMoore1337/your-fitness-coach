@@ -2621,9 +2621,7 @@ test('mobile использует список и отдельный конте�
   await editor.getByRole('button', { name: 'Все дни' }).click();
   const allDaysDialog = page.getByRole('dialog', { name: 'Все дни программы' });
   await expect(allDaysDialog).toBeVisible();
-  await expect(
-    allDaysDialog.getByRole('button', { name: 'Изменить порядок' }),
-  ).toHaveCount(0);
+  await expect(allDaysDialog.getByRole('button', { name: 'Изменить порядок' })).toHaveCount(0);
   await allDaysDialog.getByRole('button', { name: 'Закрыть список дней' }).click();
   await expect(allDaysDialog).toHaveCount(0);
   const exerciseRow = editor.locator('.copy-editor__exercise').first();
