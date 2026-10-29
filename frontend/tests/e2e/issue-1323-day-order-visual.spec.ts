@@ -25,8 +25,8 @@ test('#1323 approved All Days sorting - real browser visual evidence', async ({
     is_public: false,
     is_example: false,
     can_edit: true,
-    is_assigned_to_current_user: true,
-    is_active_for_current_user: true,
+    is_assigned_to_current_user: false,
+    is_active_for_current_user: false,
     assigned_by_user_id: null,
     assigned_by_full_name: null,
     assigned_program_id: 77,
@@ -79,7 +79,7 @@ test('#1323 approved All Days sorting - real browser visual evidence', async ({
   );
 
   await page.goto('/app?section=programs&view=manage&start=templates');
-  await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
+  await page.getByRole('button', { name: 'Редактировать', exact: true }).click();
   const editor = page.locator('.program-editor-modal');
   await expect(editor.getByRole('button', { name: 'Все дни' })).toBeVisible();
   await expect(editor.getByRole('button', { name: 'Переместить день выше' })).toHaveCount(0);
