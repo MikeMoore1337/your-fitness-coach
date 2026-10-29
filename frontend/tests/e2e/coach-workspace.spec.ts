@@ -2616,7 +2616,10 @@ test('mobile использует список и отдельный конте�
   await expect(editor).toBeVisible();
   const dayInput = editor.getByRole('textbox', { name: 'Название дня' });
   await expect(dayInput).toHaveValue('Тренировка 1');
-  const dayActions = editor.locator('.copy-editor__current-day .copy-editor__order-actions');
+  const dayManagement = editor.locator('.copy-editor__day-actions');
+  await expect(dayManagement).not.toHaveAttribute('open', '');
+  await dayManagement.locator('summary').click();
+  const dayActions = dayManagement.locator('.copy-editor__order-actions');
   await expect(dayActions.getByRole('button', { name: 'Переместить день выше' })).toBeDisabled();
   const exerciseRow = editor.locator('.copy-editor__exercise').first();
   expect((await exerciseRow.boundingBox())?.height).toBeGreaterThanOrEqual(44);
