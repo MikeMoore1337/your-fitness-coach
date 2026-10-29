@@ -298,3 +298,56 @@ def test_one_week_cycle_execution_and_rolling_snapshot(client):
         assert [
             (row.id, row.actual_reps, row.actual_weight) for row in completed.exercises[0].sets
         ] == original_sets
+
+
+@pytest.mark.parametrize("restart", [False, True])
+def test_cycle_retains_future_window_with_unfinished_workout(client, monkeypatch, restart):
+    from datetime import timedelta
+
+    from fitminiapp_api.api.v1 import workouts as routes
+
+    headers = _auth(client, 916108)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 1, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    assigned = client.post(
+        f"/api/v1/programs/templates/{created.json()['template']['id']}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    if restart:
+        state = client.get(f"/api/v1/programs/assigned/{program_id}/lifecycle", headers=headers)
+        response = client.post(
+            f"/api/v1/programs/assigned/{program_id}/lifecycle",
+            headers=headers,
+            json={
+                "action": "restart",
+                "expected_revision_number": state.json()["current_revision_number"],
+                "reason": "Повторить программу",
+            },
+        )
+        assert response.status_code == 200, response.text
+        program_id = response.json()["new_program_id"]
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        assert program.duration_weeks == 16
+        start = program.start_date
+        original = (
+            db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=1).one().id
+        )
+    monkeypatch.setattr(routes, "recovery_today_for_user", lambda _user: start + timedelta(weeks=4))
+    for _ in range(2):
+        response = client.get("/api/v1/workouts/today", headers=headers)
+        assert response.status_code == 200, response.text
+    with get_session_context() as db:
+        rows = db.query(UserWorkout).filter_by(user_program_id=program_id).all()
+        assert sorted(row.week_number for row in rows) == list(range(1, 9))
+        assert db.get(UserWorkout, original).status == "planned"
+        assert all(
+            not item.is_completed and item.actual_weight is None
+            for row in rows
+            for exercise in row.exercises
+            for item in exercise.sets
+        )

@@ -330,12 +330,17 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
     }
 
 
-def materialize_next_cycle_window(db: Session, program: UserProgram) -> int:
+def materialize_next_cycle_window(
+    db: Session, program: UserProgram, *, through_date: date | None = None
+) -> int:
     """Extend a finished window from the immutable assignment plan under the program lock."""
     db.query(UserProgram).filter_by(id=program.id).with_for_update().one()
     revision = (
         db.query(ProgramRevision)
-        .filter_by(user_program_id=program.id, change_kind="assigned")
+        .filter(
+            ProgramRevision.user_program_id == program.id,
+            ProgramRevision.change_kind.in_(["assigned", "program_restarted"]),
+        )
         .order_by(ProgramRevision.revision_number)
         .first()
     )
@@ -346,12 +351,19 @@ def materialize_next_cycle_window(db: Session, program: UserProgram) -> int:
     if not cycle or cycle["length_weeks"] != 1 or not cycle["repeat"]:
         return 0
     rows = db.query(UserWorkout).filter_by(user_program_id=program.id).all()
-    if any(row.status not in {"completed", "skipped", "cancelled"} for row in rows):
-        return 0
     last_week = max((row.week_number for row in rows), default=0)
+    pending = any(row.status not in {"completed", "skipped", "cancelled"} for row in rows)
+    if pending:
+        if through_date is None:
+            return 0
+        target_week = max(1, (through_date - program.start_date).days // 7 + 1) + 3
+        if target_week <= last_week:
+            return 0
+    else:
+        target_week = last_week + 4
     source = [row for row in snapshot["workouts"] if row["week_number"] == 1]
     created = 0
-    for week in range(last_week + 1, min(last_week + 4, program.duration_weeks) + 1):
+    for week in range(last_week + 1, min(last_week + 4, target_week, program.duration_weeks) + 1):
         for source_workout in source:
             workout = UserWorkout(
                 user_program_id=program.id,

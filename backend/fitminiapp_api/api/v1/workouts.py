@@ -541,6 +541,20 @@ def get_today_workout(
     db: Session = Depends(get_db),
 ):
     today = recovery_today_for_user(current_user)
+    from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
+
+    programs = (
+        db.query(UserProgram)
+        .filter(
+            UserProgram.user_id == current_user.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
+        )
+        .all()
+    )
+    for program in programs:
+        if materialize_next_cycle_window(db, program, through_date=today):
+            db.commit()
 
     active_workout = (
         db.query(UserWorkout)
