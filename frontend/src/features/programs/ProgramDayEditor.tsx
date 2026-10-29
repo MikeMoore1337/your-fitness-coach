@@ -591,13 +591,15 @@ export function ProgramDayEditor({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="secondary copy-editor__manage-days"
-            onClick={(event) => openAllDays(event.currentTarget, true)}
-          >
-            Изменить порядок дней
-          </button>
+          {dayCount > 1 && (
+            <button
+              type="button"
+              className="secondary copy-editor__manage-days"
+              onClick={(event) => openAllDays(event.currentTarget, true)}
+            >
+              Изменить порядок дней
+            </button>
+          )}
           <p className="muted copy-editor__limit">В одном цикле максимум 8 тренировочных дней.</p>
         </aside>
 
