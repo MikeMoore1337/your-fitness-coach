@@ -137,3 +137,20 @@
 .program-editor-modal .program-builder-settings[open] > summary {
   padding-right: 52px;
 }
+
+.program-builder-optional > summary > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.program-builder-optional > summary small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.program-builder--settings-open .program-builder-settings {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+}
