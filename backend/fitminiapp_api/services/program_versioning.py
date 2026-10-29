@@ -4,7 +4,7 @@ from copy import deepcopy
 from datetime import date, timedelta
 from itertools import pairwise
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, inspect, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
@@ -572,6 +572,9 @@ def _write_cycle_exercises(db: Session, workout: UserWorkout, plan: dict) -> Non
     workout.source_cycle_week = plan["source_cycle_week"]
     workout.cycle_iteration = plan["cycle_iteration"]
     db.flush()
+    for exercise in workout.exercises:
+        if inspect(exercise).persistent:
+            db.expire(exercise, ["sets", "exercise"])
     db.expire(workout, ["exercises"])
 
 
@@ -727,21 +730,48 @@ def materialize_cycle_read_window(
 def hydrate_cycle_read_workout(db: Session, workout: UserWorkout) -> bool:
     if workout.source_cycle_week is None or workout.status != "planned":
         return False
+    loaded = [
+        (exercise, list(inspect(exercise).dict.get("sets", [])))
+        for exercise in inspect(workout).dict.get("exercises", [])
+    ]
     with Session(bind=db.get_bind().engine, autoflush=False) as projection:
         current = projection.get(UserWorkout, workout.id)
         changed = current is not None and hydrate_cycle_workout(projection, current)
         projection.commit()
     if changed:
-        db.expire(
-            workout,
-            [
+        # Relationship expiry alone leaves held child identities stale; retain caller edits.
+        for exercise, sets in loaded:
+            for item in [exercise, *sets]:
+                state = inspect(item)
+                if not state.persistent:
+                    continue
+                clean = [
+                    attr.key
+                    for attr in state.mapper.column_attrs
+                    if attr.key != "id" and not state.attrs[attr.key].history.has_changes()
+                ]
+                if clean:
+                    db.expire(item, clean)
+            clean_relationships = [
+                key
+                for key in ("sets", "exercise")
+                if not inspect(exercise).attrs[key].history.has_changes()
+            ]
+            if inspect(exercise).persistent and clean_relationships:
+                db.expire(exercise, clean_relationships)
+        clean_parent = [
+            key
+            for key in (
                 "exercises",
                 "plan_materialized",
                 "source_cycle_week",
                 "cycle_iteration",
                 "plan_revision_number",
-            ],
-        )
+            )
+            if not inspect(workout).attrs[key].history.has_changes()
+        ]
+        if clean_parent:
+            db.expire(workout, clean_parent)
     return changed
 
 

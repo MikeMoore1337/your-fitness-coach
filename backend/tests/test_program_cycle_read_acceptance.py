@@ -3,6 +3,7 @@
 from datetime import datetime, time, timedelta
 
 import pytest
+from sqlalchemy.orm import joinedload
 from test_program_cycle_domain import TODAY, assigned_cycle, revision, schedule
 from test_program_cycle_domain import fixed_calendar as fixed_calendar
 from test_program_week_cycle import _auth, _payload
@@ -11,9 +12,12 @@ from fitminiapp_api.api.v1 import workouts as routes
 from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
 from fitminiapp_api.models.notification import Notification, NotificationSetting
 from fitminiapp_api.models.program import (
+    ProgramRevision,
     ProgramTemplate,
     UserProgram,
     UserWorkout,
+    UserWorkoutExercise,
+    UserWorkoutSet,
     WorkoutSetMutation,
 )
 from fitminiapp_api.models.user import CoachClient, User
@@ -555,3 +559,120 @@ def test_next_workout_scope_selects_nearest_logical_occurrence(client, monkeypat
     with get_session_context() as db:
         override = program_versioning._cycle_occurrence_overrides(db, program_id)[-1]
         assert override["weeks"] == [9], override
+
+
+def test_plan_revision_snapshot_matches_removed_set_composition(client):
+    headers, program_id, slot, exercise = assigned_cycle(client, k=1, n=20)
+    response = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": revision(program_id),
+            "effective_scope": "future_program",
+            "occurrence_weeks": [2],
+            "day_number": 1,
+            "target_template_exercise_id": slot,
+            "exercise_id": exercise,
+            "prescribed_sets": 1,
+            "prescribed_reps": "14",
+            "rest_seconds": 90,
+        },
+    )
+    assert response.status_code == 200, response.text
+    with get_session_context() as db:
+        row = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=2).one()
+        assert len(row.exercises[0].sets) == 1
+        record = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program_id, revision_number=revision(program_id))
+            .one()
+        )
+        snapshot = next(item for item in record.snapshot["workouts"] if item["week_number"] == 2)
+        assert len(snapshot["exercises"][0]["sets"]) == 1
+
+
+@pytest.mark.parametrize(
+    "dirty_notes,pending_set,extra_set",
+    [
+        (False, False, False),
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+    ],
+)
+def test_read_hydration_refreshes_already_loaded_exercises_and_set_versions(
+    client, monkeypatch, dirty_notes, pending_set, extra_set
+):
+    _, program_id, slot, exercise_id = assigned_cycle(client, k=1, n=20)
+    if extra_set:
+        with get_session_context() as db:
+            workout = (
+                db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=2).one()
+            )
+            db.add(UserWorkoutSet(workout_exercise_id=workout.exercises[0].id, set_number=3))
+    monkeypatch.setattr(program_versioning, "MAX_GENERATED_SETS", 1)
+    with SessionLocal() as caller:
+        owner = caller.query(User).filter_by(telegram_user_id=916200).one()
+        workout = (
+            caller.query(UserWorkout)
+            .options(joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets))
+            .filter_by(user_program_id=program_id, week_number=2)
+            .one()
+        )
+        old_exercise = workout.exercises[0]
+        old_sets = list(old_exercise.sets)
+        assert old_exercise.prescribed_reps == "6"
+        if dirty_notes:
+            old_exercise.notes = "Caller pending exercise notes"
+        pending = UserWorkoutSet(set_number=4) if pending_set else None
+        if pending is not None:
+            old_exercise.sets.append(pending)
+        with SessionLocal() as editor:
+            program = editor.get(UserProgram, program_id)
+            program_versioning.upsert_future_program_exercise(
+                editor,
+                editor.get(User, owner.id),
+                program_id,
+                CoachProgramExerciseCreate(
+                    expected_revision_number=program.current_revision_number,
+                    effective_scope="future_program",
+                    occurrence_weeks=[2],
+                    day_number=1,
+                    target_template_exercise_id=slot,
+                    exercise_id=exercise_id,
+                    prescribed_sets=2,
+                    prescribed_reps="14",
+                    rest_seconds=90,
+                ),
+            )
+        read = routes._get_user_workout_or_404(caller, owner, workout.id)
+        assert read.plan_revision_number == 2
+        live_sets = [item for item in read.exercises[0].sets if item is not pending]
+        assert (
+            read.exercises[0].prescribed_reps,
+            [item.version for item in live_sets],
+        ) == ("14", [2, 2])
+        assert [item.id for item in live_sets] == [item.id for item in old_sets[:2]]
+        assert old_exercise.prescribed_reps == "14"
+        assert [item.version for item in old_sets[:2]] == [2, 2]
+        assert [item.plan_version for item in old_sets[:2]] == [2, 2]
+        if extra_set:
+            assert old_sets[-1].id not in [item.id for item in live_sets]
+        if pending is not None:
+            assert pending in caller.new and pending in old_exercise.sets
+            caller.rollback()
+            with SessionLocal() as observer:
+                assert (
+                    observer.query(UserWorkoutSet)
+                    .filter_by(workout_exercise_id=old_exercise.id)
+                    .count()
+                    == 2
+                )
+        if dirty_notes:
+            assert old_exercise.notes == "Caller pending exercise notes"
+            caller.rollback()
+            with SessionLocal() as observer:
+                assert (
+                    observer.get(UserWorkoutExercise, old_exercise.id).notes
+                    != "Caller pending exercise notes"
+                )
