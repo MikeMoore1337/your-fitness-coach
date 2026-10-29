@@ -330,6 +330,53 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
     }
 
 
+def materialize_next_cycle_window(db: Session, program: UserProgram) -> int:
+    """Extend a finished window from the immutable assignment plan under the program lock."""
+    db.query(UserProgram).filter_by(id=program.id).with_for_update().one()
+    revision = (
+        db.query(ProgramRevision)
+        .filter_by(user_program_id=program.id, change_kind="assigned")
+        .order_by(ProgramRevision.revision_number)
+        .first()
+    )
+    if revision is None:
+        return 0
+    snapshot = revision.snapshot
+    cycle = (snapshot["program"].get("program_metadata") or {}).get("week_cycle")
+    if not cycle or cycle["length_weeks"] != 1 or not cycle["repeat"]:
+        return 0
+    rows = db.query(UserWorkout).filter_by(user_program_id=program.id).all()
+    if any(row.status not in {"completed", "skipped", "cancelled"} for row in rows):
+        return 0
+    last_week = max((row.week_number for row in rows), default=0)
+    source = [row for row in snapshot["workouts"] if row["week_number"] == 1]
+    created = 0
+    for week in range(last_week + 1, min(last_week + 4, program.duration_weeks) + 1):
+        for source_workout in source:
+            workout = UserWorkout(
+                user_program_id=program.id,
+                scheduled_date=date.fromisoformat(source_workout["scheduled_date"])
+                + timedelta(days=(week - 1) * max(7, len(source))),
+                day_number=source_workout["day_number"],
+                week_number=week,
+                title=source_workout["title"],
+                status="planned",
+            )
+            db.add(workout)
+            for source_exercise in source_workout["exercises"]:
+                values = {key: value for key, value in source_exercise.items() if key != "sets"}
+                exercise = UserWorkoutExercise(workout=workout, **values)
+                db.add(exercise)
+                for source_set in source_exercise["sets"]:
+                    values = {
+                        key: value for key, value in source_set.items() if key != "is_completed"
+                    }
+                    db.add(UserWorkoutSet(workout_exercise=exercise, is_completed=False, **values))
+            created += 1
+    db.flush()
+    return created
+
+
 def record_program_revision(
     db: Session,
     program: UserProgram,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from fitminiapp_api.db.session import get_session_context
-from fitminiapp_api.models.program import UserProgram
+from fitminiapp_api.models.program import UserProgram, UserWorkout, UserWorkoutSet
 from fitminiapp_api.models.user import User
 
 
@@ -113,6 +113,38 @@ def test_cycle_without_week_types_is_preserved_and_not_assigned(client):
     assert blocked.status_code == 403
 
 
+def test_one_week_cycle_assigns_16_weeks_with_empty_actual_results(client):
+    headers = _auth(client, 916106)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 1, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    assert created.status_code == 200, created.text
+    template_id = created.json()["template"]["id"]
+    assigned = client.post(
+        f"/api/v1/programs/templates/{template_id}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    with get_session_context() as db:
+        assert db.query(UserProgram).filter_by(id=program_id).one().duration_weeks == 16
+        workouts = db.query(UserWorkout).filter_by(user_program_id=program_id).all()
+        assert workouts
+        assert all(row.status == "planned" and row.completed_at is None for row in workouts)
+        sets = (
+            db.query(UserWorkoutSet)
+            .join(UserWorkoutSet.workout_exercise)
+            .join(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .all()
+        )
+        assert sets and all(
+            not row.is_completed and row.actual_weight is None and row.actual_reps is None
+            for row in sets
+        )
+
+
 def test_other_user_cannot_read_cycle_and_edit_cannot_replace_it(client):
     owner = _auth(client, 916101)
     other = _auth(client, 916102)
@@ -180,3 +212,69 @@ def test_coach_clone_preserves_cycle_and_cannot_assign_it(client):
     )
     assert blocked.status_code == 403
     assert blocked.json()["detail"] == "Назначение программы с циклом недель пока недоступно"
+
+
+def test_one_week_cycle_execution_and_rolling_snapshot(client):
+    from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
+
+    headers = _auth(client, 916107)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 1, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    template_id = created.json()["template"]["id"]
+    assigned = client.post(
+        f"/api/v1/programs/templates/{template_id}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter_by(user_program_id=program_id)
+            .order_by(UserWorkout.week_number)
+            .all()
+        )
+        assert [row.week_number for row in workouts] == [1, 2, 3, 4]
+        workout_id = workouts[0].id
+    started = client.post(f"/api/v1/workouts/{workout_id}/start", headers=headers)
+    assert started.status_code == 200, started.text
+    for item in started.json()["exercises"][0]["sets"]:
+        saved = client.patch(
+            f"/api/v1/workouts/sets/{item['id']}",
+            headers=headers,
+            json={"actual_reps": 8, "actual_weight": 40, "is_completed": True},
+        )
+        assert saved.status_code == 200, saved.text
+    finished = client.post(f"/api/v1/workouts/{workout_id}/finish", headers=headers)
+    assert finished.status_code == 200, finished.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        assert program.is_active
+        completed = db.get(UserWorkout, workout_id)
+        assert completed.status == "completed"
+        original_sets = [
+            (row.id, row.actual_reps, row.actual_weight) for row in completed.exercises[0].sets
+        ]
+        for row in program.workouts:
+            if row.status == "planned":
+                row.status = "skipped"
+        db.flush()
+        assert materialize_next_cycle_window(db, program) == 4
+        assert materialize_next_cycle_window(db, program) == 0
+        assert [
+            (row.id, row.actual_reps, row.actual_weight) for row in completed.exercises[0].sets
+        ] == original_sets
+        generated = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id, UserWorkout.week_number > 4)
+            .all()
+        )
+        assert {row.week_number for row in generated} == {5, 6, 7, 8}
+        assert all(
+            not item.is_completed and item.actual_weight is None and item.actual_reps is None
+            for row in generated
+            for exercise in row.exercises
+            for item in exercise.sets
+        )

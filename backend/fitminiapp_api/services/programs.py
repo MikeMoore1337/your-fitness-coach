@@ -475,7 +475,8 @@ def assign_template_to_user(
     schedule_weekdays: list[int] | None = None,
     replace_active: bool = False,
 ) -> tuple[UserProgram, int]:
-    if (template.program_metadata or {}).get("week_cycle") is not None:
+    cycle = (template.program_metadata or {}).get("week_cycle")
+    if cycle is not None and not (cycle["length_weeks"] == 1 and cycle["repeat"]):
         raise ProgramError("Назначение программы с циклом недель пока недоступно")
     # Сериализуем конкурирующие назначения для одного пользователя. Частичный
     # unique index остаётся последней линией защиты на уровне БД.
@@ -647,7 +648,7 @@ def assign_template_to_user(
 
     created = 0
 
-    for week_index in range(duration_weeks):
+    for week_index in range(min(duration_weeks, 4) if cycle else duration_weeks):
         for day, day_offset in zip(ordered_days, day_offsets, strict=True):
             workout = UserWorkout(
                 user_program_id=user_program.id,

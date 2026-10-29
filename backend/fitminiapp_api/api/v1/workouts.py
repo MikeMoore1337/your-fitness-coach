@@ -316,6 +316,9 @@ def _require_active_program(program: UserProgram) -> None:
 
 def _reconcile_program_completion(db: Session, program: UserProgram, current_user: User) -> None:
     db.flush()
+    from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
+
+    materialize_next_cycle_window(db, program)
     remaining_workout = (
         db.query(UserWorkout.id)
         .filter(
