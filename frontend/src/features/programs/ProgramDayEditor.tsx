@@ -69,6 +69,7 @@ export function ProgramDayEditor({
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
+  const rootRef = useRef<HTMLElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
   const scrollTimerRef = useRef<number | null>(null);
   const allDaysTriggerRef = useRef<HTMLButtonElement>(null);
@@ -489,6 +490,7 @@ export function ProgramDayEditor({
     );
   };
 
+  const portalRoot = rootRef.current?.closest('.modal') || document.body;
   const dayCount = days.length;
   const allDayButtons = days.map((item, index) => (
     <button
@@ -510,7 +512,7 @@ export function ProgramDayEditor({
 
   return (
     <>
-      <section className="copy-editor" aria-label="Дни и упражнения программы">
+      <section ref={rootRef} className="copy-editor" aria-label="Дни и упражнения программы">
         <aside className="copy-editor__rail" aria-label="Список тренировочных дней">
           <div className="copy-editor__section-head">
             <h3>Дни программы</h3>
@@ -801,7 +803,7 @@ export function ProgramDayEditor({
               <div className="copy-editor__day-grid">{allDayButtons}</div>
             </div>
           </div>,
-          document.body,
+          portalRoot,
         )}
       {detailOpen &&
         mobileView &&
@@ -822,7 +824,7 @@ export function ProgramDayEditor({
               {renderDetails(true)}
             </div>
           </div>,
-          document.body,
+          portalRoot,
         )}
     </>
   );
