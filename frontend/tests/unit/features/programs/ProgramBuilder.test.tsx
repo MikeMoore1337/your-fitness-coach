@@ -392,26 +392,26 @@ describe('ProgramBuilder type-aware prescription', () => {
     const user = userEvent.setup();
     renderBuilder();
     await screen.findByText('Настройки программы', { exact: true });
-    await user.clear(screen.getByRole('textbox', { name: 'Название', exact: true }));
-    await user.type(screen.getByRole('textbox', { name: 'Название', exact: true }), 'Мой черновик');
+    await user.clear(screen.getByRole('textbox', { name: 'Название' }));
+    await user.type(screen.getByRole('textbox', { name: 'Название' }), 'Мой черновик');
     await user.click(screen.getByText('Настройки программы', { exact: true }));
-    expect(screen.queryByRole('textbox', { name: 'Название', exact: true })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Название' })).toBeNull();
     await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Цель', exact: true }),
+      screen.getByRole('combobox', { name: 'Цель' }),
       'muscle_gain',
     );
     await user.clear(screen.getByRole('spinbutton', { name: 'Длительность, недель' }));
     await user.type(screen.getByRole('spinbutton', { name: 'Длительность, недель' }), '3');
     await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }));
-    expect(screen.getByRole('textbox', { name: 'Название', exact: true })).toHaveValue(
+    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue(
       'Мой черновик',
     );
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates', expect.anything());
     await user.click(screen.getByText('Настройки программы', { exact: true }));
-    expect(screen.getByRole('combobox', { name: 'Цель', exact: true })).toHaveValue('muscle_gain');
+    expect(screen.getByRole('combobox', { name: 'Цель' })).toHaveValue('muscle_gain');
     expect(screen.getByRole('spinbutton', { name: 'Длительность, недель' })).toHaveValue(3);
     await user.keyboard('{Escape}');
-    expect(screen.getByRole('textbox', { name: 'Название', exact: true })).toHaveValue(
+    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue(
       'Мой черновик',
     );
   });
