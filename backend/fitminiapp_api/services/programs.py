@@ -476,7 +476,7 @@ def assign_template_to_user(
     replace_active: bool = False,
 ) -> tuple[UserProgram, int]:
     cycle = (template.program_metadata or {}).get("week_cycle")
-    if cycle is not None and not (cycle["length_weeks"] == 1 and cycle["repeat"]):
+    if cycle is not None and not (cycle["length_weeks"] <= 4 and cycle["repeat"]):
         raise ProgramError("Назначение программы с циклом недель пока недоступно")
     # Сериализуем конкурирующие назначения для одного пользователя. Частичный
     # unique index остаётся последней линией защиты на уровне БД.
@@ -532,7 +532,7 @@ def assign_template_to_user(
         for day in ordered_days
         for exercise_item in day.exercises
     )
-    if has_weekly_prescriptions and duration_weeks > effective_duration_weeks:
+    if has_weekly_prescriptions and duration_weeks > effective_duration_weeks and not cycle:
         raise ProgramError(
             f"This periodized template is available for at most {effective_duration_weeks} weeks"
         )
@@ -574,7 +574,11 @@ def assign_template_to_user(
                     weekly_prescription
                 )
     if has_weekly_prescriptions:
-        for week_number in range(1, duration_weeks + 1):
+        for week_number in (
+            range(1, min(duration_weeks, cycle["length_weeks"]) + 1)
+            if cycle
+            else range(1, duration_weeks + 1)
+        ):
             if any(
                 (exercise_item.id, week_number) not in assignment_week_prescriptions
                 for day in ordered_days
@@ -649,6 +653,7 @@ def assign_template_to_user(
     created = 0
 
     for week_index in range(min(duration_weeks, 4) if cycle else duration_weeks):
+        source_week = week_index % cycle["length_weeks"] + 1 if cycle else week_index + 1
         for day, day_offset in zip(ordered_days, day_offsets, strict=True):
             workout = UserWorkout(
                 user_program_id=user_program.id,
@@ -663,15 +668,15 @@ def assign_template_to_user(
 
             for exercise_item in sorted(day.exercises, key=lambda row: row.sort_order):
                 exercise = assignment_week_exercises.get(
-                    (exercise_item.id, week_index + 1),
+                    (exercise_item.id, source_week),
                     assignment_exercises[exercise_item.id],
                 )
                 prescription = assignment_week_prescriptions.get(
-                    (exercise_item.id, week_index + 1),
+                    (exercise_item.id, source_week),
                     assignment_prescriptions[exercise_item.id],
                 )
                 structured_plan = assignment_week_plans.get(
-                    (exercise_item.id, week_index + 1),
+                    (exercise_item.id, source_week),
                     assignment_plans[exercise_item.id],
                 )
                 has_structured_plan = bool(
@@ -679,14 +684,14 @@ def assign_template_to_user(
                     or any(
                         weekly.prescription is not None
                         for weekly in exercise_item.weekly_prescriptions
-                        if weekly.week_number == week_index + 1
+                        if weekly.week_number == source_week
                     )
                 )
                 selected_weekly_exercise_id = assignment_week_exercise_ids.get(
-                    (exercise_item.id, week_index + 1)
+                    (exercise_item.id, source_week)
                 )
                 selected_weekly_prescription_id = assignment_week_prescription_ids.get(
-                    (exercise_item.id, week_index + 1)
+                    (exercise_item.id, source_week)
                 )
                 group_id, group_kind, group_order = _group_projection(exercise_item)
                 workout_exercise = UserWorkoutExercise(

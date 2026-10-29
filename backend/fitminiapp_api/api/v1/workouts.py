@@ -535,12 +535,7 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
     }
 
 
-@router.get("/today", response_model=WorkoutTodayResponse)
-def get_today_workout(
-    current_user: User = Depends(require_user),
-    db: Session = Depends(get_db),
-):
-    today = recovery_today_for_user(current_user)
+def _materialize_user_cycle_window(db: Session, current_user: User, target_date: date) -> None:
     from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
 
     programs = (
@@ -553,8 +548,17 @@ def get_today_workout(
         .all()
     )
     for program in programs:
-        if materialize_next_cycle_window(db, program, through_date=today):
+        if materialize_next_cycle_window(db, program, through_date=target_date):
             db.commit()
+
+
+@router.get("/today", response_model=WorkoutTodayResponse)
+def get_today_workout(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    today = recovery_today_for_user(current_user)
+    _materialize_user_cycle_window(db, current_user, today)
 
     active_workout = (
         db.query(UserWorkout)
@@ -861,6 +865,7 @@ def get_week_schedule(
     db: Session = Depends(get_db),
 ):
     today = recovery_today_for_user(current_user)
+    _materialize_user_cycle_window(db, current_user, today)
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     workouts = (
@@ -901,6 +906,8 @@ def get_schedule(
         raise HTTPException(
             status_code=422, detail="Диапазон расписания не может быть больше 93 дней"
         )
+
+    _materialize_user_cycle_window(db, current_user, start)
 
     workouts = (
         db.query(UserWorkout)

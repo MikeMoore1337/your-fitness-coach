@@ -331,6 +331,19 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
     }
 
 
+def _cycle_occurrence_overrides(db: Session, program_id: int) -> list[dict]:
+    result = []
+    for revision in (
+        db.query(ProgramRevision)
+        .filter_by(user_program_id=program_id)
+        .order_by(ProgramRevision.revision_number)
+    ):
+        result.extend(revision.changed_fields.get("inherited_occurrence_overrides", []))
+        if "occurrence_override" in revision.changed_fields:
+            result.append(revision.changed_fields["occurrence_override"])
+    return result
+
+
 def materialize_next_cycle_window(
     db: Session, program: UserProgram, *, through_date: date | None = None
 ) -> int:
@@ -349,13 +362,14 @@ def materialize_next_cycle_window(
         return 0
     snapshot = revision.snapshot
     cycle = (snapshot["program"].get("program_metadata") or {}).get("week_cycle")
-    if not cycle or cycle["length_weeks"] != 1 or not cycle["repeat"]:
+    if not cycle or cycle["length_weeks"] > 4 or not cycle["repeat"]:
         return 0
+    source = [row for row in snapshot["workouts"] if row["week_number"] == 1]
     rows = db.query(UserWorkout).filter_by(user_program_id=program.id).all()
     existing_weeks = {row.week_number for row in rows}
     pending = any(row.status not in {"completed", "skipped", "cancelled"} for row in rows)
     if through_date is not None:
-        first_week = max(1, (through_date - program.start_date).days // 7 + 1)
+        first_week = max(1, (through_date - program.start_date).days // max(7, len(source)) + 1)
     elif pending:
         return 0
     else:
@@ -363,20 +377,13 @@ def materialize_next_cycle_window(
             (week for week in range(1, program.duration_weeks + 1) if week not in existing_weeks),
             program.duration_weeks + 1,
         )
-    source = [row for row in snapshot["workouts"] if row["week_number"] == 1]
-    overrides = [
-        row.changed_fields["occurrence_override"]
-        for row in db.query(ProgramRevision)
-        .filter_by(user_program_id=program.id)
-        .order_by(ProgramRevision.revision_number)
-        .all()
-        if "occurrence_override" in row.changed_fields
-    ]
+    overrides = _cycle_occurrence_overrides(db, program.id)
     created = 0
     for week in range(first_week, min(first_week + 3, program.duration_weeks) + 1):
         if week in existing_weeks:
             continue
-        for original in source:
+        source_week = (week - 1) % cycle["length_weeks"] + 1
+        for original in [row for row in snapshot["workouts"] if row["week_number"] == source_week]:
             source_workout = deepcopy(original)
             for override in overrides:
                 if (
@@ -397,7 +404,14 @@ def materialize_next_cycle_window(
                                 "planned_role": segment["role"],
                                 "planned_position": segment["position"],
                                 "planned_group_id": segment.get("group_id"),
-                                "planned_group_kind": None,
+                                "planned_group_kind": next(
+                                    (
+                                        group["kind"]
+                                        for group in item["prescription"].get("groups", [])
+                                        if group["group_id"] == segment.get("group_id")
+                                    ),
+                                    None,
+                                ),
                                 "planned_round": segment.get("round_number"),
                             }
                             for index, segment in enumerate(item["prescription"]["segments"], 1)
@@ -405,7 +419,7 @@ def materialize_next_cycle_window(
             workout = UserWorkout(
                 user_program_id=program.id,
                 scheduled_date=date.fromisoformat(source_workout["scheduled_date"])
-                + timedelta(days=(week - 1) * max(7, len(source))),
+                + timedelta(days=(week - source_week) * max(7, len(source))),
                 day_number=source_workout["day_number"],
                 week_number=week,
                 title=source_workout["title"],
@@ -795,6 +809,7 @@ def apply_program_lifecycle_action(
             change_kind="program_restarted",
             reason=payload.reason,
             changed_fields={
+                "inherited_occurrence_overrides": _cycle_occurrence_overrides(db, program.id),
                 "source_program_id": program.id,
                 "history_boundary": "new_program",
                 "workouts_created": len(source_workouts),
@@ -1787,6 +1802,11 @@ def upsert_future_program_exercise(
         )
         db.commit()
         return 0, revision.revision_number
+
+    if program.template and (program.template.program_metadata or {}).get("week_cycle"):
+        raise ProgramError(
+            "Cycle edits require explicit occurrence weeks until future scopes are supported"
+        )
 
     today = today_for_user(target_user)
     planned_workouts_query = (

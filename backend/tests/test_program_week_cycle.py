@@ -100,7 +100,7 @@ def test_invalid_cycles_and_assignment_are_rejected_without_partial_creation(cli
     assert client.get("/api/v1/programs/templates/mine", headers=headers).json() == before
 
 
-def test_cycle_without_week_types_is_preserved_and_not_assigned(client):
+def test_cycle_without_week_types_is_preserved_and_assigned(client):
     headers = _auth(client, 916105)
     payload = _payload(client, headers)
     payload["week_cycle"] = {"length_weeks": 3, "repeat": True}
@@ -110,7 +110,7 @@ def test_cycle_without_week_types_is_preserved_and_not_assigned(client):
     assert cycle == {"schema_version": 1, "length_weeks": 3, "week_types": None, "repeat": True}
     template_id = created.json()["template"]["id"]
     blocked = client.post(f"/api/v1/programs/templates/{template_id}/assign-to-me", headers=headers)
-    assert blocked.status_code == 403
+    assert blocked.status_code == 200, blocked.text
 
 
 def test_one_week_cycle_assigns_16_weeks_with_empty_actual_results(client):
@@ -192,7 +192,7 @@ def test_legacy_template_remains_assignable_without_week_cycle(client):
     assert assigned.json()["workouts_created"] > 0
 
 
-def test_coach_clone_preserves_cycle_and_cannot_assign_it(client):
+def test_coach_clone_preserves_cycle_and_can_assign_it(client):
     headers = _auth(client, 916103, is_coach=True)
     payload = _payload(client, headers)
     payload["week_cycle"] = {"length_weeks": 2, "week_types": ["light", "heavy"], "repeat": True}
@@ -210,8 +210,8 @@ def test_coach_clone_preserves_cycle_and_cannot_assign_it(client):
     blocked = client.post(
         f"/api/v1/programs/templates/{clone.json()['id']}/assign-to-me", headers=headers
     )
-    assert blocked.status_code == 403
-    assert blocked.json()["detail"] == "Назначение программы с циклом недель пока недоступно"
+    assert blocked.status_code == 200, blocked.text
+    assert blocked.json()["user_program_id"] > 0
 
 
 def test_one_week_cycle_execution_and_rolling_snapshot(client):
@@ -302,8 +302,9 @@ def test_one_week_cycle_execution_and_rolling_snapshot(client):
 
 @pytest.mark.parametrize("restart", [False, True])
 @pytest.mark.parametrize("weeks_absent", [4, 8])
+@pytest.mark.parametrize("schedule_route", ["today", "week", "schedule"])
 def test_cycle_retains_future_window_with_unfinished_workout(
-    client, monkeypatch, restart, weeks_absent
+    client, monkeypatch, restart, weeks_absent, schedule_route
 ):
     from datetime import timedelta
 
@@ -344,7 +345,7 @@ def test_cycle_retains_future_window_with_unfinished_workout(
         routes, "recovery_today_for_user", lambda _user: start + timedelta(weeks=weeks_absent)
     )
     for _ in range(2):
-        response = client.get("/api/v1/workouts/today", headers=headers)
+        response = client.get(f"/api/v1/workouts/{schedule_route}", headers=headers)
         assert response.status_code == 200, response.text
     with get_session_context() as db:
         rows = db.query(UserWorkout).filter_by(user_program_id=program_id).all()
@@ -360,7 +361,8 @@ def test_cycle_retains_future_window_with_unfinished_workout(
         )
 
 
-def test_future_week_ten_override_is_materialized(client):
+@pytest.mark.parametrize("restart_after_edit", [False, True])
+def test_future_week_ten_override_is_materialized(client, restart_after_edit):
     from datetime import timedelta
 
     from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
@@ -398,6 +400,18 @@ def test_future_week_ten_override_is_materialized(client):
         },
     )
     assert edited.status_code == 200, edited.text
+    if restart_after_edit:
+        restarted = client.post(
+            f"/api/v1/programs/assigned/{program_id}/lifecycle",
+            headers=headers,
+            json={
+                "action": "restart",
+                "expected_revision_number": edited.json()["current_revision_number"],
+                "reason": "Повторить изменённый план",
+            },
+        )
+        assert restarted.status_code == 200, restarted.text
+        program_id = restarted.json()["new_program_id"]
     with get_session_context() as db:
         program = db.get(UserProgram, program_id)
         for _ in range(2):
@@ -413,3 +427,61 @@ def test_future_week_ten_override_is_materialized(client):
         assert len(rows[10].exercises[0].sets) == 3
         assert rows[9].exercises[0].prescribed_sets == 2
         assert rows[1].exercises[0].prescribed_sets == 2
+
+
+def test_three_week_cycle_maps_week_sixteen_to_first_prescription(client):
+    from datetime import timedelta
+
+    from fitminiapp_api.models.program import (
+        ProgramTemplate,
+        ProgramTemplateExerciseWeekPrescription,
+    )
+    from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
+
+    headers = _auth(client, 916110)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 3, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    template_id = created.json()["template"]["id"]
+    with get_session_context() as db:
+        slot = db.get(ProgramTemplate, template_id).days[0].exercises[0]
+        for week in range(1, 4):
+            db.add(
+                ProgramTemplateExerciseWeekPrescription(
+                    template_exercise_id=slot.id,
+                    exercise_id=slot.exercise_id,
+                    week_number=week,
+                    prescribed_sets=week,
+                    prescribed_reps=str(week * 3),
+                    rest_seconds=90,
+                )
+            )
+    assigned = client.post(
+        f"/api/v1/programs/templates/{template_id}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        initial = (
+            db.query(UserWorkout)
+            .filter_by(user_program_id=program_id)
+            .order_by(UserWorkout.week_number)
+            .all()
+        )
+        assert [row.exercises[0].prescribed_sets for row in initial] == [1, 2, 3, 1]
+        assert (
+            materialize_next_cycle_window(
+                db, program, through_date=program.start_date + timedelta(weeks=15)
+            )
+            == 1
+        )
+        last = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=16).one()
+        assert last.exercises[0].prescribed_sets == 1
+        assert last.exercises[0].prescribed_reps == "3"
+        assert (
+            last.exercises[0].source_weekly_prescription_id
+            == initial[0].exercises[0].source_weekly_prescription_id
+        )
