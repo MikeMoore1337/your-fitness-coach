@@ -6130,9 +6130,10 @@ for (const theme of ['dark', 'light'] as const) {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
     await page.addInitScript((selectedTheme) => {
       localStorage.setItem('app-theme', selectedTheme);
-      (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts = 0;
+      const trackedWindow = window as typeof window & { __postCompletionRestStarts: number };
+      trackedWindow.__postCompletionRestStarts = 0;
       window.addEventListener('fit:rest', () => {
-        (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts += 1;
+        trackedWindow.__postCompletionRestStarts += 1;
       });
     }, theme);
     const server = await mockActiveWorkout(page);
@@ -6145,7 +6146,8 @@ for (const theme of ['dark', 'light'] as const) {
     await first.getByRole('button', { name: /^Завершить:/ }).click();
     await expect.poll(() => server.readSet(201).is_completed).toBe(true);
     const restStarts = await page.evaluate(
-      () => (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts,
+      () =>
+        (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts,
     );
     const patchCountAtCompletion = server.patches.length;
     await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
@@ -6163,11 +6165,15 @@ for (const theme of ['dark', 'light'] as const) {
     await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
     expect(server.readSet(201).is_completed).toBe(true);
     await expect(first.getByText('Выполнен', { exact: true })).toBeVisible();
-    await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+      'data-workout-set-id',
+      '202',
+    );
     await expect(page.getByRole('button', { name: 'Пропустить', exact: true })).toHaveCount(0);
     expect(
       await page.evaluate(
-        () => (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts,
+        () =>
+          (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts,
       ),
     ).toBe(restStarts);
     expect(
@@ -6203,11 +6209,17 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
     const restored = page.locator('[data-workout-set-id="201"]');
     await restored.locator('.active-workout-set__advanced > summary').click();
-    await expect(restored.getByRole('button', { name: /^2 —/ })).toHaveAttribute('aria-pressed', 'false');
+    await expect(restored.getByRole('button', { name: /^2 —/ })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
     await expect(restored.getByRole('checkbox', { name: 'Подход до отказа' })).not.toBeChecked();
     await expect(restored.getByLabel(/^Вес,/)).toBeDisabled();
     await expect(restored.getByText('Выполнен', { exact: true })).toBeVisible();
-    await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+      'data-workout-set-id',
+      '202',
+    );
   });
 }
 
