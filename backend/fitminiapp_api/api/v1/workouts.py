@@ -179,10 +179,14 @@ router = APIRouter()
 
 @router.get("/progress/activity-heatmap", response_model=ActivityHeatmapResponse)
 def workout_activity_heatmap(
+    year: int | None = Query(default=None, ge=1970, le=9999),
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    return build_activity_heatmap(db, current_user)
+    try:
+        return build_activity_heatmap(db, current_user, year=year)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def now_for_user_naive(user: User):

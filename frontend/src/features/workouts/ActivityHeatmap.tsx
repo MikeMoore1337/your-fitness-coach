@@ -4,6 +4,7 @@ import './ActivityHeatmap.css';
 
 export type ActivityDay = {
   date: string;
+  is_future?: boolean;
   completed_workouts: number | null;
   working_sets: number | null;
 };
@@ -21,10 +22,10 @@ function dateLabel(value: string) {
   );
 }
 
-function monthLabel(value: string) {
+function monthLabel(value: string, calendarYear: boolean) {
   return new Intl.DateTimeFormat('ru-RU', {
     month: 'long',
-    year: 'numeric',
+    year: calendarYear ? undefined : 'numeric',
     timeZone: 'UTC',
   }).format(new Date(`${value}T00:00:00Z`));
 }
@@ -36,11 +37,17 @@ function valueLabel(value: number | null) {
 export function ActivityHeatmap({
   data,
   variant = 'year',
+  year,
+  onYearChange,
 }: {
   data: ActivityHeatmapData;
   variant?: 'year' | 'months';
+  year?: number;
+  onYearChange?: (year: number) => void;
 }) {
-  const [selected, setSelected] = useState(data.days.at(-1)?.date ?? '');
+  const [selected, setSelected] = useState(
+    data.days.filter((day) => !day.is_future).at(-1)?.date ?? '',
+  );
   const selectedDay = data.days.find((day) => day.date === selected) ?? data.days.at(-1);
   const groups: ActivityDay[][] = [];
   for (const day of data.days) {
@@ -54,7 +61,24 @@ export function ActivityHeatmap({
 
   return (
     <section className="activity-heatmap" aria-labelledby="activity-heatmap-title">
-      <h2 id="activity-heatmap-title">Активность за 365 дней</h2>
+      <h2 id="activity-heatmap-title">
+        {year ? `Активность за ${year} год` : 'Активность за 365 дней'}
+      </h2>
+      {year && onYearChange && (
+        <label>
+          Год
+          <select aria-label="Год" value={year} onChange={(event) => onYearChange(Number(event.target.value))}>
+            {Array.from(
+              { length: new Date().getFullYear() - 1969 },
+              (_, index) => new Date().getFullYear() - index,
+            ).map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <p>Часовой пояс: {data.timezone}</p>
       {data.days[0] && data.days.at(-1) && (
         <p>
@@ -69,16 +93,17 @@ export function ActivityHeatmap({
       )}
       {data.history_complete &&
         data.days.length > 0 &&
-        data.days.every((day) => day.completed_workouts === 0) && (
+        data.days.every((day) => day.completed_workouts === 0 || day.is_future) && (
           <p>За этот период нет завершённых тренировок.</p>
         )}
+      <p>Будущие дни не содержат данных об активности.</p>
       <div
         className={`activity-heatmap__groups activity-heatmap__groups--${variant}`}
         aria-hidden="true"
       >
         {groups.map((group, index) => (
           <div className="activity-heatmap__group" key={group?.[0]?.date ?? index}>
-            {group?.[0] && <span>{monthLabel(group[0].date)}</span>}
+            {group?.[0] && <span>{monthLabel(group[0].date, Boolean(year))}</span>}
             <div className="activity-heatmap__grid">
               {Array.from(
                 {
@@ -95,9 +120,11 @@ export function ActivityHeatmap({
                   key={day.date}
                   className="activity-heatmap__cell"
                   data-level={
-                    day.completed_workouts === null
-                      ? 'unknown'
-                      : Math.min(day.completed_workouts, 3)
+                    day.is_future
+                      ? 'future'
+                      : day.completed_workouts === null
+                        ? 'unknown'
+                        : Math.min(day.completed_workouts, 3)
                   }
                 />
               ))}
@@ -108,6 +135,7 @@ export function ActivityHeatmap({
       <div className="activity-heatmap__legend" aria-label="Легенда: количество тренировок">
         {[
           ['unknown', 'Нет данных'],
+          ['future', 'Будущий день'],
           ['0', '0'],
           ['1', '1'],
           ['2', '2'],
@@ -138,9 +166,9 @@ export function ActivityHeatmap({
           </label>
           {selectedDay && (
             <p aria-live="polite">
-              {dateLabel(selectedDay.date)}: тренировки —{' '}
-              {valueLabel(selectedDay.completed_workouts)}, рабочие подходы —{' '}
-              {valueLabel(selectedDay.working_sets)}.
+              {selectedDay.is_future
+                ? `${dateLabel(selectedDay.date)}: этот день ещё не наступил.`
+                : `${dateLabel(selectedDay.date)}: тренировки — ${valueLabel(selectedDay.completed_workouts)}, рабочие подходы — ${valueLabel(selectedDay.working_sets)}.`}
             </p>
           )}
           <details>

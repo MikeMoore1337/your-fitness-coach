@@ -1261,7 +1261,7 @@ test('progress remains clear and free of horizontal overflow at supported widths
     .getByRole('tab', { name: /^Тренировки/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Активность за 365 дней' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Активность за \d{4} год/ })).toBeVisible();
   await expect(page.getByText(/История неполная/)).toBeVisible();
   await expect(page.getByText('Грудные')).toBeVisible();
   await expect(page.getByText('+6 подх.')).toBeVisible();

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { ActivityHeatmap } from '../../src/features/workouts/ActivityHeatmap';
 
 const data = {
@@ -40,4 +40,12 @@ it('distinguishes a known empty history from unknown days', () => {
     />,
   );
   expect(screen.getByText('За этот период нет завершённых тренировок.')).toBeInTheDocument();
+});
+
+it('requests the selected calendar year', () => {
+  const onYearChange = vi.fn();
+  render(<ActivityHeatmap data={data} year={2026} onYearChange={onYearChange} />);
+  expect(screen.getByRole('heading', { name: 'Активность за 2026 год' })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Год'), { target: { value: '2024' } });
+  expect(onYearChange).toHaveBeenCalledWith(2024);
 });

@@ -17,14 +17,19 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.services.workouts import working_volume_set_filter
 
 
-def build_activity_heatmap(db: Session, user: User, *, now: datetime | None = None) -> dict:
+def build_activity_heatmap(
+    db: Session, user: User, *, now: datetime | None = None, year: int | None = None
+) -> dict:
     timezone_name = get_user_timezone_name(user)
     timezone = get_timezone(timezone_name)
     today = (now or datetime.now(UTC)).astimezone(timezone).date()
-    start = today - timedelta(days=364)
+    if year is not None and not 1970 <= year <= today.year:
+        raise ValueError("Год должен быть между 1970 и текущим годом")
+    start = date(year, 1, 1) if year is not None else today - timedelta(days=364)
+    end = date(year, 12, 31) if year is not None else today
     start_utc = datetime.combine(start, time.min, timezone).astimezone(UTC).replace(tzinfo=None)
     end_utc = (
-        datetime.combine(today + timedelta(days=1), time.min, timezone)
+        datetime.combine(min(end, today) + timedelta(days=1), time.min, timezone)
         .astimezone(UTC)
         .replace(tzinfo=None)
     )
@@ -71,20 +76,22 @@ def build_activity_heatmap(db: Session, user: User, *, now: datetime | None = No
         totals[day][0] += 1
         totals[day][1] += working_sets
     days = []
-    for offset in range(365):
+    for offset in range((end - start).days + 1):
         day = start + timedelta(days=offset)
         counts = totals.get(day)
+        unavailable = bool(undated) or day > today
         days.append(
             {
                 "date": day,
-                "completed_workouts": counts[0] if counts else (None if undated else 0),
-                "working_sets": counts[1] if counts else (None if undated else 0),
+                "is_future": day > today,
+                "completed_workouts": counts[0] if counts else (None if unavailable else 0),
+                "working_sets": counts[1] if counts else (None if unavailable else 0),
             }
         )
     return {
         "timezone": timezone_name,
         "start_date": start,
-        "end_date": today,
+        "end_date": end,
         "history_complete": not bool(undated),
         "undated_workouts": undated,
         "days": days,

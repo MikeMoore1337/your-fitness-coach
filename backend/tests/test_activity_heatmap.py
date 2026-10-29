@@ -174,3 +174,37 @@ def test_repeated_dst_hour_groups_distinct_instants_on_the_same_local_day(client
         result = build_activity_heatmap(db, user, now=datetime(2026, 11, 2, 12, tzinfo=UTC))
         day = next(row for row in result["days"] if row["date"].isoformat() == "2026-11-01")
         assert day["completed_workouts"] == 2
+
+
+def test_calendar_year_preserves_leap_day_and_marks_future(client):
+    headers = _auth(client, 727_840)
+    with get_session_context() as db:
+        user = db.query(User).filter_by(id=_user_id(727_840)).one()
+        result = build_activity_heatmap(
+            db, user, year=2024, now=datetime(2024, 3, 1, 12, tzinfo=UTC)
+        )
+        assert len(result["days"]) == 366
+        assert result["days"][59]["date"].isoformat() == "2024-02-29"
+        assert result["days"][59]["completed_workouts"] == 0
+        assert result["days"][-1]["is_future"] is True
+        assert result["days"][-1]["completed_workouts"] is None
+        assert (
+            len(
+                build_activity_heatmap(db, user, year=2023, now=datetime(2024, 3, 1, tzinfo=UTC))[
+                    "days"
+                ]
+            )
+            == 365
+        )
+    assert (
+        client.get(
+            "/api/v1/workouts/progress/activity-heatmap?year=9999", headers=headers
+        ).status_code
+        == 422
+    )
+    assert (
+        client.get(
+            "/api/v1/workouts/progress/activity-heatmap?year=1969", headers=headers
+        ).status_code
+        == 422
+    )

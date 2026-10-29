@@ -5794,6 +5794,11 @@ export interface components {
              * Format: date
              */
             date: string;
+            /**
+             * Is Future
+             * @default false
+             */
+            is_future: boolean;
             /** Completed Workouts */
             completed_workouts: number | null;
             /** Working Sets */
@@ -24231,7 +24236,9 @@ export interface operations {
     };
     workout_activity_heatmap_api_v1_workouts_progress_activity_heatmap_get: {
         parameters: {
-            query?: never;
+            query?: {
+                year?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -24245,6 +24252,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityHeatmapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

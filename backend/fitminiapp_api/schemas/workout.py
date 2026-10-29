@@ -39,6 +39,7 @@ WORKOUT_COMPLETION_NOTE_MAX_LENGTH = 500
 
 class ActivityHeatmapDay(BaseModel):
     date: date
+    is_future: bool = False
     completed_workouts: int | None
     working_sets: int | None
 

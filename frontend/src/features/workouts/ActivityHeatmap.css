@@ -104,3 +104,12 @@
 .activity-heatmap__groups--year .activity-heatmap__group:last-child {
   border-right: 0;
 }
+
+.activity-heatmap__cell[data-level='future'] {
+  background: transparent;
+  border-style: dotted;
+}
+
+.activity-heatmap__groups--months .activity-heatmap__group > span {
+  min-height: 1.2rem;
+}

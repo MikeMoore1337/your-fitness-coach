@@ -1550,10 +1550,13 @@ export function ProgressExperience({
     enabled: view === 'overview',
   });
   const analytics = useTrainingAnalytics(selection, view === 'training');
+  const [activityYear, setActivityYear] = useState(Number(today.slice(0, 4)));
   const activity = useQuery({
-    queryKey: ['workout', 'activity-heatmap'],
+    queryKey: ['workout', 'activity-heatmap', activityYear],
     queryFn: async () => {
-      const result = await api<ActivityHeatmapData>('/api/v1/workouts/progress/activity-heatmap');
+      const result = await api<ActivityHeatmapData>(
+        `/api/v1/workouts/progress/activity-heatmap?year=${activityYear}`,
+      );
       if (!result || !Array.isArray(result.days)) {
         throw new Error('Не удалось загрузить календарь активности.');
       }
@@ -1677,7 +1680,12 @@ export function ProgressExperience({
                         retry={() => void activity.refetch()}
                       />
                     ) : activity.data ? (
-                      <ActivityHeatmap data={activity.data} />
+                      <ActivityHeatmap
+                        key={activityYear}
+                        data={activity.data}
+                        year={activityYear}
+                        onYearChange={setActivityYear}
+                      />
                     ) : null}
                     <TrainingSection analytics={analytics} summary={summary.data} />
                   </>
