@@ -54,12 +54,13 @@ export function ProgramDayEditor({
   const [detailOpen, setDetailOpen] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [mobileView, setMobileView] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 1099px)').matches,
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+    window.matchMedia('(max-width: 1099px)').matches,
   );
   useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
     const media = window.matchMedia('(max-width: 1099px)');
     const update = () => setMobileView(media.matches);
-    update();
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
@@ -86,7 +87,7 @@ export function ProgramDayEditor({
       setDetailOpen(false);
       setAllDaysOpen(false);
       const carousel = carouselRef.current;
-      if (carousel) carousel.scrollTo({ left: carousel.clientWidth * next, behavior: 'instant' });
+      if (carousel) carousel.scrollLeft = carousel.clientWidth * next;
     },
     [days.length],
   );
@@ -95,7 +96,7 @@ export function ProgramDayEditor({
     const carousel = carouselRef.current;
     if (!carousel) return;
     const frame = window.requestAnimationFrame(() => {
-      carousel.scrollTo({ left: carousel.clientWidth * dayIndex, behavior: 'instant' });
+      carousel.scrollLeft = carousel.clientWidth * dayIndex;
     });
     return () => window.cancelAnimationFrame(frame);
   }, [dayIndex, days.length]);
