@@ -491,8 +491,60 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
                 )
             ).scalar_one()
             assert "community_unverified" not in legacy_constraint
+            connection.commit()
 
-            command.upgrade(alembic_config, "head")
+            from sqlalchemy import event
+
+            migration_lock_id = 626517843
+            observed_concurrent_index = []
+
+            def check_migration_lock(_conn, _cursor, statement, _parameters, _context, _many):
+                if (
+                    "CONCURRENTLY" not in statement
+                    or "uq_user_workouts_cycle_occurrence" not in statement
+                ):
+                    return
+                with maintenance_engine.connect().execution_options(
+                    isolation_level="AUTOCOMMIT"
+                ) as observer:
+                    acquired = observer.execute(
+                        text("SELECT pg_try_advisory_lock(:key)"), {"key": migration_lock_id}
+                    ).scalar_one()
+                    if acquired:
+                        observer.execute(
+                            text("SELECT pg_advisory_unlock(:key)"), {"key": migration_lock_id}
+                        )
+                    assert acquired is False, "autocommit released the migrator serialization lock"
+                    observed_concurrent_index.append(True)
+
+            event.listen(connection, "before_cursor_execute", check_migration_lock)
+            try:
+                command.upgrade(alembic_config, "head")
+            finally:
+                event.remove(connection, "before_cursor_execute", check_migration_lock)
+            assert observed_concurrent_index == [True]
+            assert (
+                connection.execute(
+                    text(
+                        "SELECT indisvalid FROM pg_index WHERE indexrelid = "
+                        "'uq_user_workouts_cycle_occurrence'::regclass"
+                    )
+                ).scalar_one()
+                is True
+            )
+            connection.commit()
+            with maintenance_engine.connect().execution_options(
+                isolation_level="AUTOCOMMIT"
+            ) as observer:
+                assert (
+                    observer.execute(
+                        text("SELECT pg_try_advisory_lock(:key)"), {"key": migration_lock_id}
+                    ).scalar_one()
+                    is True
+                )
+                observer.execute(
+                    text("SELECT pg_advisory_unlock(:key)"), {"key": migration_lock_id}
+                )
             corrected_constraint, validated = connection.execute(
                 text(
                     "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "

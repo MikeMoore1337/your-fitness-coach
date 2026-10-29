@@ -17,7 +17,7 @@ CoachProgramRolloutResultStatus = Literal["applied", "already_applied", "failed"
 class CoachProgramRolloutDiff(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    week_number: int = Field(..., ge=1, le=24)
+    week_number: int = Field(..., ge=1)
     day_number: int = Field(..., ge=1, le=8)
     exercise_title: str = Field(..., min_length=1, max_length=128)
     change: CoachProgramRolloutChange

@@ -186,6 +186,36 @@ def test_online_migration_accepts_concurrent_index_on_existing_table(tmp_path: P
     validate_added_migration(path)
 
 
+@pytest.mark.parametrize(
+    "kind", ["valid", "write", "other_index", "other_query", "non_pg", "dynamic"]
+)
+def test_concurrent_index_allows_only_exact_catalog_validation(tmp_path: Path, kind: str) -> None:
+    query = "SELECT indisvalid AND indisunique FROM pg_index WHERE indexrelid = 'ix_users_name'::regclass"
+    if kind == "write":
+        query += "; DELETE FROM users"
+    elif kind == "other_index":
+        query = query.replace("ix_users_name", "another_index")
+    elif kind == "other_query":
+        query = "SELECT * FROM users"
+    expression = "query" if kind == "dynamic" else repr(query)
+    dialect = "sqlite" if kind == "non_pg" else "postgresql"
+    path = _migration(
+        tmp_path / "0065_index_validation.py",
+        'online_rollout_phase = "expand"\nonline_rollout_notes = "Validate the concurrent index."\n'
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        f'    if bind.dialect.name == "{dialect}":\n'
+        "        with op.get_context().autocommit_block():\n"
+        '            op.create_index("ix_users_name", "users", ["name"], postgresql_concurrently=True, if_not_exists=True)\n'
+        f"            bind.execute(sa.text({expression})).scalar_one()\n",
+    )
+    if kind != "valid":
+        with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+            validate_added_migration(path)
+    else:
+        validate_added_migration(path)
+
+
 @pytest.mark.parametrize("operation", ["drop_table", "drop_column", "alter_column"])
 def test_online_migration_rejects_destructive_contract_operation(
     tmp_path: Path, operation: str
@@ -467,3 +497,58 @@ def test_rest_unique_swap_rejects_undeclared_migration_name(tmp_path: Path) -> N
     ).read_text(encoding="utf-8")
     with pytest.raises(OnlineMigrationError, match="unapproved"):
         validate_added_migration(_migration(tmp_path / "9999_unrelated_unique_swap.py", source))
+
+
+def test_cycle_storage_migrations_use_declared_online_operations():
+    import runpy
+    from pathlib import Path
+
+    checker = runpy.run_path(
+        str(Path(__file__).resolve().parents[1] / "scripts" / "check_online_migrations.py")
+    )
+    for filename in (
+        "0134_program_cycle_storage.py",
+        "0135_program_duration_unbounded.py",
+        "0136_program_week_unbounded.py",
+    ):
+        checker["validate_added_migration"](
+            Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions" / filename
+        )
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        (
+            'batch_alter_table("program_template_exercise_weeks")',
+            'batch_alter_table("user_workouts")',
+        ),
+        (
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="check")',
+            'batch.drop_constraint("other", type_="check")',
+        ),
+        (
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="check")',
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="unique")',
+        ),
+        ('"week_number >= 1"', '"week_number >= 0"'),
+        (
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="check")',
+            'batch.drop_column("week_number")',
+        ),
+    ],
+)
+def test_sqlite_check_swap_rejects_undeclared_or_mismatching_operations(tmp_path, old, new):
+    import runpy
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    checker = runpy.run_path(str(root / "scripts" / "check_online_migrations.py"))
+    source = (
+        root / "backend" / "alembic" / "versions" / "0136_program_week_unbounded.py"
+    ).read_text(encoding="utf-8")
+    assert old in source
+    invalid = tmp_path / "invalid.py"
+    invalid.write_text(source.replace(old, new), encoding="utf-8")
+    with pytest.raises(checker["OnlineMigrationError"]):
+        checker["validate_added_migration"](invalid)
