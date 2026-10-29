@@ -4967,9 +4967,21 @@ async function runIssue1164SpacingScenario(
   await secondSet.getByText('Дополнительно', { exact: true }).click();
   await expect(secondSet.getByLabel('Вид подхода')).not.toBeVisible();
 
+  // #1318: keep the focus outline inside both inputs without shifting the label.
   const weight = secondSet.getByLabel(/Вес,/);
+  const repetitions = secondSet.getByRole('spinbutton', { name: /Повторы,/ });
+  for (const field of [weight, repetitions]) {
+    await field.focus();
+    await expect(field).toBeFocused();
+    await expect(field).toHaveCSS('outline-width', '3px');
+    await expect(field).toHaveCSS('outline-offset', '-4px');
+    const distance = await field.evaluate((input) => {
+      const caption = input.closest('label')!.querySelector('span')!;
+      return input.getBoundingClientRect().top - caption.getBoundingClientRect().bottom;
+    });
+    expect(distance).toBeGreaterThanOrEqual(0);
+  }
   await weight.focus();
-  await expect(weight).toBeFocused();
   await expectClearOfBottomDock(weight, `${theme} ${viewport.width}px weight`);
   await expectClearOfBottomDock(
     secondSet.getByRole('button', { name: /^Завершить:/ }),
@@ -6089,6 +6101,32 @@ for (const issue1162Width of [320, 360, 393, 430]) {
       );
       expect(closedLayout.buttonsFit).toEqual([true, true]);
       expect(closedLayout.actions?.height).toBeLessThanOrEqual(52);
+
+      // #1320: completed RIR/failure can be corrected without reopening the set.
+      const writesBeforeMetadata = server.patches.length;
+      await first.locator('.active-workout-set__advanced > summary').click();
+      const completedRir = first.getByRole('button', { name: /^1 —/ });
+      const completedFailure = first.getByRole('checkbox', { name: 'Подход до отказа' });
+      await expect(completedRir).toBeEnabled();
+      await expect(completedFailure).toBeEnabled();
+      await completedRir.click();
+      await expect.poll(() => server.readSet(201).rir).toBe('1');
+      await completedRir.click();
+      await expect.poll(() => server.readSet(201).rir).toBeNull();
+      await first.getByRole('button', { name: /^2 —/ }).click();
+      await expect.poll(() => server.readSet(201).rir).toBe('2');
+      await completedFailure.check();
+      await expect.poll(() => server.readSet(201).reached_failure).toBe(true);
+      await completedFailure.uncheck();
+      await expect.poll(() => server.readSet(201).reached_failure).toBe(false);
+      await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+      const metadataWrites = server.patches.slice(writesBeforeMetadata);
+      expect(metadataWrites.length).toBeGreaterThanOrEqual(5);
+      expect(metadataWrites.every((patch) => patch.body.is_completed === true)).toBe(true);
+      expect(server.readSet(201).is_completed).toBe(true);
+      await expect(first.getByText('Выполнен', { exact: true })).toBeVisible();
+      await expect(current).toHaveAttribute('aria-current', 'step');
+      await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
 
       const actions = completedActions(first);
       await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
