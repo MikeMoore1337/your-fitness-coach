@@ -983,7 +983,9 @@ function WorkoutSetRow({
                 const nextReachedFailure = event.target.checked;
                 editing.current = true;
                 setReachedFailure(nextReachedFailure);
-                if (!editingCompleted) void enqueueSave({ reachedFailure: nextReachedFailure }, false, false);
+                if (!editingCompleted) {
+                  void enqueueSave({ reachedFailure: nextReachedFailure }, false, false);
+                }
               }}
             />
             <span>Подход до отказа</span>
