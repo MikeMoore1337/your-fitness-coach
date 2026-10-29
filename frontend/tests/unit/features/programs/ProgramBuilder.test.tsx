@@ -263,7 +263,6 @@ describe('ProgramBuilder type-aware prescription', () => {
     );
   });
 
-
   it('переключает дни через «Все дни», не теряя изменения названий', async () => {
     const user = userEvent.setup();
     renderBuilder();
