@@ -203,6 +203,11 @@
   gap: 9px;
 }
 .copy-editor__danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 9px 12px;
   color: var(--v2-danger, #e88d86);
 }
 .copy-editor__mobile-days {
