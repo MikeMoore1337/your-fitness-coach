@@ -4967,9 +4967,21 @@ async function runIssue1164SpacingScenario(
   await secondSet.getByText('Дополнительно', { exact: true }).click();
   await expect(secondSet.getByLabel('Вид подхода')).not.toBeVisible();
 
+  // #1318: keep the focus outline inside both inputs without shifting the label.
   const weight = secondSet.getByLabel(/Вес,/);
+  const repetitions = secondSet.getByRole('spinbutton', { name: /Повторы,/ });
+  for (const field of [weight, repetitions]) {
+    await field.focus();
+    await expect(field).toBeFocused();
+    await expect(field).toHaveCSS('outline-width', '3px');
+    await expect(field).toHaveCSS('outline-offset', '-4px');
+    const distance = await field.evaluate((input) => {
+      const caption = input.closest('label')!.querySelector('span')!;
+      return input.getBoundingClientRect().top - caption.getBoundingClientRect().bottom;
+    });
+    expect(distance).toBeGreaterThanOrEqual(0);
+  }
   await weight.focus();
-  await expect(weight).toBeFocused();
   await expectClearOfBottomDock(weight, `${theme} ${viewport.width}px weight`);
   await expectClearOfBottomDock(
     secondSet.getByRole('button', { name: /^Завершить:/ }),
