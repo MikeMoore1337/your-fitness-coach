@@ -396,24 +396,17 @@ describe('ProgramBuilder type-aware prescription', () => {
     await user.type(screen.getByRole('textbox', { name: 'Название' }), 'Мой черновик');
     await user.click(screen.getByText('Настройки программы', { exact: true }));
     expect(screen.queryByRole('textbox', { name: 'Название' })).toBeNull();
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Цель' }),
-      'muscle_gain',
-    );
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Цель' }), 'muscle_gain');
     await user.clear(screen.getByRole('spinbutton', { name: 'Длительность, недель' }));
     await user.type(screen.getByRole('spinbutton', { name: 'Длительность, недель' }), '3');
     await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }));
-    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue(
-      'Мой черновик',
-    );
+    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue('Мой черновик');
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates', expect.anything());
     await user.click(screen.getByText('Настройки программы', { exact: true }));
     expect(screen.getByRole('combobox', { name: 'Цель' })).toHaveValue('muscle_gain');
     expect(screen.getByRole('spinbutton', { name: 'Длительность, недель' })).toHaveValue(3);
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue(
-      'Мой черновик',
-    );
+    await user.keyboard.press('Escape');
+    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue('Мой черновик');
   });
 
   it('не закрывает настройки с недопустимой длительностью', async () => {
