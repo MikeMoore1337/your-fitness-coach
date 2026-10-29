@@ -14218,6 +14218,8 @@ export interface components {
             /** Reason Codes */
             reason_codes?: string[];
             active_program?: components["schemas"]["ProgramGeneratorActiveProgram"] | null;
+            /** Suggestions */
+            suggestions?: components["schemas"]["ProgramGeneratorSuggestion"][];
         };
         /** ProgramGeneratorProgram */
         ProgramGeneratorProgram: {
@@ -14239,6 +14241,8 @@ export interface components {
             days: components["schemas"]["ProgramGeneratorDay"][];
             /** Estimated Duration Minutes */
             estimated_duration_minutes: number;
+            /** Days Per Week */
+            days_per_week: number;
         };
         /** ProgramGeneratorRequest */
         ProgramGeneratorRequest: {
@@ -14296,6 +14300,13 @@ export interface components {
              * @enum {string}
              */
             provenance_type: "YFC_GENERIC" | "SOURCE_ADAPTATION" | "CUSTOM";
+        };
+        /** ProgramGeneratorSuggestion */
+        ProgramGeneratorSuggestion: {
+            source: components["schemas"]["ProgramGeneratorSource"];
+            /** Changes */
+            changes: string[];
+            inputs: components["schemas"]["ProgramGeneratorRequest"];
         };
         /** ProgramImportAiInfo */
         ProgramImportAiInfo: {

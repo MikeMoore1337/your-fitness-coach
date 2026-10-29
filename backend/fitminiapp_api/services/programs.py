@@ -512,6 +512,14 @@ def assign_template_to_user(
     ordered_days = sorted(template.days, key=lambda row: row.day_number)
     if len(ordered_days) > 8:
         raise ProgramError("A program cycle supports at most eight training days")
+    frequency = template.sessions_per_week
+    rotating = frequency != len(ordered_days) and frequency <= 7
+    scheduled_days = [
+        [ordered_days[(week * frequency + index) % len(ordered_days)] for index in range(frequency)]
+        if rotating
+        else ordered_days
+        for week in range(duration_weeks)
+    ]
     visible_by_effective_id = get_visible_exercise_display_map(db, target_user)
     assignment_exercises: dict[int, Exercise] = {}
     assignment_prescriptions: dict[int, ExercisePrescription] = {}
@@ -584,15 +592,16 @@ def assign_template_to_user(
                 )["segments"]
             )
         )
-        for week_number in range(1, duration_weeks + 1)
-        for exercise_id, base_prescription in assignment_prescriptions.items()
+        for week_number, week_days in enumerate(scheduled_days, start=1)
+        for day in week_days
+        for exercise_id in (item.id for item in day.exercises)
     )
     if generated_sets > MAX_GENERATED_SETS:
         raise ProgramError("Program is too large to assign in one operation")
     if schedule_weekdays is not None:
         if len(ordered_days) > 7:
             raise ProgramError("An eight-day cycle uses automatic sequential scheduling")
-        if len(schedule_weekdays) != len(ordered_days):
+        if len(schedule_weekdays) != frequency:
             raise ProgramError("Choose one weekday for every program day")
         if any(day < 0 or day > 6 for day in schedule_weekdays):
             raise ProgramError("Weekdays must be between 0 and 6")
@@ -615,7 +624,11 @@ def assign_template_to_user(
         cycle_span_days = 7
     else:
         effective_start_date = requested_start_date
-        day_offsets = list(range(len(ordered_days)))
+        day_offsets = (
+            [index * 7 // frequency for index in range(frequency)]
+            if rotating
+            else list(range(len(ordered_days)))
+        )
         normalized_weekdays = [
             (effective_start_date.weekday() + offset) % 7 for offset in day_offsets
         ]
@@ -643,8 +656,8 @@ def assign_template_to_user(
 
     created = 0
 
-    for week_index in range(duration_weeks):
-        for day, day_offset in zip(ordered_days, day_offsets, strict=True):
+    for week_index, week_days in enumerate(scheduled_days):
+        for day, day_offset in zip(week_days, day_offsets, strict=True):
             workout = UserWorkout(
                 user_program_id=user_program.id,
                 scheduled_date=effective_start_date

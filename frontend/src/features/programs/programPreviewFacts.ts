@@ -26,6 +26,16 @@ function knownFrequency(value: unknown): string | null {
     : null;
 }
 
+export function programWeeklySessions(template: ProgramTemplate): number {
+  const frequency = metadata(template).days_per_week;
+  return typeof frequency === 'number' &&
+    Number.isInteger(frequency) &&
+    frequency >= 1 &&
+    frequency <= 8
+    ? frequency
+    : template.days.length;
+}
+
 function knownScheduleFrequency(value: unknown): string | null {
   if (
     !Array.isArray(value) ||
