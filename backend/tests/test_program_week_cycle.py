@@ -58,15 +58,17 @@ def test_week_cycle_persists_without_materializing_workouts(client, weeks):
     assert client.get(f"/api/v1/programs/templates/{template_id}", headers=headers).json()[
         "program_metadata"
     ]["week_cycle"] == {"schema_version": 1, **cycle}
-    for _ in range(2):
-        blocked = client.post(
-            f"/api/v1/programs/templates/{template_id}/assign-to-me", headers=headers
-        )
-        assert blocked.status_code == 403
-        assert blocked.json()["detail"] == "Назначение программы с циклом недель пока недоступно"
+    assigned = client.post(
+        f"/api/v1/programs/templates/{template_id}/assign-to-me", headers=headers
+    )
+    assert assigned.status_code == 200, assigned.text
+    repeated = client.post(
+        f"/api/v1/programs/templates/{template_id}/assign-to-me", headers=headers
+    )
+    assert repeated.status_code == 409
     with get_session_context() as db:
         user = db.query(User).filter_by(telegram_user_id=916000 + weeks).one()
-        assert db.query(UserProgram).filter_by(user_id=user.id).count() == 0
+        assert db.query(UserProgram).filter_by(user_id=user.id).count() == 1
 
 
 def test_invalid_cycles_and_assignment_are_rejected_without_partial_creation(client):
@@ -92,11 +94,14 @@ def test_invalid_cycles_and_assignment_are_rejected_without_partial_creation(cli
         json={
             **payload,
             "assign_after_create": True,
+            "duration_weeks": 2,
             "week_cycle": {"length_weeks": 1, "week_types": ["light"], "repeat": False},
         },
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Назначение программы с циклом недель пока недоступно"
+    assert (
+        response.json()["detail"] == "Длительность программы превышает длину цикла без повторения"
+    )
     assert client.get("/api/v1/programs/templates/mine", headers=headers).json() == before
 
 
@@ -157,7 +162,7 @@ def test_other_user_cannot_read_cycle_and_edit_cannot_replace_it(client):
         client.post(
             "/api/v1/shares/program/preview", headers=owner, json={"template_id": template_id}
         ).status_code
-        == 422
+        == 200
     )
     assert client.get(f"/api/v1/programs/templates/{template_id}", headers=other).status_code in (
         403,
@@ -350,7 +355,10 @@ def test_cycle_retains_future_window_with_unfinished_workout(
     with get_session_context() as db:
         rows = db.query(UserWorkout).filter_by(user_program_id=program_id).all()
         assert sorted(row.week_number for row in rows) == list(range(1, 5)) + list(
-            range(weeks_absent + 1, weeks_absent + 5)
+            range(
+                weeks_absent + 1,
+                weeks_absent + {"today": 4, "week": 1, "schedule": 8}[schedule_route] + 1,
+            )
         )
         assert db.get(UserWorkout, original).status == "planned"
         assert all(
@@ -502,8 +510,8 @@ def test_oversized_logical_cycle_is_rejected_before_snapshot_generation(client):
         headers=headers,
         json={"duration_weeks": 16},
     )
-    assert response.status_code == 403, response.text
-    assert response.json()["detail"] == "Cycle snapshot is too large to assign in one operation"
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"] == "Размер плана превышает допустимый объём одного назначения"
     with get_session_context() as db:
         user = db.query(User).filter_by(telegram_user_id=916111).one()
         assert db.query(UserProgram).filter_by(user_id=user.id).count() == 0

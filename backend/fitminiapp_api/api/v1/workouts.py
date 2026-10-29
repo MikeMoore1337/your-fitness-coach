@@ -296,6 +296,10 @@ def _get_user_workout_or_404(
     workout = query.first()
     if not workout:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
+    from fitminiapp_api.services.program_versioning import hydrate_cycle_workout
+
+    if hydrate_cycle_workout(db, workout):
+        db.commit()
     return workout
 
 
@@ -453,6 +457,9 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
         "scheduled_time": workout.scheduled_time,
         "day_number": workout.day_number,
         "week_number": workout.week_number,
+        "source_cycle_week": workout.source_cycle_week,
+        "cycle_iteration": workout.cycle_iteration,
+        "plan_revision_number": workout.plan_revision_number,
         "title": workout.title,
         "status": workout.status,
         "started_at": workout.started_at.isoformat() if workout.started_at else None,
@@ -535,8 +542,13 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
     }
 
 
-def _materialize_user_cycle_window(db: Session, current_user: User, target_date: date) -> None:
-    from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
+def _materialize_user_cycle_window(
+    db: Session, current_user: User, target_date: date, end: date | None = None
+) -> None:
+    from fitminiapp_api.services.program_versioning import (
+        materialize_cycle_schedule,
+        materialize_next_cycle_window,
+    )
 
     programs = (
         db.query(UserProgram)
@@ -548,8 +560,11 @@ def _materialize_user_cycle_window(db: Session, current_user: User, target_date:
         .all()
     )
     for program in programs:
-        if materialize_next_cycle_window(db, program, through_date=target_date):
-            db.commit()
+        if end is None:
+            materialize_next_cycle_window(db, program, through_date=target_date)
+        else:
+            materialize_cycle_schedule(db, program, target_date, end)
+    db.commit()
 
 
 @router.get("/today", response_model=WorkoutTodayResponse)
@@ -602,6 +617,10 @@ def get_today_workout(
     if not workout:
         raise HTTPException(status_code=404, detail="На сегодня тренировка не назначена")
 
+    from fitminiapp_api.services.program_versioning import hydrate_cycle_workout
+
+    if hydrate_cycle_workout(db, workout):
+        db.commit()
     return _serialize_workout(workout, db, current_user)
 
 
@@ -865,9 +884,9 @@ def get_week_schedule(
     db: Session = Depends(get_db),
 ):
     today = recovery_today_for_user(current_user)
-    _materialize_user_cycle_window(db, current_user, today)
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
+    _materialize_user_cycle_window(db, current_user, week_start, week_end)
     workouts = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
@@ -907,7 +926,7 @@ def get_schedule(
             status_code=422, detail="Диапазон расписания не может быть больше 93 дней"
         )
 
-    _materialize_user_cycle_window(db, current_user, start)
+    _materialize_user_cycle_window(db, current_user, start, end)
 
     workouts = (
         db.query(UserWorkout)

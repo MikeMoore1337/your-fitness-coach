@@ -9,7 +9,7 @@ from math import floor
 from typing import Literal, cast
 
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import (
     get_user_timezone_name,
@@ -438,6 +438,42 @@ def build_progress_summaries(
             raise ValueError("period end must not be before period start")
     actual_today_by_user = {user.id: today_for_user(user) for user in users}
 
+    cycle_programs = (
+        db.query(UserProgram)
+        .options(selectinload(UserProgram.workouts))
+        .filter(
+            UserProgram.user_id.in_(user_ids),
+            UserProgram.status.in_({"active", "scheduled", "paused"}),
+            UserProgram.workouts.any(UserWorkout.source_cycle_week.is_not(None)),
+        )
+        .order_by(UserProgram.id)
+        .all()
+    )
+    missing_workouts_by_user: dict[int, int] = defaultdict(int)
+    if cycle_programs:
+        from fitminiapp_api.services.program_versioning import (
+            cycle_workout_count,
+            materialize_cycle_schedule,
+        )
+
+        changed = 0
+        for program in cycle_programs:
+            current_day = actual_today_by_user[program.user_id]
+            if program.is_active and program.status in {"active", "scheduled"}:
+                changed += materialize_cycle_schedule(
+                    db, program, current_day, current_day + timedelta(days=27)
+                )
+                db.expire(program, ["workouts"])
+            missing_workouts_by_user[program.user_id] += cycle_workout_count(
+                db,
+                program,
+                start=start_by_user[program.user_id],
+                end=min(today_by_user[program.user_id], current_day - timedelta(days=1)),
+                missing_only=True,
+            )
+        if changed:
+            db.commit()
+
     workout_rows = (
         db.query(
             UserProgram.user_id,
@@ -815,9 +851,10 @@ def build_progress_summaries(
         ]
         completed_workouts = [row for row in evaluated_workouts if row.status == "completed"]
         skipped_workouts = [row for row in evaluated_workouts if row.status == "skipped"]
+        evaluated_count = len(evaluated_workouts) + missing_workouts_by_user[user.id]
         workout_adherence = calculate_adherence_component(
             achieved=len(completed_workouts),
-            evaluated=len(evaluated_workouts),
+            evaluated=evaluated_count,
             weight=ADHERENCE_WEIGHTS["workouts"],
             unavailable_status="not_applicable",
             unavailable_reason="no_evaluable_planned_workouts",
@@ -992,7 +1029,7 @@ def build_progress_summaries(
             "period_start": start_by_user[user.id],
             "period_end": current_day,
             "training": {
-                "planned_workouts": len(evaluated_workouts),
+                "planned_workouts": evaluated_count,
                 "completed_workouts": len(completed_workouts),
                 "skipped_workouts": len(skipped_workouts),
                 "frequency_per_week": round(len(completed_workouts) * 7 / period_days, 2),

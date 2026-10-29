@@ -58,7 +58,7 @@ from fitminiapp_api.services.nutrition import build_nutrition_target_response_fr
 from fitminiapp_api.services.prescription_semantics import (
     ensure_plan,
 )
-from fitminiapp_api.services.program_common import MAX_PROGRAM_DURATION_WEEKS, ProgramError
+from fitminiapp_api.services.program_common import MAX_GENERATED_SETS, ProgramError
 from fitminiapp_api.services.program_versioning import (
     apply_imported_template_revision,
     record_program_revision,
@@ -73,7 +73,6 @@ GOALS = {"muscle_gain", "fat_loss", "maintenance", "recomposition", "strength"}
 LEVELS = {"beginner", "intermediate", "advanced"}
 MODES = {"self", "coach"}
 LEGACY_DEMO_TEMPLATE_SLUG = "upper-lower-4x"
-MAX_GENERATED_SETS = 20_000
 
 
 def _input_prescription(
@@ -477,15 +476,13 @@ def assign_template_to_user(
     replace_active: bool = False,
 ) -> tuple[UserProgram, int]:
     cycle = (template.program_metadata or {}).get("week_cycle")
-    if cycle is not None and not (cycle["repeat"]):
-        raise ProgramError("Назначение программы с циклом недель пока недоступно")
+    if cycle and not cycle["repeat"] and duration_weeks > cycle["length_weeks"]:
+        raise ProgramError("Длительность программы превышает длину цикла без повторения")
     # Сериализуем конкурирующие назначения для одного пользователя. Частичный
     # unique index остаётся последней линией защиты на уровне БД.
     db.query(User).filter(User.id == target_user.id).with_for_update().one()
-    if duration_weeks < 1 or duration_weeks > MAX_PROGRAM_DURATION_WEEKS:
-        raise ProgramError(
-            f"Program duration must be between 1 and {MAX_PROGRAM_DURATION_WEEKS} weeks"
-        )
+    if duration_weeks < 1:
+        raise ProgramError("Длительность программы должна быть положительной")
     active_program = (
         db.query(UserProgram)
         .filter(
@@ -517,7 +514,7 @@ def assign_template_to_user(
 
     ordered_days = sorted(template.days, key=lambda row: row.day_number)
     if cycle and len(ordered_days) > 7:
-        raise ProgramError("A calendar-week cycle supports at most seven training days")
+        raise ProgramError("В календарной неделе может быть не больше семи тренировочных дней")
     if len(ordered_days) > 8:
         raise ProgramError("A program cycle supports at most eight training days")
     visible_by_effective_id = get_visible_exercise_display_map(db, target_user)
@@ -589,12 +586,10 @@ def assign_template_to_user(
             for slot, base_plan in assignment_plans.items()
         )
         if snapshot_set_budget > MAX_GENERATED_SETS:
-            raise ProgramError("Cycle snapshot is too large to assign in one operation")
+            raise ProgramError("Размер плана превышает допустимый объём одного назначения")
     if has_weekly_prescriptions:
         for week_number in (
-            range(1, min(duration_weeks, cycle["length_weeks"]) + 1)
-            if cycle
-            else range(1, duration_weeks + 1)
+            range(1, cycle["length_weeks"] + 1) if cycle else range(1, duration_weeks + 1)
         ):
             if any(
                 (exercise_item.id, week_number) not in assignment_week_prescriptions
@@ -602,15 +597,27 @@ def assign_template_to_user(
                 for exercise_item in day.exercises
             ):
                 raise ProgramError("Periodized template has an incomplete weekly prescription")
+    if (
+        not cycle
+        and duration_weeks * sum(len(plan["segments"]) for plan in assignment_plans.values())
+        > MAX_GENERATED_SETS
+    ):
+        raise ProgramError("Program is too large to assign in one operation")
     generated_sets = sum(
         (
             len(
                 assignment_week_plans.get(
-                    (exercise_id, week_number), assignment_plans[exercise_id]
+                    (
+                        exercise_id,
+                        (week_number - 1) % cycle["length_weeks"] + 1 if cycle else week_number,
+                    ),
+                    assignment_plans[exercise_id],
                 )["segments"]
             )
         )
-        for week_number in range(1, duration_weeks + 1)
+        for week_number in (
+            range(1, min(duration_weeks, 4) + 1) if cycle else range(1, duration_weeks + 1)
+        )
         for exercise_id, base_prescription in assignment_prescriptions.items()
     )
     if generated_sets > MAX_GENERATED_SETS:
@@ -647,6 +654,10 @@ def assign_template_to_user(
         ]
         cycle_span_days = 7 if cycle else max(7, len(ordered_days))
 
+    if duration_weeks > (date.max - effective_start_date).days // 7:
+        raise ProgramError(
+            "Длительность программы выходит за поддерживаемый диапазон календарных дат"
+        )
     program_status = "scheduled" if effective_start_date > today else "active"
     user_program = UserProgram(
         user_id=target_user.id,
@@ -680,6 +691,9 @@ def assign_template_to_user(
                 week_number=week_index + 1,
                 title=day.title,
                 status="planned",
+                source_cycle_week=source_week if cycle else None,
+                cycle_iteration=week_index // cycle["length_weeks"] + 1 if cycle else None,
+                plan_revision_number=1 if cycle else None,
             )
             db.add(workout)
 
@@ -1695,9 +1709,24 @@ def list_coach_assigned_programs(db: Session, coach: User) -> list[dict]:
     result: list[dict] = []
     for program, client, private_name in rows:
         workouts = list(program.workouts)
+        is_cycle = any(row.source_cycle_week is not None for row in workouts)
+        today = today_for_user(client)
+        if is_cycle and program.is_active and program.status in {"active", "scheduled"}:
+            from fitminiapp_api.services.program_versioning import materialize_cycle_schedule
+
+            if materialize_cycle_schedule(db, program, today, today + timedelta(days=27)):
+                db.commit()
+                db.expire(program, ["workouts"])
+                workouts = list(program.workouts)
         completed = sum(workout.status == "completed" for workout in workouts)
         planned = sum(workout.status == "planned" for workout in workouts)
-        today = today_for_user(client)
+        total = len(workouts)
+        if is_cycle:
+            from fitminiapp_api.services.program_versioning import cycle_workout_count
+
+            total = cycle_workout_count(db, program)
+            if program.status in {"active", "scheduled", "paused"}:
+                planned += cycle_workout_count(db, program, missing_only=True)
         upcoming_dates = [
             workout.scheduled_date
             for workout in workouts
@@ -1724,7 +1753,7 @@ def list_coach_assigned_programs(db: Session, coach: User) -> list[dict]:
                 "duration_weeks": program.duration_weeks,
                 "schedule_weekdays": program.schedule_weekdays,
                 "completed_at": program.completed_at,
-                "workouts_total": len(workouts),
+                "workouts_total": total,
                 "workouts_completed": completed,
                 "workouts_planned": planned,
                 "next_workout_date": min(upcoming_dates) if upcoming_dates else None,
