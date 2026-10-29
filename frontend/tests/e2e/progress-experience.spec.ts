@@ -834,13 +834,31 @@ async function mockProgress(
       return route.fulfill({
         json: {
           timezone: 'Europe/Moscow',
-          history_complete: year === 2023,
-          undated_workouts: year === 2023 ? 0 : 1,
+          history_complete: year === 2023 || year === 2022,
+          undated_workouts: year === 2023 || year === 2022 ? 0 : 1,
           days: Array.from({ length: count }, (_, index) => ({
             date: new Date(Date.UTC(year, 0, 1 + index)).toISOString().slice(0, 10),
             is_future: year === new Date().getFullYear() && index > 29,
-            completed_workouts: year === 2023 ? 0 : index === 26 ? 1 : index === 27 ? 0 : null,
-            working_sets: year === 2023 ? 0 : index === 26 ? 4 : index === 27 ? 0 : null,
+            completed_workouts:
+              year === 2023
+                ? 0
+                : year === 2022
+                  ? index % 5 === 0
+                    ? 1
+                    : 0
+                  : index === 26 || (year === 2024 && index >= 35 && index % 5 === 0)
+                    ? 1
+                    : null,
+            working_sets:
+              year === 2023
+                ? 0
+                : year === 2022
+                  ? index % 5 === 0
+                    ? 4
+                    : 0
+                  : index === 26 || (year === 2024 && index >= 35 && index % 5 === 0)
+                    ? 4
+                    : null,
           })),
         },
       });
@@ -1266,8 +1284,8 @@ test('progress remains clear and free of horizontal overflow at supported widths
     .getByRole('tab', { name: /^Тренировки/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Активность за \d{4} год/ })).toBeVisible();
-  await expect(page.getByText(/История неполная/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Активность', exact: true })).toBeVisible();
+  await expect(page.getByText('История неполная', { exact: true })).toBeVisible();
   await expect(page.getByText('Грудные')).toBeVisible();
   await expect(page.getByText('+6 подх.')).toBeVisible();
   await page.getByText('Жим штанги лёжа').click();
@@ -4216,7 +4234,7 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
 
 test.use({ video: process.env.CAPTURE_835_VIDEO === '1' ? 'on' : 'off' });
 test.describe('#835 carousel', () => {
-  for (const width of [320, 360, 390, 430, 1440]) {
+  for (const width of [320, 360, 390, 430, 768, 1024, 1280, 1440, 1920]) {
     for (const theme of ['dark', 'light'] as const) {
       test(`#835 month calendar selects days and resets years at ${width}px ${theme}`, async ({
         page,
@@ -4240,7 +4258,7 @@ test.describe('#835 carousel', () => {
           .getByRole('tab', { name: /^Тренировки/ })
           .click();
         const calendar = page.locator('.activity-heatmap');
-        await expect(calendar.locator('.activity-heatmap__month-button')).toHaveCount(12);
+
         const capture = async (state: string) => {
           if (!process.env.CAPTURE_835_FINAL) return;
           const dir = resolve(process.env.CAPTURE_835_FINAL);
@@ -4264,7 +4282,12 @@ test.describe('#835 carousel', () => {
             await calendar.getByRole('table').scrollIntoViewIfNeeded();
             await page.screenshot({ path, animations: 'disabled' });
           } else {
-            await page.screenshot({ path, fullPage: state === 'overview', animations: 'disabled' });
+            await page.screenshot({
+              path,
+              fullPage:
+                state === 'overview' || state === 'active-year' || state === 'complete-year',
+              animations: 'disabled',
+            });
           }
         };
         if (width < 768) {
@@ -4380,7 +4403,7 @@ test.describe('#835 carousel', () => {
           await capture('selected');
           await expect(active.locator('button[data-date="2024-01-28"]')).toHaveAttribute(
             'data-level',
-            '0',
+            'unknown',
           );
           const bounds = await jan.boundingBox();
           expect(bounds?.height).toBeGreaterThanOrEqual(44);
@@ -4401,17 +4424,62 @@ test.describe('#835 carousel', () => {
           await expect(active.locator('button[data-date]:enabled')).toHaveCount(0);
           await capture('future');
         } else {
+          const grid = calendar.getByRole('grid', { name: 'Годовая карта активности' });
+          await expect(grid.getByRole('row')).toHaveCount(7);
+          await expect(grid.locator('button[tabindex="0"]')).toHaveCount(1);
+          expect((await calendar.boundingBox())?.height).toBeLessThan(420);
           await capture('overview');
-          await calendar.getByRole('button', { name: 'январь', exact: true }).click();
-          const days = calendar.locator('.activity-heatmap__desktop button[data-date]');
-          await expect(days.nth(29)).toBeFocused();
-          await capture('month');
-          await days.nth(26).click();
+          const warning = calendar.getByText('История неполная', { exact: true });
+          await warning.click();
+          await expect(calendar.locator('.activity-heatmap__history')).toHaveAttribute('open', '');
+          await expect(calendar.locator('.activity-heatmap__history')).toContainText(
+            'Без подтверждённой даты: 1',
+          );
+          await capture('history-details');
+          await warning.click();
+          await calendar.getByLabel('Год', { exact: true }).selectOption('2022');
+          await expect(grid.locator('button[data-date="2022-01-01"]')).toHaveCount(1);
+          await expect(calendar.locator('.activity-heatmap__history')).toHaveCount(0);
+          await capture('complete-year');
+          await calendar.getByLabel('Год', { exact: true }).selectOption('2024');
+          await expect(grid.locator('button[data-date]')).toHaveCount(366);
+          await capture('active-year');
+          const chosen = grid.locator('button[data-date="2024-01-27"]');
+          await chosen.hover();
+          await expect(calendar.getByRole('tooltip')).toContainText('рабочие подходы — 4');
+          await capture('hover');
+          await calendar.getByRole('tooltip').hover();
+          await expect(calendar.getByRole('tooltip')).toBeVisible();
+          expect((await chosen.boundingBox())?.width).toBeGreaterThanOrEqual(10);
+          expect((await chosen.boundingBox())?.width).toBeLessThanOrEqual(14);
+          await chosen.click();
+          await expect(calendar.getByRole('tooltip')).toHaveCount(0);
+          await expect(chosen).toHaveAttribute('aria-pressed', 'true');
+          await expect(calendar.locator('[aria-live]').last()).toContainText('рабочие подходы — 4');
           await capture('selected');
-          await page.keyboard.press('Escape');
-          await calendar.getByRole('button', { name: 'декабрь', exact: true }).click();
+          await chosen.focus();
+          await chosen.press('Escape');
+          await expect(calendar.getByRole('tooltip')).toHaveCount(0);
+          await chosen.press('ArrowRight');
+          await expect(grid.locator('button[data-date="2024-02-03"]')).toBeFocused();
+          await page.keyboard.press('ArrowDown');
+          await expect(grid.locator('button[data-date="2024-02-04"]')).toBeFocused();
+          await page.keyboard.press('Enter');
+          await expect(calendar.locator('[aria-live]').last()).toContainText('Нет данных');
+          await capture('unknown');
+          await grid.locator('button[data-date="2024-02-29"]').click();
+          await expect(calendar.locator('[aria-live]').last()).toContainText('29 февраля 2024');
+          await capture('leap');
+          await expect(grid.locator('button[tabindex="0"]')).toHaveCount(1);
+          await calendar
+            .getByLabel('Год', { exact: true })
+            .selectOption(String(new Date().getFullYear()));
+          await expect(grid.locator('button[data-date$="-01-31"]')).toBeDisabled();
+          await expect(calendar.locator('[aria-live]').last()).toContainText('30 января');
           await capture('future');
-          await page.keyboard.press('Escape');
+          const add = page.getByTestId('quick-add-trigger');
+          await calendar.scrollIntoViewIfNeeded();
+          await expectNoOverlap(calendar, add);
         }
         await calendar.getByText('Данные по дням', { exact: true }).click();
         await expect(calendar.getByRole('table')).toBeVisible();
@@ -4420,6 +4488,12 @@ test.describe('#835 carousel', () => {
         await expect(
           calendar.getByText('За этот период нет завершённых тренировок.'),
         ).toBeVisible();
+        if (width < 768)
+          await expect(
+            calendar.locator(
+              '.activity-heatmap__slide:not([inert]) button[data-date="2023-01-28"]',
+            ),
+          ).toHaveAttribute('data-level', '0');
         await capture('empty');
         await expectNoHorizontalOverflow(page);
       });

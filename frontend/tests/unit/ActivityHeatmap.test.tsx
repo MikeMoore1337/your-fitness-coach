@@ -32,9 +32,8 @@ afterEach(() => {
 
 it('shows facts and selects an unknown day in the month calendar', () => {
   render(<ActivityHeatmap data={data} />);
-  expect(screen.getByText(/История неполная/)).toBeInTheDocument();
+  expect(screen.getByText('История неполная', { exact: true })).toBeInTheDocument();
   expect(screen.getByText(/рабочие подходы — 4/)).toBeInTheDocument();
-  fireEvent.click(document.querySelector('.activity-heatmap__month-button')!);
   fireEvent.click(
     document.querySelector('.activity-heatmap__desktop button[data-date="2026-01-01"]')!,
   );
@@ -64,14 +63,13 @@ it('distinguishes a known empty history from unknown days', () => {
 it('requests the selected calendar year', () => {
   const onYearChange = vi.fn();
   render(<ActivityHeatmap data={data} year={2026} onYearChange={onYearChange} />);
-  expect(screen.getByRole('heading', { name: 'Активность за 2026 год' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Активность' })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Год'), { target: { value: '2024' } });
   expect(onYearChange).toHaveBeenCalledWith(2024);
 });
 
-it('resets the chosen day and expanded month across year changes and excludes future dates', () => {
+it('resets the chosen day across year changes and excludes future dates', () => {
   const view = render(<ActivityHeatmap data={data} year={2026} />);
-  fireEvent.click(document.querySelector('.activity-heatmap__month-button')!);
   fireEvent.click(
     document.querySelector('.activity-heatmap__desktop button[data-date="2026-01-01"]')!,
   );
@@ -81,7 +79,9 @@ it('resets the chosen day and expanded month across year changes and excludes fu
       data={{ ...data, days: [{ date: '2024-12-31', completed_workouts: 2, working_sets: 6 }] }}
     />,
   );
-  expect(screen.queryByRole('region', { name: /Выбор дня/ })).not.toBeInTheDocument();
+  expect(
+    document.querySelector('.activity-heatmap__desktop button[data-date="2024-12-31"]'),
+  ).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText(/рабочие подходы — 6/)).toBeInTheDocument();
   view.rerender(
     <ActivityHeatmap
@@ -96,7 +96,6 @@ it('resets the chosen day and expanded month across year changes and excludes fu
     />,
   );
   expect(screen.getByText(/рабочие подходы — 4/)).toBeInTheDocument();
-  fireEvent.click(document.querySelector('.activity-heatmap__month-button')!);
   expect(
     document.querySelector('.activity-heatmap__desktop button[data-date="2026-01-03"]')!,
   ).toBeDisabled();
@@ -159,4 +158,47 @@ it('keeps the account current year selectable across the UTC year boundary', () 
   expect(document.querySelector('.activity-heatmap__month-nav h3')).toHaveTextContent(
     'январь 2027',
   );
+});
+
+it.each([
+  [2023, 365, 53],
+  [2024, 366, 53],
+  [2012, 366, 54],
+])('keeps every date in %i with %i days and %i calendar columns', (year, count, weeks) => {
+  const days = Array.from({ length: count }, (_, i) => ({
+    date: new Date(Date.UTC(year, 0, i + 1)).toISOString().slice(0, 10),
+    completed_workouts: 0,
+    working_sets: 0,
+  }));
+  render(<ActivityHeatmap year={year} data={{ ...data, days }} />);
+  const grid = screen.getByRole('grid');
+  expect(grid).toHaveAttribute('aria-colcount', String(weeks + 1));
+  expect(grid.querySelectorAll('button[data-date]')).toHaveLength(count);
+  expect(grid.querySelector(`button[data-date="${year}-01-01"]`)).toBeInTheDocument();
+  expect(grid.querySelector(`button[data-date="${year}-12-31"]`)).toBeInTheDocument();
+  expect(grid.querySelectorAll('button[tabindex="0"]')).toHaveLength(1);
+});
+it('navigates the year grid by weeks, selects with one tab stop and shows factual hover text', () => {
+  const days = Array.from({ length: 366 }, (_, i) => ({
+    date: new Date(Date.UTC(2024, 0, i + 1)).toISOString().slice(0, 10),
+    completed_workouts: i === 0 ? 1 : null,
+    working_sets: i === 0 ? 4 : null,
+  }));
+  render(<ActivityHeatmap year={2024} data={{ ...data, days }} />);
+  const grid = screen.getByRole('grid');
+  const first = grid.querySelector<HTMLButtonElement>('button[data-date="2024-01-01"]')!;
+  fireEvent.mouseEnter(first.parentElement!);
+  expect(screen.getByRole('tooltip')).toHaveTextContent('рабочие подходы — 4');
+  fireEvent.click(first);
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  expect(first).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.keyDown(first, { key: 'ArrowRight' });
+  expect(grid.querySelector('button[data-date="2024-01-08"]')).toHaveFocus();
+  fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+  expect(grid.querySelector('button[data-date="2024-01-09"]')).toHaveFocus();
+  fireEvent.keyDown(document.activeElement!, { key: 'End', ctrlKey: true });
+  expect(grid.querySelector('button[data-date="2024-12-31"]')).toHaveFocus();
+  expect(grid.querySelectorAll('button[tabindex="0"]')).toHaveLength(1);
+  fireEvent.keyDown(document.activeElement!, { key: 'Home', ctrlKey: true });
+  expect(first).toHaveFocus();
 });

@@ -11,27 +11,6 @@
   font-size: var(--font-size-section, 1.25rem);
 }
 
-.activity-heatmap__groups {
-  overflow-x: auto;
-  margin: 1.25rem 0;
-}
-
-.activity-heatmap__groups--months {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem 0.5rem;
-  --activity-cell: clamp(0.4rem, 1.8vw, 0.65rem);
-}
-
-.activity-heatmap__grid {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(7, var(--activity-cell, 0.65rem));
-  grid-auto-columns: var(--activity-cell, 0.65rem);
-  gap: 0.2rem;
-  width: max-content;
-}
-
 .activity-heatmap__cell {
   display: inline-block;
   box-sizing: border-box;
@@ -55,13 +34,6 @@
 }
 .activity-heatmap__cell[data-level='3'] {
   background: var(--color-accent);
-}
-
-.activity-heatmap__group > span {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  margin-bottom: 0.4rem;
 }
 
 .activity-heatmap__legend {
@@ -95,37 +67,6 @@
   border-style: dotted;
 }
 
-.activity-heatmap__groups--months .activity-heatmap__group > span {
-  min-height: 1.2rem;
-}
-
-.activity-heatmap__month-button {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: center;
-  width: 100%;
-  min-height: 44px;
-  padding: 0.5rem 0.1rem;
-  color: var(--color-text);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  font: inherit;
-  font-size: var(--font-size-caption);
-  cursor: pointer;
-}
-.activity-heatmap__month-button:focus-visible {
-  outline: var(--focus-width) solid var(--color-focus);
-  outline-offset: 2px;
-}
-.activity-heatmap__calendar {
-  margin: 1rem -0.75rem;
-  padding: 0.25rem;
-}
-.activity-heatmap__calendar p {
-  font-size: var(--font-size-caption);
-}
 .activity-heatmap__days {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -145,9 +86,6 @@
 }
 .activity-heatmap__days button:disabled {
   opacity: 0.45;
-}
-.activity-heatmap__calendar > button {
-  min-height: 44px;
 }
 
 .activity-heatmap__mobile {
@@ -249,4 +187,160 @@
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: -2px;
   }
+}
+
+.activity-heatmap__mobile-only {
+  display: none;
+}
+.activity-heatmap__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.activity-heatmap__header h2 {
+  margin: 0;
+}
+.activity-heatmap__header label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--font-size-caption);
+}
+.activity-heatmap__header select {
+  margin: 0;
+  width: auto;
+  min-height: 36px;
+}
+.activity-heatmap__year {
+  position: relative;
+  container-type: inline-size;
+  margin: 1rem 0;
+}
+.activity-heatmap__year-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 3px;
+}
+.activity-heatmap__year-map {
+  --year-cell: clamp(10px, 1.25cqi, 14px);
+  width: max-content;
+}
+.activity-heatmap__year-months,
+.activity-heatmap__year-row {
+  display: grid;
+  grid-template-columns: 1.8rem repeat(var(--weeks), var(--year-cell));
+  gap: 2px;
+}
+.activity-heatmap__year-months {
+  margin-bottom: 0.4rem;
+}
+.activity-heatmap__year-months span {
+  white-space: nowrap;
+}
+.activity-heatmap__year-row {
+  margin-top: 2px;
+  align-items: center;
+  height: var(--year-cell);
+}
+.activity-heatmap__year-row > span {
+  min-width: 0;
+  height: var(--year-cell);
+}
+.activity-heatmap__year-map {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+:root .activity-heatmap__year-row button[data-yfc-choice] {
+  display: block;
+  padding: 0;
+  width: var(--year-cell);
+  height: var(--year-cell);
+  min-width: 0;
+  min-height: 0;
+  border-radius: 2px;
+}
+.activity-heatmap__year-row button:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: 1px;
+}
+.activity-heatmap__year-row button:disabled {
+  cursor: default;
+}
+.activity-heatmap__tooltip {
+  position: absolute;
+  z-index: 2;
+  width: min(300px, 100%);
+  padding: 0.5rem;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font-size: var(--font-size-caption);
+  pointer-events: auto;
+}
+@media (min-width: 768px) {
+  .activity-heatmap__timezone {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-caption);
+    margin: 0.4rem 0;
+  }
+  .activity-heatmap__history {
+    margin: 0.5rem 0;
+    font-size: var(--font-size-caption);
+    color: var(--color-text-muted);
+  }
+  .activity-heatmap__history summary {
+    width: fit-content;
+  }
+  .activity-heatmap__history p {
+    max-width: 65ch;
+  }
+  .activity-heatmap__legend {
+    margin-bottom: 0.5rem;
+  }
+  .activity-heatmap > p[aria-live] {
+    font-variant-numeric: tabular-nums;
+    margin: 0.6rem 0;
+    font-size: var(--font-size-caption);
+  }
+}
+@media (max-width: 767px) {
+  .activity-heatmap__mobile-only {
+    display: revert;
+  }
+  .activity-heatmap__header {
+    display: block;
+  }
+  .activity-heatmap__header h2 {
+    margin-block: 0.83em;
+  }
+  .activity-heatmap__header label {
+    display: block;
+    font-size: inherit;
+  }
+  .activity-heatmap__header select {
+    display: block;
+    width: 100%;
+    margin-top: 0.4rem;
+  }
+}
+
+.activity-heatmap__year-row [role='rowheader'] {
+  line-height: var(--year-cell);
+}
+
+:root .activity-heatmap__year-row button[data-level='0']:not([aria-pressed='true']) {
+  background: var(--color-surface-subtle);
+}
+:root .activity-heatmap__year-row button[data-level='unknown']:not([aria-pressed='true']) {
+  background: repeating-linear-gradient(135deg, transparent 0 2px, var(--color-text-muted) 2px 3px);
+}
+:root .activity-heatmap__year-row button[data-level='1']:not([aria-pressed='true']) {
+  background: var(--color-accent-subtle);
+}
+:root .activity-heatmap__year-row button[data-level='2']:not([aria-pressed='true']),
+:root .activity-heatmap__year-row button[data-level='3']:not([aria-pressed='true']) {
+  background: var(--color-accent);
 }
