@@ -339,7 +339,7 @@ describe('ProgramBuilder type-aware prescription', () => {
       })),
     } as ProgramTemplate;
     renderBuilder({ editingTemplate });
-    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await screen.findByRole('button', { name: 'Все дни' });
     await user.click(screen.getByRole('button', { name: 'Все дни' }));
     const chooser = screen.getByRole('dialog', { name: 'Все дни программы' });
     await user.click(within(chooser).getByRole('button', { name: /День 8/ }));
@@ -353,7 +353,7 @@ describe('ProgramBuilder type-aware prescription', () => {
   it('отключает стрелки карусели для единственного дня', async () => {
     emulateMobileEditorViewport();
     renderBuilder({ editingTemplate: activeTemplate });
-    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await screen.findByRole('button', { name: 'Предыдущий день' });
     expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
   });
