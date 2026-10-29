@@ -874,10 +874,12 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
     const builder = page.locator('#program-builder');
     await expect(builder.getByRole('heading', { name: 'Создать свою программу' })).toBeVisible();
     await expect(builder.getByLabel('Название', { exact: true })).toHaveValue('Моя программа');
-    await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 1');
+    await expect(builder.getByRole('textbox', { name: 'Название дня' })).toHaveValue(
+      'Тренировка 1',
+    );
     await expect(builder.getByRole('combobox', { name: 'Цель', exact: true })).toBeHidden();
     await expect(builder.getByRole('button', { name: 'Добавить упражнение' })).toBeVisible();
-    await expect(builder.getByRole('button', { name: 'Создать программу' })).toBeVisible();
+    await expect(builder.getByRole('button', { name: 'Проверить и назначить' })).toBeVisible();
     expect(
       await page
         .locator('#program-builder, #program-library')
@@ -906,10 +908,10 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
     path: '../.artifacts/screenshots/task-118/mobile-web-390x844-light.png',
     fullPage: true,
   });
+  await mobilePage.locator('#program-builder .copy-editor__exercise').first().click();
   await mobilePage
-    .locator('#program-builder')
+    .getByRole('dialog', { name: 'Параметры упражнения' })
     .getByRole('button', { name: 'Поиск упражнения' })
-    .first()
     .click();
   const mobileSearch = mobilePage
     .getByRole('dialog', { name: 'Выбор упражнения' })
