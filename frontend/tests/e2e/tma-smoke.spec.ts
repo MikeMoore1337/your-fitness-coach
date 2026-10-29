@@ -563,8 +563,8 @@ test('program history keeps current block, readable revisions and workout return
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs&view=manage'),
-    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage&panel=operations'),
+    mobilePage.goto('/app?section=programs&view=manage&panel=operations'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -631,7 +631,9 @@ test('program history keeps current block, readable revisions and workout return
   await expect(tmaPage.getByText(/доступен только для просмотра/)).toBeVisible();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=programs&program_history=77&program_revision=4');
+  await expect(tmaPage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=4',
+  );
   await expect(tmaPage.locator('.program-history__disclosure')).toHaveJSProperty('open', true);
   await expect(tmaPage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
   await expect(tmaPage.locator('#program-revision-77-4 > summary')).toBeFocused();
@@ -644,7 +646,9 @@ test('program history keeps current block, readable revisions and workout return
   await expect(tmaPage.getByText('3 подх. · 8–10 повт. · отдых 90 сек.')).toBeVisible();
   await expect(tmaPage.getByText('4 подх. · 6–8 повт. · отдых 120 сек.')).not.toBeAttached();
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=programs&program_history=77&program_revision=3');
+  await expect(tmaPage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=3',
+  );
   await expect(tmaPage.locator('#program-revision-77-3')).toHaveJSProperty('open', true);
 
   await mobilePage
@@ -653,7 +657,9 @@ test('program history keeps current block, readable revisions and workout return
     .click();
   await expect(mobilePage.getByText('4 подх. · 6–8 повт. · отдых 120 сек.')).toBeVisible();
   await mobilePage.getByRole('link', { name: 'К истории программы' }).click();
-  await expect(mobilePage).toHaveURL('/app?section=programs&program_history=77&program_revision=4');
+  await expect(mobilePage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=4',
+  );
   await expect(mobilePage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
 });
 
@@ -670,8 +676,8 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
   });
   await installPlatformApi(tmaPage, { programHistory: 'many', aiAdaptation: 'available' });
   await Promise.all([
-    mobilePage.goto('/app?section=programs&view=manage'),
-    tmaPage.goto('/app?section=programs&view=manage'),
+    mobilePage.goto('/app?section=programs&view=manage&panel=operations'),
+    tmaPage.goto('/app?section=programs&view=manage&panel=operations'),
   ]);
   await tma.setTheme('dark');
 
@@ -777,7 +783,7 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
     programHistory: 'many',
     aiAdaptation: 'available',
   });
-  await desktopReviewPage.goto('/app?section=programs&view=manage');
+  await desktopReviewPage.goto('/app?section=programs&view=manage&panel=operations');
   const desktopReview = desktopReviewPage.getByTestId('ai-adaptation');
   await desktopReview.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
   const desktopGenerate = desktopReviewPage.waitForRequest(
@@ -808,7 +814,7 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
     }
   });
   await installPlatformApi(desktop, { browserSession: true, programHistory: 'many' });
-  await desktop.goto('/app?section=programs&view=manage');
+  await desktop.goto('/app?section=programs&view=manage&panel=operations');
   const desktopAdaptation = desktop.getByTestId('ai-adaptation');
   await expect(desktopAdaptation).toHaveCount(0);
   await expect(desktop.getByText('Текущий тренировочный блок')).toBeVisible();
@@ -826,7 +832,7 @@ test('program history renders empty, one-block and full lifecycle states honestl
   for (const state of ['empty', 'one', 'many'] as const) {
     const page = await browser.newPage({ viewport: MOBILE_CONTEXTS.baseline });
     await installPlatformApi(page, { browserSession: true, programHistory: state });
-    await page.goto('/app?section=programs&view=manage');
+    await page.goto('/app?section=programs&view=manage&panel=operations');
     const history = page.locator('.program-history');
 
     if (state === 'empty') {
@@ -866,8 +872,8 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs&view=manage'),
-    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage&start=create'),
+    mobilePage.goto('/app?section=programs&view=manage&start=create'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -999,9 +1005,8 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       browserSession: !current.telegram,
       programHistory: 'many',
     });
-    await page.goto('/app?section=programs&view=manage');
-    const program = page.locator('.program-active');
-    const history = program.locator('.program-history');
+    await page.goto('/app?section=programs&view=manage&panel=operations');
+    const history = page.locator('.program-manage-destination .program-history');
     await expect(history.getByText('Текущий тренировочный блок')).toBeVisible();
     await waitForVisualStability(page);
     if (current.screenshot) {
@@ -1076,9 +1081,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       const radius = rootStyle.getPropertyValue('--radius-action').trim();
       const currentBlock = element.querySelector<HTMLElement>('.program-current-block');
       const action = element.querySelector<HTMLElement>('.program-block-actions .ui-button');
-      const editAction = element
-        .closest('.program-active')
-        ?.querySelector<HTMLElement>('.program-active__edit-action');
+      const editAction = document.querySelector<HTMLElement>('.program-active__edit-action');
       const disclosure = element.querySelector<HTMLElement>('.disclosure-icon');
       const disclosureRect = disclosure?.getBoundingClientRect();
       return {
@@ -1096,8 +1099,10 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     });
     expect(brandContract.boundaryShadow).toContain(brandContract.lime);
     expect(brandContract.actionRadius).toBe(brandContract.radius);
-    expect(brandContract.editActionBackground).toBe(brandContract.lime);
-    expect(brandContract.editActionColor).toBe(brandContract.onLime);
+    // #1326: editing is now a neutral secondary action; the lime primary action previews the plan.
+    expect(brandContract.editActionBackground).not.toBeNull();
+    expect(brandContract.editActionBackground).not.toBe(brandContract.lime);
+    expect(brandContract.editActionColor).not.toBeNull();
     expect(brandContract.disclosure).toEqual({ width: 28, height: 28 });
 
     if (current.screenshot) {
@@ -1116,7 +1121,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       await page.locator('#appBottomNav').evaluate((element) => {
         element.style.visibility = '';
       });
-      await program.screenshot({
+      await history.screenshot({
         path: `../.artifacts/screenshots/task-59/${current.surface}-${current.viewport.width}x${current.viewport.height}-${current.theme}-history.png`,
       });
       await history

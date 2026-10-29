@@ -265,7 +265,7 @@ test('lower-body aliases, compact guide and program selection work on small view
     .click();
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/app?section=programs&view=manage');
+  await page.goto('/app?section=programs&view=manage&start=create');
   const builder = page.locator('#program-builder');
   await builder.locator('.copy-editor__exercise').first().tap();
   const picker = page
@@ -350,7 +350,7 @@ test('lower-body catalog and picker keep Mobile Web and desktop parity', async (
   await page.emulateMedia({ colorScheme: 'light' });
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/app?section=programs&view=manage');
+  await page.goto('/app?section=programs&view=manage&start=create');
   await page.locator('#program-builder .copy-editor__exercise').first().tap();
   const picker = page
     .getByRole('dialog', { name: 'Параметры упражнения' })

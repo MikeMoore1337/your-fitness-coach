@@ -89,8 +89,8 @@ for (const width of [360, 393])
         expect(font.faces, JSON.stringify(font)).toBe(2);
         expect(font.loaded, JSON.stringify(font)).toBe(true);
       }
-      await page.goto('/app?section=programs&view=manage&start=templates');
-      await expect(page.locator('.program-current-block h4')).toBeVisible();
+      await page.goto('/app?section=programs&view=manage');
+      await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
       await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
       const editor = page.getByRole('dialog');
       await expect(editor.getByRole('heading').first()).toHaveCSS('font-family', /^Oswald,/);
