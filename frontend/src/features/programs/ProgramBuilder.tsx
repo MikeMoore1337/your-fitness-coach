@@ -16,6 +16,7 @@ import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
 import { ProgramDayEditor } from './ProgramDayEditor';
+import { ProgramSettingsPanel } from './ProgramSettingsPanel';
 import './ProgramBuilderFocus.css';
 import { DateInput } from '../../shared/ui/PickerInput';
 import {
@@ -159,6 +160,7 @@ export function ProgramBuilder({
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const snapshot = JSON.stringify([
     title,
     goal,
@@ -429,24 +431,24 @@ export function ProgramBuilder({
 
   return (
     <Card
-      className="program-builder"
+      className={`program-builder${settingsOpen ? ' program-builder--settings-open' : ''}`}
       collapsible={false}
       id={!editingTemplate && !targetTelegramId ? 'program-builder' : undefined}
       title={
         editingTemplate
-          ? undefined
+          ? saveAsCopy
+            ? 'Редактирование личной копии'
+            : 'Редактирование программы'
           : targetTelegramId
             ? `Новая программа для ${targetName || targetTelegramId}`
             : 'Создать свою программу'
       }
       description={
         editingTemplate
-          ? saveAsCopy
-            ? `Настройте личную копию «${editingTemplate.title}»`
-            : `Редактирование «${editingTemplate.title}»`
+          ? undefined
           : targetTelegramId
             ? `Назначение для ${targetName || targetTelegramId}`
-            : 'Название уже заполнено — добавьте упражнение и сохраните.'
+            : undefined
       }
     >
       {exercises.isLoading ? (
@@ -480,262 +482,265 @@ export function ProgramBuilder({
           }
           onSubmit={(event) => {
             event.preventDefault();
-            setReviewOpen(true);
+            if (!settingsOpen) setReviewOpen(true);
           }}
         >
-          {saveAsCopy && (
-            <p className="program-builder-copy-note">
-              Исходный шаблон не изменится. Изменения сохранятся в отдельной личной копии.
-            </p>
-          )}
-          <section
-            className="program-builder-basics stack"
-            aria-labelledby={`${sectionId}-program-basics-title`}
-          >
-            <div>
-              <span className="eyebrow">Шаг 1</span>
-              <h3 id={`${sectionId}-program-basics-title`}>Основа программы</h3>
+          <div className="program-builder-primary stack" hidden={settingsOpen}>
+            {saveAsCopy && (
+              <p className="program-builder-copy-note">
+                Исходный шаблон не изменится. Изменения сохранятся в отдельной личной копии.
+              </p>
+            )}
+            <section
+              className="program-builder-basics stack"
+              aria-labelledby={`${sectionId}-program-basics-title`}
+            >
+              <div>
+                <span className="eyebrow">Шаг 1</span>
+                <h3 id={`${sectionId}-program-basics-title`}>Основа программы</h3>
+              </div>
+              <div className="form-grid">
+                <label className="field">
+                  <span>Название</span>
+                  <input
+                    value={title}
+                    maxLength={128}
+                    enterKeyHint="next"
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+            </section>
+            <div className="program-builder-days-heading">
+              <div>
+                <span className="eyebrow">Шаг 2</span>
+                <h3>Тренировочные дни</h3>
+              </div>
             </div>
-            <div className="form-grid">
-              <label className="field">
-                <span>Название</span>
-                <input
-                  value={title}
-                  maxLength={128}
-                  enterKeyHint="next"
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </label>
-            </div>
-          </section>
-          <div className="program-builder-days-heading">
-            <div>
-              <span className="eyebrow">Шаг 2</span>
-              <h3>Тренировочные дни</h3>
-            </div>
+            <ProgramDayEditor
+              days={days}
+              setDays={setDays}
+              updateDay={updateDay}
+              exercises={orderedExercises}
+              defaultRestSeconds={defaultRestSeconds}
+              onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
+            />
           </div>
-          <ProgramDayEditor
-            days={days}
-            setDays={setDays}
-            updateDay={updateDay}
-            exercises={orderedExercises}
-            defaultRestSeconds={defaultRestSeconds}
-            onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
-          />
-          <details className="program-builder-settings compact-disclosure">
-            <summary className="yfc-disclosure-summary">
-              <span>
-                <strong>Настройки программы</strong>
-                <small>Цель, уровень, расписание, шаблон и общий отдых</small>
-              </span>
-              <DisclosureIcon />
-            </summary>
-            <div className="program-builder-settings__body stack">
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-program-profile-title`}
-              >
-                <h3 id={`${sectionId}-program-profile-title`}>Цель и уровень</h3>
-                <p className="muted">
-                  По умолчанию программа подходит для поддержания формы и начального уровня.
-                </p>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Цель</span>
-                    <select
-                      value={goal}
-                      onChange={(event) =>
-                        setGoal(event.target.value as ProgramTemplateCreate['goal'])
-                      }
-                    >
-                      <option value="fat_loss">Похудение</option>
-                      <option value="muscle_gain">Набор</option>
-                      <option value="maintenance">Поддержание</option>
-                      <option value="recomposition">Рекомпозиция</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Уровень</span>
-                    <select
-                      value={level}
-                      onChange={(event) =>
-                        setLevel(event.target.value as ProgramTemplateCreate['level'])
-                      }
-                    >
-                      <option value="beginner">Начальный</option>
-                      <option value="intermediate">Средний</option>
-                      <option value="advanced">Продвинутый</option>
-                    </select>
-                  </label>
-                </div>
-              </section>
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-program-schedule-title`}
-              >
-                <h3 id={`${sectionId}-program-schedule-title`}>Расписание</h3>
-                <p className="muted">
-                  {activeProgramEdit
-                    ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
-                    : 'По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.'}
-                </p>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Начать не раньше</span>
-                    <DateInput
-                      disabled={activeProgramEdit}
-                      min={defaultStartDate}
-                      value={startDate}
-                      onChange={(event) => {
-                        setStartDate(event.target.value);
-                        setScheduleWeekdays(scheduleForDays(days.length, event.target.value));
-                      }}
-                      required
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Длительность, недель</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      disabled={activeProgramEdit}
-                      min="1"
-                      max="24"
-                      value={durationWeeks}
-                      onChange={(event) => setDurationWeeks(Number(event.target.value))}
-                      required
-                    />
-                  </label>
-                </div>
-                {usesSequentialCycle ? (
-                  <ContextualHelp summary="Как устроен цикл?">
-                    <p>
-                      Восьмидневный цикл планируется последовательно и автоматически повторяется
-                      после восьмой тренировки.
-                    </p>
-                  </ContextualHelp>
-                ) : (
-                  <div className="form-grid">
-                    {days.map((day, dayIndex) => (
-                      <label className="field" key={`schedule-${dayIndex}`}>
-                        <span>{day.title || simpleTrainingTitle(dayIndex + 1)}</span>
-                        <select
-                          value={effectiveScheduleWeekdays[dayIndex] ?? ''}
-                          onChange={(event) =>
-                            setScheduleWeekdays(
-                              effectiveScheduleWeekdays.map((value, index) =>
-                                index === dayIndex ? Number(event.target.value) : value,
-                              ),
-                            )
-                          }
-                        >
-                          {weekdayLabels.map((label, weekday) => (
-                            <option value={weekday} key={label}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                {!scheduleIsValid && (
-                  <p className="field-error" role="alert">
-                    Выберите разные дни недели в порядке тренировок. После воскресенья можно
-                    продолжить с понедельника.
+          <ProgramSettingsPanel
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            valid={
+              scheduleIsValid &&
+              Number.isInteger(durationWeeks) &&
+              durationWeeks >= 1 &&
+              durationWeeks <= 24 &&
+              Boolean(startDate) &&
+              defaultRestSeconds >= 15 &&
+              defaultRestSeconds <= 600
+            }
+          >
+            <section
+              className="program-builder-section stack"
+              aria-labelledby={`${sectionId}-program-profile-title`}
+            >
+              <h3 id={`${sectionId}-program-profile-title`}>Цель и уровень</h3>
+              <p className="muted">Для чего и какой уровень подготовки</p>
+              <div className="form-grid">
+                <label className="field">
+                  <span>Цель</span>
+                  <select
+                    value={goal}
+                    onChange={(event) =>
+                      setGoal(event.target.value as ProgramTemplateCreate['goal'])
+                    }
+                  >
+                    <option value="fat_loss">Похудение</option>
+                    <option value="muscle_gain">Набор</option>
+                    <option value="maintenance">Поддержание</option>
+                    <option value="recomposition">Рекомпозиция</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Уровень</span>
+                  <select
+                    value={level}
+                    onChange={(event) =>
+                      setLevel(event.target.value as ProgramTemplateCreate['level'])
+                    }
+                  >
+                    <option value="beginner">Начальный</option>
+                    <option value="intermediate">Средний</option>
+                    <option value="advanced">Продвинутый</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <section
+              className="program-builder-section stack"
+              aria-labelledby={`${sectionId}-program-schedule-title`}
+            >
+              <h3 id={`${sectionId}-program-schedule-title`}>Расписание</h3>
+              <p className="muted">
+                {activeProgramEdit
+                  ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
+                  : 'Когда начинать и как часто тренироваться.'}
+              </p>
+              <div className="form-grid">
+                <label className="field">
+                  <span>Начать не раньше</span>
+                  <DateInput
+                    disabled={activeProgramEdit}
+                    min={defaultStartDate}
+                    value={startDate}
+                    onChange={(event) => {
+                      setStartDate(event.target.value);
+                      setScheduleWeekdays(scheduleForDays(days.length, event.target.value));
+                    }}
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span>Длительность, недель</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    disabled={activeProgramEdit}
+                    min="1"
+                    max="24"
+                    value={durationWeeks}
+                    onChange={(event) => setDurationWeeks(Number(event.target.value))}
+                    required
+                  />
+                </label>
+              </div>
+              {usesSequentialCycle ? (
+                <ContextualHelp summary="Как устроен цикл?">
+                  <p>
+                    Восьмидневный цикл планируется последовательно и автоматически повторяется после
+                    восьмой тренировки.
                   </p>
-                )}
-              </section>
-              <details className="program-builder-optional">
-                <summary className="yfc-disclosure-summary">
-                  <span>
-                    <strong>Дополнительно</strong>
-                    <small>Быстрое заполнение и общий отдых</small>
-                  </span>
-                  <DisclosureIcon />
-                </summary>
-                <div className="program-builder-optional__body stack">
-                  <section
-                    className="program-builder-section stack"
-                    aria-labelledby={`${sectionId}-strength-template-title`}
-                  >
-                    <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
-                    <div className="form-grid">
-                      <label className="field">
-                        <span>Схема</span>
-                        <select
-                          value={split}
-                          onChange={(event) => {
-                            const next = event.target.value as StrengthSplit;
-                            setSplit(next);
-                            setPresetDays(resolveStrengthRule(level, next).recommended);
-                          }}
-                        >
-                          <option value="fullbody">Всё тело</option>
-                          <option value="upper_lower">Верх/Низ</option>
-                          <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
-                          <option value="split">Сплит</option>
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span>
-                          Тренировок ({rule.min}–{rule.max})
-                        </span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={rule.min}
-                          max={rule.max}
-                          value={presetDays}
-                          onChange={(event) => setPresetDays(Number(event.target.value))}
-                        />
-                      </label>
-                    </div>
-                    {rule.warning && <p className="muted">{rule.warning}</p>}
-                    <button type="button" className="secondary" onClick={() => void loadPreset()}>
-                      Заполнить по шаблону
-                    </button>
-                  </section>
-                  <section
-                    className="program-builder-section stack"
-                    aria-labelledby={`${sectionId}-program-rest-title`}
-                  >
-                    <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
-                    <p className="muted">
-                      Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
-                    </p>
-                    <div className="toolbar wrap program-builder-rest-actions">
-                      <label className="field">
-                        <span>Общий отдых, сек</span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min="15"
-                          max="600"
-                          value={defaultRestSeconds}
-                          onChange={(event) => setDefaultRestSeconds(Number(event.target.value))}
-                          required
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={defaultRestSeconds < 15 || defaultRestSeconds > 600}
-                        onClick={() => {
-                          setDays(applyRestSeconds(days, defaultRestSeconds));
-                          toast('Общее время отдыха применено ко всем упражнениям');
+                </ContextualHelp>
+              ) : (
+                <div className="form-grid">
+                  {days.map((day, dayIndex) => (
+                    <label className="field" key={`schedule-${dayIndex}`}>
+                      <span>{day.title || simpleTrainingTitle(dayIndex + 1)}</span>
+                      <select
+                        value={effectiveScheduleWeekdays[dayIndex] ?? ''}
+                        onChange={(event) =>
+                          setScheduleWeekdays(
+                            effectiveScheduleWeekdays.map((value, index) =>
+                              index === dayIndex ? Number(event.target.value) : value,
+                            ),
+                          )
+                        }
+                      >
+                        {weekdayLabels.map((label, weekday) => (
+                          <option value={weekday} key={label}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {!scheduleIsValid && (
+                <p className="field-error" role="alert">
+                  Выберите разные дни недели в порядке тренировок. После воскресенья можно
+                  продолжить с понедельника.
+                </p>
+              )}
+            </section>
+            <details className="program-builder-optional">
+              <summary className="yfc-disclosure-summary">
+                <span>
+                  <strong>Дополнительно</strong>
+                  <small>Быстрое заполнение и общий отдых</small>
+                </span>
+                <DisclosureIcon />
+              </summary>
+              <div className="program-builder-optional__body stack">
+                <section
+                  className="program-builder-section stack"
+                  aria-labelledby={`${sectionId}-strength-template-title`}
+                >
+                  <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
+                  <div className="form-grid">
+                    <label className="field">
+                      <span>Схема</span>
+                      <select
+                        value={split}
+                        onChange={(event) => {
+                          const next = event.target.value as StrengthSplit;
+                          setSplit(next);
+                          setPresetDays(resolveStrengthRule(level, next).recommended);
                         }}
                       >
-                        Применить ко всем упражнениям
-                      </button>
-                    </div>
-                  </section>
-                </div>
-              </details>
-            </div>
-          </details>
-          <div className="program-builder-footer">
+                        <option value="fullbody">Всё тело</option>
+                        <option value="upper_lower">Верх/Низ</option>
+                        <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
+                        <option value="split">Сплит</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>
+                        Тренировок ({rule.min}–{rule.max})
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={rule.min}
+                        max={rule.max}
+                        value={presetDays}
+                        onChange={(event) => setPresetDays(Number(event.target.value))}
+                      />
+                    </label>
+                  </div>
+                  {rule.warning && <p className="muted">{rule.warning}</p>}
+                  <button type="button" className="secondary" onClick={() => void loadPreset()}>
+                    Заполнить по шаблону
+                  </button>
+                </section>
+                <section
+                  className="program-builder-section stack"
+                  aria-labelledby={`${sectionId}-program-rest-title`}
+                >
+                  <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
+                  <p className="muted">
+                    Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
+                  </p>
+                  <div className="toolbar wrap program-builder-rest-actions">
+                    <label className="field">
+                      <span>Общий отдых, сек</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="15"
+                        max="600"
+                        value={defaultRestSeconds}
+                        onChange={(event) => setDefaultRestSeconds(Number(event.target.value))}
+                        required
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={defaultRestSeconds < 15 || defaultRestSeconds > 600}
+                      onClick={() => {
+                        setDays(applyRestSeconds(days, defaultRestSeconds));
+                        toast('Общее время отдыха применено ко всем упражнениям');
+                      }}
+                    >
+                      Применить ко всем упражнениям
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </details>
+          </ProgramSettingsPanel>
+          <div className="program-builder-footer" hidden={settingsOpen}>
             <div className="program-builder-footer__summary">
               <span className="eyebrow">Шаг 3</span>
               <strong>
@@ -756,7 +761,7 @@ export function ProgramBuilder({
               {editingTemplate || saveAsCopy ? 'Проверить и сохранить' : 'Проверить и назначить'}
             </button>
           </div>
-          {reviewOpen && (
+          {reviewOpen && !settingsOpen && (
             <section
               className="program-builder-review"
               role="dialog"

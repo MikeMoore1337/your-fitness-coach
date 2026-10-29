@@ -74,6 +74,7 @@ export function ProgramDayEditor({
     if (node) setPortalRoot(node.closest<HTMLElement>('.modal') ?? document.body);
   }, []);
   const carouselRef = useRef<HTMLDivElement>(null);
+  const dayTitleRef = useRef<HTMLInputElement>(null);
   const scrollTimerRef = useRef<number | null>(null);
   const allDaysTriggerRef = useRef<HTMLButtonElement>(null);
   const allDaysDialogRef = useRef<HTMLDivElement>(null);
@@ -464,7 +465,7 @@ export function ProgramDayEditor({
                 setSelectedExercise(exerciseIndex - 1);
               }}
             >
-              <Icon name="move-up" size={20} /> Выше
+              Выше
             </button>
             <button
               type="button"
@@ -478,7 +479,7 @@ export function ProgramDayEditor({
                 setSelectedExercise(exerciseIndex + 1);
               }}
             >
-              <Icon name="move-down" size={20} /> Ниже
+              Ниже
             </button>
           </div>
         )}
@@ -508,7 +509,7 @@ export function ProgramDayEditor({
     >
       <strong>День {index + 1}</strong>
       <span>{item.title || simpleTrainingTitle(index + 1)}</span>
-      <small>{item.exercises.length} упр.</small>
+      <small>{item.exercises.filter((row) => row.exercise_id > 0).length} упр.</small>
     </button>
   ));
 
@@ -533,7 +534,7 @@ export function ProgramDayEditor({
               >
                 <strong>День {index + 1}</strong>
                 <span>{item.title || simpleTrainingTitle(index + 1)}</span>
-                <small>{item.exercises.length} упр.</small>
+                <small>{item.exercises.filter((row) => row.exercise_id > 0).length} упр.</small>
               </button>
             ))}
           </div>
@@ -593,7 +594,10 @@ export function ProgramDayEditor({
                     День {index + 1} из {dayCount}
                   </span>
                   <strong>{item.title || simpleTrainingTitle(index + 1)}</strong>
-                  <small>{item.exercises.length} упр. · тренировочный день</small>
+                  <small>
+                    {item.exercises.filter((row) => row.exercise_id > 0).length} упр. ·
+                    тренировочный день
+                  </small>
                 </button>
               ))}
             </div>
@@ -626,6 +630,7 @@ export function ProgramDayEditor({
             <label className="field">
               <span>Название дня</span>
               <input
+                ref={dayTitleRef}
                 maxLength={128}
                 required
                 value={day.title}
@@ -638,7 +643,38 @@ export function ProgramDayEditor({
               />
             </label>
             <details className="copy-editor__day-actions">
-              <summary>Управление днём</summary>
+              <summary className="yfc-disclosure-summary">
+                <span>Действия с днём</span>
+                <DisclosureIcon />
+              </summary>
+              <div className="copy-editor__day-menu">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => {
+                    dayTitleRef.current?.focus();
+                    dayTitleRef.current?.select();
+                  }}
+                >
+                  Изменить название дня
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={dayCount >= 8}
+                  onClick={() => {
+                    if (days.length >= 8) return;
+                    const copy = structuredClone(day);
+                    copy.title = `${day.title.slice(0, 120)} (копия)`;
+                    setDays((current) => (current.length >= 8 ? current : [...current, copy]));
+                    setSelectedDay(days.length);
+                    setSelectedExercise(0);
+                    setDetailOpen(false);
+                  }}
+                >
+                  Дублировать день
+                </button>
+              </div>
               <div className="copy-editor__order-actions">
                 <button
                   type="button"
@@ -647,7 +683,7 @@ export function ProgramDayEditor({
                   onClick={() => moveDay(-1)}
                   aria-label="Переместить день выше"
                 >
-                  <Icon name="move-up" size={20} />
+                  Раньше
                 </button>
                 <button
                   type="button"
@@ -656,7 +692,7 @@ export function ProgramDayEditor({
                   onClick={() => moveDay(1)}
                   aria-label="Переместить день ниже"
                 >
-                  <Icon name="move-down" size={20} />
+                  Позже
                 </button>
                 {dayCount > 1 && (
                   <button
@@ -674,7 +710,9 @@ export function ProgramDayEditor({
           <div className="copy-editor__section-head copy-editor__exercise-heading">
             <div>
               <h3>Упражнения</h3>
-              <span className="muted">{day.exercises.length} упр.</span>
+              <span className="muted">
+                {day.exercises.filter((row) => row.exercise_id > 0).length} упр.
+              </span>
             </div>
             <button
               type="button"
@@ -705,14 +743,16 @@ export function ProgramDayEditor({
                   <span className="copy-editor__exercise-info">
                     <strong>{details?.title ?? 'Выберите упражнение'}</strong>
                     <span>
-                      {cardio
-                        ? String(item.prescribed_duration_minutes ?? 0) + ' мин'
-                        : String(item.prescribed_sets ?? 0) +
-                          ' × ' +
-                          String(item.prescribed_reps ?? '') +
-                          ' · отдых ' +
-                          String(item.rest_seconds ?? 0) +
-                          ' сек'}
+                      {!item.exercise_id
+                        ? 'Нажмите, чтобы выбрать'
+                        : cardio
+                          ? String(item.prescribed_duration_minutes ?? 0) + ' мин'
+                          : String(item.prescribed_sets ?? 0) +
+                            ' × ' +
+                            String(item.prescribed_reps ?? '') +
+                            ' · отдых ' +
+                            String(item.rest_seconds ?? 0) +
+                            ' сек'}
                     </span>
                     {(item.notes || isPairedWithPrevious(day, index)) && (
                       <small>
@@ -750,7 +790,7 @@ export function ProgramDayEditor({
             {dayCount < 8 ? (
               <button
                 type="button"
-                className="secondary"
+                className="secondary copy-editor__add"
                 onClick={() => {
                   setDays((current) => [
                     ...current,

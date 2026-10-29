@@ -388,6 +388,64 @@ describe('ProgramBuilder type-aware prescription', () => {
     expect(optional).not.toHaveAttribute('open');
   });
 
+  it('открывает отдельный экран настроек, сохраняет черновик и не отправляет запрос', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await screen.findByText('Настройки программы', { exact: true });
+    await user.clear(screen.getByRole('textbox', { name: 'Название', exact: true }));
+    await user.type(screen.getByRole('textbox', { name: 'Название', exact: true }), 'Мой черновик');
+    await user.click(screen.getByText('Настройки программы', { exact: true }));
+    expect(screen.queryByRole('textbox', { name: 'Название', exact: true })).toBeNull();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Цель', exact: true }),
+      'muscle_gain',
+    );
+    await user.clear(screen.getByRole('spinbutton', { name: 'Длительность, недель' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Длительность, недель' }), '3');
+    await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }));
+    expect(screen.getByRole('textbox', { name: 'Название', exact: true })).toHaveValue(
+      'Мой черновик',
+    );
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates', expect.anything());
+    await user.click(screen.getByText('Настройки программы', { exact: true }));
+    expect(screen.getByRole('combobox', { name: 'Цель', exact: true })).toHaveValue('muscle_gain');
+    expect(screen.getByRole('spinbutton', { name: 'Длительность, недель' })).toHaveValue(3);
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('textbox', { name: 'Название', exact: true })).toHaveValue(
+      'Мой черновик',
+    );
+  });
+
+  it('не закрывает настройки с недопустимой длительностью', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await user.click(await screen.findByText('Настройки программы', { exact: true }));
+    const weeks = screen.getByRole('spinbutton', { name: 'Длительность, недель' });
+    await user.clear(weeks);
+    await user.type(weeks, '0');
+    expect(screen.getByRole('button', { name: 'Сохранить настройки' })).toBeDisabled();
+    await user.clear(weeks);
+    await user.type(weeks, '4');
+    expect(screen.getByRole('button', { name: 'Сохранить настройки' })).toBeEnabled();
+  });
+
+  it('копирует день без общих ссылок и не показывает стрелки перестановки', async () => {
+    const user = userEvent.setup();
+    renderBuilder({ editingTemplate: activeTemplate });
+    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await user.click(screen.getByText('Действия с днём', { exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Дублировать день' }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Силовая (копия)');
+    const sets = screen.getByRole('spinbutton', { name: 'Рабочие подходы' });
+    await user.clear(sets);
+    await user.type(sets, '5');
+    const rail = document.querySelector('.copy-editor__rail') as HTMLElement;
+    await user.click(within(rail).getByRole('tab', { name: /День 1/ }));
+    expect(screen.getByRole('spinbutton', { name: 'Рабочие подходы' })).toHaveValue(3);
+    expect(document.querySelector('[data-icon="move-up"], [data-icon="move-down"]')).toBeNull();
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates/9', expect.anything());
+  });
+
   it('связывает разделы с собственными заголовками при двух открытых редакторах', async () => {
     const user = userEvent.setup();
     renderBuilder();
@@ -409,7 +467,13 @@ describe('ProgramBuilder type-aware prescription', () => {
       'Быстрое заполнение',
       'Отдых между подходами',
     ]) {
-      const sections = screen.getAllByRole('region', { name });
+      // Main content is intentionally hidden in the focused settings view.
+      const sections = [
+        ...document.querySelectorAll<HTMLElement>('section[aria-labelledby]'),
+      ].filter(
+        (section) =>
+          document.getElementById(section.getAttribute('aria-labelledby')!)?.textContent === name,
+      );
       expect(sections).toHaveLength(2);
       for (const section of sections) {
         const id = section.getAttribute('aria-labelledby');

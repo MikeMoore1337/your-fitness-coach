@@ -376,3 +376,28 @@
     scroll-behavior: auto;
   }
 }
+
+/* Approved #1327: paired full-width actions; no positional-arrow glyphs. */
+.copy-editor .copy-editor__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--touch-target, 44px);
+  text-align: center;
+}
+.copy-editor__day-menu {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+.copy-editor__day-menu button {
+  min-height: var(--touch-target, 44px);
+  text-align: left;
+}
+.copy-editor__day-actions > .yfc-disclosure-summary {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+}
