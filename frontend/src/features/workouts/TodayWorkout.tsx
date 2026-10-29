@@ -962,12 +962,14 @@ function WorkoutSetRow({
 
           {!isCurrent && (
             <RirSelector
-              disabled={completedFieldsDisabled}
+              disabled={disabled || completing}
               value={rir}
               onChange={(nextRir) => {
                 editing.current = true;
                 setRir(nextRir);
-                if (!editingCompleted) enqueueSave({ rir: nextRir });
+                // Completed sets allow quick metadata edits without reopening the set.
+                // Keep the explicit completed state and do not start a second rest period.
+                if (!editingCompleted) void enqueueSave({ rir: nextRir }, false, false);
               }}
             />
           )}
@@ -975,13 +977,13 @@ function WorkoutSetRow({
           <label className="active-workout-failure">
             <input
               type="checkbox"
-              disabled={completedFieldsDisabled}
+              disabled={disabled || completing}
               checked={reachedFailure}
               onChange={(event) => {
                 const nextReachedFailure = event.target.checked;
                 editing.current = true;
                 setReachedFailure(nextReachedFailure);
-                if (!editingCompleted) enqueueSave({ reachedFailure: nextReachedFailure });
+                if (!editingCompleted) void enqueueSave({ reachedFailure: nextReachedFailure }, false, false);
               }}
             />
             <span>Подход до отказа</span>
