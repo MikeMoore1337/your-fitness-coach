@@ -385,6 +385,7 @@ describe('ProgramBuilder type-aware prescription', () => {
     expect(screen.getAllByText('День 2 из 3').length).toBeGreaterThan(0);
     await user.click(within(chooser).getByRole('button', { name: 'Готово' }));
     await user.click(within(chooser).getByRole('button', { name: /День 1/ }));
+    await waitFor(() => expect(chooser).not.toBeInTheDocument());
     expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 2');
 
     await user.click(screen.getByRole('button', { name: 'Сохранить программу' }));
