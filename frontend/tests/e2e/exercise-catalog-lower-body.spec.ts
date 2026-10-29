@@ -267,7 +267,10 @@ test('lower-body aliases, compact guide and program selection work on small view
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/app?section=programs&view=manage&start=create');
   const builder = page.locator('#program-builder');
-  const picker = builder.getByRole('button', { name: 'Поиск упражнения' }).first();
+  await builder.locator('.copy-editor__exercise').first().tap();
+  const picker = page
+    .getByRole('dialog', { name: 'Параметры упражнения' })
+    .getByRole('button', { name: 'Поиск упражнения' });
   await picker.tap();
   const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
   await pickerSheet
@@ -348,10 +351,10 @@ test('lower-body catalog and picker keep Mobile Web and desktop parity', async (
 
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/app?section=programs&view=manage&start=create');
+  await page.locator('#program-builder .copy-editor__exercise').first().tap();
   const picker = page
-    .locator('#program-builder')
-    .getByRole('button', { name: 'Поиск упражнения' })
-    .first();
+    .getByRole('dialog', { name: 'Параметры упражнения' })
+    .getByRole('button', { name: 'Поиск упражнения' });
   await picker.tap();
   const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
   await pickerSheet.getByRole('searchbox', { name: 'Поиск упражнения' }).fill('glute drive');
