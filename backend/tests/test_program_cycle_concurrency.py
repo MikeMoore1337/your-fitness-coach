@@ -239,6 +239,10 @@ def test_two_scoped_edits_with_same_revision_have_one_winner(client):
     facts = _assigned_cycle_with_completed_facts(client)
     results = _run_parallel(lambda db: _edit(db, facts, 3), lambda db: _edit(db, facts, 4))
     assert sorted(status for status, _ in results) == ["conflict", "ok"]
+    assert (
+        next(value for status, value in results if status == "conflict")
+        == "Program revision conflict"
+    )
     with get_session_context() as db:
         assert (
             db.get(UserProgram, facts["program_id"]).current_revision_number == facts["version"] + 1
@@ -275,6 +279,10 @@ def test_two_restarts_with_same_revision_create_one_new_assignment(client):
 
     results = _run_parallel(restart, restart)
     assert sorted(status for status, _ in results) == ["conflict", "ok"]
+    assert (
+        next(value for status, value in results if status == "conflict")
+        == "Program revision conflict"
+    )
     new_id = next(result["new_program_id"] for status, result in results if status == "ok")
     with get_session_context() as db:
         restarted = (
