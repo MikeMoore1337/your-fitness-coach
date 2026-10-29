@@ -3680,6 +3680,51 @@ async function assertIssue996FooterGeometry(dialog: Locator, afterPreview = fals
   }
 }
 
+test('#1202 searches verified replacements without applying one', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await mockActiveWorkout(page);
+  await page.route('**/workouts/42/exercises/101/alternatives?*', (route) =>
+    route.fulfill({
+      json: [
+        {
+          exercise_id: 13,
+          title: 'Жим гантелей лёжа',
+          aliases: ['dumbbell bench press'],
+          equipment_ids: ['dumbbell', 'bench'],
+        },
+        { exercise_id: 14, title: 'Жим в тренажёре', aliases: [], equipment_ids: ['machine'] },
+        { exercise_id: 15, title: 'Отжимания', aliases: [], equipment_ids: ['bodyweight'] },
+        { exercise_id: 16, title: 'Жим Смита', aliases: [], equipment_ids: ['machine'] },
+      ],
+    }),
+  );
+  const writes: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/adaptations/'))
+      writes.push(request.url());
+  });
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('button', { name: 'Заменить только в этой тренировке', exact: true })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Заменить только в этой тренировке' });
+  await dialog.getByRole('checkbox', { name: 'Гантели' }).check();
+  await dialog.getByRole('checkbox', { name: 'Скамья' }).check();
+  await dialog.getByRole('button', { name: 'Все подходящие' }).click();
+  const search = dialog.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+  await search.focus();
+  await search.fill('dumbell bench press');
+  await expect(dialog.getByRole('radio', { name: /Жим гантелей лёжа/ })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: /Жим Смита/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
+  expect(writes).toEqual([]);
+});
+
 test('V9-01 replaces only an untouched active exercise and survives refresh', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockActiveWorkout(page);

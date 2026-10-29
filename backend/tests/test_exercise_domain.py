@@ -804,8 +804,8 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         "media_blocked": 35,
         "media_remote_runtime_assets": 0,
         "media_static_only": 4,
-        "metadata_aliases_populated": 69,
-        "metadata_aliases_reviewed_empty": 137,
+        "metadata_aliases_populated": 72,
+        "metadata_aliases_reviewed_empty": 134,
         "metadata_execution_populated": 69,
         "metadata_execution_reviewed_empty": 137,
         "metadata_machine_applicable": 52,
@@ -1013,6 +1013,14 @@ def test_exercise_domain_seed_is_idempotent() -> None:
     assert before["muscles"] == 26
     assert before["equipment"] == 9
     assert before["alternatives"] > 0
+
+
+def test_bench_press_aliases_preserve_equipment_and_angle() -> None:
+    metadata = structured_catalog_metadata()
+    assert "barbell bench press" in metadata["bench-press"]["aliases"]
+    assert "dumbbell bench press" in metadata["dumbbell-bench-press"]["aliases"]
+    assert "incline dumbbell bench press" in metadata["incline-dumbbell-press"]["aliases"]
+    assert "dumbbell bench press" not in metadata["bench-press"]["aliases"]
 
 
 def test_exercise_catalog_metadata_loading_has_no_per_row_queries(client) -> None:
