@@ -36,7 +36,7 @@ class ProgramTemplate(Base):
             name="ck_program_templates_split_type",
         ),
         CheckConstraint(
-            "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
+            "default_duration_weeks >= 1",
             name="ck_program_templates_default_duration_weeks",
         ),
     )
@@ -69,7 +69,10 @@ class ProgramTemplate(Base):
 
     @property
     def sessions_per_week(self) -> int:
-        frequency = (self.program_metadata or {}).get("days_per_week")
+        metadata = self.program_metadata or {}
+        if metadata.get("week_cycle"):
+            return len(self.days)
+        frequency = metadata.get("days_per_week")
         if type(frequency) is int and 1 <= frequency <= 8:
             return frequency
         return len(self.days)
@@ -177,7 +180,7 @@ class ProgramTemplateExerciseWeekPrescription(Base):
             name="uq_program_template_exercise_week",
         ),
         CheckConstraint(
-            "week_number >= 1 AND week_number <= 24",
+            "week_number >= 1",
             name="ck_program_template_exercise_weeks_number",
         ),
         CheckConstraint(
@@ -428,6 +431,15 @@ class UserWorkout(Base):
             "scheduled_date",
             "status",
         ),
+        Index(
+            "uq_user_workouts_cycle_occurrence",
+            "user_program_id",
+            "week_number",
+            "day_number",
+            unique=True,
+            postgresql_where=text("source_cycle_week IS NOT NULL"),
+            sqlite_where=text("source_cycle_week IS NOT NULL"),
+        ),
         CheckConstraint(
             "completion_feedback IS NULL OR completion_feedback IN "
             "('easier_than_expected', 'as_expected', 'harder_than_expected')",
@@ -445,6 +457,10 @@ class UserWorkout(Base):
     scheduled_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     day_number: Mapped[int] = mapped_column(Integer)
     week_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    plan_materialized: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=True)
+    source_cycle_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cycle_iteration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    plan_revision_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     title: Mapped[str] = mapped_column(String(128))
     status: Mapped[str] = mapped_column(String(32), default="planned")
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -590,6 +606,7 @@ class UserWorkoutSet(Base):
     planned_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    plan_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     workout_exercise: Mapped[UserWorkoutExercise] = relationship(
         "UserWorkoutExercise", back_populates="sets"

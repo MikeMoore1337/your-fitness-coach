@@ -27,6 +27,7 @@ function knownFrequency(value: unknown): string | null {
 }
 
 export function programWeeklySessions(template: ProgramTemplate): number {
+  if (metadata(template).week_cycle) return template.days.length;
   const frequency = metadata(template).days_per_week;
   return typeof frequency === 'number' &&
     Number.isInteger(frequency) &&

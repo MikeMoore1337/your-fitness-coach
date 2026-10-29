@@ -852,3 +852,60 @@ def test_rotation_revision_cannot_collapse_repeated_days(client):
                 allow_structure_changes=True,
             )
         assert [(row.id, row.scheduled_date, row.day_number) for row in program.workouts] == before
+
+
+def test_native_week_cycle_keeps_its_bounded_window_and_session_slots(client):
+    headers = _auth(client, 53380)
+    exercise = _exercise_by_slug(client, headers, "squat")
+    created = client.post(
+        "/api/v1/programs/templates",
+        headers=headers,
+        json={
+            "title": "Недельный цикл",
+            "goal": "strength",
+            "level": "beginner",
+            "mode": "self",
+            "assign_after_create": False,
+            "week_cycle": {
+                "schema_version": 1,
+                "length_weeks": 1,
+                "week_types": None,
+                "repeat": True,
+            },
+            "days": [
+                {
+                    "title": "День",
+                    "exercises": [
+                        {
+                            "exercise_id": exercise["id"],
+                            "prescribed_sets": 2,
+                            "prescribed_reps": "8",
+                            "rest_seconds": 90,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    assert created.status_code == 200, created.text
+    template_id = created.json()["template"]["id"]
+    with get_session_context() as db:
+        template = db.get(ProgramTemplate, template_id)
+        template.program_metadata = {**template.program_metadata, "days_per_week": 3}
+        assert template.sessions_per_week == 1
+    assigned = client.post(
+        f"/api/v1/programs/templates/{template_id}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 30},
+    )
+    assert assigned.status_code == 200, assigned.text
+    assert assigned.json()["workouts_created"] == 4
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == assigned.json()["user_program_id"])
+            .all()
+        )
+        assert len(workouts) == 4
+        assert all(row.source_cycle_week == 1 for row in workouts)
+        assert {row.day_number for row in workouts} == {1}

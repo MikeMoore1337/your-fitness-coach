@@ -49,7 +49,7 @@ class ProgramGeneratorRequest(BaseModel):
 class ProgramGeneratorConfirmRequest(BaseModel):
     draft_token: str = Field(min_length=1, max_length=16_384)
     start_date: date | None = None
-    duration_weeks: int | None = Field(default=None, ge=1, le=24)
+    duration_weeks: int | None = Field(default=None, ge=1)
     replace_active: bool = False
 
 
