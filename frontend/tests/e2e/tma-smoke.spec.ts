@@ -1097,8 +1097,10 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     });
     expect(brandContract.boundaryShadow).toContain(brandContract.lime);
     expect(brandContract.actionRadius).toBe(brandContract.radius);
-    expect(brandContract.editActionBackground).toBeNull();
-    expect(brandContract.editActionColor).toBeNull();
+    // #1326: editing is now a neutral secondary action; the lime primary action previews the plan.
+    expect(brandContract.editActionBackground).not.toBeNull();
+    expect(brandContract.editActionBackground).not.toBe(brandContract.lime);
+    expect(brandContract.editActionColor).not.toBeNull();
     expect(brandContract.disclosure).toEqual({ width: 28, height: 28 });
 
     if (current.screenshot) {

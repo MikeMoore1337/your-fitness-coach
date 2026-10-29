@@ -3212,6 +3212,12 @@ test('поля адаптируются к разным iPhone, а пример 
   await page.locator('.program-example-modal__close').click();
   await expect(previewDialog).toHaveCount(0);
 
+  // #1326: the active program preview lives in overview; return to the library to launch this template.
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Программы и шаблоны/ })
+    .click();
+  await expect(sourceCard).toBeVisible();
   await sourceCard.getByRole('button', { name: 'Запустить' }).click();
   const assignmentDialog = page.locator('.assignment-modal');
   await expect(assignmentDialog).toBeVisible();
