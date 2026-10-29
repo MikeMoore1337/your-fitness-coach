@@ -16,6 +16,7 @@ import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
 import { SearchableExercisePicker } from './SearchableExercisePicker';
+import { ProgramDayEditor } from './ProgramDayEditor';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
 import {
@@ -378,8 +379,8 @@ export function ProgramBuilder({
       title={
         editingTemplate
           ? saveAsCopy
-            ? 'Настроить личную копию'
-            : 'Редактировать программу'
+            ? 'Редактирование личной копии'
+            : 'Редактирование программы'
           : targetTelegramId
             ? `Новая программа для ${targetName || targetTelegramId}`
             : 'Создать свою программу'
@@ -420,7 +421,7 @@ export function ProgramBuilder({
         </section>
       ) : (
         <form
-          className="stack top-gap"
+          className={editingTemplate ? 'stack top-gap program-builder--personal-editor' : 'stack top-gap'}
           onSubmit={async (e) => {
             e.preventDefault();
             let replaceActive = false;
@@ -469,12 +470,21 @@ export function ProgramBuilder({
           <div className="program-builder-days-heading">
             <div>
               <span className="eyebrow">Шаг 2</span>
-              <h3>Добавьте упражнения</h3>
-              <p>Первая тренировка уже создана. Выберите хотя бы одно упражнение.</p>
+              <h3>{editingTemplate ? 'Тренировочные дни' : 'Добавьте упражнения'}</h3>
+              <p>{editingTemplate ? 'Выберите день и настройте его упражнения.' : 'Первая тренировка уже создана. Выберите хотя бы одно упражнение.'}</p>
             </div>
             <Badge>{days.length} из 8</Badge>
           </div>
-          {days.map((day, dayIndex) => (
+          {editingTemplate ? (
+            <ProgramDayEditor
+              days={days}
+              setDays={setDays}
+              updateDay={updateDay}
+              exercises={orderedExercises}
+              defaultRestSeconds={defaultRestSeconds}
+              onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
+            />
+          ) : days.map((day, dayIndex) => (
             <div className="program-day stack" key={dayIndex}>
               <div className="program-day__head">
                 <span className="program-day__number">{dayIndex + 1}</span>
@@ -1051,7 +1061,7 @@ export function ProgramBuilder({
                 упр.
               </strong>
             </div>
-            {days.length < 8 ? (
+            {!editingTemplate && (days.length < 8 ? (
               <button
                 type="button"
                 className="secondary"
@@ -1069,7 +1079,7 @@ export function ProgramBuilder({
               </button>
             ) : (
               <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>
-            )}
+            ))}
             <button
               className="program-builder-footer__save"
               disabled={
@@ -1082,10 +1092,8 @@ export function ProgramBuilder({
             >
               {mutation.isPending
                 ? 'Сохраняем…'
-                : saveAsCopy
-                  ? 'Сохранить личную копию'
-                  : editingTemplate
-                    ? 'Сохранить изменения'
+                : editingTemplate
+                  ? 'Сохранить программу'
                     : targetTelegramId
                       ? 'Создать и назначить'
                       : 'Создать программу'}
