@@ -148,3 +148,29 @@ def test_finish_records_utc_instant_without_replacing_legacy_time(client):
         workout = db.get(UserWorkout, workout_id)
         assert workout.completed_at is not None
         assert before <= workout.completed_at_utc <= after
+
+
+def test_repeated_dst_hour_groups_distinct_instants_on_the_same_local_day(client):
+    _auth(client, 727_839)
+    with get_session_context() as db:
+        user = db.query(User).filter_by(id=_user_id(727_839)).one()
+        if user.profile is None:
+            user.profile = UserProfile(timezone="America/New_York")
+        else:
+            user.profile.timezone = "America/New_York"
+        program = _program(db, user.id)
+        for hour in (5, 6):
+            db.add(
+                UserWorkout(
+                    user_program_id=program.id,
+                    scheduled_date=datetime(2026, 10, 31).date(),
+                    day_number=1,
+                    title="Тренировка",
+                    status="completed",
+                    completed_at_utc=datetime(2026, 11, 1, hour, 30),
+                )
+            )
+        db.flush()
+        result = build_activity_heatmap(db, user, now=datetime(2026, 11, 2, 12, tzinfo=UTC))
+        day = next(row for row in result["days"] if row["date"].isoformat() == "2026-11-01")
+        assert day["completed_workouts"] == 2
