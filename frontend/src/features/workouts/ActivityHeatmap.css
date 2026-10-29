@@ -17,24 +17,26 @@
 }
 
 .activity-heatmap__groups--months {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 0.5rem;
+  --activity-cell: clamp(0.4rem, 1.8vw, 0.65rem);
 }
 
 .activity-heatmap__grid {
   display: grid;
   grid-auto-flow: column;
-  grid-template-rows: repeat(7, 0.65rem);
-  grid-auto-columns: 0.65rem;
+  grid-template-rows: repeat(7, var(--activity-cell, 0.65rem));
+  grid-auto-columns: var(--activity-cell, 0.65rem);
   gap: 0.2rem;
   width: max-content;
 }
 
 .activity-heatmap__cell {
   display: inline-block;
-  width: 0.65rem;
-  height: 0.65rem;
+  box-sizing: border-box;
+  width: var(--activity-cell, 0.65rem);
+  height: var(--activity-cell, 0.65rem);
   border: 1px solid var(--color-border);
   border-radius: 2px;
   background: var(--color-surface-subtle);
@@ -86,4 +88,19 @@
   background: var(--color-surface-subtle);
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
+}
+
+.activity-heatmap__groups--year {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.activity-heatmap__groups--year .activity-heatmap__group {
+  flex: 0 0 auto;
+  padding-right: 0.75rem;
+  border-right: 1px solid var(--color-border);
+}
+
+.activity-heatmap__groups--year .activity-heatmap__group:last-child {
+  border-right: 0;
 }

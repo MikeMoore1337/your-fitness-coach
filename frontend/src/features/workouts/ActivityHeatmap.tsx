@@ -42,11 +42,10 @@ export function ActivityHeatmap({
 }) {
   const [selected, setSelected] = useState(data.days.at(-1)?.date ?? '');
   const selectedDay = data.days.find((day) => day.date === selected) ?? data.days.at(-1);
-  const showMonths = variant === 'months';
   const groups: ActivityDay[][] = [];
   for (const day of data.days) {
     const last = groups.at(-1);
-    if (!last || (variant === 'months' && last[0]?.date.slice(0, 7) !== day.date.slice(0, 7))) {
+    if (!last || last[0]?.date.slice(0, 7) !== day.date.slice(0, 7)) {
       groups.push([day]);
     } else {
       last.push(day);
@@ -79,7 +78,7 @@ export function ActivityHeatmap({
       >
         {groups.map((group, index) => (
           <div className="activity-heatmap__group" key={group?.[0]?.date ?? index}>
-            {showMonths && group?.[0] && <span>{monthLabel(group[0].date)}</span>}
+            {group?.[0] && <span>{monthLabel(group[0].date)}</span>}
             <div className="activity-heatmap__grid">
               {Array.from(
                 {
