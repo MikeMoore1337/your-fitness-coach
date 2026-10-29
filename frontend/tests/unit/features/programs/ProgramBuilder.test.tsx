@@ -117,6 +117,10 @@ function renderBuilder(props: { editingTemplate?: ProgramTemplate } = {}) {
 }
 
 function emulateMobileEditorViewport() {
+  const mobileStyle = document.createElement('style');
+  mobileStyle.dataset.mobileCopyEditorTest = 'true';
+  mobileStyle.textContent = '.copy-editor__mobile-days { display: block !important; }';
+  document.head.append(mobileStyle);
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: query === '(max-width: 1099px)',
     media: query,
@@ -155,6 +159,7 @@ describe('ProgramBuilder type-aware prescription', () => {
 
   afterEach(() => {
     cleanup();
+    document.querySelectorAll('[data-mobile-copy-editor-test]').forEach((node) => node.remove());
     vi.unstubAllGlobals();
   });
 
