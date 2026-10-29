@@ -27,3 +27,17 @@ it('shows an empty state', () => {
   render(<ActivityHeatmap data={{ ...data, days: [] }} />);
   expect(screen.getByText('Данных об активности пока нет.')).toBeInTheDocument();
 });
+
+it('distinguishes a known empty history from unknown days', () => {
+  render(
+    <ActivityHeatmap
+      data={{
+        ...data,
+        history_complete: true,
+        undated_workouts: 0,
+        days: [{ date: '2026-01-01', completed_workouts: 0, working_sets: 0 }],
+      }}
+    />,
+  );
+  expect(screen.getByText('За этот период нет завершённых тренировок.')).toBeInTheDocument();
+});

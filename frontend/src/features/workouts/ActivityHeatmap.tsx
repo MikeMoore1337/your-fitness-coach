@@ -53,6 +53,11 @@ export function ActivityHeatmap({
           могут быть неполными.
         </p>
       )}
+      {data.history_complete &&
+        data.days.length > 0 &&
+        data.days.every((day) => day.completed_workouts === 0) && (
+          <p>За этот период нет завершённых тренировок.</p>
+        )}
       <div
         className={`activity-heatmap__groups activity-heatmap__groups--${variant}`}
         aria-hidden="true"
