@@ -6147,6 +6147,7 @@ for (const theme of ['dark', 'light'] as const) {
     const restStarts = await page.evaluate(
       () => (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts,
     );
+    const patchCountAtCompletion = server.patches.length;
     await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
     await expect(first.getByLabel(/^Вес,/)).toBeDisabled();
     await first.locator('.active-workout-set__advanced > summary').click();
@@ -6170,7 +6171,9 @@ for (const theme of ['dark', 'light'] as const) {
       ),
     ).toBe(restStarts);
     expect(
-      server.patches.filter((patch) => patch.setId === 201 && patch.body.is_completed === false),
+      server.patches
+        .slice(patchCountAtCompletion)
+        .filter((patch) => patch.setId === 201 && patch.body.is_completed !== true),
     ).toHaveLength(0);
     expect(
       server.patches.filter((patch) => patch.setId === 201).slice(-1)[0]?.body.is_completed,
