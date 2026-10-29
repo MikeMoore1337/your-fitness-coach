@@ -511,11 +511,22 @@ export function ProgramDayEditor({
   const allDayButtons = days.map((item, index) =>
     allDaysReordering ? (
       <div key={index} className="copy-editor__day-sort-row">
-        <div className="copy-editor__day-sort-name" aria-current={index === dayIndex ? 'true' : undefined}>
-          <strong>День {index + 1} · {item.title || simpleTrainingTitle(index + 1)}</strong>
-          <small>{item.exercises.length} упр.{index === dayIndex ? ' · выбран' : ''}</small>
+        <div
+          className="copy-editor__day-sort-name"
+          aria-current={index === dayIndex ? 'true' : undefined}
+        >
+          <strong>
+            День {index + 1} · {item.title || simpleTrainingTitle(index + 1)}
+          </strong>
+          <small>
+            {item.exercises.length} упр.{index === dayIndex ? ' · выбран' : ''}
+          </small>
         </div>
-        <div className="copy-editor__sort-actions" role="group" aria-label={`Порядок дня ${index + 1}`}>
+        <div
+          className="copy-editor__sort-actions"
+          role="group"
+          aria-label={`Порядок дня ${index + 1}`}
+        >
           <button
             type="button"
             className="secondary"
@@ -838,7 +849,8 @@ export function ProgramDayEditor({
                 <div className="copy-editor__sheet-toolbar">
                   {allDaysReordering && (
                     <p className="muted">
-                      Меняйте порядок кнопками «Раньше» и «Позже». Изменения сохранятся вместе с программой.
+                      Меняйте порядок кнопками «Раньше» и «Позже». Изменения сохранятся вместе с
+                      программой.
                     </p>
                   )}
                   <button
@@ -850,7 +862,11 @@ export function ProgramDayEditor({
                   </button>
                 </div>
               )}
-              <div className={allDaysReordering ? 'copy-editor__day-sort-list' : 'copy-editor__day-grid'}>
+              <div
+                className={
+                  allDaysReordering ? 'copy-editor__day-sort-list' : 'copy-editor__day-grid'
+                }
+              >
                 {allDayButtons}
               </div>
             </div>
