@@ -16,6 +16,7 @@ import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
 import { ProgramDayEditor } from './ProgramDayEditor';
+import './ProgramBuilderFocus.css';
 import { DateInput } from '../../shared/ui/PickerInput';
 import {
   productEventSurface,
