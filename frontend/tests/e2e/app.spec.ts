@@ -3488,7 +3488,7 @@ test('детерминированный подбор проходит preview, 
   });
 });
 
-test('клиент собирает и переупорядочивает личную программу', async ({ page }) => {
+test('клиент собирает и проверяет личную программу перед назначением', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
@@ -3517,7 +3517,7 @@ test('клиент собирает и переупорядочивает лич
       .evaluateAll((elements) => elements.map((element) => element.id)),
   ).toEqual(['program-builder', 'program-library']);
   await expect(builder.getByLabel('Название', { exact: true })).toHaveValue('Моя программа');
-  await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 1');
+  await expect(builder.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 1');
   await expect(builder.getByText('Настройки программы', { exact: true })).toBeVisible();
   await expect(builder.getByRole('combobox', { name: 'Цель', exact: true })).toBeHidden();
   const settings = builder.locator('.program-builder-settings');
@@ -3533,7 +3533,9 @@ test('клиент собирает и переупорядочивает лич
   await settings.locator('summary').click();
   await expect(goal).toBeHidden();
 
-  const exercisePicker = builder.getByRole('button', { name: 'Поиск упражнения' }).first();
+  await builder.locator('.copy-editor__exercise').first().click();
+  const parameters = page.getByRole('dialog', { name: 'Параметры упражнения' });
+  const exercisePicker = parameters.getByRole('button', { name: 'Поиск упражнения' });
   await exercisePicker.click();
   const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
   const exerciseSearch = pickerSheet.getByRole('searchbox', { name: 'Поиск упражнения' });
@@ -3556,39 +3558,22 @@ test('клиент собирает и переупорядочивает лич
   await expect(exercisePicker).toContainText('Тяга блока');
   await expect(builder.getByText('1 тренировка · 1 упр.', { exact: true })).toBeVisible();
 
-  await builder.getByRole('button', { name: 'Добавить упражнение' }).first().click();
-  const exercisePickers = builder.getByRole('button', { name: 'Поиск упражнения' });
-  await expect(exercisePickers.nth(0)).toContainText('Тяга блока');
-  await expect(exercisePickers.nth(1)).toContainText('Выбрать упражнение');
-  const moveExerciseDown = builder.getByRole('button', {
-    name: 'Переместить упражнение 1 ниже',
-  });
-  await moveExerciseDown.focus();
-  await moveExerciseDown.press('Enter');
-  const exerciseRows = builder.locator('.program-exercise-row');
-  await expect(exerciseRows.nth(0).getByRole('button', { name: 'Техника и детали' })).toHaveCount(
-    0,
-  );
-  await expect(exerciseRows.nth(1).getByRole('button', { name: 'Техника и детали' })).toBeVisible();
-  await expect(exercisePickers.nth(0)).toContainText('Выбрать упражнение');
-  await expect(exercisePickers.nth(1)).toContainText('Тяга блока');
-  await builder.getByRole('button', { name: 'Удалить упражнение 1 из дня 1' }).click();
-
-  await builder.getByRole('button', { name: 'Добавить день' }).click();
-  const moveDayUp = builder.getByRole('button', { name: 'Переместить день 2 выше' });
-  await moveDayUp.focus();
-  await moveDayUp.press('Enter');
-  await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 2');
-  await expect(builder.getByLabel('Название дня 2')).toHaveValue('Тренировка 1');
-  await builder.getByRole('button', { name: 'Удалить день 1' }).click();
-  await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 1');
+  await parameters.getByRole('button', { name: 'Закрыть параметры' }).click();
+  await expect(builder.locator('.copy-editor__exercise').first()).toContainText('Тяга блока');
+  await expect(
+    builder.locator('.copy-editor__current-day').getByRole('textbox', {
+      name: 'Название дня',
+    }),
+  ).toHaveValue('Тренировка 1');
 
   const createRequest = page.waitForRequest(
     (request) =>
       new URL(request.url()).pathname.endsWith('/programs/templates') &&
       request.method() === 'POST',
   );
-  await builder.getByRole('button', { name: 'Создать программу' }).click();
+  await builder.getByRole('button', { name: 'Проверить и назначить' }).click();
+  await expect(builder.getByRole('heading', { name: 'Проверка программы' })).toBeVisible();
+  await builder.getByRole('button', { name: 'Создать и назначить' }).click();
   const payload = (await createRequest).postDataJSON() as {
     title: string;
     goal: string;
