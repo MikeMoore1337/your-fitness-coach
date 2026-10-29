@@ -2741,7 +2741,7 @@ body:has(.app-shell--design-v2) {
 }
 
 /* #1318: draw the focus ring inside the input without moving the label or keyboard viewport. */
-.active-workout--design-v2 .active-workout-set.is-current .active-workout-input input:focus-visible {
+.active-workout--design-v2 .is-current .active-workout-input input:focus-visible {
   outline-offset: -4px;
 }
 
