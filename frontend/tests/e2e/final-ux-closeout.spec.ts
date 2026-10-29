@@ -392,7 +392,10 @@ async function exerciseDisclosures(page: Page, root: Locator, label: string) {
       };
     });
     expect.soft(state.icon, `${label}: ${initial.label} has approved Icon-chevron`).not.toBeNull();
-    if (state.ariaExpanded !== null) expect.soft(state.ariaExpanded).toBe(String(state.open));
+    if (state.ariaExpanded !== null) {
+      // React-controlled disclosures sync aria-expanded after the native toggle.
+      await expect(summary).toHaveAttribute('aria-expanded', String(state.open));
+    }
     expect.soft(state.focusOutline, `${label}: ${initial.label} focus`).not.toBe('none');
     expect.soft(state.width, `${label}: ${initial.label} touch width`).toBeGreaterThanOrEqual(44);
     expect.soft(state.height, `${label}: ${initial.label} touch height`).toBeGreaterThanOrEqual(44);
