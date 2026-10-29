@@ -84,9 +84,6 @@
   gap: 12px;
   min-height: 52px;
 }
-.program-builder-settings[open] > summary .disclosure-icon {
-  display: none;
-}
 .program-builder .program-builder-settings__body {
   margin-top: 12px;
   padding-top: 0;
