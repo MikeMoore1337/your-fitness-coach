@@ -278,3 +278,23 @@ def test_one_week_cycle_execution_and_rolling_snapshot(client):
             for exercise in row.exercises
             for item in exercise.sets
         )
+
+    for _ in range(3):
+        with get_session_context() as db:
+            planned_ids = [
+                row.id
+                for row in db.query(UserWorkout)
+                .filter_by(user_program_id=program_id, status="planned")
+                .all()
+            ]
+        for pending_id in planned_ids:
+            skipped = client.post(f"/api/v1/workouts/{pending_id}/skip", headers=headers)
+            assert skipped.status_code == 200, skipped.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        assert program.status == "completed" and not program.is_active
+        assert db.query(UserWorkout).filter_by(user_program_id=program_id).count() == 16
+        completed = db.get(UserWorkout, workout_id)
+        assert [
+            (row.id, row.actual_reps, row.actual_weight) for row in completed.exercises[0].sets
+        ] == original_sets
