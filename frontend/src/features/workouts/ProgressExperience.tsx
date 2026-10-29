@@ -1552,7 +1552,13 @@ export function ProgressExperience({
   const analytics = useTrainingAnalytics(selection, view === 'training');
   const activity = useQuery({
     queryKey: ['workout', 'activity-heatmap'],
-    queryFn: () => api<ActivityHeatmapData>('/api/v1/workouts/progress/activity-heatmap'),
+    queryFn: async () => {
+      const result = await api<ActivityHeatmapData>('/api/v1/workouts/progress/activity-heatmap');
+      if (!result || !Array.isArray(result.days)) {
+        throw new Error('Не удалось загрузить календарь активности.');
+      }
+      return result;
+    },
     enabled: view === 'training',
   });
   const controlledNutritionPeriod = useMemo<ControlledNutritionPeriod>(

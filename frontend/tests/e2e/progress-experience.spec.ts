@@ -826,6 +826,20 @@ async function mockProgress(
         headers: { 'Content-Disposition': 'attachment; filename="nutrition-report.csv"' },
       });
     }
+    if (path.endsWith('/workouts/progress/activity-heatmap')) {
+      return route.fulfill({
+        json: {
+          timezone: 'Europe/Moscow',
+          history_complete: false,
+          undated_workouts: 1,
+          days: Array.from({ length: 365 }, (_, index) => ({
+            date: new Date(Date.UTC(2029, 1, 1 + index)).toISOString().slice(0, 10),
+            completed_workouts: null,
+            working_sets: null,
+          })),
+        },
+      });
+    }
     if (path.endsWith('/workouts/progress/training-analytics')) {
       return route.fulfill({
         json: {
@@ -1247,6 +1261,8 @@ test('progress remains clear and free of horizontal overflow at supported widths
     .getByRole('tab', { name: /^Тренировки/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Активность за 365 дней' })).toBeVisible();
+  await expect(page.getByText(/История неполная/)).toBeVisible();
   await expect(page.getByText('Грудные')).toBeVisible();
   await expect(page.getByText('+6 подх.')).toBeVisible();
   await page.getByText('Жим штанги лёжа').click();
