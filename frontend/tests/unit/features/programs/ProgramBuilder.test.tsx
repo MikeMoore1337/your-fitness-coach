@@ -303,6 +303,36 @@ describe('ProgramBuilder type-aware prescription', () => {
     );
   });
 
+  it('даёт быстрый переход к последнему дню и не прокручивает одно-дневный цикл', async () => {
+    const user = userEvent.setup();
+    const editingTemplate = {
+      ...activeTemplate,
+      days: Array.from({ length: 8 }, (_, index) => ({
+        ...activeTemplate.days[0],
+        id: index + 100,
+        day_number: index + 1,
+        title: 'Тренировка ' + (index + 1),
+      })),
+    } as ProgramTemplate;
+    renderBuilder({ editingTemplate });
+    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await user.click(screen.getByRole('button', { name: 'Все дни' }));
+    const chooser = screen.getByRole('dialog', { name: 'Все дни программы' });
+    await user.click(within(chooser).getByRole('button', { name: /День 8/ }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 8');
+    expect(screen.getByText('День 8 из 8')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Предыдущий день' }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 7');
+  });
+
+  it('отключает стрелки карусели для единственного дня', async () => {
+    renderBuilder({ editingTemplate: activeTemplate });
+    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
+  });
+
   it('связывает разделы с собственными заголовками при двух открытых редакторах', async () => {
     const user = userEvent.setup();
     renderBuilder();
