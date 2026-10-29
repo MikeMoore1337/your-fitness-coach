@@ -345,11 +345,13 @@ def list_compatible_alternatives(
         if _effective_exercise_id(candidate.exercise) in used_ids:
             continue
         source_slug = _source_exercise_slug(candidate.exercise)
+        metadata = exercise_catalog_metadata(source_slug)
         media = get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
         alternatives.append(
             {
                 "exercise_id": candidate.exercise.id,
                 "title": candidate.exercise.title,
+                "aliases": list(metadata["aliases"]) if metadata else [],
                 "equipment_ids": list(candidate.equipment_ids),
                 "score": candidate.score,
                 "reason_keys": list(candidate.reason_keys),

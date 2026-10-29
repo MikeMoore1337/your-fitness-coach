@@ -175,6 +175,10 @@ def test_replacement_requires_curated_compatible_alternative_and_fresh_preview(c
     )
     assert alternatives.status_code == 200
     replacement = next(item for item in alternatives.json() if item["title"] == "Жим гантелей лежа")
+    catalog = client.get("/api/v1/programs/exercises", headers=headers).json()
+    matching = next(item for item in catalog if item["id"] == replacement["exercise_id"])
+    assert replacement["aliases"] == matching["aliases"]
+    assert "dumbbell bench press" in replacement["aliases"]
     assert replacement["media_thumbnail_url"] == (
         "/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg"
     )
