@@ -67,6 +67,9 @@ test('#861 modeled TMA keyboard respects safe areas and Back restores the editor
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   await expect(dialog.getByRole('searchbox')).toBeFocused();
+  await dialog.getByRole('searchbox').fill('присд');
+  await expect(dialog.locator('.exercise-picker__option')).toHaveCount(exercises.length);
+  await expect(trigger).toContainText('Выбрать упражнение');
   await dialog.getByRole('searchbox').fill('присед');
   await setModeledVisualViewport(page, 420, 48);
   await telegram.setViewport(420, 844, false);
@@ -88,6 +91,30 @@ test('#861 modeled TMA keyboard respects safe areas and Back restores the editor
 });
 
 test.use({ hasTouch: true, serviceWorkers: 'block' });
+
+test('#1202 suggests a typo match without selecting an exercise', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await installPlatformApi(page, { browserSession: true, programHistory: 'many' });
+  await page.route('**/api/v1/programs/exercises', (route) =>
+    route.fulfill({
+      json: [
+        { ...exercises[0], id: 101, title: 'Жим гантелей лёжа', slug: 'dumbbell-press' },
+        { ...exercises[0], id: 102, title: 'Жим штанги лёжа', slug: 'barbell-press' },
+      ],
+    }),
+  );
+  await page.goto('/app?section=programs&view=manage');
+  const trigger = page.getByRole('button', { name: 'Поиск упражнения', exact: true }).first();
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
+  await dialog.getByRole('searchbox').fill('жим гантелй');
+  await expect(dialog.locator('.exercise-picker__option')).toHaveCount(1);
+  await expect(dialog.locator('.exercise-picker__option')).toContainText('Жим гантелей лёжа');
+  await expect(trigger).toContainText('Выбрать упражнение');
+  await expectNoHorizontalOverflow(page);
+  await dialog.locator('.exercise-picker__option').click();
+  await expect(trigger).toContainText('Жим гантелей лёжа');
+});
 
 for (const width of [320, 360, 390, 393, 430]) {
   for (const theme of ['dark', 'light'] as const) {
