@@ -379,6 +379,15 @@ describe('ProgramBuilder type-aware prescription', () => {
     expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
   });
 
+  it('показывает единственную настройку программы без дублирующей кнопки', async () => {
+    renderBuilder();
+    await screen.findByText('Настройки программы', { exact: true });
+    expect(screen.queryByRole('button', { name: 'Настройки и расписание' })).toBeNull();
+    const optional = screen.getByText('Дополнительно', { exact: true }).closest('details');
+    expect(optional).not.toBeNull();
+    expect(optional).not.toHaveAttribute('open');
+  });
+
   it('связывает разделы с собственными заголовками при двух открытых редакторах', async () => {
     const user = userEvent.setup();
     renderBuilder();
@@ -389,6 +398,9 @@ describe('ProgramBuilder type-aware prescription', () => {
     const settings = screen.getAllByText('Настройки программы', { exact: true });
     expect(settings).toHaveLength(2);
     for (const summary of settings) await user.click(summary);
+    const optional = screen.getAllByText('Дополнительно', { exact: true });
+    expect(optional).toHaveLength(2);
+    for (const summary of optional) await user.click(summary);
     const ids: string[] = [];
     for (const name of [
       'Основа программы',
