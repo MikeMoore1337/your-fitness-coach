@@ -54,7 +54,6 @@ function buildSearchGroups<T extends ExerciseSearchItem>(exercises: T[]): Search
       ...(record.aliases ?? []),
       ...(record.machine_variant_tags ?? []),
       ...(record.execution_variant_tags ?? []),
-      ...(record.alternatives ?? []).map((alternative) => alternative.title),
     ]);
     return {
       exercise: canonical,

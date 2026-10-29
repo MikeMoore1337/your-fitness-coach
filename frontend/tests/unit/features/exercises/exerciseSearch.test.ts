@@ -262,4 +262,13 @@ describe('Issue 1202 typo suggestions', () => {
       1, 2, 3, 4,
     ]);
   });
+
+  it('does not return an exercise just because its alternative has the searched name', () => {
+    const candidates = [
+      { ...rows[0]!, alternatives: [{ title: 'Жим штанги лёжа' }] },
+      rows[1]!,
+    ];
+    expect(rankExercisesForSearch(candidates, 'жим штанги').map((item) => item.id)).toEqual([2]);
+    expect(rankExercisesForSearch(candidates, 'жим штангй').map((item) => item.id)).toEqual([2]);
+  });
 });
