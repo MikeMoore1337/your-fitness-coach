@@ -51,6 +51,7 @@ export function ProgramDayEditor({
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedExercise, setSelectedExercise] = useState(0);
   const [allDaysOpen, setAllDaysOpen] = useState(false);
+  const [allDaysReordering, setAllDaysReordering] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [mobileView, setMobileView] = useState(
@@ -75,7 +76,7 @@ export function ProgramDayEditor({
   }, []);
   const carouselRef = useRef<HTMLDivElement>(null);
   const scrollTimerRef = useRef<number | null>(null);
-  const allDaysTriggerRef = useRef<HTMLButtonElement>(null);
+  const allDaysReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const allDaysDialogRef = useRef<HTMLDivElement>(null);
   const detailDialogRef = useRef<HTMLDivElement>(null);
   const exerciseTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -139,9 +140,16 @@ export function ProgramDayEditor({
     }, 120);
   };
 
+  const openAllDays = (trigger: HTMLButtonElement, reordering = false) => {
+    allDaysReturnFocusRef.current = trigger;
+    if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
+    setAllDaysReordering(reordering);
+    setAllDaysOpen(true);
+  };
+
   const closeAllDays = useCallback(() => {
     setAllDaysOpen(false);
-    window.requestAnimationFrame(() => allDaysTriggerRef.current?.focus());
+    window.requestAnimationFrame(() => allDaysReturnFocusRef.current?.focus());
   }, []);
   const closeDetail = useCallback(() => {
     setDetailOpen(false);
@@ -226,11 +234,17 @@ export function ProgramDayEditor({
     });
   };
 
-  const moveDay = (direction: number) => {
-    const next = dayIndex + direction;
-    if (next < 0 || next >= days.length) return;
-    setDays((current) => moveItem(current, dayIndex, next));
-    selectDay(next);
+  const moveDay = (from: number, direction: number) => {
+    const to = from + direction;
+    if (from < 0 || from >= days.length || to < 0 || to >= days.length) return;
+    if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
+    setDays((current) => moveItem(current, from, to));
+    setSelectedDay((selected) => {
+      if (selected === from) return to;
+      if (from < selected && to >= selected) return selected - 1;
+      if (from > selected && to <= selected) return selected + 1;
+      return selected;
+    });
   };
 
   const deleteDay = async () => {
@@ -494,23 +508,52 @@ export function ProgramDayEditor({
   };
 
   const dayCount = days.length;
-  const allDayButtons = days.map((item, index) => (
-    <button
-      key={index}
-      type="button"
-      className="copy-editor__day-choice"
-      data-yfc-choice="compact"
-      aria-pressed={index === dayIndex}
-      onClick={() => {
-        selectDay(index);
-        window.requestAnimationFrame(() => allDaysTriggerRef.current?.focus());
-      }}
-    >
-      <strong>День {index + 1}</strong>
-      <span>{item.title || simpleTrainingTitle(index + 1)}</span>
-      <small>{item.exercises.length} упр.</small>
-    </button>
-  ));
+  const allDayButtons = days.map((item, index) =>
+    allDaysReordering ? (
+      <div key={index} className="copy-editor__day-sort-row">
+        <div className="copy-editor__day-sort-name" aria-current={index === dayIndex ? 'true' : undefined}>
+          <strong>День {index + 1} · {item.title || simpleTrainingTitle(index + 1)}</strong>
+          <small>{item.exercises.length} упр.{index === dayIndex ? ' · выбран' : ''}</small>
+        </div>
+        <div className="copy-editor__sort-actions" role="group" aria-label={`Порядок дня ${index + 1}`}>
+          <button
+            type="button"
+            className="secondary"
+            disabled={index === 0}
+            onClick={() => moveDay(index, -1)}
+            aria-label={`Переместить день ${index + 1} раньше`}
+          >
+            Раньше
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            disabled={index === dayCount - 1}
+            onClick={() => moveDay(index, 1)}
+            aria-label={`Переместить день ${index + 1} позже`}
+          >
+            Позже
+          </button>
+        </div>
+      </div>
+    ) : (
+      <button
+        key={index}
+        type="button"
+        className="copy-editor__day-choice"
+        data-yfc-choice="compact"
+        aria-pressed={index === dayIndex}
+        onClick={() => {
+          selectDay(index);
+          window.requestAnimationFrame(() => allDaysReturnFocusRef.current?.focus());
+        }}
+      >
+        <strong>День {index + 1}</strong>
+        <span>{item.title || simpleTrainingTitle(index + 1)}</span>
+        <small>{item.exercises.length} упр.</small>
+      </button>
+    ),
+  );
 
   return (
     <>
@@ -537,6 +580,13 @@ export function ProgramDayEditor({
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            className="secondary copy-editor__manage-days"
+            onClick={(event) => openAllDays(event.currentTarget, true)}
+          >
+            Изменить порядок дней
+          </button>
           <p className="muted copy-editor__limit">В одном цикле максимум 8 тренировочных дней.</p>
         </aside>
 
@@ -547,8 +597,7 @@ export function ProgramDayEditor({
               <button
                 type="button"
                 className="secondary"
-                ref={allDaysTriggerRef}
-                onClick={() => setAllDaysOpen(true)}
+                onClick={(event) => openAllDays(event.currentTarget)}
               >
                 Все дни
               </button>
@@ -641,24 +690,6 @@ export function ProgramDayEditor({
               />
             </label>
             <div className="copy-editor__order-actions">
-              <button
-                type="button"
-                className="secondary"
-                disabled={dayIndex === 0}
-                onClick={() => moveDay(-1)}
-                aria-label="Переместить день выше"
-              >
-                <Icon name="move-up" size={20} />
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                disabled={dayIndex === dayCount - 1}
-                onClick={() => moveDay(1)}
-                aria-label="Переместить день ниже"
-              >
-                <Icon name="move-down" size={20} />
-              </button>
               {dayCount > 1 && (
                 <button
                   type="button"
@@ -803,7 +834,25 @@ export function ProgramDayEditor({
                   <Icon name="close" size={20} />
                 </button>
               </div>
-              <div className="copy-editor__day-grid">{allDayButtons}</div>
+              {dayCount > 1 && (
+                <div className="copy-editor__sheet-toolbar">
+                  {allDaysReordering && (
+                    <p className="muted">
+                      Меняйте порядок кнопками «Раньше» и «Позже». Изменения сохранятся вместе с программой.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setAllDaysReordering((current) => !current)}
+                  >
+                    {allDaysReordering ? 'Готово' : 'Изменить порядок'}
+                  </button>
+                </div>
+              )}
+              <div className={allDaysReordering ? 'copy-editor__day-sort-list' : 'copy-editor__day-grid'}>
+                {allDayButtons}
+              </div>
             </div>
           </div>,
           portalRoot,
