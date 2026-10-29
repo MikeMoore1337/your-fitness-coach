@@ -73,6 +73,8 @@ function scheduleForDays(dayCount: number, startDate: string): number[] {
   return Array.from({ length: dayCount }, (_, index) => (firstWeekday + index) % 7);
 }
 
+const CARDIO_METRIC_TYPE = 'cardio' as const;
+
 export function ProgramBuilder({
   targetTelegramId,
   targetName,
@@ -623,7 +625,7 @@ export function ProgramBuilder({
                             ...day,
                             exercises: day.exercises.map((row, index) => {
                               if (index !== exerciseIndex) return row;
-                              if (selected?.metric_type === 'cardio') {
+                              if (selected?.metric_type === CARDIO_METRIC_TYPE) {
                                 return {
                                   ...row,
                                   exercise_id: nextExerciseId,
@@ -666,7 +668,7 @@ export function ProgramBuilder({
                     </div>
                     <div className="program-exercise-row__metrics">
                       {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                        ?.metric_type === 'cardio' ? (
+                        ?.metric_type === CARDIO_METRIC_TYPE ? (
                         <label className="field">
                           <span>Плановая длительность, мин</span>
                           <input
@@ -747,7 +749,7 @@ export function ProgramBuilder({
                         <span>
                           <strong>
                             {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                              ?.metric_type === 'cardio'
+                              ?.metric_type === CARDIO_METRIC_TYPE
                               ? 'Заметка и замены'
                               : 'Заметка, суперсет и замены'}
                           </strong>
@@ -776,7 +778,7 @@ export function ProgramBuilder({
                         </label>
                         {exerciseIndex > 0 &&
                           exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                            ?.metric_type !== 'cardio' && (
+                            ?.metric_type !== CARDIO_METRIC_TYPE && (
                             <label className="checkbox-row">
                               <input
                                 type="checkbox"
@@ -832,7 +834,7 @@ export function ProgramBuilder({
                           );
                         })()}
                         {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                          ?.metric_type !== 'cardio' && (
+                          ?.metric_type !== CARDIO_METRIC_TYPE && (
                           <small className="muted">
                             Разминочные и дроп-сеты отмечаются отдельно во время тренировки.
                           </small>
