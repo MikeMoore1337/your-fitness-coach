@@ -373,8 +373,12 @@ describe('ProgramBuilder type-aware prescription', () => {
     await user.click(screen.getByRole('button', { name: 'Все дни' }));
     const chooser = screen.getByRole('dialog', { name: 'Все дни программы' });
     await user.click(within(chooser).getByRole('button', { name: 'Изменить порядок' }));
-    expect(within(chooser).getByRole('button', { name: 'Переместить день 1 раньше' })).toBeDisabled();
-    expect(within(chooser).getByRole('button', { name: 'Переместить день 3 позже' })).toBeDisabled();
+    expect(
+      within(chooser).getByRole('button', { name: 'Переместить день 1 раньше' }),
+    ).toBeDisabled();
+    expect(
+      within(chooser).getByRole('button', { name: 'Переместить день 3 позже' }),
+    ).toBeDisabled();
 
     await user.click(within(chooser).getByRole('button', { name: 'Переместить день 2 раньше' }));
     expect(titleInput).toHaveValue('Изменённая первая');
