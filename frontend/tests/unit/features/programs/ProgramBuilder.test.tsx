@@ -116,6 +116,19 @@ function renderBuilder(props: { editingTemplate?: ProgramTemplate } = {}) {
   );
 }
 
+function emulateMobileEditorViewport() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query === '(max-width: 1099px)',
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
+
 describe('ProgramBuilder type-aware prescription', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -140,7 +153,10 @@ describe('ProgramBuilder type-aware prescription', () => {
     });
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('для cardio запрашивает длительность и не отправляет силовое назначение', async () => {
     const user = userEvent.setup();
@@ -306,6 +322,7 @@ describe('ProgramBuilder type-aware prescription', () => {
   });
 
   it('даёт быстрый переход к последнему дню и не прокручивает одно-дневный цикл', async () => {
+    emulateMobileEditorViewport();
     const user = userEvent.setup();
     const editingTemplate = {
       ...activeTemplate,
@@ -329,6 +346,7 @@ describe('ProgramBuilder type-aware prescription', () => {
   });
 
   it('отключает стрелки карусели для единственного дня', async () => {
+    emulateMobileEditorViewport();
     renderBuilder({ editingTemplate: activeTemplate });
     await screen.findByRole('combobox', { name: 'Поиск упражнения' });
     expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
