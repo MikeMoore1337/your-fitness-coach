@@ -4989,7 +4989,10 @@ async function runIssue1164SpacingScenario(
     });
     expect(geometry, '#1318: the input must have a visible caption').not.toBeNull();
     expect(geometry!.outlineWidth).toBeGreaterThanOrEqual(3);
-    expect(geometry!.clearance, '#1318: focus ring must clear the caption').toBeGreaterThanOrEqual(2);
+    expect(
+      geometry!.clearance,
+      '#1318: focus ring must clear the caption',
+    ).toBeGreaterThanOrEqual(2);
   };
   const weight = secondSet.getByLabel(/Вес,/);
   await assertLabelClearOfFocusRing(weight);
