@@ -53,12 +53,14 @@ test.describe('универсальная геометрия предпросм�
             await page.route('**/api/v1/programs/templates/mine', (route) =>
               route.fulfill({ json: [template] }),
             );
-            await page.goto('/app?section=programs&view=manage');
+            await page.goto(
+              '/app?section=programs&view=manage' +
+                (template.is_active_for_current_user ? '' : '&start=templates'),
+            );
             if (surface !== 'telegram') await page.getByRole('button', { name: 'Клиент' }).click();
-            if (!template.is_active_for_current_user) await openCard(page, 'Программы и шаблоны');
             await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
             const trigger = template.is_active_for_current_user
-              ? page.getByRole('button', { name: 'Посмотреть план', exact: true })
+              ? page.getByRole('button', { name: 'Посмотреть состав', exact: true })
               : page.getByRole('button', {
                   name: `Посмотреть ${template.is_example ? 'шаблон' : 'программу'} «${template.title}»`,
                   exact: true,
@@ -2489,7 +2491,11 @@ test('training preferences сохраняют Mobile Web/TMA композици�
     await expect(planManagementLink).toBeVisible();
     await planManagementLink.click();
     await expect(page).toHaveURL('/app?section=programs&view=manage');
-    await page.getByRole('button', { name: 'Подобрать другую' }).click();
+    await page
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Заменить программу/ })
+      .click();
+    await page.getByRole('button', { name: 'Подбор по параметрам' }).click();
     const wizard = page.getByRole('dialog', { name: 'Цель' });
     await expect(wizard).toBeVisible();
     await expect(wizard.getByText(/подставили достоверные ответы из профиля/i)).toBeVisible();
@@ -2960,11 +2966,19 @@ test('поля адаптируются к разным iPhone, а пример 
   await planManagementLink.click();
   await expect(page).toHaveURL('/app?section=programs&view=manage');
   await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Назначение и изменения/ })
+    .click();
   await page.getByText('Все этапы и изменения', { exact: true }).click();
   await expect(page.getByText('Тренировочные блоки ещё не настроены')).toBeVisible();
   await expect(page.getByText('Программа назначена')).toBeVisible();
   await page.getByText('Все этапы и изменения', { exact: true }).click();
-  await openCard(page, 'Программы и шаблоны');
+  await page.getByRole('button', { name: 'К центру управления' }).click();
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Программы и шаблоны/ })
+    .click();
   const example = page.getByRole('button', {
     name: 'Посмотреть шаблон «Программа на всё тело — 3 дня»',
   });
@@ -3148,7 +3162,7 @@ test('поля адаптируются к разным iPhone, а пример 
   await page.locator('.program-example-modal__close').click();
   await expect(previewDialog).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Посмотреть план' }).click();
+  await page.getByRole('button', { name: 'Посмотреть состав' }).click();
   await expect(previewDialog).toBeVisible();
   await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
   await expect(
@@ -3385,6 +3399,10 @@ test('детерминированный подбор проходит preview, 
   await planManagementLink.click();
   await expect(page).toHaveURL('/app?section=programs&view=manage');
 
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Заменить программу/ })
+    .click();
   const launcher = page.getByRole('button', { name: 'Подобрать программу' });
   await launcher.click();
   const wizard = page.getByRole('dialog', { name: 'Цель' });
@@ -3507,7 +3525,7 @@ test('клиент собирает и переупорядочивает лич
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'План');
-  await page.goto('/app?section=programs&view=manage');
+  await page.goto('/app?section=programs&view=manage&start=create');
 
   const builder = page.locator('#program-builder');
   await expect(builder.getByRole('heading', { name: 'Создать свою программу' })).toBeVisible();

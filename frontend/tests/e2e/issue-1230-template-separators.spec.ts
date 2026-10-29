@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { installPlatformApi } from './fixtures/platform-api';
 import { previewTemplates } from './fixtures/program-preview';
 
@@ -45,19 +44,23 @@ test.describe('Issue #1230: ready-template separators', () => {
         route.fulfill({ json: [] }),
       );
 
-      await page.goto('/app?section=programs&view=manage');
+      await page.goto('/app?section=programs&view=manage&start=templates');
       await page.getByRole('button', { name: 'Клиент', exact: true }).click();
-      const library = await openCard(page, 'Программы и шаблоны');
+      const library = page.locator('#program-library');
       const group = library.locator('.program-library__group').filter({
         has: page.getByRole('heading', { name: 'Готовые шаблоны', exact: true }),
       });
       const grid = group.locator('.program-template-grid');
       const cards = grid.locator('.program-template-card');
-      const summary = library.locator(':scope > summary');
       const toggleLibrary = async () => {
-        await summary.scrollIntoViewIfNeeded();
-        await expect(summary).toBeInViewport();
-        await summary.click();
+        if (await library.isVisible()) {
+          await page.getByRole('button', { name: 'К центру управления' }).click();
+        } else {
+          await page
+            .getByRole('navigation', { name: 'Управление программой' })
+            .getByRole('button', { name: /Программы и шаблоны/ })
+            .click();
+        }
       };
       await expect(cards).toHaveCount(count);
       const card = cards.first();
@@ -178,13 +181,17 @@ test.describe('Issue #1230: ready-template separators', () => {
                 .toBe(true);
             }
             await toggleLibrary();
-            await expect(library).not.toHaveAttribute('open');
+            await expect(library).toBeHidden();
             await expect(grid).toBeHidden();
-            await expect(summary).toBeInViewport();
+            await expect(
+              page.getByRole('heading', { name: 'Программы и шаблоны', level: 1 }),
+            ).toBeVisible();
             await toggleLibrary();
-            await expect(library).toHaveAttribute('open', '');
+            await expect(library).toBeVisible();
             await expect(cards).toHaveCount(count);
-            await expect(summary).toBeInViewport();
+            await expect(
+              page.getByRole('heading', { name: 'Программы и шаблоны', level: 1 }),
+            ).toBeVisible();
           }
           if (evidenceDir && count === 16 && (width === 393 || width === 1440)) {
             const directory = path.join(evidenceDir, testInfo.project.name);

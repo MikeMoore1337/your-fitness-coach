@@ -465,6 +465,14 @@ export function TemplatesList({
         (item.is_example || (item.owner_user_id !== user?.id && !item.can_edit)),
     ) ?? [];
 
+  useEffect(() => {
+    if (mode !== 'full' || !defaultLibraryOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('program-manage-heading')?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [defaultLibraryOpen, mode]);
+
   const isManage = mode === 'full';
   const isSummary = mode === 'summary';
   const showingOverview = panel === 'overview';

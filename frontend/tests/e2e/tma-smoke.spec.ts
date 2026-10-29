@@ -563,8 +563,8 @@ test('program history keeps current block, readable revisions and workout return
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs&view=manage'),
-    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage&panel=operations'),
+    mobilePage.goto('/app?section=programs&view=manage&panel=operations'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -670,8 +670,8 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
   });
   await installPlatformApi(tmaPage, { programHistory: 'many', aiAdaptation: 'available' });
   await Promise.all([
-    mobilePage.goto('/app?section=programs&view=manage'),
-    tmaPage.goto('/app?section=programs&view=manage'),
+    mobilePage.goto('/app?section=programs&view=manage&panel=operations'),
+    tmaPage.goto('/app?section=programs&view=manage&panel=operations'),
   ]);
   await tma.setTheme('dark');
 
@@ -777,7 +777,7 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
     programHistory: 'many',
     aiAdaptation: 'available',
   });
-  await desktopReviewPage.goto('/app?section=programs&view=manage');
+  await desktopReviewPage.goto('/app?section=programs&view=manage&panel=operations');
   const desktopReview = desktopReviewPage.getByTestId('ai-adaptation');
   await desktopReview.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
   const desktopGenerate = desktopReviewPage.waitForRequest(
@@ -808,7 +808,7 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
     }
   });
   await installPlatformApi(desktop, { browserSession: true, programHistory: 'many' });
-  await desktop.goto('/app?section=programs&view=manage');
+  await desktop.goto('/app?section=programs&view=manage&panel=operations');
   const desktopAdaptation = desktop.getByTestId('ai-adaptation');
   await expect(desktopAdaptation).toHaveCount(0);
   await expect(desktop.getByText('Текущий тренировочный блок')).toBeVisible();
@@ -826,7 +826,7 @@ test('program history renders empty, one-block and full lifecycle states honestl
   for (const state of ['empty', 'one', 'many'] as const) {
     const page = await browser.newPage({ viewport: MOBILE_CONTEXTS.baseline });
     await installPlatformApi(page, { browserSession: true, programHistory: state });
-    await page.goto('/app?section=programs&view=manage');
+    await page.goto('/app?section=programs&view=manage&panel=operations');
     const history = page.locator('.program-history');
 
     if (state === 'empty') {
@@ -866,8 +866,8 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs&view=manage'),
-    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage&start=create'),
+    mobilePage.goto('/app?section=programs&view=manage&start=create'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -997,9 +997,8 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       browserSession: !current.telegram,
       programHistory: 'many',
     });
-    await page.goto('/app?section=programs&view=manage');
-    const program = page.locator('.program-active');
-    const history = program.locator('.program-history');
+    await page.goto('/app?section=programs&view=manage&panel=operations');
+    const history = page.locator('.program-manage-destination .program-history');
     await expect(history.getByText('Текущий тренировочный блок')).toBeVisible();
     await waitForVisualStability(page);
     if (current.screenshot) {

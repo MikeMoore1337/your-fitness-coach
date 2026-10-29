@@ -361,8 +361,8 @@ test('approved B mobile picker preserves editor draft and supports keyboard sear
     programHistory: 'many',
     longExerciseName: true,
   });
-  await page.goto('/app?section=programs&view=manage&start=templates');
-  await expect(page.locator('.program-current-block h4')).toBeVisible();
+  await page.goto('/app?section=programs&view=manage');
+  await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
   await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
   const editor = page.locator('.program-editor-modal');
   const title = editor.getByLabel('Название', { exact: true });

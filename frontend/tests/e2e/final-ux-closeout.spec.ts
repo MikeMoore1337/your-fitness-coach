@@ -45,19 +45,19 @@ const SURFACES: Surface[] = [
     path: '/app?section=programs&view=manage&start=templates',
     root: '#appContent',
     heading: 'Программы и шаблоны',
-    proof: '.program-current-block',
-    state: 'Populated template library and revision history',
+    proof: '#program-library',
+    state: 'Focused template library; program history available in another destination',
   },
   {
     name: 'program-editor',
-    path: '/app?section=programs&view=manage&start=templates',
+    path: '/app?section=programs&view=manage',
     root: '[role="dialog"]',
     heading: /Редактирование программы|Редактировать программу|Редактирование шаблона/,
     proof: 'input',
     state:
       'Existing template with one empty workout and zero exercises; save disabled, no persistence assertion',
     prepare: async (page) => {
-      await expect(page.locator('.program-current-block h4')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
       await settle(page);
       await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
