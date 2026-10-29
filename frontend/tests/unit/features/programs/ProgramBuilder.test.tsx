@@ -375,8 +375,8 @@ describe('ProgramBuilder type-aware prescription', () => {
     emulateMobileEditorViewport();
     renderBuilder({ editingTemplate: activeTemplate });
     await screen.findByRole('button', { name: 'Предыдущий день' });
-    expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
   });
 
   it('показывает единственную настройку программы без дублирующей кнопки', async () => {
@@ -405,7 +405,7 @@ describe('ProgramBuilder type-aware prescription', () => {
     await user.click(screen.getByText('Настройки программы', { exact: true }));
     expect(screen.getByRole('combobox', { name: 'Цель' })).toHaveValue('muscle_gain');
     expect(screen.getByRole('spinbutton', { name: 'Длительность, недель' })).toHaveValue(3);
-    await user.keyboard.press('Escape');
+    await user.keyboard('{Escape}');
     expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue('Мой черновик');
   });
 
@@ -506,7 +506,7 @@ const activeTemplate = {
   assigned_program_schedule_weekdays: [1],
   current_revision_number: 4,
   assigned_program_updated: false,
-  future_workouts_updated: 0,
+  future_workouts_updated: 2,
   assigned_program_revision_number: null,
   default_duration_weeks: 1,
   provenance_type: 'CUSTOM',
