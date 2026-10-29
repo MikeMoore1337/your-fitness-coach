@@ -289,7 +289,10 @@ export function ProgramDayEditor({
             exercises={exercises}
             value={activeRow.exercise_id}
             clearValue={0}
-            onOpenGuide={onOpenGuide}
+            onOpenGuide={(exercise) => {
+              const known = available(exercise.id);
+              if (known) onOpenGuide(known);
+            }}
             onChange={(id) => selectExerciseId(exerciseIndex, typeof id === 'number' ? id : 0)}
           />
         </div>
@@ -389,7 +392,7 @@ export function ProgramDayEditor({
                 }));
                 setSelectedExercise(exerciseIndex - 1);
               }}>
-              <Icon name="move-up" size={18} /> Выше
+              <Icon name="move-up" size={20} /> Выше
             </button>
             <button type="button" className="secondary" disabled={exerciseIndex === day.exercises.length - 1}
               onClick={() => {
@@ -398,7 +401,7 @@ export function ProgramDayEditor({
                 }));
                 setSelectedExercise(exerciseIndex + 1);
               }}>
-              <Icon name="move-down" size={18} /> Ниже
+              <Icon name="move-down" size={20} /> Ниже
             </button>
           </div>
         )}
@@ -501,11 +504,11 @@ export function ProgramDayEditor({
             <div className="copy-editor__order-actions">
               <button type="button" className="secondary" disabled={dayIndex === 0}
                 onClick={() => moveDay(-1)} aria-label="Переместить день выше">
-                <Icon name="move-up" size={18} />
+                <Icon name="move-up" size={20} />
               </button>
               <button type="button" className="secondary" disabled={dayIndex === dayCount - 1}
                 onClick={() => moveDay(1)} aria-label="Переместить день ниже">
-                <Icon name="move-down" size={18} />
+                <Icon name="move-down" size={20} />
               </button>
               {dayCount > 1 && (
                 <button type="button" className="text-button copy-editor__danger"
@@ -566,7 +569,7 @@ export function ProgramDayEditor({
                 exerciseTriggerRef.current = null;
                 setDetailOpen(mobileView);
               }}>
-              <Icon name="plus" size={18} /> Добавить упражнение
+              <Icon name="plus" size={20} /> Добавить упражнение
             </button>
           ) : <p className="muted">В одной тренировке максимум 20 упражнений.</p>}
 
@@ -581,7 +584,7 @@ export function ProgramDayEditor({
                   setSelectedDay(dayCount);
                   setSelectedExercise(0);
                 }}>
-                <Icon name="plus" size={18} /> Добавить день
+                <Icon name="plus" size={20} /> Добавить день
               </button>
             ) : <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>}
           </div>
