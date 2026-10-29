@@ -34,6 +34,7 @@ test.describe('Issue #1230: ready-template separators', () => {
     test(`${count} ready templates keep the card surface and actions`, async ({
       page,
     }, testInfo) => {
+      if (count === 16) test.slow(); // Eight mobile theme/viewport cases exercise every final-card action.
       const evidenceDir = process.env.TEMPLATE_SEPARATORS_EVIDENCE_DIR;
       const snapshots: unknown[] = [];
       await installPlatformApi(page, { activeProgram: false });
@@ -52,6 +53,12 @@ test.describe('Issue #1230: ready-template separators', () => {
       });
       const grid = group.locator('.program-template-grid');
       const cards = grid.locator('.program-template-card');
+      const summary = library.locator(':scope > summary');
+      const toggleLibrary = async () => {
+        await summary.scrollIntoViewIfNeeded();
+        await expect(summary).toBeInViewport();
+        await summary.click();
+      };
       await expect(cards).toHaveCount(count);
       const card = cards.first();
       await expect(card.getByRole('button', { name: 'Настроить копию' })).toBeVisible();
@@ -69,9 +76,9 @@ test.describe('Issue #1230: ready-template separators', () => {
         ]);
       }
 
-      await library.locator(':scope > summary').click();
+      await toggleLibrary();
       await expect(grid).toBeHidden();
-      await library.locator(':scope > summary').click();
+      await toggleLibrary();
       await expect(grid).toBeVisible();
 
       for (const theme of THEMES) {
@@ -152,6 +159,33 @@ test.describe('Issue #1230: ready-template separators', () => {
             expect(card.paddingRight).not.toBe('0px');
           }
           expect(snapshot.overflow).toBe(0);
+          if (count === 16 && width <= 430) {
+            await expect(cards.last().getByRole('button')).toHaveCount(4);
+            for (const button of await cards.last().getByRole('button').all()) {
+              await button.click({ trial: true });
+              await expect(button).toBeInViewport({ ratio: 1 });
+              await expect
+                .poll(() =>
+                  button.evaluate((element) => {
+                    const box = element.getBoundingClientRect();
+                    const hit = document.elementFromPoint(
+                      box.left + box.width / 2,
+                      box.top + box.height / 2,
+                    );
+                    return hit !== null && element.contains(hit);
+                  }),
+                )
+                .toBe(true);
+            }
+            await toggleLibrary();
+            await expect(library).not.toHaveAttribute('open');
+            await expect(grid).toBeHidden();
+            await expect(summary).toBeInViewport();
+            await toggleLibrary();
+            await expect(library).toHaveAttribute('open', '');
+            await expect(cards).toHaveCount(count);
+            await expect(summary).toBeInViewport();
+          }
           if (evidenceDir && count === 16 && (width === 393 || width === 1440)) {
             const directory = path.join(evidenceDir, testInfo.project.name);
             mkdirSync(directory, { recursive: true });
