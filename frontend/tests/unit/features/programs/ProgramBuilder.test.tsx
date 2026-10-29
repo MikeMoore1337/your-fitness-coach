@@ -350,6 +350,80 @@ describe('ProgramBuilder type-aware prescription', () => {
     expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 7');
   });
 
+  it('сортирует дни внутри «Все дни» без смены выбранной тренировки и сохраняет новый порядок', async () => {
+    emulateMobileEditorViewport();
+    const user = userEvent.setup();
+    const editingTemplate = {
+      ...activeTemplate,
+      days: [1, 2, 3].map((number) => ({
+        ...activeTemplate.days[0],
+        id: 90 + number,
+        day_number: number,
+        title: 'Тренировка ' + number,
+        exercises: activeTemplate.days[0]!.exercises.map((exercise) => ({ ...exercise })),
+      })),
+    } as ProgramTemplate;
+    renderBuilder({ editingTemplate });
+    const titleInput = await screen.findByRole('textbox', { name: 'Название дня' });
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Изменённая первая');
+    expect(screen.queryByRole('button', { name: 'Переместить день выше' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Переместить день ниже' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Все дни' }));
+    const chooser = screen.getByRole('dialog', { name: 'Все дни программы' });
+    await user.click(within(chooser).getByRole('button', { name: 'Изменить порядок' }));
+    expect(within(chooser).getByRole('button', { name: 'Переместить день 1 раньше' })).toBeDisabled();
+    expect(within(chooser).getByRole('button', { name: 'Переместить день 3 позже' })).toBeDisabled();
+
+    await user.click(within(chooser).getByRole('button', { name: 'Переместить день 2 раньше' }));
+    expect(titleInput).toHaveValue('Изменённая первая');
+    expect(screen.getAllByText('День 2 из 3').length).toBeGreaterThan(0);
+    await user.click(within(chooser).getByRole('button', { name: 'Готово' }));
+    await user.click(within(chooser).getByRole('button', { name: /День 1/ }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 2');
+
+    await user.click(screen.getByRole('button', { name: 'Сохранить программу' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/programs/templates/9',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            days: [
+              expect.objectContaining({ title: 'Тренировка 2' }),
+              expect.objectContaining({ title: 'Изменённая первая' }),
+              expect.objectContaining({ title: 'Тренировка 3' }),
+            ],
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('на desktop открывает сортировку из списка дней и возвращает фокус по Escape', async () => {
+    const user = userEvent.setup();
+    const editingTemplate = {
+      ...activeTemplate,
+      days: [1, 2].map((number) => ({
+        ...activeTemplate.days[0],
+        id: 90 + number,
+        day_number: number,
+        title: 'Тренировка ' + number,
+        exercises: activeTemplate.days[0]!.exercises.map((exercise) => ({ ...exercise })),
+      })),
+    } as ProgramTemplate;
+    renderBuilder({ editingTemplate });
+    const trigger = await screen.findByRole('button', { name: 'Изменить порядок дней' });
+    await user.click(trigger);
+    const chooser = screen.getByRole('dialog', { name: 'Все дни программы' });
+    expect(within(chooser).getByRole('button', { name: 'Готово' })).toBeInTheDocument();
+    await user.click(within(chooser).getByRole('button', { name: 'Переместить день 1 позже' }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 1');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole('dialog', { name: 'Все дни программы' })).not.toBeInTheDocument();
+  });
+
   it('отключает стрелки карусели для единственного дня', async () => {
     emulateMobileEditorViewport();
     renderBuilder({ editingTemplate: activeTemplate });
