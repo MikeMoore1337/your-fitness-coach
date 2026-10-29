@@ -264,7 +264,7 @@ export function ProgramDayEditor({
           </div>
           {mobile && (
             <button type="button" className="secondary copy-editor__icon" onClick={closeDetail} aria-label="Закрыть параметры">
-              <Icon name="x" size={20} />
+              <Icon name="close" size={20} />
             </button>
           )}
         </div>
@@ -389,7 +389,7 @@ export function ProgramDayEditor({
           </div>
         )}
         <button type="button" className="text-button copy-editor__danger" onClick={() => void deleteRow(exerciseIndex)}>
-          <Icon name="trash-2" size={16} /> Удалить упражнение
+          <Icon name="trash" size={16} /> Удалить упражнение
         </button>
       </div>
     );
@@ -587,7 +587,7 @@ export function ProgramDayEditor({
               <h3>Все дни программы</h3>
               <button type="button" className="secondary copy-editor__icon"
                 onClick={closeAllDays} aria-label="Закрыть список дней">
-                <Icon name="x" size={20} />
+                <Icon name="close" size={20} />
               </button>
             </div>
             <div className="copy-editor__day-grid">{allDayButtons}</div>
