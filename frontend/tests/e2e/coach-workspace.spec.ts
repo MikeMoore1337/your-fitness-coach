@@ -2611,7 +2611,7 @@ test('mobile использует список и отдельный конте�
 
   await page.locator('#coach-client-program > summary').click();
   await page.getByText('Назначить новую программу').click();
-  await expect(page.getByRole('heading', { name: 'Добавьте упражнения' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Тренировочные дни' })).toBeVisible();
   const editor = page.locator('.copy-editor');
   await expect(editor).toBeVisible();
   const dayInput = editor.getByRole('textbox', { name: 'Название дня' });
