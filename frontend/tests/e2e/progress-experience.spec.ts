@@ -4214,13 +4214,13 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
   );
 });
 
-for (const width of [320, 390, 430]) {
+for (const width of [320, 390, 430, 1440]) {
   for (const theme of ['dark', 'light'] as const) {
     test(`#835 month calendar selects days and resets years at ${width}px ${theme}`, async ({
       page,
       browserName,
     }) => {
-      await page.setViewportSize({ width, height: 844 });
+      await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
       await mockProgress(page);
@@ -4240,10 +4240,13 @@ for (const width of [320, 390, 430]) {
         if (!process.env.CAPTURE_835_FINAL) return;
         const dir = resolve(process.env.CAPTURE_835_FINAL);
         await mkdir(dir, { recursive: true });
-        await calendar.screenshot({
-          path: resolve(dir, `${browserName}-${theme}-${width}-${state}.png`),
-          animations: 'disabled',
-        });
+        const path = resolve(dir, `${browserName}-${theme}-${width}-${state}.png`);
+        if (state === 'table') {
+          await calendar.getByRole('table').scrollIntoViewIfNeeded();
+          await page.screenshot({ path, animations: 'disabled' });
+        } else {
+          await calendar.screenshot({ path, animations: 'disabled' });
+        }
       };
       await capture('overview');
       const january = calendar.getByRole('button', { name: 'январь', exact: true });
@@ -4280,6 +4283,7 @@ for (const width of [320, 390, 430]) {
       await page.keyboard.press('Escape');
       await calendar.getByText('Данные по дням', { exact: true }).click();
       await expect(calendar.getByRole('table')).toBeVisible();
+      await capture('table');
       await expectNoHorizontalOverflow(page);
     });
   }
