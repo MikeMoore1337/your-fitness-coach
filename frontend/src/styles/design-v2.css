@@ -2740,6 +2740,11 @@ body:has(.app-shell--design-v2) {
   font-variant-numeric: tabular-nums;
 }
 
+/* #1318: draw the focus ring inside the input without moving the label or keyboard viewport. */
+.active-workout--design-v2 .is-current .active-workout-input input:focus-visible {
+  outline-offset: -4px;
+}
+
 .active-workout--design-v2 .active-workout-set__done {
   border-radius: var(--v2-control-radius);
 }
