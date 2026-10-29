@@ -514,11 +514,7 @@ export function ProgramDayEditor({
 
   return (
     <>
-      <section
-        ref={captureRoot}
-        className="copy-editor"
-        aria-label="Дни и упражнения программы"
-      >
+      <section ref={captureRoot} className="copy-editor" aria-label="Дни и упражнения программы">
         <aside className="copy-editor__rail" aria-label="Список тренировочных дней">
           <div className="copy-editor__section-head">
             <h3>Дни программы</h3>
