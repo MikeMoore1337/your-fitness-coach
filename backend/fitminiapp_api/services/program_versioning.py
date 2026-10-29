@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date, timedelta
 
 from sqlalchemy import and_, or_
@@ -351,20 +352,56 @@ def materialize_next_cycle_window(
     if not cycle or cycle["length_weeks"] != 1 or not cycle["repeat"]:
         return 0
     rows = db.query(UserWorkout).filter_by(user_program_id=program.id).all()
-    last_week = max((row.week_number for row in rows), default=0)
+    existing_weeks = {row.week_number for row in rows}
     pending = any(row.status not in {"completed", "skipped", "cancelled"} for row in rows)
-    if pending:
-        if through_date is None:
-            return 0
-        target_week = max(1, (through_date - program.start_date).days // 7 + 1) + 3
-        if target_week <= last_week:
-            return 0
+    if through_date is not None:
+        first_week = max(1, (through_date - program.start_date).days // 7 + 1)
+    elif pending:
+        return 0
     else:
-        target_week = last_week + 4
+        first_week = next(
+            (week for week in range(1, program.duration_weeks + 1) if week not in existing_weeks),
+            program.duration_weeks + 1,
+        )
     source = [row for row in snapshot["workouts"] if row["week_number"] == 1]
+    overrides = [
+        row.changed_fields["occurrence_override"]
+        for row in db.query(ProgramRevision)
+        .filter_by(user_program_id=program.id)
+        .order_by(ProgramRevision.revision_number)
+        .all()
+        if "occurrence_override" in row.changed_fields
+    ]
     created = 0
-    for week in range(last_week + 1, min(last_week + 4, target_week, program.duration_weeks) + 1):
-        for source_workout in source:
+    for week in range(first_week, min(first_week + 3, program.duration_weeks) + 1):
+        if week in existing_weeks:
+            continue
+        for original in source:
+            source_workout = deepcopy(original)
+            for override in overrides:
+                if (
+                    week not in override["weeks"]
+                    or source_workout["day_number"] != override["day_number"]
+                ):
+                    continue
+                for item in source_workout["exercises"]:
+                    if (
+                        item.get("source_template_exercise_id")
+                        == override["source_template_exercise_id"]
+                    ):
+                        item.update(override["exercise"])
+                        item["sets"] = [
+                            {
+                                "set_number": index,
+                                "set_kind": "working",
+                                "planned_role": segment["role"],
+                                "planned_position": segment["position"],
+                                "planned_group_id": segment.get("group_id"),
+                                "planned_group_kind": None,
+                                "planned_round": segment.get("round_number"),
+                            }
+                            for index, segment in enumerate(item["prescription"]["segments"], 1)
+                        ]
             workout = UserWorkout(
                 user_program_id=program.id,
                 scheduled_date=date.fromisoformat(source_workout["scheduled_date"])
@@ -1666,6 +1703,90 @@ def upsert_future_program_exercise(
     )
     if exercise_metric_type(exercise) == "strength" and projection.rest_seconds < 15:
         raise ProgramError("Strength rest must be at least 15 seconds")
+
+    if payload.occurrence_weeks is not None:
+        weeks = sorted(set(payload.occurrence_weeks))
+        if payload.effective_scope != "future_program" or payload.effective_date is not None:
+            raise ProgramError("Explicit weeks require future-program scope without a date")
+        if any(
+            type(week) is not int or week < 1 or week > program.duration_weeks for week in weeks
+        ):
+            raise ProgramError("Invalid occurrence week")
+        if payload.target_template_exercise_id is None or payload.day_number is None:
+            raise ProgramError("Explicit weeks require a program day and source exercise")
+        source_revision = (
+            db.query(ProgramRevision)
+            .filter(
+                ProgramRevision.user_program_id == program.id,
+                ProgramRevision.change_kind.in_(["assigned", "program_restarted"]),
+            )
+            .order_by(ProgramRevision.revision_number)
+            .first()
+        )
+        cycle = (
+            (source_revision.snapshot["program"].get("program_metadata") or {}).get("week_cycle")
+            if source_revision
+            else None
+        )
+        if not cycle:
+            raise ProgramError("Explicit occurrence edits require an assigned cycle")
+        candidates = [
+            item
+            for row in source_revision.snapshot["workouts"]
+            if row["day_number"] == payload.day_number
+            for item in row["exercises"]
+            if item.get("source_template_exercise_id") == payload.target_template_exercise_id
+        ]
+        if not candidates:
+            raise ProgramError("Unknown source exercise")
+        if any(
+            payload.model_dump()[key] is not None
+            for key in ("group_id", "group_kind", "group_order", "superset_group", "superset_order")
+        ):
+            raise ProgramError("Occurrence edits cannot change exercise groups")
+        if any(
+            program.start_date + timedelta(weeks=week - 1) < today_for_user(target_user)
+            for week in weeks
+        ):
+            raise ProgramError("Occurrence edits must target future weeks")
+        existing = (
+            db.query(UserWorkout)
+            .filter(
+                UserWorkout.user_program_id == program.id,
+                UserWorkout.week_number.in_(weeks),
+                UserWorkout.day_number == payload.day_number,
+            )
+            .all()
+        )
+        if existing:
+            raise ProgramError(
+                "Editing materialized occurrences requires the existing planned-workout contract"
+            )
+        override = {
+            "weeks": weeks,
+            "day_number": payload.day_number,
+            "source_template_exercise_id": payload.target_template_exercise_id,
+            "exercise": {
+                "exercise_id": payload.exercise_id,
+                "metric_type": exercise_metric_type(exercise),
+                "prescribed_sets": projection.prescribed_sets,
+                "prescribed_reps": projection.prescribed_reps,
+                "prescribed_duration_minutes": projection.prescribed_duration_minutes,
+                "rest_seconds": projection.rest_seconds,
+                "notes": payload.notes,
+                "prescription": plan.model_dump(mode="json"),
+            },
+        }
+        revision = record_program_revision(
+            db,
+            program,
+            actor=actor,
+            change_kind="plan_updated",
+            reason=payload.reason,
+            changed_fields={"occurrence_override": override},
+        )
+        db.commit()
+        return 0, revision.revision_number
 
     today = today_for_user(target_user)
     planned_workouts_query = (

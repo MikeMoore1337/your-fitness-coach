@@ -8718,6 +8718,8 @@ export interface components {
              * @enum {string}
              */
             effective_scope: "next_workout" | "current_block" | "future_program";
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
             /** Effective Date */
             effective_date?: string | null;
             /** Exercise Id */

@@ -905,6 +905,7 @@ class TrainingBlockMutationResponse(BaseModel):
 class CoachProgramExerciseCreate(BaseModel):
     expected_revision_number: int = Field(ge=0)
     effective_scope: Literal["next_workout", "current_block", "future_program"]
+    occurrence_weeks: list[int] | None = Field(default=None, min_length=1, max_length=100)
     effective_date: date | None = None
     exercise_id: int = Field(ge=1)
     day_number: int | None = Field(default=None, ge=1, le=14)

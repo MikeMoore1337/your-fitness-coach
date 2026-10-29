@@ -301,7 +301,10 @@ def test_one_week_cycle_execution_and_rolling_snapshot(client):
 
 
 @pytest.mark.parametrize("restart", [False, True])
-def test_cycle_retains_future_window_with_unfinished_workout(client, monkeypatch, restart):
+@pytest.mark.parametrize("weeks_absent", [4, 8])
+def test_cycle_retains_future_window_with_unfinished_workout(
+    client, monkeypatch, restart, weeks_absent
+):
     from datetime import timedelta
 
     from fitminiapp_api.api.v1 import workouts as routes
@@ -337,13 +340,17 @@ def test_cycle_retains_future_window_with_unfinished_workout(client, monkeypatch
         original = (
             db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=1).one().id
         )
-    monkeypatch.setattr(routes, "recovery_today_for_user", lambda _user: start + timedelta(weeks=4))
+    monkeypatch.setattr(
+        routes, "recovery_today_for_user", lambda _user: start + timedelta(weeks=weeks_absent)
+    )
     for _ in range(2):
         response = client.get("/api/v1/workouts/today", headers=headers)
         assert response.status_code == 200, response.text
     with get_session_context() as db:
         rows = db.query(UserWorkout).filter_by(user_program_id=program_id).all()
-        assert sorted(row.week_number for row in rows) == list(range(1, 9))
+        assert sorted(row.week_number for row in rows) == list(range(1, 5)) + list(
+            range(weeks_absent + 1, weeks_absent + 5)
+        )
         assert db.get(UserWorkout, original).status == "planned"
         assert all(
             not item.is_completed and item.actual_weight is None
@@ -351,3 +358,58 @@ def test_cycle_retains_future_window_with_unfinished_workout(client, monkeypatch
             for exercise in row.exercises
             for item in exercise.sets
         )
+
+
+def test_future_week_ten_override_is_materialized(client):
+    from datetime import timedelta
+
+    from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
+
+    headers = _auth(client, 916109)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 1, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    assigned = client.post(
+        f"/api/v1/programs/templates/{created.json()['template']['id']}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        source = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=1).one()
+        exercise_id = source.exercises[0].exercise_id
+        slot = source.exercises[0].source_template_exercise_id
+        version = program.current_revision_number
+    edited = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": version,
+            "effective_scope": "future_program",
+            "occurrence_weeks": [10],
+            "day_number": 1,
+            "target_template_exercise_id": slot,
+            "exercise_id": exercise_id,
+            "prescribed_sets": 3,
+            "prescribed_reps": "12",
+            "rest_seconds": 90,
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        for _ in range(2):
+            materialize_next_cycle_window(
+                db, program, through_date=program.start_date + timedelta(weeks=8)
+            )
+        rows = {
+            row.week_number: row
+            for row in db.query(UserWorkout).filter_by(user_program_id=program_id).all()
+        }
+        assert rows[10].exercises[0].prescribed_sets == 3
+        assert rows[10].exercises[0].prescribed_reps == "12"
+        assert len(rows[10].exercises[0].sets) == 3
+        assert rows[9].exercises[0].prescribed_sets == 2
+        assert rows[1].exercises[0].prescribed_sets == 2
