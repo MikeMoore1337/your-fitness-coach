@@ -58,7 +58,7 @@
   min-height: 72px;
 }
 .copy-editor__rail-button[aria-selected='true'],
-.copy-editor__day-choice[aria-selected='true'] {
+.copy-editor__day-choice[aria-pressed='true'] {
   border-color: var(--v2-accent, var(--accent, #d0ff58));
 }
 .copy-editor__rail-button strong,
@@ -123,7 +123,7 @@
   padding: 12px;
   text-align: left;
 }
-.copy-editor__exercise[aria-selected='true'] {
+.copy-editor__exercise[aria-pressed='true'] {
   border-color: var(--v2-accent, var(--accent, #d0ff58));
 }
 .copy-editor__ordinal {
