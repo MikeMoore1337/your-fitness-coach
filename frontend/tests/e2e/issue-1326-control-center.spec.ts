@@ -45,6 +45,22 @@ for (const viewport of [
   }
 }
 
+test('#1326 preserves a program-builder draft while returning through the overview', async ({
+  page,
+}) => {
+  await installPlatformApi(page, { browserSession: true, programHistory: 'many' });
+  await page.goto('/app?section=programs&view=manage&start=create');
+  const title = page.locator('#program-builder').getByLabel('Название', { exact: true });
+  await expect(title).toBeVisible();
+  await title.fill('Черновик без потери');
+  await page.getByRole('button', { name: 'К центру управления' }).click();
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Создать или импортировать/ })
+    .click();
+  await expect(title).toHaveValue('Черновик без потери');
+});
+
 test('#1326 legacy deep links still open focused destinations', async ({ page }) => {
   await installPlatformApi(page, { browserSession: true, programHistory: 'many' });
   await page.goto('/app?section=programs&view=manage&start=templates');

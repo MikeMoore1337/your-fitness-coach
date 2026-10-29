@@ -425,16 +425,37 @@ async function exerciseDisclosures(page: Page, root: Locator, label: string) {
   await settle(page);
   const touchControls = [];
   if (label.startsWith('program-management-')) {
-    for (const name of ['Скачать XLSX-шаблон', 'Скачать CSV-шаблон', 'Удалить программу']) {
+    // #1326: import and destructive actions now live in separate focused destinations.
+    await page.getByRole('button', { name: 'К центру управления' }).click();
+    const deleteControl = root.getByRole('button', { name: 'Удалить программу', exact: true });
+    await expect(deleteControl).toBeVisible();
+    const deleteBox = await deleteControl.boundingBox();
+    expect(deleteBox).not.toBeNull();
+    expect(deleteBox!.width).toBeGreaterThanOrEqual(44);
+    expect(deleteBox!.height).toBeGreaterThanOrEqual(44);
+    touchControls.push({
+      name: 'Удалить программу',
+      width: deleteBox!.width,
+      height: deleteBox!.height,
+    });
+    await root
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Создать или импортировать/ })
+      .click();
+    for (const name of ['Скачать XLSX-шаблон', 'Скачать CSV-шаблон']) {
       const control = root.getByRole('button', { name, exact: true });
-      await expect(control).toHaveCount(1);
       await expect(control).toBeVisible();
       const box = await control.boundingBox();
-      expect(box, `${label}: ${name} geometry`).not.toBeNull();
-      expect(box!.width, `${label}: ${name} width`).toBeGreaterThanOrEqual(44);
-      expect(box!.height, `${label}: ${name} height`).toBeGreaterThanOrEqual(44);
+      expect(box, label + ': ' + name + ' geometry').not.toBeNull();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
       touchControls.push({ name, width: box!.width, height: box!.height });
     }
+    await page.getByRole('button', { name: 'К центру управления' }).click();
+    await root
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Программы и шаблоны/ })
+      .click();
   }
   const expanded = await computed(root);
   const expandedAudit = await collectUiAudit(page, {

@@ -59,6 +59,30 @@
   min-width: 0;
   min-height: 48px;
 }
+/* A2: viewing the workout composition is primary; editing remains contextual. */
+.app-section--programs .program-manage-layout .program-active__view-action {
+  border-color: var(--v2-lime);
+  background: var(--v2-lime);
+  color: var(--v2-on-lime);
+}
+.app-section--programs .program-manage-layout .program-active__view-action:hover:not(:disabled) {
+  border-color: var(--v2-lime-hover);
+  background: var(--v2-lime-hover);
+  color: var(--v2-on-lime);
+}
+.app-section--programs .program-manage-layout .program-active__edit-action {
+  border-color: var(--v2-border);
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
+}
+.app-section--programs .program-manage-layout .program-active__edit-action:hover:not(:disabled) {
+  border-color: var(--v2-border-strong);
+  background: var(--v2-surface-strong);
+  color: var(--v2-text-primary);
+}
+.program-manage-layout .program-active__actions > :only-child {
+  grid-column: 1 / -1;
+}
 .program-manage-layout .program-active__delete-action {
   min-height: 48px;
   border-color: var(--v2-danger);

@@ -49,7 +49,7 @@ function installProgramExercises(page: Parameters<typeof installPlatformApi>[0])
 
 async function openProgramEditor(page: Parameters<typeof installPlatformApi>[0]) {
   await page.goto('/app?section=programs&view=manage');
-  await expect(page.getByRole('heading', { name: 'Программы и шаблоны' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
   await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
   const modal = page.locator('.program-editor-modal');
   await expect(modal).toBeVisible();

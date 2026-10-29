@@ -3162,6 +3162,7 @@ test('поля адаптируются к разным iPhone, а пример 
   await page.locator('.program-example-modal__close').click();
   await expect(previewDialog).toHaveCount(0);
 
+  await page.getByRole('button', { name: 'К центру управления' }).click();
   await page.getByRole('button', { name: 'Посмотреть состав' }).click();
   await expect(previewDialog).toBeVisible();
   await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();

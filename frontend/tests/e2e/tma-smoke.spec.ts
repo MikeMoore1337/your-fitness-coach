@@ -631,7 +631,9 @@ test('program history keeps current block, readable revisions and workout return
   await expect(tmaPage.getByText(/доступен только для просмотра/)).toBeVisible();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=programs&program_history=77&program_revision=4');
+  await expect(tmaPage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=4',
+  );
   await expect(tmaPage.locator('.program-history__disclosure')).toHaveJSProperty('open', true);
   await expect(tmaPage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
   await expect(tmaPage.locator('#program-revision-77-4 > summary')).toBeFocused();
@@ -644,7 +646,9 @@ test('program history keeps current block, readable revisions and workout return
   await expect(tmaPage.getByText('3 подх. · 8–10 повт. · отдых 90 сек.')).toBeVisible();
   await expect(tmaPage.getByText('4 подх. · 6–8 повт. · отдых 120 сек.')).not.toBeAttached();
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=programs&program_history=77&program_revision=3');
+  await expect(tmaPage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=3',
+  );
   await expect(tmaPage.locator('#program-revision-77-3')).toHaveJSProperty('open', true);
 
   await mobilePage
@@ -653,7 +657,9 @@ test('program history keeps current block, readable revisions and workout return
     .click();
   await expect(mobilePage.getByText('4 подх. · 6–8 повт. · отдых 120 сек.')).toBeVisible();
   await mobilePage.getByRole('link', { name: 'К истории программы' }).click();
-  await expect(mobilePage).toHaveURL('/app?section=programs&program_history=77&program_revision=4');
+  await expect(mobilePage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=4',
+  );
   await expect(mobilePage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
 });
 
@@ -1073,9 +1079,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       const radius = rootStyle.getPropertyValue('--radius-action').trim();
       const currentBlock = element.querySelector<HTMLElement>('.program-current-block');
       const action = element.querySelector<HTMLElement>('.program-block-actions .ui-button');
-      const editAction = element
-        .closest('.program-active')
-        ?.querySelector<HTMLElement>('.program-active__edit-action');
+      const editAction = document.querySelector<HTMLElement>('.program-active__edit-action');
       const disclosure = element.querySelector<HTMLElement>('.disclosure-icon');
       const disclosureRect = disclosure?.getBoundingClientRect();
       return {
@@ -1093,8 +1097,8 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     });
     expect(brandContract.boundaryShadow).toContain(brandContract.lime);
     expect(brandContract.actionRadius).toBe(brandContract.radius);
-    expect(brandContract.editActionBackground).toBe(brandContract.lime);
-    expect(brandContract.editActionColor).toBe(brandContract.onLime);
+    expect(brandContract.editActionBackground).toBeNull();
+    expect(brandContract.editActionColor).toBeNull();
     expect(brandContract.disclosure).toEqual({ width: 28, height: 28 });
 
     if (current.screenshot) {
@@ -1113,7 +1117,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       await page.locator('#appBottomNav').evaluate((element) => {
         element.style.visibility = '';
       });
-      await program.screenshot({
+      await history.screenshot({
         path: `../.artifacts/screenshots/task-59/${current.surface}-${current.viewport.width}x${current.viewport.height}-${current.theme}-history.png`,
       });
       await history

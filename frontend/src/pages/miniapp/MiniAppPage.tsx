@@ -524,21 +524,11 @@ export default function MiniAppPage({
                   )}
                   {programManagementOpen ? (
                     <TemplatesList
-                      key={
-                        programStart === 'templates'
-                          ? 'templates-start'
-                          : programStart === 'generator'
-                            ? 'generator-start'
-                            : 'templates-default'
-                      }
                       defaultLibraryOpen={programStart === 'templates'}
                       mode="full"
                       readOnly={!capabilities.canMutatePrograms}
                     >
-                      <ProgramBuilder
-                        key={programStart === 'create' ? 'create-start' : 'create-default'}
-                        defaultOpen={programStart === 'create'}
-                      />
+                      <ProgramBuilder defaultOpen={programStart === 'create'} />
                     </TemplatesList>
                   ) : (
                     <>

@@ -466,6 +466,12 @@ export function TemplatesList({
     ) ?? [];
 
   useEffect(() => {
+    if (mode !== 'full' || new URLSearchParams(search).get('start') !== 'generator') return;
+    const frame = window.requestAnimationFrame(() => setGeneratorOpen(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, search]);
+
+  useEffect(() => {
     if (mode !== 'full' || !defaultLibraryOpen) return;
     const frame = window.requestAnimationFrame(() => {
       document.getElementById('program-manage-heading')?.focus({ preventScroll: true });

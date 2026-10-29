@@ -56,10 +56,7 @@ test.describe('Issue #1230: ready-template separators', () => {
         if (await library.isVisible()) {
           await page.getByRole('button', { name: 'К центру управления' }).click();
         } else {
-          await page
-            .getByRole('navigation', { name: 'Управление программой' })
-            .getByRole('button', { name: /Программы и шаблоны/ })
-            .click();
+          await page.getByRole('button', { name: 'Выбрать готовую' }).click();
         }
       };
       await expect(cards).toHaveCount(count);
@@ -183,9 +180,7 @@ test.describe('Issue #1230: ready-template separators', () => {
             await toggleLibrary();
             await expect(library).toBeHidden();
             await expect(grid).toBeHidden();
-            await expect(
-              page.getByRole('heading', { name: 'Программы и шаблоны', level: 1 }),
-            ).toBeVisible();
+            await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
             await toggleLibrary();
             await expect(library).toBeVisible();
             await expect(cards).toHaveCount(count);
