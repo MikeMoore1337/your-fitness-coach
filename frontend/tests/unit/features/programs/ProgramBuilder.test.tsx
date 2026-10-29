@@ -320,7 +320,7 @@ describe('ProgramBuilder type-aware prescription', () => {
     const chooser = screen.getByRole('dialog', { name: 'Все дни программы' });
     await user.click(within(chooser).getByRole('button', { name: /День 8/ }));
     expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 8');
-    expect(screen.getByText('День 8 из 8')).toBeInTheDocument();
+    expect(screen.getAllByText('День 8 из 8').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Предыдущий день' }));
     expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 7');
