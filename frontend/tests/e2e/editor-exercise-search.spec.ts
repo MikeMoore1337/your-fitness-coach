@@ -53,7 +53,7 @@ test('#861 modeled TMA keyboard respects safe areas and Back restores the editor
   const telegram = new TelegramHarness(page);
   await installPlatformApi(page, { programHistory: 'many' });
   await page.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: exercises }));
-  await page.goto('/app?section=programs&view=manage&start=templates');
+  await page.goto('/app?section=programs&view=manage');
   await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
   const editor = page.locator('.program-editor-modal');
   await expect(
@@ -63,7 +63,9 @@ test('#861 modeled TMA keyboard respects safe areas and Back restores the editor
   await draftTitle.fill('Черновик Telegram');
   await expect(draftTitle).toHaveValue('Черновик Telegram');
   await editor.getByRole('button', { name: 'Добавить упражнение', exact: true }).click();
-  const trigger = editor.getByRole('button', { name: 'Поиск упражнения', exact: true });
+  const trigger = page
+    .getByRole('dialog', { name: 'Параметры упражнения' })
+    .getByRole('button', { name: 'Поиск упражнения', exact: true });
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   await expect(dialog.getByRole('searchbox')).toBeFocused();
@@ -103,7 +105,7 @@ test('#1202 suggests a typo match without selecting an exercise', async ({ page 
       ],
     }),
   );
-  await page.goto('/app?section=programs&view=manage');
+  await page.goto('/app?section=programs&view=manage&start=create');
   const trigger = page.getByRole('button', { name: 'Поиск упражнения', exact: true }).first();
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
@@ -129,7 +131,7 @@ for (const width of [320, 360, 390, 393, 430]) {
         route.fulfill({ json: exercises }),
       );
       const catalogResponse = page.waitForResponse('**/api/v1/programs/exercises');
-      await page.goto('/app?section=programs&view=manage&start=templates');
+      await page.goto('/app?section=programs&view=manage');
       await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
       const response = await catalogResponse;
       expect(response.status()).toBe(200);
@@ -142,7 +144,9 @@ for (const width of [320, 360, 390, 393, 430]) {
       await draftTitle.fill('Черновик редактора');
       await expect(draftTitle).toHaveValue('Черновик редактора');
       await editor.getByRole('button', { name: 'Добавить упражнение', exact: true }).click();
-      const trigger = editor.getByRole('button', { name: 'Поиск упражнения', exact: true });
+      const trigger = page
+        .getByRole('dialog', { name: 'Параметры упражнения' })
+        .getByRole('button', { name: 'Поиск упражнения', exact: true });
       await trigger.click();
       const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
       const search = dialog.getByRole('searchbox');
