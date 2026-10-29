@@ -48,8 +48,8 @@ function installProgramExercises(page: Parameters<typeof installPlatformApi>[0])
 }
 
 async function openProgramEditor(page: Parameters<typeof installPlatformApi>[0]) {
-  await page.goto('/app?section=programs&view=manage&start=templates');
-  await expect(page.getByRole('heading', { name: 'Программы и шаблоны' })).toBeVisible();
+  await page.goto('/app?section=programs&view=manage');
+  await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
   await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
   const modal = page.locator('.program-editor-modal');
   await expect(modal).toBeVisible();
@@ -239,7 +239,7 @@ test('Task 731 import mapping searches locally and preserves resolve rows', asyn
     await route.fulfill({ json: preview(true) });
   });
 
-  await page.goto('/app?section=programs&view=manage&start=templates');
+  await page.goto('/app?section=programs&view=manage&start=create');
   const upload = page.getByLabel('Загрузить документ программы');
   await upload.setInputFiles({
     name: 'program.csv',
