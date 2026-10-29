@@ -1,0 +1,38 @@
+/* Additional review workflow for the shared ProgramDayEditor (#1327). */
+.program-builder-open-settings {
+  min-height: 44px;
+  width: 100%;
+}
+.program-builder-review {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.program-builder-review__errors {
+  padding: 12px;
+  border: 1px solid var(--danger-line);
+  border-radius: var(--radius-control);
+}
+.program-builder-review__errors ul {
+  padding-inline-start: 22px;
+}
+.program-builder-review__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.program-builder-review__actions button {
+  min-height: 44px;
+}
+@media (max-width: 520px) {
+  .program-builder-review__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .program-builder-review__actions button {
+    width: 100%;
+  }
+}

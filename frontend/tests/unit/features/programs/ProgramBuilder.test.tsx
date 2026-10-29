@@ -172,15 +172,14 @@ describe('ProgramBuilder type-aware prescription', () => {
     await user.click(screen.getByRole('option', { name: /Велотренажёр/ }));
 
     const duration = screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' });
-    const exerciseRow = duration.closest<HTMLElement>('.program-exercise-row');
-    expect(exerciseRow).not.toBeNull();
     expect(duration).toHaveValue(30);
-    expect(within(exerciseRow!).queryByText('Рабочие подходы')).not.toBeInTheDocument();
-    expect(within(exerciseRow!).queryByText('Повторы')).not.toBeInTheDocument();
-    expect(within(exerciseRow!).queryByText('Отдых, сек')).not.toBeInTheDocument();
+    expect(screen.queryByText('Рабочие подходы')).not.toBeInTheDocument();
+    expect(screen.queryByText('Повторы')).not.toBeInTheDocument();
+    expect(screen.queryByText('Отдых, сек')).not.toBeInTheDocument();
     await user.clear(duration);
     await user.type(duration, '25');
-    await user.click(screen.getByRole('button', { name: 'Создать программу' }));
+    await user.click(screen.getByRole('button', { name: 'Проверить и назначить' }));
+    await user.click(screen.getByRole('button', { name: 'Создать и назначить' }));
 
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -204,6 +203,25 @@ describe('ProgramBuilder type-aware prescription', () => {
         }),
       ),
     );
+  });
+
+  it('показывает ошибки пустой программы до отправки POST', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await user.click(screen.getByRole('button', { name: 'Проверить и назначить' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'День 1: добавьте хотя бы одно упражнение.',
+    );
+    expect(screen.getByRole('button', { name: 'Создать и назначить' })).toBeDisabled();
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates', expect.anything());
+  });
+
+  it('новый конструктор использует общий редактор одного дня', async () => {
+    renderBuilder();
+    await screen.findByRole('button', { name: 'Добавить день' });
+    expect(document.querySelector('.copy-editor')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Добавить упражнение' })).toBeInTheDocument();
   });
 
   it('находит machine/lever упражнение по разговорному alias и добавляет canonical item', async () => {
@@ -233,7 +251,8 @@ describe('ProgramBuilder type-aware prescription', () => {
     const user = userEvent.setup();
     renderBuilder({ editingTemplate: activeTemplate });
 
-    await user.click(await screen.findByRole('button', { name: 'Сохранить программу' }));
+    await user.click(await screen.findByRole('button', { name: 'Проверить и сохранить' }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
 
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -268,7 +287,8 @@ describe('ProgramBuilder type-aware prescription', () => {
     expect(rows[0]).toHaveTextContent('Велотренажёр');
     expect(rows[1]).toHaveTextContent('Жим штанги лёжа');
     expect(screen.getAllByRole('combobox', { name: 'Поиск упражнения' })).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'Сохранить программу' }));
+    await user.click(screen.getByRole('button', { name: 'Проверить и сохранить' }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
         '/api/v1/programs/templates/9',
@@ -311,7 +331,8 @@ describe('ProgramBuilder type-aware prescription', () => {
     await user.click(within(rail).getByRole('tab', { name: /День 3/ }));
     await user.click(within(rail).getByRole('tab', { name: /День 2/ }));
     expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('День с прогрессией');
-    await user.click(screen.getByRole('button', { name: 'Сохранить программу' }));
+    await user.click(screen.getByRole('button', { name: 'Проверить и сохранить' }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
         '/api/v1/programs/templates/9',

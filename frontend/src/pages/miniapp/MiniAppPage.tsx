@@ -163,9 +163,9 @@ function requestedWellbeingDate(search: string): string | undefined {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
 }
 
-function requestedProgramStart(search: string): 'create' | 'templates' | null {
+function requestedProgramStart(search: string): 'create' | 'templates' | 'generator' | null {
   const value = new URLSearchParams(search).get('start');
-  return value === 'create' || value === 'templates' ? value : null;
+  return value === 'create' || value === 'templates' || value === 'generator' ? value : null;
 }
 
 function requestedProgramView(search: string): 'summary' | 'manage' {
@@ -524,15 +524,11 @@ export default function MiniAppPage({
                   )}
                   {programManagementOpen ? (
                     <TemplatesList
-                      key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
                       defaultLibraryOpen={programStart === 'templates'}
                       mode="full"
                       readOnly={!capabilities.canMutatePrograms}
                     >
-                      <ProgramBuilder
-                        key={programStart === 'create' ? 'create-start' : 'create-default'}
-                        defaultOpen={programStart === 'create'}
-                      />
+                      <ProgramBuilder defaultOpen={programStart === 'create'} />
                     </TemplatesList>
                   ) : (
                     <>

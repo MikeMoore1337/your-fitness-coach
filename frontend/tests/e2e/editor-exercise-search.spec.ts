@@ -53,7 +53,7 @@ test('#861 modeled TMA keyboard respects safe areas and Back restores the editor
   const telegram = new TelegramHarness(page);
   await installPlatformApi(page, { programHistory: 'many' });
   await page.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: exercises }));
-  await page.goto('/app?section=programs&view=manage&start=templates');
+  await page.goto('/app?section=programs&view=manage');
   await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
   const editor = page.locator('.program-editor-modal');
   await expect(
@@ -105,8 +105,11 @@ test('#1202 suggests a typo match without selecting an exercise', async ({ page 
       ],
     }),
   );
-  await page.goto('/app?section=programs&view=manage');
-  const trigger = page.getByRole('button', { name: 'Поиск упражнения', exact: true }).first();
+  await page.goto('/app?section=programs&view=manage&start=create');
+  const builder = page.locator('#program-builder');
+  await builder.locator('.copy-editor__exercise').first().click();
+  const parameters = page.getByRole('dialog', { name: 'Параметры упражнения' });
+  const trigger = parameters.getByRole('button', { name: 'Поиск упражнения', exact: true });
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   await dialog.getByRole('searchbox').fill('жим гантелй');
@@ -131,7 +134,7 @@ for (const width of [320, 360, 390, 393, 430]) {
         route.fulfill({ json: exercises }),
       );
       const catalogResponse = page.waitForResponse('**/api/v1/programs/exercises');
-      await page.goto('/app?section=programs&view=manage&start=templates');
+      await page.goto('/app?section=programs&view=manage');
       await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
       const response = await catalogResponse;
       expect(response.status()).toBe(200);
