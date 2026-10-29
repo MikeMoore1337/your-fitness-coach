@@ -543,7 +543,7 @@ export function ProgramDayEditor({
         <div className="copy-editor__content">
           <div className="copy-editor__mobile-days">
             <div className="copy-editor__section-head">
-              <h3>Выбор дня</h3>
+              <h3>Дни</h3>
               <button
                 type="button"
                 className="secondary"
@@ -623,9 +623,6 @@ export function ProgramDayEditor({
           </div>
 
           <div className="copy-editor__current-day">
-            <div className="copy-editor__eyebrow">
-              День {dayIndex + 1} из {dayCount}
-            </div>
             <label className="field">
               <span>Название дня</span>
               <input
@@ -640,41 +637,44 @@ export function ProgramDayEditor({
                 }
               />
             </label>
-            <div className="copy-editor__order-actions">
-              <button
-                type="button"
-                className="secondary"
-                disabled={dayIndex === 0}
-                onClick={() => moveDay(-1)}
-                aria-label="Переместить день выше"
-              >
-                <Icon name="move-up" size={20} />
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                disabled={dayIndex === dayCount - 1}
-                onClick={() => moveDay(1)}
-                aria-label="Переместить день ниже"
-              >
-                <Icon name="move-down" size={20} />
-              </button>
-              {dayCount > 1 && (
+            <details className="copy-editor__day-actions">
+              <summary>Управление днём</summary>
+              <div className="copy-editor__order-actions">
                 <button
                   type="button"
-                  className="text-button copy-editor__danger"
-                  onClick={() => void deleteDay()}
+                  className="secondary"
+                  disabled={dayIndex === 0}
+                  onClick={() => moveDay(-1)}
+                  aria-label="Переместить день выше"
                 >
-                  Удалить день
+                  <Icon name="move-up" size={20} />
                 </button>
-              )}
-            </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={dayIndex === dayCount - 1}
+                  onClick={() => moveDay(1)}
+                  aria-label="Переместить день ниже"
+                >
+                  <Icon name="move-down" size={20} />
+                </button>
+                {dayCount > 1 && (
+                  <button
+                    type="button"
+                    className="text-button copy-editor__danger"
+                    onClick={() => void deleteDay()}
+                  >
+                    Удалить день
+                  </button>
+                )}
+              </div>
+            </details>
           </div>
 
           <div className="copy-editor__section-head copy-editor__exercise-heading">
             <div>
               <h3>Упражнения</h3>
-              <span className="muted">{day.exercises.length} упр. · только выбранный день</span>
+              <span className="muted">{day.exercises.length} упр.</span>
             </div>
             <button
               type="button"
