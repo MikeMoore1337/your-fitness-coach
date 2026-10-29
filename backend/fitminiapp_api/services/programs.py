@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import date, timedelta
 from uuid import uuid4
 
@@ -476,7 +477,7 @@ def assign_template_to_user(
     replace_active: bool = False,
 ) -> tuple[UserProgram, int]:
     cycle = (template.program_metadata or {}).get("week_cycle")
-    if cycle is not None and not (cycle["length_weeks"] <= 4 and cycle["repeat"]):
+    if cycle is not None and not (cycle["repeat"]):
         raise ProgramError("Назначение программы с циклом недель пока недоступно")
     # Сериализуем конкурирующие назначения для одного пользователя. Частичный
     # unique index остаётся последней линией защиты на уровне БД.
@@ -515,6 +516,8 @@ def assign_template_to_user(
     ).delete(synchronize_session=False)
 
     ordered_days = sorted(template.days, key=lambda row: row.day_number)
+    if cycle and len(ordered_days) > 7:
+        raise ProgramError("A calendar-week cycle supports at most seven training days")
     if len(ordered_days) > 8:
         raise ProgramError("A program cycle supports at most eight training days")
     visible_by_effective_id = get_visible_exercise_display_map(db, target_user)
@@ -573,6 +576,20 @@ def assign_template_to_user(
                 assignment_week_prescriptions[(exercise_item.id, weekly.week_number)] = (
                     weekly_prescription
                 )
+    if cycle:
+        snapshot_set_budget = cycle["length_weeks"] * sum(
+            max(
+                [len(base_plan["segments"])]
+                + [
+                    len(weekly_plan["segments"])
+                    for (slot_id, _), weekly_plan in assignment_week_plans.items()
+                    if slot_id == slot
+                ]
+            )
+            for slot, base_plan in assignment_plans.items()
+        )
+        if snapshot_set_budget > MAX_GENERATED_SETS:
+            raise ProgramError("Cycle snapshot is too large to assign in one operation")
     if has_weekly_prescriptions:
         for week_number in (
             range(1, min(duration_weeks, cycle["length_weeks"]) + 1)
@@ -628,7 +645,7 @@ def assign_template_to_user(
         normalized_weekdays = [
             (effective_start_date.weekday() + offset) % 7 for offset in day_offsets
         ]
-        cycle_span_days = max(7, len(ordered_days))
+        cycle_span_days = 7 if cycle else max(7, len(ordered_days))
 
     program_status = "scheduled" if effective_start_date > today else "active"
     user_program = UserProgram(
@@ -751,7 +768,7 @@ def assign_template_to_user(
             created += 1
 
     db.flush()
-    record_program_revision(
+    assignment_revision = record_program_revision(
         db,
         user_program,
         actor=assigned_by,
@@ -762,6 +779,72 @@ def assign_template_to_user(
             "duration_weeks": duration_weeks,
         },
     )
+    if cycle:
+        logical_cycle = []
+        for source_week in range(1, cycle["length_weeks"] + 1):
+            for original in assignment_revision.snapshot["workouts"]:
+                if original["week_number"] != 1:
+                    continue
+                day_plan = deepcopy(original)
+                day_plan.pop("id", None)
+                day_plan["week_number"] = source_week
+                day_plan["scheduled_date"] = (
+                    date.fromisoformat(original["scheduled_date"])
+                    + timedelta(weeks=source_week - 1)
+                ).isoformat()
+                for item in day_plan["exercises"]:
+                    slot = item["source_template_exercise_id"]
+                    key = (slot, source_week)
+                    template_slot = next(
+                        item for day in ordered_days for item in day.exercises if item.id == slot
+                    )
+                    structured = template_slot.prescription is not None or any(
+                        item.week_number == source_week and item.prescription is not None
+                        for item in template_slot.weekly_prescriptions
+                    )
+                    projection = assignment_week_prescriptions.get(
+                        key, assignment_prescriptions[slot]
+                    )
+                    plan = assignment_week_plans.get(key, assignment_plans[slot])
+                    selected_exercise = assignment_week_exercises.get(
+                        key, assignment_exercises[slot]
+                    )
+                    item.update(
+                        exercise_id=assignment_week_exercise_ids.get(key, selected_exercise.id),
+                        metric_type=exercise_metric_type(selected_exercise),
+                        source_weekly_prescription_id=assignment_week_prescription_ids.get(key),
+                        prescribed_sets=projection.prescribed_sets,
+                        prescribed_reps=projection.prescribed_reps,
+                        prescribed_duration_minutes=projection.prescribed_duration_minutes,
+                        rest_seconds=projection.rest_seconds,
+                        prescription=plan if structured else None,
+                    )
+                    item["sets"] = [
+                        {
+                            "set_number": index,
+                            "set_kind": "working",
+                            "is_completed": False,
+                            "planned_role": segment["role"] if structured else None,
+                            "planned_position": segment["position"] if structured else None,
+                            "planned_group_id": segment.get("group_id"),
+                            "planned_group_kind": next(
+                                (
+                                    group["kind"]
+                                    for group in plan.get("groups", [])
+                                    if group["group_id"] == segment.get("group_id")
+                                ),
+                                None,
+                            ),
+                            "planned_round": segment.get("round_number"),
+                        }
+                        for index, segment in enumerate(plan["segments"], 1)
+                    ]
+                logical_cycle.append(day_plan)
+        assignment_revision.snapshot = {
+            **assignment_revision.snapshot,
+            "logical_cycle": logical_cycle,
+        }
+        db.flush()
     if assigned_by.id != target_user.id:
         queue_notification(
             db,

@@ -362,14 +362,16 @@ def materialize_next_cycle_window(
         return 0
     snapshot = revision.snapshot
     cycle = (snapshot["program"].get("program_metadata") or {}).get("week_cycle")
-    if not cycle or cycle["length_weeks"] > 4 or not cycle["repeat"]:
+    if not cycle or not cycle["repeat"]:
         return 0
-    source = [row for row in snapshot["workouts"] if row["week_number"] == 1]
+    cycle_plan = snapshot.get(
+        "logical_cycle", revision.changed_fields.get("logical_cycle", snapshot["workouts"])
+    )
     rows = db.query(UserWorkout).filter_by(user_program_id=program.id).all()
     existing_weeks = {row.week_number for row in rows}
     pending = any(row.status not in {"completed", "skipped", "cancelled"} for row in rows)
     if through_date is not None:
-        first_week = max(1, (through_date - program.start_date).days // max(7, len(source)) + 1)
+        first_week = max(1, (through_date - program.start_date).days // 7 + 1)
     elif pending:
         return 0
     else:
@@ -383,7 +385,7 @@ def materialize_next_cycle_window(
         if week in existing_weeks:
             continue
         source_week = (week - 1) % cycle["length_weeks"] + 1
-        for original in [row for row in snapshot["workouts"] if row["week_number"] == source_week]:
+        for original in [row for row in cycle_plan if row["week_number"] == source_week]:
             source_workout = deepcopy(original)
             for override in overrides:
                 if (
@@ -419,7 +421,7 @@ def materialize_next_cycle_window(
             workout = UserWorkout(
                 user_program_id=program.id,
                 scheduled_date=date.fromisoformat(source_workout["scheduled_date"])
-                + timedelta(days=(week - source_week) * max(7, len(source))),
+                + timedelta(days=(week - source_week) * 7),
                 day_number=source_workout["day_number"],
                 week_number=week,
                 title=source_workout["title"],
@@ -802,6 +804,28 @@ def apply_program_lifecycle_action(
                 "history_boundary": "new_program",
             },
         )
+        original_revision = (
+            db.query(ProgramRevision)
+            .filter(
+                ProgramRevision.user_program_id == program.id,
+                ProgramRevision.change_kind.in_(["assigned", "program_restarted"]),
+            )
+            .order_by(ProgramRevision.revision_number)
+            .first()
+        )
+        inherited_cycle = (
+            deepcopy(
+                original_revision.snapshot.get(
+                    "logical_cycle", original_revision.changed_fields.get("logical_cycle", [])
+                )
+            )
+            if original_revision
+            else []
+        )
+        for day_plan in inherited_cycle:
+            day_plan["scheduled_date"] = (
+                date.fromisoformat(day_plan["scheduled_date"]) + date_shift
+            ).isoformat()
         record_program_revision(
             db,
             new_program,
@@ -809,6 +833,7 @@ def apply_program_lifecycle_action(
             change_kind="program_restarted",
             reason=payload.reason,
             changed_fields={
+                "logical_cycle": inherited_cycle,
                 "inherited_occurrence_overrides": _cycle_occurrence_overrides(db, program.id),
                 "source_program_id": program.id,
                 "history_boundary": "new_program",
@@ -1773,11 +1798,12 @@ def upsert_future_program_exercise(
             )
             .all()
         )
-        if existing:
-            raise ProgramError(
-                "Editing materialized occurrences requires the existing planned-workout contract"
-            )
-        override = {
+        if any(
+            row.status != "planned" or row.started_at is not None or _workout_has_recorded_data(row)
+            for row in existing
+        ):
+            raise ProgramError("Occurrence edits cannot replace started or recorded workouts")
+        override: dict = {
             "weeks": weeks,
             "day_number": payload.day_number,
             "source_template_exercise_id": payload.target_template_exercise_id,
@@ -1792,6 +1818,44 @@ def upsert_future_program_exercise(
                 "prescription": plan.model_dump(mode="json"),
             },
         }
+        for workout in existing:
+            target = next(
+                (
+                    item
+                    for item in workout.exercises
+                    if item.source_template_exercise_id == payload.target_template_exercise_id
+                ),
+                None,
+            )
+            if target is None:
+                raise ProgramError("Unknown source exercise in materialized occurrence")
+            for key, value in override["exercise"].items():
+                setattr(target, key, value)
+            for item in list(target.sets):
+                db.delete(item)
+            db.flush()
+            db.expire(target, ["sets"])
+            for index, segment in enumerate(plan.model_dump(mode="json")["segments"], 1):
+                db.add(
+                    UserWorkoutSet(
+                        workout_exercise_id=target.id,
+                        set_number=index,
+                        set_kind="working",
+                        is_completed=False,
+                        planned_role=segment["role"],
+                        planned_position=segment["position"],
+                        planned_group_id=segment.get("group_id"),
+                        planned_group_kind=next(
+                            (
+                                group["kind"]
+                                for group in override["exercise"]["prescription"].get("groups", [])
+                                if group["group_id"] == segment.get("group_id")
+                            ),
+                            None,
+                        ),
+                        planned_round=segment.get("round_number"),
+                    )
+                )
         revision = record_program_revision(
             db,
             program,
@@ -1801,7 +1865,7 @@ def upsert_future_program_exercise(
             changed_fields={"occurrence_override": override},
         )
         db.commit()
-        return 0, revision.revision_number
+        return len(existing), revision.revision_number
 
     if program.template and (program.template.program_metadata or {}).get("week_cycle"):
         raise ProgramError(

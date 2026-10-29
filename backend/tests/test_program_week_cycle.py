@@ -362,7 +362,8 @@ def test_cycle_retains_future_window_with_unfinished_workout(
 
 
 @pytest.mark.parametrize("restart_after_edit", [False, True])
-def test_future_week_ten_override_is_materialized(client, restart_after_edit):
+@pytest.mark.parametrize("edit_week", [3, 10])
+def test_future_week_ten_override_is_materialized(client, restart_after_edit, edit_week):
     from datetime import timedelta
 
     from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
@@ -390,7 +391,7 @@ def test_future_week_ten_override_is_materialized(client, restart_after_edit):
         json={
             "expected_revision_number": version,
             "effective_scope": "future_program",
-            "occurrence_weeks": [10],
+            "occurrence_weeks": [edit_week],
             "day_number": 1,
             "target_template_exercise_id": slot,
             "exercise_id": exercise_id,
@@ -422,14 +423,15 @@ def test_future_week_ten_override_is_materialized(client, restart_after_edit):
             row.week_number: row
             for row in db.query(UserWorkout).filter_by(user_program_id=program_id).all()
         }
-        assert rows[10].exercises[0].prescribed_sets == 3
-        assert rows[10].exercises[0].prescribed_reps == "12"
-        assert len(rows[10].exercises[0].sets) == 3
+        assert rows[edit_week].exercises[0].prescribed_sets == 3
+        assert rows[edit_week].exercises[0].prescribed_reps == "12"
+        assert len(rows[edit_week].exercises[0].sets) == 3
         assert rows[9].exercises[0].prescribed_sets == 2
         assert rows[1].exercises[0].prescribed_sets == 2
 
 
-def test_three_week_cycle_maps_week_sixteen_to_first_prescription(client):
+@pytest.mark.parametrize("cycle_length", [3, 7])
+def test_cycle_maps_week_sixteen_to_source_prescription(client, cycle_length):
     from datetime import timedelta
 
     from fitminiapp_api.models.program import (
@@ -440,12 +442,12 @@ def test_three_week_cycle_maps_week_sixteen_to_first_prescription(client):
 
     headers = _auth(client, 916110)
     payload = _payload(client, headers)
-    payload["week_cycle"] = {"length_weeks": 3, "repeat": True}
+    payload["week_cycle"] = {"length_weeks": cycle_length, "repeat": True}
     created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
     template_id = created.json()["template"]["id"]
     with get_session_context() as db:
         slot = db.get(ProgramTemplate, template_id).days[0].exercises[0]
-        for week in range(1, 4):
+        for week in range(1, cycle_length + 1):
             db.add(
                 ProgramTemplateExerciseWeekPrescription(
                     template_exercise_id=slot.id,
@@ -471,7 +473,9 @@ def test_three_week_cycle_maps_week_sixteen_to_first_prescription(client):
             .order_by(UserWorkout.week_number)
             .all()
         )
-        assert [row.exercises[0].prescribed_sets for row in initial] == [1, 2, 3, 1]
+        assert [row.exercises[0].prescribed_sets for row in initial] == [
+            (week % cycle_length) + 1 for week in range(4)
+        ]
         assert (
             materialize_next_cycle_window(
                 db, program, through_date=program.start_date + timedelta(weeks=15)
@@ -479,9 +483,27 @@ def test_three_week_cycle_maps_week_sixteen_to_first_prescription(client):
             == 1
         )
         last = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=16).one()
-        assert last.exercises[0].prescribed_sets == 1
-        assert last.exercises[0].prescribed_reps == "3"
+        assert last.exercises[0].prescribed_sets == ((16 - 1) % cycle_length) + 1
+        assert last.exercises[0].prescribed_reps == str((((16 - 1) % cycle_length) + 1) * 3)
         assert (
             last.exercises[0].source_weekly_prescription_id
-            == initial[0].exercises[0].source_weekly_prescription_id
+            == initial[(16 - 1) % cycle_length].exercises[0].source_weekly_prescription_id
         )
+
+
+def test_oversized_logical_cycle_is_rejected_before_snapshot_generation(client):
+    headers = _auth(client, 916111)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 1000000000, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    assert created.status_code == 200, created.text
+    response = client.post(
+        f"/api/v1/programs/templates/{created.json()['template']['id']}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 16},
+    )
+    assert response.status_code == 403, response.text
+    assert response.json()["detail"] == "Cycle snapshot is too large to assign in one operation"
+    with get_session_context() as db:
+        user = db.query(User).filter_by(telegram_user_id=916111).one()
+        assert db.query(UserProgram).filter_by(user_id=user.id).count() == 0
