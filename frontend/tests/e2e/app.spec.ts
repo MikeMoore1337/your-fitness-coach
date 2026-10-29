@@ -3546,7 +3546,7 @@ test('клиент собирает и проверяет личную прог�
   await expect(builder.getByText('Настройки программы', { exact: true })).toBeVisible();
   await expect(builder.getByRole('combobox', { name: 'Цель', exact: true })).toBeHidden();
   const settings = builder.locator('.program-builder-settings');
-  await settings.locator('summary').click();
+  await settings.locator(':scope > summary').click();
   const goal = builder.getByRole('combobox', { name: 'Цель', exact: true });
   await goal.selectOption('recomposition');
   await expect(goal).toHaveValue('recomposition');
@@ -3555,7 +3555,7 @@ test('клиент собирает и проверяет личную прог�
   await duration.fill('2');
   await expect(duration).toHaveValue('2');
   await duration.fill('1');
-  await settings.locator('summary').click();
+  await settings.locator(':scope > summary').click();
   await expect(goal).toBeHidden();
 
   await builder.locator('.copy-editor__exercise').first().click();
