@@ -2619,8 +2619,16 @@ test('mobile использует список и отдельный конте�
   const dayManagement = editor.locator('.copy-editor__day-actions');
   await expect(dayManagement).not.toHaveAttribute('open', '');
   await dayManagement.locator('summary').click();
-  const dayActions = dayManagement.locator('.copy-editor__order-actions');
-  await expect(dayActions.getByRole('button', { name: 'Переместить день выше' })).toBeDisabled();
+  await expect(dayManagement.getByRole('button', { name: 'Дублировать день' })).toBeVisible();
+  await dayManagement.locator('summary').click();
+  await expect(editor.getByRole('button', { name: 'Переместить день выше' })).toHaveCount(0);
+  await expect(editor.getByRole('button', { name: 'Переместить день ниже' })).toHaveCount(0);
+  await editor.getByRole('button', { name: 'Все дни' }).click();
+  const allDaysDialog = page.getByRole('dialog', { name: 'Все дни программы' });
+  await expect(allDaysDialog).toBeVisible();
+  await expect(allDaysDialog.getByRole('button', { name: 'Изменить порядок' })).toHaveCount(0);
+  await allDaysDialog.getByRole('button', { name: 'Закрыть список дней' }).click();
+  await expect(allDaysDialog).toHaveCount(0);
   const exerciseRow = editor.locator('.copy-editor__exercise').first();
   expect((await exerciseRow.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   const addExercise = editor.getByRole('button', { name: 'Добавить упражнение' });
