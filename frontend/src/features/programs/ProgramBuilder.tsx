@@ -71,8 +71,6 @@ function scheduleForDays(dayCount: number, startDate: string): number[] {
   return Array.from({ length: dayCount }, (_, index) => (firstWeekday + index) % 7);
 }
 
-const CARDIO_METRIC_TYPE = 'cardio' as const;
-
 export function ProgramBuilder({
   targetTelegramId,
   targetName,
@@ -324,7 +322,8 @@ export function ProgramBuilder({
   });
 
   const totalExercises = days.reduce(
-    (count, day) => count + day.exercises.filter((item) => item.exercise_id > 0).length, 0,
+    (count, day) => count + day.exercises.filter((item) => item.exercise_id > 0).length,
+    0,
   );
   const reviewIssues: string[] = [];
   if (!title.trim()) reviewIssues.push('Укажите название программы.');
@@ -335,26 +334,45 @@ export function ProgramBuilder({
     if (!day.title.trim()) reviewIssues.push('День ' + (index + 1) + ': укажите название.');
     if (!day.exercises.some((item) => item.exercise_id > 0))
       reviewIssues.push('День ' + (index + 1) + ': добавьте хотя бы одно упражнение.');
-    day.exercises.filter((item) => item.exercise_id > 0).forEach((item) => {
-      const cardio = exercises.data?.find((exercise) => exercise.id === item.exercise_id)?.metric_type === 'cardio';
-      if (cardio && (!item.prescribed_duration_minutes ||
-        item.prescribed_duration_minutes < 1 || item.prescribed_duration_minutes > 600))
-        reviewIssues.push('День ' + (index + 1) + ': проверьте длительность.');
-      if (!cardio && (!item.prescribed_sets || item.prescribed_sets < 1 ||
-        item.prescribed_sets > 10 || !item.prescribed_reps?.trim() ||
-        item.rest_seconds == null || item.rest_seconds < 15 || item.rest_seconds > 600))
-        reviewIssues.push('День ' + (index + 1) + ': проверьте подходы, повторы и отдых.');
-    });
+    day.exercises
+      .filter((item) => item.exercise_id > 0)
+      .forEach((item) => {
+        const cardio =
+          exercises.data?.find((exercise) => exercise.id === item.exercise_id)?.metric_type ===
+          'cardio';
+        if (
+          cardio &&
+          (!item.prescribed_duration_minutes ||
+            item.prescribed_duration_minutes < 1 ||
+            item.prescribed_duration_minutes > 600)
+        )
+          reviewIssues.push('День ' + (index + 1) + ': проверьте длительность.');
+        if (
+          !cardio &&
+          (!item.prescribed_sets ||
+            item.prescribed_sets < 1 ||
+            item.prescribed_sets > 10 ||
+            !item.prescribed_reps?.trim() ||
+            item.rest_seconds == null ||
+            item.rest_seconds < 15 ||
+            item.rest_seconds > 600)
+        )
+          reviewIssues.push('День ' + (index + 1) + ': проверьте подходы, повторы и отдых.');
+      });
   });
   const submitReviewedProgram = async () => {
     if (mutation.isPending || reviewIssues.length || navigator.onLine === false) return;
     let replaceActive = false;
     if (!editingTemplate && user?.has_active_program) {
-      if (!(await confirm({
-        title: 'Заменить активную программу?',
-        message: 'Текущая программа будет архивирована. Тренировку, которая уже идёт, заменить нельзя.',
-        confirmText: 'Создать и заменить',
-      }))) return;
+      if (
+        !(await confirm({
+          title: 'Заменить активную программу?',
+          message:
+            'Текущая программа будет архивирована. Тренировку, которая уже идёт, заменить нельзя.',
+          confirmText: 'Создать и заменить',
+        }))
+      )
+        return;
       replaceActive = true;
     }
     mutation.mutate({ replaceActive });
@@ -515,13 +533,18 @@ export function ProgramBuilder({
             defaultRestSeconds={defaultRestSeconds}
             onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
           />
-          <button type="button" className="secondary program-builder-open-settings"
+          <button
+            type="button"
+            className="secondary program-builder-open-settings"
             onClick={() => {
               if (settingsRef.current) {
                 settingsRef.current.open = true;
                 settingsRef.current.scrollIntoView?.({ block: 'start' });
               }
-            }}>Настройки и расписание</button>
+            }}
+          >
+            Настройки и расписание
+          </button>
           <details ref={settingsRef} className="program-builder-settings compact-disclosure">
             <summary className="yfc-disclosure-summary">
               <span>
@@ -736,40 +759,71 @@ export function ProgramBuilder({
                 упр.
               </strong>
             </div>
-            <button type="button" className="program-builder-footer__save"
-              onClick={() => setReviewOpen(true)}>
+            <button
+              type="button"
+              className="program-builder-footer__save"
+              onClick={() => setReviewOpen(true)}
+            >
               {editingTemplate || saveAsCopy ? 'Проверить и сохранить' : 'Проверить и назначить'}
             </button>
           </div>
           {reviewOpen && (
-            <section className="program-builder-review" role="dialog" aria-modal="false"
-              aria-labelledby={sectionId + '-review-title'}>
+            <section
+              className="program-builder-review"
+              role="dialog"
+              aria-modal="false"
+              aria-labelledby={sectionId + '-review-title'}
+            >
               <h3 id={sectionId + '-review-title'}>Проверка программы</h3>
               <strong>{title || 'Без названия'}</strong>
-              <p>{trainingCountLabel(days.length)} · {totalExercises} упражнений</p>
-              <p>Начало: {startDate} · {durationWeeks} нед.</p>
-              <p>Расписание: {usesSequentialCycle ? 'Последовательный цикл' :
-                effectiveScheduleWeekdays.map((day) => weekdayLabels[day]).join(', ')}</p>
+              <p>
+                {trainingCountLabel(days.length)} · {totalExercises} упражнений
+              </p>
+              <p>
+                Начало: {startDate} · {durationWeeks} нед.
+              </p>
+              <p>
+                Расписание:{' '}
+                {usesSequentialCycle
+                  ? 'Последовательный цикл'
+                  : effectiveScheduleWeekdays.map((day) => weekdayLabels[day]).join(', ')}
+              </p>
               {reviewIssues.length ? (
                 <div className="program-builder-review__errors" role="alert">
                   <strong>Исправьте перед сохранением:</strong>
-                  <ul>{reviewIssues.map((message, index) => <li key={index}>{message}</li>)}</ul>
+                  <ul>
+                    {reviewIssues.map((message, index) => (
+                      <li key={index}>{message}</li>
+                    ))}
+                  </ul>
                 </div>
-              ) : <p role="status">Программа готова к сохранению.</p>}
-              {navigator.onLine === false &&
-                <p role="alert">Нет соединения. Черновик остаётся на устройстве.</p>}
-              {!editingTemplate && user?.has_active_program &&
-                <p>При замене текущая программа будет отправлена в архив после подтверждения.</p>}
+              ) : (
+                <p role="status">Программа готова к сохранению.</p>
+              )}
+              {navigator.onLine === false && (
+                <p role="alert">Нет соединения. Черновик остаётся на устройстве.</p>
+              )}
+              {!editingTemplate && user?.has_active_program && (
+                <p>При замене текущая программа будет отправлена в архив после подтверждения.</p>
+              )}
               <div className="program-builder-review__actions">
-                <button type="button" className="secondary"
-                  onClick={() => setReviewOpen(false)}>Вернуться к редактированию</button>
-                <button type="button" disabled={Boolean(reviewIssues.length) ||
-                  mutation.isPending || navigator.onLine === false}
-                  onClick={() => void submitReviewedProgram()}>
-                  {mutation.isPending ? 'Сохраняем…'
-                    : saveAsCopy ? 'Сохранить личную копию'
-                    : editingTemplate ? 'Сохранить изменения'
-                    : 'Создать и назначить'}
+                <button type="button" className="secondary" onClick={() => setReviewOpen(false)}>
+                  Вернуться к редактированию
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    Boolean(reviewIssues.length) || mutation.isPending || navigator.onLine === false
+                  }
+                  onClick={() => void submitReviewedProgram()}
+                >
+                  {mutation.isPending
+                    ? 'Сохраняем…'
+                    : saveAsCopy
+                      ? 'Сохранить личную копию'
+                      : editingTemplate
+                        ? 'Сохранить изменения'
+                        : 'Создать и назначить'}
                 </button>
               </div>
             </section>
