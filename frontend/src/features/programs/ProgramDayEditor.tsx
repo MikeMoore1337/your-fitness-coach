@@ -60,7 +60,10 @@ export function ProgramDayEditor({
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
     const media = window.matchMedia('(max-width: 1099px)');
-    const update = () => setMobileView(media.matches);
+    const update = () => {
+      setMobileView(media.matches);
+      if (!media.matches) setDetailOpen(false);
+    };
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
@@ -130,11 +133,16 @@ export function ProgramDayEditor({
   }, []);
   const closeDetail = useCallback(() => {
     setDetailOpen(false);
-    window.requestAnimationFrame(() => exerciseTriggerRef.current?.focus());
+    window.requestAnimationFrame(() => {
+      const fallback = document.querySelector<HTMLButtonElement>('.copy-editor__exercise[aria-pressed="true"]');
+      const previous = exerciseTriggerRef.current;
+      if (previous?.isConnected) previous.focus();
+      else fallback?.focus();
+    });
   }, []);
 
   useEffect(() => {
-    if (!allDaysOpen && !detailOpen) return;
+    if (!allDaysOpen && !(detailOpen && mobileView)) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const dialog = allDaysOpen ? allDaysDialogRef.current : detailDialogRef.current;
@@ -169,7 +177,7 @@ export function ProgramDayEditor({
       document.body.style.overflow = previous;
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [allDaysOpen, detailOpen, closeAllDays, closeDetail]);
+  }, [allDaysOpen, detailOpen, closeAllDays, closeDetail, mobileView]);
 
   if (!day) return <p className="muted">Добавьте первый тренировочный день.</p>;
 
@@ -399,7 +407,7 @@ export function ProgramDayEditor({
   const allDayButtons = days.map((item, index) => (
     <button key={index} type="button"
       className="copy-editor__day-choice" data-yfc-choice="compact"
-      aria-selected={index === dayIndex}
+      aria-pressed={index === dayIndex}
       onClick={() => {
         selectDay(index);
         window.requestAnimationFrame(() => allDaysTriggerRef.current?.focus());
@@ -549,6 +557,7 @@ export function ProgramDayEditor({
                   exercises: [...current.exercises, newExercise(defaultRestSeconds)],
                 }));
                 setSelectedExercise(day.exercises.length);
+                exerciseTriggerRef.current = null;
                 setDetailOpen(mobileView);
               }}>
               <Icon name="plus" size={18} /> Добавить упражнение
