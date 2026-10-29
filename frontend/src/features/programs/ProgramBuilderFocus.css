@@ -1,7 +1,37 @@
 /* Additional review workflow for the shared ProgramDayEditor (#1327). */
-.program-builder-open-settings {
+.program-builder > form .program-builder-basics {
+  /* Equal left edge for step 1 and step 2 across mobile and desktop. */
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.program-builder > form .program-builder-footer {
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.program-builder-copy-note {
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.42;
+}
+.program-builder-optional {
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.program-builder-optional > summary {
+  cursor: pointer;
   min-height: 44px;
-  width: 100%;
+}
+.program-builder-optional__body {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
 }
 .program-builder-review {
   display: grid;
