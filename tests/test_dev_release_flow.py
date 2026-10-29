@@ -94,7 +94,15 @@ def test_dev_migration_preflight_uses_immutable_target_without_child_git(
         "catch { Write-Output ('GATE_REJECTED='+$script:FailureCode); exit 17 }\n",
         encoding="utf-8-sig",
     )
-    env = {**os.environ, "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"}
+    # Reset inherited trusted paths only in this disposable fixture's child processes.
+    env = {
+        **os.environ,
+        "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "",
+    }
+    env.pop("GIT_CONFIG_PARAMETERS", None)
     raw = subprocess.run(["git", "status", "--porcelain"], cwd=repo, env=env, capture_output=True)
     assert raw.returncode != 0, "exercise Git's actual dubious-ownership boundary"
     result = subprocess.run(
