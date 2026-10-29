@@ -159,6 +159,24 @@ export function ProgramBuilder({
     editingTemplate.current_revision_number != null,
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
+  const [selectedDay, setSelectedDay] = useState(0);
+  const [allDaysOpen, setAllDaysOpen] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<number | null>(editingTemplate ? null : 0);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const selectDay = (index: number) => {
+    if (index < 0 || index >= days.length) return;
+    setSelectedDay(index);
+    setAllDaysOpen(false);
+    setEditingExercise(null);
+  };
+  useEffect(() => {
+    if (selectedDay >= days.length) setSelectedDay(Math.max(0, days.length - 1));
+    const carousel = carouselRef.current;
+    if (carousel && selectedDay < days.length) {
+      carousel.scrollTo?.({ left: selectedDay * carousel.clientWidth, behavior: 'instant' });
+    }
+  }, [selectedDay, days.length]);
   const snapshot = JSON.stringify([
     title,
     goal,
@@ -228,6 +246,9 @@ export function ProgramBuilder({
         } satisfies ProgramTemplateAssignmentCreate,
       }),
     onSuccess: async (result) => {
+      setReviewOpen(false);
+      setSelectedDay(0);
+      setEditingExercise(null);
       if (!editingTemplate) {
         trackGrowthEvent('program_added');
         if (targetTelegramId) {
@@ -319,6 +340,42 @@ export function ProgramBuilder({
     },
   });
 
+  const totalExercises = days.reduce(
+    (total, day) => total + day.exercises.filter((item) => item.exercise_id > 0).length, 0,
+  );
+  const reviewIssues: string[] = [];
+  if (!title.trim()) reviewIssues.push('Укажите название программы.');
+  if (!scheduleIsValid) reviewIssues.push('Проверьте расписание тренировочных дней.');
+  if (durationWeeks < 1 || durationWeeks > 24)
+    reviewIssues.push('Длительность должна составлять от 1 до 24 недель.');
+  days.forEach((day, index) => {
+    if (!day.title.trim()) reviewIssues.push('День ' + (index + 1) + ': укажите название.');
+    if (!day.exercises.some((item) => item.exercise_id > 0))
+      reviewIssues.push('День ' + (index + 1) + ': добавьте упражнение.');
+    day.exercises.filter((item) => item.exercise_id > 0).forEach((item) => {
+      const cardio = exercises.data?.find((exercise) => exercise.id === item.exercise_id)?.metric_type === 'cardio';
+      if (cardio && (!item.prescribed_duration_minutes ||
+        item.prescribed_duration_minutes < 1 || item.prescribed_duration_minutes > 600))
+        reviewIssues.push('День ' + (index + 1) + ': проверьте длительность.');
+      if (!cardio && (!item.prescribed_sets || item.prescribed_sets < 1 ||
+        item.prescribed_sets > 10 || !item.prescribed_reps?.trim() ||
+        item.rest_seconds == null || item.rest_seconds < 15 || item.rest_seconds > 600))
+        reviewIssues.push('День ' + (index + 1) + ': проверьте подходы, повторы и отдых.');
+    });
+  });
+  const submitReviewedProgram = async () => {
+    if (mutation.isPending || reviewIssues.length || navigator.onLine === false) return;
+    let replaceActive = false;
+    if (!editingTemplate && user?.has_active_program) {
+      if (!(await confirm({
+        title: 'Заменить активную программу?',
+        message: 'Текущая программа будет отправлена в архив. Тренировку, которая уже идёт, заменить нельзя.',
+        confirmText: 'Создать и заменить',
+      }))) return;
+      replaceActive = true;
+    }
+    mutation.mutate({ replaceActive });
+  };
   const updateDay = (index: number, next: Day | ((current: Day) => Day)) =>
     setDays((currentDays) =>
       currentDays.map((day, dayIndex) =>
@@ -419,27 +476,12 @@ export function ProgramBuilder({
           </div>
         </section>
       ) : (
-        <form
-          className="stack top-gap"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            let replaceActive = false;
-            if (
-              !editingTemplate &&
-              user?.has_active_program &&
-              !(await confirm({
-                title: 'Заменить активную программу?',
-                message:
-                  'Новая программа станет активной, а текущая будет отправлена в архив. Тренировку, которая уже идёт, заменить нельзя.',
-                confirmText: 'Создать и заменить',
-              }))
-            )
-              return;
-            replaceActive = Boolean(user?.has_active_program);
-            mutation.mutate({ replaceActive });
+        <form className="stack top-gap program-builder-focused"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setReviewOpen(true);
           }}
-        >
-          {saveAsCopy && (
+        >          {saveAsCopy && (
             <p className="auth-notice">
               Исходный готовый шаблон останется без изменений. После сохранения появится личная
               копия, в которой можно использовать свои упражнения.
@@ -468,14 +510,75 @@ export function ProgramBuilder({
           </section>
           <div className="program-builder-days-heading">
             <div>
-              <span className="eyebrow">Шаг 2</span>
-              <h3>Добавьте упражнения</h3>
-              <p>Первая тренировка уже создана. Выберите хотя бы одно упражнение.</p>
+              <span className="eyebrow">День в центре</span>
+              <h3>Упражнения выбранного дня</h3>
+              <p>Выберите день, чтобы изменить его упражнения.</p>
             </div>
             <Badge>{days.length} из 8</Badge>
           </div>
-          {days.map((day, dayIndex) => (
-            <div className="program-day stack" key={dayIndex}>
+          <div className="program-builder-day-toolbar">
+            <button type="button" className="secondary" aria-label="Предыдущий день"
+              disabled={selectedDay === 0} onClick={() => selectDay(selectedDay - 1)}>
+              <Icon name="chevron-left" size={20}/>
+            </button>
+            <strong aria-live="polite">День {selectedDay + 1} из {days.length}</strong>
+            <button type="button" className="secondary" aria-label="Следующий день"
+              disabled={selectedDay === days.length - 1} onClick={() => selectDay(selectedDay + 1)}>
+              <Icon name="chevron-right" size={20}/>
+            </button>
+            <button type="button" className="secondary" aria-expanded={allDaysOpen}
+              onClick={() => setAllDaysOpen(!allDaysOpen)}>Все дни</button>
+          </div>
+          <div className="program-builder-day-carousel" ref={carouselRef} role="tablist"
+            aria-label="Выбор тренировочного дня"
+            onScroll={(event) => {
+              const target = event.currentTarget;
+              if (!target.clientWidth) return;
+              const index = Math.min(days.length - 1,
+                Math.max(0, Math.round(target.scrollLeft / target.clientWidth)));
+              if (index !== selectedDay) {
+                setSelectedDay(index);
+                setEditingExercise(null);
+              }
+            }}>
+            {days.map((day, index) => (
+              <button key={index} type="button" role="tab" className="program-builder-day-slide"
+                data-yfc-choice="compact" aria-controls={sectionId + '-current-day'}
+                aria-selected={selectedDay === index} tabIndex={selectedDay === index ? 0 : -1}
+                onClick={() => selectDay(index)}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+                    event.preventDefault();
+                    const next = Math.max(0, Math.min(days.length - 1,
+                      index + (event.key === 'ArrowRight' ? 1 : -1)));
+                    selectDay(next);
+                    carouselRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+                  }
+                }}>
+                <span className="eyebrow">Тренировка {index + 1}</span>
+                <strong>{day.title || 'Без названия'}</strong>
+                <small>{day.exercises.filter((item) => item.exercise_id > 0).length} упр.</small>
+              </button>
+            ))}
+          </div>
+          {allDaysOpen && (
+            <div className="program-builder-all-days" role="dialog" aria-label="Все дни программы">
+              <strong>Перейти к дню</strong>
+              {days.map((day, index) => (
+                <button type="button" key={index}
+                  aria-current={selectedDay === index ? 'true' : undefined}
+                  onClick={() => selectDay(index)}>
+                  День {index + 1} · {day.title || 'Без названия'} ·
+                  {' '}{day.exercises.filter((item) => item.exercise_id > 0).length} упр.
+                </button>
+              ))}
+              <button type="button" className="secondary"
+                onClick={() => setAllDaysOpen(false)}>Закрыть</button>
+            </div>
+          )}
+          {days.map((day, dayIndex) => dayIndex === selectedDay ? (
+            <div className="program-day stack" key={dayIndex} role="tabpanel"
+              id={sectionId + '-current-day'} aria-label={'Упражнения дня ' + (dayIndex + 1)}>
               <div className="program-day__head">
                 <span className="program-day__number">{dayIndex + 1}</span>
                 <input
@@ -526,6 +629,29 @@ export function ProgramBuilder({
               </div>
               {day.exercises.map((item, exerciseIndex) => (
                 <div className="program-exercise-row" key={exerciseIndex}>
+                  <button type="button" className="program-exercise-summary"
+                    aria-label={'Изменить упражнение ' + (exerciseIndex + 1)}
+                    aria-expanded={editingExercise === exerciseIndex}
+                    onClick={() => setEditingExercise(
+                      editingExercise === exerciseIndex ? null : exerciseIndex)}>
+                    <span className="program-exercise-row__number">{exerciseIndex + 1}</span>
+                    <span className="program-exercise-summary__text">
+                      <strong>{exercises.data?.find((exercise) => exercise.id === item.exercise_id)?.title ||
+                        'Выберите упражнение'}</strong>
+                      <small>{item.prescribed_duration_minutes != null
+                        ? item.prescribed_duration_minutes + ' мин'
+                        : (item.prescribed_sets ?? '—') + ' × ' +
+                          (item.prescribed_reps || '—') + ' · отдых ' +
+                          (item.rest_seconds ?? '—') + ' сек'}
+                        {item.notes ? ' · Заметка' : ''}
+                        {item.superset_group ? ' · Суперсет' : ''}
+                      </small>
+                    </span>
+                    <Icon name="chevron-right" size={20}/>
+                  </button>
+                  {(editingExercise === exerciseIndex ||
+                    (editingExercise === null && item.exercise_id === 0 && day.exercises.length === 1)) && (
+                    <>
                   <div className="field exercise-select">
                     <span className="program-exercise-row__heading">
                       <span>
@@ -816,18 +942,21 @@ export function ProgramBuilder({
                       )}
                     </div>
                   </details>
+                    </>
+                  )}
                 </div>
               ))}
               {day.exercises.length < 20 ? (
                 <button
                   type="button"
                   className="secondary program-add-exercise"
-                  onClick={() =>
+                  onClick={() => {
+                    setEditingExercise(day.exercises.length);
                     updateDay(dayIndex, (currentDay) => ({
                       ...currentDay,
                       exercises: [...currentDay.exercises, blankExercise(defaultRestSeconds)],
-                    }))
-                  }
+                    }));
+                  }}
                 >
                   <Icon name="plus" size={16} />
                   Добавить упражнение
@@ -836,7 +965,7 @@ export function ProgramBuilder({
                 <span className="muted">В одной тренировке максимум 20 упражнений.</span>
               )}
             </div>
-          ))}
+          ) : null)}
           <details className="program-builder-settings compact-disclosure">
             <summary className="yfc-disclosure-summary">
               <span>
@@ -1055,42 +1184,59 @@ export function ProgramBuilder({
               <button
                 type="button"
                 className="secondary"
-                onClick={() =>
+                onClick={() => {
+                  setSelectedDay(days.length);
+                  setEditingExercise(0);
                   setDays((currentDays) => [
                     ...currentDays,
                     {
                       title: simpleTrainingTitle(currentDays.length + 1),
                       exercises: [blankExercise(defaultRestSeconds)],
                     },
-                  ])
-                }
+                  ]);
+                }}
               >
                 <Icon name="plus" size={16} /> Добавить день
               </button>
             ) : (
               <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>
             )}
-            <button
-              className="program-builder-footer__save"
-              disabled={
-                mutation.isPending ||
-                !scheduleIsValid ||
-                durationWeeks < 1 ||
-                durationWeeks > 24 ||
-                days.some((day) => day.exercises.every((item) => !item.exercise_id))
-              }
-            >
-              {mutation.isPending
-                ? 'Сохраняем…'
-                : saveAsCopy
-                  ? 'Сохранить личную копию'
-                  : editingTemplate
-                    ? 'Сохранить изменения'
-                    : targetTelegramId
-                      ? 'Создать и назначить'
-                      : 'Создать программу'}
+            <button type="button" className="program-builder-footer__save"
+              onClick={() => setReviewOpen(true)}>
+              {editingTemplate || saveAsCopy ? 'Проверить и сохранить' : 'Проверить и назначить'}
             </button>
           </div>
+          {reviewOpen && (
+            <section className="program-builder-review" role="dialog" aria-modal="false"
+              aria-labelledby={sectionId + '-review'}>
+              <h3 id={sectionId + '-review'}>Проверка программы</h3>
+              <strong>{title || 'Без названия'}</strong>
+              <p>{trainingCountLabel(days.length)} · {totalExercises} упр.</p>
+              <p>Дата начала: {startDate} · {durationWeeks} нед.</p>
+              <p>Расписание: {usesSequentialCycle ? 'Последовательный цикл' :
+                effectiveScheduleWeekdays.map((weekday) => weekdayLabels[weekday]).join(', ')}</p>
+              {reviewIssues.length ? (
+                <div className="program-builder-review__errors" role="alert">
+                  <strong>Исправьте ошибки:</strong>
+                  <ul>{reviewIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
+                </div>
+              ) : <p role="status">Программа готова к сохранению.</p>}
+              {navigator.onLine === false &&
+                <p role="alert">Нет соединения. Черновик остаётся на устройстве.</p>}
+              {!editingTemplate && user?.has_active_program &&
+                <p>Активная программа будет архивирована только после подтверждения замены.</p>}
+              <div className="program-builder-review__actions">
+                <button type="button" className="secondary"
+                  onClick={() => setReviewOpen(false)}>Вернуться к редактированию</button>
+                <button type="button" disabled={Boolean(reviewIssues.length) ||
+                  mutation.isPending || navigator.onLine === false}
+                  onClick={() => void submitReviewedProgram()}>
+                  {mutation.isPending ? 'Сохраняем…' : saveAsCopy ? 'Сохранить личную копию'
+                    : editingTemplate ? 'Сохранить изменения' : 'Создать и назначить'}
+                </button>
+              </div>
+            </section>
+          )}
         </form>
       )}
       {guide && (
