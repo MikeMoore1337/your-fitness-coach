@@ -1248,6 +1248,17 @@ async function mockProgress(
   });
 }
 
+async function expectTrainingHeading(page: Page) {
+  const desktop = await page.evaluate(() => matchMedia('(min-width: 768px)').matches);
+  await expect(
+    page.locator('#progress-training').getByRole('heading', {
+      name: desktop ? 'Показатели за период' : 'Тренировки',
+      level: 2,
+      exact: true,
+    }),
+  ).toBeVisible();
+}
+
 test('progress remains clear and free of horizontal overflow at supported widths', async ({
   page,
 }) => {
@@ -1283,7 +1294,7 @@ test('progress remains clear and free of horizontal overflow at supported widths
     .getByRole('navigation', { name: 'Разделы прогресса' })
     .getByRole('tab', { name: /^Тренировки/ })
     .click();
-  await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+  await expectTrainingHeading(page);
   await expect(page.getByRole('heading', { name: 'Активность', exact: true })).toBeVisible();
   await expect(page.getByText('История неполная', { exact: true })).toBeVisible();
   await expect(page.getByText('Грудные')).toBeVisible();
@@ -1314,7 +1325,7 @@ test('progress remains clear and free of horizontal overflow at supported widths
     await expect(
       page.locator('.progress-hero').getByRole('tab', { name: '30 дней' }),
     ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+    await expectTrainingHeading(page);
   }
 
   expect(consoleErrors).toEqual([]);
@@ -1928,7 +1939,7 @@ test('Progress has no decorative one-sided lime rails across themes and widths',
       .getByRole('navigation', { name: 'Разделы прогресса' })
       .getByRole('tab', { name: /^Тренировки/ })
       .click();
-    await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+    await expectTrainingHeading(page);
     const trainingContract = await page.locator('.progress-experience').evaluate((root) => {
       const cards = Array.from(root.querySelectorAll<HTMLElement>('.program-history-workout'));
       return cards.map((card) => getComputedStyle(card).boxShadow);
@@ -2265,7 +2276,7 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
     .getByRole('navigation', { name: 'Разделы прогресса' })
     .getByRole('tab', { name: /^Тренировки/ })
     .click();
-  await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+  await expectTrainingHeading(page);
   const trainingConfidence = page
     .locator('#progress-training')
     .getByLabel('Достаточно ли данных: Данных достаточно для оценки')
