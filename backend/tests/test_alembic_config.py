@@ -96,7 +96,8 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
     assert auth_families is not None
     assert relocated_marker is not None
     assert auth_families.down_revision == legacy_support.revision
-    assert revisions.get_heads() == ["0136_program_week_number_unbounded"]
+    assert revisions.get_heads() == ["0136_program_week_unbounded"]
+    assert all(len(item.revision) <= 32 for item in revisions.walk_revisions())
     assert relocated_marker.revision in {
         revision.revision
         for revision in revisions.iterate_revisions("head", legacy_support.revision)

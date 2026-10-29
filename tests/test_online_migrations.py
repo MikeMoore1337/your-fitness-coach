@@ -479,7 +479,7 @@ def test_cycle_storage_migrations_use_declared_online_operations():
     for filename in (
         "0134_program_cycle_storage.py",
         "0135_program_duration_unbounded.py",
-        "0136_program_week_number_unbounded.py",
+        "0136_program_week_unbounded.py",
     ):
         checker["validate_added_migration"](
             Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions" / filename
@@ -515,7 +515,7 @@ def test_sqlite_check_swap_rejects_undeclared_or_mismatching_operations(tmp_path
     root = Path(__file__).resolve().parents[1]
     checker = runpy.run_path(str(root / "scripts" / "check_online_migrations.py"))
     source = (
-        root / "backend" / "alembic" / "versions" / "0136_program_week_number_unbounded.py"
+        root / "backend" / "alembic" / "versions" / "0136_program_week_unbounded.py"
     ).read_text(encoding="utf-8")
     assert old in source
     invalid = tmp_path / "invalid.py"
