@@ -98,11 +98,17 @@ export function ProgramDayEditor({
   useEffect(() => {
     const carousel = carouselRef.current;
     if (!carousel) return;
-    const frame = window.requestAnimationFrame(() => {
-      carousel.scrollLeft = carousel.clientWidth * dayIndex;
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [dayIndex, days.length]);
+    const align = () => {
+      if (mobileView) carousel.scrollLeft = carousel.clientWidth * dayIndex;
+    };
+    const frame = window.requestAnimationFrame(align);
+    const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(align) : null;
+    resize?.observe(carousel);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resize?.disconnect();
+    };
+  }, [dayIndex, days.length, mobileView]);
 
   useEffect(() => {
     return () => {
