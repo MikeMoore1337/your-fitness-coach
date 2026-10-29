@@ -112,9 +112,7 @@ function searchRank<T extends ExerciseSearchItem>(
 
   const tokens = query.split(' ').filter(Boolean);
   if (tokens.every((token) => group.haystack.includes(token))) return 4;
-  return [...group.titles, ...group.aliases].some((value) => fuzzyMatches(value, tokens))
-    ? 5
-    : null;
+  return null;
 }
 
 export function rankExercisesForSearch<T extends ExerciseSearchItem>(
@@ -122,8 +120,19 @@ export function rankExercisesForSearch<T extends ExerciseSearchItem>(
   rawQuery: string,
 ): T[] {
   const query = normalizeExerciseSearchText(rawQuery);
-  return buildSearchGroups(exercises)
-    .map((group) => ({ group, rank: searchRank(group, query) }))
+  const groups = buildSearchGroups(exercises);
+  const ranked = groups.map((group) => ({ group, rank: searchRank(group, query) }));
+  if (query && !ranked.some((item) => item.rank !== null)) {
+    const tokens = query.split(' ');
+    for (const item of ranked) {
+      if (
+        [...item.group.titles, ...item.group.aliases].some((value) => fuzzyMatches(value, tokens))
+      ) {
+        item.rank = 5;
+      }
+    }
+  }
+  return ranked
     .filter((item): item is { group: SearchGroup<T>; rank: number } => item.rank !== null)
     .sort(
       (left, right) =>

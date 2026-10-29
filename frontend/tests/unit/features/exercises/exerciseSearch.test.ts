@@ -251,7 +251,7 @@ describe('Issue 1202 typo suggestions', () => {
     expect(ids).not.toContain(excluded);
   });
 
-  it('ranks exact, alias, prefix and typo matches in that order', () => {
+  it('uses typo matches only when exact, alias, prefix and token matches fail', () => {
     const candidates = [
       { id: 1, title: 'bench press' },
       { id: 2, title: 'A', aliases: ['bench press'] },
@@ -259,15 +259,15 @@ describe('Issue 1202 typo suggestions', () => {
       { id: 4, title: 'bench presx wide' },
     ];
     expect(rankExercisesForSearch(candidates, 'bench press').map((item) => item.id)).toEqual([
-      1, 2, 3, 4,
+      1, 2, 3,
+    ]);
+    expect(rankExercisesForSearch([candidates[3]!], 'bench press').map((item) => item.id)).toEqual([
+      4,
     ]);
   });
 
   it('does not return an exercise just because its alternative has the searched name', () => {
-    const candidates = [
-      { ...rows[0]!, alternatives: [{ title: 'Жим штанги лёжа' }] },
-      rows[1]!,
-    ];
+    const candidates = [{ ...rows[0]!, alternatives: [{ title: 'Жим штанги лёжа' }] }, rows[1]!];
     expect(rankExercisesForSearch(candidates, 'жим штанги').map((item) => item.id)).toEqual([2]);
     expect(rankExercisesForSearch(candidates, 'жим штангй').map((item) => item.id)).toEqual([2]);
   });
