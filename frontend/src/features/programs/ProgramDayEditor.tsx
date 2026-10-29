@@ -53,9 +53,11 @@ export function ProgramDayEditor({
   const [allDaysOpen, setAllDaysOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [reordering, setReordering] = useState(false);
-  const [mobileView, setMobileView] = useState(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
-    window.matchMedia('(max-width: 1099px)').matches,
+  const [mobileView, setMobileView] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 1099px)').matches,
   );
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
@@ -140,7 +142,9 @@ export function ProgramDayEditor({
   const closeDetail = useCallback(() => {
     setDetailOpen(false);
     window.requestAnimationFrame(() => {
-      const fallback = document.querySelector<HTMLButtonElement>('.copy-editor__exercise[aria-pressed="true"]');
+      const fallback = document.querySelector<HTMLButtonElement>(
+        '.copy-editor__exercise[aria-pressed="true"]',
+      );
       const previous = exerciseTriggerRef.current;
       if (previous?.isConnected) previous.focus();
       else fallback?.focus();
@@ -190,9 +194,7 @@ export function ProgramDayEditor({
   const changeRow = (index: number, change: (row: Row) => Row) => {
     updateDay(dayIndex, (current) => ({
       ...current,
-      exercises: current.exercises.map((row, rowIndex) =>
-        rowIndex === index ? change(row) : row,
-      ),
+      exercises: current.exercises.map((row, rowIndex) => (rowIndex === index ? change(row) : row)),
     }));
   };
 
@@ -245,7 +247,8 @@ export function ProgramDayEditor({
     if (
       !(await confirm({
         title: 'Удалить упражнение?',
-        message: 'Упражнение будет удалено из этого дня. Изменение вступит в силу после сохранения программы.',
+        message:
+          'Упражнение будет удалено из этого дня. Изменение вступит в силу после сохранения программы.',
         confirmText: 'Удалить упражнение',
       }))
     )
@@ -273,11 +276,18 @@ export function ProgramDayEditor({
       <div className="copy-editor__detail-fields">
         <div className="copy-editor__detail-title">
           <div>
-            <span className="eyebrow">День {dayIndex + 1} · упражнение {exerciseIndex + 1}</span>
+            <span className="eyebrow">
+              День {dayIndex + 1} · упражнение {exerciseIndex + 1}
+            </span>
             <h3>{selected?.title ?? 'Выберите упражнение'}</h3>
           </div>
           {mobile && (
-            <button type="button" className="secondary copy-editor__icon" onClick={closeDetail} aria-label="Закрыть параметры">
+            <button
+              type="button"
+              className="secondary copy-editor__icon"
+              onClick={closeDetail}
+              aria-label="Закрыть параметры"
+            >
               <Icon name="close" size={20} />
             </button>
           )}
@@ -304,11 +314,19 @@ export function ProgramDayEditor({
         {cardio ? (
           <label className="field">
             <span>Плановая длительность, мин</span>
-            <input type="number" inputMode="numeric" min="1" max="600" required
+            <input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              max="600"
+              required
               value={activeRow.prescribed_duration_minutes ?? ''}
-              onChange={(event) => changeRow(exerciseIndex, (row) => ({
-                ...row, prescribed_duration_minutes: Number(event.target.value),
-              }))}
+              onChange={(event) =>
+                changeRow(exerciseIndex, (row) => ({
+                  ...row,
+                  prescribed_duration_minutes: Number(event.target.value),
+                }))
+              }
             />
           </label>
         ) : (
@@ -316,52 +334,85 @@ export function ProgramDayEditor({
             <div className="copy-editor__metrics">
               <label className="field">
                 <span>Рабочие подходы</span>
-                <input type="number" inputMode="numeric" min="1" max="10" required
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="10"
+                  required
                   value={activeRow.prescribed_sets ?? ''}
-                  onChange={(event) => changeRow(exerciseIndex, (row) => ({
-                    ...row, prescribed_sets: Number(event.target.value),
-                  }))}
+                  onChange={(event) =>
+                    changeRow(exerciseIndex, (row) => ({
+                      ...row,
+                      prescribed_sets: Number(event.target.value),
+                    }))
+                  }
                 />
               </label>
               <label className="field">
                 <span>Отдых, сек</span>
-                <input type="number" inputMode="numeric" min="15" max="600" required
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="15"
+                  max="600"
+                  required
                   value={activeRow.rest_seconds ?? ''}
-                  onChange={(event) => changeRow(exerciseIndex, (row) => ({
-                    ...row, rest_seconds: Number(event.target.value),
-                  }))}
+                  onChange={(event) =>
+                    changeRow(exerciseIndex, (row) => ({
+                      ...row,
+                      rest_seconds: Number(event.target.value),
+                    }))
+                  }
                 />
               </label>
             </div>
             <label className="field">
               <span>Повторы, включая последовательность по подходам</span>
-              <input type="text" maxLength={32} required value={activeRow.prescribed_reps ?? ''}
+              <input
+                type="text"
+                maxLength={32}
+                required
+                value={activeRow.prescribed_reps ?? ''}
                 placeholder="Например: 12/10/8/15"
-                onChange={(event) => changeRow(exerciseIndex, (row) => ({
-                  ...row, prescribed_reps: event.target.value,
-                }))}
+                onChange={(event) =>
+                  changeRow(exerciseIndex, (row) => ({
+                    ...row,
+                    prescribed_reps: event.target.value,
+                  }))
+                }
               />
             </label>
           </>
         )}
         <details className="compact-disclosure copy-editor__advanced">
           <summary className="yfc-disclosure-summary">
-            <span><strong>Заметка и дополнительные параметры</strong><small>Суперсеты, замены, комментарий</small></span>
+            <span>
+              <strong>Заметка и дополнительные параметры</strong>
+              <small>Суперсеты, замены, комментарий</small>
+            </span>
             <DisclosureIcon />
           </summary>
           <div className="copy-editor__advanced-body">
             <label className="field">
               <span>Заметка к упражнению</span>
-              <input maxLength={2000} value={activeRow.notes ?? ''}
+              <input
+                maxLength={2000}
+                value={activeRow.notes ?? ''}
                 placeholder="Например: выполнять медленно, без рывков"
-                onChange={(event) => changeRow(exerciseIndex, (row) => ({
-                  ...row, notes: event.target.value,
-                }))}
+                onChange={(event) =>
+                  changeRow(exerciseIndex, (row) => ({
+                    ...row,
+                    notes: event.target.value,
+                  }))
+                }
               />
             </label>
             {exerciseIndex > 0 && !cardio && (
               <label className="checkbox-row">
-                <input type="checkbox" checked={isPairedWithPrevious(day, exerciseIndex)}
+                <input
+                  type="checkbox"
+                  checked={isPairedWithPrevious(day, exerciseIndex)}
                   onChange={(event) =>
                     updateDay(dayIndex, (current) =>
                       toggleSuperset(current, exerciseIndex, event.target.checked),
@@ -373,39 +424,65 @@ export function ProgramDayEditor({
             )}
             <div className="stack">
               <strong>Проверенные замены</strong>
-              {alternatives.length ? alternatives.map((alternative) => (
-                <button key={alternative.id} type="button" className="text-button"
-                  onClick={() => selectExerciseId(exerciseIndex, alternative.id)}>
-                  Заменить на «{alternative.title}»
-                </button>
-              )) : <small className="muted">Проверенных замен пока нет.</small>}
+              {alternatives.length ? (
+                alternatives.map((alternative) => (
+                  <button
+                    key={alternative.id}
+                    type="button"
+                    className="text-button"
+                    onClick={() => selectExerciseId(exerciseIndex, alternative.id)}
+                  >
+                    Заменить на «{alternative.title}»
+                  </button>
+                ))
+              ) : (
+                <small className="muted">Проверенных замен пока нет.</small>
+              )}
             </div>
-            {!cardio && <small className="muted">Разминочные и дроп-сеты отмечаются во время тренировки.</small>}
+            {!cardio && (
+              <small className="muted">
+                Разминочные и дроп-сеты отмечаются во время тренировки.
+              </small>
+            )}
           </div>
         </details>
         {reordering && (
           <div className="copy-editor__order-actions" aria-label="Порядок упражнения">
-            <button type="button" className="secondary" disabled={exerciseIndex === 0}
+            <button
+              type="button"
+              className="secondary"
+              disabled={exerciseIndex === 0}
               onClick={() => {
                 updateDay(dayIndex, (current) => ({
-                  ...current, exercises: moveItem(current.exercises, exerciseIndex, exerciseIndex - 1),
+                  ...current,
+                  exercises: moveItem(current.exercises, exerciseIndex, exerciseIndex - 1),
                 }));
                 setSelectedExercise(exerciseIndex - 1);
-              }}>
+              }}
+            >
               <Icon name="move-up" size={20} /> Выше
             </button>
-            <button type="button" className="secondary" disabled={exerciseIndex === day.exercises.length - 1}
+            <button
+              type="button"
+              className="secondary"
+              disabled={exerciseIndex === day.exercises.length - 1}
               onClick={() => {
                 updateDay(dayIndex, (current) => ({
-                  ...current, exercises: moveItem(current.exercises, exerciseIndex, exerciseIndex + 1),
+                  ...current,
+                  exercises: moveItem(current.exercises, exerciseIndex, exerciseIndex + 1),
                 }));
                 setSelectedExercise(exerciseIndex + 1);
-              }}>
+              }}
+            >
               <Icon name="move-down" size={20} /> Ниже
             </button>
           </div>
         )}
-        <button type="button" className="text-button copy-editor__danger" onClick={() => void deleteRow(exerciseIndex)}>
+        <button
+          type="button"
+          className="text-button copy-editor__danger"
+          onClick={() => void deleteRow(exerciseIndex)}
+        >
           <Icon name="trash" size={16} /> Удалить упражнение
         </button>
       </div>
@@ -414,13 +491,17 @@ export function ProgramDayEditor({
 
   const dayCount = days.length;
   const allDayButtons = days.map((item, index) => (
-    <button key={index} type="button"
-      className="copy-editor__day-choice" data-yfc-choice="compact"
+    <button
+      key={index}
+      type="button"
+      className="copy-editor__day-choice"
+      data-yfc-choice="compact"
       aria-pressed={index === dayIndex}
       onClick={() => {
         selectDay(index);
         window.requestAnimationFrame(() => allDaysTriggerRef.current?.focus());
-      }}>
+      }}
+    >
       <strong>День {index + 1}</strong>
       <span>{item.title || simpleTrainingTitle(index + 1)}</span>
       <small>{item.exercises.length} упр.</small>
@@ -432,14 +513,20 @@ export function ProgramDayEditor({
       <section className="copy-editor" aria-label="Дни и упражнения программы">
         <aside className="copy-editor__rail" aria-label="Список тренировочных дней">
           <div className="copy-editor__section-head">
-            <h3>Дни программы</h3><span className="muted">{dayCount} из 8</span>
+            <h3>Дни программы</h3>
+            <span className="muted">{dayCount} из 8</span>
           </div>
           <div className="copy-editor__rail-days" role="tablist" aria-label="Тренировочные дни">
             {days.map((item, index) => (
-              <button key={index} type="button" role="tab"
-                data-yfc-choice="compact" aria-selected={index === dayIndex}
+              <button
+                key={index}
+                type="button"
+                role="tab"
+                data-yfc-choice="compact"
+                aria-selected={index === dayIndex}
                 className="copy-editor__rail-button"
-                onClick={() => selectDay(index)}>
+                onClick={() => selectDay(index)}
+              >
                 <strong>День {index + 1}</strong>
                 <span>{item.title || simpleTrainingTitle(index + 1)}</span>
                 <small>{item.exercises.length} упр.</small>
@@ -453,74 +540,144 @@ export function ProgramDayEditor({
           <div className="copy-editor__mobile-days">
             <div className="copy-editor__section-head">
               <h3>Выбор дня</h3>
-              <button type="button" className="secondary" ref={allDaysTriggerRef}
-                onClick={() => setAllDaysOpen(true)}>
+              <button
+                type="button"
+                className="secondary"
+                ref={allDaysTriggerRef}
+                onClick={() => setAllDaysOpen(true)}
+              >
                 Все дни
               </button>
             </div>
-            <div className="copy-editor__carousel" ref={carouselRef} onScroll={handleCarouselScroll}
-              role="tablist" aria-label="Дни программы" onKeyDown={(event) => {
-                if (event.key === 'ArrowRight') { event.preventDefault(); selectDay(dayIndex + 1); }
-                if (event.key === 'ArrowLeft') { event.preventDefault(); selectDay(dayIndex - 1); }
-                if (event.key === 'Home') { event.preventDefault(); selectDay(0); }
-                if (event.key === 'End') { event.preventDefault(); selectDay(dayCount - 1); }
-              }}>
+            <div
+              className="copy-editor__carousel"
+              ref={carouselRef}
+              onScroll={handleCarouselScroll}
+              role="tablist"
+              aria-label="Дни программы"
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowRight') {
+                  event.preventDefault();
+                  selectDay(dayIndex + 1);
+                }
+                if (event.key === 'ArrowLeft') {
+                  event.preventDefault();
+                  selectDay(dayIndex - 1);
+                }
+                if (event.key === 'Home') {
+                  event.preventDefault();
+                  selectDay(0);
+                }
+                if (event.key === 'End') {
+                  event.preventDefault();
+                  selectDay(dayCount - 1);
+                }
+              }}
+            >
               {days.map((item, index) => (
-                <button key={index} type="button" role="tab"
-                  className="copy-editor__slide" tabIndex={index === dayIndex ? 0 : -1}
+                <button
+                  key={index}
+                  type="button"
+                  role="tab"
+                  className="copy-editor__slide"
+                  tabIndex={index === dayIndex ? 0 : -1}
                   aria-selected={index === dayIndex}
                   aria-label={'День ' + (index + 1) + ' из ' + dayCount + ': ' + item.title}
-                  onClick={() => selectDay(index)}>
-                  <span className="eyebrow">День {index + 1} из {dayCount}</span>
+                  onClick={() => selectDay(index)}
+                >
+                  <span className="eyebrow">
+                    День {index + 1} из {dayCount}
+                  </span>
                   <strong>{item.title || simpleTrainingTitle(index + 1)}</strong>
                   <small>{item.exercises.length} упр. · тренировочный день</small>
                 </button>
               ))}
             </div>
             <div className="copy-editor__carousel-actions">
-              <button type="button" className="secondary copy-editor__icon" disabled={dayIndex === 0}
-                onClick={() => selectDay(dayIndex - 1)} aria-label="Предыдущий день">
+              <button
+                type="button"
+                className="secondary copy-editor__icon"
+                disabled={dayIndex === 0}
+                onClick={() => selectDay(dayIndex - 1)}
+                aria-label="Предыдущий день"
+              >
                 <Icon name="chevron-left" size={20} />
               </button>
-              <span aria-live="polite" className="copy-editor__counter">День {dayIndex + 1} из {dayCount}</span>
-              <button type="button" className="secondary copy-editor__icon"
-                disabled={dayIndex === dayCount - 1} onClick={() => selectDay(dayIndex + 1)}
-                aria-label="Следующий день">
+              <span aria-live="polite" className="copy-editor__counter">
+                День {dayIndex + 1} из {dayCount}
+              </span>
+              <button
+                type="button"
+                className="secondary copy-editor__icon"
+                disabled={dayIndex === dayCount - 1}
+                onClick={() => selectDay(dayIndex + 1)}
+                aria-label="Следующий день"
+              >
                 <Icon name="chevron-right" size={20} />
               </button>
             </div>
           </div>
 
           <div className="copy-editor__current-day">
-            <div className="copy-editor__eyebrow">День {dayIndex + 1} из {dayCount}</div>
+            <div className="copy-editor__eyebrow">
+              День {dayIndex + 1} из {dayCount}
+            </div>
             <label className="field">
               <span>Название дня</span>
-              <input maxLength={128} required value={day.title}
-                onChange={(event) => updateDay(dayIndex, (current) => ({
-                  ...current, title: event.target.value,
-                }))}
+              <input
+                maxLength={128}
+                required
+                value={day.title}
+                onChange={(event) =>
+                  updateDay(dayIndex, (current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
               />
             </label>
             <div className="copy-editor__order-actions">
-              <button type="button" className="secondary" disabled={dayIndex === 0}
-                onClick={() => moveDay(-1)} aria-label="Переместить день выше">
+              <button
+                type="button"
+                className="secondary"
+                disabled={dayIndex === 0}
+                onClick={() => moveDay(-1)}
+                aria-label="Переместить день выше"
+              >
                 <Icon name="move-up" size={20} />
               </button>
-              <button type="button" className="secondary" disabled={dayIndex === dayCount - 1}
-                onClick={() => moveDay(1)} aria-label="Переместить день ниже">
+              <button
+                type="button"
+                className="secondary"
+                disabled={dayIndex === dayCount - 1}
+                onClick={() => moveDay(1)}
+                aria-label="Переместить день ниже"
+              >
                 <Icon name="move-down" size={20} />
               </button>
               {dayCount > 1 && (
-                <button type="button" className="text-button copy-editor__danger"
-                  onClick={() => void deleteDay()}>Удалить день</button>
+                <button
+                  type="button"
+                  className="text-button copy-editor__danger"
+                  onClick={() => void deleteDay()}
+                >
+                  Удалить день
+                </button>
               )}
             </div>
           </div>
 
           <div className="copy-editor__section-head copy-editor__exercise-heading">
-            <div><h3>Упражнения</h3><span className="muted">{day.exercises.length} упр. · только выбранный день</span></div>
-            <button type="button" className="secondary" aria-pressed={reordering}
-              onClick={() => setReordering((value) => !value)}>
+            <div>
+              <h3>Упражнения</h3>
+              <span className="muted">{day.exercises.length} упр. · только выбранный день</span>
+            </div>
+            <button
+              type="button"
+              className="secondary"
+              aria-pressed={reordering}
+              onClick={() => setReordering((value) => !value)}
+            >
               {reordering ? 'Готово' : 'Изменить порядок'}
             </button>
           </div>
@@ -529,22 +686,29 @@ export function ProgramDayEditor({
               const details = available(item.exercise_id);
               const cardio = details?.metric_type === 'cardio';
               return (
-                <button key={index} type="button" className="copy-editor__exercise"
+                <button
+                  key={index}
+                  type="button"
+                  className="copy-editor__exercise"
                   aria-pressed={index === exerciseIndex}
                   onClick={(event) => {
                     exerciseTriggerRef.current = event.currentTarget;
                     setSelectedExercise(index);
                     setDetailOpen(mobileView);
-                  }}>
+                  }}
+                >
                   <span className="copy-editor__ordinal">{index + 1}</span>
                   <span className="copy-editor__exercise-info">
                     <strong>{details?.title ?? 'Выберите упражнение'}</strong>
                     <span>
                       {cardio
                         ? String(item.prescribed_duration_minutes ?? 0) + ' мин'
-                        : String(item.prescribed_sets ?? 0) + ' × ' +
-                          String(item.prescribed_reps ?? '') + ' · отдых ' +
-                          String(item.rest_seconds ?? 0) + ' сек'}
+                        : String(item.prescribed_sets ?? 0) +
+                          ' × ' +
+                          String(item.prescribed_reps ?? '') +
+                          ' · отдых ' +
+                          String(item.rest_seconds ?? 0) +
+                          ' сек'}
                     </span>
                     {(item.notes || isPairedWithPrevious(day, index)) && (
                       <small>
@@ -559,7 +723,9 @@ export function ProgramDayEditor({
             })}
           </div>
           {day.exercises.length < 20 ? (
-            <button type="button" className="secondary copy-editor__add"
+            <button
+              type="button"
+              className="secondary copy-editor__add"
               onClick={() => {
                 updateDay(dayIndex, (current) => ({
                   ...current,
@@ -568,25 +734,36 @@ export function ProgramDayEditor({
                 setSelectedExercise(day.exercises.length);
                 exerciseTriggerRef.current = null;
                 setDetailOpen(mobileView);
-              }}>
+              }}
+            >
               <Icon name="plus" size={20} /> Добавить упражнение
             </button>
-          ) : <p className="muted">В одной тренировке максимум 20 упражнений.</p>}
+          ) : (
+            <p className="muted">В одной тренировке максимум 20 упражнений.</p>
+          )}
 
           <div className="copy-editor__add-day">
             {dayCount < 8 ? (
-              <button type="button" className="secondary"
+              <button
+                type="button"
+                className="secondary"
                 onClick={() => {
                   setDays((current) => [
                     ...current,
-                    { title: simpleTrainingTitle(current.length + 1), exercises: [newExercise(defaultRestSeconds)] },
+                    {
+                      title: simpleTrainingTitle(current.length + 1),
+                      exercises: [newExercise(defaultRestSeconds)],
+                    },
                   ]);
                   setSelectedDay(dayCount);
                   setSelectedExercise(0);
-                }}>
+                }}
+              >
                 <Icon name="plus" size={20} /> Добавить день
               </button>
-            ) : <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>}
+            ) : (
+              <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>
+            )}
           </div>
         </div>
 
@@ -595,35 +772,58 @@ export function ProgramDayEditor({
         </aside>
       </section>
 
-      {allDaysOpen && createPortal(
-        <div className="copy-editor__overlay" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeAllDays();
-        }}>
-          <div className="copy-editor__sheet" role="dialog" aria-modal="true"
-            aria-label="Все дни программы" ref={allDaysDialogRef}>
-            <div className="copy-editor__sheet-header">
-              <h3>Все дни программы</h3>
-              <button type="button" className="secondary copy-editor__icon"
-                onClick={closeAllDays} aria-label="Закрыть список дней">
-                <Icon name="close" size={20} />
-              </button>
+      {allDaysOpen &&
+        createPortal(
+          <div
+            className="copy-editor__overlay"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeAllDays();
+            }}
+          >
+            <div
+              className="copy-editor__sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Все дни программы"
+              ref={allDaysDialogRef}
+            >
+              <div className="copy-editor__sheet-header">
+                <h3>Все дни программы</h3>
+                <button
+                  type="button"
+                  className="secondary copy-editor__icon"
+                  onClick={closeAllDays}
+                  aria-label="Закрыть список дней"
+                >
+                  <Icon name="close" size={20} />
+                </button>
+              </div>
+              <div className="copy-editor__day-grid">{allDayButtons}</div>
             </div>
-            <div className="copy-editor__day-grid">{allDayButtons}</div>
-          </div>
-        </div>,
-        document.body,
-      )}
-      {detailOpen && mobileView && createPortal(
-        <div className="copy-editor__overlay copy-editor__detail-overlay" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeDetail();
-        }}>
-          <div className="copy-editor__sheet copy-editor__detail-sheet" role="dialog"
-            aria-modal="true" aria-label="Параметры упражнения" ref={detailDialogRef}>
-            {renderDetails(true)}
-          </div>
-        </div>,
-        document.body,
-      )}
+          </div>,
+          document.body,
+        )}
+      {detailOpen &&
+        mobileView &&
+        createPortal(
+          <div
+            className="copy-editor__overlay copy-editor__detail-overlay"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closeDetail();
+            }}
+          >
+            <div
+              className="copy-editor__sheet copy-editor__detail-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Параметры упражнения"
+              ref={detailDialogRef}
+            >
+              {renderDetails(true)}
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

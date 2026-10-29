@@ -421,7 +421,9 @@ export function ProgramBuilder({
         </section>
       ) : (
         <form
-          className={editingTemplate ? 'stack top-gap program-builder--personal-editor' : 'stack top-gap'}
+          className={
+            editingTemplate ? 'stack top-gap program-builder--personal-editor' : 'stack top-gap'
+          }
           onSubmit={async (e) => {
             e.preventDefault();
             let replaceActive = false;
@@ -471,7 +473,11 @@ export function ProgramBuilder({
             <div>
               <span className="eyebrow">Шаг 2</span>
               <h3>{editingTemplate ? 'Тренировочные дни' : 'Добавьте упражнения'}</h3>
-              <p>{editingTemplate ? 'Выберите день и настройте его упражнения.' : 'Первая тренировка уже создана. Выберите хотя бы одно упражнение.'}</p>
+              <p>
+                {editingTemplate
+                  ? 'Выберите день и настройте его упражнения.'
+                  : 'Первая тренировка уже создана. Выберите хотя бы одно упражнение.'}
+              </p>
             </div>
             <Badge>{days.length} из 8</Badge>
           </div>
@@ -484,243 +490,200 @@ export function ProgramBuilder({
               defaultRestSeconds={defaultRestSeconds}
               onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
             />
-          ) : days.map((day, dayIndex) => (
-            <div className="program-day stack" key={dayIndex}>
-              <div className="program-day__head">
-                <span className="program-day__number">{dayIndex + 1}</span>
-                <input
-                  aria-label={`Название дня ${dayIndex + 1}`}
-                  value={day.title}
-                  maxLength={128}
-                  required
-                  onChange={(e) => updateDay(dayIndex, { ...day, title: e.target.value })}
-                />
-                <div className="program-order-controls" aria-label={`Порядок дня ${dayIndex + 1}`}>
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={`Переместить день ${dayIndex + 1} выше`}
-                    disabled={dayIndex === 0}
-                    onClick={() =>
-                      setDays((currentDays) => moveItem(currentDays, dayIndex, dayIndex - 1))
-                    }
+          ) : (
+            days.map((day, dayIndex) => (
+              <div className="program-day stack" key={dayIndex}>
+                <div className="program-day__head">
+                  <span className="program-day__number">{dayIndex + 1}</span>
+                  <input
+                    aria-label={`Название дня ${dayIndex + 1}`}
+                    value={day.title}
+                    maxLength={128}
+                    required
+                    onChange={(e) => updateDay(dayIndex, { ...day, title: e.target.value })}
+                  />
+                  <div
+                    className="program-order-controls"
+                    aria-label={`Порядок дня ${dayIndex + 1}`}
                   >
-                    <Icon name="move-up" size={20} />
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={`Переместить день ${dayIndex + 1} ниже`}
-                    disabled={dayIndex === days.length - 1}
-                    onClick={() =>
-                      setDays((currentDays) => moveItem(currentDays, dayIndex, dayIndex + 1))
-                    }
-                  >
-                    <Icon name="move-down" size={20} />
-                  </button>
-                  {days.length > 1 && (
                     <button
                       type="button"
-                      className="btn-danger"
-                      aria-label={`Удалить день ${dayIndex + 1}`}
+                      className="secondary"
+                      aria-label={`Переместить день ${dayIndex + 1} выше`}
+                      disabled={dayIndex === 0}
                       onClick={() =>
-                        setDays((currentDays) =>
-                          currentDays.filter((_, index) => index !== dayIndex),
-                        )
+                        setDays((currentDays) => moveItem(currentDays, dayIndex, dayIndex - 1))
                       }
                     >
-                      <TrashIcon />
+                      <Icon name="move-up" size={20} />
                     </button>
-                  )}
-                </div>
-              </div>
-              {day.exercises.map((item, exerciseIndex) => (
-                <div className="program-exercise-row" key={exerciseIndex}>
-                  <div className="field exercise-select">
-                    <span className="program-exercise-row__heading">
-                      <span>
-                        <span className="program-exercise-row__number">{exerciseIndex + 1}</span>
-                        <strong>Упражнение</strong>
-                      </span>
-                      <span
-                        className="program-exercise-row__actions"
-                        aria-label={`Действия с упражнением ${exerciseIndex + 1}`}
-                      >
-                        <button
-                          type="button"
-                          className="secondary"
-                          aria-label={`Переместить упражнение ${exerciseIndex + 1} выше`}
-                          disabled={exerciseIndex === 0}
-                          onClick={() =>
-                            updateDay(dayIndex, (currentDay) => ({
-                              ...currentDay,
-                              exercises: moveItem(
-                                currentDay.exercises,
-                                exerciseIndex,
-                                exerciseIndex - 1,
-                              ),
-                            }))
-                          }
-                        >
-                          <Icon name="move-up" size={20} />
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          aria-label={`Переместить упражнение ${exerciseIndex + 1} ниже`}
-                          disabled={exerciseIndex === day.exercises.length - 1}
-                          onClick={() =>
-                            updateDay(dayIndex, (currentDay) => ({
-                              ...currentDay,
-                              exercises: moveItem(
-                                currentDay.exercises,
-                                exerciseIndex,
-                                exerciseIndex + 1,
-                              ),
-                            }))
-                          }
-                        >
-                          <Icon name="move-down" size={20} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-danger"
-                          aria-label={`Удалить упражнение ${exerciseIndex + 1} из дня ${dayIndex + 1}`}
-                          onClick={() =>
-                            updateDay(dayIndex, (currentDay) =>
-                              removeExercise(currentDay, exerciseIndex),
-                            )
-                          }
-                        >
-                          <TrashIcon />
-                        </button>
-                      </span>
-                    </span>
-                    <SearchableExercisePicker
-                      mobileSheet
-                      exercises={orderedExercises}
-                      value={item.exercise_id}
-                      clearValue={0}
-                      onOpenGuide={(exercise) =>
-                        setGuide({ id: exercise.id, title: exercise.title })
+                    <button
+                      type="button"
+                      className="secondary"
+                      aria-label={`Переместить день ${dayIndex + 1} ниже`}
+                      disabled={dayIndex === days.length - 1}
+                      onClick={() =>
+                        setDays((currentDays) => moveItem(currentDays, dayIndex, dayIndex + 1))
                       }
-                      onChange={(exerciseId) => {
-                        const nextExerciseId = typeof exerciseId === 'number' ? exerciseId : 0;
-                        const selected = exercises.data?.find(
-                          (exercise) => exercise.id === nextExerciseId,
-                        );
-                        updateDay(dayIndex, {
-                          ...day,
-                          exercises: day.exercises.map((row, index) => {
-                            if (index !== exerciseIndex) return row;
-                            if (selected?.metric_type === 'cardio') {
-                              return {
-                                ...row,
-                                exercise_id: nextExerciseId,
-                                prescribed_sets: null,
-                                prescribed_reps: null,
-                                prescribed_duration_minutes: row.prescribed_duration_minutes ?? 30,
-                                superset_group: null,
-                                superset_order: null,
-                              };
-                            }
-                            return {
-                              ...row,
-                              exercise_id: nextExerciseId,
-                              prescribed_sets: row.prescribed_sets ?? 3,
-                              prescribed_reps: row.prescribed_reps || '8-12',
-                              prescribed_duration_minutes: null,
-                            };
-                          }),
-                        });
-                      }}
-                    />
-                    {exercises.data?.some((exercise) => exercise.id === item.exercise_id) && (
+                    >
+                      <Icon name="move-down" size={20} />
+                    </button>
+                    {days.length > 1 && (
                       <button
                         type="button"
-                        className="text-button"
-                        onClick={() => {
-                          const selected = exercises.data?.find(
-                            (exercise) => exercise.id === item.exercise_id,
-                          );
-                          if (selected) setGuide({ id: selected.id, title: selected.title });
-                        }}
+                        className="btn-danger"
+                        aria-label={`Удалить день ${dayIndex + 1}`}
+                        onClick={() =>
+                          setDays((currentDays) =>
+                            currentDays.filter((_, index) => index !== dayIndex),
+                          )
+                        }
                       >
-                        {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                          ?.has_guide
-                          ? 'Техника и детали'
-                          : 'Подробнее об упражнении'}
+                        <TrashIcon />
                       </button>
                     )}
                   </div>
-                  <div className="program-exercise-row__metrics">
-                    {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                      ?.metric_type === 'cardio' ? (
-                      <label className="field">
-                        <span>Плановая длительность, мин</span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min="1"
-                          max="600"
-                          required
-                          value={item.prescribed_duration_minutes ?? ''}
-                          onChange={(event) =>
-                            updateDay(dayIndex, {
-                              ...day,
-                              exercises: day.exercises.map((row, index) =>
-                                index === exerciseIndex
-                                  ? {
-                                      ...row,
-                                      prescribed_duration_minutes: Number(event.target.value),
-                                    }
-                                  : row,
-                              ),
-                            })
-                          }
-                        />
-                      </label>
-                    ) : (
-                      (
-                        [
-                          ['prescribed_sets', 'Рабочие подходы'],
-                          ['prescribed_reps', 'Повторы'],
-                          ['rest_seconds', 'Отдых, сек'],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <label className="field" key={key}>
-                          <span>{label}</span>
+                </div>
+                {day.exercises.map((item, exerciseIndex) => (
+                  <div className="program-exercise-row" key={exerciseIndex}>
+                    <div className="field exercise-select">
+                      <span className="program-exercise-row__heading">
+                        <span>
+                          <span className="program-exercise-row__number">{exerciseIndex + 1}</span>
+                          <strong>Упражнение</strong>
+                        </span>
+                        <span
+                          className="program-exercise-row__actions"
+                          aria-label={`Действия с упражнением ${exerciseIndex + 1}`}
+                        >
+                          <button
+                            type="button"
+                            className="secondary"
+                            aria-label={`Переместить упражнение ${exerciseIndex + 1} выше`}
+                            disabled={exerciseIndex === 0}
+                            onClick={() =>
+                              updateDay(dayIndex, (currentDay) => ({
+                                ...currentDay,
+                                exercises: moveItem(
+                                  currentDay.exercises,
+                                  exerciseIndex,
+                                  exerciseIndex - 1,
+                                ),
+                              }))
+                            }
+                          >
+                            <Icon name="move-up" size={20} />
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary"
+                            aria-label={`Переместить упражнение ${exerciseIndex + 1} ниже`}
+                            disabled={exerciseIndex === day.exercises.length - 1}
+                            onClick={() =>
+                              updateDay(dayIndex, (currentDay) => ({
+                                ...currentDay,
+                                exercises: moveItem(
+                                  currentDay.exercises,
+                                  exerciseIndex,
+                                  exerciseIndex + 1,
+                                ),
+                              }))
+                            }
+                          >
+                            <Icon name="move-down" size={20} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-danger"
+                            aria-label={`Удалить упражнение ${exerciseIndex + 1} из дня ${dayIndex + 1}`}
+                            onClick={() =>
+                              updateDay(dayIndex, (currentDay) =>
+                                removeExercise(currentDay, exerciseIndex),
+                              )
+                            }
+                          >
+                            <TrashIcon />
+                          </button>
+                        </span>
+                      </span>
+                      <SearchableExercisePicker
+                        mobileSheet
+                        exercises={orderedExercises}
+                        value={item.exercise_id}
+                        clearValue={0}
+                        onOpenGuide={(exercise) =>
+                          setGuide({ id: exercise.id, title: exercise.title })
+                        }
+                        onChange={(exerciseId) => {
+                          const nextExerciseId = typeof exerciseId === 'number' ? exerciseId : 0;
+                          const selected = exercises.data?.find(
+                            (exercise) => exercise.id === nextExerciseId,
+                          );
+                          updateDay(dayIndex, {
+                            ...day,
+                            exercises: day.exercises.map((row, index) => {
+                              if (index !== exerciseIndex) return row;
+                              if (selected?.metric_type === 'cardio') {
+                                return {
+                                  ...row,
+                                  exercise_id: nextExerciseId,
+                                  prescribed_sets: null,
+                                  prescribed_reps: null,
+                                  prescribed_duration_minutes:
+                                    row.prescribed_duration_minutes ?? 30,
+                                  superset_group: null,
+                                  superset_order: null,
+                                };
+                              }
+                              return {
+                                ...row,
+                                exercise_id: nextExerciseId,
+                                prescribed_sets: row.prescribed_sets ?? 3,
+                                prescribed_reps: row.prescribed_reps || '8-12',
+                                prescribed_duration_minutes: null,
+                              };
+                            }),
+                          });
+                        }}
+                      />
+                      {exercises.data?.some((exercise) => exercise.id === item.exercise_id) && (
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => {
+                            const selected = exercises.data?.find(
+                              (exercise) => exercise.id === item.exercise_id,
+                            );
+                            if (selected) setGuide({ id: selected.id, title: selected.title });
+                          }}
+                        >
+                          {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
+                            ?.has_guide
+                            ? 'Техника и детали'
+                            : 'Подробнее об упражнении'}
+                        </button>
+                      )}
+                    </div>
+                    <div className="program-exercise-row__metrics">
+                      {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
+                        ?.metric_type === 'cardio' ? (
+                        <label className="field">
+                          <span>Плановая длительность, мин</span>
                           <input
-                            type={key === 'prescribed_reps' ? 'text' : 'number'}
-                            inputMode={key === 'prescribed_reps' ? undefined : 'numeric'}
-                            min={
-                              key === 'prescribed_sets'
-                                ? 1
-                                : key === 'rest_seconds'
-                                  ? 15
-                                  : undefined
-                            }
-                            max={
-                              key === 'prescribed_sets'
-                                ? 10
-                                : key === 'rest_seconds'
-                                  ? 600
-                                  : undefined
-                            }
-                            maxLength={key === 'prescribed_reps' ? 32 : undefined}
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            max="600"
                             required
-                            value={item[key] ?? ''}
-                            onChange={(e) =>
+                            value={item.prescribed_duration_minutes ?? ''}
+                            onChange={(event) =>
                               updateDay(dayIndex, {
                                 ...day,
                                 exercises: day.exercises.map((row, index) =>
                                   index === exerciseIndex
                                     ? {
                                         ...row,
-                                        [key]:
-                                          key === 'prescribed_reps'
-                                            ? e.target.value
-                                            : Number(e.target.value),
+                                        prescribed_duration_minutes: Number(event.target.value),
                                       }
                                     : row,
                                 ),
@@ -728,125 +691,176 @@ export function ProgramBuilder({
                             }
                           />
                         </label>
-                      ))
-                    )}
-                  </div>
-                  <details className="program-exercise-advanced compact-disclosure">
-                    <summary className="yfc-disclosure-summary">
-                      <span>
-                        <strong>
-                          {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                            ?.metric_type === 'cardio'
-                            ? 'Заметка и замены'
-                            : 'Заметка, суперсет и замены'}
-                        </strong>
-                        <small>Необязательные настройки упражнения</small>
-                      </span>
-                      <DisclosureIcon />
-                    </summary>
-                    <div className="program-exercise-advanced__body">
-                      <label className="field exercise-notes">
-                        <span>Заметка к упражнению</span>
-                        <input
-                          maxLength={2000}
-                          value={item.notes ?? ''}
-                          placeholder="Например: выполнять медленно, без рывков"
-                          onChange={(event) =>
-                            updateDay(dayIndex, {
-                              ...day,
-                              exercises: day.exercises.map((row, index) =>
-                                index === exerciseIndex
-                                  ? { ...row, notes: event.target.value }
-                                  : row,
-                              ),
-                            })
-                          }
-                        />
-                      </label>
-                      {exerciseIndex > 0 &&
-                        exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                          ?.metric_type !== 'cardio' && (
-                          <label className="checkbox-row">
+                      ) : (
+                        (
+                          [
+                            ['prescribed_sets', 'Рабочие подходы'],
+                            ['prescribed_reps', 'Повторы'],
+                            ['rest_seconds', 'Отдых, сек'],
+                          ] as const
+                        ).map(([key, label]) => (
+                          <label className="field" key={key}>
+                            <span>{label}</span>
                             <input
-                              type="checkbox"
-                              checked={isPairedWithPrevious(day, exerciseIndex)}
-                              onChange={(event) =>
-                                updateDay(
-                                  dayIndex,
-                                  toggleSuperset(day, exerciseIndex, event.target.checked),
-                                )
+                              type={key === 'prescribed_reps' ? 'text' : 'number'}
+                              inputMode={key === 'prescribed_reps' ? undefined : 'numeric'}
+                              min={
+                                key === 'prescribed_sets'
+                                  ? 1
+                                  : key === 'rest_seconds'
+                                    ? 15
+                                    : undefined
+                              }
+                              max={
+                                key === 'prescribed_sets'
+                                  ? 10
+                                  : key === 'rest_seconds'
+                                    ? 600
+                                    : undefined
+                              }
+                              maxLength={key === 'prescribed_reps' ? 32 : undefined}
+                              required
+                              value={item[key] ?? ''}
+                              onChange={(e) =>
+                                updateDay(dayIndex, {
+                                  ...day,
+                                  exercises: day.exercises.map((row, index) =>
+                                    index === exerciseIndex
+                                      ? {
+                                          ...row,
+                                          [key]:
+                                            key === 'prescribed_reps'
+                                              ? e.target.value
+                                              : Number(e.target.value),
+                                        }
+                                      : row,
+                                  ),
+                                })
                               }
                             />
-                            <span>Суперсет — выполнить вместе с предыдущим упражнением подряд</span>
                           </label>
-                        )}
-                      {(() => {
-                        const selected = exercises.data?.find(
-                          (exercise) => exercise.id === item.exercise_id,
-                        );
-                        const alternatives = (selected?.alternatives ?? [])
-                          .map((alternative) =>
-                            exercises.data?.find((exercise) => exercise.id === alternative.id),
-                          )
-                          .filter((exercise): exercise is Exercise => Boolean(exercise));
-                        return alternatives.length ? (
-                          <div className="program-exercise-alternatives">
-                            <strong>Проверенные замены</strong>
-                            <div className="toolbar wrap">
-                              {alternatives.map((alternative) => (
-                                <button
-                                  type="button"
-                                  className="text-button"
-                                  key={alternative.id}
-                                  onClick={() =>
-                                    updateDay(dayIndex, {
-                                      ...day,
-                                      exercises: day.exercises.map((row, index) =>
-                                        index === exerciseIndex
-                                          ? { ...row, exercise_id: alternative.id }
-                                          : row,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  Заменить на «{alternative.title}»
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <small className="muted">Проверенных замен пока нет.</small>
-                        );
-                      })()}
-                      {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                        ?.metric_type !== 'cardio' && (
-                        <small className="muted">
-                          Разминочные и дроп-сеты отмечаются отдельно во время тренировки.
-                        </small>
+                        ))
                       )}
                     </div>
-                  </details>
-                </div>
-              ))}
-              {day.exercises.length < 20 ? (
-                <button
-                  type="button"
-                  className="secondary program-add-exercise"
-                  onClick={() =>
-                    updateDay(dayIndex, (currentDay) => ({
-                      ...currentDay,
-                      exercises: [...currentDay.exercises, blankExercise(defaultRestSeconds)],
-                    }))
-                  }
-                >
-                  <Icon name="plus" size={16} />
-                  Добавить упражнение
-                </button>
-              ) : (
-                <span className="muted">В одной тренировке максимум 20 упражнений.</span>
-              )}
-            </div>
-          ))}
+                    <details className="program-exercise-advanced compact-disclosure">
+                      <summary className="yfc-disclosure-summary">
+                        <span>
+                          <strong>
+                            {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
+                              ?.metric_type === 'cardio'
+                              ? 'Заметка и замены'
+                              : 'Заметка, суперсет и замены'}
+                          </strong>
+                          <small>Необязательные настройки упражнения</small>
+                        </span>
+                        <DisclosureIcon />
+                      </summary>
+                      <div className="program-exercise-advanced__body">
+                        <label className="field exercise-notes">
+                          <span>Заметка к упражнению</span>
+                          <input
+                            maxLength={2000}
+                            value={item.notes ?? ''}
+                            placeholder="Например: выполнять медленно, без рывков"
+                            onChange={(event) =>
+                              updateDay(dayIndex, {
+                                ...day,
+                                exercises: day.exercises.map((row, index) =>
+                                  index === exerciseIndex
+                                    ? { ...row, notes: event.target.value }
+                                    : row,
+                                ),
+                              })
+                            }
+                          />
+                        </label>
+                        {exerciseIndex > 0 &&
+                          exercises.data?.find((exercise) => exercise.id === item.exercise_id)
+                            ?.metric_type !== 'cardio' && (
+                            <label className="checkbox-row">
+                              <input
+                                type="checkbox"
+                                checked={isPairedWithPrevious(day, exerciseIndex)}
+                                onChange={(event) =>
+                                  updateDay(
+                                    dayIndex,
+                                    toggleSuperset(day, exerciseIndex, event.target.checked),
+                                  )
+                                }
+                              />
+                              <span>
+                                Суперсет — выполнить вместе с предыдущим упражнением подряд
+                              </span>
+                            </label>
+                          )}
+                        {(() => {
+                          const selected = exercises.data?.find(
+                            (exercise) => exercise.id === item.exercise_id,
+                          );
+                          const alternatives = (selected?.alternatives ?? [])
+                            .map((alternative) =>
+                              exercises.data?.find((exercise) => exercise.id === alternative.id),
+                            )
+                            .filter((exercise): exercise is Exercise => Boolean(exercise));
+                          return alternatives.length ? (
+                            <div className="program-exercise-alternatives">
+                              <strong>Проверенные замены</strong>
+                              <div className="toolbar wrap">
+                                {alternatives.map((alternative) => (
+                                  <button
+                                    type="button"
+                                    className="text-button"
+                                    key={alternative.id}
+                                    onClick={() =>
+                                      updateDay(dayIndex, {
+                                        ...day,
+                                        exercises: day.exercises.map((row, index) =>
+                                          index === exerciseIndex
+                                            ? { ...row, exercise_id: alternative.id }
+                                            : row,
+                                        ),
+                                      })
+                                    }
+                                  >
+                                    Заменить на «{alternative.title}»
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <small className="muted">Проверенных замен пока нет.</small>
+                          );
+                        })()}
+                        {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
+                          ?.metric_type !== 'cardio' && (
+                          <small className="muted">
+                            Разминочные и дроп-сеты отмечаются отдельно во время тренировки.
+                          </small>
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                ))}
+                {day.exercises.length < 20 ? (
+                  <button
+                    type="button"
+                    className="secondary program-add-exercise"
+                    onClick={() =>
+                      updateDay(dayIndex, (currentDay) => ({
+                        ...currentDay,
+                        exercises: [...currentDay.exercises, blankExercise(defaultRestSeconds)],
+                      }))
+                    }
+                  >
+                    <Icon name="plus" size={16} />
+                    Добавить упражнение
+                  </button>
+                ) : (
+                  <span className="muted">В одной тренировке максимум 20 упражнений.</span>
+                )}
+              </div>
+            ))
+          )}
           <details className="program-builder-settings compact-disclosure">
             <summary className="yfc-disclosure-summary">
               <span>
@@ -1061,25 +1075,26 @@ export function ProgramBuilder({
                 упр.
               </strong>
             </div>
-            {!editingTemplate && (days.length < 8 ? (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() =>
-                  setDays((currentDays) => [
-                    ...currentDays,
-                    {
-                      title: simpleTrainingTitle(currentDays.length + 1),
-                      exercises: [blankExercise(defaultRestSeconds)],
-                    },
-                  ])
-                }
-              >
-                <Icon name="plus" size={16} /> Добавить день
-              </button>
-            ) : (
-              <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>
-            ))}
+            {!editingTemplate &&
+              (days.length < 8 ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() =>
+                    setDays((currentDays) => [
+                      ...currentDays,
+                      {
+                        title: simpleTrainingTitle(currentDays.length + 1),
+                        exercises: [blankExercise(defaultRestSeconds)],
+                      },
+                    ])
+                  }
+                >
+                  <Icon name="plus" size={16} /> Добавить день
+                </button>
+              ) : (
+                <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>
+              ))}
             <button
               className="program-builder-footer__save"
               disabled={
@@ -1094,9 +1109,9 @@ export function ProgramBuilder({
                 ? 'Сохраняем…'
                 : editingTemplate
                   ? 'Сохранить программу'
-                    : targetTelegramId
-                      ? 'Создать и назначить'
-                      : 'Создать программу'}
+                  : targetTelegramId
+                    ? 'Создать и назначить'
+                    : 'Создать программу'}
             </button>
           </div>
         </form>

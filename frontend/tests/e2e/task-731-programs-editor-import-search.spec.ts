@@ -297,7 +297,9 @@ test('Task 731 editor remains usable in Mobile Web and mocked TMA', async ({
     await page.setViewportSize({ width: 390, height: 844 });
     const modal = await openProgramEditor(page);
     await modal.getByRole('button', { name: 'Добавить упражнение' }).click();
-    const picker = page.getByRole('dialog', { name: 'Параметры упражнения' }).getByRole('button', { name: 'Поиск упражнения', exact: true });
+    const picker = page
+      .getByRole('dialog', { name: 'Параметры упражнения' })
+      .getByRole('button', { name: 'Поиск упражнения', exact: true });
     await picker.click();
     await expect(
       page.getByRole('dialog', { name: 'Выбор упражнения' }).getByRole('searchbox'),

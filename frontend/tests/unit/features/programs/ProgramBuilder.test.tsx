@@ -296,7 +296,9 @@ describe('ProgramBuilder type-aware prescription', () => {
         '/api/v1/programs/templates/9',
         expect.objectContaining({
           body: expect.objectContaining({
-            days: expect.arrayContaining([expect.objectContaining({ title: 'День с прогрессией' })]),
+            days: expect.arrayContaining([
+              expect.objectContaining({ title: 'День с прогрессией' }),
+            ]),
           }),
         }),
       ),
