@@ -74,6 +74,11 @@
 .copy-editor__day-choice small {
   opacity: 0.75;
 }
+.copy-editor__manage-days {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 44px;
+}
 .copy-editor__limit {
   font-size: 0.8rem;
   line-height: 1.45;
@@ -203,12 +208,14 @@
   gap: 9px;
 }
 .copy-editor__danger {
+  color: var(--v2-danger, #e88d86);
+}
+.copy-editor__detail-fields .copy-editor__danger {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
+  justify-self: start;
   gap: 8px;
-  min-height: 44px;
-  padding: 9px 12px;
-  color: var(--v2-danger, #e88d86);
 }
 .copy-editor__mobile-days {
   display: none;
@@ -247,6 +254,62 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
+}
+.copy-editor__sheet-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.copy-editor__sheet-toolbar .muted {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.copy-editor__sheet-toolbar button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+.copy-editor__day-sort-list {
+  display: grid;
+  gap: 9px;
+}
+.copy-editor__day-sort-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--v2-border, var(--border, #424842));
+  border-radius: 14px;
+  background: var(--v2-surface-secondary, #43484222);
+}
+.copy-editor__day-sort-name {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.copy-editor__day-sort-name strong {
+  line-height: 1.3;
+}
+.copy-editor__day-sort-name[aria-current='true'] strong {
+  color: var(--v2-accent, var(--accent, #d0ff58));
+}
+.copy-editor__day-sort-name small {
+  opacity: 0.75;
+}
+.copy-editor__sort-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.copy-editor__sort-actions button {
+  min-height: 44px;
+  min-width: 76px;
 }
 .copy-editor__day-choice {
   background: var(--v2-surface-secondary, #43484222);
@@ -349,6 +412,20 @@
   }
   .copy-editor__detail-sheet .copy-editor__detail-fields {
     padding-bottom: 20px;
+  }
+}
+@media (max-width: 520px) {
+  .copy-editor__day-sort-row {
+    grid-template-columns: 1fr;
+  }
+  .copy-editor__sort-actions button {
+    flex: 1;
+  }
+  .copy-editor__sheet-toolbar {
+    flex-wrap: wrap;
+  }
+  .copy-editor__sheet-toolbar button {
+    width: 100%;
   }
 }
 @media (max-width: 350px) {
