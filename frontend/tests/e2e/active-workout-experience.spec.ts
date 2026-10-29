@@ -4967,9 +4967,34 @@ async function runIssue1164SpacingScenario(
   await secondSet.getByText('Дополнительно', { exact: true }).click();
   await expect(secondSet.getByLabel('Вид подхода')).not.toBeVisible();
 
+  // #1318: the focus ring must not overlap the weight or reps caption, even on a
+  // second active set with the mobile keyboard and rest panel on screen.
+  const assertLabelClearOfFocusRing = async (field: Locator) => {
+    await field.focus();
+    await expect(field).toBeFocused();
+    const geometry = await field.evaluate((element) => {
+      const caption = element.closest('label')?.querySelector(':scope > span');
+      if (!caption) return null;
+      const style = getComputedStyle(element);
+      const outlineWidth = Number.parseFloat(style.outlineWidth);
+      const outlineOffset = Number.parseFloat(style.outlineOffset);
+      return {
+        outlineWidth,
+        clearance:
+          element.getBoundingClientRect().top -
+          outlineWidth -
+          outlineOffset -
+          caption.getBoundingClientRect().bottom,
+      };
+    });
+    expect(geometry, '#1318: the input must have a visible caption').not.toBeNull();
+    expect(geometry!.outlineWidth).toBeGreaterThanOrEqual(3);
+    expect(geometry!.clearance, '#1318: focus ring must clear the caption').toBeGreaterThanOrEqual(2);
+  };
   const weight = secondSet.getByLabel(/Вес,/);
+  await assertLabelClearOfFocusRing(weight);
+  await assertLabelClearOfFocusRing(secondSet.getByRole('spinbutton', { name: /Повторы,/ }));
   await weight.focus();
-  await expect(weight).toBeFocused();
   await expectClearOfBottomDock(weight, `${theme} ${viewport.width}px weight`);
   await expectClearOfBottomDock(
     secondSet.getByRole('button', { name: /^Завершить:/ }),
