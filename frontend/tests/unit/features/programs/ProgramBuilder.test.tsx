@@ -434,6 +434,13 @@ describe('ProgramBuilder type-aware prescription', () => {
     await screen.findByRole('button', { name: 'Предыдущий день' });
     expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Изменить порядок дней' })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Все дни' }));
+    expect(
+      within(screen.getByRole('dialog', { name: 'Все дни программы' })).queryByRole('button', {
+        name: 'Изменить порядок',
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('связывает разделы с собственными заголовками при двух открытых редакторах', async () => {
