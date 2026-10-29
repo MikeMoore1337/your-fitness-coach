@@ -6122,6 +6122,92 @@ for (const issue1162Width of [320, 360, 393, 430]) {
   }
 }
 
+for (const theme of ['dark', 'light'] as const) {
+  test(`#1320 completed strength set allows direct RIR and failure updates ${theme}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((selectedTheme) => {
+      localStorage.setItem('app-theme', selectedTheme);
+      (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts = 0;
+      window.addEventListener('fit:rest', () => {
+        (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts += 1;
+      });
+    }, theme);
+    const server = await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const first = page.locator('[data-workout-set-id="201"]');
+    await first.getByLabel(/^Вес,/).fill('42.5');
+    await first.getByLabel(/^Повторы,/).fill('9');
+    await first.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    const restStarts = await page.evaluate(
+      () => (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts,
+    );
+    await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+    await expect(first.getByLabel(/^Вес,/)).toBeDisabled();
+    await first.locator('.active-workout-set__advanced > summary').click();
+
+    const rir = first.getByRole('button', { name: /^2 —/ });
+    const failure = first.getByRole('checkbox', { name: 'Подход до отказа' });
+    await expect(rir).toBeEnabled();
+    await expect(failure).toBeEnabled();
+    await rir.click();
+    await expect.poll(() => server.readSet(201).rir).toBe('2');
+    await failure.check();
+    await expect.poll(() => server.readSet(201).reached_failure).toBe(true);
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    expect(server.readSet(201).is_completed).toBe(true);
+    await expect(first.getByText('Выполнен', { exact: true })).toBeVisible();
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+    await expect(page.getByRole('button', { name: 'Пропустить', exact: true })).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => (window as typeof window & { __postCompletionRestStarts: number }).__postCompletionRestStarts,
+      ),
+    ).toBe(restStarts);
+    expect(
+      server.patches.filter((patch) => patch.setId === 201 && patch.body.is_completed === false),
+    ).toHaveLength(0);
+    expect(
+      server.patches.filter((patch) => patch.setId === 201).slice(-1)[0]?.body.is_completed,
+    ).toBe(true);
+
+    // A completed-set editing draft must still wait for explicit Save, and Cancel restores it.
+    const patchCount = server.patches.length;
+    await first.getByRole('button', { name: 'Редактировать' }).click();
+    await first.getByRole('button', { name: /^1 —/ }).click();
+    await failure.uncheck();
+    expect(server.patches).toHaveLength(patchCount);
+    await first.getByRole('button', { name: 'Отмена' }).click();
+    await expect(rir).toHaveAttribute('aria-pressed', 'true');
+    await expect(failure).toBeChecked();
+    expect(server.readSet(201)).toMatchObject({
+      rir: '2',
+      reached_failure: true,
+      is_completed: true,
+    });
+
+    await rir.click();
+    await expect.poll(() => server.readSet(201).rir).toBeNull();
+    await failure.uncheck();
+    await expect.poll(() => server.readSet(201).reached_failure).toBe(false);
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    await page.reload();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const restored = page.locator('[data-workout-set-id="201"]');
+    await restored.locator('.active-workout-set__advanced > summary').click();
+    await expect(restored.getByRole('button', { name: /^2 —/ })).toHaveAttribute('aria-pressed', 'false');
+    await expect(restored.getByRole('checkbox', { name: 'Подход до отказа' })).not.toBeChecked();
+    await expect(restored.getByLabel(/^Вес,/)).toBeDisabled();
+    await expect(restored.getByText('Выполнен', { exact: true })).toBeVisible();
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+  });
+}
+
 test('#1162 long exercise titles keep completed actions inline at 320px', async ({ page }) => {
   const longTitle = 'Жим штанги лёжа с паузой и контролем траектории';
   const server = await mockActiveWorkout(
