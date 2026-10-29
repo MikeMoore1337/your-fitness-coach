@@ -6,7 +6,7 @@ from test_training_analytics import _add_exercise_session, _auth, _program, _use
 from fitminiapp_api.db.performance import begin_sql_metrics, current_sql_metrics, reset_sql_metrics
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.exercise import Exercise
-from fitminiapp_api.models.program import UserWorkout
+from fitminiapp_api.models.program import UserWorkout, UserWorkoutExercise, UserWorkoutSet
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.services.activity_heatmap import build_activity_heatmap
 
@@ -70,17 +70,30 @@ def test_activity_heatmap_bounds_queries_and_isolates_accounts(client):
         )
         program = _program(db, user.id)
         other = _program(db, _user_id(727_837))
+        exercise_id = db.query(Exercise.id).filter_by(slug="bench-press").scalar()
+        assert exercise_id is not None
         for index in range(366):
-            db.add(
-                UserWorkout(
-                    user_program_id=program.id,
-                    scheduled_date=now.date(),
-                    day_number=1,
-                    title="Тренировка",
-                    status="completed",
-                    completed_at_utc=(now - timedelta(days=index)).replace(tzinfo=None),
+            workout = UserWorkout(
+                user_program_id=program.id,
+                scheduled_date=now.date(),
+                day_number=1,
+                title="Тренировка",
+                status="completed",
+                completed_at_utc=(now - timedelta(days=index)).replace(tzinfo=None),
+            )
+            workout.exercises.append(
+                UserWorkoutExercise(
+                    exercise_id=exercise_id,
+                    sort_order=1,
+                    prescribed_sets=2,
+                    prescribed_reps="8",
+                    rest_seconds=60,
+                    sets=[
+                        UserWorkoutSet(set_number=number, is_completed=True) for number in (1, 2)
+                    ],
                 )
             )
+            db.add(workout)
         db.add(
             UserWorkout(
                 user_program_id=other.id,
@@ -111,7 +124,9 @@ def test_activity_heatmap_bounds_queries_and_isolates_accounts(client):
             reset_sql_metrics(token)
         assert metrics.query_count == 2
         assert sum(day["completed_workouts"] for day in result["days"]) == 365
+        assert sum(day["working_sets"] for day in result["days"]) == 730
         assert result["history_complete"] is True
+        print(f"Activity SQL: {metrics.query_count} queries, {metrics.duration_ms:.1f} ms")
 
 
 def test_finish_records_utc_instant_without_replacing_legacy_time(client):

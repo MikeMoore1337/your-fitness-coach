@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DisclosureIcon } from '../../shared/ui/common';
 import './ActivityHeatmap.css';
 
 export type ActivityDay = {
@@ -20,6 +21,14 @@ function dateLabel(value: string) {
   );
 }
 
+function monthLabel(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
 function valueLabel(value: number | null) {
   return value === null ? 'Нет данных' : String(value);
 }
@@ -33,6 +42,7 @@ export function ActivityHeatmap({
 }) {
   const [selected, setSelected] = useState(data.days.at(-1)?.date ?? '');
   const selectedDay = data.days.find((day) => day.date === selected) ?? data.days.at(-1);
+  const showMonths = variant === 'months';
   const groups: ActivityDay[][] = [];
   for (const day of data.days) {
     const last = groups.at(-1);
@@ -47,6 +57,11 @@ export function ActivityHeatmap({
     <section className="activity-heatmap" aria-labelledby="activity-heatmap-title">
       <h2 id="activity-heatmap-title">Активность за 365 дней</h2>
       <p>Часовой пояс: {data.timezone}</p>
+      {data.days[0] && data.days.at(-1) && (
+        <p>
+          {dateLabel(data.days[0].date)} — {dateLabel(data.days.at(-1)!.date)}
+        </p>
+      )}
       {!data.history_complete && (
         <p>
           История неполная. Без подтверждённой даты: {data.undated_workouts}. Известные значения
@@ -64,13 +79,7 @@ export function ActivityHeatmap({
       >
         {groups.map((group, index) => (
           <div className="activity-heatmap__group" key={group?.[0]?.date ?? index}>
-            {variant === 'months' && group?.[0] && (
-              <span>
-                {dateLabel(group[0].date)
-                  .replace(/^\d+\s/, '')
-                  .replace(/\s+г\.$/, '')}
-              </span>
-            )}
+            {showMonths && group?.[0] && <span>{monthLabel(group[0].date)}</span>}
             <div className="activity-heatmap__grid">
               {Array.from(
                 {
@@ -136,7 +145,9 @@ export function ActivityHeatmap({
             </p>
           )}
           <details>
-            <summary>Данные по дням</summary>
+            <summary className="yfc-disclosure-summary">
+              Данные по дням <DisclosureIcon />
+            </summary>
             <table>
               <thead>
                 <tr>

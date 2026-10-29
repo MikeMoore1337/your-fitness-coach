@@ -6,6 +6,11 @@
   padding: 1rem;
 }
 
+.activity-heatmap h2 {
+  font-family: var(--font-display, inherit);
+  font-size: var(--font-size-section, 1.25rem);
+}
+
 .activity-heatmap__groups {
   overflow-x: auto;
   margin: 1.25rem 0;
