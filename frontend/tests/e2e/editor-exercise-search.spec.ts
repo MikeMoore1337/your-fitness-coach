@@ -63,7 +63,9 @@ test('#861 modeled TMA keyboard respects safe areas and Back restores the editor
   await draftTitle.fill('Черновик Telegram');
   await expect(draftTitle).toHaveValue('Черновик Telegram');
   await editor.getByRole('button', { name: 'Добавить упражнение', exact: true }).click();
-  const trigger = editor.getByRole('button', { name: 'Поиск упражнения', exact: true });
+  const trigger = page
+    .getByRole('dialog', { name: 'Параметры упражнения' })
+    .getByRole('button', { name: 'Поиск упражнения', exact: true });
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   await expect(dialog.getByRole('searchbox')).toBeFocused();
@@ -142,7 +144,9 @@ for (const width of [320, 360, 390, 393, 430]) {
       await draftTitle.fill('Черновик редактора');
       await expect(draftTitle).toHaveValue('Черновик редактора');
       await editor.getByRole('button', { name: 'Добавить упражнение', exact: true }).click();
-      const trigger = editor.getByRole('button', { name: 'Поиск упражнения', exact: true });
+      const trigger = page
+        .getByRole('dialog', { name: 'Параметры упражнения' })
+        .getByRole('button', { name: 'Поиск упражнения', exact: true });
       await trigger.click();
       const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
       const search = dialog.getByRole('searchbox');
