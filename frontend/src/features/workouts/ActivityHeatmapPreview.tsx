@@ -7,7 +7,7 @@ import { ActivityHeatmap, type ActivityDay } from './ActivityHeatmap';
 const params = new URLSearchParams(window.location.search);
 const isLight = params.get('theme') === 'light';
 const hasNoActivity = params.get('state') === 'empty';
-document.body.style.cssText = `margin:0;padding:24px;font:16px Inter,sans-serif;--font-display:Oswald,sans-serif;background:${isLight ? '#f5f5f2' : '#0c0e0d'};--color-text:${isLight ? '#1b1e1a' : '#f4f5f1'};--color-text-muted:${isLight ? '#596057' : '#aeb5aa'};--color-surface:${isLight ? '#fff' : '#191c1a'};--color-surface-subtle:${isLight ? '#e5e8e2' : '#303630'};--color-border:${isLight ? '#c7cec2' : '#4c554a'};--color-accent:#b8ef5f;--color-accent-subtle:${isLight ? '#dcecbf' : '#455833'};color:var(--color-text)`;
+document.body.style.cssText = `margin:0;padding:12px;font:16px Inter,sans-serif;--font-display:Oswald,sans-serif;background:${isLight ? '#f5f5f2' : '#0c0e0d'};--color-text:${isLight ? '#1b1e1a' : '#f4f5f1'};--color-text-muted:${isLight ? '#596057' : '#aeb5aa'};--color-surface:${isLight ? '#fff' : '#191c1a'};--color-surface-subtle:${isLight ? '#e5e8e2' : '#303630'};--color-border:${isLight ? '#c7cec2' : '#4c554a'};--color-accent:#b8ef5f;--color-accent-subtle:${isLight ? '#dcecbf' : '#455833'};color:var(--color-text)`;
 function Preview() {
   const [year, setYear] = useState(2026);
   const countDays = (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / 86400000;
@@ -48,7 +48,6 @@ function Preview() {
           undated_workouts: hasNoActivity ? 0 : 3,
           days,
         }}
-        variant={params.get('variant') === 'months' ? 'months' : 'year'}
       />
     </main>
   );

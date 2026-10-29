@@ -14,11 +14,12 @@ const data = {
 
 afterEach(cleanup);
 
-it.each(['year', 'months'] as const)('shows facts and unknown days in %s view', (variant) => {
-  render(<ActivityHeatmap data={data} variant={variant} />);
+it('shows facts and selects an unknown day in the month calendar', () => {
+  render(<ActivityHeatmap data={data} />);
   expect(screen.getByText(/История неполная/)).toBeInTheDocument();
   expect(screen.getByText(/рабочие подходы — 4/)).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Выберите день'), { target: { value: '2026-01-01' } });
+  fireEvent.click(screen.getByRole('button', { name: /январь/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^1 января 2026/ }));
   expect(screen.getByText(/тренировки — Нет данных/)).toBeInTheDocument();
   expect(screen.getByRole('table')).toHaveTextContent('Нет данных');
 });
@@ -48,4 +49,33 @@ it('requests the selected calendar year', () => {
   expect(screen.getByRole('heading', { name: 'Активность за 2026 год' })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Год'), { target: { value: '2024' } });
   expect(onYearChange).toHaveBeenCalledWith(2024);
+});
+
+it('resets the chosen day and expanded month across year changes and excludes future dates', () => {
+  const view = render(<ActivityHeatmap data={data} year={2026} />);
+  fireEvent.click(screen.getByRole('button', { name: /январь/ }));
+  fireEvent.click(screen.getByRole('button', { name: /^1 января 2026/ }));
+  view.rerender(
+    <ActivityHeatmap
+      year={2024}
+      data={{ ...data, days: [{ date: '2024-12-31', completed_workouts: 2, working_sets: 6 }] }}
+    />,
+  );
+  expect(screen.queryByRole('region', { name: /Выбор дня/ })).not.toBeInTheDocument();
+  expect(screen.getByText(/рабочие подходы — 6/)).toBeInTheDocument();
+  view.rerender(
+    <ActivityHeatmap
+      year={2026}
+      data={{
+        ...data,
+        days: [
+          ...data.days,
+          { date: '2026-01-03', is_future: true, completed_workouts: null, working_sets: null },
+        ],
+      }}
+    />,
+  );
+  expect(screen.getByText(/рабочие подходы — 4/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /январь/ }));
+  expect(screen.getByRole('button', { name: /^3 января 2026/ })).toBeDisabled();
 });

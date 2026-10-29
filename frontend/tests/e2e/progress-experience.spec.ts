@@ -827,13 +827,18 @@ async function mockProgress(
       });
     }
     if (path.endsWith('/workouts/progress/activity-heatmap')) {
+      const year = Number(
+        new URL(route.request().url()).searchParams.get('year') ?? new Date().getFullYear(),
+      );
+      const count = (Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / 86400000;
       return route.fulfill({
         json: {
           timezone: 'Europe/Moscow',
           history_complete: false,
           undated_workouts: 1,
-          days: Array.from({ length: 365 }, (_, index) => ({
-            date: new Date(Date.UTC(2029, 1, 1 + index)).toISOString().slice(0, 10),
+          days: Array.from({ length: count }, (_, index) => ({
+            date: new Date(Date.UTC(year, 0, 1 + index)).toISOString().slice(0, 10),
+            is_future: year === new Date().getFullYear() && index > 29,
             completed_workouts: null,
             working_sets: null,
           })),
@@ -4208,3 +4213,74 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
     ),
   );
 });
+
+for (const width of [320, 390, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#835 month calendar selects days and resets years at ${width}px ${theme}`, async ({
+      page,
+      browserName,
+    }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockProgress(page);
+      await page.goto('/app?section=progress');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Прогресс' })
+        .click();
+      await page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('tab', { name: /^Тренировки/ })
+        .click();
+      const calendar = page.locator('.activity-heatmap');
+      await expect(calendar.locator('.activity-heatmap__month-button')).toHaveCount(12);
+      const capture = async (state: string) => {
+        if (!process.env.CAPTURE_835_FINAL) return;
+        const dir = resolve(process.env.CAPTURE_835_FINAL);
+        await mkdir(dir, { recursive: true });
+        await calendar.screenshot({
+          path: resolve(dir, `${browserName}-${theme}-${width}-${state}.png`),
+          animations: 'disabled',
+        });
+      };
+      await capture('overview');
+      const january = calendar.getByRole('button', { name: 'январь', exact: true });
+      await january.click();
+      const days = calendar.locator('button[data-date]');
+      await expect(days.nth(29)).toBeFocused();
+      await days.nth(29).press('Home');
+      await expect(days.nth(25)).toBeFocused();
+      const bounds = await days.first().boundingBox();
+      expect(bounds?.height).toBeGreaterThanOrEqual(44);
+      expect(bounds?.width).toBeGreaterThanOrEqual(32);
+      await capture('month');
+      await days.nth(25).press('ArrowRight');
+      await expect(days.nth(26)).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(days.nth(26)).toHaveAttribute('aria-pressed', 'true');
+      await expect(calendar.locator('[aria-live]')).toContainText('27 января');
+      await capture('selected');
+      await page.keyboard.press('Escape');
+      await expect(january).toBeFocused();
+      await expect(calendar.getByRole('region')).toHaveCount(0);
+      await calendar.getByLabel('Год', { exact: true }).selectOption('2024');
+      await calendar.getByRole('button', { name: 'февраль', exact: true }).click();
+      await calendar.locator('button[data-date="2024-02-29"]').click();
+      await expect(calendar.locator('[aria-live]')).toContainText('29 февраля 2024');
+      await calendar
+        .getByLabel('Год', { exact: true })
+        .selectOption(String(new Date().getFullYear()));
+      await expect(calendar.getByRole('region')).toHaveCount(0);
+      await expect(calendar.locator('[aria-live]')).toContainText('30 января');
+      await calendar.getByRole('button', { name: 'декабрь', exact: true }).click();
+      await expect(calendar.locator('button[data-date]:enabled')).toHaveCount(0);
+      await capture('future');
+      await page.keyboard.press('Escape');
+      await calendar.getByText('Данные по дням', { exact: true }).click();
+      await expect(calendar.getByRole('table')).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+}

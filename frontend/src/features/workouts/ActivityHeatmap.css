@@ -90,21 +90,6 @@
   border-radius: 0.5rem;
 }
 
-.activity-heatmap__groups--year {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.activity-heatmap__groups--year .activity-heatmap__group {
-  flex: 0 0 auto;
-  padding-right: 0.75rem;
-  border-right: 1px solid var(--color-border);
-}
-
-.activity-heatmap__groups--year .activity-heatmap__group:last-child {
-  border-right: 0;
-}
-
 .activity-heatmap__cell[data-level='future'] {
   background: transparent;
   border-style: dotted;
@@ -112,4 +97,55 @@
 
 .activity-heatmap__groups--months .activity-heatmap__group > span {
   min-height: 1.2rem;
+}
+
+.activity-heatmap__month-button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.1rem;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+.activity-heatmap__month-button:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: 2px;
+}
+.activity-heatmap__calendar {
+  margin: 1rem -0.75rem;
+  padding: 0.25rem;
+}
+.activity-heatmap__calendar p {
+  font-size: var(--font-size-caption);
+}
+.activity-heatmap__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.activity-heatmap__days button {
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface-subtle);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.activity-heatmap__days button:disabled {
+  opacity: 0.45;
+}
+.activity-heatmap__calendar > button {
+  min-height: 44px;
 }

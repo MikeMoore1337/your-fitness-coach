@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { DisclosureIcon } from '../../shared/ui/common';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
+import { Button, DisclosureIcon } from '../../shared/ui/common';
 import './ActivityHeatmap.css';
 
 export type ActivityDay = {
@@ -34,21 +34,78 @@ function valueLabel(value: number | null) {
   return value === null ? 'Нет данных' : String(value);
 }
 
-export function ActivityHeatmap({
+export function ActivityHeatmap(props: Parameters<typeof ActivityHeatmapContent>[0]) {
+  return (
+    <ActivityHeatmapContent key={props.year ?? props.data.days[0]?.date ?? 'calendar'} {...props} />
+  );
+}
+
+function ActivityHeatmapContent({
   data,
-  variant = 'year',
   year,
   onYearChange,
 }: {
   data: ActivityHeatmapData;
-  variant?: 'year' | 'months';
   year?: number;
   onYearChange?: (year: number) => void;
 }) {
-  const [selected, setSelected] = useState(
-    data.days.filter((day) => !day.is_future).at(-1)?.date ?? '',
-  );
-  const selectedDay = data.days.find((day) => day.date === selected) ?? data.days.at(-1);
+  const id = useId();
+  const scope = data.days[0]?.date ?? '';
+  const initialDay = data.days.filter((day) => !day.is_future).at(-1);
+  const [selection, setSelection] = useState({
+    scope,
+    date: initialDay?.date ?? '',
+    month: '',
+    focused: '',
+  });
+  const selectedDay =
+    (selection.scope === scope &&
+      data.days.find((day) => day.date === selection.date && !day.is_future)) ||
+    initialDay;
+  const openMonth = selection.scope === scope ? selection.month : '';
+  const monthButtons = useRef(new Map<string, HTMLButtonElement>());
+  const calendar = useRef<HTMLDivElement>(null);
+  function closeMonth() {
+    setSelection({ scope, date: selectedDay?.date ?? '', month: '', focused: '' });
+    monthButtons.current.get(openMonth)?.focus();
+  }
+  function openCalendar(month: string) {
+    const first = data.days.find((day) => day.date.startsWith(month) && !day.is_future);
+    const focused = selectedDay?.date.startsWith(month) ? selectedDay.date : (first?.date ?? '');
+    setSelection({ scope, date: selectedDay?.date ?? '', month, focused });
+    requestAnimationFrame(() => {
+      const target = calendar.current?.querySelector<HTMLButtonElement>(
+        `button[data-date="${focused}"]`,
+      );
+      (target ?? calendar.current)?.focus();
+    });
+  }
+  function moveDay(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMonth();
+      return;
+    }
+    if (!(event.target instanceof HTMLButtonElement) || !event.target.dataset.date) return;
+    const buttons = Array.from(
+      calendar.current?.querySelectorAll<HTMLButtonElement>('button[data-date]:not(:disabled)') ??
+        [],
+    );
+    const index = buttons.indexOf(event.target);
+    const weekday = (new Date(`${event.target.dataset.date}T00:00:00Z`).getUTCDay() + 6) % 7;
+    const offsets: Record<string, number> = {
+      ArrowLeft: -1,
+      ArrowRight: 1,
+      ArrowUp: -7,
+      ArrowDown: 7,
+      Home: -weekday,
+      End: 6 - weekday,
+    };
+    const offset = offsets[event.key];
+    if (offset === undefined) return;
+    event.preventDefault();
+    buttons[Math.max(0, Math.min(buttons.length - 1, index + offset))]?.focus();
+  }
   const groups: ActivityDay[][] = [];
   for (const day of data.days) {
     const last = groups.at(-1);
@@ -60,14 +117,16 @@ export function ActivityHeatmap({
   }
 
   return (
-    <section className="activity-heatmap" aria-labelledby="activity-heatmap-title">
-      <h2 id="activity-heatmap-title">
-        {year ? `Активность за ${year} год` : 'Активность за 365 дней'}
-      </h2>
+    <section className="activity-heatmap" aria-labelledby={`${id}-title`}>
+      <h2 id={`${id}-title`}>{year ? `Активность за ${year} год` : 'Активность за 365 дней'}</h2>
       {year && onYearChange && (
         <label>
           Год
-          <select aria-label="Год" value={year} onChange={(event) => onYearChange(Number(event.target.value))}>
+          <select
+            aria-label="Год"
+            value={year}
+            onChange={(event) => onYearChange(Number(event.target.value))}
+          >
             {Array.from(
               { length: new Date().getFullYear() - 1969 },
               (_, index) => new Date().getFullYear() - index,
@@ -97,41 +156,105 @@ export function ActivityHeatmap({
           <p>За этот период нет завершённых тренировок.</p>
         )}
       <p>Будущие дни не содержат данных об активности.</p>
-      <div
-        className={`activity-heatmap__groups activity-heatmap__groups--${variant}`}
-        aria-hidden="true"
-      >
+      <div className="activity-heatmap__groups activity-heatmap__groups--months">
         {groups.map((group, index) => (
           <div className="activity-heatmap__group" key={group?.[0]?.date ?? index}>
-            {group?.[0] && <span>{monthLabel(group[0].date, Boolean(year))}</span>}
-            <div className="activity-heatmap__grid">
-              {Array.from(
-                {
-                  length: group?.[0]
-                    ? (new Date(`${group[0].date}T00:00:00Z`).getUTCDay() + 6) % 7
-                    : 0,
-                },
-                (_, index) => (
-                  <span key={`padding-${index}`} />
-                ),
-              )}
-              {group?.map((day) => (
-                <span
-                  key={day.date}
-                  className="activity-heatmap__cell"
-                  data-level={
-                    day.is_future
-                      ? 'future'
-                      : day.completed_workouts === null
-                        ? 'unknown'
-                        : Math.min(day.completed_workouts, 3)
-                  }
-                />
-              ))}
-            </div>
+            <button
+              type="button"
+              className="activity-heatmap__month-button"
+              ref={(node) => {
+                const month = group[0]?.date.slice(0, 7);
+                if (month) {
+                  if (node) monthButtons.current.set(month, node);
+                  else monthButtons.current.delete(month);
+                }
+              }}
+              aria-expanded={openMonth === group[0]?.date.slice(0, 7)}
+              aria-controls={
+                openMonth === group[0]?.date.slice(0, 7) ? `${id}-calendar` : undefined
+              }
+              onClick={() => group[0] && openCalendar(group[0].date.slice(0, 7))}
+            >
+              <span>{group[0] && monthLabel(group[0].date, Boolean(year))}</span>
+              <span className="activity-heatmap__grid" aria-hidden="true">
+                {Array.from(
+                  {
+                    length: group?.[0]
+                      ? (new Date(`${group[0].date}T00:00:00Z`).getUTCDay() + 6) % 7
+                      : 0,
+                  },
+                  (_, index) => (
+                    <span key={`padding-${index}`} />
+                  ),
+                )}
+                {group?.map((day) => (
+                  <span
+                    key={day.date}
+                    className="activity-heatmap__cell"
+                    data-level={
+                      day.is_future
+                        ? 'future'
+                        : day.completed_workouts === null
+                          ? 'unknown'
+                          : Math.min(day.completed_workouts, 3)
+                    }
+                  />
+                ))}
+              </span>
+            </button>
           </div>
         ))}
       </div>
+      {openMonth && (
+        <div
+          id={`${id}-calendar`}
+          ref={calendar}
+          tabIndex={-1}
+          className="activity-heatmap__calendar"
+          role="region"
+          aria-label={`Выбор дня: ${monthLabel(`${openMonth}-01`, Boolean(year))}`}
+          onKeyDown={moveDay}
+        >
+          <h3>{monthLabel(`${openMonth}-01`, Boolean(year))}</h3>
+          <p>Стрелки — переход по дням. Выбор — клавишей ввода, сворачивание — клавишей отмены.</p>
+          <div className="activity-heatmap__days">
+            {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day) => (
+              <span key={day} aria-hidden="true">
+                {day}
+              </span>
+            ))}
+            {Array.from(
+              { length: (new Date(`${openMonth}-01T00:00:00Z`).getUTCDay() + 6) % 7 },
+              (_, index) => (
+                <span key={`empty-${index}`} />
+              ),
+            )}
+            {data.days
+              .filter((day) => day.date.startsWith(openMonth))
+              .map((day) => (
+                <button
+                  key={day.date}
+                  data-date={day.date}
+                  type="button"
+                  data-yfc-choice="compact"
+                  disabled={day.is_future}
+                  aria-pressed={selectedDay?.date === day.date}
+                  aria-label={`${dateLabel(day.date)}: ${day.is_future ? 'будущий день' : `тренировки — ${valueLabel(day.completed_workouts)}, рабочие подходы — ${valueLabel(day.working_sets)}`}`}
+                  tabIndex={selection.focused === day.date ? 0 : -1}
+                  onFocus={() => setSelection((current) => ({ ...current, focused: day.date }))}
+                  onClick={() =>
+                    setSelection({ scope, date: day.date, month: openMonth, focused: day.date })
+                  }
+                >
+                  {Number(day.date.slice(-2))}
+                </button>
+              ))}
+          </div>
+          <Button type="button" variant="secondary" onClick={closeMonth}>
+            Свернуть месяц
+          </Button>
+        </div>
+      )}
       <div className="activity-heatmap__legend" aria-label="Легенда: количество тренировок">
         {[
           ['unknown', 'Нет данных'],
@@ -151,19 +274,6 @@ export function ActivityHeatmap({
         <p>Данных об активности пока нет.</p>
       ) : (
         <>
-          <label>
-            Выберите день
-            <select
-              value={selectedDay?.date ?? ''}
-              onChange={(event) => setSelected(event.target.value)}
-            >
-              {data.days.map((day) => (
-                <option key={day.date} value={day.date}>
-                  {dateLabel(day.date)}
-                </option>
-              ))}
-            </select>
-          </label>
           {selectedDay && (
             <p aria-live="polite">
               {selectedDay.is_future
@@ -187,8 +297,8 @@ export function ActivityHeatmap({
                 {data.days.map((day) => (
                   <tr key={day.date}>
                     <th scope="row">{dateLabel(day.date)}</th>
-                    <td>{valueLabel(day.completed_workouts)}</td>
-                    <td>{valueLabel(day.working_sets)}</td>
+                    <td>{day.is_future ? 'Будущий день' : valueLabel(day.completed_workouts)}</td>
+                    <td>{day.is_future ? 'Будущий день' : valueLabel(day.working_sets)}</td>
                   </tr>
                 ))}
               </tbody>
