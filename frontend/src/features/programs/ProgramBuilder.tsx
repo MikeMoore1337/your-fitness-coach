@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { DisclosureIcon, Badge, Card, LoadingState } from '../../shared/ui/common';
+import { DisclosureIcon, Card, LoadingState } from '../../shared/ui/common';
 import { orderExercisesForLevel } from './exerciseOrdering';
 import { buildStrengthPreset, resolveStrengthRule, type StrengthSplit } from './strengthPresets';
 import { usePersistentState } from '../../shared/storage';
@@ -159,7 +159,6 @@ export function ProgramBuilder({
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
   const [reviewOpen, setReviewOpen] = useState(false);
-  const settingsRef = useRef<HTMLDetailsElement>(null);
   const snapshot = JSON.stringify([
     title,
     goal,
@@ -435,9 +434,7 @@ export function ProgramBuilder({
       id={!editingTemplate && !targetTelegramId ? 'program-builder' : undefined}
       title={
         editingTemplate
-          ? saveAsCopy
-            ? 'Редактирование личной копии'
-            : 'Редактирование программы'
+          ? undefined
           : targetTelegramId
             ? `Новая программа для ${targetName || targetTelegramId}`
             : 'Создать свою программу'
@@ -487,9 +484,8 @@ export function ProgramBuilder({
           }}
         >
           {saveAsCopy && (
-            <p className="auth-notice">
-              Исходный готовый шаблон останется без изменений. После сохранения появится личная
-              копия, в которой можно использовать свои упражнения.
+            <p className="program-builder-copy-note">
+              Исходный шаблон не изменится. Изменения сохранятся в отдельной личной копии.
             </p>
           )}
           <section
@@ -516,14 +512,8 @@ export function ProgramBuilder({
           <div className="program-builder-days-heading">
             <div>
               <span className="eyebrow">Шаг 2</span>
-              <h3>{editingTemplate ? 'Тренировочные дни' : 'Добавьте упражнения'}</h3>
-              <p>
-                {editingTemplate
-                  ? 'Выберите день и настройте его упражнения.'
-                  : 'Первая тренировка уже создана. Выберите хотя бы одно упражнение.'}
-              </p>
+              <h3>Тренировочные дни</h3>
             </div>
-            <Badge>{days.length} из 8</Badge>
           </div>
           <ProgramDayEditor
             days={days}
@@ -533,19 +523,7 @@ export function ProgramBuilder({
             defaultRestSeconds={defaultRestSeconds}
             onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
           />
-          <button
-            type="button"
-            className="secondary program-builder-open-settings"
-            onClick={() => {
-              if (settingsRef.current) {
-                settingsRef.current.open = true;
-                settingsRef.current.scrollIntoView?.({ block: 'start' });
-              }
-            }}
-          >
-            Настройки и расписание
-          </button>
-          <details ref={settingsRef} className="program-builder-settings compact-disclosure">
+          <details className="program-builder-settings compact-disclosure">
             <summary className="yfc-disclosure-summary">
               <span>
                 <strong>Настройки программы</strong>
@@ -669,81 +647,92 @@ export function ProgramBuilder({
                   </p>
                 )}
               </section>
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-strength-template-title`}
-              >
-                <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Схема</span>
-                    <select
-                      value={split}
-                      onChange={(event) => {
-                        const next = event.target.value as StrengthSplit;
-                        setSplit(next);
-                        setPresetDays(resolveStrengthRule(level, next).recommended);
-                      }}
-                    >
-                      <option value="fullbody">Всё тело</option>
-                      <option value="upper_lower">Верх/Низ</option>
-                      <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
-                      <option value="split">Сплит</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>
-                      Тренировок ({rule.min}–{rule.max})
-                    </span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={rule.min}
-                      max={rule.max}
-                      value={presetDays}
-                      onChange={(event) => setPresetDays(Number(event.target.value))}
-                    />
-                  </label>
-                </div>
-                {rule.warning && <p className="muted">{rule.warning}</p>}
-                <button type="button" className="secondary" onClick={() => void loadPreset()}>
-                  Заполнить по шаблону
-                </button>
-              </section>
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-program-rest-title`}
-              >
-                <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
-                <p className="muted">
-                  Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
-                </p>
-                <div className="toolbar wrap program-builder-rest-actions">
-                  <label className="field">
-                    <span>Общий отдых, сек</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="15"
-                      max="600"
-                      value={defaultRestSeconds}
-                      onChange={(event) => setDefaultRestSeconds(Number(event.target.value))}
-                      required
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={defaultRestSeconds < 15 || defaultRestSeconds > 600}
-                    onClick={() => {
-                      setDays(applyRestSeconds(days, defaultRestSeconds));
-                      toast('Общее время отдыха применено ко всем упражнениям');
-                    }}
+              <details className="program-builder-optional">
+                <summary className="yfc-disclosure-summary">
+                  <span>
+                    <strong>Дополнительно</strong>
+                    <small>Быстрое заполнение и общий отдых</small>
+                  </span>
+                  <DisclosureIcon />
+                </summary>
+                <div className="program-builder-optional__body stack">
+                  <section
+                    className="program-builder-section stack"
+                    aria-labelledby={`${sectionId}-strength-template-title`}
                   >
-                    Применить ко всем упражнениям
-                  </button>
+                    <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
+                    <div className="form-grid">
+                      <label className="field">
+                        <span>Схема</span>
+                        <select
+                          value={split}
+                          onChange={(event) => {
+                            const next = event.target.value as StrengthSplit;
+                            setSplit(next);
+                            setPresetDays(resolveStrengthRule(level, next).recommended);
+                          }}
+                        >
+                          <option value="fullbody">Всё тело</option>
+                          <option value="upper_lower">Верх/Низ</option>
+                          <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
+                          <option value="split">Сплит</option>
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>
+                          Тренировок ({rule.min}–{rule.max})
+                        </span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={rule.min}
+                          max={rule.max}
+                          value={presetDays}
+                          onChange={(event) => setPresetDays(Number(event.target.value))}
+                        />
+                      </label>
+                    </div>
+                    {rule.warning && <p className="muted">{rule.warning}</p>}
+                    <button type="button" className="secondary" onClick={() => void loadPreset()}>
+                      Заполнить по шаблону
+                    </button>
+                  </section>
+                  <section
+                    className="program-builder-section stack"
+                    aria-labelledby={`${sectionId}-program-rest-title`}
+                  >
+                    <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
+                    <p className="muted">
+                      Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
+                    </p>
+                    <div className="toolbar wrap program-builder-rest-actions">
+                      <label className="field">
+                        <span>Общий отдых, сек</span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min="15"
+                          max="600"
+                          value={defaultRestSeconds}
+                          onChange={(event) => setDefaultRestSeconds(Number(event.target.value))}
+                          required
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={defaultRestSeconds < 15 || defaultRestSeconds > 600}
+                        onClick={() => {
+                          setDays(applyRestSeconds(days, defaultRestSeconds));
+                          toast('Общее время отдыха применено ко всем упражнениям');
+                        }}
+                      >
+                        Применить ко всем упражнениям
+                      </button>
+                    </div>
+                  </section>
                 </div>
-              </section>
+              </details>
             </div>
           </details>
           <div className="program-builder-footer">
