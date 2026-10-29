@@ -210,7 +210,9 @@ describe('ProgramBuilder type-aware prescription', () => {
     renderBuilder();
     await screen.findByRole('combobox', { name: 'Поиск упражнения' });
     await user.click(screen.getByRole('button', { name: 'Проверить и назначить' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('День 1: добавьте хотя бы одно упражнение.');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'День 1: добавьте хотя бы одно упражнение.',
+    );
     expect(screen.getByRole('button', { name: 'Создать и назначить' })).toBeDisabled();
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates', expect.anything());
   });
