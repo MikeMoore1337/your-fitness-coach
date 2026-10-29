@@ -25,7 +25,7 @@ from fitminiapp_api.models.weekly_digest import (
     WeeklyDigestIssueItem,
     WeeklyDigestPreference,
 )
-from fitminiapp_api.services import weekly_digest, worker
+from fitminiapp_api.services import notifications, weekly_digest, worker
 from fitminiapp_api.services.weekly_digest import (
     approve_digest_issue,
     claim_due_digest_deliveries,
@@ -423,15 +423,19 @@ def test_429_retry_after_is_persisted(monkeypatch) -> None:
         assert delivery.next_attempt_at == NOW + timedelta(seconds=12)
 
 
-def test_quiet_hours_delay_does_not_consult_product_notification_toggle(monkeypatch) -> None:
+@pytest.mark.parametrize("local_now", [datetime(2026, 8, 26, 23, 59), datetime(2026, 8, 27, 0, 0)])
+def test_quiet_hours_delay_does_not_consult_product_notification_toggle(
+    monkeypatch, local_now
+) -> None:
+    monkeypatch.setattr(notifications, "now_for_user_naive", lambda _user: local_now)
     issue_id = _approved_issue(monkeypatch)
     user_id = _subscriber()
     with get_session_context() as db:
         setting = NotificationSetting(
             user_id=user_id,
             telegram_enabled=False,
-            quiet_hours_start=time(0, 0),
-            quiet_hours_end=time(23, 59),
+            quiet_hours_start=time(23, 0),
+            quiet_hours_end=time(1, 0),
         )
         db.add(setting)
         db.flush()
