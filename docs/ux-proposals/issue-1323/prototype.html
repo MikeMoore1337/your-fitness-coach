@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>#1323 - Редактор личной копии - прототип</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-synthesis:none;font-size:15px;--lime:#d0ff58;--ink:#f5f6f5;--muted:#a6aaa8;--bg:#101211;--surface:#1b1e1c;--surface2:#252923;--border:#363b35;--edge:#121512;--shadow:0 24px 70px #0008}
+[data-theme="light"]{--lime:#789b00;--ink:#171b17;--muted:#616b60;--bg:#f6f7f4;--surface:#fff;--surface2:#eef0e9;--border:#d6ddd1;--edge:#fafcf8;--shadow:0 20px 65px #2222}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}button,input,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.35}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--lime);outline-offset:3px}
+a{color:inherit}.previewbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px max(14px,calc((100vw - 1230px)/2));background:var(--edge);color:var(--muted);font-size:12px;border-bottom:1px solid var(--border)}
+.previewbar strong{color:var(--ink)}.previewbar button,.previewbar select{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:9px;min-height:34px;padding:4px 9px}
+.app{max-width:1250px;margin:auto;min-height:calc(100dvh - 58px)}.top{display:flex;justify-content:space-between;align-items:flex-start;padding:28px 26px 20px;gap:14px;border-bottom:1px solid var(--border)}
+.eyebrow{color:var(--lime);font-size:11px;letter-spacing:.15em;font-weight:900;text-transform:uppercase}.top h1{font-size:27px;letter-spacing:-.045em;line-height:1.05;margin:8px 0 7px}.subtitle{font-size:13px;color:var(--muted);line-height:1.6}.topright{display:flex;gap:10px;align-items:center}.status{font-size:12px;color:var(--muted)}
+.button{border:1px solid var(--border);background:var(--surface2);color:var(--ink);border-radius:14px;min-height:44px;padding:10px 16px;font-weight:750}.button.primary{background:var(--lime);color:var(--edge);border-color:var(--lime)}[data-theme="light"] .button.primary{color:#fff}.button.flat{background:transparent}.button.circle{width:44px;height:44px;padding:0;border-radius:50%;font-size:20px}.button.critical{color:#fe9991}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr) 310px;min-height:680px}.column{min-width:0;padding:24px;border-right:1px solid var(--border)}.column:last-child{border-right:0}.minor{color:var(--muted);font-size:12px;line-height:1.5}.sectionline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px}.sectiontitle{font-size:16px;font-weight:850;letter-spacing:-.025em}.rail-list{display:grid;gap:7px}.rail-day{width:100%;text-align:left;border:1px solid transparent;background:none;color:var(--ink);border-radius:13px;padding:11px 12px;min-height:58px}.rail-day[aria-selected="true"]{border-color:var(--lime);background:var(--surface2);box-shadow:inset 0 1px #ffffff10}.rail-day .number{font-weight:850;font-size:14px}.rail-day .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.35}.rail-limit{margin-top:20px;padding:12px;border:1px solid var(--border);border-radius:12px;font-size:12px;line-height:1.45;color:var(--muted)}
+.mobile-only{display:none}.day-meta{display:flex;gap:10px;align-items:center;margin-bottom:20px}.day-number{font-size:11px;color:var(--lime);font-weight:900;letter-spacing:.08em;text-transform:uppercase}.day-heading{margin:6px 0 0;font-size:26px;line-height:1.13;letter-spacing:-.035em}.rowactions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.exercise-list{display:grid;gap:11px}.exercise-item{background:var(--surface);border:1px solid var(--border);border-radius:17px;display:flex;align-items:center;gap:12px;padding:16px 14px;text-align:left;color:var(--ink);width:100%;min-height:86px}
+.exercise-item[aria-selected="true"]{border-color:var(--lime);background:var(--surface2)}.order{width:32px;min-width:32px;aspect-ratio:1;border-radius:9px;display:grid;place-items:center;background:var(--surface2);color:var(--muted);font-weight:750}.exbody{min-width:0;flex:1}.exname{font-weight:780;line-height:1.35}.exmeta{color:var(--muted);font-size:12px;margin-top:7px}.exbadges{font-size:11px;color:var(--lime);margin-top:8px}.chevron{color:var(--muted);font-size:23px}.add{width:100%;margin-top:16px;border:1px dashed var(--border);background:transparent;color:var(--ink);padding:14px;border-radius:14px;min-height:48px;font-weight:700}
+.note{margin-top:16px;color:var(--muted);font-size:12px;line-height:1.6}.detail{background:var(--edge);display:flex;flex-direction:column;gap:15px}.detail h2{font-size:19px;line-height:1.25;margin:5px 0 0}.field{display:grid;gap:7px}.field label{font-size:12px;color:var(--muted);font-weight:600}.field input,.field textarea{width:100%;padding:11px 12px;border-radius:11px;border:1px solid var(--border);background:var(--surface);color:var(--ink);min-height:44px}.field textarea{resize:vertical;min-height:76px}
+.fieldgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.hr{height:1px;background:var(--border);margin:3px 0}.check{display:flex;gap:9px;align-items:center;font-size:12px;min-height:44px}.check input{accent-color:var(--lime);width:19px;height:19px}.detailbottom{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}.detailempty{padding:24px;border:1px dashed var(--border);border-radius:14px;color:var(--muted);font-size:13px;line-height:1.6}
+.carousel-frame{width:100%;min-width:0;overflow:hidden}.carousel{width:100%;display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x pan-y}.carousel::-webkit-scrollbar{display:none}.day-slide{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always;padding:2px}
+.day-card{min-height:150px;border:1px solid var(--lime);border-radius:19px;background:var(--surface2);padding:19px;box-shadow:inset 0 1px #ffffff12}
+.day-card h2{margin:9px 0;font-size:23px;line-height:1.15;overflow-wrap:anywhere;letter-spacing:-.035em}.day-card p{margin:0;color:var(--muted);font-size:12px}
+.carouselcontrols{display:flex;align-items:center;gap:10px;margin-top:12px}.position{flex:1;text-align:center;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+.drawer-bg,.sheet-bg{position:fixed;inset:0;background:#0009;z-index:20;display:none}.drawer-bg.open,.sheet-bg.open{display:block}.sheet{position:absolute;bottom:0;left:0;right:0;max-height:86dvh;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:22px max(18px,env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom));box-shadow:var(--shadow)}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}.sheet-head h2{margin:0;font-size:21px}.sheet-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.sheet-day{text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:14px;min-height:78px;padding:12px;color:var(--ink)}.sheet-day[aria-selected="true"]{border-color:var(--lime);background:var(--surface2)}.sheet-day b{font-size:14px}.sheet-day small{display:block;margin-top:7px;line-height:1.35;color:var(--muted)}
+.mobile-details{position:absolute;inset:auto 0 0;max-height:93dvh;overflow:auto;border-radius:24px 24px 0 0;background:var(--edge);padding:23px 20px calc(22px + env(safe-area-inset-bottom));box-shadow:var(--shadow)}.mobile-details .detail{padding:0;border:0}.mobile-details .detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.mobile-save{display:none}.notice{padding:11px 12px;font-size:12px;line-height:1.5;color:var(--muted);border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+@media(max-width:900px){
+.app{max-width:610px;padding-bottom:106px}.previewbar{justify-content:center}.top{padding:19px 18px 15px;align-items:center}.top h1{font-size:20px}.topright .button.primary{display:none}.topright .status{display:none}.layout{display:block;min-height:0}.column{padding:19px 18px;border:0}.column.rail,.column.detail{display:none}.column.main{padding-top:17px}.desktop-only{display:none}.mobile-only{display:block}.day-meta{display:none}.sectionline{margin-top:21px}.mobile-save{position:fixed;left:0;right:0;bottom:0;z-index:5;display:block;padding:12px max(18px,env(safe-area-inset-left)) calc(12px + env(safe-area-inset-bottom));background:var(--edge);border-top:1px solid var(--border)}.mobile-save .button{width:100%}.exercise-item{min-height:79px;padding:12px}.day-card{min-height:147px}.day-card h2{font-size:23px}
+}
+@media(max-width:350px){.sheet-list{grid-template-columns:1fr}.top h1{font-size:18px}.top{padding-left:14px;padding-right:14px}.column{padding-left:14px;padding-right:14px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style>
+</head>
+<body data-theme="dark">
+<div class="previewbar"><strong>МАКЕТ #1323 · СИНТЕТИЧЕСКИЕ ДАННЫЕ · БЕЗ СОХРАНЕНИЯ</strong>
+<label>Тема <select id="theme"><option value="dark">Тёмная</option><option value="light">Светлая</option></select></label>
+<label>Дней <select id="count"><option>1</option><option>3</option><option>5</option><option selected>8</option><option>10</option><option>12</option><option>14</option></select></label>
+<button id="jump-last">Последний день</button>
+</div>
+<main class="app" aria-label="Макет редактора личной копии">
+<header class="top"><div><div class="eyebrow">Личная копия программы</div><h1>Редактирование программы</h1><div class="subtitle">Силовой сплит · персональная копия</div></div><div class="topright"><span class="status">● Есть несохранённые изменения</span><button class="button primary" data-save>Сохранить программу</button><button class="button circle" id="close" aria-label="Закрыть макет">×</button></div></header>
+<div class="layout">
+<aside class="column rail"><div class="sectionline"><div class="sectiontitle">Дни программы</div><span class="minor" id="total"></span></div><div class="rail-list" id="rail"></div><div class="rail-limit">Доступный сейчас предел API: 8 дней. Макеты для 10-14 дней не обозначают поддержку их сохранения.</div></aside>
+<section class="column main" aria-label="Упражнения выбранного дня">
+<div class="mobile-only">
+<div class="sectionline"><div class="sectiontitle">Выбор дня</div><button class="button flat" id="all-days">Все дни</button></div>
+<div class="carousel-frame"><div class="carousel" id="carousel" role="tablist" aria-label="Дни программы"></div></div>
+<div class="carouselcontrols"><button class="button circle" id="prev" aria-label="Предыдущий день">‹</button><div class="position" aria-live="polite" id="position"></div><button class="button circle" id="next" aria-label="Следующий день">›</button></div>
+</div>
+<div class="day-meta desktop-only"><div><div class="day-number" id="desktop-counter">День</div><h2 class="day-heading" id="desktop-title"></h2></div></div>
+<div class="sectionline"><div><div class="sectiontitle">Упражнения</div><div class="minor" id="exercise-count"></div></div><button class="button flat" id="reorder">Изменить порядок</button></div>
+<div class="exercise-list" id="exercise-list"></div>
+<button class="add" id="add-exercise">＋ Добавить упражнение</button>
+<p class="note">Нажмите на упражнение, чтобы изменить подходы, повторения, отдых, заметки, суперсеты или замену. Изменения другого дня остаются в черновике.</p>
+<div class="notice" id="limit-notice" hidden>10-14 дней: только визуальный сценарий. Backend сохраняет максимум 8 дней; в реальной форме нельзя сохранить такой цикл.</div>
+</section>
+<aside class="column detail" id="detail-column" aria-label="Параметры упражнения"></aside>
+</div>
+<div class="mobile-save"><button class="button primary" data-save>Сохранить программу</button></div>
+</main>
+<div class="sheet-bg" id="sheet-bg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Все дни"><div class="sheet-head"><h2>Все дни программы</h2><button class="button circle" id="close-sheet" aria-label="Закрыть список дней">×</button></div><div class="sheet-list" id="sheet-list"></div></div></div>
+<div class="drawer-bg" id="drawer-bg"><div class="mobile-details" role="dialog" aria-modal="true" aria-label="Параметры упражнения" id="mobile-details"></div></div>
+<script>
+(function(){
+'use strict';
+const query=new URLSearchParams(location.search), names=['Грудь и трицепс','Спина и бицепс','Ноги: квадрицепс и ягодицы','Плечи и корпус','Грудь: объём','Тяговые упражнения','Ноги: задняя поверхность','Верх тела','Низ тела','Функциональная тренировка','Силовой день','Восстановительная тренировка','Акцент на спину','Смешанный день'];
+const exerciseNames=['Жим гантелей лёжа','Тяга вертикального блока','Разгибание ног сидя','Жим гантелей сидя'];
+const state={count:Number(query.get('count'))||8,day:Number(query.get('day'))||6,exercise:0,changed:false,order:false,openSheet:false,openDrawer:false};
+state.count=[1,3,5,8,10,12,14].includes(state.count)?state.count:8;state.day=Math.max(1,Math.min(state.count,state.day));
+const $=id=>document.getElementById(id);
+function dayName(i){return names[(i-1)%names.length]}
+function exercisesFor(i){return [0,1,2,3].slice(0,i%3+2).map((idx)=>({title:exerciseNames[(idx+i-1)%4],sets:idx===1?4:3,reps:idx===0?'12/10/8/15':'8-12',rest:idx===0?120:90,notes:idx===2?'Контроль движения':'',superset:idx===3}))}
+function markChanged(){state.changed=true;document.querySelectorAll('.status').forEach(e=>e.textContent='● Есть несохранённые изменения')}
+function lineDay(i){return '<b>День '+i+'</b><small>'+dayName(i)+' · '+exercisesFor(i).length+' упр.</small>'}
+function goDay(i,fromScroll=false){
+const next=Math.max(1,Math.min(state.count,i));state.day=next;state.exercise=0;
+$('position').textContent='День '+next+' из '+state.count;$('prev').disabled=next===1;$('next').disabled=next===state.count;
+$('desktop-counter').textContent='День '+next+' из '+state.count;$('desktop-title').textContent=dayName(next);
+document.querySelectorAll('[data-day]').forEach(e=>e.setAttribute('aria-selected',String(Number(e.dataset.day)===next)));
+if(!fromScroll){$('carousel').scrollTo({left:(next-1)*$('carousel').clientWidth,behavior:'instant'})}
+drawExercises();drawDetail();if(state.openSheet)closeSheet();if(state.openDrawer)closeDrawer();
+}
+function drawDays(){
+$('total').textContent=state.count+' из 8';
+$('rail').innerHTML=Array.from({length:state.count},(_,i)=>'<button class="rail-day" data-day="'+(i+1)+'" role="tab"><div class="number">День '+(i+1)+'</div><div class="hint">'+dayName(i+1)+' · '+exercisesFor(i+1).length+' упр.</div></button>').join('');
+$('carousel').innerHTML=Array.from({length:state.count},(_,i)=>'<div class="day-slide" role="tab" data-day="'+(i+1)+'" aria-label="День '+(i+1)+' из '+state.count+'"><div class="day-card"><div class="day-number">ДЕНЬ '+(i+1)+' ИЗ '+state.count+'</div><h2>'+dayName(i+1)+'</h2><p>'+exercisesFor(i+1).length+' упражнения · силовая тренировка</p></div></div>').join('');
+$('sheet-list').innerHTML=Array.from({length:state.count},(_,i)=>'<button class="sheet-day" data-day="'+(i+1)+'">'+lineDay(i+1)+'</button>').join('');
+document.querySelectorAll('button[data-day]').forEach(button=>button.addEventListener('click',()=>goDay(Number(button.dataset.day))));
+$('limit-notice').hidden=state.count<=8;
+document.querySelectorAll('[data-save]').forEach(b=>b.disabled=state.count>8);
+goDay(state.day);
+}
+function drawExercises(){
+const data=exercisesFor(state.day);$('exercise-count').textContent=data.length+' упражнения · выбран только этот день';
+$('exercise-list').innerHTML=data.map((ex,i)=>'<button class="exercise-item" data-exercise="'+i+'" aria-selected="'+(i===state.exercise)+'"><span class="order">'+String(i+1).padStart(2,'0')+'</span><span class="exbody"><span class="exname">'+ex.title+'</span><div class="exmeta">'+ex.sets+' × '+ex.reps+' · отдых '+ex.rest+' сек</div>'+(ex.notes||ex.superset?'<div class="exbadges">'+(ex.notes?'● Заметка  ':'')+(ex.superset?'● Суперсет':'')+'</div>':'')+'</span><span class="chevron">›</span></button>').join('');
+document.querySelectorAll('[data-exercise]').forEach(b=>b.addEventListener('click',()=>{state.exercise=Number(b.dataset.exercise);drawExercises();drawDetail();if(matchMedia('(max-width:900px)').matches)openDrawer()}));
+}
+function detailMarkup(mobile){
+const ex=exercisesFor(state.day)[state.exercise],head='<div class="detail-head"><div><div class="day-number">ДЕНЬ '+state.day+' · УПРАЖНЕНИЕ '+(state.exercise+1)+'</div><h2>'+ex.title+'</h2></div>'+(mobile?'<button class="button circle" id="close-drawer" aria-label="Закрыть параметры">×</button>':'')+'</div>';
+return '<div class="detail">'+head+'<div class="field"><label>Упражнение</label><button class="button flat" type="button" data-prototype-action>Заменить упражнение</button></div><div class="hr"></div><div class="fieldgrid"><div class="field"><label for="sets-'+mobile+'">Подходы</label><input id="sets-'+mobile+'" type="number" min="1" value="'+ex.sets+'"></div><div class="field"><label for="rest-'+mobile+'">Отдых, сек</label><input id="rest-'+mobile+'" type="number" min="0" value="'+ex.rest+'"></div></div><div class="field"><label for="reps-'+mobile+'">Повторения, схема</label><input id="reps-'+mobile+'" value="'+ex.reps+'"></div><div class="field"><label for="notes-'+mobile+'">Заметка</label><textarea id="notes-'+mobile+'">'+ex.notes+'</textarea></div><label class="check"><input type="checkbox" '+(ex.superset?'checked':'')+'> Объединить в суперсет</label><div class="detailbottom"><button class="button flat" type="button" data-prototype-action>Другие настройки</button><button class="button critical" type="button" data-prototype-action>Удалить · с подтверждением</button></div></div>';
+}
+function drawDetail(){
+$('detail-column').innerHTML=detailMarkup(false);$('mobile-details').innerHTML=detailMarkup(true);
+if($('close-drawer'))$('close-drawer').addEventListener('click',closeDrawer);
+document.querySelectorAll('.detail input,.detail textarea').forEach(input=>input.addEventListener('input',markChanged));
+document.querySelectorAll('[data-prototype-action]').forEach(b=>b.addEventListener('click',()=>alert('Это только визуальный макет: действия с данными будут подключены после утверждения.')));
+}
+function openDrawer(){state.openDrawer=true;$('drawer-bg').classList.add('open');document.body.style.overflow='hidden';$('close-drawer').focus()}
+function closeDrawer(){state.openDrawer=false;$('drawer-bg').classList.remove('open');document.body.style.overflow='';document.querySelector('[data-exercise="'+state.exercise+'"]')?.focus()}
+function openSheet(){state.openSheet=true;$('sheet-bg').classList.add('open');document.body.style.overflow='hidden';$('close-sheet').focus()}
+function closeSheet(){state.openSheet=false;$('sheet-bg').classList.remove('open');document.body.style.overflow='';$('all-days').focus()}
+$('prev').addEventListener('click',()=>goDay(state.day-1));$('next').addEventListener('click',()=>goDay(state.day+1));$('all-days').addEventListener('click',openSheet);$('close-sheet').addEventListener('click',closeSheet);
+$('sheet-bg').addEventListener('click',e=>{if(e.target===$('sheet-bg'))closeSheet()});$('drawer-bg').addEventListener('click',e=>{if(e.target===$('drawer-bg'))closeDrawer()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(state.openSheet)closeSheet();else if(state.openDrawer)closeDrawer()}});
+let scrollTick=false;$('carousel').addEventListener('scroll',()=>{if(scrollTick)return;scrollTick=true;requestAnimationFrame(()=>{scrollTick=false;const el=$('carousel');const newDay=Math.round(el.scrollLeft/Math.max(1,el.clientWidth))+1;if(newDay!==state.day)goDay(newDay,true)})},{passive:true});
+$('theme').value=query.get('theme')==='light'?'light':'dark';document.body.dataset.theme=$('theme').value;$('theme').addEventListener('change',e=>document.body.dataset.theme=e.target.value);
+$('count').value=String(state.count);$('count').addEventListener('change',e=>{state.count=Number(e.target.value);state.day=Math.min(state.day,state.count);drawDays()});
+$('jump-last').addEventListener('click',()=>goDay(state.count));
+$('close').addEventListener('click',()=>alert('Макет без маршрутов. В приложении закрытие защищается проверкой несохранённых изменений.'));
+document.querySelectorAll('[data-save]').forEach(b=>b.addEventListener('click',()=>alert('Это прототип без API: программа не сохранена.')));
+$('add-exercise').addEventListener('click',()=>alert('Прототип: добавление упражнения будет использовать существующий поиск и API.'));
+$('reorder').addEventListener('click',()=>{state.order=!state.order;$('reorder').textContent=state.order?'Готово':'Изменить порядок'});
+drawDays();
+if(query.get('all')==='1')openSheet();
+if(query.get('panel')==='1'&&matchMedia('(max-width:900px)').matches)openDrawer();
+})();
+</script>
+</body>
+</html>
