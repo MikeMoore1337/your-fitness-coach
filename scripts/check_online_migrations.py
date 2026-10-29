@@ -323,6 +323,46 @@ def _is_in_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST,
     return False
 
 
+def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict) -> bool:
+    if not (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "bind"
+        and call.func.attr == "execute"
+        and len(call.args) == 1
+    ):
+        return False
+    query = call.args[0]
+    sql = (
+        query.args[0].value
+        if isinstance(query, ast.Call)
+        and isinstance(query.func, ast.Attribute)
+        and isinstance(query.func.value, ast.Name)
+        and query.func.value.id == "sa"
+        and query.func.attr == "text"
+        and len(query.args) == 1
+        and isinstance(query.args[0], ast.Constant)
+        and isinstance(query.args[0].value, str)
+        else ""
+    )
+    checked = re.fullmatch(
+        r"SELECT indisvalid AND indisunique FROM pg_index WHERE indexrelid = "
+        r"'([a-z][a-z0-9_]*)'::regclass",
+        sql,
+    )
+    return bool(
+        checked
+        and _is_in_postgresql_branch(call, links)
+        and any(
+            item.func.attr == "create_index"
+            and item.args
+            and isinstance(item.args[0], ast.Constant)
+            and item.args[0].value == checked[1]
+            for item in _op_calls(upgrade)
+        )
+    )
+
+
 def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object) -> None:
     links = _parent_links(upgrade)
     created_tables = {
@@ -389,6 +429,23 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 )
         elif phase == "numeric_precision" and isinstance(function, ast.Name):
             allowed = function.id == "_ensure_upgrade_safe"
+        if phase == "expand":
+            if _is_index_validation(call, upgrade, links) or (
+                isinstance(function, ast.Attribute)
+                and function.attr == "scalar_one"
+                and isinstance(function.value, ast.Call)
+                and _is_index_validation(function.value, upgrade, links)
+            ):
+                allowed = True
+            if (
+                isinstance(function, ast.Name)
+                and function.id == "RuntimeError"
+                and isinstance(links.get(call, (None, ""))[0], ast.Raise)
+                and len(call.args) == 1
+                and isinstance(call.args[0], ast.Constant)
+                and isinstance(call.args[0].value, str)
+            ):
+                allowed = True
         if _is_autocommit_block_call(call):
             allowed = True
         if not allowed:
@@ -828,6 +885,8 @@ def validate_added_migration(path: Path) -> None:
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "op"
         ):
+            if phase == "expand" and _is_index_validation(node, upgrade, links):
+                continue
             raise OnlineMigrationError(
                 f"{path} uses SQL execution outside the verified op.execute online contract"
             )

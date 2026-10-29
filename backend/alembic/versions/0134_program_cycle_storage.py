@@ -50,6 +50,16 @@ def upgrade() -> None:
                 postgresql_concurrently=True,
                 if_not_exists=True,
             )
+            valid = bind.execute(
+                sa.text(
+                    "SELECT indisvalid AND indisunique FROM pg_index WHERE indexrelid = "
+                    "'uq_user_workouts_cycle_occurrence'::regclass"
+                )
+            ).scalar_one()
+            if not valid:
+                raise RuntimeError(
+                    "Incomplete cycle occurrence index; repair it before retrying migration"
+                )
     else:
         op.add_column("user_workouts", sa.Column("plan_materialized", sa.Boolean(), nullable=True))
         op.add_column("user_workouts", sa.Column("source_cycle_week", sa.Integer(), nullable=True))

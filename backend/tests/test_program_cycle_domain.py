@@ -780,3 +780,36 @@ def test_coach_and_progress_count_full_logical_plan_after_absence(client, monkey
         )
     # Existing athlete reads keep the same projected occurrence identifiers.
     assert schedule(client, headers, later, 7)
+
+
+def test_cycle_revision_checks_current_trainer_and_assignment_owner(client):
+    from fitminiapp_api.models.user import CoachClient, User
+
+    headers, program_id, _, _ = assigned_cycle(client)
+    other = _auth(client, 916202)
+    trainer = _auth(client, 916203, is_coach=True)
+    change = {
+        "expected_revision_number": revision(program_id),
+        "effective_from_week": 2,
+        "duration_weeks": 20,
+    }
+    endpoint = f"/api/v1/programs/assigned/{program_id}/cycle"
+    assert client.patch(endpoint, headers=other, json=change).status_code in {403, 404}
+    assert client.patch(endpoint, headers=trainer, json=change).status_code in {403, 404}
+    with get_session_context() as db:
+        coach = db.query(User).filter_by(telegram_user_id=916203).one()
+        program = db.get(UserProgram, program_id)
+        program.assigned_by_user_id = coach.id
+        db.add(CoachClient(coach_user_id=coach.id, client_user_id=program.user_id, status="active"))
+    response = client.patch(endpoint, headers=trainer, json=change)
+    assert response.status_code == 200, response.text
+    with get_session_context() as db:
+        db.query(CoachClient).filter_by(
+            client_user_id=db.get(UserProgram, program_id).user_id
+        ).one().status = "inactive"
+    change["expected_revision_number"] = revision(program_id)
+    change["duration_weeks"] = 22
+    assert client.patch(endpoint, headers=trainer, json=change).status_code in {403, 404}
+    assert revision(program_id) == change["expected_revision_number"]
+    response = client.patch(endpoint, headers=headers, json=change)
+    assert response.status_code == 200, response.text

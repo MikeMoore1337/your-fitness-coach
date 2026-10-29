@@ -4,6 +4,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import sqlalchemy
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -37,7 +38,8 @@ def test_alembic_env_accepts_percent_encoded_database_url(monkeypatch) -> None:
     assert captured["sqlalchemy.url"] == ("postgresql+psycopg://app:encoded%%21password@db/app")
 
 
-def test_alembic_online_engine_uses_fixed_application_marker(monkeypatch) -> None:
+@pytest.mark.parametrize("migration_fails", [False, True])
+def test_alembic_online_engine_uses_fixed_application_marker(monkeypatch, migration_fails) -> None:
     from alembic import context
     from fitminiapp_api.core import config as app_config
 
@@ -54,7 +56,16 @@ def test_alembic_online_engine_uses_fixed_application_marker(monkeypatch) -> Non
     class Connection:
         dialect = SimpleNamespace(name="postgresql")
 
-        def execute(self, *_args, **_kwargs) -> None:
+        def in_transaction(self):
+            return False
+
+        def execute(self, statement, *_args, **_kwargs) -> None:
+            captured.setdefault("statements", []).append(str(statement))
+
+        def rollback(self):
+            return None
+
+        def commit(self):
             return None
 
     class Connectable:
@@ -69,7 +80,12 @@ def test_alembic_online_engine_uses_fixed_application_marker(monkeypatch) -> Non
     monkeypatch.setattr(context, "is_offline_mode", lambda: False)
     monkeypatch.setattr(context, "configure", lambda **_kwargs: None)
     monkeypatch.setattr(context, "begin_transaction", nullcontext)
-    monkeypatch.setattr(context, "run_migrations", lambda: None)
+
+    def migrate():
+        if migration_fails:
+            raise RuntimeError("injected migration failure")
+
+    monkeypatch.setattr(context, "run_migrations", migrate)
     monkeypatch.setattr(sqlalchemy, "engine_from_config", fake_engine_from_config)
     monkeypatch.setattr(
         app_config.settings,
@@ -77,9 +93,18 @@ def test_alembic_online_engine_uses_fixed_application_marker(monkeypatch) -> Non
         "postgresql+psycopg://app:password@db/app",
     )
 
-    runpy.run_path(str(root / "backend" / "alembic" / "env.py"))
+    with (
+        pytest.raises(RuntimeError, match="injected migration failure")
+        if migration_fails
+        else nullcontext()
+    ):
+        runpy.run_path(str(root / "backend" / "alembic" / "env.py"))
 
     assert captured["connect_args"] == {"application_name": "yfc-migration"}
+    assert captured["statements"] == [
+        "SELECT pg_advisory_lock(:lock_id)",
+        "SELECT pg_advisory_unlock(:lock_id)",
+    ]
 
 
 def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:

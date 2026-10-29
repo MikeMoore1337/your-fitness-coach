@@ -108,6 +108,9 @@ def test_cycle_storage_downgrade_fails_closed_and_safe_roundtrip_preserves_rows(
             connection.exec_driver_sql("UPDATE user_workouts SET source_cycle_week=NULL WHERE id=1")
             for number in ("0136", "0135", "0134"):
                 _load(number).downgrade()
+        assert "ck_program_templates_default_duration_weeks" not in {
+            row["name"] for row in sa.inspect(connection).get_check_constraints("program_templates")
+        }
         columns = {item["name"] for item in sa.inspect(connection).get_columns("user_workouts")}
         assert "source_cycle_week" not in columns and "plan_materialized" not in columns
         assert connection.exec_driver_sql(

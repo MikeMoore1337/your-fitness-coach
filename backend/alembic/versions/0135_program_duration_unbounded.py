@@ -54,16 +54,8 @@ def downgrade() -> None:
         op.execute("SET LOCAL lock_timeout = '3s'")
         op.execute("SET LOCAL statement_timeout = '30s'")
         op.execute(
-            "ALTER TABLE program_templates DROP CONSTRAINT IF EXISTS ck_program_templates_default_duration_weeks, "
-            "ADD CONSTRAINT ck_program_templates_default_duration_weeks CHECK (default_duration_weeks >= 1 AND default_duration_weeks <= 24) NOT VALID"
-        )
-        op.execute(
-            "ALTER TABLE program_templates VALIDATE CONSTRAINT ck_program_templates_default_duration_weeks"
+            "ALTER TABLE program_templates DROP CONSTRAINT IF EXISTS ck_program_templates_default_duration_weeks"
         )
     else:
         with op.batch_alter_table("program_templates") as batch:
             batch.drop_constraint("ck_program_templates_default_duration_weeks", type_="check")
-            batch.create_check_constraint(
-                "ck_program_templates_default_duration_weeks",
-                "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
-            )

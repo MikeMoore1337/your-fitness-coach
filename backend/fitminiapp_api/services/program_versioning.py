@@ -1116,9 +1116,11 @@ def apply_program_lifecycle_action(
     program_id: int,
     payload: ProgramLifecycleActionRequest,
 ) -> dict[str, object]:
+    program, _role = get_program_for_actor(db, actor, program_id)
+    # Match assignment/deletion: lock the owner before the program.
+    owner = db.query(User).filter(User.id == program.user_id).with_for_update().one()
     program, _role = get_program_for_actor(db, actor, program_id, lock=True)
     _ensure_expected_revision(program, payload.expected_revision_number)
-    owner = db.query(User).filter(User.id == program.user_id).with_for_update().one()
     previous_status = program.status
     now = now_msk_naive()
 

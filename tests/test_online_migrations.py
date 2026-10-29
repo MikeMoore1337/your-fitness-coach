@@ -186,6 +186,36 @@ def test_online_migration_accepts_concurrent_index_on_existing_table(tmp_path: P
     validate_added_migration(path)
 
 
+@pytest.mark.parametrize(
+    "kind", ["valid", "write", "other_index", "other_query", "non_pg", "dynamic"]
+)
+def test_concurrent_index_allows_only_exact_catalog_validation(tmp_path: Path, kind: str) -> None:
+    query = "SELECT indisvalid AND indisunique FROM pg_index WHERE indexrelid = 'ix_users_name'::regclass"
+    if kind == "write":
+        query += "; DELETE FROM users"
+    elif kind == "other_index":
+        query = query.replace("ix_users_name", "another_index")
+    elif kind == "other_query":
+        query = "SELECT * FROM users"
+    expression = "query" if kind == "dynamic" else repr(query)
+    dialect = "sqlite" if kind == "non_pg" else "postgresql"
+    path = _migration(
+        tmp_path / "0065_index_validation.py",
+        'online_rollout_phase = "expand"\nonline_rollout_notes = "Validate the concurrent index."\n'
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        f'    if bind.dialect.name == "{dialect}":\n'
+        "        with op.get_context().autocommit_block():\n"
+        '            op.create_index("ix_users_name", "users", ["name"], postgresql_concurrently=True, if_not_exists=True)\n'
+        f"            bind.execute(sa.text({expression})).scalar_one()\n",
+    )
+    if kind != "valid":
+        with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+            validate_added_migration(path)
+    else:
+        validate_added_migration(path)
+
+
 @pytest.mark.parametrize("operation", ["drop_table", "drop_column", "alter_column"])
 def test_online_migration_rejects_destructive_contract_operation(
     tmp_path: Path, operation: str

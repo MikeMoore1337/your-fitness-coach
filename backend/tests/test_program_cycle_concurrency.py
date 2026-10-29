@@ -3,14 +3,20 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import timedelta
-from threading import Barrier
+from threading import Barrier, Event
 
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.exc import IntegrityError
 
 from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
-from fitminiapp_api.models.program import ProgramRevision, UserProgram, UserWorkout, UserWorkoutSet
+from fitminiapp_api.models.program import (
+    ProgramRevision,
+    ProgramTemplate,
+    UserProgram,
+    UserWorkout,
+    UserWorkoutSet,
+)
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program import CoachProgramExerciseCreate, ProgramLifecycleActionRequest
 from fitminiapp_api.services.program_common import ProgramError
@@ -19,6 +25,7 @@ from fitminiapp_api.services.program_versioning import (
     materialize_cycle_schedule,
     upsert_future_program_exercise,
 )
+from fitminiapp_api.services.programs import assign_template_to_user
 
 pytestmark = pytest.mark.skipif(
     engine.dialect.name != "postgresql", reason="requires real PostgreSQL row locks and constraints"
@@ -299,6 +306,64 @@ def test_two_restarts_with_same_revision_create_one_new_assignment(client):
             for row in rows
             for exercise in row.exercises
             for item in exercise.sets
+        )
+    _assert_facts_unchanged(facts)
+
+
+def test_restart_and_replacement_use_the_same_postgres_lock_order(client):
+    facts = _assigned_cycle_with_completed_facts(client)
+    owner_locked, restart_requesting_owner = Event(), Event()
+
+    def observe_owner_lock(connection, _cursor, statement, _parameters, _context, _many):
+        if (
+            connection.info.get("916_lock_scenario") == "restart"
+            and "FROM users" in statement
+            and "FOR UPDATE" in statement
+        ):
+            restart_requesting_owner.set()
+
+    def replace(db):
+        db.execute(text("SET LOCAL lock_timeout = '3s'"))
+        db.connection().info["916_lock_scenario"] = "replace"
+        owner = db.query(User).filter_by(id=facts["owner_id"]).with_for_update().one()
+        owner_locked.set()
+        assert restart_requesting_owner.wait(10)
+        old = db.get(UserProgram, facts["program_id"])
+        return assign_template_to_user(
+            db,
+            db.get(ProgramTemplate, old.template_id),
+            owner,
+            owner,
+            start_date=old.start_date,
+            duration_weeks=16,
+            replace_active=True,
+        )[0].id
+
+    def restart(db):
+        db.execute(text("SET LOCAL lock_timeout = '3s'"))
+        db.connection().info["916_lock_scenario"] = "restart"
+        assert owner_locked.wait(10)
+        return apply_program_lifecycle_action(
+            db,
+            db.get(User, facts["owner_id"]),
+            facts["program_id"],
+            ProgramLifecycleActionRequest(
+                action="restart",
+                expected_revision_number=facts["version"],
+                reason="Проверка порядка блокировок",
+            ),
+        )
+
+    event.listen(engine, "before_cursor_execute", observe_owner_lock)
+    try:
+        results = _run_parallel(replace, restart)
+    finally:
+        event.remove(engine, "before_cursor_execute", observe_owner_lock)
+    assert results[0][0] == "ok"
+    assert results[1] == ("conflict", "Program revision conflict")
+    with get_session_context() as db:
+        assert (
+            db.query(UserProgram).filter_by(user_id=facts["owner_id"], is_active=True).count() == 1
         )
     _assert_facts_unchanged(facts)
 

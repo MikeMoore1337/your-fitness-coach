@@ -51,6 +51,8 @@ Restart создаёт новое назначение с полным логи�
 
 Миграции 0134–0136 добавляют nullable lineage, concurrent partial unique index и заменяют CHECK с верхним пределом 24 на положительный домен. Для legacy `plan_materialized=NULL` означает материализованный план. Downgrade отказывается удалять используемую lineage или восстанавливать предел 24 поверх длинных программ; нужен forward-fix.
 
+Существующая блокировка мигратора использует тот же PostgreSQL advisory key на уровне сессии: autocommit при создании индекса не освобождает её. После успеха или ошибки блокировка снимается. Для программного вызова Alembic переданное соединение должно завершить текущую транзакцию. Индекс после concurrent build проверяется на валидность; незавершённый индекс останавливает миграцию и требует ремонта перед повтором. Online checker допускает только точный запрос этих признаков создаваемого индекса, а остальные SQL-вызовы остаются запрещены. Downgrade 0135 возвращает исходную схему без нового CHECK длительности, что сохраняет полный replay старых миграций.
+
 Основные приёмочные тесты: `test_program_cycle_domain.py`, `test_program_week_cycle.py`, `test_program_lifecycle.py`. `test_program_cycle_storage_migration.py` проверяет ограничения, сохранение фактов и защиту downgrade. `test_program_cycle_concurrency.py` содержит реальные конкурентные транзакции и пропускается на SQLite.
 
 Для PostgreSQL используйте отдельную disposable БД: `TEST_DATABASE_URL` заставляет pytest пересоздавать её схему. Никогда не указывайте DEV или production. Пример проверки: `python -m pytest backend/tests/test_program_cycle_concurrency.py -q`; для полного replay Alembic запускайте `python -m alembic upgrade head` из `backend/` с синтетической конфигурацией отдельной базы.
