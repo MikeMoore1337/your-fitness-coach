@@ -297,8 +297,8 @@ function ActivityHeatmapContent({
             onChange={(event) => onYearChange(Number(event.target.value))}
           >
             {Array.from(
-              { length: new Date().getFullYear() - 1969 },
-              (_, index) => new Date().getFullYear() - index,
+              { length: Math.max(new Date().getFullYear(), year) - 1969 },
+              (_, index) => Math.max(new Date().getFullYear(), year) - index,
             ).map((value) => (
               <option key={value} value={value}>
                 {value}

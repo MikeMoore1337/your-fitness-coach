@@ -197,6 +197,7 @@
   .activity-heatmap__slide {
     flex: 0 0 100%;
     min-width: 0;
+    overflow: hidden;
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }
@@ -207,7 +208,10 @@
     gap: 4px 2px;
     padding: 3px;
   }
-  .activity-heatmap__slide button {
+  .activity-heatmap__slide .activity-heatmap__days button {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
     min-height: 44px;
     aspect-ratio: 1;
     border-radius: var(--radius-control);

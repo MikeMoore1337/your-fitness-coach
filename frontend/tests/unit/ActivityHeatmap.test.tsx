@@ -139,3 +139,24 @@ it.each([true, false])('respects reduced motion %s for month buttons', (reduce) 
     expect.objectContaining({ behavior: reduce ? 'instant' : 'smooth' }),
   );
 });
+
+it('keeps the account current year selectable across the UTC year boundary', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-12-31T12:30:00Z'));
+  render(
+    <ActivityHeatmap
+      year={2027}
+      onYearChange={vi.fn()}
+      data={{
+        timezone: 'Pacific/Kiritimati',
+        history_complete: true,
+        undated_workouts: 0,
+        days: [{ date: '2027-01-01', completed_workouts: 0, working_sets: 0 }],
+      }}
+    />,
+  );
+  expect(screen.getByLabelText('Год')).toHaveValue('2027');
+  expect(document.querySelector('.activity-heatmap__month-nav h3')).toHaveTextContent(
+    'январь 2027',
+  );
+});

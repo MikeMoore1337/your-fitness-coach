@@ -4246,6 +4246,8 @@ test.describe('#835 carousel', () => {
           const dir = resolve(process.env.CAPTURE_835_FINAL);
           await mkdir(dir, { recursive: true });
           await page.evaluate(() => document.fonts.ready);
+          if (width < 768 && state !== 'table' && state !== 'overview')
+            await calendar.locator('.activity-heatmap__mobile').scrollIntoViewIfNeeded();
           if (width < 768)
             await expect
               .poll(() =>
@@ -4383,6 +4385,9 @@ test.describe('#835 carousel', () => {
           const bounds = await jan.boundingBox();
           expect(bounds?.height).toBeGreaterThanOrEqual(44);
           expect(bounds?.width).toBeGreaterThanOrEqual(32);
+          expect(bounds?.width).toBeLessThanOrEqual(
+            (await slider.evaluate((node) => node.clientWidth)) / 7,
+          );
           await calendar
             .getByLabel('Год', { exact: true })
             .selectOption(String(new Date().getFullYear()));
