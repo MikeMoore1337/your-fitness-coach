@@ -202,6 +202,42 @@ class LoggedSetItem(BaseModel):
     planned_round: int | None = None
 
 
+class WorkoutSetResult(BaseModel):
+    set_id: int
+    set_number: int
+    set_version: int
+    actual_weight: float | None = None
+    actual_reps: int | None = None
+
+
+class WorkoutSetPastResult(WorkoutSetResult):
+    workout_id: int
+    workout_exercise_id: int
+    completed_at: datetime
+    performed_on: date
+
+
+class WorkoutSetHistoryItem(BaseModel):
+    set_id: int
+    set_number: int
+    set_version: int
+    workout_exercise_id: int
+    exercise_id: int
+    source_template_exercise_id: int | None
+    previous_today: WorkoutSetResult | None = None
+    previous_workout: WorkoutSetPastResult | None = None
+    history_status: Literal[
+        "matched", "no_previous_workout", "no_matching_set", "identity_unproven"
+    ]
+
+
+class WorkoutSetHistoryResponse(BaseModel):
+    workout_id: int
+    user_program_id: int
+    program_revision_number: int
+    sets: list[WorkoutSetHistoryItem]
+
+
 class ProgressionSessionEvidence(BaseModel):
     workout_id: int
     scheduled_date: date

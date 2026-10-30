@@ -3,7 +3,12 @@ import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
-import type { ExerciseHistory, Workout, WorkoutScheduleItem } from '../../shared/api/types';
+import type {
+  ExerciseHistory,
+  Workout,
+  WorkoutScheduleItem,
+  WorkoutSetHistory,
+} from '../../shared/api/types';
 import { haptic } from '../../shared/telegram/useTelegram';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
@@ -51,6 +56,8 @@ import { WorkoutRecovery } from './WorkoutRecovery';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
+import { formatCalendarDate } from '../../shared/dateTime';
 import {
   productEventSurface,
   trackCoreProductEvent,
@@ -69,6 +76,7 @@ import { WarmupProposal } from './WarmupProposal';
 import { PlateCalculator } from './PlateCalculator';
 import { ExerciseSetupMemory } from './ExerciseSetupMemory';
 import { ActiveSessionSummary } from './ActiveSessionSummary';
+import { boundSetHistory, previousCompletedSet } from './workoutSetHistory';
 import {
   hasDecimalScale,
   isCompleteDecimalDraft,
@@ -90,6 +98,7 @@ type PreviousSetSource = Pick<
   WorkoutSet,
   'actual_reps' | 'actual_weight' | 'duration_minutes' | 'distance_km'
 >;
+type SetHistoryState = 'ready' | 'loading' | 'offline' | 'unavailable';
 
 export function resolvePreviousSetValues(
   set: PreviousSetSource,
@@ -404,6 +413,10 @@ function WorkoutSetRow({
   isCurrent,
   previousResult,
   previousValues,
+  previousSetNumber,
+  previousPending,
+  pastHistory,
+  historyState,
   restSeconds,
   userId,
   workoutId,
@@ -424,6 +437,10 @@ function WorkoutSetRow({
   isCurrent: boolean;
   previousResult: string | null;
   previousValues?: PreviousSetValues;
+  previousSetNumber?: number;
+  previousPending: boolean;
+  pastHistory?: WorkoutSetHistory['sets'][number];
+  historyState: SetHistoryState;
   restSeconds: number;
   userId?: number;
   workoutId: number;
@@ -469,16 +486,29 @@ function WorkoutSetRow({
   const serverVersion = set.version ?? 1;
   const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
   const canPrefillWeight = weight === '' && previousValues?.actual_weight != null;
-  const [prefillDismissed, setPrefillDismissed] = useState(false);
   const canPrefill =
     isCurrent &&
     !disabled &&
     !completed &&
     previousResult !== null &&
-    !prefillDismissed &&
     (canPrefillReps || canPrefillWeight);
-  const prefillSpaceReserved =
-    prefillDismissed && isCurrent && !disabled && !completed && previousResult !== null;
+  const past =
+    historyState === 'ready' && pastHistory?.history_status === 'matched'
+      ? pastHistory.previous_workout
+      : null;
+  const pastResult = past ? formatSetResult(past.actual_reps, past.actual_weight) : null;
+  const canPrefillPast =
+    isCurrent &&
+    !disabled &&
+    !completed &&
+    past != null &&
+    ((reps === '' && past.actual_reps != null) || (weight === '' && past.actual_weight != null));
+  const pastMessage = {
+    offline: 'История недоступна без сети',
+    loading: 'Обновляем историю…',
+    unavailable: 'История временно недоступна',
+    ready: pastResult ?? 'Нет прошлого результата',
+  }[historyState];
   const completedFieldsDisabled = disabled || completing || (completed && !editingCompleted);
 
   const canStartRest = (nextSetKind: SetKind, nextCompleted: boolean) =>
@@ -765,9 +795,35 @@ function WorkoutSetRow({
         </div>
       )}
 
-      {isCurrent && previousResult && (
-        <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
-      )}
+      <div
+        className="active-workout-set__history"
+        role="group"
+        aria-label={`История подхода ${set.set_number}`}
+      >
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Предыдущий сегодня</b>
+            <small>
+              {previousSetNumber == null
+                ? 'В этом упражнении'
+                : `Подход ${previousSetNumber} · ${previousPending ? (durable ? 'сохранён на устройстве' : 'не синхронизирован') : 'завершён'}`}
+            </small>
+          </span>
+          <strong>{previousResult ?? 'Нет завершённого подхода'}</strong>
+        </div>
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Прошлая тренировка</b>
+            <small>
+              {past
+                ? `Этот подход · №${past.set_number} · ${formatCalendarDate(past.performed_on, { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+                : 'Этот подход'}
+            </small>
+            {past && <small>Справочно: тип недели может отличаться</small>}
+          </span>
+          <strong>{pastMessage}</strong>
+        </div>
+      </div>
       {isCurrent && (
         <p className="active-workout-set__context">
           <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
@@ -798,7 +854,6 @@ function WorkoutSetRow({
             onChange={(event) => {
               const nextWeight = event.target.value;
               editing.current = true;
-              setPrefillDismissed(nextWeight !== '' && reps !== '');
               setWeight(nextWeight);
               if (!editingCompleted) enqueueSave({ weight: nextWeight });
             }}
@@ -825,7 +880,6 @@ function WorkoutSetRow({
             onChange={(event) => {
               const nextReps = event.target.value;
               editing.current = true;
-              setPrefillDismissed(nextReps !== '' && weight !== '');
               setReps(nextReps);
               if (!editingCompleted) enqueueSave({ reps: nextReps });
             }}
@@ -875,19 +929,15 @@ function WorkoutSetRow({
         </Button>
       </div>
 
-      {(canPrefill || prefillSpaceReserved) && (
-        <div
-          className={`active-workout-set__prefill-actions${prefillSpaceReserved ? ' is-hidden' : ''}`}
-          aria-hidden={prefillSpaceReserved || undefined}
-        >
+      {isCurrent && !completed && (
+        <div className="active-workout-set__prefill-actions active-workout-set__prefill-actions--history">
           <button
             className="active-workout-set__prefill"
-            disabled={completing}
+            disabled={!canPrefill || completing}
             type="button"
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
               const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
-              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
@@ -897,27 +947,25 @@ function WorkoutSetRow({
               });
             }}
           >
-            Подставить предыдущий результат
+            Подставить предыдущий подход сегодня
           </button>
           <button
-            className="active-workout-set__prefill active-workout-set__prefill--commit"
-            disabled={completing}
+            className="active-workout-set__prefill"
+            disabled={!canPrefillPast || completing}
             type="button"
             onClick={() => {
-              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
-              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
-              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
+              if (!past) return;
+              const nextReps =
+                reps === '' && past.actual_reps != null ? String(past.actual_reps) : reps;
+              const nextWeight =
+                weight === '' && past.actual_weight != null ? String(past.actual_weight) : weight;
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
-              enqueueSave({ reps: nextReps, weight: nextWeight, completed: true }, true);
-              trackProductEvent({
-                name: 'previous_set_reuse_used',
-                surface: productEventSurface(),
-              });
+              void enqueueSave({ reps: nextReps, weight: nextWeight });
             }}
           >
-            Подставить и завершить
+            Подставить из прошлой тренировки
           </button>
         </div>
       )}
@@ -2454,6 +2502,37 @@ export function TodayWorkout({
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
   const activeSync = useActiveWorkoutQueue(user?.id, workout.data);
+  const online = useOnlineStatus();
+  const historyEnabled = Boolean(
+    user?.id &&
+    workout.data &&
+    online &&
+    !workout.isFetching &&
+    !workout.isError &&
+    activeSync.pendingCount === 0 &&
+    !['pending', 'syncing', 'offline', 'error', 'conflict'].includes(activeSync.syncState),
+  );
+  const setHistory = useQuery({
+    queryKey: ['workout', 'set-history', user?.id, workout.data?.id, workout.dataUpdatedAt],
+    queryFn: ({ signal }) =>
+      api<WorkoutSetHistory>(`/api/v1/workouts/${workout.data!.id}/set-history`, {
+        signal,
+        cache: 'no-store',
+      }),
+    enabled: historyEnabled,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+  const historyState: SetHistoryState = !online
+    ? 'offline'
+    : workout.isError || ['error', 'conflict'].includes(activeSync.syncState) || setHistory.isError
+      ? 'unavailable'
+      : !historyEnabled || setHistory.isFetching || setHistory.isPending
+        ? 'loading'
+        : 'ready';
   useScreenWakeLock(workout.data?.status === 'in_progress');
   const mutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
@@ -2856,21 +2935,28 @@ export function TodayWorkout({
       if (!row || !controls || !dock?.height || !timer) return;
       const viewport = window.visualViewport;
       const top = Math.max(viewport?.offsetTop ?? 0, timer.bottom);
-      const bottom =
-        Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight), dock.top) - 8;
+      const viewportBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const bottom = Math.min(viewportBottom, dock.top) - 8;
       const nextRow = row.nextElementSibling;
       const next = nextRow?.querySelector('[data-workout-field="done"]')?.getBoundingClientRect();
-      const visibleNext =
-        nextRow &&
-        nextRow.getBoundingClientRect().top <
-          (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const nextTop = nextRow?.getBoundingClientRect().top;
+      const visibleNext = nextTop != null && nextTop < viewportBottom;
       const rir = row.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
       const overlap = Math.max(
         0,
         controls.bottom - bottom,
         visibleNext && next ? next.bottom - bottom : 0,
       );
-      const delta = Math.min(overlap, Math.min(controls.top, rir?.top ?? controls.top) - top);
+      const availableScroll = Math.min(controls.top, rir?.top ?? controls.top) - top;
+      // Keep current controls visible when both sets cannot fit above the dock.
+      if (visibleNext && next && next.bottom > bottom && overlap > availableScroll) {
+        const hideNext = viewportBottom - nextTop + 1;
+        if (hideNext <= bottom - controls.bottom) {
+          window.scrollBy({ top: -Math.ceil(hideNext), behavior: 'instant' });
+          return;
+        }
+      }
+      const delta = Math.min(overlap, availableScroll);
       if (delta > 0) window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -3307,10 +3393,22 @@ export function TodayWorkout({
 
                   <div className="active-workout-exercise__sets">
                     {exercise.sets.map((set, setIndex) => {
-                      const previousSet = setIndex > 0 ? exercise.sets[setIndex - 1] : undefined;
-                      const previousPending = previousSet
-                        ? activeSync.pendingBySet.get(previousSet.id)
-                        : undefined;
+                      const previousStrength =
+                        metricType === 'strength'
+                          ? previousCompletedSet(exercise.sets, setIndex, activeSync.pendingBySet)
+                          : undefined;
+                      const previousSet =
+                        metricType === 'strength'
+                          ? previousStrength?.set
+                          : setIndex > 0
+                            ? exercise.sets[setIndex - 1]
+                            : undefined;
+                      const previousPending =
+                        metricType === 'strength'
+                          ? previousStrength?.pending
+                          : previousSet
+                            ? activeSync.pendingBySet.get(previousSet.id)
+                            : undefined;
                       const previousValues = previousSet
                         ? resolvePreviousSetValues(previousSet, previousPending)
                         : undefined;
@@ -3325,6 +3423,10 @@ export function TodayWorkout({
                               previousValues.actual_weight,
                             )
                         : null;
+                      const pastHistory =
+                        metricType === 'strength' && historyState === 'ready'
+                          ? boundSetHistory(setHistory.data, data.id, exercise, set)
+                          : undefined;
                       return metricType === 'cardio' ? (
                         <CardioWorkoutRow
                           key={set.id}
@@ -3359,6 +3461,12 @@ export function TodayWorkout({
                           isCurrent={currentSet?.set.id === set.id}
                           previousResult={previousResult}
                           previousValues={previousValues}
+                          previousSetNumber={previousSet?.set_number}
+                          previousPending={Boolean(previousPending)}
+                          pastHistory={pastHistory}
+                          historyState={
+                            historyState === 'ready' && !pastHistory ? 'unavailable' : historyState
+                          }
                           pending={activeSync.pendingBySet.get(set.id)}
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}

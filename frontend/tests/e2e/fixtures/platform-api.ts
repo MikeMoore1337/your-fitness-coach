@@ -1761,6 +1761,28 @@ export async function installPlatformApi(
         ],
       });
     }
+    if (path.endsWith('/workouts/42/set-history')) {
+      return route.fulfill({
+        json: {
+          workout_id: 42,
+          user_program_id: 1,
+          program_revision_number: 1,
+          sets: [
+            {
+              set_id: 201,
+              set_number: 1,
+              set_version: setVersion,
+              workout_exercise_id: 101,
+              exercise_id: 11,
+              source_template_exercise_id: null,
+              previous_today: null,
+              previous_workout: null,
+              history_status: 'identity_unproven',
+            },
+          ],
+        },
+      });
+    }
     if (path.endsWith('/workouts/today')) {
       if (workoutStatus === 'none') {
         return route.fulfill({
