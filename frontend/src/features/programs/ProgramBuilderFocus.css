@@ -173,6 +173,16 @@
 .program-periodization__choice small {
   color: var(--muted);
 }
+.program-periodization__scope {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.program-periodization__scope legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
 .program-periodization__fields,
 .program-periodization__week {
   display: grid;
@@ -196,4 +206,28 @@
 }
 .program-periodization__preview p {
   font-size: 0.85rem;
+}
+.program-periodization__warning {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--v2-warning);
+  border-radius: var(--radius-control);
+  background: var(--v2-warning-surface);
+}
+.program-periodization__warning strong {
+  color: var(--v2-warning);
+}
+.program-periodization__actions {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 16px;
+}
+.program-periodization__actions > button:first-child,
+.program-periodization__confirm {
+  width: 100%;
+}
+.program-periodization button.secondary {
+  border: 1px solid var(--border);
+  background: var(--surface);
 }

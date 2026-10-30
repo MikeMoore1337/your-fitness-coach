@@ -119,6 +119,92 @@ def test_template_edit_preserves_and_updates_each_source_week(client):
         }
 
 
+def test_scoped_exercise_change_preserves_other_planned_exercises(client):
+    from copy import deepcopy
+
+    from fitminiapp_api.services.program_versioning import (
+        hydrate_cycle_workout,
+        record_program_revision,
+    )
+
+    headers = _auth(client, 918258)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 1, "repeat": True}
+    payload["days"][0]["exercises"].append(deepcopy(payload["days"][0]["exercises"][0]))
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    assigned = client.post(
+        f"/api/v1/programs/templates/{created.json()['template']['id']}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    with get_session_context() as db:
+        workout = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=4).one()
+        first, second = sorted(workout.exercises, key=lambda item: item.sort_order)
+        second.prescribed_reps = "15"
+        second.source_template_exercise_id = None
+        second_set_ids = [item.id for item in second.sets]
+        slot, exercise_id = first.source_template_exercise_id, first.exercise_id
+        workout_id = workout.id
+    changed = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "effective_scope": "future_program",
+            "occurrence_weeks": [4],
+            "skip_protected": True,
+            "day_number": 1,
+            "target_template_exercise_id": slot,
+            "exercise_id": exercise_id,
+            "prescribed_sets": 3,
+            "prescribed_reps": "12",
+            "rest_seconds": 90,
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    with get_session_context() as db:
+        first, second = sorted(
+            db.get(UserWorkout, workout_id).exercises, key=lambda item: item.sort_order
+        )
+        assert first.prescribed_reps == "12"
+        assert second.prescribed_reps == "15"
+        assert [item.id for item in second.sets] == second_set_ids
+    changed_type = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/week-type",
+        headers=headers,
+        json={"expected_revision_number": 2, "occurrence_weeks": [3], "week_type": "light"},
+    )
+    assert changed_type.status_code == 200, changed_type.text
+    with get_session_context() as db:
+        row = db.get(UserWorkout, workout_id)
+        assert hydrate_cycle_workout(db, row)
+        first, second = sorted(row.exercises, key=lambda item: item.sort_order)
+        assert first.prescribed_reps == "12" and second.prescribed_reps == "15"
+        assert [item.id for item in second.sets] == second_set_ids
+    disabled = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/disable",
+        headers=headers,
+        json={"expected_revision_number": 3, "effective_from_week": 4},
+    )
+    assert disabled.status_code == 200, disabled.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        record_program_revision(
+            db,
+            program,
+            actor=db.get(User, program.user_id),
+            change_kind="block_updated",
+            changed_fields={"operation": "metadata_only"},
+        )
+        row = db.get(UserWorkout, workout_id)
+        assert hydrate_cycle_workout(db, row)
+        second = sorted(row.exercises, key=lambda item: item.sort_order)[1]
+        assert second.source_template_exercise_id is None and second.prescribed_reps == "15"
+        assert [item.id for item in second.sets] == second_set_ids
+
+
 def test_enable_cycle_on_legacy_assignment_preserves_history_and_expands_future(client):
     from datetime import datetime, time, timedelta
 

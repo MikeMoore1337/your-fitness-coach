@@ -100,7 +100,19 @@ describe('Изменение назначенной периодизации', (
     apiMock.mockRejectedValueOnce(new ApiError('conflict', 409));
     await user.click(screen.getByRole('button', { name: 'Применить изменения' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('План уже изменился');
-    expect(screen.getByRole('combobox', { name: 'Новый тип недели' })).toHaveValue('light');
+    expect(screen.getByRole('button', { name: 'Применить изменения' })).toBeDisabled();
+    apiMock.mockResolvedValueOnce({ current_revision_number: 6, duration_weeks: 16 });
+    await user.click(screen.getByRole('button', { name: 'Обновить план' }));
+    expect(await screen.findByRole('combobox', { name: 'Новый тип недели' })).toHaveValue('light');
+    await screen.findByText(/Неделя 7 · исходная 1 · проход 3/);
+    await user.click(screen.getByRole('button', { name: 'Проверить изменения' }));
+    expect(apiMock).toHaveBeenLastCalledWith(
+      '/api/v1/programs/assigned/9/cycle/week-type/preview',
+      {
+        method: 'POST',
+        body: { expected_revision_number: 6, week_type: 'light', occurrence_weeks: [7], offset: 0 },
+      },
+    );
     expect(changed).not.toHaveBeenCalled();
   });
 
@@ -108,5 +120,30 @@ describe('Изменение назначенной периодизации', (
     setup(vi.fn(), true);
     expect(await screen.findByText(/План подготовлен тренером/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Проверить изменения' })).not.toBeInTheDocument();
+  });
+
+  it('не предлагает изменить упражнение без устойчивой исходной позиции', async () => {
+    const user = userEvent.setup();
+    const initial = week(7);
+    apiMock.mockResolvedValue({
+      weeks: [
+        {
+          ...initial,
+          workouts: [
+            {
+              ...initial.workouts[0],
+              exercises: [{ source_template_exercise_id: null, exercise_id: 11 }],
+            },
+          ],
+        },
+      ],
+      total_weeks: 1,
+      offset: 0,
+    });
+    setup();
+    await screen.findByText(/Неделя 7 · исходная 1 · проход 3/);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Что изменить' }), 'exercise');
+    expect(screen.getByRole('option', { name: /измените в тренировке/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Проверить изменения' })).toBeDisabled();
   });
 });

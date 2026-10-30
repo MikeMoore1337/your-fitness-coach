@@ -74,6 +74,36 @@ def revision(program_id):
         return db.get(UserProgram, program_id).current_revision_number
 
 
+def test_duration_change_preserves_existing_future_workout_plan(client):
+    headers, program_id, _, _ = assigned_cycle(client)
+    with get_session_context() as db:
+        workout = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=4).one()
+        workout.exercises[0].prescribed_reps = "15"
+        workout_id = workout.id
+        set_ids = [item.id for item in workout.exercises[0].sets]
+    response = client.patch(
+        f"/api/v1/programs/assigned/{program_id}/cycle",
+        headers=headers,
+        json={"expected_revision_number": 1, "effective_from_week": 4, "duration_weeks": 20},
+    )
+    assert response.status_code == 200, response.text
+    with get_session_context() as db:
+        workout = db.get(UserWorkout, workout_id)
+        assert workout.exercises[0].prescribed_reps == "15"
+        assert [item.id for item in workout.exercises[0].sets] == set_ids
+        program = db.get(UserProgram, program_id)
+        program_versioning.record_program_revision(
+            db,
+            program,
+            actor=None,
+            change_kind="block_updated",
+            changed_fields={"operation": "metadata_only"},
+        )
+        assert program_versioning.hydrate_cycle_workout(db, workout)
+        assert workout.exercises[0].prescribed_reps == "15"
+        assert [item.id for item in workout.exercises[0].sets] == set_ids
+
+
 def schedule(client, headers, start, days=93):
     response = client.get(
         "/api/v1/workouts/schedule",

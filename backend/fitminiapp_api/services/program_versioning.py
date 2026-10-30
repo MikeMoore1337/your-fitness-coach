@@ -437,6 +437,7 @@ def _cycle_workout_plans(
     *,
     revisions: list[ProgramRevision] | None = None,
     source_index: dict[int, dict[int, list[dict]]] | None = None,
+    scheduled_dates: dict[int, date] | None = None,
 ) -> list[dict]:
     config = _cycle_plan_at(db, program, week, revisions=revisions)
     if config is None:
@@ -467,12 +468,17 @@ def _cycle_workout_plans(
         result["scheduled_date"] = (
             date.fromisoformat(original["scheduled_date"]) + timedelta(weeks=week - source_week)
         ).isoformat()
+        effective_date = (
+            scheduled_dates[result["day_number"]].isoformat()
+            if scheduled_dates and result["day_number"] in scheduled_dates
+            else result["scheduled_date"]
+        )
         for override in overrides:
             if (
                 "week_type" in override
                 or not _override_matches(override, week, source_week, boundary)
                 or result["day_number"] != override["day_number"]
-                or result["scheduled_date"] < override.get("not_before_date", "")
+                or effective_date < override.get("not_before_date", "")
             ):
                 continue
             for item in result["exercises"]:
@@ -635,17 +641,34 @@ def _cycle_plan_sets(plan: dict) -> list[dict]:
     ]
 
 
-def _write_cycle_exercises(db: Session, workout: UserWorkout, plan: dict) -> None:
+def _write_cycle_exercises(
+    db: Session, workout: UserWorkout, plan: dict, *, target_slot: int | None = None
+) -> None:
     if (
         workout.status != "planned"
         or workout.started_at is not None
         or _workout_has_recorded_data(workout)
     ):
         raise ProgramError("Нельзя заменить начатую тренировку или записанные результаты")
-    by_slot = {item.source_template_exercise_id: item for item in workout.exercises}
+    by_slot = {
+        ("template", item.source_template_exercise_id)
+        if item.source_template_exercise_id is not None
+        else ("manual", item.sort_order): item
+        for item in workout.exercises
+    }
+    if len(by_slot) != len(workout.exercises):
+        raise ProgramError("Позиции упражнений в тренировке неоднозначны")
     retained = set()
     for source in plan["exercises"]:
-        slot = source["source_template_exercise_id"]
+        if target_slot is not None and source["source_template_exercise_id"] != target_slot:
+            continue
+        slot = (
+            ("template", source["source_template_exercise_id"])
+            if source["source_template_exercise_id"] is not None
+            else ("manual", source["sort_order"])
+        )
+        if slot in retained:
+            raise ProgramError("Позиции упражнений в плане неоднозначны")
         retained.add(slot)
         exercise = by_slot.get(slot)
         values = {key: value for key, value in source.items() if key != "sets"}
@@ -675,7 +698,7 @@ def _write_cycle_exercises(db: Session, workout: UserWorkout, plan: dict) -> Non
         for item in old_sets.values():
             db.delete(item)
     for slot, exercise in by_slot.items():
-        if slot not in retained:
+        if target_slot is None and slot not in retained:
             db.delete(exercise)
     workout.plan_materialized = True
     workout.plan_revision_number = workout.user_program.current_revision_number
@@ -706,16 +729,66 @@ def hydrate_cycle_workout(db: Session, workout: UserWorkout) -> bool:
         and workout.plan_revision_number == program.current_revision_number
     ):
         return False
+    revisions = (
+        db.query(ProgramRevision)
+        .filter_by(user_program_id=program.id)
+        .order_by(ProgramRevision.revision_number)
+        .all()
+    )
     plan = next(
         (
             item
-            for item in _cycle_workout_plans(db, program, workout.week_number)
+            for item in _cycle_workout_plans(
+                db,
+                program,
+                workout.week_number,
+                revisions=revisions,
+                scheduled_dates={workout.day_number: workout.scheduled_date},
+            )
             if item["day_number"] == workout.day_number
         ),
         None,
     )
     if plan is None:
         raise ProgramError("Не найден исходный план тренировки")
+    if workout.plan_materialized is not False and workout.plan_revision_number is not None:
+        previous_revisions = [
+            revision
+            for revision in revisions
+            if revision.revision_number <= workout.plan_revision_number
+        ]
+        if any(revision.revision_number == workout.plan_revision_number for revision in revisions):
+            previous = next(
+                (
+                    item
+                    for item in _cycle_workout_plans(
+                        db,
+                        program,
+                        workout.week_number,
+                        revisions=previous_revisions,
+                        scheduled_dates={workout.day_number: workout.scheduled_date},
+                    )
+                    if item["day_number"] == workout.day_number
+                ),
+                None,
+            )
+            if previous is not None:
+                old = {item["source_template_exercise_id"]: item for item in previous["exercises"]}
+                new = {item["source_template_exercise_id"]: item for item in plan["exercises"]}
+                if (
+                    len(old) == len(previous["exercises"])
+                    and len(new) == len(plan["exercises"])
+                    and old.keys() == new.keys()
+                    and (None not in new or old[None] == new[None])
+                ):
+                    for slot in new:
+                        if slot is not None and old[slot] != new[slot]:
+                            _write_cycle_exercises(db, workout, plan, target_slot=slot)
+                    workout.source_cycle_week = plan["source_cycle_week"]
+                    workout.cycle_iteration = plan["cycle_iteration"]
+                    workout.plan_revision_number = program.current_revision_number
+                    db.flush()
+                    return True
     _write_cycle_exercises(db, workout, plan)
     return True
 
@@ -1020,12 +1093,20 @@ def revise_program_cycle(
                         workout.week_number,
                         revisions=current_revisions,
                         source_index=indexed_sources,
+                        scheduled_dates={workout.day_number: workout.scheduled_date},
                     )
                     if item["day_number"] == workout.day_number
                 ),
                 None,
             )
             if plan is None:
+                continue
+            if config is None and workout.status == "planned":
+                if (workout.source_cycle_week, workout.cycle_iteration) == (
+                    plan["source_cycle_week"],
+                    plan["cycle_iteration"],
+                ):
+                    workout.plan_revision_number = revision.revision_number
                 continue
             workout.status = "planned"
             if workout.plan_materialized is not False:
@@ -1383,6 +1464,11 @@ def disable_program_cycle(
     )
     by_key = {(row.week_number, row.day_number): row for row in existing}
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
+    existing_by_week: dict[int, list[UserWorkout]] = {}
+    dates_by_week: dict[int, dict[int, date]] = {}
+    for row in existing:
+        existing_by_week.setdefault(row.week_number, []).append(row)
+        dates_by_week.setdefault(row.week_number, {})[row.day_number] = row.scheduled_date
     if preview:
         weeks = []
         for week in range(
@@ -1391,7 +1477,12 @@ def disable_program_cycle(
         ):
             workouts = []
             for plan in _cycle_workout_plans(
-                db, program, week, revisions=revisions, source_index=indexed_sources
+                db,
+                program,
+                week,
+                revisions=revisions,
+                source_index=indexed_sources,
+                scheduled_dates=dates_by_week.get(week),
             ):
                 row = by_key.get((week, plan["day_number"]))
                 scheduled = (
@@ -1416,10 +1507,31 @@ def disable_program_cycle(
     frozen = []
     plans_by_key = {}
     sets = 0
+    snapshot_by_key = {
+        (item["week_number"], item["day_number"]): item
+        for item in _build_program_snapshot(db, program)["workouts"]
+    }
     for week in range(boundary, program.duration_weeks + 1):
-        for plan in _cycle_workout_plans(
-            db, program, week, revisions=revisions, source_index=indexed_sources
-        ):
+        week_plans = {
+            plan["day_number"]: plan
+            for plan in _cycle_workout_plans(
+                db,
+                program,
+                week,
+                revisions=revisions,
+                source_index=indexed_sources,
+                scheduled_dates=dates_by_week.get(week),
+            )
+        }
+        for row in existing_by_week.get(week, []):
+            if (
+                row.scheduled_date >= today
+                and row.status == "planned"
+                and row.plan_materialized is not False
+                and not _workout_has_recorded_data(row)
+            ):
+                week_plans[row.day_number] = snapshot_by_key[(week, row.day_number)]
+        for plan in week_plans.values():
             sets += sum(len(exercise["sets"]) for exercise in plan["exercises"])
             if sets > MAX_GENERATED_SETS:
                 raise ProgramError("Размер плана превышает допустимый объём одной операции")
@@ -1466,15 +1578,9 @@ def disable_program_cycle(
             or _workout_has_recorded_data(row)
         ):
             continue
-        if (
-            row.plan_materialized is not False
-            and row.plan_revision_number != payload.expected_revision_number
-        ):
-            _write_cycle_exercises(db, row, target_plan)
-        else:
-            row.source_cycle_week = target_plan["source_cycle_week"]
-            row.cycle_iteration = 1
-            row.plan_revision_number = revision.revision_number
+        row.source_cycle_week = target_plan["source_cycle_week"]
+        row.cycle_iteration = 1
+        row.plan_revision_number = revision.revision_number
     revision.snapshot = _build_program_snapshot(db, program)
     record_audit_event(
         db,
@@ -1557,6 +1663,9 @@ def revise_program_week_type(
     )
     by_key = {(row.week_number, row.day_number): row for row in existing}
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
+    dates_by_week: dict[int, dict[int, date]] = {}
+    for row in existing:
+        dates_by_week.setdefault(row.week_number, {})[row.day_number] = row.scheduled_date
     if preview:
         result = []
         overrides = _cycle_occurrence_overrides(db, program.id, revisions=revisions)
@@ -1568,14 +1677,32 @@ def revise_program_week_type(
             source_week = (week - boundary) % cycle["length_weeks"] + 1
             workouts = []
             for plan in _cycle_workout_plans(
-                db, program, week, revisions=revisions, source_index=indexed_sources
+                db,
+                program,
+                week,
+                revisions=revisions,
+                source_index=indexed_sources,
+                scheduled_dates=dates_by_week.get(week),
             ):
                 row = by_key.get((week, plan["day_number"]))
                 scheduled = (
                     row.scheduled_date if row else date.fromisoformat(plan["scheduled_date"])
                 )
+                needs_refresh = bool(
+                    row is not None
+                    and row.plan_materialized is not False
+                    and (
+                        row.source_cycle_week != plan["source_cycle_week"]
+                        or row.cycle_iteration != plan["cycle_iteration"]
+                    )
+                )
                 changeable = scheduled >= today and (
-                    row is None or (row.status == "planned" and not _workout_has_recorded_data(row))
+                    row is None
+                    or (
+                        row.status == "planned"
+                        and not _workout_has_recorded_data(row)
+                        and not needs_refresh
+                    )
                 )
                 current_type = (
                     workout_cycle_week_type(db, row, revisions)[0]
@@ -1591,6 +1718,7 @@ def revise_program_week_type(
                         "scheduled_date": scheduled.isoformat(),
                         "status": row.status if row else "planned",
                         "changeable": changeable,
+                        "needs_refresh": needs_refresh,
                         "week_type": current_type,
                         "day_number": plan["day_number"],
                         "exercises": [
@@ -1646,24 +1774,21 @@ def revise_program_week_type(
                         row.week_number,
                         revisions=revisions,
                         source_index=indexed_sources,
+                        scheduled_dates={row.day_number: row.scheduled_date},
                     )
                     if item["day_number"] == row.day_number
                 ),
                 None,
             )
             if target_plan is not None:
+                if row.plan_materialized is not False and (
+                    row.source_cycle_week != target_plan["source_cycle_week"]
+                    or row.cycle_iteration != target_plan["cycle_iteration"]
+                ):
+                    raise ProgramError(
+                        "Откройте тренировку и обновите её план перед изменением типа"
+                    )
                 candidates.append((row, target_plan))
-    if (
-        sum(
-            len(item["sets"])
-            for row, plan in candidates
-            if row.plan_materialized is not False
-            and row.plan_revision_number != program.current_revision_number
-            for item in plan["exercises"]
-        )
-        > MAX_GENERATED_SETS
-    ):
-        raise ProgramError("Размер плана превышает допустимый объём одной операции")
     revision = record_program_revision(
         db,
         program,
@@ -1672,15 +1797,9 @@ def revise_program_week_type(
         changed_fields={"occurrence_override": {**scope, "week_type": payload.week_type}},
     )
     for row, plan in candidates:
-        if (
-            row.plan_materialized is not False
-            and row.plan_revision_number != payload.expected_revision_number
-        ):
-            _write_cycle_exercises(db, row, plan)
-        else:
-            row.source_cycle_week = plan["source_cycle_week"]
-            row.cycle_iteration = plan["cycle_iteration"]
-            row.plan_revision_number = revision.revision_number
+        row.source_cycle_week = plan["source_cycle_week"]
+        row.cycle_iteration = plan["cycle_iteration"]
+        row.plan_revision_number = revision.revision_number
     revision.snapshot = _build_program_snapshot(db, program)
     record_audit_event(
         db,
@@ -2260,7 +2379,11 @@ def _ensure_program_mutable(program: UserProgram) -> None:
 
 def _workout_has_recorded_data(workout: UserWorkout) -> bool:
     """Treat persisted workout facts as immutable even if status is inconsistent."""
-    if workout.started_at is not None or workout.completed_at is not None:
+    if (
+        workout.started_at is not None
+        or workout.started_at_utc is not None
+        or workout.completed_at is not None
+    ):
         return True
     return any(
         workout_set.is_completed
@@ -3468,6 +3591,8 @@ def upsert_future_program_exercise(
         if len(identities) != 1:
             raise ProgramError("Укажите тренировочный день и исходную позицию упражнения")
         selected_day, selected_slot = next(iter(identities))
+        if selected_slot is None:
+            raise ProgramError("У исходного упражнения нет устойчивой позиции")
         if any(
             payload.model_dump()[key] is not None
             for key in ("group_id", "group_kind", "group_order", "superset_group", "superset_order")
@@ -3556,6 +3681,20 @@ def upsert_future_program_exercise(
             if _override_matches(scope, row.week_number, row_source, config[2]):
                 if row.status == "cancelled" and explicit is None:
                     continue
+                if (
+                    payload.skip_protected
+                    and row.status == "planned"
+                    and not _workout_has_recorded_data(row)
+                    and row.plan_materialized is not False
+                    and (
+                        row.source_cycle_week != row_source
+                        or row.cycle_iteration
+                        != (row.week_number - config[2]) // config[0]["length_weeks"] + 1
+                    )
+                ):
+                    raise ProgramError(
+                        "Откройте тренировку и обновите её план перед изменением упражнения"
+                    )
                 existing.append(row)
         if not payload.skip_protected and any(
             row.status != "planned" or row.started_at is not None or _workout_has_recorded_data(row)
@@ -3592,22 +3731,54 @@ def upsert_future_program_exercise(
             changed_fields={"occurrence_override": override},
         )
         db.flush()
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program.id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+        indexed_sources: dict[int, dict[int, list[dict]]] = {}
         revised_sets = 0
+        updated_count = 0
         for workout in existing:
             effective = next(
-                item
-                for item in _cycle_workout_plans(db, program, workout.week_number)
-                if item["day_number"] == workout.day_number
+                (
+                    item
+                    for item in _cycle_workout_plans(
+                        db,
+                        program,
+                        workout.week_number,
+                        revisions=revisions,
+                        source_index=indexed_sources,
+                        scheduled_dates={workout.day_number: workout.scheduled_date},
+                    )
+                    if item["day_number"] == workout.day_number
+                ),
+                None,
             )
-            count = sum(len(item["sets"]) for item in effective["exercises"])
+            if effective is None:
+                continue
+            target = next(
+                (
+                    item
+                    for item in effective["exercises"]
+                    if item.get("source_template_exercise_id") == selected_slot
+                ),
+                None,
+            )
+            if target is None:
+                continue
+            count = len(target["sets"])
             if (
                 workout.plan_materialized is not False
                 and revised_sets + count <= MAX_GENERATED_SETS
             ):
-                _write_cycle_exercises(db, workout, effective)
+                _write_cycle_exercises(db, workout, effective, target_slot=selected_slot)
                 revised_sets += count
+                updated_count += 1
             elif workout.plan_materialized is False:
                 workout.plan_revision_number = revision.revision_number
+                updated_count += 1
         revision.snapshot = _build_program_snapshot(db, program)
         record_audit_event(
             db,
@@ -3619,7 +3790,7 @@ def upsert_future_program_exercise(
             details={"revision_number": revision.revision_number, "scope": scope},
         )
         db.commit()
-        return len(existing), revision.revision_number
+        return updated_count, revision.revision_number
 
     if payload.skip_protected or any(
         value is not None

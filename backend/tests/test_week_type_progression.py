@@ -274,6 +274,53 @@ def test_scoped_exercise_change_skips_protected_workouts(client):
         ] == facts
 
 
+def test_started_utc_without_local_start_is_protected(client):
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 5)
+    with get_session_context() as db:
+        row = db.get(UserWorkout, workouts[5])
+        row.started_at_utc = datetime.combine(row.scheduled_date, time(10))
+        assert row.status == "planned" and row.started_at is None
+    path = f"/api/v1/programs/assigned/{program_id}/cycle/week-type"
+    payload = {"expected_revision_number": 1, "week_type": "heavy", "occurrence_weeks": [5]}
+    preview = client.post(path + "/preview", headers=headers, json=payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["weeks"][0]["workouts"][0]["changeable"] is False
+    applied = client.post(path, headers=headers, json=payload)
+    assert applied.status_code == 200, applied.text
+    with get_session_context() as db:
+        row = db.get(UserWorkout, workouts[5])
+        assert row.plan_revision_number == 1 and row.started_at_utc is not None
+
+
+def test_changing_type_does_not_rewrite_an_older_materialized_plan(client):
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 8)
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        row = db.get(UserWorkout, workouts[8])
+        row.exercises[0].prescribed_reps = "15"
+        original_ids = [item.id for item in row.exercises[0].sets]
+        record_program_revision(
+            db,
+            program,
+            actor=db.get(User, program.user_id),
+            change_kind="block_updated",
+            changed_fields={"operation": "metadata_only"},
+        )
+    result = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/week-type",
+        headers=headers,
+        json={"expected_revision_number": 2, "week_type": "heavy", "occurrence_weeks": [8]},
+    )
+    assert result.status_code == 200, result.text
+    with get_session_context() as db:
+        row = db.get(UserWorkout, workouts[8])
+        assert row.exercises[0].prescribed_reps == "15"
+        assert [item.id for item in row.exercises[0].sets] == original_ids
+        assert row.plan_revision_number == 3
+
+
 def test_future_source_repeats_skip_started_occurrence(client):
     headers, program_id = _cycle(client, ["heavy", None, "light"])
     workouts = _workouts(program_id, 11)
@@ -304,6 +351,51 @@ def test_future_source_repeats_skip_started_occurrence(client):
         assert db.get(UserWorkout, workouts[4]).exercises[0].prescribed_reps == "12"
         assert db.get(UserWorkout, workouts[7]).exercises[0].prescribed_reps == "8-10"
         assert db.get(UserWorkout, workouts[10]).exercises[0].prescribed_reps == "12"
+
+
+def test_scoped_change_uses_rescheduled_future_date(client, monkeypatch):
+    import fitminiapp_api.services.program_versioning as versioning
+
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 3)
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        row = db.get(UserWorkout, workouts[2])
+        row.scheduled_date = program.start_date + timedelta(weeks=8)
+        today = program.start_date + timedelta(weeks=7)
+        exercise = row.exercises[0]
+        slot, exercise_id = exercise.source_template_exercise_id, exercise.exercise_id
+    monkeypatch.setattr(versioning, "today_for_user", lambda _user: today)
+    result = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "effective_scope": "future_program",
+            "occurrence_weeks": [2],
+            "skip_protected": True,
+            "day_number": 1,
+            "target_template_exercise_id": slot,
+            "exercise_id": exercise_id,
+            "prescribed_sets": 2,
+            "prescribed_reps": "12",
+            "rest_seconds": 90,
+        },
+    )
+    assert result.status_code == 200, result.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        row = db.get(UserWorkout, workouts[2])
+        assert row.exercises[0].prescribed_reps == "12"
+        record_program_revision(
+            db,
+            program,
+            actor=db.get(User, program.user_id),
+            change_kind="block_updated",
+            changed_fields={"operation": "metadata_only"},
+        )
+        assert versioning.hydrate_cycle_workout(db, row)
+        assert row.exercises[0].prescribed_reps == "12"
 
 
 def test_week_type_preview_expands_only_requested_source_week(client):
@@ -460,6 +552,33 @@ def test_disabling_cycle_does_not_reapply_older_overrides(client):
     with get_session_context() as db:
         program = db.get(UserProgram, program_id)
         assert _cycle_workout_plans(db, program, 8)[0]["exercises"][0]["prescribed_reps"] == "10"
+
+
+def test_disabling_cycle_preserves_existing_unrecorded_workout_plan(client):
+    from fitminiapp_api.services.program_versioning import _cycle_workout_plans
+
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 8)
+    with get_session_context() as db:
+        row = db.get(UserWorkout, workouts[8])
+        row.exercises[0].prescribed_reps = "15"
+        original_ids = [item.id for item in row.exercises[0].sets]
+    disabled = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/disable",
+        headers=headers,
+        json={"expected_revision_number": 1, "effective_from_week": 7},
+    )
+    assert disabled.status_code == 200, disabled.text
+    with get_session_context() as db:
+        row = db.get(UserWorkout, workouts[8])
+        assert row.exercises[0].prescribed_reps == "15"
+        assert [item.id for item in row.exercises[0].sets] == original_ids
+        assert (
+            _cycle_workout_plans(db, db.get(UserProgram, program_id), 8)[0]["exercises"][0][
+                "prescribed_reps"
+            ]
+            == "15"
+        )
 
 
 def test_reenable_after_disable_preserves_future_plan(client):
