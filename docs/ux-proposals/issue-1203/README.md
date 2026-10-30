@@ -30,7 +30,7 @@
 | Выбор упражнения в программе: доступные | [mobile](screens/picker-dark-mobile.png) · [desktop](screens/picker-dark-desktop.png) | [mobile](screens/picker-light-mobile.png) · [desktop](screens/picker-light-desktop.png) |
 | Выбор упражнения в программе: все | [mobile](screens/picker-all-dark-mobile.png) · [desktop](screens/picker-all-dark-desktop.png) | [mobile](screens/picker-all-light-mobile.png) · [desktop](screens/picker-all-light-desktop.png) |
 | Выбор профиля в конструкторе | [mobile](screens/picker-profile-dark-mobile.png) · [desktop](screens/picker-profile-dark-desktop.png) | [mobile](screens/picker-profile-light-mobile.png) · [desktop](screens/picker-profile-light-desktop.png) |
-| Существующий диалог безопасной замены | [mobile](screens/replacement-dark-mobile.png) · [desktop](screens/replacement-dark-desktop.png) | [mobile](screens/replacement-light-mobile.png) · [desktop](screens/replacement-light-desktop.png) |
+| Существующий диалог безопасной замены | [320/360](screens/replacement-dark-320-360.png) · [393/430](screens/replacement-dark-393-430.png) · [desktop](screens/replacement-dark-desktop.png) | [320/360](screens/replacement-light-320-360.png) · [393/430](screens/replacement-light-393-430.png) · [desktop](screens/replacement-light-desktop.png) |
 | Выбор профиля для замены | [mobile](screens/replacement-profile-dark-mobile.png) · [desktop](screens/replacement-profile-dark-desktop.png) | [mobile](screens/replacement-profile-light-mobile.png) · [desktop](screens/replacement-profile-light-desktop.png) |
 | Нет подключения | [mobile](screens/offline-dark-mobile.png) · [desktop](screens/offline-dark-desktop.png) | [mobile](screens/offline-light-mobile.png) · [desktop](screens/offline-light-desktop.png) |
 | Одновременное изменение | [mobile](screens/conflict-dark-mobile.png) · [desktop](screens/conflict-dark-desktop.png) | [mobile](screens/conflict-light-mobile.png) · [desktop](screens/conflict-light-desktop.png) |
@@ -76,8 +76,9 @@
   требованиями остаются видимыми с пометкой «Проверить». Упражнения без дополнительных
   принадлежностей могут быть показаны как доступные.
 - Выбор профиля не изменяет программу, рабочие веса или историю. В конструкторе выбор профиля
-  сохраняет текущий черновик. В замене пользователь может изменить оборудование для конкретного
-  действия; совместимость и применение остаются на сервере.
+  сохраняет текущий черновик. В замене пользователь может изменить основное оборудование для
+  конкретного действия; дополнительные принадлежности берутся из выбранного профиля. Совместимость
+  и применение остаются на сервере.
 - Ошибки сети и конфликт версий сохраняют введённые данные на экране; успешное сохранение нельзя
   показывать до ответа сервера.
 
