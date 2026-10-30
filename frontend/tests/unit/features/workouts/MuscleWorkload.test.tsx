@@ -204,13 +204,17 @@ describe('MuscleWorkloadDistribution', () => {
     const { rerender } = render(
       <MuscleWorkloadDistribution analytics={{ ...analytics([]), completed_set_count: 0 }} />,
     );
-    expect(screen.getByText('Нет записанных подходов')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Нет записанных подходов', level: 4 }),
+    ).toBeVisible();
     rerender(
       <MuscleWorkloadDistribution
         analytics={{ ...analytics([]), completed_sets_without_muscle_metadata: 7 }}
       />,
     );
-    expect(screen.getByText('Распределение пока недоступно')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Распределение пока недоступно', level: 4 }),
+    ).toBeVisible();
     expect(screen.getByText('Неполные сведения о мышцах')).toBeVisible();
     expect(screen.getByText(/7 подходов без мышечных связей/)).toBeVisible();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();

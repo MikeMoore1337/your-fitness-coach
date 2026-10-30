@@ -1297,9 +1297,17 @@ test('progress remains clear and free of horizontal overflow at supported widths
   await expectTrainingHeading(page);
   await expect(page.getByRole('heading', { name: 'Активность', exact: true })).toBeVisible();
   await expect(page.getByText('История неполная', { exact: true })).toBeVisible();
-  await expect(page.getByText('Грудные')).toBeVisible();
-  await expect(page.getByText('+6 подх.')).toBeVisible();
-  await page.getByText('Жим штанги лёжа').click();
+  const distribution = page.getByRole('region', { name: 'Мышечные группы', exact: true });
+  const chest = distribution.getByRole('button', { name: /^Грудные Всего 18 / });
+  await expect(chest).toBeVisible();
+  await expect(chest).toHaveAttribute('aria-pressed', 'true');
+  await expect(distribution.getByRole('region', { name: 'Грудные', exact: true })).toContainText(
+    'Изменение: +6 подходов',
+  );
+  await page
+    .locator('#progress-training .progress-exercises')
+    .getByText('Жим штанги лёжа', { exact: true })
+    .click();
   await expect(page.getByText('Детали тренировки')).toBeVisible();
   await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
   await expect(page.locator('.progress-hero').getByRole('tab', { name: '7 дней' })).toHaveAttribute(

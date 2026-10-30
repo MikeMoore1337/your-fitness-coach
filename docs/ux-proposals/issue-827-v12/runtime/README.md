@@ -23,8 +23,12 @@ AFTER — работающая React-страница, без замены DOM �
 ## Цикл исправлений
 
 1. Начальный desktop AFTER не прошёл визуальное сравнение: 44px внутренних отступов вместо 24px, вступление переносилось лишней строкой. Исправлены scoped отступы и ширина текста; повторный просмотр восьми native AFTER/detail дал PASS.
-2. Пустой shared EmptyState сначала отличался от A1: центрированный Inter, серая пунктирная карточка. Scoped CSS восстановил Oswald, сплошную рамку и левое выравнивание. Дополнительная проверка обнаружила оставшееся `justify-items:center`; исправлен корень. Все 72 empty/unmapped сочетания пересняты, начало текста проверено относительно padding; независимый повторный просмотр всех 24 листов дал PASS.
+2. Пустой shared EmptyState сначала отличался от A1: центрированный Inter, серая пунктирная карточка. Scoped CSS восстановил сплошную рамку и левое выравнивание. CI затем обнаружил нарушение семантики: заголовок Oswald находился в `p`. В итоговом локальном empty-state используются настоящий `h4` и описание Inter; общий компонент и typography gate не менялись. Все 72 empty/unmapped сочетания пересняты, начало текста проверено относительно padding. Один capture прервался при Vite dependency reload из параллельного typography-прогона; серверный журнал подтвердил reload, после окончания оптимизации этот случай отдельно прошёл без изменения assertions. Итоговые изображения повторно просмотрены.
 3. На 320px значение «Вспомогательное: 16» может переходить на следующую строку внутри сравнения. Текст целиком читается; это допустимый reflow. Более лёгкий вес текста WebKit наблюдался и в утверждённом макете; шрифты Inter/Oswald загружены в обоих движках.
+
+Первый exact-head CI `41017307813` для `b1855368` выявил четыре повторения typography-ошибки и один старый неоднозначный `getByText` в общем Progress-тесте. После семантического исправления селекторы ограничены строкой группы, её деталями и историей. Проверки console/pageerror, геометрии, delta и drill-down сохранены. Повтор: 24/24 Chromium/WebKit без retries, включая неизменённый `typography-system.spec.ts`; targeted unit 7/7 и typecheck/lint PASS. Слияние первого красного HEAD не выполнялось.
+
+После semantic fix все опубликованные PNG побайтово совпали с предыдущими; дополнительно независимый UX-reviewer открыл 24 итоговых empty/unmapped листа и четыре native AFTER. Code и visual delta review — PASS.
 
 ## Фактический контракт
 
@@ -45,7 +49,7 @@ AFTER — работающая React-страница, без замены DOM �
 | Accessibility/browser semantics | 12 PASS: Web 320/1440 и mocked TMA 393, обе темы/движка; keyboard, focus, ARIA tree/controls, forced-colors semantics, reduced-motion ≤0,01ms |
 | Контраст текста                 | Минимум 5,07:1 среди проверенных пар, включая края выбранного градиента; [accessibility.json](accessibility.json)                             |
 | Source quality                  | TypeScript, ESLint, Russian UI guard, lime-edge guard, Prettier изменённых файлов, Ruff и diff check PASS                                     |
-| Build/budget                    | Vite build PASS; entry JS 296909 raw / 93389 gzip при неизменных бюджетах 310000 / 96000                                                      |
+| Build/budget                    | Vite build PASS; entry JS 296909 raw / 93379 gzip при неизменных бюджетах 310000 / 96000                                                      |
 
 На Windows обычный полный `format:check` обнаруживает CRLF в существующих файлах. Полный Prettier с `end-of-line=auto` прошёл; посторонние файлы не переформатированы. Обязательный стандартный LF check в GitHub CI остаётся включённым. Проверка доступного ARIA tree не заменяет запуск настоящего screen reader. Native AT, физический iPhone и настоящий Telegram-клиент — **NOT_VERIFIED**.
 

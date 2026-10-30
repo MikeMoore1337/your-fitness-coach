@@ -326,9 +326,7 @@
   margin: 14px 0 0;
 }
 
-.muscle-distribution > .empty-state {
-  display: block;
-  justify-items: stretch;
+.muscle-distribution__empty {
   max-width: 760px;
   margin: 18px 0;
   padding: 32px 22px;
@@ -338,13 +336,13 @@
   text-align: left;
 }
 
-.muscle-distribution .ui-state__title {
+.muscle-distribution__empty h4 {
   margin: 0 0 var(--v2-space-3);
   color: var(--v2-text-primary);
   font: 500 calc(var(--font-size-body-lg) * 1.5) / 1.2 var(--font-display);
 }
 
-.muscle-distribution .ui-state__text {
+.muscle-distribution__empty p {
   max-width: 55ch;
   margin: 0;
   color: var(--v2-text-secondary);

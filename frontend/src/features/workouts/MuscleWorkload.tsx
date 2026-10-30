@@ -272,18 +272,18 @@ export function MuscleWorkloadDistribution({ analytics }: { analytics: TrainingA
           </span>
         </>
       ) : (
-        <EmptyState
-          title={
-            analytics.completed_set_count > 0
+        <div className="muscle-distribution__empty">
+          <h4>
+            {analytics.completed_set_count > 0
               ? 'Распределение пока недоступно'
-              : 'Нет записанных подходов'
-          }
-          text={
-            analytics.completed_set_count > 0
+              : 'Нет записанных подходов'}
+          </h4>
+          <p>
+            {analytics.completed_set_count > 0
               ? 'Подходы записаны, но у упражнений нет сведений о мышцах. Отсутствие связей не означает, что мышцы не участвовали.'
-              : 'За выбранный период нет записанных завершённых рабочих подходов. Здесь появятся группы и упражнения из вашего журнала.'
-          }
-        />
+              : 'За выбранный период нет записанных завершённых рабочих подходов. Здесь появятся группы и упражнения из вашего журнала.'}
+          </p>
+        </div>
       )}
     </section>
   );
