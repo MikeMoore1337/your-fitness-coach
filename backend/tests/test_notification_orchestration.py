@@ -443,6 +443,28 @@ def test_quiet_hours_cross_midnight_and_use_account_timezone() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("local_now", "expected_utc"),
+    [
+        (datetime(2026, 3, 7, 23, 30), datetime(2026, 3, 8, 12)),
+        (datetime(2026, 10, 31, 23, 30), datetime(2026, 11, 1, 13)),
+    ],
+)
+def test_quiet_hours_cross_dst_transition(local_now, expected_utc) -> None:
+    with get_session_context() as session:
+        user = User(telegram_user_id=86406, is_coach=False)
+        session.add(user)
+        session.flush()
+        session.add(UserProfile(user_id=user.id, timezone="America/New_York"))
+        setting = NotificationSetting(
+            user_id=user.id, quiet_hours_start=time(22), quiet_hours_end=time(8)
+        )
+        session.add(setting)
+        session.flush()
+        session.refresh(user)
+        assert quiet_hours_retry_at(setting, user, now_local=local_now) == expected_utc
+
+
 def test_worker_rechecks_disabled_channel_without_losing_in_app_event(monkeypatch) -> None:
     fixed_now = datetime(2026, 8, 24, 9)
     monkeypatch.setattr(notification_service, "utcnow", lambda: fixed_now)

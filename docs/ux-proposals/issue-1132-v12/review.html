@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YFC · История подхода · #1132</title>
+<link rel="stylesheet" href="../../../frontend/src/styles/design-system.css">
+<style>
+@font-face{font-family:Inter;src:url('../../../frontend/public/assets/fonts/inter-cyrillic.woff2')}@font-face{font-family:Inter;src:url('../../../frontend/public/assets/fonts/inter-latin.woff2');unicode-range:U+0000-00FF}@font-face{font-family:Oswald;src:url('../../../frontend/public/assets/fonts/oswald-cyrillic.woff2')}@font-face{font-family:Oswald;src:url('../../../frontend/public/assets/fonts/oswald-latin.woff2');unicode-range:U+0000-00FF}
+*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;background:var(--v2-canvas);color:var(--v2-text-primary);font:14px/1.4 Inter,sans-serif;font-variant-numeric:tabular-nums}html[data-theme=light]{color-scheme:light;--v2-canvas:#f5f5f5;--v2-surface:#fff;--v2-surface-secondary:#ededed;--v2-text-primary:#111;--v2-text-secondary:#535353;--v2-border:#c7c7c7;--v2-accent-text:#426600;--glass-solid:#e6e9e6;--glass-edge:#878f85}button,input{font:inherit;min-height:44px}button{cursor:pointer}button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--v2-focus);outline-offset:-3px}input:focus-visible{outline:2px solid #111;outline-offset:-5px;box-shadow:inset 0 0 0 2px var(--v2-focus)}.prototype{padding:8px 12px;margin:0;text-align:center;font-size:11px;color:var(--v2-text-secondary);border-bottom:1px solid var(--v2-border)}.app{max-width:1184px;margin:auto;display:grid;grid-template-columns:160px minmax(0,1fr);gap:32px;padding:24px 28px 180px}.sidebar{position:sticky;top:24px;align-self:start}.brand{font:22px/1.2 Oswald,sans-serif;margin:0 0 24px}.brand span{color:var(--v2-lime)}.nav{display:grid;gap:8px}.nav button{border:0;background:transparent;color:var(--v2-text-secondary);text-align:left;padding:8px 12px;border-radius:9999px}.nav button:first-child{background:var(--v2-surface-secondary);box-shadow:inset 0 0 0 1px var(--v2-accent-text);color:var(--v2-text-primary)}main{min-width:0}.top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--v2-border)}.plain{border:0;background:transparent;color:inherit;padding:6px 0}.theme,.technique{border:1px solid var(--v2-border);border-radius:14px;background:var(--v2-surface);color:inherit;padding:8px 12px}.eyebrow{color:var(--v2-accent-text);font-size:11px;font-weight:700;margin:16px 0 4px}h1,h2{font-family:Oswald,sans-serif;margin:0;font-weight:600}h1{font-size:26px}h2{font-size:24px}.meta{font-size:12px;color:var(--v2-text-secondary);margin:6px 0}.progress{height:4px;background:var(--v2-border);margin:8px 0}.progress span{height:4px;display:block;width:50%;background:var(--v2-lime)}.exercise-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px}.technique{flex:none}.set{padding:16px 0;border-bottom:1px solid var(--v2-border);min-width:0}.set.current{padding:18px;margin:12px 0;border:1px solid var(--v2-lime);border-radius:24px;background:var(--v2-surface-secondary);scroll-margin-bottom:190px}.set-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.identity{display:flex;align-items:center;gap:10px}.number{font-size:18px;font-weight:700;min-width:24px}.identity strong{font-size:14px}.identity small{display:block;font-size:10px;color:var(--v2-text-secondary)}.kind{font-size:11px;text-align:right;color:var(--v2-text-secondary)}.current .kind{color:var(--v2-accent-text)}.history{font-size:12px;min-width:0;color:var(--v2-text-secondary)}.history small{display:block;font-size:11px;line-height:1.5}.history strong{color:var(--v2-text-primary);font-size:14px;font-weight:650;white-space:nowrap}.history strong.empty{white-space:normal;font-size:12px;font-weight:500}.source,.value{min-width:0}.today .source{font-weight:600}.past .source{font-weight:400}.a .history{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0;min-height:105px}.a .datum{padding:8px;border:1px solid var(--v2-border);border-radius:10px}.a .value{margin-top:6px}.b .history{display:grid;gap:6px;margin:10px 0;min-height:96px}.b .datum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,42%);align-items:center;gap:8px}.b .value{text-align:right}.b .past{border-top:1px solid var(--v2-border);padding-top:7px}.c .history{margin:12px 0;min-height:104px}.c .datum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--v2-border)}.c .value{text-align:center}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.fields label{display:block;min-width:0;font-size:12px;font-weight:600;color:var(--v2-text-secondary)}.fields input{margin-top:4px;width:100%;min-width:0;height:48px;padding:8px 4px;border:1px solid #bfc3c3;border-radius:14px;text-align:center;background:#fff;color:#111;font-size:20px;font-weight:700}.current .fields input{height:72px;font-size:clamp(30px,8vw,48px)}.rir{border:0;padding:0;margin:12px 0;min-width:0}.rir legend{padding:0;color:var(--v2-text-secondary);font-size:12px;font-weight:600}.rir div{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:6px}.rir button{border:1px solid var(--v2-border);border-radius:14px;background:transparent;color:inherit;font-weight:700}.rir button[aria-pressed=true]{box-shadow:inset 0 0 0 1px var(--v2-accent-text);background:var(--v2-surface)}.done{width:100%;min-height:48px;border:0;border-radius:14px;background:var(--v2-lime);color:#090b0b;font-weight:700}:is(.options,.help,.helpers){margin-top:12px;border-top:1px solid var(--v2-border)}:is(.options,.help,.helpers) summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-size:12px;color:var(--v2-text-secondary)}.failure{display:flex;align-items:center;gap:8px;min-height:44px}.failure input{width:20px;min-height:20px;accent-color:var(--v2-lime)}.context{font-size:12px;color:var(--v2-text-secondary);margin:8px 0}.prefill-actions{display:grid;gap:8px;margin-top:12px}.prefill-actions button{width:100%;min-height:44px;padding:8px;border:1px solid var(--v2-border);border-radius:14px;background:var(--v2-surface-secondary);color:var(--v2-text-primary);font-size:12px;font-weight:600}.prefill-actions button:last-child{background:var(--v2-lime);color:#090b0b;border-color:transparent}.note{font-size:11px;color:var(--v2-text-secondary)}.set:not(.current) .history{min-height:0}.set:not(.current) .identity small{display:none}.finish{margin-top:20px}.finish p{font-size:12px;color:var(--v2-text-secondary)}.finish button{width:100%;padding:10px;border:1px solid var(--v2-border);border-radius:14px;background:var(--v2-surface);color:inherit}.rest{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);width:min(680px,calc(100% - 24px));z-index:5;padding:10px 14px;border:1px solid var(--glass-edge);border-radius:24px;background:var(--glass-solid);box-shadow:0 6px 20px #0003;display:flex;align-items:center;justify-content:space-between;gap:8px}.rest>div:last-child{display:flex;gap:6px;flex-shrink:0}.rest button{white-space:nowrap}.rest small{display:block;font-size:11px;color:var(--v2-text-secondary)}.rest strong{font:28px/1.4 Oswald,sans-serif}.rest button{padding:6px 8px;border:1px solid var(--v2-border);border-radius:14px;background:var(--v2-surface);color:inherit;font-size:12px}.dock{display:none}.keyboard{display:none}.keyboard-mode .keyboard{display:block;position:fixed;left:0;right:0;bottom:0;height:278px;padding:8px 6px;background:#c9cbd0;color:#111;z-index:10}.keyboard small{display:block;text-align:center;font-size:11px;margin-bottom:6px}.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:520px;margin:auto}.keys button{height:48px;border:0;border-radius:6px;background:#fff;color:#111;font-size:24px;box-shadow:0 1px 1px #0005}.keyboard-mode .rest{bottom:290px}.keyboard-mode .app{padding-bottom:500px}.wire{filter:grayscale(1)}.wire h1,.wire h2{font-family:Inter,sans-serif}.wire .datum{border-style:dashed}
+@media(min-width:1100px){.set.current{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.85fr);gap:0 24px}.current .set-head{grid-column:1/-1}.current .history{grid-column:1;grid-row:2/4;align-content:center;margin:0}.current .fields{grid-column:2;grid-row:2;margin:0}.current .rir{grid-column:2;grid-row:3}.current .done{grid-column:2;grid-row:4}.current :is(.options,.help,.helpers){grid-column:1;grid-row:4/6;align-self:end}.current .note{grid-column:2}.c .current .history{grid-column:2;grid-row:3}.c .current .rir{grid-column:1;grid-row:3}.c .current :is(.options,.help,.helpers){grid-column:1;grid-row:4}.set:not(.current){display:grid;grid-template-columns:minmax(150px,.7fr) minmax(0,1.2fr) minmax(160px,1fr);gap:20px;align-items:center}.set:not(.current) .set-head,.set:not(.current) .history,.set:not(.current) .fields{margin:0}}
+@media(min-width:1100px){:is(.a,.b,.c) .current .context{grid-column:1;grid-row:4;align-self:start}:is(.a,.b,.c) .current .prefill-actions{grid-column:2;grid-row:5}:is(.a,.b,.c) .current .help{grid-column:1;grid-row:5;align-self:start}:is(.a,.b,.c) .current .helpers{grid-column:1;grid-row:6;align-self:start}:is(.a,.b,.c) .current .options{grid-column:1;grid-row:7;align-self:start}}
+@media(max-width:767px){.app{display:block;padding:12px 12px 210px}.sidebar{display:none}.top{font-size:12px}h1{font-size:24px}h2{font-size:22px}.exercise-head{margin-top:16px}.technique{padding:6px 9px}.set.current{padding:14px}.fields{gap:10px}.a .history{gap:8px;min-height:114px}.a .datum{padding:6px}.history strong{font-size:13px}.history strong.empty{font-size:11px}.dock{position:fixed;bottom:8px;left:8px;right:8px;height:54px;border:1px solid var(--glass-edge);border-radius:9999px;background:var(--glass-solid);z-index:4;display:flex;justify-content:space-around;padding:4px}.dock button{background:transparent;border:0;min-width:44px;color:var(--v2-text-secondary);font-size:10px;padding:2px 6px;border-radius:9999px}.dock button:first-child{color:var(--v2-text-primary);box-shadow:inset 0 0 0 1px var(--v2-accent-text)}.rest{bottom:74px}.rest strong{font-size:26px}.keyboard-mode .dock{display:none}.keyboard-mode .rest{bottom:290px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style>
+<style>
+.a.compact-a .history{min-height:0;gap:6px}
+.a.compact-a .datum{padding:6px}
+.a.compact-a .history small{line-height:1.2}
+.a.compact-a .value{margin-top:3px}
+</style></head><body>
+<p class="prototype"><strong id="concept-name"></strong> · #1132 · макет · синтетические данные <span id="state-name"></span></p>
+<div class="app"><aside class="sidebar"><p class="brand">YOUR FITNESS<br><span>COACH</span></p><nav class="nav" aria-label="Разделы"><button aria-current="page">Сегодня</button><button>План</button><button>Питание</button><button>Прогресс</button><button>Добавить</button></nav></aside><main>
+<header class="top"><button class="plain">К сводке</button><strong>Текущая тренировка</strong><button class="theme" aria-label="Сменить тему">Тема</button></header>
+<p class="eyebrow">ТРЕНИРОВКА · ДЕНЬ 1</p><h1>Силовая база</h1><p class="meta">30 октября · В процессе · <span id="progress-copy"></span></p><div class="progress" aria-hidden="true"><span></span></div><p class="meta">Синхронизировано</p>
+<header class="exercise-head"><div><p class="eyebrow">УПРАЖНЕНИЕ 1 ИЗ 3</p><h2>Приседания со штангой</h2><p class="meta">4 подхода · 5–8 повторений · отдых 120 с</p></div><button class="technique">Техника</button></header>
+<section id="sets" aria-label="Подходы упражнения"></section><footer class="finish"><p>Незаполненные подходы останутся без результата.</p><button>Завершить тренировку</button></footer></main></div>
+<aside class="rest" aria-label="Таймер отдыха"><div><small id="rest-label">Отдых после подхода 2</small><strong>01:28</strong><small>Всего 02:00</small></div><div><button>+30 с</button> <button>Пропустить</button></div></aside>
+<nav class="dock" aria-label="Разделы"><button aria-current="page">Сегодня</button><button>План</button><button>Питание</button><button>Прогресс</button><button>Добавить</button></nav>
+<aside class="keyboard" aria-label="Модель цифровой клавиатуры"><small>Модель клавиатуры · не физический iPhone</small><div class="keys"></div></aside>
+<script>
+const params=new URLSearchParams(location.search),concept=params.get('concept')||'b',state=params.get('state')||'third';
+const names={a:'A · Две ячейки',b:'B · Две строки',c:'C · Под полями'};
+const states={first:'Первый подход',second:'Второй подход',third:'Третий подход',empty:'Нет исторического подхода №3',nohistory:'Нет прошлой тренировки',warmup:'Разминка и рабочие',long:'Длинные значения',changed:'Структура изменена',focus:'Фокус в поле веса',keyboard:'Клавиатура: модель',unproven:'Соответствие не доказано'};
+document.documentElement.dataset.theme=params.get('theme')||'dark';document.body.classList.add(concept);if(concept==='a'&&params.get('compact')==='1')document.body.classList.add('compact-a');if(params.has('wire'))document.body.classList.add('wire');if(state==='keyboard')document.body.classList.add('keyboard-mode');
+document.querySelector('#concept-name').textContent=concept==='a'&&params.get('compact')==='1'?'A · Компактные ячейки':names[concept];document.querySelector('#state-name').textContent='· '+states[state];
+const current=['first','nohistory','unproven'].includes(state)?1:state==='second'?2:3,pastWeights=[160,180,200,190],pastReps=[8,6,5,6],todayWeights=[165,185,205,195],todayReps=[8,6,5,6],empty=['nohistory','unproven','changed'].includes(state);
+function history(number,previous,warmup){const today=previous===null?'Нет завершённого подхода':previous===0?'60 кг × 10':`${state==='long'?'999,99':todayWeights[previous-1]} кг × ${state==='long'?'1000':[8,6,5,6][previous-1]}`;const missing=empty||warmup||(state==='empty'&&number===3);const past=missing?'Нет прошлого результата':`${state==='long'?'999,99':pastWeights[number-1]} кг × ${state==='long'?'1000':pastReps[number-1]}`;return `<div class="history" aria-label="Два факта о подходе"><div class="datum today"><div class="source">Предыдущий сегодня<small>${previous===null?'В этом упражнении':previous===0?'Разминка · завершена':`Подход ${state==='warmup'?previous+1:previous} · завершён`}</small></div><div class="value"><strong class="${previous===null?'empty':''}">${today}</strong></div></div><div class="datum past"><div class="source">Прошлая тренировка<small>Этот подход${missing?'':` · №${state==='warmup'?number+1:number} · 23.10.2026`}</small></div><div class="value"><strong class="${missing?'empty':''}">${past}</strong></div></div></div>`}
+function row(number,warmup=false){const active=!warmup&&number===current,completed=warmup||number<current,previous=number>1?Math.min(number-1,current-1)||null:(state==='warmup'&&!warmup?0:null),displayNumber=state==='warmup'&&!warmup?number+1:number;const fields=`<div class="fields"><label>Вес, кг<input aria-label="Вес, подход ${number}${warmup?' разминка':''}" inputmode="decimal" enterkeyhint="next" type="text" value="${completed?(warmup?60:todayWeights[number-1]):''}"></label><label>Повторения<input aria-label="Повторения, подход ${number}${warmup?' разминка':''}" inputmode="numeric" enterkeyhint="done" type="text" value="${completed?(warmup?10:todayReps[number-1]):''}"></label></div>`;return `<article class="set ${active?'current':''} ${completed?'completed':''}" ${active?'aria-current="step"':''} data-set="${warmup?'warmup':number}"><header class="set-head"><div class="identity"><span class="number">${warmup?'Р':displayNumber}</span><div><strong>${warmup?'Разминочный подход':active?`Подход ${displayNumber} из ${state==='warmup'?5:4}`:`Подход ${displayNumber}`}</strong><small>Сначала вес, затем повторы</small></div></div><span class="kind">${warmup?'Разминка':active?'Сейчас · рабочий':completed?'Выполнен':'Рабочий'}</span></header>${concept==='c'?fields:''}${history(number,previous,warmup)}${active?'<p class="context">5–8 повторений · Отдых 120 с</p>':''}${concept==='c'?'':fields}${active?`<fieldset class="rir"><legend>Повторы в запасе (RIR)</legend><div>${['0','1','2','3','4+'].map(x=>`<button aria-label="RIR ${x}" aria-pressed="false">${x}</button>`).join('')}</div></fieldset><button class="done">Завершить подход</button>${previous!==null?'<div class="prefill-actions"><button>Подставить предыдущий результат</button><button>Подставить и завершить</button></div>':''}<details class="help"><summary>Что такое RIR?</summary><p class="note">Сколько повторений ещё осталось бы в запасе.</p></details><details class="helpers"><summary>Разминка и блины</summary><button class="theme">Посчитать блины</button></details><details class="options"><summary>Дополнительно</summary><label class="failure"><input type="checkbox">Подход до отказа</label></details>`:''}${state==='changed'&&active?'<p class="note">Состав подходов изменён.</p>':''}${state==='unproven'&&active?'<p class="note">Нет достоверного соответствия в истории.</p>':''}</article>`}
+document.querySelector('#sets').innerHTML=(state==='warmup'?row(1,true):'')+[1,2,3,4].map(n=>row(n)).join('');document.querySelector('#progress-copy').textContent=`${state==='warmup'?current:current-1} из ${state==='warmup'?5:4} подходов`;document.querySelector('#rest-label').textContent=current===1?'Таймер отдыха · готов':`Отдых после подхода ${state==='warmup'?current:current-1}`;if(current===1)document.querySelector('.rest strong').textContent='02:00';if(state==='warmup')document.querySelector('.exercise-head .meta').textContent='1 разминка · 4 рабочих подхода · отдых 120 с';
+document.querySelector('.theme').addEventListener('click',()=>document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark');document.querySelectorAll('.rir button').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('.rir button').forEach(x=>x.setAttribute('aria-pressed','false'));button.setAttribute('aria-pressed','true')}));
+document.querySelectorAll('.fields input').forEach(input=>input.addEventListener('input',()=>input.value=input.value.replace(/[^\d.,]/g,'')));document.querySelector('.keys').innerHTML=['1','2','3','4','5','6','7','8','9',',','0','Удалить'].map(x=>`<button>${x}</button>`).join('');document.querySelectorAll('.keys button').forEach(button=>button.addEventListener('pointerdown',event=>{event.preventDefault();const input=document.querySelector('.current input');input.value=button.textContent==='Удалить'?input.value.slice(0,-1):input.value+button.textContent;input.focus({preventScroll:true})}));
+window.prototypeReady=document.fonts.ready.then(()=>{const card=document.querySelector('.current');const input=card.querySelector('input');if(['focus','keyboard'].includes(state))input.focus({preventScroll:true});const target=state==='keyboard'?input:card;const offset=state==='keyboard'?Math.max(80,innerHeight-278-document.querySelector('.rest').offsetHeight-(concept==='c'?390:270)):90;window.scrollBy(0,target.getBoundingClientRect().top-offset)});
+</script>
+<script>
+  (() => {
+    const option = params.get('reuse');
+    if (concept !== 'b' || !['stack', 'inline', 'split'].includes(option)) return;
+    window.prototypeReady = window.prototypeReady.then(() => {
+      document.body.classList.add('reuse-option-active');
+      const current = document.querySelector('.set.current');
+      const history = current.querySelector('.history');
+      const today = history.querySelector('.today .value strong');
+      const past = history.querySelector('.past .value strong');
+      const inputs = [...current.querySelectorAll('.fields input')];
+
+      function values(element) {
+        const match = element.textContent.match(/^([\d.,]+) кг × (\d+)$/);
+        return match ? [match[1], match[2]] : null;
+      }
+
+      function button(label, accessibleLabel, source) {
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.textContent = label;
+        control.setAttribute('aria-label', accessibleLabel);
+        control.addEventListener('click', () => {
+          source?.forEach((value, index) => {
+            if (!inputs[index].value) {
+              inputs[index].value = value;
+              inputs[index].dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          });
+          update();
+        });
+        return control;
+      }
+
+      const todayValues = values(today);
+      const pastValues = values(past);
+      const todayButton = button(
+        option === 'split' ? 'Подставить: сегодня' : 'Подставить предыдущий подход сегодня',
+        'Подставить вес и повторы предыдущего подхода сегодня',
+        todayValues,
+      );
+      const pastButton = button(
+        option === 'inline' ? 'Подставить' : option === 'split' ? 'Подставить: прошлую тренировку' : 'Подставить из прошлой тренировки',
+        'Подставить вес и повторы этого подхода из прошлой тренировки',
+        pastValues,
+      );
+      const actions = document.createElement('div');
+      actions.className = `prefill-actions reuse-${option}`;
+      actions.append(todayButton);
+      if (option === 'inline') {
+        pastButton.className = 'history-reuse';
+        const pastValue = history.querySelector('.past .value');
+        pastValue.classList.add('has-history-reuse');
+        pastValue.append(pastButton);
+      } else {
+        actions.append(pastButton);
+      }
+      current.querySelector('.prefill-actions')?.remove();
+      current.querySelector('.done').after(actions);
+
+      function update() {
+        const hasEmptyField = inputs.some(input => !input.value);
+        todayButton.disabled = !todayValues || !hasEmptyField;
+        pastButton.disabled = !pastValues || !hasEmptyField;
+      }
+      inputs.forEach(input => input.addEventListener('input', update));
+      update();
+
+      const styles = document.createElement('style');
+      styles.textContent = `
+        .reuse-option-active .prefill-actions button:last-child{background:var(--v2-surface-secondary);color:var(--v2-text-primary);border:1px solid var(--v2-border)}
+        .prefill-actions.reuse-split{grid-template-columns:repeat(2,minmax(0,1fr))}
+        .prefill-actions.reuse-split button{padding:6px;line-height:1.25}
+        .b .history .past .value.has-history-reuse{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+        .history-reuse{min-height:44px;padding:6px 10px;border:1px solid var(--v2-border);border-radius:12px;background:var(--v2-surface-secondary);color:var(--v2-text-primary);font-size:12px;font-weight:600}
+        .prefill-actions button:disabled,.history-reuse:disabled{opacity:.55;cursor:not-allowed}
+      `;
+      document.head.append(styles);
+      document.querySelector('#concept-name').textContent = 'B · подстановка результата';
+    });
+  })();
+</script></body></html>

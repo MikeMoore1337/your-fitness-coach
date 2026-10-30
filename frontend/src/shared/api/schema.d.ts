@@ -3135,6 +3135,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/{workout_id}/set-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workout Set History */
+        get: operations["workout_set_history_api_v1_workouts__workout_id__set_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/start": {
         parameters: {
             query?: never;
@@ -18633,6 +18650,79 @@ export interface components {
              */
             week_number: number;
         };
+        /** WorkoutSetHistoryItem */
+        WorkoutSetHistoryItem: {
+            /** Set Id */
+            set_id: number;
+            /** Set Number */
+            set_number: number;
+            /** Set Version */
+            set_version: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Source Template Exercise Id */
+            source_template_exercise_id: number | null;
+            previous_today?: components["schemas"]["WorkoutSetResult"] | null;
+            previous_workout?: components["schemas"]["WorkoutSetPastResult"] | null;
+            /**
+             * History Status
+             * @enum {string}
+             */
+            history_status: "matched" | "no_previous_workout" | "no_matching_set" | "identity_unproven";
+        };
+        /** WorkoutSetHistoryResponse */
+        WorkoutSetHistoryResponse: {
+            /** Workout Id */
+            workout_id: number;
+            /** User Program Id */
+            user_program_id: number;
+            /** Program Revision Number */
+            program_revision_number: number;
+            /** Sets */
+            sets: components["schemas"]["WorkoutSetHistoryItem"][];
+        };
+        /** WorkoutSetPastResult */
+        WorkoutSetPastResult: {
+            /** Set Id */
+            set_id: number;
+            /** Set Number */
+            set_number: number;
+            /** Set Version */
+            set_version: number;
+            /** Actual Weight */
+            actual_weight?: number | null;
+            /** Actual Reps */
+            actual_reps?: number | null;
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /**
+             * Performed On
+             * Format: date
+             */
+            performed_on: string;
+        };
+        /** WorkoutSetResult */
+        WorkoutSetResult: {
+            /** Set Id */
+            set_id: number;
+            /** Set Number */
+            set_number: number;
+            /** Set Version */
+            set_version: number;
+            /** Actual Weight */
+            actual_weight?: number | null;
+            /** Actual Reps */
+            actual_reps?: number | null;
+        };
         /** WorkoutSetUpdate */
         WorkoutSetUpdate: {
             /** Actual Reps */
@@ -25384,6 +25474,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrainingAnalyticsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workout_set_history_api_v1_workouts__workout_id__set_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutSetHistoryResponse"];
                 };
             };
             /** @description Validation Error */

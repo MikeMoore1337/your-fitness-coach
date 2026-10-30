@@ -19,6 +19,7 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import CoachClient, User
+from fitminiapp_api.services import programs
 from fitminiapp_api.services.accounts import build_account_export
 
 
@@ -341,6 +342,10 @@ def test_personal_records_include_earlier_same_day(
     client,
     monkeypatch,
 ) -> None:
+    fixed_today = datetime(2026, 8, 23).date()
+    monkeypatch.setattr("test_workout_completion_summary.today_msk", lambda: fixed_today)
+    monkeypatch.setattr(programs, "today_for_user", lambda _user: fixed_today)
+    monkeypatch.setattr(workout_routes, "recovery_today_for_user", lambda _user: fixed_today)
     headers = _auth(client, 53_401)
     workout = _assigned_workout(client, headers, sets=1)
     current_completed_at = datetime(2026, 8, 23, 13, 0)
