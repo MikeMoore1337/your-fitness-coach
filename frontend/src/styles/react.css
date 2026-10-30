@@ -5861,6 +5861,9 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   min-width: 0;
   min-height: var(--touch-target, 44px);
 }
+.active-workout-rest__actual {
+  margin-inline-start: 8px;
+}
 .active-workout-rest__time,
 .active-workout-rest__actual-value {
   display: grid;

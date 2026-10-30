@@ -971,7 +971,10 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
           `${width}px ${theme}: planned clock hierarchy`,
         ).toBeGreaterThanOrEqual(parseFloat(result.actualSize));
         expect(result.actualFits, `${width}px ${theme}: full hour format visible`).toBe(true);
-        expect(result.plannedRight).toBeLessThanOrEqual(result.actualLeft + 1);
+        expect(
+          result.actualLeft - result.plannedRight,
+          `${width}px ${theme}: clock separation`,
+        ).toBeGreaterThanOrEqual(15);
         expect(result.actualRight).toBeLessThanOrEqual(result.statusLeft + 1);
         expect(result.stopRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
