@@ -402,7 +402,7 @@ def test_offline_replay_rejects_changed_identity(client, case, field, value):
     assert _read(client, case)["current_note"] is None
 
 
-def test_account_export_contains_only_owned_notes_and_no_mutation_keys(client, case):
+def test_account_export_excludes_private_exercise_notes(client, case):
     current = _read(client, case)
     assert (
         client.put(
@@ -416,11 +416,37 @@ def test_account_export_contains_only_owned_notes_and_no_mutation_keys(client, c
         payload = build_account_export(db, db.get(User, case["user_id"]))
         program = next(item for item in payload["programs"] if item["id"] == case["program_id"])
         workout = next(item for item in program["workouts"] if item["id"] == case["current"])
-        note = workout["exercise_notes"][0]
-        assert note["body"] == "Личная запись" and note["tags"] == ["hard"]
-        assert "mutation_id" not in note and "context_key" not in note
+        assert "exercise_notes" not in workout
+        assert "Личная запись" not in str(payload)
+        assert "private-mutation" not in str(payload)
         outsider = db.query(User).filter(User.id != case["user_id"]).first()
         assert "Личная запись" not in str(build_account_export(db, outsider))
+
+
+def test_public_progress_share_excludes_private_exercise_notes(client, case):
+    current = _read(client, case)
+    assert (
+        client.put(
+            _url(case["current"], case["current_ex"]),
+            headers=case["headers"],
+            json=_payload(current, "share-private", body="Личное наблюдение для себя", tags=[]),
+        ).status_code
+        == 200
+    )
+    preview = client.post(
+        "/api/v1/shares/progress/preview", headers=case["headers"], json={"period": "days_30"}
+    )
+    assert preview.status_code == 200, preview.text
+    created = client.post(
+        "/api/v1/shares/progress",
+        headers=case["headers"],
+        json={"period": "days_30", "preview_hash": preview.json()["preview_hash"]},
+    )
+    assert created.status_code == 201, created.text
+    public = client.get(f"/api/v1/public/shares/{created.json()['share_id']}")
+    assert public.status_code == 200, public.text
+    for response in (preview, created, public):
+        assert "Личное наблюдение для себя" not in str(response.json())
 
 
 def test_assigned_coach_cannot_read_or_modify_private_note(client, case):
@@ -437,6 +463,11 @@ def test_assigned_coach_cannot_read_or_modify_private_note(client, case):
         db.add(CoachClient(coach_user_id=coach_id, client_user_id=case["user_id"], status="active"))
     path = _url(case["current"], case["current_ex"])
     history_path = f"/api/v1/workouts/exercise-notes/history/{saved['current_note']['id']}"
+    timeline = client.get(
+        f"/api/v1/coach/clients/{case['user_id']}/workouts", headers=coach_headers
+    )
+    assert timeline.status_code == 200, timeline.text
+    assert "Личное наблюдение" not in str(timeline.json())
     assert client.get(path, headers=coach_headers).status_code == 404
     assert client.get(history_path, headers=coach_headers).status_code == 404
     assert (
