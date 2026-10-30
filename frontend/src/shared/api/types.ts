@@ -123,6 +123,7 @@ export type AssignedCheckInTemplateList = ApiSchemas['AssignedCheckInTemplateLis
 export type CheckInTemplateFieldCatalog = ApiSchemas['CheckInFieldCatalogItem'];
 export type Workout = ApiSchemas['WorkoutTodayResponse'];
 export type WorkoutSetHistory = ApiSchemas['WorkoutSetHistoryResponse'];
+export type WorkoutCopy = ApiSchemas['WorkoutCopyResponse'];
 export type WorkoutStatus = ApiSchemas['WorkoutStatusResponse'];
 export type WorkoutScheduleItem = ApiSchemas['WorkoutScheduleItem'];
 export type WorkoutHistoryItem = ApiSchemas['WorkoutHistoryItem'];
