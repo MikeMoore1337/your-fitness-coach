@@ -18,11 +18,18 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import User
-from fitminiapp_api.schemas.program import CoachProgramExerciseCreate, ProgramLifecycleActionRequest
+from fitminiapp_api.schemas.program import (
+    CoachProgramExerciseCreate,
+    ProgramCycleDisableRequest,
+    ProgramLifecycleActionRequest,
+    ProgramWeekTypeRevisionRequest,
+)
 from fitminiapp_api.services.program_common import ProgramError
 from fitminiapp_api.services.program_versioning import (
     apply_program_lifecycle_action,
+    disable_program_cycle,
     materialize_cycle_schedule,
+    revise_program_week_type,
     upsert_future_program_exercise,
 )
 from fitminiapp_api.services.programs import assign_template_to_user
@@ -265,6 +272,44 @@ def test_two_scoped_edits_with_same_revision_have_one_winner(client):
         assert (
             row.exercises[0].prescribed_sets
             == overrides[0].changed_fields["occurrence_override"]["exercise"]["prescribed_sets"]
+        )
+    _assert_facts_unchanged(facts)
+
+
+def test_concurrent_type_change_and_disable_have_one_winner(client):
+    facts = _assigned_cycle_with_completed_facts(client)
+
+    def set_type(db):
+        return revise_program_week_type(
+            db,
+            db.get(User, facts["owner_id"]),
+            facts["program_id"],
+            ProgramWeekTypeRevisionRequest(
+                expected_revision_number=facts["version"], week_type="heavy", occurrence_weeks=[10]
+            ),
+            preview=False,
+        )
+
+    def disable(db):
+        return disable_program_cycle(
+            db,
+            db.get(User, facts["owner_id"]),
+            facts["program_id"],
+            ProgramCycleDisableRequest(
+                expected_revision_number=facts["version"], effective_from_week=4
+            ),
+            preview=False,
+        )
+
+    results = _run_parallel(set_type, disable)
+    assert sorted(status for status, _ in results) == ["conflict", "ok"]
+    assert (
+        next(value for status, value in results if status == "conflict")
+        == "Program revision conflict"
+    )
+    with get_session_context() as db:
+        assert (
+            db.get(UserProgram, facts["program_id"]).current_revision_number == facts["version"] + 1
         )
     _assert_facts_unchanged(facts)
 

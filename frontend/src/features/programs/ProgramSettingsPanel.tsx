@@ -51,9 +51,6 @@ export function ProgramSettingsPanel({ open, onOpenChange, valid, children }: Pr
       ref={panelRef}
       className="program-builder-settings compact-disclosure"
       open={open}
-      onToggle={(event) => {
-        if (event.currentTarget.open !== open) onOpenChange(event.currentTarget.open);
-      }}
       onKeyDown={(event) => {
         if (
           open &&

@@ -151,3 +151,49 @@
   max-width: 760px;
   margin-inline: auto;
 }
+
+.program-periodization__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-control);
+}
+.program-periodization__choice input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--v2-lime, var(--accent));
+}
+.program-periodization__choice span {
+  display: grid;
+  gap: 3px;
+}
+.program-periodization__choice small {
+  color: var(--muted);
+}
+.program-periodization__fields,
+.program-periodization__week {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 12px;
+}
+.program-periodization__week,
+.program-periodization__plan-week {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.program-periodization__week select {
+  min-width: 0;
+}
+.program-periodization__paging {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.program-periodization__preview p {
+  font-size: 0.85rem;
+}

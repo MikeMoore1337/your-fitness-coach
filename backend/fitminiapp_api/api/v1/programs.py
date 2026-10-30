@@ -14,6 +14,9 @@ from fitminiapp_api.schemas.program import (
     ExerciseCatalogItem,
     ExerciseGuide,
     ProgramAssignmentResponse,
+    ProgramCycleDisableRequest,
+    ProgramCycleDurationPreviewRequest,
+    ProgramCycleEnableRequest,
     ProgramCycleRevisionRequest,
     ProgramLifecycleActionRequest,
     ProgramLifecycleMutationResponse,
@@ -24,6 +27,7 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateCreate,
     ProgramTemplateCreateResponse,
     ProgramTemplateResponse,
+    ProgramWeekTypeRevisionRequest,
     TemplateExerciseReplacementRequest,
     TrainingBlockActionRequest,
     TrainingBlockAdvanceResponse,
@@ -79,11 +83,15 @@ from fitminiapp_api.services.program_versioning import (
     advance_training_block,
     apply_program_lifecycle_action,
     create_training_block,
+    disable_program_cycle,
+    enable_program_cycle,
     list_program_revisions,
     list_training_blocks,
+    preview_cycle_duration,
     program_lifecycle_summary,
     repeat_training_block,
     revise_program_cycle,
+    revise_program_week_type,
     update_training_block,
     upsert_future_program_exercise,
 )
@@ -906,6 +914,100 @@ def update_assigned_cycle(
         db.rollback()
         raise _assigned_program_error(exc) from exc
     return {"current_revision_number": revision_number}
+
+
+@router.post("/assigned/{program_id}/cycle/week-type/preview")
+def preview_assigned_week_type(
+    program_id: int,
+    payload: ProgramWeekTypeRevisionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_week_type(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/disable/preview")
+def preview_disabled_cycle(
+    program_id: int,
+    payload: ProgramCycleDisableRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return disable_program_cycle(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/enable/preview")
+def preview_enabled_cycle(
+    program_id: int,
+    payload: ProgramCycleEnableRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return enable_program_cycle(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/enable")
+def update_enabled_cycle(
+    program_id: int,
+    payload: ProgramCycleEnableRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return enable_program_cycle(db, current_user, program_id, payload, preview=False)
+    except ProgramError as exc:
+        db.rollback()
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/duration/preview")
+def preview_assigned_cycle_duration(
+    program_id: int,
+    payload: ProgramCycleDurationPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_cycle_duration(db, current_user, program_id, payload)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/disable")
+def update_disabled_cycle(
+    program_id: int,
+    payload: ProgramCycleDisableRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return disable_program_cycle(db, current_user, program_id, payload, preview=False)
+    except ProgramError as exc:
+        db.rollback()
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/week-type")
+def update_assigned_week_type(
+    program_id: int,
+    payload: ProgramWeekTypeRevisionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_week_type(db, current_user, program_id, payload, preview=False)
+    except ProgramError as exc:
+        db.rollback()
+        raise _assigned_program_error(exc) from exc
 
 
 @router.post(

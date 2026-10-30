@@ -12,6 +12,7 @@ from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.notification import Notification
 from fitminiapp_api.models.program import (
+    ProgramRevision,
     UserProgram,
     UserWorkout,
     UserWorkoutExercise,
@@ -120,7 +121,10 @@ from fitminiapp_api.services.nutrition_reports import (
 )
 from fitminiapp_api.services.period_bounds import PeriodBoundsError, resolve_progress_bounds
 from fitminiapp_api.services.program_common import ProgramError
-from fitminiapp_api.services.program_versioning import record_program_revision
+from fitminiapp_api.services.program_versioning import (
+    record_program_revision,
+    workout_cycle_week_type,
+)
 from fitminiapp_api.services.progress import (
     build_progress_summary_for_range,
 )
@@ -457,6 +461,15 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
         for item in workout.exercises
     }
     progression_guidance = build_progression_guidance(db, current_user, workout)
+    week_type, week_type_known = (None, False)
+    if workout.source_cycle_week is not None:
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=workout.user_program_id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+        week_type, week_type_known = workout_cycle_week_type(db, workout, revisions)
     metric_types = {item.id: workout_exercise_metric_type(item) for item in workout.exercises}
 
     def media_preview(item: UserWorkoutExercise) -> dict[str, object]:
@@ -489,6 +502,8 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
         "week_number": workout.week_number,
         "source_cycle_week": workout.source_cycle_week,
         "cycle_iteration": workout.cycle_iteration,
+        "week_type": week_type,
+        "week_type_known": week_type_known,
         "plan_revision_number": workout.plan_revision_number,
         "title": workout.title,
         "status": workout.status,

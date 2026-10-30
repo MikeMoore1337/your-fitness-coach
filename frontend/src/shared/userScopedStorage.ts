@@ -138,7 +138,8 @@ export function weeklyReviewDraftStorageKey(userId: number | 'anonymous'): strin
 }
 
 export function programDraftStorageKey(
-  field: 'title' | 'goal' | 'level' | 'days' | 'rest' | 'start' | 'duration' | 'weekdays',
+  field:
+    'title' | 'goal' | 'level' | 'days' | 'rest' | 'start' | 'duration' | 'weekdays' | 'week-cycle',
   scope: string,
 ): string {
   return `fit_program_${field}_${scope}`;

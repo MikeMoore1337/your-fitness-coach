@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
@@ -18,6 +18,9 @@ import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
 import { ProgramDayEditor } from './ProgramDayEditor';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { ProgramSettingsPanel } from './ProgramSettingsPanel';
+import { ProgramPeriodization } from './ProgramPeriodization';
+import { ActiveProgramPeriodization } from './ActiveProgramPeriodization';
+import { templateWeekCycle } from './programPreviewFacts';
 import './ProgramBuilderFocus.css';
 import { DateInput } from '../../shared/ui/PickerInput';
 import {
@@ -33,6 +36,42 @@ import {
 } from './programDefaults';
 
 type Day = ProgramTemplateCreate['days'][number];
+type DraftExercise = Day['exercises'][number];
+type WeeklyPrescription = NonNullable<DraftExercise['weekly_prescriptions']>[number];
+
+function weekPrescription(exercise: DraftExercise, week: number): WeeklyPrescription {
+  return (
+    exercise.weekly_prescriptions?.find((item) => item.week_number === week) ?? {
+      exercise_id: exercise.exercise_id,
+      week_number: week,
+      prescribed_sets: exercise.prescribed_sets ?? 1,
+      prescribed_reps: exercise.prescribed_reps ?? '',
+      prescribed_duration_minutes: exercise.prescribed_duration_minutes,
+      rest_seconds: exercise.rest_seconds,
+      prescription: exercise.prescription,
+    }
+  );
+}
+
+function projectSourceWeek(days: Day[], week: number): Day[] {
+  return days.map((day) => ({
+    ...day,
+    exercises: day.exercises.map((exercise) => {
+      if (week === 1 && !exercise.weekly_prescriptions?.some((item) => item.week_number === 1))
+        return exercise;
+      const weekly = weekPrescription(exercise, week);
+      return {
+        ...exercise,
+        exercise_id: weekly.exercise_id,
+        prescribed_sets: weekly.prescribed_sets,
+        prescribed_reps: weekly.prescribed_reps,
+        prescribed_duration_minutes: weekly.prescribed_duration_minutes,
+        rest_seconds: weekly.rest_seconds,
+        prescription: weekly.prescription ?? exercise.prescription,
+      };
+    }),
+  }));
+}
 type ProgramTemplateAssignmentCreate = ProgramTemplateCreate & {
   start_date: string;
   duration_weeks: number;
@@ -129,6 +168,11 @@ export function ProgramBuilder({
         notes: exercise.notes,
         superset_group: exercise.superset_group,
         superset_order: exercise.superset_order,
+        prescription: exercise.prescription,
+        group_id: exercise.group_id,
+        group_kind: exercise.group_kind,
+        group_order: exercise.group_order,
+        weekly_prescriptions: exercise.weekly_prescriptions,
       })),
     })) ?? [blankDay(1)],
   );
@@ -147,8 +191,22 @@ export function ProgramBuilder({
   );
   const [durationWeeks, setDurationWeeks, clearDurationDraft] = usePersistentState<number>(
     programDraftStorageKey('duration', draftScope),
-    editingTemplate?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+    (editingTemplate?.is_active_for_current_user && !saveAsCopy
+      ? editingTemplate.assigned_program_duration_weeks
+      : null) ??
+      (templateWeekCycle(editingTemplate) ? editingTemplate?.default_duration_weeks : undefined) ??
+      SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
   );
+  const [weekCycle, setWeekCycle, clearWeekCycleDraft] = usePersistentState<NonNullable<
+    ProgramTemplateCreate['week_cycle']
+  > | null>(programDraftStorageKey('week-cycle', draftScope), templateWeekCycle(editingTemplate));
+  const [sourceWeek, setSourceWeek] = useState<number | ''>(1);
+  const sourceWeekValid =
+    typeof sourceWeek === 'number' &&
+    Number.isInteger(sourceWeek) &&
+    sourceWeek >= 1 &&
+    (!weekCycle || sourceWeek <= weekCycle.length_weeks);
+  const selectedSourceWeek = sourceWeekValid ? (sourceWeek as number) : 1;
   const [scheduleWeekdays, setScheduleWeekdays, clearScheduleDraft] = usePersistentState<number[]>(
     programDraftStorageKey('weekdays', draftScope),
     editingTemplate?.assigned_program_schedule_weekdays ?? [],
@@ -171,12 +229,13 @@ export function ProgramBuilder({
     defaultRestSeconds,
     startDate,
     durationWeeks,
+    weekCycle,
     scheduleWeekdays,
   ]);
-  const originalSnapshot = useRef(snapshot);
+  const [originalSnapshot] = useState(snapshot);
   useEffect(() => {
-    onDirtyChange?.(snapshot !== originalSnapshot.current);
-  }, [onDirtyChange, snapshot]);
+    onDirtyChange?.(snapshot !== originalSnapshot);
+  }, [onDirtyChange, originalSnapshot, snapshot]);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [creationSuccess, setCreationSuccess] = useState<{ canStartToday: boolean } | null>(null);
   const exercises = useQuery({
@@ -220,6 +279,7 @@ export function ProgramBuilder({
           assign_after_create: !editingTemplate,
           start_date: startDate,
           duration_weeks: durationWeeks,
+          week_cycle: weekCycle,
           schedule_weekdays: scheduleWeekdaysForSave(days.length, effectiveScheduleWeekdays),
           expected_revision_number: activeProgramEdit
             ? editingTemplate?.current_revision_number
@@ -227,7 +287,20 @@ export function ProgramBuilder({
           replace_active: replaceActive,
           days: days.map((day) => ({
             ...day,
-            exercises: day.exercises.filter((item) => item.exercise_id > 0),
+            exercises: day.exercises
+              .filter((item) => item.exercise_id > 0)
+              .map((item) => ({
+                ...item,
+                weekly_prescriptions:
+                  weekCycle &&
+                  days.some((draftDay) =>
+                    draftDay.exercises.some((row) => (row.weekly_prescriptions?.length ?? 0) > 0),
+                  )
+                    ? Array.from({ length: weekCycle.length_weeks }, (_, index) =>
+                        weekPrescription(item, index + 1),
+                      )
+                    : item.weekly_prescriptions,
+              })),
           })),
         } satisfies ProgramTemplateAssignmentCreate,
       }),
@@ -284,6 +357,7 @@ export function ProgramBuilder({
       clearDurationDraft(
         result?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
       );
+      clearWeekCycleDraft(templateWeekCycle(editingTemplate));
       clearScheduleDraft(result?.assigned_program_schedule_weekdays ?? []);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['templates'] }),
@@ -328,10 +402,61 @@ export function ProgramBuilder({
     (count, day) => count + day.exercises.filter((item) => item.exercise_id > 0).length,
     0,
   );
+  const hasDetailedPrescriptions = days.some((day) =>
+    day.exercises.some((item) => item.prescription || (item.weekly_prescriptions?.length ?? 0) > 0),
+  );
+  const sourceSetCount = days.reduce(
+    (sum, day) =>
+      sum +
+      day.exercises
+        .filter((item) => item.exercise_id > 0)
+        .reduce(
+          (count, item) =>
+            count +
+            Math.max(
+              item.prescription?.segments.length ?? item.prescribed_sets ?? 1,
+              ...(item.weekly_prescriptions ?? []).map(
+                (weekly) => weekly.prescription?.segments.length ?? weekly.prescribed_sets,
+              ),
+            ),
+          0,
+        ),
+    0,
+  );
+  const sourceBudgetExceeded = Boolean(
+    weekCycle && weekCycle.length_weeks * sourceSetCount > 20000,
+  );
+  const hasExtraWeeks = Boolean(
+    weekCycle &&
+    days.some((day) =>
+      day.exercises.some((item) =>
+        item.weekly_prescriptions?.some((weekly) => weekly.week_number > weekCycle.length_weeks),
+      ),
+    ),
+  );
   const reviewIssues: string[] = [];
   if (!title.trim()) reviewIssues.push('Укажите название программы.');
-  if (durationWeeks < 1 || durationWeeks > 24)
-    reviewIssues.push('Укажите длительность от 1 до 24 недель.');
+  if (
+    !Number.isSafeInteger(durationWeeks) ||
+    durationWeeks < 1 ||
+    (!weekCycle && durationWeeks > 24)
+  )
+    reviewIssues.push(
+      weekCycle ? 'Укажите длительность программы.' : 'Укажите длительность от 1 до 24 недель.',
+    );
+  if (
+    weekCycle &&
+    (!Number.isInteger(weekCycle.length_weeks) ||
+      weekCycle.length_weeks < 1 ||
+      weekCycle.length_weeks > 20000)
+  )
+    reviewIssues.push('Укажите допустимое количество исходных недель.');
+  if (weekCycle && !weekCycle.repeat && durationWeeks > weekCycle.length_weeks)
+    reviewIssues.push('Без повтора срок не может быть больше исходного цикла.');
+  if (weekCycle && hasExtraWeeks)
+    reviewIssues.push('Подтвердите удаление предписаний за пределами исходного цикла.');
+  if (weekCycle && !sourceWeekValid) reviewIssues.push('Укажите существующую исходную неделю.');
+  if (sourceBudgetExceeded) reviewIssues.push('Размер недельной схемы превышает допустимый объём.');
   if (!scheduleIsValid) reviewIssues.push('Проверьте расписание тренировок.');
   days.forEach((day, index) => {
     if (!day.title.trim()) reviewIssues.push('День ' + (index + 1) + ': укажите название.');
@@ -382,9 +507,31 @@ export function ProgramBuilder({
   };
   const updateDay = (index: number, next: Day | ((current: Day) => Day)) =>
     setDays((currentDays) =>
-      currentDays.map((day, dayIndex) =>
-        dayIndex === index ? (typeof next === 'function' ? next(day) : next) : day,
-      ),
+      currentDays.map((day, dayIndex) => {
+        if (dayIndex !== index) return day;
+        const currentWeekDay = projectSourceWeek([day], selectedSourceWeek)[0]!;
+        const edited = typeof next === 'function' ? next(currentWeekDay) : next;
+        if (!weekCycle || selectedSourceWeek === 1) return edited;
+        return {
+          ...day,
+          exercises: day.exercises.map((exercise, exerciseIndex) => {
+            const replacement = edited.exercises[exerciseIndex]!;
+            const weekly = Array.from({ length: weekCycle.length_weeks }, (_, weekIndex) =>
+              weekPrescription(exercise, weekIndex + 1),
+            );
+            weekly[selectedSourceWeek - 1] = {
+              ...weekly[selectedSourceWeek - 1]!,
+              exercise_id: replacement.exercise_id,
+              prescribed_sets: replacement.prescribed_sets ?? 1,
+              prescribed_reps: replacement.prescribed_reps ?? '',
+              prescribed_duration_minutes: replacement.prescribed_duration_minutes,
+              rest_seconds: replacement.rest_seconds,
+              prescription: replacement.prescription,
+            };
+            return { ...exercise, weekly_prescriptions: weekly };
+          }),
+        };
+      }),
     );
   const rule = resolveStrengthRule(level, split);
   const [presetDays, setPresetDays] = useState<number>(rule.recommended);
@@ -520,14 +667,41 @@ export function ProgramBuilder({
                 <h3>Тренировочные дни</h3>
               </div>
             </div>
+            {weekCycle && !activeProgramEdit && weekCycle.length_weeks > 1 && (
+              <div className="program-builder-section stack">
+                <label className="field">
+                  <span>Исходная неделя</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max={weekCycle.length_weeks}
+                    value={sourceWeek}
+                    onChange={(event) =>
+                      setSourceWeek(event.target.value === '' ? '' : Number(event.target.value))
+                    }
+                    disabled={sourceBudgetExceeded}
+                    required
+                  />
+                </label>
+                <p className="muted">
+                  Предписания относятся к выбранной исходной неделе. Состав дней меняется в первой
+                  неделе.
+                </p>
+              </div>
+            )}
             <ProgramDayEditor
-              days={days}
+              days={projectSourceWeek(
+                days,
+                weekCycle && !activeProgramEdit ? selectedSourceWeek : 1,
+              )}
               setDays={setDays}
               updateDay={updateDay}
               exercises={orderedExercises}
               equipmentFilterEnabled={!targetTelegramId && canMutateProfile}
               defaultRestSeconds={defaultRestSeconds}
               onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
+              sourceWeek={weekCycle && !activeProgramEdit ? selectedSourceWeek : 1}
             />
           </div>
           <ProgramSettingsPanel
@@ -537,7 +711,14 @@ export function ProgramBuilder({
               scheduleIsValid &&
               Number.isInteger(durationWeeks) &&
               durationWeeks >= 1 &&
-              durationWeeks <= 24 &&
+              (weekCycle !== null || durationWeeks <= 24) &&
+              !hasExtraWeeks &&
+              !sourceBudgetExceeded &&
+              (!weekCycle ||
+                (Number.isInteger(weekCycle.length_weeks) &&
+                  weekCycle.length_weeks >= 1 &&
+                  weekCycle.length_weeks <= 20000 &&
+                  (weekCycle.repeat || durationWeeks <= weekCycle.length_weeks))) &&
               Boolean(startDate) &&
               defaultRestSeconds >= 15 &&
               defaultRestSeconds <= 600
@@ -610,7 +791,7 @@ export function ProgramBuilder({
                     inputMode="numeric"
                     disabled={activeProgramEdit}
                     min="1"
-                    max="24"
+                    max={weekCycle ? undefined : 24}
                     value={durationWeeks}
                     onChange={(event) => setDurationWeeks(Number(event.target.value))}
                     required
@@ -656,6 +837,96 @@ export function ProgramBuilder({
                 </p>
               )}
             </section>
+            {activeProgramEdit &&
+            editingTemplate?.assigned_program_id != null &&
+            editingTemplate.current_revision_number != null ? (
+              settingsOpen ? (
+                <ActiveProgramPeriodization
+                  programId={editingTemplate.assigned_program_id}
+                  revision={editingTemplate.current_revision_number}
+                  duration={durationWeeks}
+                  initialWeek={Math.min(
+                    durationWeeks,
+                    Math.max(
+                      1,
+                      Math.floor(
+                        (Date.parse(`${defaultStartDate}T00:00:00Z`) -
+                          Date.parse(`${startDate}T00:00:00Z`)) /
+                          604800000,
+                      ) + 1,
+                    ),
+                  )}
+                  exercises={orderedExercises}
+                  dirty={snapshot !== originalSnapshot}
+                  readOnly={
+                    editingTemplate.assigned_by_user_id != null &&
+                    editingTemplate.assigned_by_user_id !== user?.id
+                  }
+                  onChanged={() => {
+                    void Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['templates'] }),
+                      queryClient.invalidateQueries({ queryKey: ['workout'] }),
+                      queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+                      queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
+                    ]).then(() => onSaved?.());
+                  }}
+                />
+              ) : null
+            ) : (
+              <ProgramPeriodization
+                cycle={weekCycle}
+                onChange={(value) => {
+                  setWeekCycle(value);
+                  if (value && value.length_weeks >= 1)
+                    setSourceWeek((current) =>
+                      value.length_weeks * sourceSetCount > 20000
+                        ? 1
+                        : typeof current === 'number'
+                          ? Math.min(current, value.length_weeks)
+                          : 1,
+                    );
+                }}
+                duration={durationWeeks}
+                onDurationChange={setDurationWeeks}
+                days={days}
+                disabled={false}
+              />
+            )}
+            {weekCycle && hasExtraWeeks && (
+              <div className="field-error" role="alert">
+                <p>
+                  В сокращаемых неделях сохранены предписания. Их нужно удалить, прежде чем
+                  сохранить новую длину цикла.
+                </p>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: 'Удалить предписания лишних недель?',
+                        message: 'Останутся предписания только для недель выбранной длины цикла.',
+                        confirmText: 'Удалить предписания',
+                      })
+                    ) {
+                      setDays((current) =>
+                        current.map((day) => ({
+                          ...day,
+                          exercises: day.exercises.map((exercise) => ({
+                            ...exercise,
+                            weekly_prescriptions: exercise.weekly_prescriptions?.filter(
+                              (item) => item.week_number <= weekCycle.length_weeks,
+                            ),
+                          })),
+                        })),
+                      );
+                    }
+                  }}
+                >
+                  Подтвердить сокращение
+                </button>
+              </div>
+            )}
             <details className="program-builder-optional">
               <summary className="yfc-disclosure-summary">
                 <span>
@@ -730,7 +1001,11 @@ export function ProgramBuilder({
                     <button
                       type="button"
                       className="secondary"
-                      disabled={defaultRestSeconds < 15 || defaultRestSeconds > 600}
+                      disabled={
+                        defaultRestSeconds < 15 ||
+                        defaultRestSeconds > 600 ||
+                        hasDetailedPrescriptions
+                      }
                       onClick={() => {
                         setDays(applyRestSeconds(days, defaultRestSeconds));
                         toast('Общее время отдыха применено ко всем упражнениям');
@@ -739,6 +1014,11 @@ export function ProgramBuilder({
                       Применить ко всем упражнениям
                     </button>
                   </div>
+                  {hasDetailedPrescriptions && (
+                    <p className="muted">
+                      Для сохранённой недельной схемы изменяйте отдых в упражнении.
+                    </p>
+                  )}
                 </section>
               </div>
             </details>

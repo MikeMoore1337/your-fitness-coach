@@ -143,6 +143,369 @@ def test_incompatible_history_does_not_propose_a_weight(client):
     )
 
 
+def test_untyped_week_does_not_use_typed_history_in_a_mixed_cycle(client):
+    _headers, program_id = _cycle(client, ["heavy", None, "heavy"])
+    workouts = _workouts(program_id, 5)
+    _complete(workouts, [1, 2, 3, 4], high_weight_weeks=(1, 3, 4))
+    result = _guidance(program_id, workouts[5])
+    assert [row["workout_id"] for row in result["evidence"]["sessions"]] == [workouts[2]]
+    assert all(
+        f"workout:{workouts[week]}/" not in item
+        for week in (1, 3, 4)
+        for item in result["proposal"]["source_evidence_ids"]
+    )
+
+
+def test_untyped_new_phase_does_not_use_typed_history(client):
+    headers, program_id = _cycle(client, ["heavy", "heavy", "heavy"])
+    workouts = _workouts(program_id, 7)
+    _complete(workouts, [1, 2, 3], high_weight_weeks=(1, 2, 3))
+    changed = client.patch(
+        f"/api/v1/programs/assigned/{program_id}/cycle",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "effective_from_week": 7,
+            "week_types": [None, None, None],
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    guidance = _guidance(program_id, workouts[7])
+    assert guidance["evidence"]["sessions"] == []
+    assert guidance["suggested_weight"] is None
+
+
+def test_week_type_preview_and_scoped_revision_preserve_started_history(client):
+    from fitminiapp_api.models.program import ProgramRevision
+    from fitminiapp_api.services.program_versioning import workout_cycle_week_type
+
+    headers, program_id = _cycle(client, ["heavy", None, "heavy"])
+    workouts = _workouts(program_id, 8)
+    _complete(workouts, [2])
+    with get_session_context() as db:
+        started = db.get(UserWorkout, workouts[5])
+        started.status = "in_progress"
+        started.started_at = datetime.combine(started.scheduled_date, time(10))
+        completed = db.get(UserWorkout, workouts[2])
+        fact = completed.exercises[0].sets[0]
+        before = (fact.id, fact.actual_weight, fact.actual_reps, fact.version)
+        revision = db.get(UserProgram, program_id).current_revision_number
+
+    path = f"/api/v1/programs/assigned/{program_id}/cycle/week-type"
+    payload = {
+        "expected_revision_number": revision,
+        "week_type": "light",
+        "occurrence_weeks": [2, 5, 8],
+    }
+    preview = client.post(path + "/preview", headers=headers, json=payload)
+    assert preview.status_code == 200, preview.text
+    assert [item["week_number"] for item in preview.json()["weeks"]] == [2, 5, 8]
+    assert [item["workouts"][0]["changeable"] for item in preview.json()["weeks"]] == [
+        False,
+        False,
+        True,
+    ]
+    with get_session_context() as db:
+        assert db.get(UserProgram, program_id).current_revision_number == revision
+
+    applied = client.post(path, headers=headers, json=payload)
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["current_revision_number"] == revision + 1
+    assert client.post(path, headers=headers, json=payload).status_code == 409
+    assert client.post(path + "/preview", headers=headers, json=payload).status_code == 409
+    other = _auth(client, 918099)
+    assert client.post(path + "/preview", headers=other, json=payload).status_code in (403, 404)
+
+    with get_session_context() as db:
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program_id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+        rows = [db.get(UserWorkout, workouts[week]) for week in (2, 5, 8)]
+        assert [workout_cycle_week_type(db, row, revisions) for row in rows] == [
+            (None, True),
+            (None, True),
+            ("light", True),
+        ]
+        fact = rows[0].exercises[0].sets[0]
+        assert (fact.id, fact.actual_weight, fact.actual_reps, fact.version) == before
+        assert rows[1].status == "in_progress"
+
+
+def test_scoped_exercise_change_skips_protected_workouts(client):
+    headers, program_id = _cycle(client, ["heavy", "light", "heavy"])
+    workouts = _workouts(program_id, 8)
+    _complete(workouts, [2])
+    with get_session_context() as db:
+        started = db.get(UserWorkout, workouts[5])
+        started.status = "in_progress"
+        started.started_at = datetime.combine(started.scheduled_date, time(10))
+        exercise = db.get(UserWorkout, workouts[8]).exercises[0]
+        slot, exercise_id = exercise.source_template_exercise_id, exercise.exercise_id
+        completed = db.get(UserWorkout, workouts[2]).exercises[0]
+        facts = [
+            (item.id, item.actual_weight, item.actual_reps, item.version) for item in completed.sets
+        ]
+    body = {
+        "expected_revision_number": 1,
+        "effective_scope": "future_program",
+        "occurrence_weeks": [2, 5, 8],
+        "skip_protected": True,
+        "day_number": 1,
+        "target_template_exercise_id": slot,
+        "exercise_id": exercise_id,
+        "prescribed_sets": 2,
+        "prescribed_reps": "12",
+        "rest_seconds": 90,
+    }
+    result = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises", headers=headers, json=body
+    )
+    assert result.status_code == 200, result.text
+    assert result.json()["workouts_updated"] == 1
+    with get_session_context() as db:
+        assert db.get(UserWorkout, workouts[8]).exercises[0].prescribed_reps == "12"
+        assert db.get(UserWorkout, workouts[5]).exercises[0].prescribed_reps == "8-10"
+        completed = db.get(UserWorkout, workouts[2]).exercises[0]
+        assert [
+            (item.id, item.actual_weight, item.actual_reps, item.version) for item in completed.sets
+        ] == facts
+
+
+def test_future_source_repeats_skip_started_occurrence(client):
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 11)
+    with get_session_context() as db:
+        started = db.get(UserWorkout, workouts[7])
+        started.status = "in_progress"
+        started.started_at = datetime.combine(started.scheduled_date, time(10))
+        exercise = started.exercises[0]
+        slot, exercise_id = exercise.source_template_exercise_id, exercise.exercise_id
+    body = {
+        "expected_revision_number": 1,
+        "effective_scope": "future_program",
+        "from_week": 4,
+        "source_cycle_week": 1,
+        "skip_protected": True,
+        "day_number": 1,
+        "target_template_exercise_id": slot,
+        "exercise_id": exercise_id,
+        "prescribed_sets": 2,
+        "prescribed_reps": "12",
+        "rest_seconds": 90,
+    }
+    result = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises", headers=headers, json=body
+    )
+    assert result.status_code == 200, result.text
+    with get_session_context() as db:
+        assert db.get(UserWorkout, workouts[4]).exercises[0].prescribed_reps == "12"
+        assert db.get(UserWorkout, workouts[7]).exercises[0].prescribed_reps == "8-10"
+        assert db.get(UserWorkout, workouts[10]).exercises[0].prescribed_reps == "12"
+
+
+def test_week_type_preview_expands_only_requested_source_week(client):
+    headers, program_id = _cycle(client, ["heavy", None, "heavy"])
+    payload = {
+        "expected_revision_number": 1,
+        "week_type": None,
+        "from_week": 4,
+        "source_cycle_week": 1,
+    }
+    response = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/week-type/preview",
+        headers=headers,
+        json=payload,
+    )
+    assert response.status_code == 200, response.text
+    assert [week["week_number"] for week in response.json()["weeks"]] == [4, 7, 10, 13, 16]
+    assert response.json()["total_weeks"] == 5
+
+
+def test_today_exposes_saved_type_without_defaulting_unset_weeks(client):
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    today = client.get("/api/v1/workouts/today", headers=headers)
+    assert today.status_code == 200, today.text
+    assert today.json()["week_type"] == "heavy" and today.json()["week_type_known"] is True
+    changed = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/week-type",
+        headers=headers,
+        json={"expected_revision_number": 1, "week_type": None, "occurrence_weeks": [1]},
+    )
+    assert changed.status_code == 200, changed.text
+    today = client.get("/api/v1/workouts/today", headers=headers)
+    assert today.status_code == 200, today.text
+    assert today.json()["week_type"] is None and today.json()["week_type_known"] is True
+
+
+def test_duration_preview_and_revision_extend_cycle_without_losing_history(client):
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 3)
+    _complete(workouts, [1])
+    payload = {"expected_revision_number": 1, "effective_from_week": 4, "duration_weeks": 20}
+    path = f"/api/v1/programs/assigned/{program_id}/cycle"
+    preview = client.post(path + "/duration/preview", headers=headers, json=payload)
+    assert preview.status_code == 200, preview.text
+    assert [
+        item["week_number"] for item in preview.json()["weeks"] if item["change"] == "added"
+    ] == [17, 18, 19, 20]
+    revised = client.patch(path, headers=headers, json=payload)
+    assert revised.status_code == 200, revised.text
+    assert client.post(path + "/duration/preview", headers=headers, json=payload).status_code == 409
+    with get_session_context() as db:
+        assert db.get(UserProgram, program_id).duration_weeks == 20
+        assert db.get(UserWorkout, workouts[1]).status == "completed"
+
+
+def test_disabling_cycle_freezes_future_plan_and_preserves_started_history(client):
+    from fitminiapp_api.models.program import ProgramRevision
+    from fitminiapp_api.services.program_versioning import (
+        _cycle_workout_plans,
+        workout_cycle_week_type,
+    )
+
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 8)
+    _complete(workouts, [2])
+    with get_session_context() as db:
+        started = db.get(UserWorkout, workouts[5])
+        started.status = "in_progress"
+        started.started_at = datetime.combine(started.scheduled_date, time(10))
+        program = db.get(UserProgram, program_id)
+        before = {week: _cycle_workout_plans(db, program, week) for week in range(4, 17)}
+        fact = db.get(UserWorkout, workouts[2]).exercises[0].sets[0]
+        history = (fact.id, fact.actual_weight, fact.actual_reps, fact.version)
+    path = f"/api/v1/programs/assigned/{program_id}/cycle/disable"
+    payload = {"expected_revision_number": 1, "effective_from_week": 4}
+    preview = client.post(path + "/preview", headers=headers, json=payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["total_weeks"] == 13
+    assert preview.json()["weeks"][1]["workouts"][0]["changeable"] is False
+    result = client.post(path, headers=headers, json=payload)
+    assert result.status_code == 200, result.text
+    assert client.post(path, headers=headers, json=payload).status_code == 409
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program_id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+        for week in range(4, 17):
+            after = _cycle_workout_plans(db, program, week)
+            assert [(item["scheduled_date"], item["exercises"]) for item in after] == [
+                (item["scheduled_date"], item["exercises"]) for item in before[week]
+            ]
+        assert workout_cycle_week_type(db, db.get(UserWorkout, workouts[5]), revisions) == (
+            None,
+            True,
+        )
+        assert workout_cycle_week_type(db, db.get(UserWorkout, workouts[7]), revisions) == (
+            None,
+            True,
+        )
+        fact = db.get(UserWorkout, workouts[2]).exercises[0].sets[0]
+        assert (fact.id, fact.actual_weight, fact.actual_reps, fact.version) == history
+
+
+def test_disabling_cycle_does_not_reapply_older_overrides(client):
+    from fitminiapp_api.services.program_versioning import _cycle_workout_plans
+
+    headers, program_id = _cycle(client, ["heavy", "light", "heavy"])
+    workouts = _workouts(program_id, 8)
+    with get_session_context() as db:
+        exercise = db.get(UserWorkout, workouts[8]).exercises[0]
+        slot, exercise_id = exercise.source_template_exercise_id, exercise.exercise_id
+    url = f"/api/v1/programs/assigned/{program_id}/exercises"
+    common = {
+        "effective_scope": "future_program",
+        "day_number": 1,
+        "target_template_exercise_id": slot,
+        "exercise_id": exercise_id,
+        "prescribed_sets": 2,
+        "rest_seconds": 90,
+    }
+    first = client.post(
+        url,
+        headers=headers,
+        json={
+            **common,
+            "expected_revision_number": 1,
+            "occurrence_weeks": [8],
+            "prescribed_reps": "6",
+        },
+    )
+    assert first.status_code == 200, first.text
+    second = client.post(
+        url,
+        headers=headers,
+        json={
+            **common,
+            "expected_revision_number": 2,
+            "from_week": 5,
+            "source_cycle_week": 2,
+            "prescribed_reps": "10",
+        },
+    )
+    assert second.status_code == 200, second.text
+    disabled = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/disable",
+        headers=headers,
+        json={"expected_revision_number": 3, "effective_from_week": 7},
+    )
+    assert disabled.status_code == 200, disabled.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        assert _cycle_workout_plans(db, program, 8)[0]["exercises"][0]["prescribed_reps"] == "10"
+
+
+def test_reenable_after_disable_preserves_future_plan(client):
+    from fitminiapp_api.models.program import ProgramRevision
+    from fitminiapp_api.services.program_versioning import (
+        _cycle_workout_plans,
+        workout_cycle_week_type,
+    )
+
+    headers, program_id = _cycle(client, ["heavy", None, "light"])
+    workouts = _workouts(program_id, 8)
+    disabled = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/disable",
+        headers=headers,
+        json={"expected_revision_number": 1, "effective_from_week": 4},
+    )
+    assert disabled.status_code == 200, disabled.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        before = _cycle_workout_plans(db, program, 7)[0]["exercises"]
+    enabled = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/enable",
+        headers=headers,
+        json={
+            "expected_revision_number": 2,
+            "effective_from_week": 7,
+            "duration_weeks": 16,
+            "week_cycle": {"length_weeks": 2, "repeat": True, "week_types": ["light", "heavy"]},
+        },
+    )
+    assert enabled.status_code == 200, enabled.text
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program_id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+        assert _cycle_workout_plans(db, program, 7)[0]["exercises"] == before
+        assert workout_cycle_week_type(db, db.get(UserWorkout, workouts[7]), revisions) == (
+            "light",
+            True,
+        )
+
+
 def test_future_revision_keeps_compatible_completed_facts(client):
     headers, program_id = _cycle(client, ["heavy", "light", "heavy"])
     workouts = _workouts(program_id, 7)
@@ -698,3 +1061,44 @@ def test_typed_coach_assignment_keeps_athlete_isolation_and_comparable_history(c
     assert coach_result.json()["exercises"][0]["guidance"]["evidence"]["week_type"] == "heavy"
     outsider = _auth(client, 917011)
     assert client.get(url, headers=outsider).status_code in (403, 404)
+
+
+def test_cycle_revision_respects_coach_relationship_and_athlete_isolation(client):
+    from test_coach_program_rollout import _setup_coach_clients, _template_payload
+
+    from fitminiapp_api.models.user import CoachClient
+
+    coach, athletes, clients = _setup_coach_clients(client, count=1)
+    exercise = next(
+        item
+        for item in client.get("/api/v1/programs/exercises", headers=coach).json()
+        if item["metric_type"] == "strength"
+    )
+    payload = _template_payload(
+        exercise["id"], title="План клиента", sets=2, telegram_user_id=clients[0][1]
+    )
+    payload["week_cycle"] = {
+        "length_weeks": 3,
+        "repeat": True,
+        "week_types": ["heavy", None, "light"],
+    }
+    created = client.post("/api/v1/programs/templates", headers=coach, json=payload)
+    assert created.status_code == 200, created.text
+    assigned = client.post(
+        f"/api/v1/coach/clients/{clients[0][0]}/templates/{created.json()['template']['id']}/assign",
+        headers=coach,
+        json={"duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    path = f"/api/v1/programs/assigned/{assigned.json()['user_program_id']}/cycle/week-type"
+    change = {"expected_revision_number": 1, "week_type": "light", "occurrence_weeks": [7]}
+    outsider = _auth(client, 918999)
+    assert client.post(path + "/preview", headers=athletes[0], json=change).status_code == 200
+    assert client.post(path + "/preview", headers=outsider, json=change).status_code in (403, 404)
+    assert client.post(path, headers=coach, json=change).status_code == 200
+    with get_session_context() as db:
+        link = db.query(CoachClient).filter_by(client_user_id=clients[0][0]).one()
+        link.status = "ended"
+    assert client.post(
+        path + "/preview", headers=coach, json={**change, "expected_revision_number": 2}
+    ).status_code in (403, 404)

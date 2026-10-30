@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.program import (
+    ProgramRevision,
     UserProgram,
     UserWorkout,
     UserWorkoutExercise,
@@ -25,7 +26,7 @@ from fitminiapp_api.schemas.workout_exercise_note import (
     ExerciseNoteVersion,
     ExerciseNoteWrite,
 )
-from fitminiapp_api.services.program_versioning import _cycle_plan_at
+from fitminiapp_api.services.program_versioning import workout_cycle_week_type
 from fitminiapp_api.services.workout_set_history import _completion_bounds
 
 
@@ -109,13 +110,13 @@ def _value(note: WorkoutExerciseNote | None) -> dict | None:
 def _week_type(db: Session, program: UserProgram, workout: UserWorkout) -> str | None:
     if workout.source_cycle_week is None:
         return None
-    config = _cycle_plan_at(db, program, workout.week_number)
-    if config is None:
-        return None
-    types = config[0].get("week_types")
-    index = workout.source_cycle_week - 1
-    value = types[index] if isinstance(types, list) and 0 <= index < len(types) else None
-    return value if value in {"light", "medium", "heavy"} else None
+    revisions = (
+        db.query(ProgramRevision)
+        .filter_by(user_program_id=program.id)
+        .order_by(ProgramRevision.revision_number)
+        .all()
+    )
+    return workout_cycle_week_type(db, workout, revisions)[0]
 
 
 def _previous(
