@@ -1,5 +1,7 @@
 # #827 — визуальный пакет A1
 
+Финальный baseline после слияния #835: `dev=b5212e1db7867ed2b0a8b9f297272988afc42b78`, обычный merge в эту ветку `db53e6fc7d9d8bded04dc06d07a8c87261ef7cf1`. Новый календарь активности, его год и inline «Добавить» сохраняются. Модуль #827 заменяет только существующее распределение внутри TrainingSection ниже календаря, показателей и DataConfidence. Training analytics не изменена; все 12 snapshots заново рассчитаны и совпали по значениям. Сервисный fixture календаря [before-activity.json](before-activity.json) честно содержит восемь legacy-тренировок без completed_at_utc; даты и нули не выдумывались.
+
 Актуализация перед публикацией: за время работы dev продвинулся до `0983d67c6b244225a21a0ac049811648201f6a44`. Второй обычный merge — `c8ce52d6e67f06a168a6693e8c87d5db09269b03`. Training analytics, её schema, AppShell, ProgressExperience, MuscleWorkload, shared tokens/fonts и зависимости не изменились. Единственное изменение общего CSS относится к `.program-wizard-result__facts`. Сервисные snapshots пересчитаны на новом baseline и по значениям совпали; BEFORE повторно снят с актуального React-source.
 
 Версия `827-A1-20261030`. Issue [#827](https://github.com/MikeMoore1337/your-fitness-coach/issues/827), существующий Draft PR [#1313](https://github.com/MikeMoore1337/your-fitness-coach/pull/1313), база `dev`. Исходный HEAD `5b33519a7d8dbbdb685da7ee2cc4cb200ed40d4d` синхронизирован обычным merge с `dev=a12d9a639d72bed6a804157e6f46786957442535`; merge commit `7bbadd6127727cf683806a12bf94b2031ad16c05`. История сохранена, force push не применяется.
@@ -7,6 +9,10 @@
 Это `audit-proposal`: готовые макеты для решения владельца. Изменений runtime, API, миграций и дизайн-токенов относительно dev нет. Issue не завершена; master/production и задачи #830/#831/#1201 не затронуты. Старые `variants.html` и восемь PNG с именами `*-mobile-*` / `*-desktop-*` остаются предварительными, отклонёнными как финальное доказательство. Текущий пакет начинается с `concepts.html` и `proposal.html`.
 
 ## Что посмотреть
+
+**Контекст актуального dev:** [mobile Dark](proposal-in-context-dark-393.png), [mobile Light](proposal-in-context-light-393.png), [desktop Dark](proposal-in-context-dark-1440.png), [desktop Light](proposal-in-context-light-1440.png). Это временный HTML-монтаж предложения в браузере с работающей текущей оболочкой. Файлы frontend не менялись; интерактивность внедрения и runtime AFTER здесь не заявляются. BEFORE ниже повторно снят после #835. Четыре монтажа проверяют размещение на текущем экране; 144-сценарная матрица относится к автономному HTML. Восемь PNG самого модуля на новом baseline остались побайтово одинаковыми.
+
+`CURRENT_DEV_CONTEXT_VISUAL_QA=PASS`: основной агент и независимый UX-reviewer повторно открыли четыре итоговых монтажа. На 393px детали идут после выбранной группы, на 1440px — справа; коллизий с текущей оболочкой не обнаружено. Первая попытка capture не довела scroll до модуля; это было обнаружено просмотром, а не принято за PASS. Итоговые кадры сняты с matching viewport и instant native scroll, с видимыми заголовком и выбранной группой. Source/UI-программа не изменялась.
 
 Запуск из корня checkout: `node docs/ux-proposals/issue-827-v12/preview.cjs`, затем открыть `http://127.0.0.1:4827/proposal.html` в браузере Codex. Остановка — Ctrl+C. Preview слушает только loopback и обслуживает только этот каталог и существующие public styles/assets; production/account API не вызывает.
 
