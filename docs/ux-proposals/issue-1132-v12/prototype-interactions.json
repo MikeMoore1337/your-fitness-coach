@@ -1,0 +1,770 @@
+[
+  {
+    "id": "chromium-light-320-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-320-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-320-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-360-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-360-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-360-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-393-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-393-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-393-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-430-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-430-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-430-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-768-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-768-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-768-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1024-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1024-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1024-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1280-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1280-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1280-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1440-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1440-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-light-1440-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-320-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-320-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-320-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-360-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-360-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-360-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-393-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-393-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-393-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-430-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-430-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-430-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-768-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-768-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-768-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1024-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1024-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1024-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1280-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1280-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1280-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1440-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1440-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "chromium-dark-1440-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-320-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-320-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-320-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-360-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-360-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-360-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-393-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-393-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-393-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-430-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-430-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-430-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-768-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-768-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-768-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1024-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1024-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1024-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1280-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1280-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1280-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1440-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1440-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-light-1440-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-320-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-320-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-320-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-360-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-360-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-360-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-393-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-393-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-393-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-430-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-430-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-430-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-768-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-768-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-768-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1024-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1024-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1024-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1280-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1280-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1280-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1440-a",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1440-b",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  },
+  {
+    "id": "webkit-dark-1440-c",
+    "stable_history": true,
+    "empty_initial_input": true,
+    "number_entry": true,
+    "rir": true,
+    "failure_toggle": true
+  }
+]
