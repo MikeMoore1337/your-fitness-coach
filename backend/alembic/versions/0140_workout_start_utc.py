@@ -19,10 +19,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    if (
-        op.get_bind()
-        .execute(sa.text("SELECT 1 FROM user_workouts WHERE started_at_utc IS NOT NULL LIMIT 1"))
-        .first()
-    ):
+    connection = op.get_bind()
+    if connection.dialect.name == "postgresql":
+        connection.execute(sa.text("LOCK TABLE user_workouts IN ACCESS EXCLUSIVE MODE"))
+    if connection.execute(
+        sa.text("SELECT 1 FROM user_workouts WHERE started_at_utc IS NOT NULL LIMIT 1")
+    ).first():
         raise RuntimeError("Unsafe downgrade: UTC workout start times exist; use a forward fix")
     op.drop_column("user_workouts", "started_at_utc")
