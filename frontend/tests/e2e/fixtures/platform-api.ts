@@ -1761,6 +1761,27 @@ export async function installPlatformApi(
         ],
       });
     }
+    if (path.endsWith('/workouts/42/exercise-notes/101') && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          workout_id: 42,
+          workout_exercise_id: 101,
+          exercise_id: 11,
+          source_template_exercise_id: null,
+          plan_revision_number: null,
+          week_number: 1,
+          day_number: 1,
+          source_cycle_week: null,
+          cycle_iteration: null,
+          version: 0,
+          current_note: null,
+          previous_note: null,
+        },
+      });
+    }
+    if (path.endsWith('/workouts/42/exercise-notes') && request.method() === 'GET') {
+      return route.fulfill({ json: [] });
+    }
     if (path.endsWith('/workouts/42/set-history')) {
       return route.fulfill({
         json: {

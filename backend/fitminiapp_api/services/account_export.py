@@ -190,6 +190,8 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "subscriptions": "retired operational billing records",
     "workout_set_mutations": "idempotency fingerprints used only for sync correctness",
     "workout_rest_actions": "idempotency fingerprints and mutation ids used only for sync correctness",
+    "workout_exercise_notes": "private exercise notes excluded until an explicit export policy exists",
+    "workout_exercise_note_mutations": "idempotency fingerprints used only for sync correctness",
     "program_imports": (
         "short-lived owner-scoped import drafts; source is never persisted and normalized content "
         "is cleared on terminal state"

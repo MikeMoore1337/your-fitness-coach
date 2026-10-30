@@ -22,6 +22,7 @@ import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
 import { WorkoutCopyButton } from './WorkoutCopyButton';
+import { ExerciseNoteHistory } from './ExerciseNoteHistory';
 
 interface RestHistoryEntry {
   id: number;
@@ -88,6 +89,7 @@ export function WorkoutHistory({
   onWorkoutSelect,
   readOnly = false,
   timeZone,
+  userId,
 }: {
   compact?: boolean;
   focusedWorkoutId?: number | null;
@@ -96,6 +98,7 @@ export function WorkoutHistory({
   onWorkoutSelect?: (workoutId: number, target: WorkoutNavigationTarget) => void;
   readOnly?: boolean;
   timeZone?: string | null;
+  userId?: number;
 }) {
   const queryClient = useQueryClient();
   const { confirm, toast } = useFeedback();
@@ -272,6 +275,9 @@ export function WorkoutHistory({
                           .rest_sessions
                       }
                     />
+                    {!readOnly && userId && (
+                      <ExerciseNoteHistory key={userId} userId={userId} workoutId={item.id} />
+                    )}
                     {item.adaptations.map((adaptation) => (
                       <p className="workout-history__adaptation" key={adaptation.id}>
                         Изменено перед тренировкой: {adaptationReasonLabels[adaptation.reason]}

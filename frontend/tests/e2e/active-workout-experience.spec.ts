@@ -5735,7 +5735,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await pulse.click();
   await cardio.getByRole('spinbutton', { name: 'Средний пульс, уд/мин' }).fill('138');
   await cardio.getByRole('combobox', { name: 'Зона пульса' }).selectOption('3');
-  await expect(cardio.locator('details')).toHaveAttribute('open', '');
+  await expect(cardio.locator('.active-workout-set__advanced')).toHaveAttribute('open', '');
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-119/mobile-web-390x844-dark-mixed-workout.png',
@@ -7859,6 +7859,13 @@ for (const theme of ['light', 'dark'] as const) {
     );
     for (const width of [320, 360, 393, 430, 1440]) {
       await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+      // The mobile-to-desktop layout can reflow after setViewportSize resolves.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
       const layout = await third.evaluate((row) => {
         const history = row.querySelector('.active-workout-set__history')!.getBoundingClientRect();
         const controls = row
@@ -8194,6 +8201,7 @@ for (const theme of ['light', 'dark'] as const) {
     const prefill = row.getByRole('button', { name: 'Подставить предыдущий подход сегодня' });
     const past = row.getByRole('button', { name: 'Подставить из прошлой тренировки' });
     const help = row.getByText('Что такое RIR?', { exact: true });
+    const note = row.locator('.exercise-execution-note > summary');
     const helpers = row.getByText('Разминка и блины', { exact: true });
     const advanced = row.getByText('Дополнительно', { exact: true });
     await expect(prefill).toBeVisible();
@@ -8211,6 +8219,7 @@ for (const theme of ['light', 'dark'] as const) {
         '.active-workout-set__prefill-actions button:first-child',
         '.active-workout-set__prefill-actions button:last-child',
         '.active-workout-set__contextual-help summary',
+        '.exercise-execution-note > summary',
         '.active-workout-set__helpers > summary',
         '.active-workout-set__advanced > summary',
       ];
@@ -8254,6 +8263,7 @@ for (const theme of ['light', 'dark'] as const) {
           '.active-workout-set__controls',
           '.active-workout-set__prefill-actions',
           '.active-workout-set__contextual-help',
+          '.exercise-execution-note',
           '.active-workout-set__helpers',
           '.active-workout-set__advanced',
         ];
@@ -8290,7 +8300,7 @@ for (const theme of ['light', 'dark'] as const) {
     await capture('prefill-collapsed');
 
     await done.focus();
-    for (const next of [prefill, help, helpers, advanced]) {
+    for (const next of [prefill, help, note, helpers, advanced]) {
       await page.keyboard.press('Tab');
       await expect(next).toBeFocused();
     }
@@ -8436,9 +8446,14 @@ test('Issue #1293 disables prefill without a previous result', async ({ page }) 
   }
   const done = row.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' });
   await done.focus();
-  for (const label of ['Что такое RIR?', 'Разминка и блины', 'Дополнительно']) {
+  for (const next of [
+    row.getByText('Что такое RIR?', { exact: true }),
+    row.locator('.exercise-execution-note > summary'),
+    row.getByText('Разминка и блины', { exact: true }),
+    row.getByText('Дополнительно', { exact: true }),
+  ]) {
     await page.keyboard.press('Tab');
-    await expect(row.getByText(label, { exact: true })).toBeFocused();
+    await expect(next).toBeFocused();
   }
 });
 

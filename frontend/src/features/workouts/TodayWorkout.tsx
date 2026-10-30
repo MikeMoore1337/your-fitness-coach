@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
@@ -76,6 +84,9 @@ import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { WarmupProposal } from './WarmupProposal';
 import { PlateCalculator } from './PlateCalculator';
 import { ExerciseSetupMemory } from './ExerciseSetupMemory';
+import { ExerciseExecutionNote } from './ExerciseExecutionNote';
+import { ExerciseNoteRecovery } from './ExerciseNoteRecovery';
+import { noteIdentity } from './exerciseNoteQueue';
 import { ActiveSessionSummary } from './ActiveSessionSummary';
 import { boundSetHistory, previousCompletedSet } from './workoutSetHistory';
 import {
@@ -428,6 +439,7 @@ function WorkoutSetRow({
   durable,
   syncing,
   syncFailed,
+  exerciseNote,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -452,6 +464,7 @@ function WorkoutSetRow({
   durable: boolean;
   syncing: boolean;
   syncFailed: boolean;
+  exerciseNote?: ReactNode;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -977,6 +990,8 @@ function WorkoutSetRow({
         </div>
       )}
 
+      {isCurrent && exerciseNote}
+
       {isCurrent && set.set_kind !== 'warmup' && set.planned_role !== 'warmup' && (
         <WorkoutSetHelpers
           disabled={disabled || completing}
@@ -1073,6 +1088,7 @@ function CardioWorkoutRow({
   durable,
   syncing,
   syncFailed,
+  exerciseNote,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -1085,6 +1101,7 @@ function CardioWorkoutRow({
   durable: boolean;
   syncing: boolean;
   syncFailed: boolean;
+  exerciseNote?: ReactNode;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -1528,6 +1545,8 @@ function CardioWorkoutRow({
           {validation}
         </p>
       )}
+
+      {isCurrent && exerciseNote}
 
       <details className="active-workout-set__advanced">
         <summary className="yfc-disclosure-summary">
@@ -3148,6 +3167,10 @@ export function TodayWorkout({
 
         <PreviousWorkoutNote workoutId={data.id} />
 
+        {user && capabilities.canMutatePrograms && (
+          <ExerciseNoteRecovery userId={user.id} workout={data} />
+        )}
+
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
             const metricType = exercise.metric_type === 'cardio' ? 'cardio' : 'strength';
@@ -3165,6 +3188,16 @@ export function TodayWorkout({
             );
             const isCurrentExercise = currentSet?.exercise.id === exercise.id;
             const exerciseOpen = isCurrentExercise || expandedExercises.has(exercise.id);
+            const exerciseNote =
+              user && started && capabilities.canMutatePrograms ? (
+                <ExerciseExecutionNote
+                  key={`${user.id}-${data.id}-${exercise.id}-${JSON.stringify(noteIdentity(data, exercise))}`}
+                  userId={user.id}
+                  workout={data}
+                  exercise={exercise}
+                  visible={exerciseOpen}
+                />
+              ) : null;
             const groupKind =
               exercise.group_kind ?? (exercise.superset_group ? ('superset' as const) : null);
             const groupLabel =
@@ -3439,6 +3472,7 @@ export function TodayWorkout({
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
+                          exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
                           enqueue={enqueueSet}
                         />
                       ) : (
@@ -3470,11 +3504,13 @@ export function TodayWorkout({
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
+                          exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
                           enqueue={enqueueSet}
                         />
                       );
                     })}
                   </div>
+                  {!isCurrentExercise && exerciseNote}
                 </div>
               </article>
             );

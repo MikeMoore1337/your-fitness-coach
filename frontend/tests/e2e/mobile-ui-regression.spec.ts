@@ -272,6 +272,9 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   );
 
   await expect(page.locator('.active-workout')).toBeVisible();
+  await expect(
+    page.locator('.exercise-execution-note > summary').getByText('Подходящих заметок пока нет'),
+  ).toBeVisible();
   await assertMobileShellGeometry(page);
   const finish = page.getByRole('button', { name: 'Завершить тренировку' });
   await expect(finish).toBeVisible();
@@ -479,10 +482,26 @@ test('@critical active workout keeps the current set primary across mobile width
         return hit === element || hit?.closest('[data-workout-field="done"]') === element;
       }),
     ).resolves.toBe(true);
-    await expectNoOverlap(
-      page.getByRole('button', { name: 'Завершить тренировку' }),
-      page.locator('#appBottomNav'),
-    );
+    // The finish button can pass behind the dock while another action is centered.
+    const finish = page.getByRole('button', { name: 'Завершить тренировку' });
+    await finish.evaluate((element) => {
+      element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    });
+    await expect(finish).toBeInViewport();
+    await expectNoOverlap(finish, page.locator('#appBottomNav'));
+    await expect(
+      finish.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2,
+        );
+        return hit === element || element.contains(hit);
+      }),
+    ).resolves.toBe(true);
+    await currentSetDone.evaluate((element) => {
+      element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    });
     await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
 
     const weightInput = currentSet.getByRole('textbox', { name: /Вес, .*подход 1/ });
