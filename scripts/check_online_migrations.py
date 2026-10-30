@@ -323,6 +323,46 @@ def _is_in_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST,
     return False
 
 
+def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict) -> bool:
+    if not (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "bind"
+        and call.func.attr == "execute"
+        and len(call.args) == 1
+    ):
+        return False
+    query = call.args[0]
+    sql = (
+        query.args[0].value
+        if isinstance(query, ast.Call)
+        and isinstance(query.func, ast.Attribute)
+        and isinstance(query.func.value, ast.Name)
+        and query.func.value.id == "sa"
+        and query.func.attr == "text"
+        and len(query.args) == 1
+        and isinstance(query.args[0], ast.Constant)
+        and isinstance(query.args[0].value, str)
+        else ""
+    )
+    checked = re.fullmatch(
+        r"SELECT indisvalid AND indisunique FROM pg_index WHERE indexrelid = "
+        r"'([a-z][a-z0-9_]*)'::regclass",
+        sql,
+    )
+    return bool(
+        checked
+        and _is_in_postgresql_branch(call, links)
+        and any(
+            item.func.attr == "create_index"
+            and item.args
+            and isinstance(item.args[0], ast.Constant)
+            and item.args[0].value == checked[1]
+            for item in _op_calls(upgrade)
+        )
+    )
+
+
 def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object) -> None:
     links = _parent_links(upgrade)
     created_tables = {
@@ -358,7 +398,16 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
             elif phase == "backfill":
                 allowed = owner == "op" and function.attr == "execute"
             elif phase == "constraint_swap":
-                allowed = owner == "op" and function.attr in {"execute", "get_bind"}
+                allowed = (owner == "op" and function.attr in {"execute", "get_bind"}) or (
+                    _is_in_non_postgresql_branch(call, links)
+                    and (
+                        (owner == "op" and function.attr == "batch_alter_table")
+                        or (
+                            owner == "batch"
+                            and function.attr in {"drop_constraint", "create_check_constraint"}
+                        )
+                    )
+                )
             elif phase == "rest_unique_swap":
                 allowed = (
                     (
@@ -380,6 +429,23 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 )
         elif phase == "numeric_precision" and isinstance(function, ast.Name):
             allowed = function.id == "_ensure_upgrade_safe"
+        if phase == "expand":
+            if _is_index_validation(call, upgrade, links) or (
+                isinstance(function, ast.Attribute)
+                and function.attr == "scalar_one"
+                and isinstance(function.value, ast.Call)
+                and _is_index_validation(function.value, upgrade, links)
+            ):
+                allowed = True
+            if (
+                isinstance(function, ast.Name)
+                and function.id == "RuntimeError"
+                and isinstance(links.get(call, (None, ""))[0], ast.Raise)
+                and len(call.args) == 1
+                and isinstance(call.args[0], ast.Constant)
+                and isinstance(call.args[0].value, str)
+            ):
+                allowed = True
         if _is_autocommit_block_call(call):
             allowed = True
         if not allowed:
@@ -565,6 +631,95 @@ def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[st
         raise OnlineMigrationError(f"{path} rest unique swap batch must contain only its drop")
 
 
+def _validate_sqlite_check_swap(
+    path: Path, upgrade: ast.AST, statements: list[str], table_name: str, constraint_name: str
+) -> None:
+    batches = [
+        node
+        for node in ast.walk(upgrade)
+        if isinstance(node, ast.With)
+        and any(
+            isinstance(item.context_expr, ast.Call)
+            and _is_direct_op_call(item.context_expr, "batch_alter_table")
+            for item in node.items
+        )
+    ]
+    if not batches:
+        return
+    if len(batches) != 1:
+        raise OnlineMigrationError(f"{path} permits only one declared SQLite CHECK batch")
+    batch = batches[0]
+    links = _parent_links(upgrade)
+    if not _is_in_non_postgresql_branch(batch, links) or len(batch.items) != 1:
+        raise OnlineMigrationError(f"{path} CHECK batch must stay in the non-PostgreSQL fallback")
+    context = batch.items[0]
+    call = context.context_expr
+    if (
+        not isinstance(call, ast.Call)
+        or len(call.args) != 1
+        or call.keywords
+        or not isinstance(call.args[0], ast.Constant)
+        or call.args[0].value != table_name
+        or not isinstance(context.optional_vars, ast.Name)
+        or context.optional_vars.id != "batch"
+    ):
+        raise OnlineMigrationError(f"{path} CHECK batch must name only its declared table")
+    calls = []
+    for statement in batch.body:
+        if not isinstance(statement, ast.Expr) or not isinstance(statement.value, ast.Call):
+            raise OnlineMigrationError(
+                f"{path} CHECK batch may contain only a declared CHECK replacement"
+            )
+        calls.append(statement.value)
+    if len(calls) not in {1, 2}:
+        raise OnlineMigrationError(
+            f"{path} CHECK batch must create one CHECK and optionally drop its predecessor"
+        )
+    if len(calls) == 2:
+        drop = calls[0]
+        if (
+            not isinstance(drop.func, ast.Attribute)
+            or not isinstance(drop.func.value, ast.Name)
+            or drop.func.value.id != "batch"
+            or drop.func.attr != "drop_constraint"
+            or len(drop.args) != 1
+            or not isinstance(drop.args[0], ast.Constant)
+            or drop.args[0].value != constraint_name
+            or len(drop.keywords) != 1
+            or drop.keywords[0].arg != "type_"
+            or not isinstance(drop.keywords[0].value, ast.Constant)
+            or drop.keywords[0].value.value != "check"
+        ):
+            raise OnlineMigrationError(f"{path} CHECK batch may drop only its declared CHECK")
+    create = calls[-1]
+    condition = re.search(r" CHECK \((.*)\) NOT VALID$", re.sub(r"\s+", " ", statements[2]).strip())
+    if (
+        condition is None
+        or not isinstance(create.func, ast.Attribute)
+        or not isinstance(create.func.value, ast.Name)
+        or create.func.value.id != "batch"
+        or create.func.attr != "create_check_constraint"
+        or len(create.args) != 2
+        or create.keywords
+        or not all(
+            isinstance(item, ast.Constant) and isinstance(item.value, str) for item in create.args
+        )
+        or create.args[0].value != constraint_name
+        or re.sub(r"\s+", " ", create.args[1].value).strip() != condition.group(1)
+    ):
+        raise OnlineMigrationError(f"{path} SQLite CHECK must match the exact PostgreSQL CHECK")
+    batch_calls = [
+        node
+        for node in ast.walk(upgrade)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "batch"
+    ]
+    if set(batch_calls) != set(calls):
+        raise OnlineMigrationError(f"{path} CHECK operations cannot escape the declared batch")
+
+
 def _validate_nullable_add_column(path: Path, call: ast.Call) -> None:
     if len(call.args) < 2 or not isinstance(call.args[1], ast.Call):
         raise OnlineMigrationError(
@@ -730,6 +885,8 @@ def validate_added_migration(path: Path) -> None:
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "op"
         ):
+            if phase == "expand" and _is_index_validation(node, upgrade, links):
+                continue
             raise OnlineMigrationError(
                 f"{path} uses SQL execution outside the verified op.execute online contract"
             )
@@ -773,7 +930,11 @@ def validate_added_migration(path: Path) -> None:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online backfill"
             )
-        elif phase == "constraint_swap" and operation not in {"execute", "get_bind"}:
+        elif phase == "constraint_swap" and operation not in {
+            "execute",
+            "get_bind",
+            "batch_alter_table",
+        }:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online constraint_swap"
             )
@@ -846,6 +1007,12 @@ def validate_added_migration(path: Path) -> None:
             constraint_name=constraint_swap_config[1],
             lock_timeout_seconds=constraint_swap_config[2],
             statement_timeout_seconds=constraint_swap_config[3],
+        )
+
+    if phase == "constraint_swap":
+        assert constraint_swap_config is not None
+        _validate_sqlite_check_swap(
+            path, upgrade, execute_statements, constraint_swap_config[0], constraint_swap_config[1]
         )
 
     if phase == "rest_unique_swap":

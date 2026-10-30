@@ -1,8 +1,10 @@
 """Two-stage YFC release governance contracts."""
 
 import json
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,6 +13,127 @@ from scripts import ci_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 UPDATE_SCRIPT = ROOT / "scripts/update_dev.ps1"
+
+
+@pytest.mark.parametrize(
+    "scenario", ["valid", "unsafe", "modified", "deleted", "renamed", "not_ancestor"]
+)
+def test_dev_migration_preflight_uses_immutable_target_without_child_git(
+    tmp_path: Path, scenario: str
+) -> None:
+    pwsh = shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("PowerShell is not available on this runner")
+    repo = tmp_path / "old checkout"
+    repo.mkdir()
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=Contract", "-c", "user.email=contract@example.invalid", *args],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    git("init", "--quiet")
+    checker = repo / "scripts/check_online_migrations.py"
+    checker.parent.mkdir()
+    checker.write_text('raise SystemExit("installed checker must not run")\n', encoding="utf-8")
+    migration = repo / "backend/alembic/versions/9999_test_expand.py"
+    migration.parent.mkdir(parents=True)
+    (migration.parent / "__init__.py").write_text("", encoding="utf-8")
+    valid = (
+        'online_rollout_phase = "expand"\n'
+        'online_rollout_notes = "Nullable additive column; metadata-only lock."\n'
+        "def upgrade():\n"
+        '    op.add_column("users", sa.Column("nickname", sa.String(), nullable=True))\n'
+    )
+    if scenario in {"modified", "deleted", "renamed"}:
+        migration.write_text(valid, encoding="utf-8")
+    git("add", ".")
+    git("commit", "--quiet", "-m", "installed version")
+    source = git("rev-parse", "HEAD")
+    if scenario == "not_ancestor":
+        git("checkout", "--orphan", "unrelated")
+    checker.write_bytes((ROOT / "scripts/check_online_migrations.py").read_bytes())
+    if scenario == "deleted":
+        migration.unlink()
+    elif scenario == "renamed":
+        migration.rename(migration.with_name("9998_renamed.py"))
+    else:
+        migration.write_text(
+            valid.replace("op.add_column", "op.drop_table")
+            if scenario == "unsafe"
+            else valid + "\n",
+            encoding="utf-8",
+        )
+    git("add", ".")
+    git("commit", "--quiet", "-m", "target version")
+    target = git("rev-parse", "HEAD")
+    git("checkout", "--quiet", source)
+    installed = checker.read_bytes()
+    status_before = git("status", "--porcelain")
+
+    def ps(value: Path | str) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+
+    harness = tmp_path / "preflight.ps1"
+    harness.write_text(
+        "$ErrorActionPreference='Stop'\n"
+        f"$script:RepoRoot={ps(repo)}; $script:StateRoot={ps(tmp_path / 'evidence')}\n"
+        "$script:CurrentResult=@{migration='NOT_RUN'}; $script:FailureCode=''\n"
+        "$tokens=$null; $errors=$null\n"
+        f"$ast=[System.Management.Automation.Language.Parser]::ParseFile({ps(UPDATE_SCRIPT)},[ref]$tokens,[ref]$errors)\n"
+        "if ($errors.Count) { throw 'parse failure' }\n"
+        "$names=@('Invoke-Git','Get-GitValue','Get-ChangedMigrations','Stop-Update','Test-MigrationCompatibility')\n"
+        "$ast.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]},$false) | "
+        "Where-Object {$_.Name -in $names} | ForEach-Object {. ([scriptblock]::Create($_.Extent.Text))}\n"
+        f"function py {{ & {ps(sys.executable)} @($args | Select-Object -Skip 1) }}\n"
+        f"try {{ Test-MigrationCompatibility -Source {ps(source)} -Target {ps(target)}; Write-Output 'VALIDATED' }}\n"
+        "catch { Write-Output ('GATE_REJECTED='+$script:FailureCode); exit 17 }\n",
+        encoding="utf-8-sig",
+    )
+    # Reset inherited trusted paths only in this disposable fixture's child processes.
+    env = {
+        **os.environ,
+        "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "",
+    }
+    env.pop("GIT_CONFIG_PARAMETERS", None)
+    raw = subprocess.run(["git", "status", "--porcelain"], cwd=repo, env=env, capture_output=True)
+    assert raw.returncode != 0, "exercise Git's actual dubious-ownership boundary"
+    result = subprocess.run(
+        [pwsh, "-NoProfile", "-File", str(harness)],
+        cwd=repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if scenario == "valid":
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "VALIDATED" in result.stdout
+        manifest = next((tmp_path / "evidence").glob("*/manifest.json"))
+        saved = json.loads(manifest.read_text(encoding="utf-8"))
+        assert (saved["active_revision"], saved["target_revision"]) == (source, target)
+        assert saved["changes"] == [{"status": "A", "path": migration.relative_to(repo).as_posix()}]
+    else:
+        assert result.returncode == 17, result.stdout + result.stderr
+        assert "GATE_REJECTED=MIGRATION_REVIEW_REQUIRED" in result.stdout
+    if scenario != "not_ancestor":
+        log = next((tmp_path / "evidence").glob("*/validation.log")).read_text(encoding="utf-8-sig")
+        if scenario == "valid":
+            assert "Online migration gate passed: 1 added migration(s)" in log
+        elif scenario == "unsafe":
+            assert "Online migration gate failed:" in log and "drop_table" in log
+        else:
+            assert "applied migration history is immutable" in log
+    assert git("rev-parse", "HEAD") == source
+    assert git("status", "--porcelain") == status_before
+    assert checker.read_bytes() == installed
 
 
 def test_dev_push_runs_ci_but_cannot_start_production_deploy() -> None:
@@ -223,7 +346,7 @@ def test_local_dev_updater_is_fail_closed_and_reuses_project_launcher() -> None:
         "-Action start",
         "safe.directory=",
         "dev:refs/remotes/origin/dev",
-        "merge', '--ff-only', 'origin/dev",
+        "merge', '--ff-only', $context.Target",
         "head_sha",
         "branch-checks",
         "check_online_migrations.py",

@@ -460,9 +460,34 @@ function Test-MigrationCompatibility {
     if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
         Stop-Update -Code 'PYTHON_UNAVAILABLE' -Summary 'Не найден launcher py для проверки миграций.' -Deferred
     }
-    Push-Location $script:RepoRoot
+    $ancestor = Invoke-Git -Arguments @('merge-base', '--is-ancestor', $Source, $Target) -AllowFailure
+    if ($ancestor.ExitCode -ne 0) {
+        Stop-Update -Code 'MIGRATION_REVIEW_REQUIRED' -Summary 'Диапазон миграций не является fast-forward.' -Deferred
+    }
+    # Validate immutable target files without raw child Git or changing the installed checkout.
+    $validationRoot = Join-Path $script:StateRoot ('migration-check-{0}' -f [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $validationRoot -Force | Out-Null
+    $archivePath = Join-Path $validationRoot 'target.zip'
+    [void](Invoke-Git -Arguments @(
+        'archive', '--format=zip', '--output', $archivePath, $Target, '--',
+        'scripts/check_online_migrations.py', 'backend/alembic/versions'
+    ))
+    Expand-Archive -LiteralPath $archivePath -DestinationPath $validationRoot
+    $manifestChanges = @($changes | ForEach-Object {
+        $fields = $_ -split "`t"
+        @{ status = $fields[0]; path = $fields[-1] }
+    })
+    $manifest = @{
+        schema_version = 1
+        active_revision = $Source
+        target_revision = $Target
+        changes = $manifestChanges
+    } | ConvertTo-Json -Depth 4
+    $manifestPath = Join-Path $validationRoot 'manifest.json'
+    [System.IO.File]::WriteAllText($manifestPath, $manifest, [System.Text.UTF8Encoding]::new($false))
+    Push-Location $validationRoot
     try {
-        & py -3.14 scripts/check_online_migrations.py $Source $Target *> $null
+        & py -3.14 scripts/check_online_migrations.py $Source $Target --manifest $manifestPath *> (Join-Path $validationRoot 'validation.log')
         $validatorExitCode = $LASTEXITCODE
     } finally {
         Pop-Location
@@ -679,7 +704,7 @@ function Invoke-Apply {
         if ($hasMigrations) {
             [void](Backup-DevDatabase -TargetSha $context.Target)
         }
-        [void](Invoke-Git -Arguments @('merge', '--ff-only', 'origin/dev'))
+        [void](Invoke-Git -Arguments @('merge', '--ff-only', $context.Target))
         $script:CurrentResult.git = 'FAST_FORWARD_APPLIED'
         Invoke-DevStart
         $script:CurrentResult.health_live = if (Test-HealthEndpoint -Path '/health/live') { 'PASS' } else { 'FAIL' }

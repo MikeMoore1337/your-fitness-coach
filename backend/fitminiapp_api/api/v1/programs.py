@@ -14,6 +14,7 @@ from fitminiapp_api.schemas.program import (
     ExerciseCatalogItem,
     ExerciseGuide,
     ProgramAssignmentResponse,
+    ProgramCycleRevisionRequest,
     ProgramLifecycleActionRequest,
     ProgramLifecycleMutationResponse,
     ProgramLifecycleResponse,
@@ -82,6 +83,7 @@ from fitminiapp_api.services.program_versioning import (
     list_training_blocks,
     program_lifecycle_summary,
     repeat_training_block,
+    revise_program_cycle,
     update_training_block,
     upsert_future_program_exercise,
 )
@@ -886,6 +888,21 @@ def repeat_assigned_program_block(
         "duration_weeks": duration_weeks,
         "current_revision_number": revision_number,
     }
+
+
+@router.patch("/assigned/{program_id}/cycle")
+def update_assigned_cycle(
+    program_id: int,
+    payload: ProgramCycleRevisionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        revision_number = revise_program_cycle(db, current_user, program_id, payload)
+    except ProgramError as exc:
+        db.rollback()
+        raise _assigned_program_error(exc) from exc
+    return {"current_revision_number": revision_number}
 
 
 @router.post(

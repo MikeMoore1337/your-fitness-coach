@@ -1683,3 +1683,84 @@ def test_weekly_matrix_extracts_four_days_and_preserves_exercise_changes(client)
             exercise["exercise_id"] for exercise in day_one["exercises"]
         ]
         assert user.id == week_four_exercise.workout.user_program.user_id
+
+
+def test_thirty_week_import_preview_preserves_all_source_weeks(client):
+    headers = _auth(client, 931130)
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerow(
+        [
+            "Название программы",
+            "Цель",
+            "Уровень",
+            "День",
+            "Название дня",
+            "Упражнение",
+            "Подходы",
+            "Повторы",
+            "Отдых",
+            "Неделя",
+        ]
+    )
+    for week in range(1, 31):
+        writer.writerow(
+            [
+                "Тридцать недель",
+                "maintenance",
+                "beginner",
+                "1",
+                "Силовая 1",
+                "Приседания с собственным весом",
+                "3",
+                "8-12",
+                "90",
+                str(week),
+            ]
+        )
+    response = _upload(client, headers, "thirty-weeks.csv", output.getvalue().encode("utf-8"))
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["duration_weeks"] == 30
+    assert body["summary"]["blocking_issue_count"] == 0, body["issues"]
+    assert {row["week_number"] for row in body["rows"]} == set(range(1, 31))
+
+
+def test_sparse_enormous_week_import_is_bounded_and_rejected(client):
+    headers = _auth(client, 931131)
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerow(
+        [
+            "Название программы",
+            "Цель",
+            "Уровень",
+            "День",
+            "Название дня",
+            "Упражнение",
+            "Подходы",
+            "Повторы",
+            "Отдых",
+            "Неделя",
+        ]
+    )
+    writer.writerow(
+        [
+            "Разреженный план",
+            "maintenance",
+            "beginner",
+            "1",
+            "Силовая 1",
+            "Приседания с собственным весом",
+            "3",
+            "8-12",
+            "90",
+            "1000000000",
+        ]
+    )
+    response = _upload(client, headers, "sparse-week.csv", output.getvalue().encode("utf-8"))
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert len(body["rows"]) == 1
+    assert body["summary"]["blocking_issue_count"] > 0
+    assert "week_sequence" in {item["code"] for item in body["issues"]}
