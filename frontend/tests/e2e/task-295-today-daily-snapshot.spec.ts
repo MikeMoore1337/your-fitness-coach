@@ -433,10 +433,11 @@ test('Task 295 keeps Profile disclosures readable at narrow widths', async ({ pa
     await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
     const profile = page.locator('.profile-settings');
     const sections = profile.locator(':scope > details.card-disclosure');
-    await expect(sections).toHaveCount(5);
+    await expect(sections).toHaveCount(6);
     const expectedLabels = [
       'Личные данные и фитнес-профиль',
       'Тренировочные предпочтения',
+      'Профили оборудования',
       'Тренер и приглашения',
       'Уведомления',
       'Доступ и безопасность',

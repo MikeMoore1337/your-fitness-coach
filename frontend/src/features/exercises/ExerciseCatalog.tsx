@@ -61,7 +61,7 @@ export function ExerciseCatalog({
   const queryClient = useQueryClient();
   const { canMutateProfile } = useRuntimeCapabilities();
   const profileEnabled = !canAssign && !targetTelegramId && canMutateProfile;
-  const { active: activeProfile } = useEquipmentProfiles(profileEnabled);
+  const { active: activeProfile, query: profilesQuery } = useEquipmentProfiles(profileEnabled);
   const [availability, setAvailability] = useState<'available' | 'all'>('available');
   const [search, setSearch] = useState('');
   const [isCompactViewport, setIsCompactViewport] = useState(
@@ -605,21 +605,22 @@ export function ExerciseCatalog({
     </>
   );
 
-  const availabilityControls = profileEnabled && (
-    <div className="equipment-availability">
-      <EquipmentProfileSelect />
-      <EquipmentProfilesManager label="Управлять профилями" />
-      {activeProfile && (
-        <AvailabilityControl
-          value={availability}
-          onChange={(value) => {
-            setAvailability(value);
-            setVisibleLimit(PAGE_SIZE);
-          }}
-        />
-      )}
-    </div>
-  );
+  const availabilityControls = profileEnabled &&
+    (profilesQuery.isError || Boolean(profilesQuery.data?.profiles?.length)) && (
+      <div className="equipment-availability">
+        <EquipmentProfileSelect />
+        <EquipmentProfilesManager label="Управлять профилями" />
+        {activeProfile && (
+          <AvailabilityControl
+            value={availability}
+            onChange={(value) => {
+              setAvailability(value);
+              setVisibleLimit(PAGE_SIZE);
+            }}
+          />
+        )}
+      </div>
+    );
   const availabilityNotice = activeProfile && (
     <p className="muted">
       Свои упражнения и упражнения с неизвестным оборудованием остаются в списке с пометкой

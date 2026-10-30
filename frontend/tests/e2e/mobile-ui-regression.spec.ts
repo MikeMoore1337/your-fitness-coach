@@ -30,7 +30,7 @@ const screenshotOptions = {
   scale: 'css' as const,
 };
 
-const activeWorkoutScreenshotOptions = {
+const longSurfaceScreenshotOptions = {
   ...screenshotOptions,
   // The dock is covered by dedicated visibility/geometry assertions below. Hiding the fixed
   // chrome keeps its position from changing the clip of this intentionally tall component.
@@ -230,7 +230,7 @@ for (const theme of ['light', 'dark'] as const) {
       } else {
         await expect(page.locator(surface.locator)).toHaveScreenshot(
           `${surface.name}-390x844-${theme}.png`,
-          screenshotOptions,
+          surface.name === 'profile' ? longSurfaceScreenshotOptions : screenshotOptions,
         );
       }
     }
@@ -302,7 +302,7 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
     };
   });
   await expect(page).toHaveScreenshot('active-workout-390x844-dark.png', {
-    ...activeWorkoutScreenshotOptions,
+    ...longSurfaceScreenshotOptions,
     fullPage: true,
     clip: activeWorkoutClip,
   });

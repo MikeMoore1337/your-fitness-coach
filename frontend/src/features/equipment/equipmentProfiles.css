@@ -2,6 +2,11 @@
   width: min(100%, 680px);
   padding: 24px;
 }
+.equipment-profiles-card > summary h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-2);
+}
 .equipment-profiles__panel > .text-button + .text-button {
   margin-inline-start: 16px;
 }
@@ -176,6 +181,19 @@
   display: grid;
   gap: 10px;
   margin-block: 12px;
+}
+.exercise-picker-sheet--equipment {
+  min-height: 0;
+}
+.exercise-picker-sheet--equipment > .equipment-availability {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  gap: 4px;
+  margin-block: 0;
+}
+.exercise-picker-sheet--equipment > .exercise-picker__results {
+  flex: 1 0 96px;
 }
 .equipment-availability .ui-tab {
   flex: 1 1 0;

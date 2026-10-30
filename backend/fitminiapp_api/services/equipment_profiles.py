@@ -14,7 +14,7 @@ def equipment_profiles_state(profile: UserProfile | None) -> dict:
     if profile is None:
         return {"revision": 0, "active_profile_id": None, "profiles": []}
     return {
-        "revision": profile.equipment_profiles_revision,
+        "revision": profile.equipment_profiles_revision or 0,
         "active_profile_id": profile.active_equipment_profile_id,
         "profiles": list(profile.equipment_profiles or []),
     }
@@ -51,7 +51,8 @@ def save_equipment_profiles(db: Session, user: User, payload: EquipmentProfilesU
         profile = UserProfile(user_id=user.id, equipment_profiles=[], equipment_profiles_revision=0)
         db.add(profile)
         db.flush()
-    if profile.equipment_profiles_revision != payload.revision:
+    revision = profile.equipment_profiles_revision or 0
+    if revision != payload.revision:
         raise EquipmentProfilesConflict("Профили оборудования изменились. Обновите их и повторите.")
 
     existing_ids = {item["id"] for item in profile.equipment_profiles or []}
@@ -72,6 +73,6 @@ def save_equipment_profiles(db: Session, user: User, payload: EquipmentProfilesU
     ):
         profile.equipment_profiles = profiles
         profile.active_equipment_profile_id = active_id
-        profile.equipment_profiles_revision += 1
+        profile.equipment_profiles_revision = revision + 1
     db.commit()
     return equipment_profiles_state(profile)

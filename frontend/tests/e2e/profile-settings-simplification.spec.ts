@@ -47,7 +47,7 @@ test('desktop account entry stays available across primary sections and never op
   expect(Math.abs(themeBox!.height - logoutBox!.height)).toBeLessThanOrEqual(1);
 
   // The profile module is lazy-loaded; ensure all disclosures mounted first.
-  await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(5);
+  await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(6);
   const cardHeights = await page
     .locator('.profile-settings > details.card-disclosure')
     .evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
@@ -125,8 +125,16 @@ test('profile stays compact while disclosures, icons and shared provider actions
 
   const majorCards = page.locator('.profile-settings > details.card-disclosure');
   // Navigation renders before the lazily loaded profile; poll instead of reading zero early.
-  await expect(majorCards).toHaveCount(5);
+  await expect(majorCards).toHaveCount(6);
   for (const card of await majorCards.all()) await expect(card).not.toHaveAttribute('open');
+
+  const equipmentCard = page.locator('.equipment-profiles-card');
+  await expect(equipmentCard.locator('summary svg[data-icon="nav-plan"]')).toBeVisible();
+  await equipmentCard.locator('summary').press('Enter');
+  await expect(equipmentCard.getByRole('link', { name: 'Управлять профилями' })).toHaveAttribute(
+    'href',
+    '/app?section=profile&view=equipment',
+  );
 
   await page.goto('/app?section=profile#profile-fitness');
   const profileCard = page.locator('#profile-personal');
@@ -188,7 +196,7 @@ test('captures matching compact Profile state in light and dark themes', async (
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
       await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
-      await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(5);
+      await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(6);
       if (surface.hasTouch) {
         await expect(page.locator('.profile-identity')).not.toBeAttached();
         await expect(page.locator('.app-desktop-account-entry')).not.toBeVisible();

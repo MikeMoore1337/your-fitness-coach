@@ -117,7 +117,10 @@ test('CRUD, availability and unknown exercises remain visible', async ({ page })
   const api = await setup(page);
   await page.goto('/app?section=catalog');
   await expect(page.locator('.exercise-catalog-item')).toHaveCount(5);
-  await page.getByRole('link', { name: 'Управлять профилями' }).click();
+  await page.goto('/app?section=profile');
+  const profileCard = page.locator('.equipment-profiles-card');
+  await profileCard.locator('summary').click();
+  await profileCard.getByRole('link', { name: 'Управлять профилями' }).click();
   const dialog = page.locator('.equipment-profiles__panel');
   await dialog.getByRole('button', { name: 'Создать профиль' }).click();
   await page.getByLabel('Название профиля').fill('Дом');
@@ -214,6 +217,47 @@ test('program picker filters without changing the program draft', async ({ page 
   await expect(picker.locator('.exercise-picker__option')).toHaveCount(5);
   await picker.getByRole('button', { name: 'Закрыть выбор упражнения' }).click();
   await expect(builder.getByLabel('Название', { exact: true })).toHaveValue('Мой черновик');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('active profile controls fit the picker above the modeled mobile keyboard', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await setup(page, {
+    revision: 1,
+    active_profile_id: homeId,
+    profiles: [{ id: homeId, name: 'Дом', equipment_ids: ['dumbbell', 'bench'] }],
+  });
+  await page.goto('/app?section=programs&view=manage&start=create');
+  await page.locator('#program-builder .copy-editor__exercise').first().click();
+  await page
+    .getByRole('dialog', { name: 'Параметры упражнения' })
+    .getByRole('button', { name: 'Поиск упражнения' })
+    .click();
+  const picker = page.getByRole('dialog', { name: 'Выбор упражнения' });
+  const search = picker.getByRole('searchbox');
+  await search.fill('присед');
+  await page.evaluate(() => {
+    const viewport = window.visualViewport!;
+    Object.defineProperty(viewport, 'height', { configurable: true, value: 420 });
+    Object.defineProperty(viewport, 'offsetTop', { configurable: true, value: 48 });
+    viewport.dispatchEvent(new Event('resize'));
+  });
+  await expect(page.locator('html')).toHaveCSS('--yfc-viewport-height', '420px');
+  await expect
+    .poll(async () => {
+      const box = await picker.boundingBox();
+      return box ? box.y + box.height : Infinity;
+    })
+    .toBeLessThanOrEqual(468);
+  await expect(search).toBeFocused();
+  await expect(picker.getByRole('tab', { name: 'Доступное' })).toBeVisible();
+  const first = await picker.locator('.exercise-picker__option').first().boundingBox();
+  const results = await picker.locator('.exercise-picker__results').boundingBox();
+  expect(first).not.toBeNull();
+  expect(results).not.toBeNull();
+  expect(first!.y + first!.height).toBeLessThanOrEqual(results!.y + results!.height);
   await expectNoHorizontalOverflow(page);
 });
 

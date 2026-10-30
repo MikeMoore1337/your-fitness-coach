@@ -62,8 +62,15 @@ export function SearchableExercisePicker(props: PickerProps) {
 }
 
 function EquipmentAwarePicker(props: PickerProps) {
-  const { active } = useEquipmentProfiles();
-  return <ExercisePicker {...props} activeProfile={active} />;
+  const { active, query } = useEquipmentProfiles();
+  const showEquipmentControls = query.isError || Boolean(query.data?.profiles?.length);
+  return (
+    <ExercisePicker
+      {...props}
+      equipmentFilterEnabled={showEquipmentControls}
+      activeProfile={active}
+    />
+  );
 }
 
 function ExercisePicker({
@@ -341,7 +348,7 @@ function ExercisePicker({
               }}
             >
               <div
-                className="exercise-picker-sheet"
+                className={`exercise-picker-sheet${equipmentFilterEnabled ? ' exercise-picker-sheet--equipment' : ''}`}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Выбор упражнения"

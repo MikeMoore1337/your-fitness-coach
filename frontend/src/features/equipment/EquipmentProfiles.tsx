@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { ApiError } from '../../shared/api/client';
 import { equipmentLabels, localizedEquipmentList } from '../../shared/equipmentLabels';
 import { Card, SegmentedControl } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { AppLink } from '../../shared/navigation/router';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
@@ -343,7 +344,12 @@ export function EquipmentProfilesCard() {
   return (
     <Card
       className="equipment-profiles-card"
-      title="Профили оборудования"
+      family="neutral"
+      title={
+        <>
+          <Icon name="nav-plan" size={20} /> Профили оборудования
+        </>
+      }
       description="Сохраняйте наборы для поиска упражнений."
     >
       <EquipmentProfilesManager label="Управлять профилями" />

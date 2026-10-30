@@ -1344,7 +1344,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "body_priority": serialize_body_priority(profile),
                 "equipment_profiles": {
                     "active_profile_id": profile.active_equipment_profile_id,
-                    "profiles": profile.equipment_profiles,
+                    "profiles": profile.equipment_profiles or [],
                 },
                 "training_preferences": {
                     "preferred_duration_min": profile.preferred_workout_duration_min,
