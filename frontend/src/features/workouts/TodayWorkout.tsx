@@ -47,6 +47,7 @@ import {
 } from './restSessions';
 import { hasWorkoutExecutionEvidence, WorkoutAdaptation } from './WorkoutAdaptation';
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
+import { PreviousWorkoutNote } from './PreviousWorkoutNote';
 import { WorkoutRecovery } from './WorkoutRecovery';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
@@ -3062,6 +3063,8 @@ export function TodayWorkout({
             )}
           />
         )}
+
+        <PreviousWorkoutNote workoutId={data.id} />
 
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
