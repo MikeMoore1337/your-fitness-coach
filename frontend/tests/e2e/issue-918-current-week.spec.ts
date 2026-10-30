@@ -13,6 +13,11 @@ for (const theme of ['dark', 'light'] as const) {
         workoutStatus: 'in_progress',
         progressionOutcome: 'consider_progressing',
       });
+      await page.route('**/api/v1/programs/exercises/11/history', (route) =>
+        route.fulfill({
+          json: { recent_sessions: [{ sets: [{ pr_eligible: true, load_kg: 40, reps: 10 }] }] },
+        }),
+      );
       await page.goto('/app?section=today');
       const workout = await page.evaluate(
         async () => (await (await fetch('/api/v1/workouts/today')).json()) as Workout,
@@ -48,6 +53,7 @@ for (const theme of ['dark', 'light'] as const) {
       const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
       await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
       await expect(summary.locator('.progression-guidance')).toContainText('Тяжёлая неделя');
+      await expect(summary).toContainText('40 кг × 10');
       await expectNoHorizontalOverflow(page);
       if (process.env.YFC_CAPTURE_918) {
         await hero.screenshot({
