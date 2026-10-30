@@ -946,11 +946,24 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
           const timerSize = getComputedStyle(planned).fontSize;
           const actualSize = getComputedStyle(actual).fontSize;
           const actualFits = actual.scrollWidth <= actual.clientWidth + 1;
+          const plannedText = document.createRange();
+          plannedText.selectNodeContents(planned);
+          const plannedRight = plannedText.getBoundingClientRect().right;
+          const originalPlanned = planned.textContent;
+          // Exercise the maximum prescribed ten-minute rest at narrow widths.
+          planned.textContent = '10:00';
+          plannedText.selectNodeContents(planned);
+          const tenMinuteRight = plannedText.getBoundingClientRect().right;
+          const tenMinuteActualLeft = actualBlock.getBoundingClientRect().left;
+          planned.textContent = originalPlanned;
           const geometry = {
             timerSize,
             actualSize,
             actualFits,
-            plannedRight: planned.getBoundingClientRect().right,
+            plannedLeft: planned.getBoundingClientRect().left,
+            plannedRight,
+            tenMinuteRight,
+            tenMinuteActualLeft,
             statusLeft: status.getBoundingClientRect().left,
             actualLeft: actualBlock.getBoundingClientRect().left,
             actualRight: actualBlock.getBoundingClientRect().right,
@@ -961,7 +974,10 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
               document.documentElement.scrollWidth - document.documentElement.clientWidth,
             actions: Array.from(
               element.querySelectorAll<HTMLElement>('.active-workout-rest__actions button'),
-            ).map((button) => button.getBoundingClientRect().width),
+            ).map((button) => {
+              const box = button.getBoundingClientRect();
+              return { left: box.left, width: box.width };
+            }),
           };
           actual.textContent = original;
           return geometry;
@@ -971,13 +987,26 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
           `${width}px ${theme}: planned clock hierarchy`,
         ).toBeGreaterThanOrEqual(parseFloat(result.actualSize));
         expect(result.actualFits, `${width}px ${theme}: full hour format visible`).toBe(true);
-        expect(result.plannedRight).toBeLessThanOrEqual(result.actualLeft + 1);
+        expect(
+          result.actualLeft - result.plannedRight,
+          `${width}px ${theme}: clock separation`,
+        ).toBeGreaterThanOrEqual(15);
+        expect(
+          result.tenMinuteActualLeft - result.tenMinuteRight,
+          `${width}px ${theme}: ten-minute rest`,
+        ).toBeGreaterThanOrEqual(4);
         expect(result.actualRight).toBeLessThanOrEqual(result.statusLeft + 1);
         expect(result.stopRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.documentOverflow).toBeLessThanOrEqual(1);
         expect(result.actions).toHaveLength(4);
-        expect(result.actions.every((buttonWidth) => buttonWidth >= 44)).toBe(true);
+        expect(result.actions.every((button) => button.width >= 44)).toBe(true);
+        expect(Math.abs(result.plannedLeft - result.actions[0]!.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(result.actualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(2);
+        // Compare rendered pixels, not platform-specific fractional font metrics.
+        expect(
+          Math.round(Math.abs(result.tenMinuteActualLeft - result.actions[1]!.left)),
+        ).toBeLessThanOrEqual(8);
         await panel.screenshot({
           path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
           animations: 'disabled',
@@ -9022,6 +9051,25 @@ test.describe('#1338 v2 compact timer', () => {
             expect(control.height).toBeGreaterThanOrEqual(44);
             expect(control.left).toBeGreaterThanOrEqual(-1);
             expect(control.right).toBeGreaterThanOrEqual(-1);
+          }
+          if (state === 'completed' || state === 'skipped') {
+            await expect(panel.locator('.active-workout-rest__complete-mark')).toHaveCount(0);
+            const terminal = await panel.evaluate((element) => {
+              const copy = element.querySelector<HTMLElement>(
+                '.active-workout-rest__complete-copy',
+              )!;
+              const copyBox = copy.getBoundingClientRect();
+              const panelBox = element.getBoundingClientRect();
+              return {
+                copyOffset: (copyBox.top + copyBox.bottom - panelBox.top - panelBox.bottom) / 2,
+              };
+            });
+            if (state === 'skipped') {
+              expect(
+                Math.abs(terminal.copyOffset),
+                'skipped text vertical center',
+              ).toBeLessThanOrEqual(1);
+            }
           }
           expect(server.readSet(201)).toEqual(previousSet);
           expect(server.readSet(202)).toEqual(nextSet);

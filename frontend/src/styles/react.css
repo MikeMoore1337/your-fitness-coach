@@ -5867,6 +5867,11 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   gap: 1px;
   min-width: 0;
 }
+/* Match the first action's width without allowing a long clock to overlap. */
+.active-workout-rest__time {
+  flex: 0 0 calc(21.0526% - 1.6842px);
+  min-width: max-content;
+}
 .active-workout-rest__time > span,
 .active-workout-rest__actual-value > span {
   color: var(--v2-text-secondary);
@@ -5978,10 +5983,17 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   cursor: pointer;
 }
 .active-workout-rest__complete-copy {
-  grid-column: 2;
+  grid-column: 1 / -1;
   font: var(--font-weight-medium) var(--font-size-caption)/var(--line-height-tight) var(--font-body);
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+}
+.active-workout-rest__complete-mark ~ .active-workout-rest__complete-copy {
+  grid-column: 2;
+}
+/* A single status spans both grid rows when an alert icon is present. */
+.active-workout-rest__complete-mark + .active-workout-rest__complete-copy:last-child {
+  grid-row: 1 / span 2;
 }
 .active-workout-rest__complete-mark {
   display: grid;
@@ -5989,8 +6001,8 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   grid-column: 1;
   grid-row: 1 / span 2;
   width: 27px;
-  height: 32px;
-  border-radius: var(--radius-control);
+  height: 27px;
+  border-radius: 50%;
   background: var(--v2-success-surface);
   color: var(--v2-success-text);
 }

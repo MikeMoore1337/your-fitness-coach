@@ -2243,11 +2243,11 @@ export function RestTimer({
                     setRestDialog('sync');
                   }}
                 >
-                  <span className="active-workout-rest__complete-mark" aria-hidden="true">
-                    {hasPendingRest ||
+                  {(hasPendingRest ||
                     restSaveError ||
                     isOfflineRest ||
-                    terminalRestLabel.startsWith('Нет') ? (
+                    terminalRestLabel.startsWith('Нет')) && (
+                    <span className="active-workout-rest__complete-mark" aria-hidden="true">
                       <Icon
                         name={
                           restSaveError || isOfflineRest || terminalRestLabel.startsWith('Нет')
@@ -2256,12 +2256,8 @@ export function RestTimer({
                         }
                         size={16}
                       />
-                    ) : isSkippedLatestRest ? (
-                      <CloseIcon />
-                    ) : (
-                      <CheckIcon />
-                    )}
-                  </span>
+                    </span>
+                  )}
                   <span className="active-workout-rest__complete-copy">{terminalRestLabel}</span>
                   {isCompletedLatestRest && latestRest?.measured_seconds != null && (
                     <span className="active-workout-rest__complete-copy">
