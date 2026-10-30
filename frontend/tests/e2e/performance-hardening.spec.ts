@@ -304,6 +304,7 @@ test('Today initial queries settle without duplicate fetches', async ({ page }) 
     '/api/v1/nutrition/hydration',
     '/api/v1/public/config',
     '/api/v1/workouts/42/comments',
+    '/api/v1/workouts/42/previous-completion-note',
     '/api/v1/workouts/cardio',
     '/api/v1/workouts/progress/summary',
     '/api/v1/workouts/recovery',

@@ -1,0 +1,49 @@
+.previous-workout-note {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.previous-workout-note > summary {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.previous-workout-note__heading {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.previous-workout-note__heading strong {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-strong);
+  line-height: 1.3;
+}
+
+.previous-workout-note__heading small {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.previous-workout-note > summary > .yfc-icon {
+  flex: 0 0 auto;
+}
+
+.previous-workout-note[open] > summary > .yfc-icon {
+  transform: rotate(180deg);
+}
+
+.previous-workout-note > p {
+  margin: 10px 0 0;
+  font-size: var(--font-size-body);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

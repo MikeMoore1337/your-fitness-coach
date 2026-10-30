@@ -26,6 +26,7 @@ import {
 import { WorkoutAdaptation } from '../workouts/WorkoutAdaptation';
 import { WorkoutRecovery } from '../workouts/WorkoutRecovery';
 import { TodayWorkout } from '../workouts/TodayWorkout';
+import { PreviousWorkoutNote } from '../workouts/PreviousWorkoutNote';
 import { Badge, Button, SemanticCard, Skeleton } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
@@ -1301,6 +1302,12 @@ export function TodayDashboard({
   }, [queryClient, timeZone, today]);
 
   const workoutFailed = Boolean(workout.error && !noTodayWorkout && !visibleWorkout);
+  const previousNoteWorkoutId =
+    selectedDate === today &&
+    visibleWorkout &&
+    (visibleWorkout.status === 'planned' || visibleWorkout.status === 'in_progress')
+      ? visibleWorkout.id
+      : null;
   const priorityContextLoading = Boolean(
     !visibleWorkout &&
     user?.has_active_program &&
@@ -1440,6 +1447,10 @@ export function TodayDashboard({
               />
             )}
           </section>
+
+          {previousNoteWorkoutId !== null && (
+            <PreviousWorkoutNote workoutId={previousNoteWorkoutId} />
+          )}
 
           {selectedDate === today &&
             recovery.data?.status === 'missed' &&
