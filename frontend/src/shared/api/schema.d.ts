@@ -3360,6 +3360,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/{workout_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Copy Completed Workout */
+        get: operations["copy_completed_workout_api_v1_workouts__workout_id__copy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/rest-sessions": {
         parameters: {
             query?: never;
@@ -18215,6 +18232,61 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /** WorkoutCopyExercise */
+        WorkoutCopyExercise: {
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /** Sort Order */
+            sort_order: number;
+            /** Sets */
+            sets: components["schemas"]["WorkoutCopySet"][];
+        };
+        /** WorkoutCopyResponse */
+        WorkoutCopyResponse: {
+            /** Title */
+            title: string;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Exercises */
+            exercises: components["schemas"]["WorkoutCopyExercise"][];
+        };
+        /** WorkoutCopySet */
+        WorkoutCopySet: {
+            /** Set Number */
+            set_number: number;
+            /** Actual Reps */
+            actual_reps?: number | null;
+            /** Actual Weight */
+            actual_weight?: number | null;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Distance Km */
+            distance_km?: number | null;
+            /** Average Heart Rate Bpm */
+            average_heart_rate_bpm?: number | null;
+            /** Heart Rate Zone */
+            heart_rate_zone?: number | null;
+            /** Set Kind */
+            set_kind?: ("warmup" | "working" | "drop") | null;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /**
+             * Is Completed
+             * @default true
+             * @constant
+             */
+            is_completed: true;
+        };
         /** WorkoutExerciseItem */
         WorkoutExerciseItem: {
             /** Id */
@@ -25802,6 +25874,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_completed_workout_api_v1_workouts__workout_id__copy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutCopyResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

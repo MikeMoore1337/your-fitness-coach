@@ -21,6 +21,7 @@ import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
+import { WorkoutCopyButton } from './WorkoutCopyButton';
 
 interface RestHistoryEntry {
   id: number;
@@ -276,8 +277,11 @@ export function WorkoutHistory({
                         Изменено перед тренировкой: {adaptationReasonLabels[adaptation.reason]}
                       </p>
                     ))}
+                    {!readOnly && (
+                      <WorkoutCopyButton workoutId={item.id} workoutTitle={item.title} />
+                    )}
                     {(item.completion_feedback || item.completion_note) && (
-                      <div className="workout-completion-context">
+                      <div className={`workout-completion-context${readOnly ? '' : ' top-gap'}`}>
                         {item.completion_feedback && (
                           <strong>
                             Самооценка: {workoutCompletionFeedbackLabels[item.completion_feedback]}
