@@ -148,6 +148,9 @@ class UserProfile(Base):
     training_location_profiles: Mapped[list[dict]] = mapped_column(
         JSON, nullable=False, default=list, server_default=text("'[]'")
     )
+    equipment_profiles: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    active_equipment_profile_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    equipment_profiles_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     preferred_exercise_ids: Mapped[list[int]] = mapped_column(
         JSON, nullable=False, default=list, server_default=text("'[]'")
     )

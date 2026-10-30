@@ -1087,6 +1087,7 @@ class ExerciseCatalogItem(BaseModel):
     primary_muscle_ids: list[str]
     secondary_muscle_ids: list[str]
     equipment_ids: list[str]
+    required_equipment_ids: list[str] | None = None
     aliases: list[str] = Field(default_factory=list)
     movement_pattern: ExerciseMovementPattern | None = None
     machine_variant_tags: list[ExerciseMachineVariantTag] = Field(default_factory=list)

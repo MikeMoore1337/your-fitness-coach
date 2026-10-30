@@ -1000,6 +1000,7 @@ def test_exercise_domain_seed_is_idempotent() -> None:
             "alternatives": session.query(ExerciseAlternative).count(),
             "guides": session.query(ExerciseGuideMetadata).count(),
         }
+        equipment_ids = {item.identifier for item in session.query(Equipment).all()}
         seed_demo_data(session, include_demo_users=False)
         after = {
             "muscles": session.query(Muscle).count(),
@@ -1011,7 +1012,8 @@ def test_exercise_domain_seed_is_idempotent() -> None:
         }
     assert before == after
     assert before["muscles"] == 26
-    assert before["equipment"] == 9
+    assert before["equipment"] == 12
+    assert {"rack", "pullup_bar", "dip_bars"}.issubset(equipment_ids)
     assert before["alternatives"] > 0
 
 

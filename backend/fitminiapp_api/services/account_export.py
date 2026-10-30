@@ -1342,6 +1342,10 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "cardio_trainings_per_week": profile.cardio_trainings_per_week,
                 "resting_heart_rate": profile.resting_heart_rate,
                 "body_priority": serialize_body_priority(profile),
+                "equipment_profiles": {
+                    "active_profile_id": profile.active_equipment_profile_id,
+                    "profiles": profile.equipment_profiles or [],
+                },
                 "training_preferences": {
                     "preferred_duration_min": profile.preferred_workout_duration_min,
                     "preferred_duration_max": profile.preferred_workout_duration_max,

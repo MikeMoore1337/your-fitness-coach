@@ -1327,6 +1327,9 @@ export async function installPlatformApi(
     const url = new URL(request.url());
     const path = url.pathname;
     if (offline && !path.endsWith('/public/config')) return route.abort('internetdisconnected');
+    if (path.endsWith('/me/equipment-profiles')) {
+      return route.fulfill({ json: { revision: 0, active_profile_id: null, profiles: [] } });
+    }
     if (path.endsWith('/public/config')) {
       return route.fulfill({
         json: {

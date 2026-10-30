@@ -25,6 +25,10 @@ from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.schemas.acquisition import FirstTouchAttributionRequest
+from fitminiapp_api.schemas.equipment_profiles import (
+    EquipmentProfilesResponse,
+    EquipmentProfilesUpdate,
+)
 from fitminiapp_api.schemas.exercise_setup import (
     ExerciseSetupMemoryResponse,
     ExerciseSetupMemorySaveRequest,
@@ -93,6 +97,11 @@ from fitminiapp_api.services.coach_clients import (
     get_current_trainer,
     preview_coach_invite_link,
     remove_current_trainer,
+)
+from fitminiapp_api.services.equipment_profiles import (
+    EquipmentProfilesConflict,
+    equipment_profiles_state,
+    save_equipment_profiles,
 )
 from fitminiapp_api.services.exercise_domain import BODY_PRIORITY_TAXONOMY
 from fitminiapp_api.services.exercise_setup_memory import (
@@ -298,6 +307,27 @@ def _build_user_response(db: Session, user) -> UserResponse:
 @router.get("", response_model=UserResponse)
 def read_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
     return _build_user_response(db, user)
+
+
+@router.get("/equipment-profiles", response_model=EquipmentProfilesResponse)
+def read_equipment_profiles(user: User = Depends(get_current_user)) -> dict:
+    return equipment_profiles_state(user.profile)
+
+
+@router.put("/equipment-profiles", response_model=EquipmentProfilesResponse)
+def replace_equipment_profiles(
+    payload: EquipmentProfilesUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        return save_equipment_profiles(db, user, payload)
+    except EquipmentProfilesConflict as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/acquisition", status_code=status.HTTP_204_NO_CONTENT)
