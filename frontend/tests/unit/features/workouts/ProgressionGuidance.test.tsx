@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Workout } from '../../../../src/shared/api/types';
 import { ProgressionGuidance } from '../../../../src/features/workouts/ProgressionGuidance';
@@ -127,6 +127,127 @@ describe('ProgressionGuidance', () => {
     expect(screen.queryByRole('button', { name: /Применить/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Оставить текущую нагрузку' }));
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it('shows the selected week type, comparable facts and actual proposal evidence', () => {
+    render(
+      <ProgressionGuidance
+        exerciseKey={102}
+        guidance={guidance({
+          ruleset_version: 'progression-guidance-v3',
+          evidence: { ...guidance().evidence, week_type: 'heavy' },
+          proposal: proposal(
+            'double_progression',
+            {},
+            {
+              proposed_weight: 42.5,
+              reason_codes: ['top_range_repeated'],
+              source_evidence_ids: ['workout:31/set:20'],
+            },
+          ),
+        })}
+        onApply={() => undefined}
+        onDismiss={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('Следующая нагрузка · Тяжёлая неделя')).toBeVisible();
+    expect(screen.getByText('Можно рассмотреть увеличение до 42,5 кг')).toBeVisible();
+    expect(screen.getByText('Прошлая сопоставимая: 40 кг × 10 · 17 августа')).toBeVisible();
+    fireEvent.click(screen.getByText('Почему такой вес?'));
+    expect(screen.getByText('Источники: workout:31/set:20')).toBeVisible();
+    expect(screen.getByText('Причины: top_range_repeated')).toBeVisible();
+    expect(screen.getByText('Версия правила: progression-guidance-v3')).toBeVisible();
+  });
+
+  it('explains missing same-type history without a proposed load', () => {
+    render(
+      <ProgressionGuidance
+        exerciseKey={103}
+        guidance={guidance({
+          ruleset_version: 'progression-guidance-v3',
+          outcome: 'review',
+          suggested_weight: null,
+          evidence: {
+            ...guidance().evidence,
+            week_type: 'light',
+            comparable_session_count: 0,
+            sessions: [],
+            reason_keys: ['insufficient_same_type_history'],
+          },
+          proposal: proposal(
+            'double_progression',
+            {},
+            {
+              reason_codes: ['insufficient_same_type_history'],
+              source_evidence_ids: [],
+            },
+          ),
+        })}
+        onApply={() => undefined}
+        onDismiss={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('Следующая нагрузка · Лёгкая неделя')).toBeVisible();
+    expect(screen.getByText('Сопоставимых тренировок пока нет.')).toBeVisible();
+    expect(screen.getByText(/нужны полные сопоставимые тренировки лёгкого типа/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Применить/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Почему такой вес?'));
+    expect(screen.queryByText(/Источники:/)).not.toBeInTheDocument();
+    expect(screen.getByText('Причины: insufficient_same_type_history')).toBeVisible();
+  });
+
+  it('describes incomplete comparable facts without fabricating a weight', () => {
+    const original = guidance();
+    render(
+      <ProgressionGuidance
+        exerciseKey={103}
+        guidance={guidance({
+          ruleset_version: 'progression-guidance-v3',
+          outcome: 'review',
+          suggested_weight: null,
+          evidence: {
+            ...original.evidence,
+            week_type: 'heavy',
+            reason_keys: ['incomplete_session_facts'],
+            sessions: [{ ...original.evidence.sessions[0]!, load: null }],
+          },
+        })}
+        onApply={() => undefined}
+        onDismiss={() => undefined}
+      />,
+    );
+    expect(
+      screen.getByText(/Прошлая сопоставимая: .*нагрузка неполная · 10 повторов/),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Применить/ })).not.toBeInTheDocument();
+  });
+
+  it('allows another explicit attempt after an asynchronous conflict', async () => {
+    let rejectAttempt: (reason: Error) => void = () => undefined;
+    const onApply = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => (rejectAttempt = reject)))
+      .mockResolvedValueOnce(undefined);
+    render(
+      <ProgressionGuidance
+        exerciseKey={104}
+        guidance={guidance()}
+        onApply={onApply}
+        onDismiss={() => undefined}
+      />,
+    );
+
+    const apply = screen.getByRole('button', { name: 'Применить 42,5 кг' });
+    fireEvent.click(apply);
+    fireEvent.click(apply);
+    expect(onApply).toHaveBeenCalledTimes(1);
+    rejectAttempt(new Error('409'));
+    await waitFor(() => {
+      fireEvent.click(apply);
+      expect(onApply).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('explains the stored rule and prefers the proposal load', () => {

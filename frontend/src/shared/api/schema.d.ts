@@ -3135,6 +3135,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/progress/training-analytics/week-type": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workout Week Type Training Analytics */
+        get: operations["workout_week_type_training_analytics_api_v1_workouts_progress_training_analytics_week_type_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/set-history": {
         parameters: {
             query?: never;
@@ -15908,6 +15925,8 @@ export interface components {
         };
         /** ProgressionEvidence */
         ProgressionEvidence: {
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
             /** Target Reps Min */
             target_reps_min?: number | null;
             /** Target Reps Max */
@@ -15931,9 +15950,9 @@ export interface components {
         ProgressionGuidance: {
             /**
              * Ruleset Version
-             * @constant
+             * @enum {string}
              */
-            ruleset_version: "progression-guidance-v2";
+            ruleset_version: "progression-guidance-v2" | "progression-guidance-v3";
             /**
              * Outcome
              * @enum {string}
@@ -17795,6 +17814,40 @@ export interface components {
              * @constant
              */
             status: "registered";
+        };
+        /** WeekTypeTrainingAnalyticsResponse */
+        WeekTypeTrainingAnalyticsResponse: {
+            /**
+             * Week Type
+             * @enum {string}
+             */
+            week_type: "light" | "medium" | "heavy";
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Exercise History Limit */
+            exercise_history_limit: number;
+            /** Completed Workout Count */
+            completed_workout_count: number;
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** External Load Volume Kg */
+            external_load_volume_kg?: number | null;
+            /** Volume Recorded Sets */
+            volume_recorded_sets: number;
+            /** Untyped Workout Count */
+            untyped_workout_count: number;
+            /** Unknown Type Workout Count */
+            unknown_type_workout_count: number;
+            /** Exercises */
+            exercises: components["schemas"]["ExerciseTrainingProgression"][];
         };
         /** WeeklyCheckInAdaptiveSummary */
         WeeklyCheckInAdaptiveSummary: {
@@ -25690,6 +25743,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrainingAnalyticsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workout_week_type_training_analytics_api_v1_workouts_progress_training_analytics_week_type_get: {
+        parameters: {
+            query: {
+                week_type: "light" | "medium" | "heavy";
+                period_days?: components["schemas"]["ProgressPeriodDays"] | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                exercise_history_limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeekTypeTrainingAnalyticsResponse"];
                 };
             };
             /** @description Validation Error */
