@@ -1642,7 +1642,7 @@ details:not([open]) > :not(summary) {
 }
 .program-wizard-result__facts > div {
   padding: 14px;
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--border);
   background: var(--surface-subtle);
 }
 .program-wizard-result__facts ul {
