@@ -37,4 +37,86 @@ document.querySelector('#sets').innerHTML=(state==='warmup'?row(1,true):'')+[1,2
 document.querySelector('.theme').addEventListener('click',()=>document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark');document.querySelectorAll('.rir button').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('.rir button').forEach(x=>x.setAttribute('aria-pressed','false'));button.setAttribute('aria-pressed','true')}));
 document.querySelectorAll('.fields input').forEach(input=>input.addEventListener('input',()=>input.value=input.value.replace(/[^\d.,]/g,'')));document.querySelector('.keys').innerHTML=['1','2','3','4','5','6','7','8','9',',','0','Удалить'].map(x=>`<button>${x}</button>`).join('');document.querySelectorAll('.keys button').forEach(button=>button.addEventListener('pointerdown',event=>{event.preventDefault();const input=document.querySelector('.current input');input.value=button.textContent==='Удалить'?input.value.slice(0,-1):input.value+button.textContent;input.focus({preventScroll:true})}));
 window.prototypeReady=document.fonts.ready.then(()=>{const card=document.querySelector('.current');const input=card.querySelector('input');if(['focus','keyboard'].includes(state))input.focus({preventScroll:true});const target=state==='keyboard'?input:card;const offset=state==='keyboard'?Math.max(80,innerHeight-278-document.querySelector('.rest').offsetHeight-(concept==='c'?390:270)):90;window.scrollBy(0,target.getBoundingClientRect().top-offset)});
+</script>
+<script>
+  (() => {
+    const option = params.get('reuse');
+    if (concept !== 'b' || !['stack', 'inline', 'split'].includes(option)) return;
+    window.prototypeReady = window.prototypeReady.then(() => {
+      document.body.classList.add('reuse-option-active');
+      const current = document.querySelector('.set.current');
+      const history = current.querySelector('.history');
+      const today = history.querySelector('.today .value strong');
+      const past = history.querySelector('.past .value strong');
+      const inputs = [...current.querySelectorAll('.fields input')];
+
+      function values(element) {
+        const match = element.textContent.match(/^([\d.,]+) кг × (\d+)$/);
+        return match ? [match[1], match[2]] : null;
+      }
+
+      function button(label, accessibleLabel, source) {
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.textContent = label;
+        control.setAttribute('aria-label', accessibleLabel);
+        control.addEventListener('click', () => {
+          source?.forEach((value, index) => {
+            if (!inputs[index].value) {
+              inputs[index].value = value;
+              inputs[index].dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          });
+          update();
+        });
+        return control;
+      }
+
+      const todayValues = values(today);
+      const pastValues = values(past);
+      const todayButton = button(
+        option === 'split' ? 'Подставить: сегодня' : 'Подставить предыдущий подход сегодня',
+        'Подставить вес и повторы предыдущего подхода сегодня',
+        todayValues,
+      );
+      const pastButton = button(
+        option === 'inline' ? 'Подставить' : option === 'split' ? 'Подставить: прошлую тренировку' : 'Подставить из прошлой тренировки',
+        'Подставить вес и повторы этого подхода из прошлой тренировки',
+        pastValues,
+      );
+      const actions = document.createElement('div');
+      actions.className = `prefill-actions reuse-${option}`;
+      actions.append(todayButton);
+      if (option === 'inline') {
+        pastButton.className = 'history-reuse';
+        const pastValue = history.querySelector('.past .value');
+        pastValue.classList.add('has-history-reuse');
+        pastValue.append(pastButton);
+      } else {
+        actions.append(pastButton);
+      }
+      current.querySelector('.prefill-actions')?.remove();
+      current.querySelector('.done').after(actions);
+
+      function update() {
+        const hasEmptyField = inputs.some(input => !input.value);
+        todayButton.disabled = !todayValues || !hasEmptyField;
+        pastButton.disabled = !pastValues || !hasEmptyField;
+      }
+      inputs.forEach(input => input.addEventListener('input', update));
+      update();
+
+      const styles = document.createElement('style');
+      styles.textContent = `
+        .reuse-option-active .prefill-actions button:last-child{background:var(--v2-surface-secondary);color:var(--v2-text-primary);border:1px solid var(--v2-border)}
+        .prefill-actions.reuse-split{grid-template-columns:repeat(2,minmax(0,1fr))}
+        .prefill-actions.reuse-split button{padding:6px;line-height:1.25}
+        .b .history .past .value.has-history-reuse{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+        .history-reuse{min-height:44px;padding:6px 10px;border:1px solid var(--v2-border);border-radius:12px;background:var(--v2-surface-secondary);color:var(--v2-text-primary);font-size:12px;font-weight:600}
+        .prefill-actions button:disabled,.history-reuse:disabled{opacity:.55;cursor:not-allowed}
+      `;
+      document.head.append(styles);
+      document.querySelector('#concept-name').textContent = 'B · подстановка результата';
+    });
+  })();
 </script></body></html>
