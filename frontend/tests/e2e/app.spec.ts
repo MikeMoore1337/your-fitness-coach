@@ -3281,6 +3281,154 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(page.locator('.exercise-lightbox')).toHaveCount(0);
 });
 
+for (const width of [360, 390, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#1335 проверенное предложение: ${width}px ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockApi(page);
+      const inputs = {
+        goal: 'strength',
+        experience: 'beginner',
+        days_per_week: 3,
+        preferred_session_duration_minutes: 60,
+        training_location: 'home',
+        available_equipment_ids: ['bodyweight', 'barbell', 'bench'],
+        priority_muscle_ids: [],
+        preferred_exercise_ids: [],
+        excluded_exercise_ids: [],
+      };
+      const source = {
+        template_id: 10,
+        slug: 'stronglifts-5x5',
+        title: 'StrongLifts 5x5',
+        goal: 'strength',
+        level: 'beginner',
+        split_type: 'full_body',
+        provenance_type: 'SOURCE_ADAPTATION',
+      };
+      const calls: Record<string, unknown>[] = [];
+      let confirmCalls = 0;
+      await page.route('**/api/v1/programs/generator/**', async (route) => {
+        if (route.request().url().endsWith('/confirm')) {
+          confirmCalls++;
+          return route.fulfill({ status: 400, json: { detail: 'Подтверждение не запрошено' } });
+        }
+        calls.push(route.request().postDataJSON());
+        if (calls.length === 1)
+          return route.fulfill({
+            json: {
+              status: 'no_compatible',
+              selection_policy_version: 'program_generator_v2',
+              input_fingerprint: 'initial',
+              message: 'Для программы «StrongLifts 5x5»: частота занятий отличается от выбранной.',
+              reason_codes: ['frequency_not_supported'],
+              suggestions: [
+                {
+                  source,
+                  inputs,
+                  changes: [
+                    'Цель: рекомпозиция → развитие силы.',
+                    'Занятий в неделю: 2 → 3.',
+                    'Понадобится дополнительно: штанга, скамья.',
+                  ],
+                },
+              ],
+            },
+          });
+        expect(calls[1]).toEqual(inputs);
+        return route.fulfill({
+          json: {
+            status: 'preview',
+            selection_policy_version: 'program_generator_v2',
+            input_fingerprint: 'rechecked',
+            draft_token: 'synthetic-checked-token',
+            message: 'Предпросмотр готов.',
+            source,
+            program: {
+              title: 'StrongLifts 5x5',
+              goal: 'strength',
+              level: 'beginner',
+              days_per_week: 3,
+              estimated_duration_minutes: 60,
+              days: [1, 2].map((day) => ({
+                day_number: day,
+                title: `Тренировка ${day}`,
+                estimated_duration_minutes: 60,
+                exercises: [
+                  {
+                    exercise_id: 1,
+                    source_exercise_id: 1,
+                    exercise_title: 'Приседание',
+                    metric_type: 'strength',
+                    prescribed_sets: 5,
+                    prescribed_reps: '5',
+                    rest_seconds: 150,
+                  },
+                ],
+              })),
+            },
+            fit_reasons: ['Три занятия в неделю с непрерывным чередованием.'],
+            tradeoffs: [],
+            adaptations: [],
+            suggestions: [],
+          },
+        });
+      });
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await openAppDestination(page, 'План');
+      await page.getByRole('link', { name: 'Управление программой', exact: true }).click();
+      await page
+        .getByRole('navigation', { name: 'Управление программой' })
+        .getByRole('button', { name: /Заменить программу/ })
+        .click();
+      await page.getByRole('button', { name: 'Подобрать программу', exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('radio', { name: /Рекомпозиция/ }).check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.getByRole('radio', { name: /Начинаю или возвращаюсь/ }).check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.locator('input[name="generator-frequency"][value="2"]').check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.getByRole('radio', { name: /60 минут/ }).check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.getByRole('radio', { name: /Дома/ }).check();
+      await expect(dialog.getByText(/Инвентарь не отмечен/)).toBeVisible();
+      await dialog.getByRole('button', { name: 'Показать программу' }).click();
+      const apply = dialog.getByRole('button', { name: 'Применить предложенное изменение' });
+      await expect(apply).toBeVisible();
+      expect(calls).toHaveLength(1);
+      expect(confirmCalls).toBe(0);
+      await expect(dialog.getByText('Цель: рекомпозиция → развитие силы.')).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Подтвердить программу' })).toHaveCount(0);
+      const panel = dialog.locator('.program-wizard__panel');
+      expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+      await page.screenshot({ path: testInfo.outputPath(`suggestion-${width}-${theme}.png`) });
+      await apply.focus();
+      await page.keyboard.press('Enter');
+      await expect(dialog.getByText('3 занятий в неделю; 2 разных тренировок')).toBeVisible();
+      expect(calls).toHaveLength(2);
+      expect(confirmCalls).toBe(0);
+      await expect(panel).toBeFocused();
+      expect(await dialog.innerText()).not.toMatch(/source-backed|draft|lifecycle|\bpreview\b/);
+      await page.setViewportSize({ width, height: 600 });
+      const confirm = dialog.getByRole('button', { name: 'Подтвердить программу' });
+      await confirm.scrollIntoViewIfNeeded();
+      await expect(confirm).toBeInViewport();
+      expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+      await page.screenshot({ path: testInfo.outputPath(`preview-${width}-${theme}.png`) });
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+    });
+  }
+}
+
 test('детерминированный подбор проходит preview, no-compatible и explicit confirm', async ({
   page,
 }) => {
@@ -3297,9 +3445,9 @@ test('детерминированный подбор проходит preview, 
         return route.fulfill({
           json: {
             status: 'no_compatible',
-            selection_policy_version: 'program_generator_v1',
+            selection_policy_version: 'program_generator_v2',
             input_fingerprint: 'preview-no-compatible',
-            message: 'Не удалось подобрать программу под все выбранные ограничения.',
+            message: 'Для программы «Всё тело»: длительность несовместима с выбранным временем.',
             reason_codes: ['duration_incompatible', 'equipment_no_canonical_substitution'],
             fit_reasons: [],
             tradeoffs: [],
@@ -3312,7 +3460,7 @@ test('детерминированный подбор проходит preview, 
       return route.fulfill({
         json: {
           status: 'preview',
-          selection_policy_version: 'program_generator_v1',
+          selection_policy_version: 'program_generator_v2',
           input_fingerprint: 'preview-1',
           message:
             'Предпросмотр готов. Программа будет сохранена только после явного подтверждения.',
@@ -3328,6 +3476,7 @@ test('детерминированный подбор проходит preview, 
           },
           program: {
             title: 'Подобранная программа · Каноническая программа на всё тело',
+            days_per_week: 3,
             goal: 'recomposition',
             level: 'beginner',
             split_type: 'full_body',
@@ -3464,7 +3613,7 @@ test('детерминированный подбор проходит preview, 
   await page.getByRole('button', { name: 'Далее' }).click();
   await page.getByRole('radio', { name: /Тренажёрный зал/ }).check();
   await page.getByRole('checkbox', { name: 'Гантели' }).check();
-  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Показать программу' }).click();
 
   const result = page.getByRole('dialog', { name: 'Предпросмотр программы' });
   await expect(result.getByRole('heading', { name: /Подобранная программа/ })).toBeVisible();
@@ -3490,9 +3639,9 @@ test('детерминированный подбор проходит preview, 
     path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-preview-desktop.png',
   });
 
-  await result.getByRole('button', { name: 'Изменить параметры' }).click();
+  await result.getByRole('button', { name: 'Изменить ответы' }).click();
   noCompatiblePreview = true;
-  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Показать программу' }).click();
   await expect(page.getByText('Совместимый вариант не найден')).toBeVisible();
   await expect(page.getByText(/длительность несовместима/i)).toBeVisible();
   await page.screenshot({
@@ -3500,8 +3649,8 @@ test('детерминированный подбор проходит preview, 
   });
 
   noCompatiblePreview = false;
-  await page.getByRole('button', { name: 'Изменить параметры' }).click();
-  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Изменить ответы' }).click();
+  await page.getByRole('button', { name: 'Показать программу' }).click();
   await page.getByRole('button', { name: 'Подтвердить программу' }).click();
   await expect(page.getByRole('heading', { name: 'Программа подтверждена' })).toBeVisible();
   expect(confirmPayload).toMatchObject({
@@ -3546,7 +3695,7 @@ test('клиент собирает и проверяет личную прог�
   await expect(builder.getByText('Настройки программы', { exact: true })).toBeVisible();
   await expect(builder.getByRole('combobox', { name: 'Цель', exact: true })).toBeHidden();
   const settings = builder.locator('.program-builder-settings');
-  await settings.locator('summary').click();
+  await settings.locator(':scope > summary').click();
   const goal = builder.getByRole('combobox', { name: 'Цель', exact: true });
   await goal.selectOption('recomposition');
   await expect(goal).toHaveValue('recomposition');
@@ -3555,7 +3704,7 @@ test('клиент собирает и проверяет личную прог�
   await duration.fill('2');
   await expect(duration).toHaveValue('2');
   await duration.fill('1');
-  await settings.locator('summary').click();
+  await settings.locator(':scope > summary').click();
   await expect(goal).toBeHidden();
 
   await builder.locator('.copy-editor__exercise').first().click();

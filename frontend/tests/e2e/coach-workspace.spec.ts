@@ -2611,11 +2611,16 @@ test('mobile использует список и отдельный конте�
 
   await page.locator('#coach-client-program > summary').click();
   await page.getByText('Назначить новую программу').click();
-  await expect(page.getByRole('heading', { name: 'Добавьте упражнения' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Тренировочные дни' })).toBeVisible();
   const editor = page.locator('.copy-editor');
   await expect(editor).toBeVisible();
   const dayInput = editor.getByRole('textbox', { name: 'Название дня' });
   await expect(dayInput).toHaveValue('Тренировка 1');
+  const dayManagement = editor.locator('.copy-editor__day-actions');
+  await expect(dayManagement).not.toHaveAttribute('open', '');
+  await dayManagement.locator('summary').click();
+  await expect(dayManagement.getByRole('button', { name: 'Дублировать день' })).toBeVisible();
+  await dayManagement.locator('summary').click();
   await expect(editor.getByRole('button', { name: 'Переместить день выше' })).toHaveCount(0);
   await expect(editor.getByRole('button', { name: 'Переместить день ниже' })).toHaveCount(0);
   await editor.getByRole('button', { name: 'Все дни' }).click();

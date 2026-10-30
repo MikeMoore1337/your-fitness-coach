@@ -456,8 +456,8 @@ describe('ProgramBuilder type-aware prescription', () => {
     emulateMobileEditorViewport();
     renderBuilder({ editingTemplate: activeTemplate });
     await screen.findByRole('button', { name: 'Предыдущий день' });
-    expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Следующий день' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Предыдущий день' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Изменить порядок дней' })).not.toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Все дни' }));
     expect(
@@ -465,6 +465,66 @@ describe('ProgramBuilder type-aware prescription', () => {
         name: 'Изменить порядок',
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it('показывает единственную настройку программы без дублирующей кнопки', async () => {
+    renderBuilder();
+    await screen.findByText('Настройки программы', { exact: true });
+    expect(screen.queryByRole('button', { name: 'Настройки и расписание' })).toBeNull();
+    const optional = screen.getByText('Дополнительно', { exact: true }).closest('details');
+    expect(optional).not.toBeNull();
+    expect(optional).not.toHaveAttribute('open');
+  });
+
+  it('открывает отдельный экран настроек, сохраняет черновик и не отправляет запрос', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await screen.findByText('Настройки программы', { exact: true });
+    await user.clear(screen.getByRole('textbox', { name: 'Название' }));
+    await user.type(screen.getByRole('textbox', { name: 'Название' }), 'Мой черновик');
+    await user.click(screen.getByText('Настройки программы', { exact: true }));
+    expect(screen.queryByRole('textbox', { name: 'Название' })).toBeNull();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Цель' }), 'muscle_gain');
+    await user.clear(screen.getByRole('spinbutton', { name: 'Длительность, недель' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Длительность, недель' }), '3');
+    await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }));
+    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue('Мой черновик');
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates', expect.anything());
+    await user.click(screen.getByText('Настройки программы', { exact: true }));
+    expect(screen.getByRole('combobox', { name: 'Цель' })).toHaveValue('muscle_gain');
+    expect(screen.getByRole('spinbutton', { name: 'Длительность, недель' })).toHaveValue(3);
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('textbox', { name: 'Название' })).toHaveValue('Мой черновик');
+  });
+
+  it('не закрывает настройки с недопустимой длительностью', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    await user.click(await screen.findByText('Настройки программы', { exact: true }));
+    const weeks = screen.getByRole('spinbutton', { name: 'Длительность, недель' });
+    await user.clear(weeks);
+    await user.type(weeks, '0');
+    expect(screen.getByRole('button', { name: 'Сохранить настройки' })).toBeDisabled();
+    await user.clear(weeks);
+    await user.type(weeks, '4');
+    expect(screen.getByRole('button', { name: 'Сохранить настройки' })).toBeEnabled();
+  });
+
+  it('копирует день без общих ссылок и не показывает стрелки перестановки', async () => {
+    const user = userEvent.setup();
+    renderBuilder({ editingTemplate: activeTemplate });
+    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await user.click(screen.getByText('Действия с днём', { exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Дублировать день' }));
+    expect(screen.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Силовая (копия)');
+    const sets = screen.getByRole('spinbutton', { name: 'Рабочие подходы' });
+    await user.clear(sets);
+    await user.type(sets, '5');
+    const rail = document.querySelector('.copy-editor__rail') as HTMLElement;
+    await user.click(within(rail).getByRole('tab', { name: /День 1/ }));
+    expect(screen.getByRole('spinbutton', { name: 'Рабочие подходы' })).toHaveValue(3);
+    expect(document.querySelector('[data-icon="move-up"], [data-icon="move-down"]')).toBeNull();
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/templates/9', expect.anything());
   });
 
   it('связывает разделы с собственными заголовками при двух открытых редакторах', async () => {
@@ -477,6 +537,9 @@ describe('ProgramBuilder type-aware prescription', () => {
     const settings = screen.getAllByText('Настройки программы', { exact: true });
     expect(settings).toHaveLength(2);
     for (const summary of settings) await user.click(summary);
+    const optional = screen.getAllByText('Дополнительно', { exact: true });
+    expect(optional).toHaveLength(2);
+    for (const summary of optional) await user.click(summary);
     const ids: string[] = [];
     for (const name of [
       'Основа программы',
@@ -485,7 +548,13 @@ describe('ProgramBuilder type-aware prescription', () => {
       'Быстрое заполнение',
       'Отдых между подходами',
     ]) {
-      const sections = screen.getAllByRole('region', { name });
+      // Main content is intentionally hidden in the focused settings view.
+      const sections = [
+        ...document.querySelectorAll<HTMLElement>('section[aria-labelledby]'),
+      ].filter(
+        (section) =>
+          document.getElementById(section.getAttribute('aria-labelledby')!)?.textContent === name,
+      );
       expect(sections).toHaveLength(2);
       for (const section of sections) {
         const id = section.getAttribute('aria-labelledby');
@@ -525,7 +594,7 @@ const activeTemplate = {
   assigned_program_schedule_weekdays: [1],
   current_revision_number: 4,
   assigned_program_updated: false,
-  future_workouts_updated: 0,
+  future_workouts_updated: 2,
   assigned_program_revision_number: null,
   default_duration_weeks: 1,
   provenance_type: 'CUSTOM',
