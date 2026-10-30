@@ -72,10 +72,10 @@ class ProgramImportProvenance(BaseModel):
 
 
 class ProgramImportBlock(BaseModel):
-    block_number: int = Field(ge=1, le=24)
+    block_number: int = Field(ge=1)
     title: str = Field(min_length=1, max_length=128)
-    week_start: int = Field(ge=1, le=24)
-    week_end: int = Field(ge=1, le=24)
+    week_start: int = Field(ge=1)
+    week_end: int = Field(ge=1)
     is_deload: bool = False
 
     @model_validator(mode="after")
@@ -89,7 +89,7 @@ class ProgramImportTarget(BaseModel):
     program_id: int = Field(ge=1)
     title: str = Field(min_length=1, max_length=128)
     owner_name: str | None = Field(default=None, max_length=128)
-    duration_weeks: int = Field(ge=1, le=24)
+    duration_weeks: int = Field(ge=1)
     current_revision_number: int = Field(ge=0)
     status: Literal["scheduled", "active"]
     day_numbers: list[int] = Field(min_length=1, max_length=8)
@@ -118,7 +118,7 @@ class ProgramImportRow(BaseModel):
     source_sheet: str | None = Field(default=None, max_length=31)
     source_range: str | None = Field(default=None, max_length=64)
     source_cells: dict[str, str] = Field(default_factory=dict, max_length=24)
-    week_number: int | None = Field(default=None, ge=1, le=24)
+    week_number: int | None = Field(default=None, ge=1)
     day_number: int | None = Field(default=None, ge=1, le=8)
     day_title: str | None = Field(default=None, max_length=128)
     exercise_name: str | None = Field(default=None, max_length=512)
@@ -134,7 +134,7 @@ class ProgramImportRow(BaseModel):
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
     prescription: ExercisePrescriptionPlan | None = None
-    block_number: int | None = Field(default=None, ge=1, le=24)
+    block_number: int | None = Field(default=None, ge=1)
     block_title: str | None = Field(default=None, max_length=128)
     block_is_deload: bool = False
     coaching_rule: ProgramCoachingRule | None = None
@@ -183,7 +183,7 @@ class ProgramImportResponse(BaseModel):
     schema_version: int
     parser_version: str
     layout_version: str | None = None
-    duration_weeks: int | None = Field(default=None, ge=1, le=24)
+    duration_weeks: int | None = Field(default=None, ge=1)
     expires_at: datetime
     program_title: str | None = None
     goal: ImportGoal | None = None

@@ -402,6 +402,9 @@ class WorkoutTodayResponse(BaseModel):
     status: str
     day_number: int
     week_number: int = 1
+    source_cycle_week: int | None = None
+    cycle_iteration: int | None = None
+    plan_revision_number: int | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     exercises: list[WorkoutExerciseItem]

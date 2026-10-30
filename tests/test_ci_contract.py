@@ -164,6 +164,11 @@ def test_migrations_use_the_selected_python_interpreter() -> None:
     commands = ci_contract.COMMAND_GROUPS["migrated-stack"].commands
     assert commands[0].argv[:3] == ("python", "-m", "alembic")
     assert commands[1].argv[:3] == ("python", "-m", "alembic")
+    races = next(command for command in commands if command.name == "program-cycle-pg16-races")
+    assert races.argv[-2:] == (
+        "-n",
+        "1",
+    )  # The worker owns a disposable database, not the migrated one.
 
 
 def test_cross_browser_group_migrates_database_for_ready_backend() -> None:

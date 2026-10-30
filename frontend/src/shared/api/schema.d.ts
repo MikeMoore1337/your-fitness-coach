@@ -1470,6 +1470,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/assigned/{program_id}/cycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Assigned Cycle */
+        patch: operations["update_assigned_cycle_api_v1_programs_assigned__program_id__cycle_patch"];
+        trace?: never;
+    };
     "/api/v1/programs/assigned/{program_id}/exercises": {
         parameters: {
             query?: never;
@@ -8773,6 +8790,12 @@ export interface components {
              * @enum {string}
              */
             effective_scope: "next_workout" | "current_block" | "future_program";
+            /** From Week */
+            from_week?: number | null;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
             /** Effective Date */
             effective_date?: string | null;
             /** Exercise Id */
@@ -14127,6 +14150,23 @@ export interface components {
             /** Deload Intensity Percent */
             deload_intensity_percent?: number | null;
         };
+        /** ProgramCycleRevisionRequest */
+        ProgramCycleRevisionRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Effective From Week */
+            effective_from_week: number;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
+            /** Source Week Order */
+            source_week_order?: number[] | null;
+            /** Week Types */
+            week_types?: ("light" | "medium" | "heavy")[] | null;
+            /** Repeat */
+            repeat?: boolean | null;
+            /** Reason */
+            reason?: string | null;
+        };
         /** ProgramGeneratorActiveProgram */
         ProgramGeneratorActiveProgram: {
             /** Program Id */
@@ -14964,6 +15004,7 @@ export interface components {
              * @default false
              */
             replace_active: boolean;
+            week_cycle?: components["schemas"]["ProgramWeekCycle"] | null;
         };
         /** ProgramTemplateCreateResponse */
         ProgramTemplateCreateResponse: {
@@ -15178,6 +15219,21 @@ export interface components {
             } | null;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayResponse"][];
+        };
+        /** ProgramWeekCycle */
+        ProgramWeekCycle: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Length Weeks */
+            length_weeks: number;
+            /** Week Types */
+            week_types?: ("light" | "medium" | "heavy")[] | null;
+            /** Repeat */
+            repeat: boolean;
         };
         /** ProgressDataSufficiency */
         ProgressDataSufficiency: {
@@ -15913,6 +15969,7 @@ export interface components {
             goal: string;
             /** Level */
             level: string;
+            week_cycle?: components["schemas"]["ProgramWeekCycle"] | null;
             /** Duration Weeks */
             duration_weeks: number;
             /** Days */
@@ -18558,6 +18615,12 @@ export interface components {
              * @default 1
              */
             week_number: number;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /** Cycle Iteration */
+            cycle_iteration?: number | null;
+            /** Plan Revision Number */
+            plan_revision_number?: number | null;
             /** Started At */
             started_at?: string | null;
             /** Completed At */
@@ -21700,6 +21763,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrainingBlockRepeatResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_assigned_cycle_api_v1_programs_assigned__program_id__cycle_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

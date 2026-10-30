@@ -5220,9 +5220,9 @@ def test_exercise_catalog_can_add_exercises_to_program_builder():
     catalog = (root / "exercises" / "ExerciseCatalog.tsx").read_text(encoding="utf-8")
     builder = (root / "programs" / "ProgramBuilder.tsx").read_text(encoding="utf-8")
     assert "/api/v1/programs/exercises" in catalog
-    editor = (root / "programs" / "ProgramDayEditor.tsx").read_text(encoding="utf-8")
+    day_editor = (root / "programs" / "ProgramDayEditor.tsx").read_text(encoding="utf-8")
     assert "<ProgramDayEditor" in builder
-    assert "Добавить упражнение" in editor
+    assert "Добавить упражнение" in day_editor
     assert "exercise_id" in builder
 
 
@@ -5235,7 +5235,8 @@ def test_program_builder_uses_difficulty_and_level_specific_day_limits():
         / "programs"
         / "ProgramBuilder.tsx"
     ).read_text(encoding="utf-8")
-    editor = (
+    assert "difficulty_level" in source or "level" in source
+    day_editor = (
         Path(__file__).resolve().parents[2]
         / "frontend"
         / "src"
@@ -5243,7 +5244,6 @@ def test_program_builder_uses_difficulty_and_level_specific_day_limits():
         / "programs"
         / "ProgramDayEditor.tsx"
     ).read_text(encoding="utf-8")
-    assert "difficulty_level" in source or "level" in source
     assert "<ProgramDayEditor" in source
-    assert "Добавить день" in editor
+    assert "Добавить день" in day_editor
     assert "prescribed_sets" in source
