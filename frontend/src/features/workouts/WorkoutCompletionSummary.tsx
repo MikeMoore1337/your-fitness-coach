@@ -8,6 +8,7 @@ import { DisclosureIcon, Badge, Button } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
+import { WorkoutCopyButton } from './WorkoutCopyButton';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 
@@ -147,6 +148,10 @@ export function WorkoutCompletionSummary({
           <dd>{summary?.completed_sets ?? fallbackCompletedSets}</dd>
         </div>
       </dl>
+
+      <div>
+        <WorkoutCopyButton workout={workout} />
+      </div>
 
       {!!summary?.exercises.length && (
         <details className="workout-completion__results">
