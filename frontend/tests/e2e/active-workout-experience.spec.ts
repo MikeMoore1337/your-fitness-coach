@@ -1003,9 +1003,10 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
         expect(result.actions.every((button) => button.width >= 44)).toBe(true);
         expect(Math.abs(result.plannedLeft - result.actions[0]!.left)).toBeLessThanOrEqual(1);
         expect(Math.abs(result.actualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(2);
-        expect(Math.abs(result.tenMinuteActualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(
-          8,
-        );
+        // Compare rendered pixels, not platform-specific fractional font metrics.
+        expect(
+          Math.round(Math.abs(result.tenMinuteActualLeft - result.actions[1]!.left)),
+        ).toBeLessThanOrEqual(8);
         await panel.screenshot({
           path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
           animations: 'disabled',
