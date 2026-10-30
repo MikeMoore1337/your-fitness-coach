@@ -465,6 +465,7 @@ class UserWorkout(Base):
     status: Mapped[str] = mapped_column(String(32), default="planned")
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at_utc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completion_feedback: Mapped[str | None] = mapped_column(String(24), nullable=True)
     completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     completion_feedback_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
