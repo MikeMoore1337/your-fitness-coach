@@ -5052,6 +5052,17 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
     scroll-margin-bottom: var(--yfc-mobile-dock-clearance);
   }
 
+  /* Keep the reuse actions and workout finish clear of the dock when centering the active set. */
+  html:not([data-yfc-keyboard='visible']):not([data-yfc-pwa-focus-placement='true'])
+    .app-shell--design-v2
+    #appContent
+    .active-workout-set.is-current:has(.active-workout-set__prefill-actions--history)
+    .active-workout-set__done {
+    scroll-margin-bottom: calc(
+      var(--yfc-mobile-dock-clearance) + clamp(0px, calc(100dvh - 640px), 160px)
+    );
+  }
+
   /* Keep the active workout's final controls in the scrollable safe area above the fixed dock. */
   .active-workout--design-v2 {
     padding-bottom: var(--yfc-mobile-dock-clearance);

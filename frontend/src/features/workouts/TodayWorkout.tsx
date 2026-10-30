@@ -2935,21 +2935,28 @@ export function TodayWorkout({
       if (!row || !controls || !dock?.height || !timer) return;
       const viewport = window.visualViewport;
       const top = Math.max(viewport?.offsetTop ?? 0, timer.bottom);
-      const bottom =
-        Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight), dock.top) - 8;
+      const viewportBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const bottom = Math.min(viewportBottom, dock.top) - 8;
       const nextRow = row.nextElementSibling;
       const next = nextRow?.querySelector('[data-workout-field="done"]')?.getBoundingClientRect();
-      const visibleNext =
-        nextRow &&
-        nextRow.getBoundingClientRect().top <
-          (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const nextTop = nextRow?.getBoundingClientRect().top;
+      const visibleNext = nextTop != null && nextTop < viewportBottom;
       const rir = row.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
       const overlap = Math.max(
         0,
         controls.bottom - bottom,
         visibleNext && next ? next.bottom - bottom : 0,
       );
-      const delta = Math.min(overlap, Math.min(controls.top, rir?.top ?? controls.top) - top);
+      const availableScroll = Math.min(controls.top, rir?.top ?? controls.top) - top;
+      // Keep current controls visible when both sets cannot fit above the dock.
+      if (visibleNext && next && next.bottom > bottom && overlap > availableScroll) {
+        const hideNext = viewportBottom - nextTop + 1;
+        if (hideNext <= bottom - controls.bottom) {
+          window.scrollBy({ top: -Math.ceil(hideNext), behavior: 'instant' });
+          return;
+        }
+      }
+      const delta = Math.min(overlap, availableScroll);
       if (delta > 0) window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frame);
