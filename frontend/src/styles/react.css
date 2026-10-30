@@ -5986,14 +5986,17 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
+.active-workout-rest__complete-copy:nth-child(2):last-child {
+  grid-row: 1 / span 2;
+}
 .active-workout-rest__complete-mark {
   display: grid;
   place-items: center;
   grid-column: 1;
   grid-row: 1 / span 2;
   width: 27px;
-  height: 32px;
-  border-radius: var(--radius-control);
+  height: 27px;
+  border-radius: 50%;
   background: var(--v2-success-surface);
   color: var(--v2-success-text);
 }

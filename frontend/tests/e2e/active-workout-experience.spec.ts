@@ -9026,6 +9026,38 @@ test.describe('#1338 v2 compact timer', () => {
             expect(control.left).toBeGreaterThanOrEqual(-1);
             expect(control.right).toBeGreaterThanOrEqual(-1);
           }
+          if (state === 'completed' || state === 'skipped') {
+            const terminal = await panel.evaluate((element) => {
+              const mark = element.querySelector<HTMLElement>(
+                '.active-workout-rest__complete-mark',
+              )!;
+              const copy = element.querySelector<HTMLElement>(
+                '.active-workout-rest__complete-copy',
+              )!;
+              const markBox = mark.getBoundingClientRect();
+              const copyBox = copy.getBoundingClientRect();
+              const panelBox = element.getBoundingClientRect();
+              const radius = getComputedStyle(mark).borderTopLeftRadius;
+              return {
+                width: markBox.width,
+                height: markBox.height,
+                radiusRatio: radius.endsWith('%')
+                  ? parseFloat(radius) / 100
+                  : parseFloat(radius) / Math.min(markBox.width, markBox.height),
+                copyOffset: (copyBox.top + copyBox.bottom - panelBox.top - panelBox.bottom) / 2,
+              };
+            });
+            expect(terminal.width, `${state}: circular mark width`).toBeCloseTo(terminal.height, 1);
+            expect(terminal.radiusRatio, `${state}: circular mark radius`).toBeGreaterThanOrEqual(
+              0.49,
+            );
+            if (state === 'skipped') {
+              expect(
+                Math.abs(terminal.copyOffset),
+                'skipped text vertical center',
+              ).toBeLessThanOrEqual(1);
+            }
+          }
           expect(server.readSet(201)).toEqual(previousSet);
           expect(server.readSet(202)).toEqual(nextSet);
           expect(server.readSet(203)).toEqual(neighbor);
