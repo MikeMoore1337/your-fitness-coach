@@ -174,30 +174,38 @@ def _previous(
         )
         .all()
     )
-    if workout.started_at is not None:
+    planned = (
+        workout.status == "planned"
+        and workout.started_at is None
+        and workout.started_at_utc is None
+    )
+    if planned:
+        cutoff_min = cutoff_max = datetime.now(UTC).replace(tzinfo=None)
+    elif workout.started_at_utc is not None:
+        cutoff_min = cutoff_max = workout.started_at_utc
+    elif workout.started_at is not None:
         cutoff_min = workout.started_at - timedelta(days=1)
         cutoff_max = workout.started_at + timedelta(days=1)
-    elif workout.completed_at is not None:
-        cutoff_min, cutoff_max = _completion_bounds(workout)
     else:
-        cutoff_min = cutoff_max = datetime.now(UTC).replace(tzinfo=None)
+        return None
     candidates = []
     for note, source, source_exercise in rows:
         if not _value(note) or note.context_key != _context_key(source, source_exercise):
             continue
-        if source.plan_materialized is False:
-            return None
         if source.completed_at is None:
             return None
         low, high = _completion_bounds(source)
-        if low >= cutoff_max:
+        if low > cutoff_max or (planned and low == cutoff_max):
             continue
-        if high >= cutoff_min:
+        if not planned and high >= cutoff_min:
             return None
         candidates.append((low, high, note, source, source_exercise))
-    candidates.sort(key=lambda item: (item[0], item[3].id), reverse=True)
-    for index, (low, _high, note, source, source_exercise) in enumerate(candidates):
-        if index + 1 < len(candidates) and low <= candidates[index + 1][1]:
+    if not candidates:
+        return None
+    latest_lower_bound = max(item[0] for item in candidates)
+    possible_latest = [item for item in candidates if item[1] >= latest_lower_bound]
+    for _low, _high, _note, source, _source_exercise in possible_latest:
+        if source.plan_materialized is False:
             return None
         source_count = (
             db.query(UserWorkoutExercise.id)
@@ -206,41 +214,44 @@ def _previous(
         )
         if source_count != 1:
             return None
-        latest_set = (
-            db.query(UserWorkoutSet)
-            .filter(
-                UserWorkoutSet.workout_exercise_id == source_exercise.id,
-                UserWorkoutSet.is_completed.is_(True),
-            )
-            .order_by(UserWorkoutSet.set_number.desc(), UserWorkoutSet.id.desc())
-            .first()
+    # Overlapping legacy timestamps cannot order workouts; use the latest saved note.
+    _low, _high, note, source, source_exercise = max(
+        possible_latest, key=lambda item: (item[2].updated_at, item[2].id)
+    )
+    latest_set = (
+        db.query(UserWorkoutSet)
+        .filter(
+            UserWorkoutSet.workout_exercise_id == source_exercise.id,
+            UserWorkoutSet.is_completed.is_(True),
         )
-        load = (
-            None
-            if latest_set is None
-            else {
-                "set_number": latest_set.set_number,
-                "actual_weight": float(latest_set.actual_weight)
-                if latest_set.actual_weight is not None
-                else None,
-                "actual_reps": latest_set.actual_reps,
-                "duration_minutes": latest_set.duration_minutes,
-                "distance_km": float(latest_set.distance_km)
-                if latest_set.distance_km is not None
-                else None,
-            }
-        )
-        value = _value(note)
-        assert value is not None
-        return {
-            **value,
-            "workout_id": source.id,
-            "workout_exercise_id": source_exercise.id,
-            "completed_on": source.completed_at.date(),
-            "week_type": note.week_type,
-            "load": load,
+        .order_by(UserWorkoutSet.set_number.desc(), UserWorkoutSet.id.desc())
+        .first()
+    )
+    load = (
+        None
+        if latest_set is None
+        else {
+            "set_number": latest_set.set_number,
+            "actual_weight": float(latest_set.actual_weight)
+            if latest_set.actual_weight is not None
+            else None,
+            "actual_reps": latest_set.actual_reps,
+            "duration_minutes": latest_set.duration_minutes,
+            "distance_km": float(latest_set.distance_km)
+            if latest_set.distance_km is not None
+            else None,
         }
-    return None
+    )
+    value = _value(note)
+    assert value is not None
+    return {
+        **value,
+        "workout_id": source.id,
+        "workout_exercise_id": source_exercise.id,
+        "completed_on": source.completed_at.date(),
+        "week_type": note.week_type,
+        "load": load,
+    }
 
 
 def read_exercise_note(db: Session, user: User, workout_id: int, workout_exercise_id: int) -> dict:

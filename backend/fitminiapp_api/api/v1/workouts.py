@@ -165,6 +165,7 @@ from fitminiapp_api.services.workout_recovery import (
     recovery_state,
     recovery_today_for_user,
     recovery_user_local_naive_to_utc_naive,
+    recovery_utc_naive_to_user_local,
     serialize_schedule_item,
 )
 from fitminiapp_api.services.workout_set_history import (
@@ -1294,7 +1295,8 @@ def start_workout(
 
     was_started = workout.started_at is not None
     if not workout.started_at:
-        workout.started_at = now_for_user_naive(current_user)
+        workout.started_at_utc = datetime.now(UTC).replace(tzinfo=None)
+        workout.started_at = recovery_utc_naive_to_user_local(workout.started_at_utc, current_user)
     workout.status = "in_progress"
     if not was_started and workout.started_at is not None:
         record_lifecycle_milestone(

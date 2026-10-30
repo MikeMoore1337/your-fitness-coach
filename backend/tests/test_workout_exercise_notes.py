@@ -1,11 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from threading import Barrier
 
 import pytest
 from test_program_week_cycle import _auth
 from test_workout_set_history import _session
 
+from fitminiapp_api.api.v1 import workouts as workout_routes
+from fitminiapp_api.core.timezone import today_for_user
 from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.program import (
@@ -532,3 +534,375 @@ def test_concurrent_mutations_and_identical_replays_are_serialized(client, case)
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(submit, (first, second))) == [2, 409]
     assert _read(client, case)["version"] == 2
+
+
+def _save_chronology_note(client, case, workout, exercise, text):
+    current = _read(client, case, workout, exercise)
+    response = client.put(
+        _url(case[workout], case[exercise]),
+        headers=case["headers"],
+        json=_payload(current, f"chronology-{workout}", body=text, tags=["easy"]),
+    )
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize(
+    "target_status,has_utc_completion",
+    [("planned", False), ("planned", True), ("in_progress", True)],
+)
+def test_chronology_shows_completed_note_from_same_day(
+    client, case, target_status, has_utc_completion
+):
+    _save_chronology_note(client, case, "old", "old_ex", "После близкой тренировки")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at = now + timedelta(hours=1)
+        source.completed_at_utc = now - timedelta(hours=2) if has_utc_completion else None
+        target = db.get(UserWorkout, case["current"])
+        target.status = target_status
+        target.started_at = (
+            now + timedelta(hours=2, minutes=30) if target_status == "in_progress" else None
+        )
+        target.started_at_utc = (
+            now - timedelta(minutes=30) if target_status == "in_progress" else None
+        )
+    previous = _read(client, case)["previous_note"]
+    assert previous["workout_id"] == case["old"]
+    assert previous["body"] == "После близкой тренировки"
+    assert previous["load"]["actual_weight"] == 190
+
+
+def test_chronology_prefers_newer_completion_even_when_older_note_was_edited_later(client, case):
+    _save_chronology_note(client, case, "recent", "recent_ex", "Новое выполнение")
+    _save_chronology_note(client, case, "old", "old_ex", "Позже исправленная старая заметка")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        for key, hours in (("old", 3), ("recent", 2)):
+            source = db.get(UserWorkout, case[key])
+            source.completed_at_utc = now - timedelta(hours=hours)
+            source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at = now + timedelta(hours=2, minutes=30)
+        target.started_at_utc = now - timedelta(minutes=30)
+    previous = _read(client, case)["previous_note"]
+    assert previous["workout_id"] == case["recent"]
+    assert previous["body"] == "Новое выполнение"
+
+
+def test_chronology_uses_last_saved_note_when_legacy_completion_order_is_unknown(client, case):
+    _save_chronology_note(client, case, "recent", "recent_ex", "Первая сохранённая")
+    _save_chronology_note(client, case, "old", "old_ex", "Последняя сохранённая")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        for key, hours in (("old", 3), ("recent", 2)):
+            source = db.get(UserWorkout, case[key])
+            source.completed_at = now + timedelta(hours=3 - hours)
+            source.completed_at_utc = None
+        target = db.get(UserWorkout, case["current"])
+        target.status, target.started_at = "planned", None
+    previous = _read(client, case)["previous_note"]
+    assert previous["workout_id"] == case["old"]
+    assert previous["body"] == "Последняя сохранённая"
+
+
+def test_chronology_never_shows_later_workout_in_completed_history(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Раньше")
+    _save_chronology_note(client, case, "recent", "recent_ex", "Позже")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        for key, hours in (("old", 3), ("recent", 1)):
+            source = db.get(UserWorkout, case[key])
+            source.completed_at_utc = now - timedelta(hours=hours)
+            source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.status = "completed"
+        target.started_at = now + timedelta(minutes=30)
+        target.started_at_utc = now - timedelta(hours=2, minutes=30)
+        target.completed_at_utc = now - timedelta(hours=2)
+        target.completed_at = target.completed_at_utc + timedelta(hours=3)
+    previous = _read(client, case)["previous_note"]
+    assert previous["workout_id"] == case["old"]
+    assert previous["body"] == "Раньше"
+
+
+def test_chronology_does_not_guess_if_legacy_source_may_follow_completed_target(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Порядок неизвестен")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at, source.completed_at_utc = now, None
+        target = db.get(UserWorkout, case["current"])
+        target.status = "completed"
+        target.started_at, target.started_at_utc = now + timedelta(hours=3), now
+        target.completed_at, target.completed_at_utc = now + timedelta(hours=3), now
+    assert _read(client, case)["previous_note"] is None
+
+
+def test_chronology_does_not_show_workout_completed_after_current_start(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Завершено позже")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(hours=1)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc = now - timedelta(hours=2)
+        target.started_at = target.started_at_utc + timedelta(hours=3)
+    assert _read(client, case)["previous_note"] is None
+
+
+def test_chronology_keeps_unknown_legacy_start_order_unresolved(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Не угадывать порядок")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(hours=2)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at, target.started_at_utc = now + timedelta(hours=2, minutes=30), None
+    assert _read(client, case)["previous_note"] is None
+
+
+def test_chronology_records_start_in_utc_and_survives_timezone_change(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Последняя до начала")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(minutes=30)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.scheduled_date = today_for_user(db.get(User, case["user_id"]))
+        target.status, target.started_at, target.started_at_utc = "planned", None, None
+    before = datetime.now(UTC).replace(tzinfo=None)
+    started = client.post(f"/api/v1/workouts/{case['current']}/start", headers=case["headers"])
+    after = datetime.now(UTC).replace(tzinfo=None)
+    assert started.status_code == 200, started.text
+    with get_session_context() as db:
+        target = db.get(UserWorkout, case["current"])
+        assert before <= target.started_at_utc <= after
+        started_at_utc = target.started_at_utc
+        db.get(User, case["user_id"]).profile.timezone = "Pacific/Kiritimati"
+    assert (
+        client.post(
+            f"/api/v1/workouts/{case['current']}/start", headers=case["headers"]
+        ).status_code
+        == 200
+    )
+    with get_session_context() as db:
+        assert db.get(UserWorkout, case["current"]).started_at_utc == started_at_utc
+    assert _read(client, case)["previous_note"]["body"] == "Последняя до начала"
+
+
+def test_chronology_start_uses_existing_utc_timezone_fallback(client, case):
+    with get_session_context() as db:
+        db.get(User, case["user_id"]).profile.timezone = "invalid/timezone"
+        target = db.get(UserWorkout, case["current"])
+        target.scheduled_date = datetime.now(UTC).date()
+        target.status, target.started_at, target.started_at_utc = "planned", None, None
+    started = client.post(f"/api/v1/workouts/{case['current']}/start", headers=case["headers"])
+    assert started.status_code == 200, started.text
+    with get_session_context() as db:
+        target = db.get(UserWorkout, case["current"])
+        assert target.started_at == target.started_at_utc
+
+
+def test_chronology_start_preserves_utc_during_repeated_dst_hour(client, case, monkeypatch):
+    _save_chronology_note(client, case, "old", "old_ex", "До перехода часов")
+    instant = datetime(2026, 11, 1, 6, 30, tzinfo=UTC)
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return instant if tz is not None else instant.replace(tzinfo=None)
+
+    with get_session_context() as db:
+        db.get(User, case["user_id"]).profile.timezone = "America/New_York"
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = datetime(2026, 11, 1, 6, 15)
+        source.completed_at = datetime(2026, 11, 1, 1, 15)
+        target = db.get(UserWorkout, case["current"])
+        target.scheduled_date = date(2026, 11, 1)
+        target.status, target.started_at, target.started_at_utc = "planned", None, None
+    monkeypatch.setattr(workout_routes, "datetime", FixedDatetime)
+    monkeypatch.setattr(workout_routes, "recovery_today_for_user", lambda _user: date(2026, 11, 1))
+    started = client.post(f"/api/v1/workouts/{case['current']}/start", headers=case["headers"])
+    assert started.status_code == 200, started.text
+    with get_session_context() as db:
+        target = db.get(UserWorkout, case["current"])
+        assert target.started_at == datetime(2026, 11, 1, 1, 30)
+        assert target.started_at_utc == datetime(2026, 11, 1, 6, 30)
+    assert _read(client, case)["previous_note"]["body"] == "До перехода часов"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("plan_revision_number", 99),
+        ("week_number", 99),
+        ("day_number", 99),
+        ("source_cycle_week", 1),
+        ("cycle_iteration", 2),
+    ],
+)
+def test_chronology_does_not_rebind_changed_source_context(client, case, field, value):
+    _save_chronology_note(client, case, "old", "old_ex", "Историческая заметка")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(hours=2)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        setattr(source, field, value)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc = now - timedelta(minutes=30)
+        target.started_at = target.started_at_utc + timedelta(hours=3)
+    assert _read(client, case)["previous_note"] is None
+    history = client.get(
+        f"/api/v1/workouts/{case['old']}/exercise-notes", headers=case["headers"]
+    ).json()
+    assert [note["body"] for note in history] == ["Историческая заметка"]
+
+
+def test_chronology_keeps_equal_exercises_in_different_program_slots_separate(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Первое место")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        ids = []
+        for key in ("old", "current"):
+            workout = db.get(UserWorkout, case[key])
+            original = workout.exercises[0]
+            other = UserWorkoutExercise(
+                workout_id=workout.id,
+                exercise_id=original.exercise_id,
+                source_template_exercise_id=original.source_template_exercise_id + 1,
+                metric_type="strength",
+                sort_order=2,
+                prescribed_sets=1,
+                prescribed_reps="8",
+            )
+            db.add(other)
+            db.flush()
+            ids.append(other.id)
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(hours=2)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc = now - timedelta(minutes=30)
+        target.started_at = target.started_at_utc + timedelta(hours=3)
+    state = client.get(_url(case["old"], ids[0]), headers=case["headers"]).json()
+    saved = client.put(
+        _url(case["old"], ids[0]),
+        headers=case["headers"],
+        json=_payload(state, "chronology-other-slot", body="Второе место", tags=[]),
+    )
+    assert saved.status_code == 200, saved.text
+    assert _read(client, case)["previous_note"]["body"] == "Первое место"
+    other = client.get(_url(case["current"], ids[1]), headers=case["headers"]).json()
+    assert other["previous_note"]["body"] == "Второе место"
+
+
+def test_chronology_excludes_later_note_from_unrelated_program(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Своя программа")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        other_program = UserProgram(
+            user_id=case["user_id"],
+            start_date=now.date(),
+            duration_weeks=16,
+            schedule_weekdays=[0],
+            status="archived",
+            is_active=False,
+            current_revision_number=1,
+        )
+        db.add(other_program)
+        db.flush()
+        other = _session(db, other_program, days_ago=1)
+        other.completed_at_utc = now - timedelta(hours=1)
+        other.completed_at = other.completed_at_utc + timedelta(hours=3)
+        other_id, other_exercise_id = other.id, other.exercises[0].id
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(hours=2)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc = now - timedelta(minutes=30)
+        target.started_at = target.started_at_utc + timedelta(hours=3)
+    state = client.get(_url(other_id, other_exercise_id), headers=case["headers"]).json()
+    saved = client.put(
+        _url(other_id, other_exercise_id),
+        headers=case["headers"],
+        json=_payload(state, "chronology-unrelated", body="Чужая программа", tags=[]),
+    )
+    assert saved.status_code == 200, saved.text
+    assert _read(client, case)["previous_note"]["body"] == "Своя программа"
+
+
+def test_chronology_carries_same_slot_across_revision_and_cycle(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "То же упражнение")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(hours=2)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc = now - timedelta(minutes=30)
+        target.started_at = target.started_at_utc + timedelta(hours=3)
+        target.week_number, target.source_cycle_week = 8, 2
+        target.cycle_iteration, target.plan_revision_number = 3, 7
+    previous = _read(client, case)["previous_note"]
+    assert previous["workout_id"] == case["old"]
+    assert previous["body"] == "То же упражнение"
+
+
+def test_chronology_does_not_rebind_replaced_source_exercise(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Исходное упражнение")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(hours=2)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        exercise = db.get(UserWorkoutExercise, case["old_ex"])
+        exercise.exercise_id = (
+            db.query(Exercise.id).filter(Exercise.id != exercise.exercise_id).first()[0]
+        )
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc = now - timedelta(minutes=30)
+        target.started_at = target.started_at_utc + timedelta(hours=3)
+    assert _read(client, case)["previous_note"] is None
+    history = client.get(
+        f"/api/v1/workouts/{case['old']}/exercise-notes", headers=case["headers"]
+    ).json()
+    assert [note["body"] for note in history] == ["Исходное упражнение"]
+
+
+def test_chronology_older_unmaterialized_workout_does_not_hide_newer_note(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Старый план")
+    _save_chronology_note(client, case, "recent", "recent_ex", "Новая заметка")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        old = db.get(UserWorkout, case["old"])
+        old.completed_at_utc = now - timedelta(days=3)
+        old.completed_at = old.completed_at_utc + timedelta(hours=3)
+        old.plan_materialized = False
+        recent = db.get(UserWorkout, case["recent"])
+        recent.completed_at_utc = now - timedelta(hours=2)
+        recent.completed_at = recent.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc = now - timedelta(minutes=30)
+        target.started_at = target.started_at_utc + timedelta(hours=3)
+    assert _read(client, case)["previous_note"]["body"] == "Новая заметка"
+
+
+def test_chronology_equal_start_and_completion_does_not_guess(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Более ранняя")
+    _save_chronology_note(client, case, "recent", "recent_ex", "Одновременная")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        old = db.get(UserWorkout, case["old"])
+        old.completed_at_utc = now - timedelta(hours=2)
+        old.completed_at = old.completed_at_utc + timedelta(hours=3)
+        instant = now - timedelta(minutes=30)
+        recent = db.get(UserWorkout, case["recent"])
+        recent.completed_at_utc, recent.completed_at = instant, instant + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.started_at_utc, target.started_at = instant, instant + timedelta(hours=3)
+    assert _read(client, case)["previous_note"] is None

@@ -55,6 +55,10 @@ def recovery_now_for_user_naive(user: User) -> datetime:
     return _recovery_now_naive(user)
 
 
+def recovery_utc_naive_to_user_local(value: datetime, user: User) -> datetime:
+    return utc_naive_to_timezone_naive(value, _account_timezone_name(user))
+
+
 def recovery_user_local_naive_to_utc_naive(value: datetime, user: User) -> datetime:
     return local_naive_to_utc_naive(value, _account_timezone_name(user))
 
