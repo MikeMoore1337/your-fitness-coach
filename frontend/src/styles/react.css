@@ -5755,6 +5755,10 @@ button.today-text-link {
   height: var(--yfc-active-workout-rest-spacer-height, 110px);
   pointer-events: none;
 }
+/* The timer exposes offline status itself; the duplicate fixed banner obscures its clocks. */
+body:has(.active-workout-rest:not(.is-compact), .active-workout-rest__collapsed) .offline-status {
+  display: none;
+}
 .active-workout-rest [hidden] {
   display: none;
 }

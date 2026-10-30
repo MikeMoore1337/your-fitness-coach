@@ -8779,6 +8779,17 @@ test.describe('#1338 v2 compact timer', () => {
       const capture = async (state: string) => {
         expect((await panel.boundingBox())!.height).toBe(110);
         expect(server.readSet(202)).toEqual(before);
+        expect(
+          await panel.evaluate((element) =>
+            Array.from(element.querySelectorAll('button, [role="timer"]')).every((control) => {
+              const r = control.getBoundingClientRect();
+              return control.contains(
+                document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2),
+              );
+            }),
+          ),
+          `${state}: clocks and actions are not covered by global notices`,
+        ).toBe(true);
         if (process.env.CAPTURE_1338_VISUALS === '1') {
           const folder = resolve(
             process.cwd(),
@@ -8805,6 +8816,7 @@ test.describe('#1338 v2 compact timer', () => {
       await setNetworkOffline(page, true);
       await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
       await expect(panel.locator('.active-workout-rest__status')).toContainText('Нет сети');
+      await expect(page.locator('.offline-status')).toBeHidden();
       const offline = (await readRestJournal(page))[0]!;
       expect(offline.pending).toHaveLength(1);
       await capture('offline');
