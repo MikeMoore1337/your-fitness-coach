@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Workout } from '../../../../src/shared/api/types';
 import { ProgressionGuidance } from '../../../../src/features/workouts/ProgressionGuidance';
@@ -90,6 +90,8 @@ describe('ProgressionGuidance', () => {
     fireEvent.click(screen.getByText('Почему такой вес?'));
     expect(screen.getByText('Цель: 3 × 8–10')).toBeVisible();
     expect(screen.getByText(/40 кг · 10 повторов/)).toBeVisible();
+    const history = screen.getByRole('list', { name: 'Последние тренировки' });
+    expect(within(history).getByRole('listitem')).toHaveTextContent(/10 повторов\s+3 раб\. подх\./);
     expect(screen.getByText(/тренировка: нормально/)).toBeVisible();
     expect(screen.getByRole('link', { name: 'Подробнее о прогрессии' })).toHaveAttribute(
       'href',
