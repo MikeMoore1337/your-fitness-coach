@@ -852,9 +852,9 @@ async function activeWorkoutQueueLength(page: Page) {
   });
 }
 
-test.describe('#1097 rest clock typography and responsive layout', () => {
+test.describe('#1097 rest clock typography and v2 compact layout', () => {
   for (const theme of ['dark', 'light'] as const) {
-    test(`planned and measured clocks share size and fit the top row in ${theme}`, async ({
+    test(`planned and measured clocks preserve hierarchy and fit the top row in ${theme}`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 393, height: 844 });
@@ -873,7 +873,7 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
       const panel = page.locator('.active-workout-rest');
       await expect(panel.locator('.active-workout-rest__actual-value')).toBeVisible();
       await expect(panel.locator('.active-workout-rest__actual-value span')).toHaveText('ФАКТ');
-      await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
 
       for (const width of [320, 360, 393, 430, 1440]) {
         await page.setViewportSize({ width, height: 844 });
@@ -882,7 +882,7 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
           const actual = element.querySelector<HTMLElement>(
             '.active-workout-rest__actual-value strong',
           )!;
-          const next = element.querySelector<HTMLElement>('.active-workout-rest__next')!;
+          const status = element.querySelector<HTMLElement>('.active-workout-rest__status')!;
           const actualBlock = element.querySelector<HTMLElement>('.active-workout-rest__actual')!;
           const stop = element.querySelector<HTMLElement>('.active-workout-rest__stop')!;
           const original = actual.textContent;
@@ -896,8 +896,7 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
             actualSize,
             actualFits,
             plannedRight: planned.getBoundingClientRect().right,
-            nextLeft: next.getBoundingClientRect().left,
-            nextRight: next.getBoundingClientRect().right,
+            statusLeft: status.getBoundingClientRect().left,
             actualLeft: actualBlock.getBoundingClientRect().left,
             actualRight: actualBlock.getBoundingClientRect().right,
             stopRight: stop.getBoundingClientRect().right,
@@ -912,12 +911,13 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
           actual.textContent = original;
           return geometry;
         });
-        expect(result.actualSize, `${width}px ${theme}: matching clock type scale`).toBe(
-          result.timerSize,
-        );
+        expect(
+          parseFloat(result.timerSize),
+          `${width}px ${theme}: planned clock hierarchy`,
+        ).toBeGreaterThanOrEqual(parseFloat(result.actualSize));
         expect(result.actualFits, `${width}px ${theme}: full hour format visible`).toBe(true);
-        expect(result.plannedRight).toBeLessThanOrEqual(result.nextLeft + 1);
-        expect(result.nextRight).toBeLessThanOrEqual(result.actualLeft + 1);
+        expect(result.plannedRight).toBeLessThanOrEqual(result.actualLeft + 1);
+        expect(result.actualRight).toBeLessThanOrEqual(result.statusLeft + 1);
         expect(result.stopRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.documentOverflow).toBeLessThanOrEqual(1);
@@ -1379,7 +1379,7 @@ async function verifyIssue1099RestSwipe(page: Page, info: TestInfo, surface: 'br
         },
       ),
     ),
-  ).toEqual([true, true, true, true, true]);
+  ).toEqual([true, true, true, true, true, true]);
   expect(await reps.inputValue()).toBe('12');
   expect(server.readSet(202).is_completed).toBe(false);
   expect(server.patches).toHaveLength(patchCountBeforeGesture);
@@ -2477,7 +2477,7 @@ for (const width of [320, 360, 393, 430]) {
       for (const phase of ['running', 'collapsed']) {
         if (phase === 'collapsed') {
           await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
-          await expect(panel.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+          await expect(panel.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
         }
         const samples = await probe();
         const tops = samples.map((sample) => sample.top);
@@ -3201,7 +3201,7 @@ test('P1 lock and resume completion starts the measured rest panel', async ({ pa
   ]);
   await expect.poll(() => server.readSet(201).is_completed).toBe(true);
   await expect(page.locator('.active-workout-rest__actual-value strong')).toHaveText('0:00');
-  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
 });
 
 for (const theme of ['dark', 'light'] as const) {
@@ -4857,12 +4857,10 @@ test('active workout keeps one obvious next action through logging, timer and fi
     secondSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }),
   ).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
-    'Далее: Жим штанги лёжа',
-  );
-  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
-    'Подход 2 из 3',
-  );
+  const restPanel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+  await expect(restPanel).not.toContainText('Жим штанги лёжа');
+  await expect(restPanel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
+  await expect(secondSet).toHaveAttribute('aria-current', 'step');
 
   await secondSet.getByText('Дополнительно').click();
   await secondSet.getByLabel('Вид подхода').selectOption('drop');
@@ -4967,7 +4965,7 @@ async function runIssue1164SpacingScenario(
   await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
   await expect(secondSet.locator('.active-workout-set__context')).toContainText('8–10 повторений');
   await expect(secondSet.locator('.active-workout-set__context')).toContainText('Отдых 90 с');
-  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
   await captureState('02-rest-prefill-visible', secondSet, true);
 
   const measure = async () =>
@@ -5055,12 +5053,12 @@ async function runIssue1164SpacingScenario(
     .toBe(true);
 
   await page.getByRole('button', { name: 'Свернуть таймер' }).click();
-  await expect(page.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
   expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
   await captureState('05-rest-collapsed', secondSet, true);
 
-  await page.getByRole('button', { name: 'Показать таймер' }).click();
-  await page.getByRole('button', { name: 'Завершить отдых' }).click();
+  await page.getByRole('button', { name: 'Развернуть таймер' }).click();
+  await page.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
   await expect(page.getByRole('button', { name: 'Скрыть' })).toBeVisible();
   expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
   await captureState('06-rest-completed', secondSet, true);
@@ -6805,7 +6803,7 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
-  await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
   await expect(panel).toContainText('ФАКТ');
   await expect(panel).not.toHaveClass(/is-compact/);
   await expect
@@ -6841,12 +6839,12 @@ test('rest timer reaches its final state from the deadline without user events',
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
   await expect(panel).toContainText('ФАКТ');
-  await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
-  await panel.getByRole('button', { name: 'Завершить отдых' }).click();
+  await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
   await expect(panel).toHaveClass(/is-compact/);
   await expect(panel).toContainText('Отдых завершён по отметке');
   await panel.getByRole('button', { name: 'Скрыть' }).click();
-  await expect(panel.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Новый отдых' })).toBeVisible();
 });
 
 test('policy C offers manual rest recovery after fifteen minutes away past the deadline', async ({
@@ -6863,7 +6861,7 @@ test('policy C offers manual rest recovery after fifteen minutes away past the d
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
   await expect(
-    page.locator('.active-workout-rest').getByRole('button', { name: 'Завершить отдых' }),
+    page.locator('.active-workout-rest').getByRole('button', { name: 'Стоп: завершить отдых' }),
   ).toBeVisible();
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
@@ -6877,13 +6875,12 @@ test('policy C offers manual rest recovery after fifteen minutes away past the d
     });
     document.dispatchEvent(new Event('visibilitychange'));
   });
+  await page.getByRole('button', { name: 'Уточнить', exact: true }).click();
   const review = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
   await expect(review).toBeVisible();
-  await expect(review).toContainText('Вы забыли завершить отдых?');
-  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
-  await review
-    .getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' })
-    .fill('2,5');
+  await expect(page.getByRole('dialog', { name: 'Сколько отдыхали?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toHaveCount(0);
+  await review.getByRole('textbox', { name: 'Фактическое время, минуты' }).fill('2,5');
   await review.getByRole('button', { name: 'Сохранить время' }).click();
   await expect(page.locator('.active-workout-rest')).toContainText(
     'Отдых сохранён по вашей отметке',
@@ -7076,6 +7073,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
           .getByRole('button', { name: '2 — ещё примерно 2 повтора' })
           .scrollIntoViewIfNeeded();
         await page.screenshot({ path: testInfo.outputPath(`selection-rir-${width}-${theme}.png`) });
+        await settleViewport(page);
 
         const nutritionLink = navigation.getByRole('link', { name: 'Питание', exact: true });
         const materialGeometry = await nutritionLink.evaluate((link) => {
@@ -7111,6 +7109,17 @@ test.describe('#914 rest timer pointer lifecycle', () => {
           body: JSON.stringify(materialGeometry),
           contentType: 'application/json',
         });
+        await settleViewport(page);
+        await expect
+          .poll(() =>
+            nutritionLink.evaluate((link) => {
+              const rect = link.getBoundingClientRect();
+              return link.contains(
+                document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+              );
+            }),
+          )
+          .toBe(true);
         await nutritionLink.tap();
         await expect(page).toHaveURL(/section=nutrition/);
         await expect(page.locator('.app-section--nutrition')).toBeVisible();
@@ -7339,7 +7348,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     // After rapid repeated taps, the terminal "Скрыть" action may already have
     // been hit at the former Skip coordinates. Both terminal states must retain
     // the explicit restart action without starting another interval.
-    const restart = context.panel.getByRole('button', { name: 'Начать отдых' });
+    const restart = context.panel.getByRole('button', { name: 'Новый отдых' });
     await expect(restart).toBeVisible();
     const dismiss = context.panel.getByRole('button', { name: 'Скрыть' });
     if (await dismiss.isVisible()) await dismiss.click();
@@ -7369,7 +7378,9 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     // already pressed Skip is an explicit user action, so it must be honored.
     await expect(context.panel).toHaveClass(/is-compact/);
     await expect(context.panel).toContainText('Отдых пропущен');
-    await expect(context.panel.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
+    await expect(context.panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toHaveCount(
+      0,
+    );
     await unchanged(page, context);
   });
 });
@@ -7516,7 +7527,7 @@ for (const theme of ['light', 'dark'] as const) {
       await set.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
       await set.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
       const rest = page.locator('.active-workout-rest');
-      await expect(rest.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await expect(rest.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
       await expect(rest).toContainText('ФАКТ');
       const folder = resolve(
         process.cwd(),
@@ -7546,9 +7557,10 @@ for (const theme of ['light', 'dark'] as const) {
         });
         document.dispatchEvent(new Event('visibilitychange'));
       });
-      const review = rest.getByRole('group', { name: 'Уточнение фактического отдыха' });
+      await rest.getByRole('button', { name: 'Уточнить', exact: true }).click();
+      const review = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
       await expect(review).toBeVisible();
-      await expect(review).toContainText('Вы забыли завершить отдых?');
+      await expect(page.getByRole('dialog', { name: 'Сколько отдыхали?' })).toBeVisible();
       await page.screenshot({
         path: resolve(folder, `after-${theme}-${width}-recovery.png`),
         animations: 'disabled',
@@ -7561,6 +7573,8 @@ async function mockRestSessions(page: Page) {
   const intervals: Record<number, Record<string, unknown>> = {};
   let nextId = 900;
   let restartRequests = 0;
+  let actionFailure: number | null = null;
+  let actionBarrier: Promise<void> | null = null;
   await page.route('**/api/v1/workouts/42/rest-sessions', async (route) => {
     const request = route.request();
     if (request.method() === 'GET') {
@@ -7587,6 +7601,14 @@ async function mockRestSessions(page: Page) {
     await route.fulfill({ json: intervals[id] });
   });
   await page.route('**/api/v1/workouts/rest-sessions/*/actions', async (route) => {
+    if (actionBarrier) await actionBarrier;
+    if (actionFailure) {
+      await route.fulfill({
+        status: actionFailure,
+        json: { detail: 'Controlled rest save failure' },
+      });
+      return;
+    }
     const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
     const interval = intervals[id];
     const payload = route.request().postDataJSON();
@@ -7639,7 +7661,23 @@ async function mockRestSessions(page: Page) {
     };
     await route.fulfill({ json: intervals[id] });
   });
-  return { intervals, restartCount: () => restartRequests };
+  return {
+    intervals,
+    restartCount: () => restartRequests,
+    failActions(status: number | null) {
+      actionFailure = status;
+    },
+    holdNextAction() {
+      let release!: () => void;
+      actionBarrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return () => {
+        actionBarrier = null;
+        release();
+      };
+    },
+  };
 }
 
 for (const theme1166 of ['dark', 'light'] as const) {
@@ -7677,15 +7715,15 @@ for (const theme1166 of ['dark', 'light'] as const) {
       await expect(page.getByRole('button', { name: 'Свернуть таймер' })).toBeVisible();
       await shot('01-running');
       await page.getByRole('button', { name: 'Свернуть таймер' }).click();
-      await expect(page.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
       await shot('02-hidden');
-      await page.getByRole('button', { name: 'Показать таймер' }).click();
+      await page.getByRole('button', { name: 'Развернуть таймер' }).click();
       await shot('03-reopened');
-      await page.getByRole('button', { name: 'Завершить отдых' }).click();
-      await expect(page.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+      await page.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
+      await expect(page.getByRole('button', { name: 'Новый отдых' })).toBeVisible();
       await shot('04-stopped');
-      await page.getByRole('button', { name: 'Начать отдых' }).click();
-      await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await page.getByRole('button', { name: 'Новый отдых' }).click();
+      await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
       await shot('05-restarted');
       expect(server.readSet(201).is_completed).toBe(true);
     });
@@ -7994,7 +8032,7 @@ test.describe('#1292 compact rest panel', () => {
         await first.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
         await first.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
         const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
-        await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
         await expect.poll(() => Object.values(restApi.intervals).length).toBe(1);
         const current = page.locator('[data-workout-set-id="202"]');
         const weight = current.getByLabel('Вес, Жим штанги лёжа, подход 2');
@@ -8035,9 +8073,9 @@ test.describe('#1292 compact rest panel', () => {
         };
         await shot('running');
         await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
-        await expect(panel.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
         await shot('collapsed');
-        await panel.getByRole('button', { name: 'Показать таймер' }).click();
+        await panel.getByRole('button', { name: 'Развернуть таймер' }).click();
         await page.evaluate(() => {
           Object.defineProperty(document, 'visibilityState', {
             configurable: true,
@@ -8053,13 +8091,14 @@ test.describe('#1292 compact rest panel', () => {
           });
           document.dispatchEvent(new Event('visibilitychange'));
         });
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
         await page
           .getByRole('group', { name: 'Уточнение фактического отдыха' })
           .getByRole('button', { name: 'Не учитывать', exact: true })
           .click();
         const summary = panel.locator('.active-workout-rest__complete-summary');
         await expect(summary).toHaveText('Отдых не учитывается');
-        const restart = panel.getByRole('button', { name: 'Начать отдых' });
+        const restart = panel.getByRole('button', { name: 'Новый отдых' });
         const dismiss = panel.getByRole('button', { name: 'Скрыть' });
         await expect(restart).toHaveClass(/ui-button--primary/);
         await expect(dismiss).toHaveClass(/ui-button--secondary/);
@@ -8118,13 +8157,12 @@ test.describe('#1292 compact rest panel', () => {
         expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
         expect(geometry.textScrollWidth).toBeLessThanOrEqual(geometry.textClientWidth + 1);
         expect(geometry.textScrollHeight).toBeLessThanOrEqual(geometry.textClientHeight + 1);
-        if (width < 681)
-          expect(geometry.status.bottom).toBeLessThanOrEqual(geometry.buttons[0]!.top + 1);
-        else expect(geometry.status.right).toBeLessThanOrEqual(geometry.buttons[0]!.left);
+        expect(geometry.status.right).toBeLessThanOrEqual(geometry.buttons[0]!.left);
+        expect(geometry.panel.height).toBeLessThanOrEqual(66);
         expect(geometry.buttons[0]!.right).toBeLessThanOrEqual(geometry.buttons[1]!.left);
         if (width < 681) {
-          expect(geometry.buttons[0]!.left - geometry.panel.left).toBeCloseTo(13, 0);
-          expect(geometry.panel.right - geometry.buttons[1]!.right).toBeCloseTo(13, 0);
+          expect(geometry.status.left - geometry.panel.left).toBeCloseTo(11, 0);
+          expect(geometry.panel.right - geometry.buttons[1]!.right).toBeCloseTo(11, 0);
         }
         for (const button of geometry.buttons) {
           expect(button.width).toBeGreaterThanOrEqual(44);
@@ -8223,7 +8261,7 @@ test.describe('#1292 compact rest panel', () => {
         await shot('dismissed');
 
         await restart.dblclick();
-        await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
         await expect.poll(() => restApi.restartCount()).toBe(1);
         await expect.poll(async () => (await readRestJournal(page)).length).toBe(2);
         const records = await readRestJournal(page);
@@ -8289,7 +8327,7 @@ test.describe('#1292 compact rest panel', () => {
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
           'Отдых завершён',
         );
-        await expect(panel.getByRole('button', { name: 'Начать отдых' })).toHaveCount(0);
+        await expect(panel.getByRole('button', { name: 'Новый отдых' })).toHaveCount(0);
         const single = await panel.evaluate((element) => {
           const p = element.getBoundingClientRect();
           const summary = element.querySelector('.active-workout-rest__complete-summary')!;
@@ -8336,7 +8374,7 @@ test.describe('#1292 compact rest panel', () => {
         await page.clock.setFixedTime(new Date(start.getTime() + 100_000));
         await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
         await expect(panel.getByRole('timer', { name: 'Отдых' })).toHaveText('0:00');
-        await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
         await shot('expired-running');
         await page.evaluate(() => {
           Object.defineProperty(document, 'visibilityState', {
@@ -8353,10 +8391,9 @@ test.describe('#1292 compact rest panel', () => {
           });
           document.dispatchEvent(new Event('visibilitychange'));
         });
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
         const recovery = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
-        await recovery
-          .getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' })
-          .fill('2,5');
+        await recovery.getByRole('textbox', { name: 'Фактическое время, минуты' }).fill('2,5');
         await recovery.getByRole('button', { name: 'Сохранить время' }).click();
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
           'ФАКТ 2:30',
@@ -8367,7 +8404,7 @@ test.describe('#1292 compact rest panel', () => {
         expect(corrected).toMatchObject({ measured_seconds: 150, source: 'USER_CORRECTED' });
         await shot('corrected');
 
-        await panel.getByRole('button', { name: 'Начать отдых' }).click();
+        await panel.getByRole('button', { name: 'Новый отдых' }).click();
         await expect.poll(() => restApi.restartCount()).toBe(1);
         await panel.getByRole('button', { name: 'Пропустить' }).click();
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
@@ -8375,11 +8412,11 @@ test.describe('#1292 compact rest panel', () => {
         );
         await shot('skipped');
         await expect.poll(async () => (await readRestJournal(page))[1]?.pending.length).toBe(0);
-        await panel.getByRole('button', { name: 'Начать отдых' }).click();
+        await panel.getByRole('button', { name: 'Новый отдых' }).click();
         await expect.poll(() => restApi.restartCount()).toBe(2);
-        await panel.getByRole('button', { name: 'Завершить отдых' }).click();
+        await panel.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
-          'Отдых завершён по отметке',
+          'Отдых завершён',
         );
         expect((await readRestJournal(page))[0]).toEqual(corrected);
         expect(await readRestJournal(page)).toHaveLength(3);
@@ -8484,5 +8521,330 @@ test.describe('#1292 compact rest panel', () => {
         await capture('tma-keyboard');
       });
     }
+  }
+});
+
+test.describe('#1338 v2 compact timer', () => {
+  test.use({ hasTouch: true });
+
+  for (const theme of ['dark', 'light'] as const) {
+    for (const width of [320, 360, 393, 430, 1120, 1440]) {
+      test('review states ' + theme + ' ' + width + 'px', async ({ page, browserName }, info) => {
+        const start = new Date('2026-10-10T12:00:00Z');
+        await page.setViewportSize({
+          width,
+          height: width === 1440 ? 1000 : width === 1120 ? 960 : 844,
+        });
+        await page.clock.install({ time: start });
+        await page.clock.setFixedTime(start);
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        const server = await mockActiveWorkout(page);
+        const restApi = await mockRestSessions(page);
+        Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, rir: '1' });
+        Object.assign(server.readSet(202), { actual_weight: 42.5, actual_reps: 9, rir: '2' });
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+        await expect(panel).toHaveCount(0);
+        expect(await readRestJournal(page)).toHaveLength(0);
+        await page
+          .locator('[data-workout-set-id="201"]')
+          .getByRole('button', { name: /^Завершить:/ })
+          .click();
+        await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+        await expect.poll(async () => (await readRestJournal(page))[0]?.server_id).toBe(900);
+        const previousSet = structuredClone(server.readSet(201));
+        const nextSet = structuredClone(server.readSet(202));
+        const neighbor = structuredClone(server.readSet(203));
+        const heights: Record<string, number> = {};
+        const capture = async (state: string, expectedHeight: number) => {
+          await expect
+            .poll(async () => (await panel.boundingBox())?.height, { message: state })
+            .toBeCloseTo(expectedHeight, 0);
+          const box = await panel.boundingBox();
+          expect(box).not.toBeNull();
+          await expect(panel).toBeInViewport();
+          if (expectedHeight === 110) expect(box!.height).toBeLessThanOrEqual(118);
+          heights[state] = box!.height;
+          const geometry = await panel.evaluate((element) => {
+            const p = element.getBoundingClientRect();
+            return {
+              overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              controls: Array.from(element.querySelectorAll('button'))
+                .filter((button) => button.getClientRects().length)
+                .map((button) => {
+                  const r = button.getBoundingClientRect();
+                  return {
+                    width: r.width,
+                    height: r.height,
+                    left: r.left - p.left,
+                    right: p.right - r.right,
+                  };
+                }),
+            };
+          });
+          expect(geometry.overflow).toBeLessThanOrEqual(1);
+          expect(geometry.controls.length).toBeGreaterThan(0);
+          for (const control of geometry.controls) {
+            expect(control.width).toBeGreaterThanOrEqual(44);
+            expect(control.height).toBeGreaterThanOrEqual(44);
+            expect(control.left).toBeGreaterThanOrEqual(-1);
+            expect(control.right).toBeGreaterThanOrEqual(-1);
+          }
+          expect(server.readSet(201)).toEqual(previousSet);
+          expect(server.readSet(202)).toEqual(nextSet);
+          expect(server.readSet(203)).toEqual(neighbor);
+          if (process.env.CAPTURE_1338_VISUALS === '1') {
+            const folder = resolve(
+              process.cwd(),
+              '..',
+              '.artifacts',
+              'tasks',
+              '1338',
+              'evidence',
+              'after',
+            );
+            await mkdir(folder, { recursive: true });
+            await page.screenshot({
+              path: resolve(folder, [browserName, theme, width, state].join('-') + '.png'),
+              animations: 'disabled',
+            });
+          }
+        };
+
+        await expect(panel.locator('.active-workout-rest__actions button')).toHaveCount(4);
+        await expect(panel.getByRole('timer')).toHaveText('1:30');
+        await capture('active', 110);
+        await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
+        await capture('collapsed-active', 60);
+        await panel.getByRole('button', { name: 'Развернуть таймер' }).click();
+        await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+        await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+        await expect(panel.getByRole('timer')).toHaveText('3:00');
+        await expect.poll(() => restApi.intervals[900]?.adjusted_seconds).toBe(180);
+
+        await page.clock.setFixedTime(new Date(start.getTime() + 200_000));
+        await page.clock.runFor(1100);
+        await expect(panel.getByRole('timer')).toHaveText('0:00');
+        await expect(panel.getByLabel('Время по отметке пользователя')).toHaveText('3:20');
+        await capture('expired', 110);
+        const intervalId = (await readRestJournal(page))[0]!.start_mutation_id;
+        await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
+        await capture('collapsed', 60);
+        await page.clock.setFixedTime(new Date(start.getTime() + 210_000));
+        await page.clock.runFor(1100);
+        await expect(panel).toContainText('ФАКТ 3:30');
+        await panel.getByRole('button', { name: 'Развернуть таймер' }).click();
+        expect((await readRestJournal(page))[0]!.start_mutation_id).toBe(intervalId);
+        await expect(panel.getByLabel('Время по отметке пользователя')).toHaveText('3:30');
+        await panel.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
+        await expect.poll(() => restApi.intervals[900]?.measured_seconds).toBe(210);
+        await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+        await capture('completed', 66);
+        const completed = (await readRestJournal(page))[0];
+        await panel.getByRole('button', { name: 'Скрыть', exact: true }).click();
+        await expect(panel.locator('.active-workout-rest__complete-summary')).toHaveCount(0);
+        await expect
+          .poll(
+            async () => (await page.locator('.active-workout-rest-spacer').boundingBox())?.height,
+          )
+          .toBe(44);
+        await capture('dismissed', 44);
+        expect(await readRestJournal(page)).toEqual([completed]);
+
+        await panel.getByRole('button', { name: 'Новый отдых', exact: true }).dblclick();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect.poll(() => restApi.restartCount()).toBe(1);
+        expect((await readRestJournal(page))[0]).toEqual(completed);
+        await expect(panel.getByLabel('Время по отметке пользователя')).toHaveText('0:00');
+        await capture('restarted', 110);
+        await panel.getByRole('button', { name: 'Пропустить', exact: true }).click();
+        await expect.poll(() => restApi.intervals[901]?.status).toBe('skipped');
+        expect(restApi.intervals[901]!.measured_seconds).toBeNull();
+        await capture('skipped', 66);
+
+        await panel.getByRole('button', { name: 'Новый отдых', exact: true }).click();
+        await expect.poll(() => restApi.restartCount()).toBe(2);
+        await setDocumentVisibility(page, 'hidden');
+        await page.clock.setFixedTime(new Date(start.getTime() + 23 * 60_000));
+        await setDocumentVisibility(page, 'visible');
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await capture('review-required', 62);
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: 'Сколько отдыхали?', exact: true });
+        const input = dialog.getByRole('textbox', {
+          name: 'Фактическое время, минуты',
+        });
+        await expect(input).toBeFocused();
+        await capture('recovery-dialog', 62);
+        const unresolved = await readRestJournal(page);
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0);
+        expect(await readRestJournal(page)).toEqual(unresolved);
+        await capture('review-required', 62);
+        const reopen = panel.getByRole('button', { name: 'Уточнить', exact: true });
+        await reopen.click();
+        await expect(input).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(dialog.locator('.active-workout-rest-dialog__close')).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(input).toBeFocused();
+        await input.fill('-1');
+        await dialog.getByRole('button', { name: 'Сохранить время', exact: true }).click();
+        await expect(input).toHaveAttribute('aria-invalid', 'true');
+        expect(await readRestJournal(page)).toEqual(unresolved);
+        await input.fill('2,5');
+        await dialog.getByRole('button', { name: 'Сохранить время', exact: true }).click();
+        await expect(dialog).toHaveCount(0);
+        await expect.poll(() => restApi.intervals[902]?.measured_seconds).toBe(150);
+        expect(restApi.intervals[902]!.source).toBe('USER_CORRECTED');
+        await capture('corrected', 66);
+
+        await panel.getByRole('button', { name: 'Новый отдых', exact: true }).click();
+        await setDocumentVisibility(page, 'hidden');
+        await page.clock.setFixedTime(new Date(start.getTime() + 45 * 60_000));
+        await setDocumentVisibility(page, 'visible');
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
+        await page
+          .getByRole('dialog', { name: 'Сколько отдыхали?', exact: true })
+          .getByRole('button', { name: 'Не учитывать', exact: true })
+          .click();
+        await expect.poll(() => restApi.intervals[903]?.status).toBe('skipped');
+        expect(restApi.intervals[903]!.measured_seconds).toBeNull();
+        await expect(panel.locator('.active-workout-rest__complete-summary')).toHaveText(
+          'Отдых не учитывается',
+        );
+        await capture('omitted', 66);
+        expect((await readRestJournal(page))[0]).toEqual(completed);
+
+        if (width === 320 && theme === 'dark') {
+          await panel.getByRole('button', { name: 'Новый отдых', exact: true }).click();
+          await page.evaluate(() => {
+            document.documentElement.style.fontSize = '200%';
+          });
+          const scaled = await panel.evaluate((element) => {
+            const p = element.getBoundingClientRect();
+            return Array.from(element.querySelectorAll('button'))
+              .filter((button) => button.getClientRects().length)
+              .map((button) => {
+                const r = button.getBoundingClientRect();
+                return (
+                  r.left >= p.left && r.right <= p.right && button.scrollWidth <= button.clientWidth
+                );
+              });
+          });
+          expect(scaled.length).toBeGreaterThanOrEqual(6);
+          expect(scaled.every(Boolean)).toBe(true);
+          if (process.env.CAPTURE_1338_VISUALS === '1') {
+            const folder = resolve(
+              process.cwd(),
+              '..',
+              '.artifacts',
+              'tasks',
+              '1338',
+              'evidence',
+              'after',
+            );
+            await page.screenshot({
+              path: resolve(folder, [browserName, theme, width, 'large-text'].join('-') + '.png'),
+              animations: 'disabled',
+            });
+          }
+        }
+        await writeFile(
+          info.outputPath('timer-heights.json'),
+          JSON.stringify({ browserName, theme, width, heights }, null, 2),
+        );
+      });
+    }
+
+    test('sync pending offline error and 409 ' + theme, async ({ page, browserName }, info) => {
+      await page.setViewportSize({ width: 393, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const server = await mockActiveWorkout(page);
+      const restApi = await mockRestSessions(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const first = page.locator('[data-workout-set-id="201"]');
+      await first.getByLabel(/^Вес,/).fill('40');
+      await first.getByLabel(/^Повторы,/).fill('8');
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(async () => (await readRestJournal(page))[0]?.server_id).toBe(900);
+      const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+      const before = structuredClone(server.readSet(202));
+      const capture = async (state: string) => {
+        expect((await panel.boundingBox())!.height).toBe(110);
+        expect(server.readSet(202)).toEqual(before);
+        if (process.env.CAPTURE_1338_VISUALS === '1') {
+          const folder = resolve(
+            process.cwd(),
+            '..',
+            '.artifacts',
+            'tasks',
+            '1338',
+            'evidence',
+            'after',
+          );
+          await mkdir(folder, { recursive: true });
+          await page.screenshot({
+            path: resolve(folder, [browserName, theme, 393, state].join('-') + '.png'),
+            animations: 'disabled',
+          });
+        }
+      };
+      const release = restApi.holdNextAction();
+      await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+      await expect(panel.locator('.active-workout-rest__status')).toContainText('Сохраняется…');
+      await capture('pending');
+      release();
+      await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+      await setNetworkOffline(page, true);
+      await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+      await expect(panel.locator('.active-workout-rest__status')).toContainText('Нет сети');
+      const offline = (await readRestJournal(page))[0]!;
+      expect(offline.pending).toHaveLength(1);
+      await capture('offline');
+      restApi.failActions(503);
+      await setNetworkOffline(page, false);
+      await expect(panel.locator('.active-workout-rest__status')).toContainText(
+        'Ошибка сохранения',
+      );
+      await capture('error');
+      const status = panel.getByRole('button', { name: /Состояние отдыха:/ });
+      await status.click();
+      const dialog = page.getByRole('dialog', { name: 'Сохранение отдыха' });
+      await expect(dialog.getByRole('alert')).toContainText('устройстве');
+      await page.keyboard.press('Escape');
+      await expect(status).toBeFocused();
+      restApi.failActions(409);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await expect(panel.locator('.active-workout-rest__status')).toContainText(
+        'Конфликт сохранения',
+      );
+      expect((await readRestJournal(page))[0]).toMatchObject({
+        start_mutation_id: offline.start_mutation_id,
+        deadline: offline.deadline,
+        pending: offline.pending,
+      });
+      await capture('conflict-409');
+      restApi.failActions(null);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+      await expect(panel.locator('.active-workout-rest__status')).toContainText('Отдых идёт');
+      expect(restApi.intervals[900]!.adjusted_seconds).toBe(180);
+      await capture('reconnected');
+      await writeFile(
+        info.outputPath('sync-verification.json'),
+        JSON.stringify(
+          { browserName, theme, pendingRetainedOn409: true, syncedAdjustedSeconds: 180 },
+          null,
+          2,
+        ),
+      );
+    });
   }
 });

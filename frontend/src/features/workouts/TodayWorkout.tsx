@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
@@ -8,6 +9,7 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
 import { Icon } from '../../shared/ui/Icon';
 import { glassProps } from '../../shared/ui/Glass';
+import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { TaskProgress } from '../../shared/ui/DataViz';
 import {
   DisclosureIcon,
@@ -15,6 +17,8 @@ import {
   Button,
   Card,
   CheckIcon,
+  CloseIcon,
+  IconButton,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -1527,14 +1531,12 @@ export function RestTimer({
   userId,
   workoutId,
   nextLabel,
-  nextExercise,
   nextPosition,
   eligibleRestSourceSetIds = [],
 }: {
   userId: number;
   workoutId: number;
   nextLabel: string;
-  nextExercise: string;
   nextPosition: string;
   eligibleRestSourceSetIds?: readonly number[];
 }) {
@@ -1560,9 +1562,11 @@ export function RestTimer({
   );
   const [restRecords, setRestRecords] = useState(() => loadRestJournal(userId, workoutId));
   const [restSaveError, setRestSaveError] = useState<string | null>(null);
+  const [restDialog, setRestDialog] = useState<'sync' | { recoveryId: string } | null>(null);
   const [compact, setCompact] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const panel = useRef<HTMLElement>(null);
+  const restSpacer = useRef<HTMLDivElement>(null);
   const pressedPointers = useRef(new Set<number>());
   const compactWhenPointersRelease = useRef(false);
   const layoutAnchor = useRef<{ element: Element; top: number } | null>(null);
@@ -1590,20 +1594,47 @@ export function RestTimer({
   const restPendingLabel = isOfflineRest
     ? 'Нет сети · отдых ожидает сохранения'
     : 'Отдых сохраняется…';
-  let collapsedRestStatus = 'Отдых идёт';
+  const needsReview = Boolean(measuredRest?.needs_review);
+  const recoveryDialogOpen =
+    needsReview &&
+    typeof restDialog === 'object' &&
+    restDialog?.recoveryId === measuredRest?.start_mutation_id;
+  const syncDialogOpen = restDialog === 'sync';
+  const restDialogOpen = recoveryDialogOpen || syncDialogOpen;
+  const restDialogTitle = recoveryDialogOpen ? 'Сколько отдыхали?' : 'Сохранение отдыха';
+  const restDialogRef = useModalA11y<HTMLDivElement>(
+    restDialogOpen,
+    () => setRestDialog(null),
+    recoveryDialogOpen ? 'input' : '.active-workout-rest-dialog__close',
+  );
+  const terminalRestLabel =
+    completedNotice === 'Отдых завершён по отметке' ||
+    completedNotice === 'Отдых сохранён по вашей отметке'
+      ? 'Отдых завершён'
+      : (completedNotice?.split(' · ')[0] ??
+        (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён'));
+  const hasPendingRest =
+    restIsUnconfirmed ||
+    Boolean(!measuredRest && latestRest && (!latestRest.server_id || latestRest.pending.length));
+  let collapsedRestStatus = seconds === 0 ? 'План готов' : 'Отдых идёт';
   if (restSaveError) {
     collapsedRestStatus = restSaveError.startsWith('Конфликт')
       ? 'Конфликт сохранения'
       : 'Ошибка сохранения';
-  } else if (restIsUnconfirmed) {
-    collapsedRestStatus = isOfflineRest ? 'Нет сети' : 'Отдых сохраняется…';
+  } else if (isOfflineRest) {
+    collapsedRestStatus = 'Нет сети';
+  } else if (hasPendingRest) {
+    collapsedRestStatus = 'Сохраняется…';
   }
   const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
   const showCompact = compact || restoredTerminal;
   const restPanelClassName = [
     'active-workout-rest',
     completedNotice || restoredTerminal ? 'active-workout-rest--complete' : null,
-    showCompact || collapsed ? 'is-compact' : null,
+    isRunningRest && seconds === 0 && !needsReview ? 'active-workout-rest--expired' : null,
+    showCompact || collapsed || needsReview ? 'is-compact' : null,
+    needsReview ? 'active-workout-rest--review' : null,
+    terminalNoticeDismissed ? 'active-workout-rest--dismissed' : null,
     showCompact && !(collapsed && isRunningRest) ? 'active-workout-rest--terminal' : null,
     showCompact && !restartCandidate && !terminalNoticeDismissed
       ? 'active-workout-rest--terminal-single'
@@ -1618,6 +1649,22 @@ export function RestTimer({
   const captureLayoutAnchor = useCallback(() => {
     const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
     if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
+  }, []);
+  const restoreLayoutAnchor = useCallback(() => {
+    const anchor = layoutAnchor.current;
+    if (!anchor) return;
+    const spacer = restSpacer.current;
+    // WebKit can resize the fixed panel before its inherited spacer height is committed.
+    if (
+      spacer?.getClientRects().length &&
+      spacer.getBoundingClientRect().height !== panel.current?.getBoundingClientRect().height
+    )
+      return;
+    layoutAnchor.current = null;
+    if (anchor.element.isConnected) {
+      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
+      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+    }
   }, []);
   const compactNotice = useCallback(() => {
     if (pressedPointers.current.size) {
@@ -1675,7 +1722,7 @@ export function RestTimer({
         setRestSaveError(
           status === 409
             ? 'Конфликт сохранения отдыха. Данные сохранены на устройстве.'
-            : 'Сервер временно недоступен. Отдых ожидает сохранения.',
+            : 'Сервер временно недоступен. Данные отдыха сохранены на устройстве и ожидают синхронизации.',
         );
       })
         .then(() => {
@@ -1873,13 +1920,22 @@ export function RestTimer({
       // same horizontal alignment without tracking vertical scroll frame by frame.
       const bounds = parent.getBoundingClientRect();
       if (bounds.width > 0) {
-        element.style.setProperty('--yfc-active-workout-rest-fixed-left', `${bounds.left}px`);
         element.style.setProperty('--yfc-active-workout-rest-fixed-width', `${bounds.width}px`);
+        const width = Math.min(bounds.width, element.getBoundingClientRect().width);
+        element.style.setProperty(
+          '--yfc-active-workout-rest-fixed-left',
+          `${bounds.left + (bounds.width - width) / 2}px`,
+        );
       }
     };
     updateClearance();
     const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateClearance);
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            updateClearance();
+            restoreLayoutAnchor();
+          });
     observer?.observe(element);
     observer?.observe(parent);
     window.addEventListener('resize', updateClearance);
@@ -1893,16 +1949,11 @@ export function RestTimer({
       element.style.removeProperty('--yfc-active-workout-rest-fixed-left');
       element.style.removeProperty('--yfc-active-workout-rest-fixed-width');
     };
-  }, [hasDeadline, collapsed, showCompact, completedNotice]);
+  }, [hasDeadline, collapsed, showCompact, completedNotice, restoreLayoutAnchor]);
 
   useLayoutEffect(() => {
-    const anchor = layoutAnchor.current;
-    layoutAnchor.current = null;
-    if (anchor?.element.isConnected) {
-      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
-      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
-    }
-  }, [collapsed, showCompact, completedNotice]);
+    restoreLayoutAnchor();
+  }, [collapsed, showCompact, completedNotice, restoreLayoutAnchor]);
 
   useEffect(() => {
     const element = panel.current;
@@ -1927,6 +1978,25 @@ export function RestTimer({
   }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
   if (!deadline && !completedNotice && !restartCandidate) return null;
+  const restStatus = (
+    <button
+      type="button"
+      className="active-workout-rest__status"
+      aria-haspopup="dialog"
+      aria-label={`Состояние отдыха: ${collapsedRestStatus}. Подробнее`}
+      onClick={(event) => {
+        // A second click from restart must not activate a newly placed control.
+        if (event.detail > 1) return;
+        event.currentTarget.focus();
+        setRestDialog('sync');
+      }}
+    >
+      {(hasPendingRest || restSaveError || isOfflineRest) && (
+        <Icon name={restSaveError || isOfflineRest ? 'warning' : 'sync'} size={16} />
+      )}
+      <span role="status">{collapsedRestStatus}</span>
+    </button>
+  );
   const restPanel = (
     <aside
       ref={panel}
@@ -1939,180 +2009,101 @@ export function RestTimer({
       }}
       onClick={(event) => event.stopPropagation()}
     >
-      {collapsed && isRunningRest ? (
+      {needsReview ? (
+        <div className="active-workout-rest__review">
+          <Icon name="warning" size={20} />
+          <div>
+            <strong>Уточнить отдых</strong>
+            <span>Время в фоне не засчитано</span>
+          </div>
+          <Button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={(event) => {
+              if (event.detail > 1) return;
+              event.currentTarget.focus();
+              if (measuredRest) setRestDialog({ recoveryId: measuredRest.start_mutation_id });
+            }}
+          >
+            Уточнить
+          </Button>
+        </div>
+      ) : collapsed && isRunningRest ? (
         <div className="active-workout-rest__collapsed">
           <div>
-            <strong aria-live="polite">{collapsedRestStatus}</strong>
-            <span>
-              ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
+            <strong role="status">{collapsedRestStatus}</strong>
+            <span className="active-workout-rest__collapsed-times">
+              Осталось{' '}
+              <span role="timer" aria-label="Отдых" aria-live="off">
+                {formatWorkoutDuration(seconds)}
+              </span>
+              {' · '}
+              <span>ФАКТ {formatWorkoutDuration(measuredElapsedSeconds)}</span>
             </span>
           </div>
           <Button
             type="button"
             variant="secondary"
-            glass="clear"
-            onClick={() => {
+            aria-label="Развернуть таймер"
+            onClick={(event) => {
+              if (event.detail > 1) return;
               captureLayoutAnchor();
               setCollapsed(false);
               writeStorage(`${storageKey}:panel-collapsed`, false);
             }}
           >
-            Показать таймер
+            Развернуть
           </Button>
         </div>
       ) : (
         <>
-          <div className="active-workout-rest__time" hidden={showCompact}>
-            <span>Отдых</span>
-            <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
-              {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
-            </strong>
-          </div>
-          <div className="active-workout-rest__next" hidden={showCompact}>
-            <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
-            <span className="active-workout-rest__next-meta">
-              <span>{nextPosition}</span>
-              {restIsUnconfirmed && (
-                <span
-                  className="active-workout-rest__next-status"
-                  aria-live="polite"
-                  title={restPendingLabel}
+          {!showCompact && (
+            <div className="active-workout-rest__top">
+              <div className="active-workout-rest__time">
+                <span>ОСТАЛОСЬ</span>
+                <strong
+                  role={completedNotice ? undefined : 'timer'}
+                  aria-label="Отдых"
+                  aria-live="off"
                 >
-                  <Icon name={isOfflineRest ? 'warning' : 'sync'} size={16} />
-                  <span className="sr-only">{restPendingLabel}</span>
-                </span>
-              )}
-            </span>
-          </div>
-          {measuredRest && !showCompact && (
-            <div className="active-workout-rest__actual">
-              <div className="active-workout-rest__actual-value">
-                <span>ФАКТ</span>
-                <strong aria-label="Время по отметке пользователя" aria-live="off">
-                  {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
+                  {formatWorkoutDuration(seconds)}
                 </strong>
               </div>
-              {!measuredRest.needs_review && (
-                <button
-                  className="active-workout-rest__stop"
+              {measuredRest && (
+                <div className="active-workout-rest__actual">
+                  <div className="active-workout-rest__actual-value">
+                    <span>ФАКТ</span>
+                    <strong aria-label="Время по отметке пользователя" aria-live="off">
+                      {formatWorkoutDuration(measuredElapsedSeconds)}
+                    </strong>
+                  </div>
+                </div>
+              )}
+              {restStatus}
+              {isRunningRest && (
+                <Button
                   type="button"
-                  aria-label="Завершить отдых"
-                  onClick={() => {
-                    const stoppedAt = Date.now();
-                    const result = updateMeasuredRest(
-                      userId,
-                      workoutId,
-                      measuredRest.source_set_id,
-                      'complete',
-                      stoppedAt,
-                    );
-                    setMeasuredRest(null);
-                    removeStorage(storageKey);
-                    setDeadline(0);
-                    setNow(stoppedAt);
-                    setCompletedNotice(
-                      result?.status === 'completed'
-                        ? 'Отдых завершён по отметке'
-                        : 'Нет достоверного замера отдыха',
-                    );
-                    compactNotice();
+                  variant="ghost"
+                  className="active-workout-rest__collapse"
+                  aria-label="Свернуть таймер"
+                  onClick={(event) => {
+                    if (event.detail > 1) return;
+                    captureLayoutAnchor();
+                    setCollapsed(true);
+                    writeStorage(`${storageKey}:panel-collapsed`, true);
                   }}
                 >
-                  Стоп
-                </button>
+                  <Icon name="chevron-up" size={20} />
+                </Button>
               )}
             </div>
           )}
-          {measuredRest?.needs_review && !showCompact && (
-            <section
-              className="active-workout-rest__recovery"
-              role="group"
-              aria-label="Уточнение фактического отдыха"
-            >
-              <strong>Вы забыли завершить отдых?</strong>
-              <p>
-                Приложение было неактивно, поэтому прошедшее время не считается достоверным замером.
-              </p>
-              <label htmlFor={`rest-recovery-${workoutId}`}>
-                Сколько вы фактически отдыхали (минуты)?
-              </label>
-              <input
-                id={`rest-recovery-${workoutId}`}
-                type="text"
-                inputMode="decimal"
-                className="ui-input"
-                placeholder="Например, 2,5"
-                value={recoveredMinutes}
-                onChange={(event) => {
-                  setRecoveredMinutes(event.target.value);
-                  setRecoveryValidation('');
-                }}
-              />
-              {recoveryValidation && <span role="alert">{recoveryValidation}</span>}
-              <div className="active-workout-rest__recovery-actions">
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => {
-                    const value = Number(recoveredMinutes.trim().replace(',', '.'));
-                    const correctedSeconds = Math.round(value * 60);
-                    if (
-                      !recoveredMinutes.trim() ||
-                      !Number.isFinite(value) ||
-                      correctedSeconds < 0 ||
-                      correctedSeconds > 86400
-                    ) {
-                      setRecoveryValidation('Введите время от 0 до 1440 минут');
-                      return;
-                    }
-                    const result = updateMeasuredRest(
-                      userId,
-                      workoutId,
-                      measuredRest.source_set_id,
-                      'complete',
-                      Date.now(),
-                      correctedSeconds,
-                    );
-                    if (result?.status !== 'completed') {
-                      setRecoveryValidation('Не удалось сохранить уточнение. Попробуйте ещё раз.');
-                      return;
-                    }
-                    setMeasuredRest(null);
-                    removeStorage(storageKey);
-                    setDeadline(0);
-                    setCompletedNotice('Отдых сохранён по вашей отметке');
-                    compactNotice();
-                  }}
-                >
-                  Сохранить время
-                </Button>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => {
-                    updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
-                    setMeasuredRest(null);
-                    removeStorage(storageKey);
-                    setDeadline(0);
-                    setCompletedNotice('Отдых не учитывается');
-                    compactNotice();
-                  }}
-                >
-                  Не учитывать
-                </Button>
-              </div>
-            </section>
-          )}
-          <div
-            className="active-workout-rest__actions"
-            hidden={showCompact || Boolean(measuredRest?.needs_review)}
-          >
+          <div className="active-workout-rest__actions" hidden={showCompact}>
             {[30, 60].map((extraSeconds) => (
               <Button
                 key={extraSeconds}
                 aria-label={`+${extraSeconds} сек`}
                 type="button"
-                glass="clear"
                 variant="secondary"
                 aria-disabled={Boolean(completedNotice)}
                 tabIndex={completedNotice ? -1 : undefined}
@@ -2140,9 +2131,37 @@ export function RestTimer({
                 <Icon name="plus" size={16} /> {extraSeconds} сек
               </Button>
             ))}
+            {measuredRest && !measuredRest.needs_review && (
+              <Button
+                className="active-workout-rest__stop"
+                type="button"
+                aria-label="Стоп: завершить отдых"
+                onClick={() => {
+                  const stoppedAt = Date.now();
+                  const result = updateMeasuredRest(
+                    userId,
+                    workoutId,
+                    measuredRest.source_set_id,
+                    'complete',
+                    stoppedAt,
+                  );
+                  setMeasuredRest(null);
+                  removeStorage(storageKey);
+                  setDeadline(0);
+                  setNow(stoppedAt);
+                  setCompletedNotice(
+                    result?.status === 'completed'
+                      ? 'Отдых завершён по отметке'
+                      : 'Нет достоверного замера отдыха',
+                  );
+                  compactNotice();
+                }}
+              >
+                Стоп
+              </Button>
+            )}
             <Button
               type="button"
-              glass="clear"
               variant="secondary"
               aria-disabled={Boolean(completedNotice)}
               tabIndex={completedNotice ? -1 : undefined}
@@ -2161,34 +2180,46 @@ export function RestTimer({
             >
               Пропустить
             </Button>
-            {isRunningRest && !measuredRest?.needs_review && (
-              <button
-                type="button"
-                className="active-workout-rest__collapse"
-                aria-label="Свернуть таймер"
-                onClick={() => {
-                  captureLayoutAnchor();
-                  setCollapsed(true);
-                  writeStorage(`${storageKey}:panel-collapsed`, true);
-                }}
-              >
-                <Icon name="chevron-up" size={20} />
-              </button>
-            )}
           </div>
           {showCompact && (
             <>
               {!terminalNoticeDismissed && (
-                <div className="active-workout-rest__complete-summary">
-                  <span className="active-workout-rest__complete-copy">
-                    {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
+                <button
+                  type="button"
+                  className="active-workout-rest__complete-summary"
+                  aria-haspopup="dialog"
+                  onClick={(event) => {
+                    if (event.detail > 1) return;
+                    event.currentTarget.focus();
+                    setRestDialog('sync');
+                  }}
+                >
+                  <span className="active-workout-rest__complete-mark" aria-hidden="true">
+                    {hasPendingRest ||
+                    restSaveError ||
+                    isOfflineRest ||
+                    terminalRestLabel.startsWith('Нет') ? (
+                      <Icon
+                        name={
+                          restSaveError || isOfflineRest || terminalRestLabel.startsWith('Нет')
+                            ? 'warning'
+                            : 'sync'
+                        }
+                        size={16}
+                      />
+                    ) : isSkippedLatestRest ? (
+                      <CloseIcon />
+                    ) : (
+                      <CheckIcon />
+                    )}
                   </span>
+                  <span className="active-workout-rest__complete-copy">{terminalRestLabel}</span>
                   {isCompletedLatestRest && latestRest?.measured_seconds != null && (
                     <span className="active-workout-rest__complete-copy">
                       ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
                     </span>
                   )}
-                </div>
+                </button>
               )}
               {(restartCandidate || !terminalNoticeDismissed) && (
                 <div className="active-workout-rest__complete-actions">
@@ -2221,14 +2252,13 @@ export function RestTimer({
                         writeStorage(`${storageKey}:panel-collapsed`, false);
                       }}
                     >
-                      Начать отдых
+                      Новый отдых
                     </Button>
                   )}
                   {!terminalNoticeDismissed && (
                     <Button
                       type="button"
                       variant="secondary"
-                      glass="clear"
                       onClick={() => {
                         captureLayoutAnchor();
                         setTerminalNoticeDismissed(Boolean(restartCandidate));
@@ -2243,30 +2273,159 @@ export function RestTimer({
               )}
             </>
           )}
-          {((measuredRest && restIsUnconfirmed && (showCompact || collapsed)) ||
-            (!measuredRest &&
-              latestRest &&
-              (!latestRest.server_id || latestRest.pending.length > 0))) && (
-            <p className="active-workout-rest__sync" aria-live="polite">
-              {isOfflineRest ? 'Нет сети · отдых ожидает сохранения' : 'Отдых сохраняется…'}
-            </p>
-          )}
-          {restSaveError && (
-            <p className="active-workout-rest__sync" role="alert">
-              {restSaveError}
-            </p>
-          )}
-          <span className="sr-only" role="status" aria-atomic="true">
-            {completedNotice ?? announcement}
-          </span>
         </>
       )}
+      <span className="sr-only" role="status" aria-atomic="true">
+        {needsReview
+          ? 'Уточните длительность отдыха или не учитывайте замер'
+          : (completedNotice ?? announcement)}
+      </span>
     </aside>
   );
   return (
     <>
       {restPanel}
-      <div className="active-workout-rest-spacer" aria-hidden="true" />
+      <div ref={restSpacer} className="active-workout-rest-spacer" aria-hidden="true" />
+      {restDialogOpen &&
+        createPortal(
+          <div
+            className="modal app-section--design-v2 active-workout-rest-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`rest-dialog-title-${workoutId}`}
+            aria-describedby={`rest-dialog-description-${workoutId}`}
+          >
+            <button
+              type="button"
+              className="modal__backdrop"
+              aria-label="Закрыть сведения об отдыхе"
+              onClick={(event) => {
+                if (event.detail <= 1) setRestDialog(null);
+              }}
+            />
+            <div
+              className="modal__panel active-workout-rest-dialog__panel"
+              ref={restDialogRef}
+              tabIndex={-1}
+            >
+              <header className="active-workout-rest-dialog__header">
+                <h2 id={`rest-dialog-title-${workoutId}`}>{restDialogTitle}</h2>
+                <IconButton
+                  type="button"
+                  className="active-workout-rest-dialog__close"
+                  aria-label="Закрыть сведения об отдыхе"
+                  onClick={() => setRestDialog(null)}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </header>
+              {recoveryDialogOpen && measuredRest?.needs_review && (
+                <section
+                  className="active-workout-rest__recovery"
+                  role="group"
+                  aria-label="Уточнение фактического отдыха"
+                >
+                  <p id={`rest-dialog-description-${workoutId}`}>
+                    Приложение было неактивно, поэтому прошедшее время не считается достоверным
+                    замером.
+                  </p>
+                  <label htmlFor={`rest-recovery-${workoutId}`}>Фактическое время, минуты</label>
+                  <input
+                    aria-invalid={Boolean(recoveryValidation)}
+                    aria-describedby={
+                      recoveryValidation ? `rest-recovery-error-${workoutId}` : undefined
+                    }
+                    id={`rest-recovery-${workoutId}`}
+                    type="text"
+                    inputMode="decimal"
+                    className="ui-input"
+                    placeholder="Например, 2,5"
+                    value={recoveredMinutes}
+                    onChange={(event) => {
+                      setRecoveredMinutes(event.target.value);
+                      setRecoveryValidation('');
+                    }}
+                  />
+                  {recoveryValidation && (
+                    <span id={`rest-recovery-error-${workoutId}`} role="alert">
+                      {recoveryValidation}
+                    </span>
+                  )}
+                  <div className="active-workout-rest__recovery-actions">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => {
+                        updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
+                        setMeasuredRest(null);
+                        removeStorage(storageKey);
+                        setDeadline(0);
+                        setCompletedNotice('Отдых не учитывается');
+                        setRestDialog(null);
+                        compactNotice();
+                      }}
+                    >
+                      Не учитывать
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const value = Number(recoveredMinutes.trim().replace(',', '.'));
+                        const correctedSeconds = Math.round(value * 60);
+                        if (
+                          !recoveredMinutes.trim() ||
+                          !Number.isFinite(value) ||
+                          correctedSeconds < 0 ||
+                          correctedSeconds > 86400
+                        ) {
+                          setRecoveryValidation('Введите время от 0 до 1440 минут');
+                          return;
+                        }
+                        const result = updateMeasuredRest(
+                          userId,
+                          workoutId,
+                          measuredRest.source_set_id,
+                          'complete',
+                          Date.now(),
+                          correctedSeconds,
+                        );
+                        if (result?.status !== 'completed') {
+                          setRecoveryValidation(
+                            'Не удалось сохранить уточнение. Попробуйте ещё раз.',
+                          );
+                          return;
+                        }
+                        setMeasuredRest(null);
+                        removeStorage(storageKey);
+                        setDeadline(0);
+                        setCompletedNotice('Отдых сохранён по вашей отметке');
+                        setRestDialog(null);
+                        compactNotice();
+                      }}
+                    >
+                      Сохранить время
+                    </Button>
+                  </div>
+                </section>
+              )}
+
+              {syncDialogOpen && (
+                <p
+                  id={`rest-dialog-description-${workoutId}`}
+                  role={restSaveError ? 'alert' : 'status'}
+                >
+                  {restSaveError ??
+                    (hasPendingRest
+                      ? `${restPendingLabel}. Данные сохранены на устройстве и ожидают синхронизации.`
+                      : isOfflineRest
+                        ? 'Нет сети. Таймер продолжает работать. Данные сохранены на устройстве.'
+                        : 'Данные отдыха синхронизированы.')}
+                </p>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -2884,7 +3043,6 @@ export function TodayWorkout({
             userId={user.id}
             workoutId={data.id}
             nextLabel={nextLabel}
-            nextExercise={currentSet?.exercise.exercise_title ?? 'Завершите тренировку'}
             nextPosition={
               currentSet
                 ? `Подход ${currentSet.set.set_number} из ${currentSet.exercise.sets.length}`
