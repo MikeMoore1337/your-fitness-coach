@@ -8,12 +8,16 @@ import sqlalchemy as sa
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
+CYCLE_REVISIONS = (
+    "0134_program_cycle_storage",
+    "0135_program_duration_unbounded",
+    "0136_program_week_unbounded",
+)
 
-def _load(number):
-    path = next(
-        (Path(__file__).resolve().parents[1] / "alembic" / "versions").glob(f"{number}_*.py")
-    )
-    spec = importlib.util.spec_from_file_location(f"cycle_storage_{number}", path)
+
+def _load(revision):
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / f"{revision}.py"
+    spec = importlib.util.spec_from_file_location(revision, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -43,8 +47,8 @@ def migrated_cycle_database(tmp_path):
         )
         connection.exec_driver_sql("INSERT INTO user_workout_sets VALUES (1, 42.25, 8, 1)")
         with Operations.context(MigrationContext.configure(connection)):
-            for number in ("0134", "0135", "0136"):
-                _load(number).upgrade()
+            for revision in CYCLE_REVISIONS:
+                _load(revision).upgrade()
     yield engine
     engine.dispose()
 
@@ -97,9 +101,9 @@ def test_cycle_storage_downgrade_fails_closed_and_safe_roundtrip_preserves_rows(
         )
         with Operations.context(MigrationContext.configure(connection)):
             with pytest.raises(RuntimeError, match="Unsafe downgrade"):
-                _load("0136").downgrade()
+                _load("0136_program_week_unbounded").downgrade()
             with pytest.raises(RuntimeError, match="Unsafe downgrade"):
-                _load("0135").downgrade()
+                _load("0135_program_duration_unbounded").downgrade()
             connection.exec_driver_sql(
                 "UPDATE program_templates SET default_duration_weeks=16 WHERE id=1"
             )
@@ -108,14 +112,14 @@ def test_cycle_storage_downgrade_fails_closed_and_safe_roundtrip_preserves_rows(
             )
             connection.exec_driver_sql("UPDATE user_workouts SET source_cycle_week=1 WHERE id=1")
             with pytest.raises(RuntimeError, match="Unsafe downgrade"):
-                _load("0134").downgrade()
+                _load("0134_program_cycle_storage").downgrade()
             connection.exec_driver_sql("UPDATE user_workouts SET source_cycle_week=NULL WHERE id=1")
             connection.exec_driver_sql("UPDATE user_workout_sets SET plan_version=2 WHERE id=1")
             with pytest.raises(RuntimeError, match="Unsafe downgrade"):
-                _load("0134").downgrade()
+                _load("0134_program_cycle_storage").downgrade()
             connection.exec_driver_sql("UPDATE user_workout_sets SET plan_version=NULL WHERE id=1")
-            for number in ("0136", "0135", "0134"):
-                _load(number).downgrade()
+            for revision in reversed(CYCLE_REVISIONS):
+                _load(revision).downgrade()
         assert "ck_program_templates_default_duration_weeks" not in {
             row["name"] for row in sa.inspect(connection).get_check_constraints("program_templates")
         }

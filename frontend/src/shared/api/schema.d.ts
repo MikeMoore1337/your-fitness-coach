@@ -2706,6 +2706,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/progress/activity-heatmap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workout Activity Heatmap */
+        get: operations["workout_activity_heatmap_api_v1_workouts_progress_activity_heatmap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/cardio": {
         parameters: {
             query?: never;
@@ -5786,6 +5803,44 @@ export interface components {
             content_size_bytes?: number | null;
             /** Error Code */
             error_code?: string | null;
+        };
+        /** ActivityHeatmapDay */
+        ActivityHeatmapDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Is Future
+             * @default false
+             */
+            is_future: boolean;
+            /** Completed Workouts */
+            completed_workouts: number | null;
+            /** Working Sets */
+            working_sets: number | null;
+        };
+        /** ActivityHeatmapResponse */
+        ActivityHeatmapResponse: {
+            /** Timezone */
+            timezone: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** History Complete */
+            history_complete: boolean;
+            /** Undated Workouts */
+            undated_workouts: number;
+            /** Days */
+            days: components["schemas"]["ActivityHeatmapDay"][];
         };
         /**
          * AdaptationPatch
@@ -24278,6 +24333,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workout_activity_heatmap_api_v1_workouts_progress_activity_heatmap_get: {
+        parameters: {
+            query?: {
+                year?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityHeatmapResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
