@@ -18,6 +18,7 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { ProgramBuilder } from './ProgramBuilder';
 import { shouldSaveTemplateAsCopy } from './templateEditing';
+import { programWeeklySessions } from './programPreviewFacts';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { ProgramRecommendation } from './ProgramRecommendation';
 import { LegacyProgramRecommendation } from './LegacyProgramRecommendation';
@@ -60,9 +61,16 @@ function weekdayFromDate(value: string): number {
 }
 
 function defaultWeekdays(template: ProgramTemplate, startDate: string): number[] {
-  if (template.days.length > 7) return [];
+  const frequency = programWeeklySessions(template);
+  if (frequency > 7) return [];
   const firstWeekday = weekdayFromDate(startDate);
-  return template.days.map((_, index) => (firstWeekday + index) % 7);
+  return Array.from(
+    { length: frequency },
+    (_, index) =>
+      (firstWeekday +
+        (frequency === template.days.length ? index : Math.floor((index * 7) / frequency))) %
+      7,
+  );
 }
 
 function weeksLabel(value: number): string {
@@ -390,7 +398,8 @@ export function TemplatesList({
     Boolean(assignmentTemplate) &&
     ((assignmentTemplate?.days.length ?? 0) > 7
       ? assignmentWeekdays.length === 0
-      : assignmentWeekdays.length === assignmentTemplate?.days.length &&
+      : assignmentWeekdays.length ===
+          (assignmentTemplate ? programWeeklySessions(assignmentTemplate) : 0) &&
         new Set(assignmentWeekdays).size === assignmentWeekdays.length &&
         assignmentOffsets.every(
           (offset, index) => index === 0 || offset > assignmentOffsets[index - 1]!,
@@ -820,6 +829,7 @@ export function TemplatesList({
           <ProgramRecommendation
             open={generatorOpen}
             onOpenChange={setGeneratorOpen}
+            onOpenPrograms={() => openPanel('library')}
             onConfirmed={refreshProgramState}
           />
           <div className="program-manage-destination" hidden={panel !== 'library'}>
@@ -1204,9 +1214,14 @@ export function TemplatesList({
                 </p>
               ) : (
                 <div className="form-grid">
-                  {assignmentTemplate.days.map((day, dayIndex) => (
-                    <label className="field" key={day.id}>
-                      <span>{day.title || `День ${dayIndex + 1}`}</span>
+                  {assignmentWeekdays.map((_, dayIndex) => (
+                    <label className="field" key={dayIndex}>
+                      <span>
+                        {programWeeklySessions(assignmentTemplate) ===
+                        assignmentTemplate.days.length
+                          ? assignmentTemplate.days[dayIndex]?.title || `День ${dayIndex + 1}`
+                          : `Занятие ${dayIndex + 1}`}
+                      </span>
                       <select
                         value={assignmentWeekdays[dayIndex] ?? ''}
                         onChange={(event) =>

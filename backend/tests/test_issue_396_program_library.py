@@ -192,7 +192,8 @@ def test_issue_396_assignments_materialize_history_and_export_structured_plans(c
         assert assigned.status_code == 200, assigned.text
         assignment = assigned.json()
         assignment_ids.append(assignment["user_program_id"])
-        assert assignment["workouts_created"] == len(item["days"])
+        expected_sessions = {"stronglifts-5x5": 3, "gzclp": 3}.get(slug, len(item["days"]))
+        assert assignment["workouts_created"] == expected_sessions
 
         history = client.get(
             f"/api/v1/programs/assigned/{assignment['user_program_id']}/revisions",

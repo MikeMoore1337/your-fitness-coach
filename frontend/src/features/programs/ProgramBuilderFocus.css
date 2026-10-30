@@ -1,7 +1,37 @@
 /* Additional review workflow for the shared ProgramDayEditor (#1327). */
-.program-builder-open-settings {
+.program-builder > form .program-builder-basics {
+  /* Equal left edge for step 1 and step 2 across mobile and desktop. */
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.program-builder > form .program-builder-footer {
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.program-builder-copy-note {
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.42;
+}
+.program-builder-optional {
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.program-builder-optional > summary {
+  cursor: pointer;
   min-height: 44px;
-  width: 100%;
+}
+.program-builder-optional__body {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
 }
 .program-builder-review {
   display: grid;
@@ -35,4 +65,89 @@
   .program-builder-review__actions button {
     width: 100%;
   }
+}
+
+.program-builder .program-builder-primary[hidden],
+.program-builder .program-builder-footer[hidden] {
+  display: none;
+}
+.program-builder--settings-open > .section-head {
+  display: none;
+}
+.program-builder .program-builder-settings[open] {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.program-builder-settings[open] > summary {
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 52px;
+}
+.program-builder .program-builder-settings__body {
+  margin-top: 12px;
+  padding-top: 0;
+  border: 0;
+  gap: 16px;
+}
+.program-builder-settings .program-builder-section {
+  border: 1px solid var(--border);
+  padding: 16px;
+  background: var(--surface);
+}
+.program-builder-settings .program-builder-section:first-child .field {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) minmax(0, 1.35fr);
+  align-items: center;
+  gap: 12px;
+}
+.program-builder-settings .program-builder-section:first-child .form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.program-builder-settings__save {
+  display: grid;
+  gap: 8px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.program-builder-settings__save button {
+  width: 100%;
+  min-height: var(--touch-target, 44px);
+}
+.program-builder-settings__save p {
+  font-size: 0.8rem;
+}
+/* The modal keeps one semantic heading and its existing close action. */
+.program-editor-modal {
+  position: relative;
+}
+.program-editor-modal > .section-head > strong {
+  display: none;
+}
+.program-editor-modal > .section-head {
+  position: absolute;
+  inset: 12px 12px auto auto;
+  width: 44px;
+  display: block;
+  z-index: 2;
+}
+.program-editor-modal .program-builder > .section-head,
+.program-editor-modal .program-builder-settings[open] > summary {
+  padding-right: 52px;
+}
+
+.program-builder-optional > summary > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.program-builder-optional > summary small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.program-builder--settings-open .program-builder-settings {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
 }
