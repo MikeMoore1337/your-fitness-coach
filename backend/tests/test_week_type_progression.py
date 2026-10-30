@@ -17,7 +17,10 @@ from fitminiapp_api.services.program_versioning import (
     materialize_next_cycle_window,
     record_program_revision,
 )
-from fitminiapp_api.services.progression_guidance import build_progression_guidance
+from fitminiapp_api.services.progression_guidance import (
+    build_progression_guidance,
+    parse_rep_target,
+)
 
 
 def _cycle(client, week_types):
@@ -74,7 +77,7 @@ def _workouts(program_id, through_week):
         }
 
 
-def _complete(workout_ids, weeks, *, high_weight_weeks=()):
+def _complete(workout_ids, weeks, *, high_weight_weeks=(), reps=10):
     with get_session_context() as db:
         for week in weeks:
             workout = db.get(UserWorkout, workout_ids[week])
@@ -83,7 +86,7 @@ def _complete(workout_ids, weeks, *, high_weight_weeks=()):
             workout.completed_at = datetime.combine(workout.scheduled_date, time(11))
             for row in workout.exercises[0].sets:
                 row.is_completed = True
-                row.actual_reps = 10
+                row.actual_reps = reps
                 row.actual_weight = 100 if week in high_weight_weeks else 40
                 row.rir = "2"
 
@@ -418,6 +421,9 @@ def test_missing_rir_is_not_reported_as_missing_same_type_history(client):
     assert result["outcome"] == "review"
     assert result["suggested_weight"] is None
     assert "missing_rir_evidence" in result["proposal"]["reason_codes"]
+    assert result["detail"] == (
+        "Запас повторов (RIR) записан не для каждого подхода, который учитывается в прогрессии."
+    )
     assert "insufficient_same_type_history" not in result["proposal"]["reason_codes"]
     assert result["evidence"]["comparable_session_count"] == 3
 
@@ -541,3 +547,154 @@ def test_type_analytics_is_additional_and_preserves_global_totals(client, monkey
         ]
         == 0
     )
+
+
+def _configure_source_template(template_id):
+    # The week-cycle editor is not yet available; use the existing backend contract in the fixture.
+    with get_session_context() as db:
+        template = db.get(ProgramTemplate, template_id)
+        target = parse_rep_target(template.days[0].exercises[0].prescribed_reps)
+        assert target is not None
+        metadata = deepcopy(template.program_metadata or {})
+        metadata["week_cycle"] = {
+            "schema_version": 1,
+            "length_weeks": 3,
+            "week_types": ["heavy", "light", "heavy"],
+            "repeat": True,
+        }
+        metadata["coaching_rules"] = [
+            {
+                "kind": "double_progression",
+                "scope": "program",
+                "rep_target": {
+                    "kind": "range",
+                    "min_reps": target.minimum,
+                    "max_reps": target.maximum,
+                },
+                "increment_value": 2.5,
+                "increment_unit": "kg",
+            }
+        ]
+        template.program_metadata = metadata
+        return target.maximum
+
+
+def _source_workouts(program_id):
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        for week in range(1, 8, 4):
+            materialize_next_cycle_window(
+                db, program, through_date=program.start_date + timedelta(weeks=week - 1)
+            )
+        rows = (
+            db.query(UserWorkout)
+            .filter_by(user_program_id=program_id)
+            .order_by(UserWorkout.week_number, UserWorkout.day_number, UserWorkout.id)
+            .all()
+        )
+        first_day = rows[0].day_number
+        return {row.week_number: row.id for row in rows if row.day_number == first_day}
+
+
+def _assert_typed_source_history(program_id, reps):
+    workouts = _source_workouts(program_id)
+    _complete(workouts, range(1, 7), high_weight_weeks=(2, 5), reps=reps)
+    result = _guidance(program_id, workouts[7])
+    assert result["evidence"]["week_type"] == "heavy"
+    assert result["suggested_weight"] == 42.5, json.dumps(result, ensure_ascii=False, default=str)
+    assert [item["workout_id"] for item in result["evidence"]["sessions"]] == [
+        workouts[6],
+        workouts[4],
+        workouts[3],
+    ]
+    assert all(
+        f"workout:{workouts[week]}/" not in source
+        for week in (2, 5)
+        for source in result["proposal"]["source_evidence_ids"]
+    )
+
+
+@pytest.mark.parametrize("source", ["generated", "imported"])
+def test_typed_generated_and_imported_programs_isolate_factual_history(client, source):
+    headers = _auth(client, 917010)
+    if source == "generated":
+        from test_program_generator import _preview
+
+        preview = _preview(client, headers)
+        confirmed = client.post(
+            "/api/v1/programs/generator/confirm",
+            headers=headers,
+            json={"draft_token": preview.json()["draft_token"]},
+        )
+        assert confirmed.status_code == 200, confirmed.text
+        template = confirmed.json()["template"]
+        assert template["provenance_type"] == "SOURCE_ADAPTATION"
+    else:
+        from test_program_import import _csv_payload, _upload, _valid_row
+
+        exercise = next(
+            item
+            for item in client.get("/api/v1/programs/exercises", headers=headers).json()
+            if item["slug"] == "squat"
+        )
+        source_bytes = _csv_payload(
+            [_valid_row(exercise_name=exercise["title"], exercise_slug=exercise["slug"])]
+        )
+        preview = _upload(client, headers, "program.csv", source_bytes)
+        assert preview.status_code == 201, preview.text
+        assert preview.json()["summary"]["blocking_issue_count"] == 0, preview.json()
+        confirmed = client.post(
+            f"/api/v1/programs/imports/{preview.json()['id']}/confirm", headers=headers
+        )
+        assert confirmed.status_code == 200, confirmed.text
+        template = confirmed.json()["template"]
+        assert template["provenance"]["source_type"] == "file_upload"
+
+    reps = _configure_source_template(template["id"])
+    assigned = client.post(
+        f"/api/v1/programs/templates/{template['id']}/assign-to-me",
+        headers=headers,
+        json={
+            "start_date": today_msk().isoformat(),
+            "duration_weeks": 16,
+            "replace_active": source == "generated",
+        },
+    )
+    assert assigned.status_code == 200, assigned.text
+    _assert_typed_source_history(assigned.json()["user_program_id"], reps)
+
+
+def test_typed_coach_assignment_keeps_athlete_isolation_and_comparable_history(client):
+    from test_coach_program_rollout import _setup_coach_clients, _template_payload
+
+    coach, athletes, clients = _setup_coach_clients(client, count=1)
+    exercises = client.get("/api/v1/programs/exercises", headers=coach).json()
+    exercise_id = next(item["id"] for item in exercises if item["metric_type"] == "strength")
+    payload = _template_payload(
+        exercise_id, title="Типы недель тренера", sets=2, telegram_user_id=clients[0][1]
+    )
+    payload["week_cycle"] = {
+        "length_weeks": 3,
+        "week_types": ["heavy", "light", "heavy"],
+        "repeat": True,
+    }
+    created = client.post("/api/v1/programs/templates", headers=coach, json=payload)
+    assert created.status_code == 200, created.text
+    template_id = created.json()["template"]["id"]
+    reps = _configure_source_template(template_id)
+    assigned = client.post(
+        f"/api/v1/coach/clients/{clients[0][0]}/templates/{template_id}/assign",
+        headers=coach,
+        json={"start_date": today_msk().isoformat(), "duration_weeks": 16},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    _assert_typed_source_history(program_id, reps)
+    url = f"/api/v1/programs/assigned/{program_id}/progression-proposals"
+    coach_result = client.get(url, headers=coach)
+    athlete_result = client.get(url, headers=athletes[0])
+    assert coach_result.status_code == athlete_result.status_code == 200
+    assert coach_result.json() == athlete_result.json()
+    assert coach_result.json()["exercises"][0]["guidance"]["evidence"]["week_type"] == "heavy"
+    outsider = _auth(client, 917011)
+    assert client.get(url, headers=outsider).status_code in (403, 404)

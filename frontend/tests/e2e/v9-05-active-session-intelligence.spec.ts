@@ -57,7 +57,7 @@ test('V9-05 keeps the active session summary collapsed until the user opens it',
   await expect(summary.getByText('Актуальные данные')).toBeVisible();
   await expect(summary).toContainText('Следующий подход');
   await expect(summary).toContainText('План');
-  await expect(summary).toContainText('Предыдущий результат');
+  await expect(summary).toContainText('Последний результат');
   await expect(summary).toContainText('RIR');
   await expect(summary).toContainText('Отдых');
   await expect(summary).toContainText('Можно рассмотреть небольшое увеличение веса');
@@ -168,7 +168,7 @@ test('V9-05 shows a truthful offline state without losing the current set', asyn
   await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
   await expect(summary.getByText('Офлайн-снимок')).toBeVisible();
   await expect(summary).toContainText('Серверное назначение');
-  await expect(summary).toContainText('Предыдущий результат');
+  await expect(summary).toContainText('Последний результат');
   await expect(page.locator('[data-workout-set-id="201"]')).toHaveAttribute('aria-current', 'step');
   await expectNoHorizontalOverflow(page);
 

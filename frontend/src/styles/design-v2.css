@@ -2605,6 +2605,10 @@ body:has(.app-shell--design-v2) {
   font-size: 0.75rem;
 }
 
+.progression-guidance__provenance {
+  overflow-wrap: anywhere;
+}
+
 .active-workout--design-v2 .progression-guidance__history {
   display: grid;
   margin: 0;
@@ -8066,6 +8070,13 @@ button.notification-row__main:focus-visible {
 
 .app-section--programs .progression-guidance__rule {
   font-weight: 600;
+}
+
+.app-section--programs .progression-guidance__facts {
+  display: grid;
+  gap: var(--v2-space-1);
+  color: var(--v2-text-secondary);
+  font-size: var(--font-size-caption);
 }
 
 .app-section--programs .progression-guidance__actions,

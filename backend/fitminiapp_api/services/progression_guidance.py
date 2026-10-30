@@ -822,7 +822,7 @@ def _rule_guidance(
     if selection.reason_code is not None:
         base["evidence"]["reason_keys"] = [selection.reason_code]
         base["detail"] = (
-            "Структура подходов не позволяет однозначно выбрать progression-driving set."
+            "Структура подходов не позволяет однозначно определить подходы для прогрессии."
         )
         return base, "hold", volume_percent, intensity_percent
 
@@ -863,7 +863,9 @@ def _rule_guidance(
         latest = sessions[0]
         if len(latest.rir_values) != latest.working_set_count:
             base["evidence"]["reason_keys"] = ["missing_rir_evidence"]
-            base["detail"] = "Не для каждого progression-driving подхода записан RIR."
+            base["detail"] = (
+                "Запас повторов (RIR) записан не для каждого подхода, который учитывается в прогрессии."
+            )
             return base, "hold", volume_percent, intensity_percent
         if _progression_failure(latest):
             base["outcome"] = "hold"
@@ -1170,7 +1172,7 @@ def _attach_proposal(
         result["suggested_weight"] = None
         result["suggested_increment"] = None
         result["evidence"]["reason_keys"].append("no_incomplete_target_sets")
-        result["detail"] = "Тренировка уже не содержит незавершённых progression-driving подходов."
+        result["detail"] = "В тренировке больше нет незавершённых подходов для прогрессии."
         proposed_weight = None
 
     if proposed_action == "set_load" and proposed_weight is not None:
@@ -1378,7 +1380,7 @@ def build_progression_guidance(
                 prescribed_sets=current.prescribed_sets,
                 prescribed_reps=current.prescribed_reps,
                 reason_code=selection.reason_code,
-                detail="Структура подходов не позволяет выбрать progression-driving set.",
+                detail="Структура подходов не позволяет определить подходы для прогрессии.",
             )
             facts = []
             action = "hold"

@@ -7703,6 +7703,19 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   gap: 12px;
 }
 
+.progress-week-type > .ui-tabs {
+  display: grid;
+  width: 100%;
+  max-width: 30rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.progress-week-type .ui-tab {
+  min-width: 0;
+  padding-inline: var(--v2-space-1);
+  font-size: var(--font-size-caption);
+}
+
 .progress-confidence-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

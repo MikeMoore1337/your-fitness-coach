@@ -82,19 +82,18 @@ export function ActiveSessionSummary({
   const detailsId = `active-session-summary-${exercise.id}-details`;
 
   let previousCopy = 'История появится после старта';
-  let previousDetail = 'Сопоставимый результат';
+  let previousDetail = 'По всей истории упражнения';
   if (started && !isCardio) {
     if (history.isPending) {
       previousCopy = 'Загрузка…';
     } else if (previousResult) {
       previousCopy = previousResult;
-      previousDetail = 'Последняя сопоставимая тренировка';
     } else if (history.isError) {
       previousCopy = online ? 'Не удалось загрузить' : 'Недоступно офлайн';
       previousDetail = 'Снимок тренировки не содержит историю';
     } else {
       previousCopy = 'Нет результата';
-      previousDetail = 'Сопоставимая тренировка ещё не записана';
+      previousDetail = 'По всей истории упражнения';
     }
   }
 
@@ -153,7 +152,7 @@ export function ActiveSessionSummary({
             <small>Серверное назначение</small>
           </div>
           <div>
-            <span>Предыдущий результат</span>
+            <span>Последний результат</span>
             <strong>{previousCopy}</strong>
             <small>{previousDetail}</small>
           </div>

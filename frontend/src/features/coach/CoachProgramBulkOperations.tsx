@@ -98,6 +98,8 @@ function proposalClass(candidate: ProposalCandidate): string {
   const { exercise, proposal } = candidate;
   return stableJson({
     exerciseId: exercise.exercise_id,
+    rulesetVersion: exercise.guidance.ruleset_version,
+    weekType: exercise.guidance.evidence.week_type ?? null,
     loadUnit: candidate.loadUnit,
     ruleKind: proposal.rule_kind,
     ruleSnapshot: proposal.rule_snapshot,

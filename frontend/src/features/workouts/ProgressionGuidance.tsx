@@ -4,6 +4,7 @@ import { productEventSurface, trackProductEvent } from '../../shared/analytics/p
 import { PublicWebLink } from '../../shared/navigation/PublicWebLink';
 import { Button, DisclosureIcon } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
+import { weekTypeGenitive, weekTypeLabels } from './weekTypes';
 
 type Guidance = NonNullable<Workout['exercises'][number]['progression_guidance']>;
 type Session = Guidance['evidence']['sessions'][number];
@@ -56,6 +57,22 @@ function sessionLabel(session: Session): string {
       ? 'нагрузка неполная'
       : `${formatNumber(session.load)} ${unitLabel(session.load_unit)}`;
   return `${date} · ${load} · ${reps}`;
+}
+
+function latestSessionLabel(session: Session): string {
+  if (session.load == null || session.reps_min == null || session.reps_max == null) {
+    return sessionLabel(session);
+  }
+  const date = new Date(`${session.scheduled_date}T12:00:00`).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  });
+  const load = `${formatNumber(session.load)} ${unitLabel(session.load_unit)}`;
+  const reps =
+    session.reps_min === session.reps_max
+      ? String(session.reps_min)
+      : `${session.reps_min}–${session.reps_max}`;
+  return `${load} × ${reps} · ${date}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -189,12 +206,29 @@ export function ProgressionGuidance({
   guidance: Guidance;
   exerciseKey: number;
   applied?: boolean;
-  onApply?: () => void;
+  onApply?: () => void | Promise<unknown>;
   onDismiss: () => void;
 }) {
   const applyStarted = useRef(false);
   const exactSuggestion = guidance.proposal?.proposed_weight ?? guidance.suggested_weight;
   const explanation = ruleSummary(guidance);
+  const typed = guidance.ruleset_version === 'progression-guidance-v3';
+  const weekType = guidance.evidence.week_type;
+  const latestSession = guidance.evidence.sessions[0];
+  const reasons = guidance.proposal?.reason_codes ?? guidance.evidence.reason_keys;
+  const insufficientHistory = reasons.includes('insufficient_same_type_history');
+  const isIncreasing = guidance.outcome === 'consider_progressing';
+  const message =
+    typed && isIncreasing && exactSuggestion != null
+      ? `Можно рассмотреть увеличение до ${formatNumber(exactSuggestion)} ${unitLabel(guidance.load_unit)}`
+      : guidance.message;
+  const proposalVersions = (guidance.proposal?.target_set_updates ?? [])
+    .map((update) => `${update.set_id}:${update.set_version}`)
+    .join(',');
+
+  useEffect(() => {
+    applyStarted.current = false;
+  }, [guidance.proposal?.proposal_id, proposalVersions]);
 
   useEffect(() => {
     trackProductEvent(
@@ -209,9 +243,23 @@ export function ProgressionGuidance({
       className={`progression-guidance is-${guidance.outcome}`}
     >
       <div className="progression-guidance__copy">
-        <span>Следующая нагрузка</span>
-        <strong>{guidance.message}</strong>
+        <span>Следующая нагрузка{weekType ? ` · ${weekTypeLabels[weekType]} неделя` : ''}</span>
+        <strong>{message}</strong>
+        {typed && (
+          <p>
+            {latestSession
+              ? `Прошлая сопоставимая: ${latestSessionLabel(latestSession)}`
+              : insufficientHistory
+                ? 'Сопоставимых тренировок пока нет.'
+                : 'Сопоставимую историю для этой рекомендации не удалось подтвердить.'}
+          </p>
+        )}
         <p>{guidance.detail}</p>
+        {weekType && insufficientHistory && (
+          <p>
+            Для рекомендации нужны полные сопоставимые тренировки {weekTypeGenitive[weekType]} типа.
+          </p>
+        )}
         {explanation && <p className="progression-guidance__rule">Правило: {explanation}</p>}
       </div>
 
@@ -255,6 +303,15 @@ export function ProgressionGuidance({
               Пока нет полных сопоставимых тренировок в этом контексте программы.
             </p>
           )}
+          {typed && (
+            <div className="progression-guidance__facts progression-guidance__provenance">
+              {guidance.proposal?.source_evidence_ids.length ? (
+                <span>Источники: {guidance.proposal.source_evidence_ids.join(' · ')}</span>
+              ) : null}
+              {reasons.length > 0 && <span>Причины: {reasons.join(' · ')}</span>}
+              <span>Версия правила: {guidance.ruleset_version}</span>
+            </div>
+          )}
           <PublicWebLink
             className="contextual-help__link progression-guidance__source"
             path="/knowledge/training/progressive-overload"
@@ -273,7 +330,17 @@ export function ProgressionGuidance({
             onClick={() => {
               if (applyStarted.current || applied) return;
               applyStarted.current = true;
-              onApply();
+              try {
+                const pending = onApply();
+                if (pending) {
+                  void pending.catch(() => {
+                    applyStarted.current = false;
+                  });
+                }
+              } catch (error) {
+                applyStarted.current = false;
+                throw error;
+              }
             }}
           >
             {applied
