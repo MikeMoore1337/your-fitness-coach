@@ -2,9 +2,8 @@
 "use strict";
 const q = (selector) => document.querySelector(selector);
 const args = new URLSearchParams(location.search);
-let days = ["7", "30", "90"].includes(args.get("days"))
-  ? args.get("days")
-  : "7";
+let days = Number(args.get("days"));
+if (![7, 30, 90].includes(days)) days = 7;
 let state = [
   "populated",
   "incomplete",
@@ -95,8 +94,8 @@ function render() {
     snapshots[["loading", "error"].includes(state) ? "empty" : state][days];
   q("#state").value = state;
   document.querySelectorAll("[data-days]").forEach((el) => {
-    el.setAttribute("aria-selected", String(el.dataset.days === days));
-    el.tabIndex = el.dataset.days === days ? 0 : -1;
+    el.setAttribute("aria-selected", String(Number(el.dataset.days) === days));
+    el.tabIndex = Number(el.dataset.days) === days ? 0 : -1;
   });
   q("#period-range").textContent =
     `Период: ${date(d.period_start)} — ${date(d.period_end)}`;
@@ -176,7 +175,7 @@ function render() {
 }
 document.querySelectorAll("[data-days]").forEach((el) => {
   el.onclick = () => {
-    days = el.dataset.days;
+    days = Number(el.dataset.days);
     render();
     el.focus();
     q("#announcement").textContent =
