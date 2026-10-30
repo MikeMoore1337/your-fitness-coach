@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from datetime import datetime, time, timedelta
+from hashlib import sha256
 
 import pytest
 from test_program_week_cycle import _auth, _payload
@@ -105,6 +107,14 @@ def test_repeated_week_type_uses_only_comparable_facts(client, same, other):
     result = _guidance(program_id, workouts[7])
     assert result["outcome"] == "consider_progressing", result
     assert result["suggested_weight"] == 42.5
+    assert result["ruleset_version"] == "progression-guidance-v3"
+    rule_material = json.dumps(
+        {"ruleset_version": "progression-guidance-v3", "rule": result["proposal"]["rule_snapshot"]},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    assert result["proposal"]["rule_id"] == sha256(rule_material).hexdigest()
     assert [row["workout_id"] for row in result["evidence"]["sessions"]] == [
         workouts[6],
         workouts[4],
@@ -379,6 +389,57 @@ def test_latest_incomplete_same_type_does_not_promote_from_older_facts(client):
         f"workout:{workouts[1]}/" not in value
         for value in result["proposal"]["source_evidence_ids"]
     )
+
+
+def test_missing_rir_is_not_reported_as_missing_same_type_history(client):
+    _headers, program_id = _cycle(client, ["heavy", "light", "heavy"])
+    workouts = _workouts(program_id, 7)
+    _complete(workouts, [1, 3, 4])
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        metadata = deepcopy(program.template.program_metadata)
+        metadata["coaching_rules"] = [
+            {
+                "kind": "rir_rpe",
+                "effort_target": {"kind": "rir", "value": 2},
+                "increment_value": 2.5,
+                "increment_unit": "kg",
+            }
+        ]
+        program.template.program_metadata = metadata
+        revision = program.revisions[0]
+        snapshot = deepcopy(revision.snapshot)
+        snapshot["program"]["program_metadata"] = metadata
+        revision.snapshot = snapshot
+        for week in (1, 3, 4):
+            for item in db.get(UserWorkout, workouts[week]).exercises[0].sets:
+                item.rir = None
+    result = _guidance(program_id, workouts[7])
+    assert result["outcome"] == "review"
+    assert result["suggested_weight"] is None
+    assert "missing_rir_evidence" in result["proposal"]["reason_codes"]
+    assert "insufficient_same_type_history" not in result["proposal"]["reason_codes"]
+    assert result["evidence"]["comparable_session_count"] == 3
+
+
+def test_no_applicable_rule_does_not_claim_unused_factual_evidence(client):
+    _headers, program_id = _cycle(client, ["heavy", "light", "heavy"])
+    workouts = _workouts(program_id, 7)
+    _complete(workouts, [3, 4])
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        metadata = deepcopy(program.template.program_metadata)
+        metadata["coaching_rules"][0].update(week_start=1, week_end=1)
+        program.template.program_metadata = metadata
+        revision = program.revisions[0]
+        snapshot = deepcopy(revision.snapshot)
+        snapshot["program"]["program_metadata"] = metadata
+        revision.snapshot = snapshot
+    result = _guidance(program_id, workouts[7])
+    assert result["outcome"] == "review"
+    assert result["proposal"]["reason_codes"] == ["no_applicable_coaching_rule"]
+    assert result["proposal"]["source_evidence_ids"] == []
+    assert result["evidence"]["sessions"] == []
 
 
 def test_incompatible_recent_same_type_stops_reuse_of_older_history(client):

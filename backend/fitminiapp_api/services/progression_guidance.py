@@ -309,8 +309,8 @@ def _rule_snapshot(rule: ProgramCoachingRule | None) -> dict[str, object]:
     return rule.model_dump(mode="json", exclude_none=True) if rule is not None else {}
 
 
-def _rule_id(rule_snapshot: dict[str, object]) -> str:
-    return _sha256({"ruleset_version": RULESET_VERSION, "rule": rule_snapshot})
+def _rule_id(rule_snapshot: dict[str, object], *, ruleset_version: str = RULESET_VERSION) -> str:
+    return _sha256({"ruleset_version": ruleset_version, "rule": rule_snapshot})
 
 
 def _rep_target_text(value: PrescriptionRepTarget | None) -> str | None:
@@ -1153,7 +1153,7 @@ def _attach_proposal(
     deload_intensity_percent: int | None = None,
 ) -> dict:
     snapshot = _rule_snapshot(rule)
-    rule_id = _rule_id(snapshot)
+    rule_id = _rule_id(snapshot, ruleset_version=result["ruleset_version"])
     source_ids = [
         f"workout:{item.workout_id}/set:{set_id}"
         for item in sessions[:3]
@@ -1502,6 +1502,9 @@ def build_progression_guidance(
                         reason_code="no_applicable_coaching_rule",
                         detail="Для этого упражнения и недели программы нет применимого правила.",
                     )
+                    if week_type is not None:
+                        facts = []
+                        all_facts = []
                 action = "set_load" if result.get("suggested_weight") is not None else "hold"
             else:
                 result, action, _volume, _intensity = _rule_guidance(
@@ -1539,13 +1542,17 @@ def build_progression_guidance(
             result["ruleset_version"] = TYPED_RULESET_VERSION
             result["evidence"]["week_type"] = week_type if week_type_known else None
             reasons = result["evidence"].get("reason_keys", [])
-            if week_type is not None and any(
-                reason in reasons
-                for reason in (
-                    "too_few_comparable_sessions",
-                    "need_one_more_stable_session",
-                    "missing_amrap_evidence",
-                    "missing_rir_evidence",
+            if week_type is not None and (
+                any(
+                    reason in reasons
+                    for reason in ("too_few_comparable_sessions", "need_one_more_stable_session")
+                )
+                or (
+                    not facts
+                    and any(
+                        reason in reasons
+                        for reason in ("missing_amrap_evidence", "missing_rir_evidence")
+                    )
                 )
             ):
                 reasons.append("insufficient_same_type_history")
