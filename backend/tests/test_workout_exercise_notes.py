@@ -606,7 +606,8 @@ def test_chronology_uses_last_saved_note_when_legacy_completion_order_is_unknown
     assert previous["body"] == "Последняя сохранённая"
 
 
-def test_chronology_never_shows_later_workout_in_completed_history(client, case):
+@pytest.mark.parametrize("has_start", [False, True])
+def test_chronology_never_shows_later_workout_in_completed_history(client, case, has_start):
     _save_chronology_note(client, case, "old", "old_ex", "Раньше")
     _save_chronology_note(client, case, "recent", "recent_ex", "Позже")
     now = datetime.now(UTC).replace(tzinfo=None)
@@ -617,8 +618,8 @@ def test_chronology_never_shows_later_workout_in_completed_history(client, case)
             source.completed_at = source.completed_at_utc + timedelta(hours=3)
         target = db.get(UserWorkout, case["current"])
         target.status = "completed"
-        target.started_at = now + timedelta(minutes=30)
-        target.started_at_utc = now - timedelta(hours=2, minutes=30)
+        target.started_at = now + timedelta(minutes=30) if has_start else None
+        target.started_at_utc = now - timedelta(hours=2, minutes=30) if has_start else None
         target.completed_at_utc = now - timedelta(hours=2)
         target.completed_at = target.completed_at_utc + timedelta(hours=3)
     previous = _read(client, case)["previous_note"]
@@ -662,6 +663,19 @@ def test_chronology_keeps_unknown_legacy_start_order_unresolved(client, case):
         target = db.get(UserWorkout, case["current"])
         target.started_at, target.started_at_utc = now + timedelta(hours=2, minutes=30), None
     assert _read(client, case)["previous_note"] is None
+
+
+def test_chronology_completed_workout_without_start_keeps_older_history(client, case):
+    _save_chronology_note(client, case, "old", "old_ex", "Раннее выполнение")
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case["old"])
+        source.completed_at_utc = now - timedelta(days=3)
+        source.completed_at = source.completed_at_utc + timedelta(hours=3)
+        target = db.get(UserWorkout, case["current"])
+        target.status, target.started_at, target.started_at_utc = "completed", None, None
+        target.completed_at, target.completed_at_utc = now + timedelta(hours=3), now
+    assert _read(client, case)["previous_note"]["body"] == "Раннее выполнение"
 
 
 def test_chronology_records_start_in_utc_and_survives_timezone_change(client, case):

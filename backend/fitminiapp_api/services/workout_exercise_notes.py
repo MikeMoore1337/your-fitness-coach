@@ -186,6 +186,8 @@ def _previous(
     elif workout.started_at is not None:
         cutoff_min = workout.started_at - timedelta(days=1)
         cutoff_max = workout.started_at + timedelta(days=1)
+    elif workout.completed_at is not None or workout.completed_at_utc is not None:
+        cutoff_min, cutoff_max = _completion_bounds(workout)
     else:
         return None
     candidates = []
