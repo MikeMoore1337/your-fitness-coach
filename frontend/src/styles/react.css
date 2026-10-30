@@ -5053,6 +5053,39 @@ button.today-text-link {
   color: var(--muted);
   font-size: 0.75rem;
 }
+.active-workout-set__history {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+}
+.active-workout-set__history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) fit-content(45%);
+  align-items: center;
+  gap: var(--v2-space-2);
+  min-width: 0;
+}
+.active-workout-set__history-row + .active-workout-set__history-row {
+  padding-top: var(--v2-space-2);
+  border-top: 1px solid var(--border);
+}
+.active-workout-set__history-row span,
+.active-workout-set__history-row small {
+  display: block;
+  min-width: 0;
+}
+.active-workout-set__history-row small {
+  font-size: inherit;
+  line-height: var(--line-height-body);
+}
+.active-workout-set__history-row strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
 .active-workout-set__prefill {
   display: inline-flex;
   align-items: center;
@@ -5091,6 +5124,21 @@ button.today-text-link {
 }
 .active-workout-set__prefill-actions .active-workout-set__prefill {
   margin: 0;
+}
+.active-workout-set__prefill-actions--history {
+  flex-direction: column;
+  margin: 0;
+}
+.active-workout-set__prefill-actions.active-workout-set__prefill-actions--history
+  .active-workout-set__prefill {
+  width: 100%;
+  flex: 0 0 auto;
+  justify-content: center;
+  text-align: center;
+}
+.active-workout-set__prefill:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .active-workout-set__prefill--commit {
   border-color: var(--accent-line);

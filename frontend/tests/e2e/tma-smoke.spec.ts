@@ -2145,7 +2145,8 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   await expect(
     tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
   ).toBeVisible();
-  expect((await tma.state()).haptics.notifications).toContain('success');
+  // The offline-draft alert can already be visible before completion is accepted.
+  await expect.poll(async () => (await tma.state()).haptics.notifications).toContain('success');
 
   api.setOffline(false);
   await setNetworkOffline(tmaPage, false);
