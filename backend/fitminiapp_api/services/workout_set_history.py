@@ -274,6 +274,8 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
                     "set_number": item.set_number,
                     "set_version": item.version,
                     "workout_exercise_id": exercise.id,
+                    "exercise_id": exercise.exercise_id,
+                    "source_template_exercise_id": exercise.source_template_exercise_id,
                     "previous_today": previous,
                     "previous_workout": past,
                     "history_status": status,

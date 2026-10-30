@@ -18437,6 +18437,10 @@ export interface components {
             set_version: number;
             /** Workout Exercise Id */
             workout_exercise_id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Source Template Exercise Id */
+            source_template_exercise_id: number | null;
             previous_today?: components["schemas"]["WorkoutSetResult"] | null;
             previous_workout?: components["schemas"]["WorkoutSetPastResult"] | null;
             /**

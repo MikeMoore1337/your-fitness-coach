@@ -206,6 +206,8 @@ class WorkoutSetHistoryItem(BaseModel):
     set_number: int
     set_version: int
     workout_exercise_id: int
+    exercise_id: int
+    source_template_exercise_id: int | None
     previous_today: WorkoutSetResult | None = None
     previous_workout: WorkoutSetPastResult | None = None
     history_status: Literal[

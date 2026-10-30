@@ -137,6 +137,8 @@ def test_all_sets_have_their_own_facts_without_prefill(client, case, count):
         case = (*case[:3], current.id, case[4])
     result = _read(client, case)
     assert len(result["sets"]) == count
+    assert all(row["source_template_exercise_id"] == 1132 for row in result["sets"])
+    assert len({row["exercise_id"] for row in result["sets"]}) == 1
     assert [row["previous_workout"]["actual_weight"] for row in result["sets"]] == [
         ([160, 180, 200, 190][index - 1] if count == 4 else 140 + 20 * index)
         for index in range(1, count + 1)
