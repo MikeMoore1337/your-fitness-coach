@@ -1297,9 +1297,17 @@ test('progress remains clear and free of horizontal overflow at supported widths
   await expectTrainingHeading(page);
   await expect(page.getByRole('heading', { name: 'Активность', exact: true })).toBeVisible();
   await expect(page.getByText('История неполная', { exact: true })).toBeVisible();
-  await expect(page.getByText('Грудные')).toBeVisible();
-  await expect(page.getByText('+6 подх.')).toBeVisible();
-  await page.getByText('Жим штанги лёжа').click();
+  const distribution = page.getByRole('region', { name: 'Мышечные группы', exact: true });
+  const chest = distribution.getByRole('button', { name: /^Грудные Всего 18 / });
+  await expect(chest).toBeVisible();
+  await expect(chest).toHaveAttribute('aria-pressed', 'true');
+  await expect(distribution.getByRole('region', { name: 'Грудные', exact: true })).toContainText(
+    'Изменение: +6 подходов',
+  );
+  await page
+    .locator('#progress-training .progress-exercises')
+    .getByText('Жим штанги лёжа', { exact: true })
+    .click();
   await expect(page.getByText('Детали тренировки')).toBeVisible();
   await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
   await expect(page.locator('.progress-hero').getByRole('tab', { name: '7 дней' })).toHaveAttribute(
@@ -1618,76 +1626,43 @@ test('schedule card keeps one contour and only internal dividers across mobile s
   }
 });
 
-test('muscle workload groups use compact cards without changing analytics or drill-down', async ({
+test('muscle workload distribution preserves analytics, keyboard drill-down and responsive readability', async ({
   page,
 }) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await mockProgress(page, 'partial', { muscleGroupWorkload: ISSUE_1050_MUSCLE_WORKLOAD });
-  await page.goto('/app?section=progress');
-  await page.getByRole('button', { name: 'Клиент' }).click();
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
-    .getByRole('link', { name: 'Прогресс' })
-    .click();
-  await page
-    .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('tab', { name: /^Тренировки/ })
-    .click();
+  await page.goto('/app?section=progress&progress_view=training');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
 
-  const training = page.locator('#progress-training');
-  const workload = training.locator('.progress-muscle-workload');
-  const cards = workload.locator(':scope > details.progress-exercise');
-  await expect(cards).toHaveCount(3);
-  await expect(workload.getByText('Передняя дельта и стабилизаторы плечевого пояса')).toBeVisible();
-  await expect(workload.getByText('Нет сравнения')).toBeVisible();
-
-  const visualContract = await cards.first().evaluate((element) => {
-    const style = getComputedStyle(element);
-    const summary = element.querySelector('summary');
-    const summaryStyle = summary ? getComputedStyle(summary) : null;
-    const parentStyle = element.parentElement ? getComputedStyle(element.parentElement) : null;
-    return {
-      borderWidths: [
-        style.borderTopWidth,
-        style.borderRightWidth,
-        style.borderBottomWidth,
-        style.borderLeftWidth,
-      ],
-      borderStyles: [
-        style.borderTopStyle,
-        style.borderRightStyle,
-        style.borderBottomStyle,
-        style.borderLeftStyle,
-      ],
-      borderColors: [
-        style.borderTopColor,
-        style.borderRightColor,
-        style.borderBottomColor,
-        style.borderLeftColor,
-      ],
-      borderRadius: style.borderRadius,
-      listGap: parentStyle?.rowGap ?? null,
-      summaryMinHeight: summaryStyle?.minHeight ?? null,
-    };
+  const workload = page.getByRole('region', { name: 'Мышечные группы', exact: true });
+  const choices = workload.getByRole('button');
+  await expect(choices).toHaveCount(3);
+  const longName = workload.getByText('Передняя дельта и стабилизаторы плечевого пояса', {
+    exact: true,
   });
-  expect(visualContract.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
-  expect(visualContract.borderStyles).toEqual(['solid', 'solid', 'solid', 'solid']);
-  expect(new Set(visualContract.borderColors).size).toBe(1);
-  expect(visualContract.borderRadius).not.toBe('0px');
-  expect(visualContract.listGap).not.toBe('0px');
-  expect(visualContract.summaryMinHeight).toBe('44px');
-
-  const firstCard = cards.first();
-  const firstSummary = firstCard.locator(':scope > summary');
-  await firstSummary.focus();
-  await expect(firstSummary).toBeFocused();
-  await firstSummary.press('Enter');
-  await expect(firstCard).toHaveAttribute('open', '');
-  await expect(firstCard).toContainText('18 подх. · 1,4 в неделю');
-  await expect(firstCard).toContainText('Текущий период');
-  expect(await firstCard.locator('button').count()).toBe(0);
-  await firstSummary.press('Enter');
-  await expect(firstCard).not.toHaveAttribute('open');
+  await expect(longName).toBeVisible();
+  const first = choices.first();
+  await expect(first).toContainText('Всего 18');
+  await expect(first).toContainText('1,4 / нед.');
+  const longChoice = choices.nth(1);
+  await longChoice.focus();
+  await longChoice.press('Enter');
+  await expect(longChoice).toBeFocused();
+  await expect(longChoice).toHaveAttribute('aria-pressed', 'true');
+  const longDetail = workload.getByRole('region', {
+    name: 'Передняя дельта и стабилизаторы плечевого пояса',
+    exact: true,
+  });
+  await expect(longDetail).toContainText('Нет данных для сравнения');
+  await expect(longDetail).toContainText('Текущие 30 дней');
+  await first.focus();
+  await first.press('Space');
+  await expect(first).toBeFocused();
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  await expect(longChoice).toHaveAttribute('aria-pressed', 'false');
+  await expect(workload.getByRole('region', { name: 'Грудь', exact: true })).toContainText(
+    'Изменение: +6 подходов',
+  );
 
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -1699,47 +1674,34 @@ test('muscle workload groups use compact cards without changing analytics or dri
       { width: 1280, height: 900 },
     ]) {
       await page.setViewportSize(viewport);
-      await expect
-        .poll(() =>
-          page.evaluate(
-            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
-          ),
-        )
-        .toBe(true);
-      await expect(workload).toBeVisible();
-      const textColors = await workload.evaluate((element) => {
-        const title = element.querySelector<HTMLElement>('.progress-exercise > summary strong');
-        const value = element.querySelector<HTMLElement>('.progress-exercise__best');
-        const heading = element
-          .closest('.progress-subsection')
-          ?.querySelector<HTMLElement>('.progress-subsection__head h3');
+      await expectNoHorizontalOverflow(page);
+      await expectTouchTargets(choices);
+      await expect(longName).toBeVisible();
+      const nameFits = await longName.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      );
+      expect(nameFits).toBe(true);
+      const visualContract = await first.evaluate((element) => {
+        const style = getComputedStyle(element);
         return {
-          title: title ? getComputedStyle(title).color : null,
-          value: value ? getComputedStyle(value).color : null,
-          heading: heading ? getComputedStyle(heading).color : null,
+          borders: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          radius: style.borderRadius,
+          choice: element.getAttribute('data-yfc-choice'),
         };
       });
-      expect(textColors.title).toBe(textColors.value);
-      expect(textColors.heading).toBe(textColors.value);
+      expect(visualContract.borders).toEqual(['1px', '1px', '1px', '1px']);
+      expect(visualContract.radius).not.toBe('0px');
+      expect(visualContract.choice).toBe('compact');
     }
   }
-
   await page.setViewportSize({ width: 393, height: 844 });
-  await cards.last().scrollIntoViewIfNeeded();
-  const dockOverlap = await page.evaluate(() => {
-    const card = document.querySelector<HTMLElement>(
-      '.progress-muscle-workload > details:last-child',
-    );
-    const dock = document.getElementById('appBottomNav');
-    if (!card || !dock) return null;
-    const cardBox = card.getBoundingClientRect();
-    const dockBox = dock.getBoundingClientRect();
-    return Math.max(
-      0,
-      Math.min(cardBox.bottom, dockBox.bottom) - Math.max(cardBox.top, dockBox.top),
-    );
-  });
-  expect(dockOverlap).toBe(0);
+  await choices.last().scrollIntoViewIfNeeded();
+  await expectNoOverlap(choices.last(), page.locator('#appBottomNav'));
 });
 
 test('captures synthetic #1050 muscle workload before/after evidence', async ({ page }) => {
@@ -1757,10 +1719,7 @@ test('captures synthetic #1050 muscle workload before/after evidence', async ({ 
     .getByRole('tab', { name: /^Тренировки/ })
     .click();
 
-  const section = page
-    .locator('#progress-training .progress-subsection')
-    .filter({ hasText: 'Распределение по мышечным группам' })
-    .first();
+  const section = page.getByRole('region', { name: 'Мышечные группы', exact: true });
   await expect(section).toBeVisible();
   await mkdir(ISSUE_1050_EVIDENCE_DIR, { recursive: true });
   for (const colorScheme of ['light', 'dark'] as const) {
@@ -1781,7 +1740,8 @@ test('captures synthetic #1050 muscle workload before/after evidence', async ({ 
 
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 393, height: 844 });
-  await section.locator('.progress-muscle-workload > details:first-child > summary').press('Enter');
+  await section.getByRole('button').nth(1).press('Enter');
+  await expect(section.getByRole('button').nth(1)).toHaveAttribute('aria-pressed', 'true');
   await section.screenshot({
     path: resolve(ISSUE_1050_EVIDENCE_DIR, `${CAPTURE_1050_PHASE}-mobile-393-light-open.png`),
   });
