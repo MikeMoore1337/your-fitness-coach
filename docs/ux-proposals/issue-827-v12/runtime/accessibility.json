@@ -1,0 +1,149 @@
+{
+  "scope": "Actual React with synthetic service-generated API data; ARIA tree does not replace physical AT",
+  "checks": [
+    {
+      "name": "chromium",
+      "theme": "dark",
+      "width": 1440,
+      "mode": "Web",
+      "minContrast": 5.123911424669872,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "chromium",
+      "theme": "dark",
+      "width": 320,
+      "mode": "Web",
+      "minContrast": 5.123911424669872,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "chromium",
+      "theme": "dark",
+      "width": 393,
+      "mode": "Telegram harness (emulated)",
+      "minContrast": 5.123911424669872,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "chromium",
+      "theme": "light",
+      "width": 1440,
+      "mode": "Web",
+      "minContrast": 5.06843740591182,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "chromium",
+      "theme": "light",
+      "width": 320,
+      "mode": "Web",
+      "minContrast": 5.06843740591182,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "chromium",
+      "theme": "light",
+      "width": 393,
+      "mode": "Telegram harness (emulated)",
+      "minContrast": 5.06843740591182,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "webkit",
+      "theme": "dark",
+      "width": 1440,
+      "mode": "Web",
+      "minContrast": 5.123911424669872,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "webkit",
+      "theme": "dark",
+      "width": 320,
+      "mode": "Web",
+      "minContrast": 5.123911424669872,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "webkit",
+      "theme": "dark",
+      "width": 393,
+      "mode": "Telegram harness (emulated)",
+      "minContrast": 5.123911424669872,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "webkit",
+      "theme": "light",
+      "width": 1440,
+      "mode": "Web",
+      "minContrast": 5.06843740591182,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "webkit",
+      "theme": "light",
+      "width": 320,
+      "mode": "Web",
+      "minContrast": 5.06843740591182,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    },
+    {
+      "name": "webkit",
+      "theme": "light",
+      "width": 393,
+      "mode": "Telegram harness (emulated)",
+      "minContrast": 5.06843740591182,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "reducedMotion": "PASS",
+      "forcedColorsSemantics": "PASS",
+      "nativeScreenReader": "NOT_VERIFIED"
+    }
+  ]
+}

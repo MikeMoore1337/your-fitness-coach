@@ -1,0 +1,109 @@
+{
+  "scope": "standalone synthetic prototype, not runtime/physical screen reader",
+  "checks": [
+    {
+      "name": "chromium",
+      "theme": "dark",
+      "width": 320,
+      "status": "PASS",
+      "minTextContrast": 5.12,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    },
+    {
+      "name": "chromium",
+      "theme": "dark",
+      "width": 1440,
+      "status": "PASS",
+      "minTextContrast": 5.12,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    },
+    {
+      "name": "chromium",
+      "theme": "light",
+      "width": 320,
+      "status": "PASS",
+      "minTextContrast": 5.07,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    },
+    {
+      "name": "chromium",
+      "theme": "light",
+      "width": 1440,
+      "status": "PASS",
+      "minTextContrast": 5.07,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    },
+    {
+      "name": "webkit",
+      "theme": "dark",
+      "width": 320,
+      "status": "PASS",
+      "minTextContrast": 5.12,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    },
+    {
+      "name": "webkit",
+      "theme": "dark",
+      "width": 1440,
+      "status": "PASS",
+      "minTextContrast": 5.12,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    },
+    {
+      "name": "webkit",
+      "theme": "light",
+      "width": 320,
+      "status": "PASS",
+      "minTextContrast": 5.07,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    },
+    {
+      "name": "webkit",
+      "theme": "light",
+      "width": 1440,
+      "status": "PASS",
+      "minTextContrast": 5.07,
+      "keyboard": "PASS",
+      "ariaTree": "PASS",
+      "touch44": "PASS",
+      "reducedMotion": "PASS",
+      "periods": "PASS",
+      "nullStates": "PASS"
+    }
+  ]
+}

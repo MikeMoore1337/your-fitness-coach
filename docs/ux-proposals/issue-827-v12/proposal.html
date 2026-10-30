@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ru" data-color-scheme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>#827 · Мышечные группы · Макет A</title>
+    <link rel="stylesheet" href="/shared/fonts.css" />
+    <link rel="stylesheet" href="/shared/design-system.css" />
+    <link rel="stylesheet" href="proposal.css" />
+    <script src="proposal.js" defer></script>
+  </head>
+  <body>
+    <a href="#muscle-map" class="skip">К мышечным группам</a>
+    <aside class="sidebar" aria-label="Оболочка YFC">
+      <div class="brand-lockup">
+        <img class="logo" alt="" width="38" height="42" /><span
+          class="brand-name"
+          >YOUR FITNESS<br />COACH</span
+        >
+      </div>
+      <p class="muted account">Спортсмен · пример</p>
+      <nav class="desktop-nav" aria-label="Основная навигация"></nav>
+      <p class="sidebar-note muted">
+        Оболочка «Прогресса»<br />Макет для согласования
+      </p>
+    </aside>
+    <main>
+      <div class="mobile-brand">
+        <div class="brand-lockup">
+          <img class="logo" alt="" width="38" height="42" /><span
+            class="brand-name"
+            >YOUR FITNESS<br />COACH</span
+          >
+        </div>
+        <span class="muted">Макет A</span>
+      </div>
+      <div class="review-strip">
+        <span>ПРОТОТИП · СИНТЕТИЧЕСКИЕ ДАННЫЕ</span
+        ><button id="theme" type="button">Светлая тема</button>
+      </div>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Факты за период</p>
+          <h1>Прогресс</h1>
+        </div>
+        <details class="help">
+          <summary>О показателях</summary>
+          <p>
+            Показаны записи о выполненных подходах и связи упражнений с мышцами.
+            Это не измерение физиологической нагрузки.
+          </p>
+        </details>
+      </header>
+      <div class="periods" role="tablist" aria-label="Период прогресса">
+        <button
+          type="button"
+          role="tab"
+          data-days="7"
+          data-yfc-choice="compact"
+          aria-selected="true"
+          tabindex="0"
+        >
+          7 дней</button
+        ><button
+          type="button"
+          role="tab"
+          data-days="30"
+          data-yfc-choice="compact"
+          aria-selected="false"
+          tabindex="-1"
+        >
+          30 дней</button
+        ><button
+          type="button"
+          role="tab"
+          data-days="90"
+          data-yfc-choice="compact"
+          aria-selected="false"
+          tabindex="-1"
+        >
+          90 дней</button
+        ><button
+          type="button"
+          class="custom"
+          disabled
+          title="В макете доступны три готовых примера периода"
+        >
+          Свой период
+        </button>
+      </div>
+      <p id="period-range" class="period-range"></p>
+      <p class="timezone muted">Часовой пояс: Москва</p>
+      <nav class="categories" aria-label="Разделы прогресса">
+        <span>Обзор</span><span>Тело</span
+        ><span data-yfc-choice="compact" aria-current="page">Тренировки</span
+        ><span>Питание</span><span>Кардио</span>
+      </nav>
+      <section class="training-head">
+        <p class="eyebrow">Нагрузка</p>
+        <h2>Тренировки</h2>
+        <p class="muted">
+          Выполненные рабочие подходы и участие мышц по данным каталога.
+        </p>
+      </section>
+      <section class="facts" aria-label="Факты выбранного периода">
+        <div>
+          <strong id="total-sets"></strong
+          ><span>выполненных<br />подходов</span>
+        </div>
+        <div>
+          <strong id="sessions"></strong
+          ><span>завершённых<br />тренировок</span>
+        </div>
+        <div>
+          <strong id="frequency"></strong><span>тренировок<br />в неделю</span>
+        </div>
+      </section>
+      <p class="previous-global muted" id="previous-global"></p>
+      <section id="muscle-map" aria-labelledby="muscle-title">
+        <div class="module-head">
+          <div>
+            <p class="eyebrow">По записям упражнений</p>
+            <h2 id="muscle-title">Мышечные группы</h2>
+          </div>
+          <span class="unit muted">Единица: подходы</span>
+        </div>
+        <p class="intro muted">
+          Один подход может участвовать в нескольких группах. Значения групп не
+          складываются в общее число подходов.
+        </p>
+        <div id="quality"></div>
+        <div class="legend" aria-label="Обозначения">
+          <span><i class="primary-key"></i>Основное участие</span
+          ><span><i class="secondary-key"></i>Вспомогательное</span>
+        </div>
+        <p class="chart-caption muted">
+          Группы по числу подходов. Обе полосы используют одну шкалу.
+        </p>
+        <div
+          id="workload"
+          class="workload"
+          aria-label="Распределение участия мышц"
+        ></div>
+        <details class="method">
+          <summary>Как читать эти данные</summary>
+          <p>
+            Выполненные рабочие и дроп-подходы учитываются в завершённых
+            тренировках. Разминка не входит. Период определяется датой
+            тренировки в журнале.
+          </p>
+          <p>
+            «Всего» у группы — готовое значение аналитики. Основное и
+            вспомогательное участие показаны раздельно. Каталог описывает
+            участие, а не силу воздействия. Отсутствие записи не означает, что
+            мышца не работала.
+          </p>
+          <p>
+            Сравнение — с предыдущим периодом той же длины. Если одна сторона не
+            содержит данных, изменение не рассчитывается. Частота — число
+            тренировок × 7 / число дней.
+          </p>
+        </details>
+      </section>
+      <section class="history">
+        <h2>История упражнений</h2>
+        <p class="muted">
+          Существующая история остаётся ниже распределения. Упражнения выбранной
+          группы доступны в её подробностях.
+        </p>
+      </section>
+      <aside class="review-controls" aria-label="Управление макетом">
+        <label for="state">Пример данных</label
+        ><select id="state">
+          <option value="populated">Заполненный журнал</option>
+          <option value="incomplete">Неполные связи мышц</option>
+          <option value="empty">Нет записей</option>
+          <option value="all_unmapped">Все подходы без связей</option>
+          <option value="loading">Загрузка</option>
+          <option value="error">Ошибка</option></select
+        ><a href="concepts.html">Три исходные композиции</a>
+        <p class="muted">
+          Автономный макет. Не подключён к аккаунту или API. Числа рассчитаны
+          существующим сервисом на тестовой базе.
+        </p>
+      </aside>
+      <p class="sr-only" id="announcement" role="status" aria-live="polite"></p>
+    </main>
+    <nav class="dock" aria-label="Основная навигация"></nav>
+  </body>
+</html>

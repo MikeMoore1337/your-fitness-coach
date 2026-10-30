@@ -45,7 +45,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
-import { MuscleWorkloadList as SharedMuscleWorkloadList } from './MuscleWorkload';
+import { MuscleWorkloadDistribution } from './MuscleWorkload';
 import { ActivityHeatmap, type ActivityHeatmapData } from './ActivityHeatmap';
 import {
   nutritionPeriodForProgress,
@@ -914,12 +914,29 @@ function TrainingSection({
         <>
           <TrainingFacts analytics={analytics.data} />
           <p className="progress-training-meta">
-            Частота:{' '}
+            {analytics.data.completed_workout_count}{' '}
+            {plural(
+              analytics.data.completed_workout_count,
+              'тренировка',
+              'тренировки',
+              'тренировок',
+            )}{' '}
+            ·{' '}
             {formatNumber(
               analytics.data.frequency_per_week ?? summary?.training.frequency_per_week ?? 0,
               2,
             )}{' '}
             в неделю
+          </p>
+          <p className="progress-training-meta">
+            Предыдущий равный период: {analytics.data.previous_completed_workout_count}{' '}
+            {plural(
+              analytics.data.previous_completed_workout_count,
+              'тренировка',
+              'тренировки',
+              'тренировок',
+            )}{' '}
+            · {formatNumber(analytics.data.previous_frequency_per_week, 2)} в неделю
           </p>
           <DataConfidence
             isStale={analytics.isPlaceholderData}
@@ -928,13 +945,7 @@ function TrainingSection({
             action={<AppLink to="/app?section=today">Открыть тренировку</AppLink>}
           />
           <div className="progress-subsection">
-            <div className="progress-subsection__head">
-              <div>
-                <h3>Распределение по мышечным группам</h3>
-                <p>Текущий период, предыдущий равный период и упражнения-источники.</p>
-              </div>
-            </div>
-            <SharedMuscleWorkloadList analytics={analytics.data} />
+            <MuscleWorkloadDistribution analytics={analytics.data} />
           </div>
           <div className="progress-subsection">
             <div className="progress-subsection__head">
