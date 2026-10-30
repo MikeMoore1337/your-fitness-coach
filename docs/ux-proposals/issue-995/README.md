@@ -1,6 +1,6 @@
 # #995: макет заметки к выполнению упражнения
 
-Статус: **макет утверждён владельцем 30 октября 2026 года в чате Codex**. Реальный [AFTER](AFTER.md) ожидает финальной визуальной приёмки. Основа экрана — React из `dev` на
+Статус: **макет и обновлённый [AFTER](AFTER.md) приняты владельцем 30 октября 2026 года в чате Codex**. Основа экрана — React из `dev` на
 [`3275bc4c`](https://github.com/MikeMoore1337/your-fitness-coach/commit/3275bc4c08238ef8b8d1f5a461e296e9159115e2):
 он содержит историю подходов [#1132 / PR #1314](https://github.com/MikeMoore1337/your-fitness-coach/pull/1314),
 общую заметку [#1195 / PR #1342](https://github.com/MikeMoore1337/your-fitness-coach/pull/1342)
