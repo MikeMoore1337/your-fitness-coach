@@ -63,6 +63,7 @@ from fitminiapp_api.schemas.workout import (
     WorkoutRecoveryStateResponse,
     WorkoutRescheduleRequest,
     WorkoutScheduleItem,
+    WorkoutSetHistoryResponse,
     WorkoutSetUpdate,
     WorkoutStatusResponse,
     WorkoutTodayResponse,
@@ -160,6 +161,10 @@ from fitminiapp_api.services.workout_recovery import (
     recovery_today_for_user,
     recovery_user_local_naive_to_utc_naive,
     serialize_schedule_item,
+)
+from fitminiapp_api.services.workout_set_history import (
+    WorkoutSetHistoryNotFound,
+    build_workout_set_history,
 )
 from fitminiapp_api.services.workout_sync import (
     WorkoutSetSyncError,
@@ -1207,6 +1212,20 @@ def delete_today_workout(
     _reconcile_program_completion(db, program, current_user)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{workout_id}/set-history", response_model=WorkoutSetHistoryResponse)
+def workout_set_history(
+    workout_id: int,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        return build_workout_set_history(db, current_user, workout_id)
+    except WorkoutSetHistoryNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/{workout_id}/start", response_model=WorkoutTodayResponse)
