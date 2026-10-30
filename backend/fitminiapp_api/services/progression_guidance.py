@@ -24,7 +24,11 @@ from fitminiapp_api.schemas.program import PrescriptionRepTarget, ProgramCoachin
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.prescription_semantics import parse_prescription_plan
 from fitminiapp_api.services.program_common import ProgramError
-from fitminiapp_api.services.program_versioning import get_program_for_actor
+from fitminiapp_api.services.program_versioning import (
+    _cycle_workout_plans,
+    get_program_for_actor,
+    workout_cycle_week_type,
+)
 from fitminiapp_api.services.workout_metrics import (
     validate_workout_set_changes,
     workout_exercise_metric_type,
@@ -45,6 +49,7 @@ ProgressionOutcome = Literal[
 LoadUnit = Literal["kg", "lb"]
 
 RULESET_VERSION = "progression-guidance-v2"
+TYPED_RULESET_VERSION = "progression-guidance-v3"
 _REP_RANGE = re.compile(r"^\s*(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?\s*$")
 _PROGRESS_MESSAGES: dict[ProgressionOutcome, str] = {
     "consider_progressing": "Можно рассмотреть небольшое увеличение веса",
@@ -508,6 +513,31 @@ def _week_block_number(metadata: object, week_number: int) -> int | None:
     return matches[0] if len(set(matches)) == 1 else None
 
 
+def _metadata_block_context(metadata: dict, week_number: int) -> str | None:
+    blocks = metadata.get("training_blocks", [])
+    if not isinstance(blocks, list):
+        return "invalid"
+    if any(
+        not isinstance(item, dict)
+        or type(item.get("week_start")) is not int
+        or type(item.get("week_end")) is not int
+        or item["week_start"] > item["week_end"]
+        for item in blocks
+    ):
+        return "invalid"
+    matches = [
+        item
+        for item in blocks
+        if isinstance(item, dict)
+        and isinstance(item.get("week_start"), int)
+        and isinstance(item.get("week_end"), int)
+        and item["week_start"] <= week_number <= item["week_end"]
+    ]
+    if len(matches) > 1:
+        return "invalid"
+    return _canonical_json(matches[0]) if matches else None
+
+
 def _resolve_coaching_rule(
     metadata: object,
     *,
@@ -633,6 +663,105 @@ def _snapshot_matches_target(
             ("prescription", exercise.prescription),
         )
     )
+
+
+def _snapshot_metadata(revision: ProgramRevision | None) -> dict | None:
+    snapshot = revision.snapshot if revision is not None else None
+    program = snapshot.get("program") if isinstance(snapshot, dict) else None
+    metadata = program.get("program_metadata") if isinstance(program, dict) else None
+    return metadata if isinstance(metadata, dict) else None
+
+
+def _snapshot_block_context(revision: ProgramRevision, workout: UserWorkout) -> tuple | None:
+    snapshot = revision.snapshot if isinstance(revision.snapshot, dict) else {}
+    blocks = snapshot.get("training_blocks")
+    if not isinstance(blocks, list):
+        return ("invalid",)
+    try:
+        if any(
+            not isinstance(block, dict)
+            or date.fromisoformat(block["start_date"]) > date.fromisoformat(block["end_date"])
+            for block in blocks
+        ):
+            return ("invalid",)
+    except KeyError, TypeError, ValueError:
+        return ("invalid",)
+    day = workout.scheduled_date.isoformat()
+    matches = [
+        block
+        for block in blocks
+        if isinstance(block, dict)
+        and isinstance(block.get("start_date"), str)
+        and isinstance(block.get("end_date"), str)
+        and block["start_date"] <= day <= block["end_date"]
+    ]
+    if len(matches) > 1:
+        return ("invalid",)
+    if not matches:
+        return None
+    block = matches[0]
+    return tuple(
+        _canonical_json(block.get(field))
+        for field in ("id", "start_date", "end_date", "purpose", "is_deload", "priority_muscle_ids")
+    )
+
+
+def _matches_cycle_plan(
+    db: Session,
+    program: UserProgram,
+    revisions: list[ProgramRevision],
+    workout: UserWorkout,
+    exercise: UserWorkoutExercise,
+) -> bool:
+    try:
+        if workout.plan_revision_number is None or exercise.source_template_exercise_id is None:
+            return False
+        available = [
+            item for item in revisions if item.revision_number <= workout.plan_revision_number
+        ]
+        plans = _cycle_workout_plans(db, program, workout.week_number, revisions=available)
+        matching_plans = [item for item in plans if item["day_number"] == workout.day_number]
+        if len(matching_plans) != 1:
+            return False
+        matching_exercises = [
+            item
+            for item in matching_plans[0]["exercises"]
+            if item.get("source_template_exercise_id") == exercise.source_template_exercise_id
+            and item.get("sort_order") == exercise.sort_order
+            and item.get("exercise_id") == exercise.exercise_id
+        ]
+        if len(matching_exercises) != 1:
+            return False
+        planned = matching_exercises[0]
+        if not all(
+            planned.get(field) == value
+            for field, value in (
+                ("metric_type", workout_exercise_metric_type(exercise)),
+                ("prescribed_sets", exercise.prescribed_sets),
+                ("prescribed_reps", exercise.prescribed_reps),
+                ("prescribed_duration_minutes", exercise.prescribed_duration_minutes),
+                ("rest_seconds", exercise.rest_seconds),
+                ("prescription", exercise.prescription),
+            )
+        ):
+            return False
+        fields = (
+            "set_number",
+            "planned_role",
+            "planned_position",
+            "planned_group_id",
+            "planned_group_kind",
+            "planned_round",
+        )
+        expected = sorted(planned["sets"], key=lambda item: item["set_number"])
+        actual = sorted(exercise.sets, key=lambda item: item.set_number)
+        return len(actual) == len(expected) and all(
+            all(getattr(row, field) == saved.get(field) for field in fields)
+            and (row.set_kind or "working") == (saved.get("set_kind") or "working")
+            for row, saved in zip(actual, expected, strict=True)
+        )
+    except AttributeError, KeyError, OverflowError, TypeError, ValueError:
+        return False
 
 
 def _revision_for_completion(
@@ -1030,7 +1159,7 @@ def _attach_proposal(
         for item in sessions[:3]
         for set_id in item.source_set_ids
     ]
-    if not source_ids:
+    if not source_ids and result["ruleset_version"] == RULESET_VERSION:
         source_ids = [f"rule:{rule_id}"]
     proposed_weight = result.get("suggested_weight")
     updates = _target_set_updates(exercise, selection, proposed_weight)
@@ -1052,7 +1181,7 @@ def _attach_proposal(
         eligibility = "no_change"
     reasons = list(dict.fromkeys(result["evidence"].get("reason_keys", [])))
     proposal_material = {
-        "ruleset_version": RULESET_VERSION,
+        "ruleset_version": result["ruleset_version"],
         "rule_id": rule_id,
         "target": [program_id, revision_number, workout.id, exercise.exercise_id],
         "source_evidence_ids": source_ids,
@@ -1081,7 +1210,7 @@ def _attach_proposal(
         "proposed_action": proposed_action,
         "target_set_updates": updates,
         "source_evidence_ids": source_ids,
-        "comparable_session_count": sum(item.complete for item in sessions),
+        "comparable_session_count": result["evidence"]["comparable_session_count"],
         "reason_codes": reasons,
         "eligibility_status": eligibility,
         "requires_confirmation": True,
@@ -1112,6 +1241,18 @@ def build_progression_guidance(
         .order_by(ProgramRevision.revision_number.asc())
         .all()
     )
+    week_type, week_type_known = workout_cycle_week_type(db, workout, revisions)
+    target_plan_revision = next(
+        (item for item in revisions if item.revision_number == workout.plan_revision_number), None
+    )
+    if week_type is not None:
+        target_metadata = _snapshot_metadata(target_plan_revision)
+        if target_metadata is None:
+            week_type_known = False
+        else:
+            metadata = target_metadata
+    if not week_type_known:
+        metadata = {}
     blocks = (
         db.query(TrainingBlock)
         .filter(TrainingBlock.user_program_id == workout.user_program_id)
@@ -1201,7 +1342,20 @@ def build_progression_guidance(
             )
             facts: list[SessionFacts] = []
             action = "hold"
-        elif not _snapshot_matches_target(revision, workout, current):
+        elif not week_type_known:
+            result = _review_result(
+                prescribed_sets=selection.expected_count or current.prescribed_sets,
+                prescribed_reps=target_reps or current.prescribed_reps,
+                reason_code="week_type_unverifiable",
+                detail="Не удалось проверить актуальную версию назначения программы.",
+            )
+            facts = []
+            action = "hold"
+        elif not (
+            _matches_cycle_plan(db, program, revisions, workout, current)
+            if week_type is not None
+            else _snapshot_matches_target(revision, workout, current)
+        ):
             result = _review_result(
                 prescribed_sets=selection.expected_count or current.prescribed_sets,
                 prescribed_reps=target_reps or current.prescribed_reps,
@@ -1231,33 +1385,104 @@ def build_progression_guidance(
         else:
             same_exercise = [item for item in candidates if item.exercise_id == current.exercise_id]
             comparable: list[UserWorkoutExercise] = []
+            same_type: list[UserWorkoutExercise] = []
             for item in same_exercise:
-                completed_at = item.workout.completed_at
-                if (
-                    completed_at is None
-                    or _revision_for_completion(revisions, completed_at) != revision_number
+                if week_type is not None and (
+                    item.workout.day_number != workout.day_number
+                    or item.sort_order != current.sort_order
+                    or item.source_template_exercise_id != current.source_template_exercise_id
+                ):
+                    continue
+                if item.workout.completed_at is None:
+                    if week_type is not None:
+                        same_type.append(item)
+                        break
+                    continue
+                historical_metadata = metadata
+                if week_type is not None:
+                    historical_type, historical_known = workout_cycle_week_type(
+                        db, item.workout, revisions
+                    )
+                    if not historical_known:
+                        same_type.append(item)
+                        break
+                    if historical_type != week_type:
+                        continue
+                    same_type.append(item)
+                    historical_revision = next(
+                        (
+                            row
+                            for row in revisions
+                            if row.revision_number == item.workout.plan_revision_number
+                        ),
+                        None,
+                    )
+                    historical_snapshot_metadata = _snapshot_metadata(historical_revision)
+                    if (
+                        historical_revision is None
+                        or target_plan_revision is None
+                        or historical_snapshot_metadata is None
+                        or not _matches_cycle_plan(db, program, revisions, item.workout, item)
+                    ):
+                        break
+                    historical_metadata = historical_snapshot_metadata
+                    historical_block = _snapshot_block_context(historical_revision, item.workout)
+                    current_snapshot_block = _snapshot_block_context(target_plan_revision, workout)
+                    if (
+                        historical_block == ("invalid",)
+                        or current_snapshot_block == ("invalid",)
+                        or historical_block != current_snapshot_block
+                    ):
+                        break
+                    historical_metadata_block = _metadata_block_context(
+                        historical_metadata, item.workout.week_number
+                    )
+                    current_metadata_block = _metadata_block_context(metadata, workout.week_number)
+                    if (
+                        historical_metadata_block == "invalid"
+                        or current_metadata_block == "invalid"
+                        or historical_metadata_block != current_metadata_block
+                    ):
+                        break
+                elif (
+                    _revision_for_completion(revisions, item.workout.completed_at)
+                    != revision_number
                 ):
                     continue
                 if item.source_template_exercise_id != current.source_template_exercise_id:
                     continue
                 if _selection_signature(item) != _selection_signature(current):
+                    if week_type is not None:
+                        break
                     continue
                 if _block_id_for_date(blocks, item.workout.scheduled_date) != current_block_id:
+                    if week_type is not None:
+                        break
                     continue
-                if _week_block_number(metadata, item.workout.week_number) != current_block_number:
+                if (
+                    _week_block_number(historical_metadata, item.workout.week_number)
+                    != current_block_number
+                ):
+                    if week_type is not None:
+                        break
                     continue
                 historical_rule, historical_error = _resolve_coaching_rule(
-                    metadata,
+                    historical_metadata,
                     exercise_id=item.exercise_id,
                     week_number=item.workout.week_number,
                 )
                 if historical_error is not None or _rule_snapshot(
                     historical_rule
                 ) != _rule_snapshot(rule):
+                    if week_type is not None:
+                        break
                     continue
                 comparable.append(item)
-            facts = [_session_facts_for_selection(item, selection) for item in comparable]
-            context_changed = bool(same_exercise and not comparable)
+            all_facts = [_session_facts_for_selection(item, selection) for item in comparable]
+            facts = all_facts[:3] if week_type is not None else all_facts
+            context_changed = bool(
+                (same_type if week_type is not None else same_exercise) and not comparable
+            )
             if rule is None:
                 if not isinstance(metadata, dict) or not metadata.get("coaching_rules"):
                     result = evaluate_progression(
@@ -1289,10 +1514,41 @@ def build_progression_guidance(
                 if context_changed and not facts:
                     result["evidence"]["reason_keys"].append("program_context_changed")
                     result["outcome"] = "review"
+                    if week_type is not None:
+                        result["message"] = _PROGRESS_MESSAGES["review"]
                     result["suggested_weight"] = None
                     result["suggested_increment"] = None
                     action = "hold"
 
+            if week_type is not None:
+                result["evidence"]["comparable_session_count"] = sum(
+                    item.complete for item in all_facts
+                )
+                if facts and not facts[0].complete and result.get("suggested_weight") is not None:
+                    result["outcome"] = "review"
+                    result["message"] = _PROGRESS_MESSAGES["review"]
+                    result["detail"] = (
+                        "Нужны полные сопоставимые рабочие подходы в текущем контексте программы."
+                    )
+                    result["suggested_weight"] = None
+                    result["suggested_increment"] = None
+                    result["evidence"]["reason_keys"].append("incomplete_session_facts")
+                    action = "hold"
+
+        if week_type is not None or not week_type_known:
+            result["ruleset_version"] = TYPED_RULESET_VERSION
+            result["evidence"]["week_type"] = week_type if week_type_known else None
+            reasons = result["evidence"].get("reason_keys", [])
+            if week_type is not None and any(
+                reason in reasons
+                for reason in (
+                    "too_few_comparable_sessions",
+                    "need_one_more_stable_session",
+                    "missing_amrap_evidence",
+                    "missing_rir_evidence",
+                )
+            ):
+                reasons.append("insufficient_same_type_history")
         result["evidence"]["reason_keys"] = list(
             dict.fromkeys(result["evidence"].get("reason_keys", []))
         )

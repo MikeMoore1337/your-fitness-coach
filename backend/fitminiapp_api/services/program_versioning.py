@@ -337,20 +337,32 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
     }
 
 
-def _cycle_occurrence_overrides(db: Session, program_id: int) -> list[dict]:
+def _cycle_occurrence_overrides(
+    db: Session, program_id: int, *, revisions: list[ProgramRevision] | None = None
+) -> list[dict]:
     result = []
-    for revision in (
-        db.query(ProgramRevision)
-        .filter_by(user_program_id=program_id)
-        .order_by(ProgramRevision.revision_number)
-    ):
+    if revisions is None:
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program_id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+    for revision in revisions:
         result.extend(revision.changed_fields.get("inherited_occurrence_overrides", []))
         if "occurrence_override" in revision.changed_fields:
             result.append(revision.changed_fields["occurrence_override"])
     return result
 
 
-def _cycle_assignment(db: Session, program: UserProgram) -> ProgramRevision | None:
+def _cycle_assignment(
+    db: Session, program: UserProgram, *, revisions: list[ProgramRevision] | None = None
+) -> ProgramRevision | None:
+    if revisions is not None:
+        return next(
+            (item for item in revisions if item.change_kind in {"assigned", "program_restarted"}),
+            None,
+        )
     return (
         db.query(ProgramRevision)
         .filter(
@@ -362,13 +374,18 @@ def _cycle_assignment(db: Session, program: UserProgram) -> ProgramRevision | No
     )
 
 
-def _cycle_configurations(db: Session, program: UserProgram) -> list[dict]:
+def _cycle_configurations(
+    db: Session, program: UserProgram, *, revisions: list[ProgramRevision] | None = None
+) -> list[dict]:
     configs = []
-    for revision in (
-        db.query(ProgramRevision)
-        .filter_by(user_program_id=program.id)
-        .order_by(ProgramRevision.revision_number)
-    ):
+    if revisions is None:
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program.id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+    for revision in revisions:
         configs.extend(revision.changed_fields.get("inherited_cycle_configurations", []))
         if "cycle_configuration" in revision.changed_fields:
             configs.append(revision.changed_fields["cycle_configuration"])
@@ -376,9 +393,9 @@ def _cycle_configurations(db: Session, program: UserProgram) -> list[dict]:
 
 
 def _cycle_plan_at(
-    db: Session, program: UserProgram, week: int
+    db: Session, program: UserProgram, week: int, *, revisions: list[ProgramRevision] | None = None
 ) -> tuple[dict, list[dict], int] | None:
-    revision = _cycle_assignment(db, program)
+    revision = _cycle_assignment(db, program, revisions=revisions)
     if revision is None:
         return None
     cycle = revision.changed_fields.get("week_cycle") or (
@@ -390,7 +407,7 @@ def _cycle_plan_at(
         "logical_cycle", revision.changed_fields.get("logical_cycle", revision.snapshot["workouts"])
     )
     boundary = 1
-    for config in _cycle_configurations(db, program):
+    for config in _cycle_configurations(db, program, revisions=revisions):
         if config["effective_from_week"] <= week:
             cycle, source, boundary = (
                 config["week_cycle"],
@@ -410,15 +427,17 @@ def _override_matches(override: dict, week: int, source_week: int, boundary: int
     )
 
 
-def _cycle_workout_plans(db: Session, program: UserProgram, week: int) -> list[dict]:
-    config = _cycle_plan_at(db, program, week)
+def _cycle_workout_plans(
+    db: Session, program: UserProgram, week: int, *, revisions: list[ProgramRevision] | None = None
+) -> list[dict]:
+    config = _cycle_plan_at(db, program, week, revisions=revisions)
     if config is None:
         return []
     cycle, source, boundary = config
     if not cycle["repeat"] and week - boundary >= cycle["length_weeks"]:
         return []
     source_week = (week - boundary) % cycle["length_weeks"] + 1
-    overrides = _cycle_occurrence_overrides(db, program.id)
+    overrides = _cycle_occurrence_overrides(db, program.id, revisions=revisions)
     plans = []
     for original in source:
         if original["week_number"] != source_week:
@@ -446,6 +465,47 @@ def _cycle_workout_plans(db: Session, program: UserProgram, week: int) -> list[d
                 item["sets"] = _cycle_plan_sets(item["prescription"])
         plans.append(result)
     return plans
+
+
+def workout_cycle_week_type(
+    db: Session, workout: UserWorkout, revisions: list[ProgramRevision]
+) -> tuple[str | None, bool]:
+    """Resolve the type from the workout's saved plan revision; false means unknown."""
+    if workout.source_cycle_week is None:
+        return None, workout.plan_revision_number is None
+    number = workout.plan_revision_number
+    if number is None or not any(item.revision_number == number for item in revisions):
+        return None, False
+    available = [item for item in revisions if item.revision_number <= number]
+    try:
+        config = _cycle_plan_at(db, workout.user_program, workout.week_number, revisions=available)
+        if config is None:
+            return None, False
+        cycle, _source, boundary = config
+        length = cycle["length_weeks"]
+        if (
+            cycle.get("schema_version") != 1
+            or type(length) is not int
+            or length < 1
+            or type(cycle.get("repeat")) is not bool
+            or workout.week_number < boundary
+            or (not cycle["repeat"] and workout.week_number - boundary >= length)
+            or workout.source_cycle_week != (workout.week_number - boundary) % length + 1
+            or workout.cycle_iteration != (workout.week_number - boundary) // length + 1
+        ):
+            return None, False
+        types = cycle.get("week_types")
+        if types is None:
+            return None, True
+        if (
+            not isinstance(types, list)
+            or len(types) != length
+            or any(item not in {"light", "medium", "heavy"} for item in types)
+        ):
+            return None, False
+        return types[workout.source_cycle_week - 1], True
+    except AttributeError, KeyError, OverflowError, TypeError, ValueError, ZeroDivisionError:
+        return None, False
 
 
 def cycle_workout_count(
