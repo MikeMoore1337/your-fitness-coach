@@ -5861,15 +5861,16 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   min-width: 0;
   min-height: var(--touch-target, 44px);
 }
-/* Match the first action's flex width, allowing for the different row gaps. */
-.active-workout-rest__time {
-  flex: 0 0 calc(21.0526% - 1.6842px);
-}
 .active-workout-rest__time,
 .active-workout-rest__actual-value {
   display: grid;
   gap: 1px;
   min-width: 0;
+}
+/* Match the first action's width without allowing a long clock to overlap. */
+.active-workout-rest__time {
+  flex: 0 0 calc(21.0526% - 1.6842px);
+  min-width: max-content;
 }
 .active-workout-rest__time > span,
 .active-workout-rest__actual-value > span {

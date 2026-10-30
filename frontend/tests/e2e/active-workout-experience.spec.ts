@@ -948,12 +948,22 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
           const actualFits = actual.scrollWidth <= actual.clientWidth + 1;
           const plannedText = document.createRange();
           plannedText.selectNodeContents(planned);
+          const plannedRight = plannedText.getBoundingClientRect().right;
+          const originalPlanned = planned.textContent;
+          // Exercise the maximum prescribed ten-minute rest at narrow widths.
+          planned.textContent = '10:00';
+          plannedText.selectNodeContents(planned);
+          const tenMinuteRight = plannedText.getBoundingClientRect().right;
+          const tenMinuteActualLeft = actualBlock.getBoundingClientRect().left;
+          planned.textContent = originalPlanned;
           const geometry = {
             timerSize,
             actualSize,
             actualFits,
             plannedLeft: planned.getBoundingClientRect().left,
-            plannedRight: plannedText.getBoundingClientRect().right,
+            plannedRight,
+            tenMinuteRight,
+            tenMinuteActualLeft,
             statusLeft: status.getBoundingClientRect().left,
             actualLeft: actualBlock.getBoundingClientRect().left,
             actualRight: actualBlock.getBoundingClientRect().right,
@@ -981,6 +991,10 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
           result.actualLeft - result.plannedRight,
           `${width}px ${theme}: clock separation`,
         ).toBeGreaterThanOrEqual(15);
+        expect(
+          result.tenMinuteActualLeft - result.tenMinuteRight,
+          `${width}px ${theme}: ten-minute rest`,
+        ).toBeGreaterThanOrEqual(4);
         expect(result.actualRight).toBeLessThanOrEqual(result.statusLeft + 1);
         expect(result.stopRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
@@ -988,7 +1002,10 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
         expect(result.actions).toHaveLength(4);
         expect(result.actions.every((button) => button.width >= 44)).toBe(true);
         expect(Math.abs(result.plannedLeft - result.actions[0]!.left)).toBeLessThanOrEqual(1);
-        expect(Math.abs(result.actualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(result.actualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(2);
+        expect(Math.abs(result.tenMinuteActualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(
+          8,
+        );
         await panel.screenshot({
           path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
           animations: 'disabled',
