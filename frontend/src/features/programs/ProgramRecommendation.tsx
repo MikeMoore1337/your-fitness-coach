@@ -95,22 +95,11 @@ const equipment: ReadonlyArray<{ value: EquipmentId; label: string }> = [
 
 const stepTitles = ['Цель', 'Опыт', 'Частота', 'Длительность', 'Место и инвентарь'] as const;
 
-const noCompatibleReasonLabels: Record<string, string> = {
-  duration_incompatible: 'Запрошенная длительность несовместима со структурой программы.',
-  equipment_no_canonical_substitution:
-    'Для обязательного упражнения нет безопасной канонической замены.',
-  excluded_exercise_no_substitution: 'Исключение упражнения не оставляет канонической замены.',
-  experience_incompatible: 'Доступные source-backed структуры требуют другого уровня опыта.',
-  frequency_not_supported: 'Подходящая source-backed структура не поддерживает эту частоту.',
-  goal_not_supported: 'Для выбранной цели нет совместимой source-backed структуры.',
-  exercise_not_canonical: 'Выбранное упражнение отсутствует в каноническом каталоге.',
-  no_compatible_program: 'Все доступные структуры нарушают хотя бы одно жёсткое ограничение.',
-};
-
 interface ProgramRecommendationProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirmed?: () => void | Promise<void>;
+  onOpenPrograms?: () => void;
 }
 
 function Choice({
@@ -146,12 +135,6 @@ function Choice({
 function durationLabel(value: number): string {
   return `${value} минут`;
 }
-function reasonLabel(code: string): string {
-  return (
-    noCompatibleReasonLabels[code] ?? 'Ограничение не позволило подтвердить совместимый вариант.'
-  );
-}
-
 function PreviewDays({ preview }: { preview: ProgramGeneratorPreviewResponse }) {
   if (!preview.program) return null;
   return (
@@ -172,7 +155,9 @@ function PreviewDays({ preview }: { preview: ProgramGeneratorPreviewResponse }) 
                   <strong>{exercise.exercise_title}</strong>
                   <small>
                     {exercise.prescribed_sets} подхода · {exercise.prescribed_reps}
-                    {exercise.group_kind ? ` · ${exercise.group_kind}` : ''}
+                    {exercise.group_kind
+                      ? ` · ${{ sequence: 'последовательность', superset: 'суперсет', rest_pause: 'отдых-пауза', myo_reps: 'мио-повторы', cluster: 'кластер', drop_chain: 'дроп-сет', circuit: 'круг' }[exercise.group_kind]}`
+                      : ''}
                   </small>
                 </span>
                 {exercise.exercise_id !== exercise.source_exercise_id && (
@@ -191,6 +176,7 @@ export function ProgramRecommendation({
   open,
   onOpenChange,
   onConfirmed,
+  onOpenPrograms,
 }: ProgramRecommendationProps) {
   const { user } = useAuth();
   const { confirm } = useFeedback();
@@ -253,6 +239,7 @@ export function ProgramRecommendation({
       }),
     onSuccess: (data) => {
       setPreview(data);
+      requestAnimationFrame(() => panelRef.current?.focus());
       trackProductEvent({
         name:
           data.status === 'preview'
@@ -323,6 +310,21 @@ export function ProgramRecommendation({
       preferred_exercise_ids: preferredIds,
       excluded_exercise_ids: excludedIds,
     });
+  };
+
+  const applySuggestion = (inputs: ProgramGeneratorRequest) => {
+    setGoal(inputs.goal);
+    setExperience(inputs.experience);
+    setDaysPerWeek(inputs.days_per_week);
+    setDuration(inputs.preferred_session_duration_minutes);
+    setLocation(inputs.training_location);
+    setEquipmentIds(inputs.available_equipment_ids ?? []);
+    setPriorityIds(inputs.priority_muscle_ids ?? []);
+    setPreferredIds(inputs.preferred_exercise_ids ?? []);
+    setExcludedIds(inputs.excluded_exercise_ids ?? []);
+    resetResult();
+    setStep(stepTitles.length - 1);
+    previewMutation.mutate(inputs);
   };
 
   const confirmPreview = async () => {
@@ -400,7 +402,7 @@ export function ProgramRecommendation({
                     <fieldset>
                       <legend>Какая цель главная сейчас?</legend>
                       <p>
-                        Цель влияет на порядок source-backed структур, но не создаёт новую методику.
+                        Подбор проверяет готовые программы. Цель не меняется без вашего согласия.
                       </p>
                       <div className="program-wizard__choices">
                         {goals.map((item) => (
@@ -518,8 +520,13 @@ export function ProgramRecommendation({
                           ))}
                         </div>
                         <small>
-                          Собственный вес можно оставить отмеченным вместе с любым другим
-                          инвентарём.
+                          {equipmentIds.length
+                            ? `Выбрано: ${equipment
+                                .filter((item) => equipmentIds.includes(item.value))
+                                .map((item) => item.label)
+                                .join(', ')}.`
+                            : 'Инвентарь не отмечен: проверим только упражнения без оборудования.'}{' '}
+                          Выбор зала не добавляет оборудование автоматически.
                         </small>
                         <label className="field">
                           <span>Приоритетные группы — необязательно</span>
@@ -589,7 +596,7 @@ export function ProgramRecommendation({
                         </label>
                       </div>
                       <p className="program-wizard__safety-note">
-                        Подбор использует канонические упражнения и source-backed структуры. Это не
+                        Подбор использует упражнения из каталога и готовые программы. Это не
                         медицинская рекомендация.
                       </p>
                     </fieldset>
@@ -609,7 +616,7 @@ export function ProgramRecommendation({
                       {previewMutation.isPending
                         ? 'Рассчитываем…'
                         : step === stepTitles.length - 1
-                          ? 'Показать preview'
+                          ? 'Показать программу'
                           : 'Далее'}
                     </button>
                   </footer>
@@ -622,7 +629,7 @@ export function ProgramRecommendation({
                 {preview.status === 'preview' && preview.program ? (
                   <>
                     <div className="program-wizard-result__lead">
-                      <Badge tone="success">Проверенный draft</Badge>
+                      <Badge tone="success">Совместимая программа</Badge>
                       <h3>{preview.program.title}</h3>
                       <p>{preview.message}</p>
                     </div>
@@ -633,7 +640,10 @@ export function ProgramRecommendation({
                       </div>
                       <div>
                         <dt>График</dt>
-                        <dd>{preview.program.days.length} тренировок</dd>
+                        <dd>
+                          {preview.program.days_per_week} занятий в неделю;{' '}
+                          {preview.program.days.length} разных тренировок
+                        </dd>
                       </div>
                       <div>
                         <dt>Длительность</dt>
@@ -692,7 +702,7 @@ export function ProgramRecommendation({
                           setStep(stepTitles.length - 1);
                         }}
                       >
-                        Изменить параметры
+                        Изменить ответы
                       </button>
                       <button
                         type="button"
@@ -711,11 +721,33 @@ export function ProgramRecommendation({
                     <span className="eyebrow">Совместимый вариант не найден</span>
                     <h3>Не удалось подобрать программу</h3>
                     <p>{preview.message}</p>
-                    <ul className="program-generator__reasons">
-                      {(preview.reason_codes ?? []).map((code) => (
-                        <li key={code}>{reasonLabel(code)}</li>
-                      ))}
-                    </ul>
+                    {(preview.suggestions ?? []).map((suggestion) => (
+                      <article
+                        className="program-generator__day"
+                        key={suggestion.source.template_id}
+                      >
+                        <h4>{suggestion.source.title}</h4>
+                        <ul>
+                          {suggestion.changes.map((change) => (
+                            <li key={change}>{change}</li>
+                          ))}
+                        </ul>
+                        <p>
+                          Программа прошла проверку с этими ответами. После применения проверим её
+                          ещё раз; сохранение потребует отдельного подтверждения.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={previewMutation.isPending}
+                          onClick={() => applySuggestion(suggestion.inputs)}
+                        >
+                          Применить предложенное изменение
+                        </button>
+                      </article>
+                    ))}
+                    {previewMutation.error && (
+                      <ErrorState message={(previewMutation.error as Error).message} />
+                    )}
                     <div className="program-wizard__result-actions">
                       <button
                         type="button"
@@ -725,10 +757,17 @@ export function ProgramRecommendation({
                           setStep(stepTitles.length - 1);
                         }}
                       >
-                        Изменить параметры
+                        Изменить ответы
                       </button>
-                      <button type="button" className="secondary" onClick={close}>
-                        Закрыть
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          close();
+                          onOpenPrograms?.();
+                        }}
+                      >
+                        Открыть готовые программы
                       </button>
                     </div>
                   </div>
@@ -741,7 +780,7 @@ export function ProgramRecommendation({
                 <div className="program-wizard-result__lead">
                   <Badge tone="success">Сохранено</Badge>
                   <h3>{confirmed.template.title}</h3>
-                  <p>Программа подтверждена и назначена через существующий lifecycle Product v4.</p>
+                  <p>Программа сохранена. Тренировки добавлены в ваш план.</p>
                 </div>
                 <div className="program-wizard__result-actions">
                   <button type="button" onClick={close}>

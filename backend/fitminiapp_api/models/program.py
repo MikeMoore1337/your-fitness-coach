@@ -67,6 +67,16 @@ class ProgramTemplate(Base):
     def effective_duration_weeks(self) -> int:
         return self.default_duration_weeks or 1
 
+    @property
+    def sessions_per_week(self) -> int:
+        metadata = self.program_metadata or {}
+        if metadata.get("week_cycle"):
+            return len(self.days)
+        frequency = metadata.get("days_per_week")
+        if type(frequency) is int and 1 <= frequency <= 8:
+            return frequency
+        return len(self.days)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=now_msk_naive,

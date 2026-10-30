@@ -15,7 +15,7 @@ vi.mock('../../../../src/shared/ui/FeedbackProvider', () => ({
 
 const preview = {
   status: 'preview',
-  selection_policy_version: 'program_generator_v1',
+  selection_policy_version: 'program_generator_v2',
   input_fingerprint: 'fingerprint',
   message: 'Предпросмотр готов.',
   draft_token: 'signed-draft',
@@ -34,6 +34,7 @@ const preview = {
     level: 'beginner',
     split_type: 'full_body',
     estimated_duration_minutes: 52,
+    days_per_week: 3,
     days: [
       {
         day_number: 1,
@@ -80,12 +81,18 @@ function renderWizard() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const onConfirmed = vi.fn();
+  const onOpenPrograms = vi.fn();
   render(
     <QueryClientProvider client={queryClient}>
-      <ProgramRecommendation open onConfirmed={onConfirmed} onOpenChange={vi.fn()} />
+      <ProgramRecommendation
+        open
+        onConfirmed={onConfirmed}
+        onOpenChange={vi.fn()}
+        onOpenPrograms={onOpenPrograms}
+      />
     </QueryClientProvider>,
   );
-  return { onConfirmed };
+  return { onConfirmed, onOpenPrograms };
 }
 
 function installFetch(response: unknown = preview) {
@@ -137,7 +144,7 @@ describe('ProgramRecommendation deterministic generator flow', () => {
 
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled();
     await reachFinalStep();
-    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
 
     expect(
       await screen.findByRole('heading', { level: 3, name: 'Каноническая программа' }),
@@ -169,9 +176,9 @@ describe('ProgramRecommendation deterministic generator flow', () => {
     installFetch(result);
     renderWizard();
     await reachFinalStep();
-    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
     expect(await screen.findByText('Упражнение заменено канонически.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Изменить параметры' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить ответы' }));
     expect(screen.getByRole('radio', { name: /Дома/ })).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Назад' }));
     expect(screen.getByRole('radio', { name: /60 минут/ })).toBeChecked();
@@ -188,31 +195,30 @@ describe('ProgramRecommendation deterministic generator flow', () => {
       fit_reasons: [],
       tradeoffs: [],
       adaptations: [],
-      message: 'Не удалось подобрать программу.',
+      message:
+        'Для программы «Каноническая программа»: длительность несовместима с выбранным временем.',
     });
     renderWizard();
     await reachFinalStep();
-    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
 
     expect(
       await screen.findByRole('heading', { name: 'Не удалось подобрать программу' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/длительность несовместима/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Изменить параметры' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Изменить ответы' })).toBeInTheDocument();
   });
 
   it('confirms once and shows the persisted state', async () => {
     installFetch();
     const { onConfirmed } = renderWizard();
     await reachFinalStep();
-    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
     await screen.findByRole('heading', { level: 3, name: 'Каноническая программа' });
     fireEvent.click(screen.getByRole('button', { name: 'Подтвердить программу' }));
 
     expect(
-      await screen.findByText(
-        'Программа подтверждена и назначена через существующий lifecycle Product v4.',
-      ),
+      await screen.findByText('Программа сохранена. Тренировки добавлены в ваш план.'),
     ).toBeInTheDocument();
     expect(onConfirmed).toHaveBeenCalledTimes(1);
   });
@@ -230,7 +236,7 @@ describe('ProgramRecommendation deterministic generator flow', () => {
     });
     renderWizard();
     await reachFinalStep();
-    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
 
     expect(await screen.findByText(/назначенная тренером/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Подтвердить программу' })).toBeDisabled();
@@ -241,11 +247,89 @@ describe('ProgramRecommendation deterministic generator flow', () => {
     const fetchMock = vi.mocked(globalThis.fetch);
     renderWizard();
     await reachFinalStep();
-    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
     await screen.findByRole('heading', { level: 3, name: 'Каноническая программа' });
     fetchMock.mockImplementationOnce(() => new Promise<Response>(() => undefined));
     fireEvent.click(screen.getByRole('button', { name: 'Подтвердить программу' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохраняем…' })).toBeDisabled());
     expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it('applies only the selected verified inputs, requests a new preview and never auto-confirms', async () => {
+    const inputs = {
+      goal: 'muscle_gain',
+      experience: 'beginner',
+      days_per_week: 3,
+      preferred_session_duration_minutes: 60,
+      training_location: 'home',
+      available_equipment_ids: ['bodyweight', 'dumbbell'],
+      priority_muscle_ids: [],
+      preferred_exercise_ids: [],
+      excluded_exercise_ids: [],
+    };
+    const calls = installFetch({
+      ...preview,
+      status: 'no_compatible',
+      program: null,
+      draft_token: null,
+      message: 'Для программы «Каноническая программа»: не хватает оборудования.',
+      reason_codes: ['equipment_no_canonical_substitution', 'experience_incompatible'],
+      suggestions: [
+        {
+          source: preview.source,
+          changes: ['Цель: рекомпозиция → набор мышц.', 'Понадобятся гантели.'],
+          inputs,
+        },
+      ],
+    });
+    renderWizard();
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
+    const apply = await screen.findByRole('button', { name: 'Применить предложенное изменение' });
+    expect(calls).toHaveLength(1);
+    expect(screen.queryByText(/требуют другого уровня/)).not.toBeInTheDocument();
+    expect(screen.getByText('Цель: рекомпозиция → набор мышц.')).toBeInTheDocument();
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...preview,
+          program: { ...preview.program, goal: 'muscle_gain', days_per_week: 3 },
+        }),
+        { status: 200 },
+      ),
+    );
+    fireEvent.click(apply);
+    await screen.findByRole('heading', { name: 'Каноническая программа', level: 3 });
+    const [, second] = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.filter(([url]) => String(url).endsWith('/generator/preview'));
+    expect(JSON.parse(String(second?.[1]?.body))).toEqual(inputs);
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([url]) => String(url).endsWith('/generator/confirm')),
+    ).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить ответы' }));
+    expect(screen.getByRole('checkbox', { name: 'Гантели' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /Дома/ })).toBeChecked();
+  });
+
+  it('explains an empty gym inventory and opens the actual program library', async () => {
+    installFetch({
+      ...preview,
+      status: 'no_compatible',
+      program: null,
+      draft_token: null,
+      suggestions: [],
+    });
+    const { onOpenPrograms } = renderWizard();
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('radio', { name: /Тренажёрный зал/ }));
+    expect(screen.getByText(/Инвентарь не отмечен/)).toHaveTextContent(
+      'Выбор зала не добавляет оборудование автоматически.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Показать программу' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть готовые программы' }));
+    expect(onOpenPrograms).toHaveBeenCalledOnce();
   });
 });
