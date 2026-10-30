@@ -122,7 +122,12 @@
   margin-bottom: 7px;
 }
 
-.exercise-execution-note__tags,
+.exercise-execution-note__tags {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
 .exercise-execution-note__buttons {
   display: flex;
   flex-wrap: wrap;
@@ -131,9 +136,11 @@
 
 .exercise-execution-note__tags button {
   min-height: 44px;
-  padding: 0 10px;
+  padding: 0 4px;
   border: 1px solid var(--border);
   font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .exercise-execution-note__buttons .ui-button {

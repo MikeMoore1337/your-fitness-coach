@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
@@ -233,6 +233,34 @@ async function capture(page: Page, name: string) {
   });
 }
 
+async function expectTagsDistributed(note: Locator) {
+  const geometry = await note.locator('.exercise-execution-note__tags').evaluate((element) => {
+    const group = element.getBoundingClientRect();
+    const buttons = Array.from(element.querySelectorAll('button')).map((button) => {
+      const box = button.getBoundingClientRect();
+      return {
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        width: box.width,
+        height: box.height,
+        fits:
+          button.scrollWidth <= button.clientWidth && button.scrollHeight <= button.clientHeight,
+      };
+    });
+    return { left: group.left, right: group.right, buttons };
+  });
+  expect(geometry.buttons).toHaveLength(3);
+  expect(Math.abs(geometry.buttons[0]!.left - geometry.left)).toBeLessThan(1);
+  expect(Math.abs(geometry.buttons[2]!.right - geometry.right)).toBeLessThan(1);
+  for (const button of geometry.buttons) {
+    expect(Math.abs(button.width - geometry.buttons[0]!.width)).toBeLessThan(1);
+    expect(Math.abs(button.top - geometry.buttons[0]!.top)).toBeLessThan(1);
+    expect(button.height).toBeGreaterThanOrEqual(44);
+    expect(button.fits).toBe(true);
+  }
+}
+
 for (const theme of ['dark', 'light'] as const) {
   for (const width of [320, 360, 393, 430, 1440]) {
     test(`real React editor ${theme} ${width}`, async ({ page, browserName }) => {
@@ -303,6 +331,7 @@ for (const theme of ['dark', 'light'] as const) {
         timerBefore!.height,
       ]);
       await expectNoHorizontalOverflow(page);
+      await expectTagsDistributed(note);
       for (const button of await note.locator('button').all())
         expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       await capture(page, `${browserName}-${theme}-${width}-editor`);
@@ -546,6 +575,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByText('Жим штанги лёжа').click();
     const editor = page.locator('.exercise-execution-note').filter({ hasText: 'Жим штанги лёжа' });
     await expect(editor.getByLabel('Заметка к этому выполнению')).toHaveValue('Личное наблюдение');
+    await expectTagsDistributed(editor);
     await editor.getByLabel('Заметка к этому выполнению').fill('Поправленная запись');
     await editor.evaluate((element) =>
       window.scrollTo({
