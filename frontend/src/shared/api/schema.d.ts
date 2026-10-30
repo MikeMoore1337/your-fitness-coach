@@ -3342,6 +3342,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/{workout_id}/previous-completion-note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Previous Completion Note */
+        get: operations["previous_completion_note_api_v1_workouts__workout_id__previous_completion_note_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/rest-sessions": {
         parameters: {
             query?: never;
@@ -14088,6 +14105,26 @@ export interface components {
             group_position?: number | null;
             /** Round Number */
             round_number?: number | null;
+        };
+        /** PreviousWorkoutNote */
+        PreviousWorkoutNote: {
+            /** Note */
+            note: string;
+            /**
+             * Completed On
+             * Format: date
+             */
+            completed_on: string;
+            /** Day Number */
+            day_number: number;
+            /** Workout Title */
+            workout_title: string;
+            /** Is Latest Completion */
+            is_latest_completion: boolean;
+        };
+        /** PreviousWorkoutNoteResponse */
+        PreviousWorkoutNoteResponse: {
+            previous_note?: components["schemas"]["PreviousWorkoutNote"] | null;
         };
         /** ProgramAssignmentResponse */
         ProgramAssignmentResponse: {
@@ -25690,6 +25727,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    previous_completion_note_api_v1_workouts__workout_id__previous_completion_note_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviousWorkoutNoteResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
