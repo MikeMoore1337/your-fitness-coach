@@ -7859,6 +7859,13 @@ for (const theme of ['light', 'dark'] as const) {
     );
     for (const width of [320, 360, 393, 430, 1440]) {
       await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+      // The mobile-to-desktop layout can reflow after setViewportSize resolves.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
       const layout = await third.evaluate((row) => {
         const history = row.querySelector('.active-workout-set__history')!.getBoundingClientRect();
         const controls = row

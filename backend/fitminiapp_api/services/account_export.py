@@ -83,6 +83,7 @@ from fitminiapp_api.models.user import (
     User,
 )
 from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery, WeeklyDigestPreference
+from fitminiapp_api.models.workout_exercise_note import WorkoutExerciseNote
 from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.services.profile import serialize_body_priority
 
@@ -90,7 +91,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 24
+ACCOUNT_EXPORT_SCHEMA_VERSION = 25
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -145,6 +146,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "workout_adaptations": "programs",
     "user_workout_exercises": "programs",
     "user_workout_sets": "programs",
+    "workout_exercise_notes": "programs",
     "workout_rest_sessions": "programs",
     "exercise_setup_memories": "exercise_setup_memories",
     "exercises": "custom_exercises",
@@ -190,6 +192,7 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "subscriptions": "retired operational billing records",
     "workout_set_mutations": "idempotency fingerprints used only for sync correctness",
     "workout_rest_actions": "idempotency fingerprints and mutation ids used only for sync correctness",
+    "workout_exercise_note_mutations": "idempotency fingerprints used only for sync correctness",
     "program_imports": (
         "short-lived owner-scoped import drafts; source is never persisted and normalized content "
         "is cleared on terminal state"
@@ -655,7 +658,9 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
 
 
 def _serialize_program(
-    program: UserProgram, rest_by_workout: dict[int, list[dict[str, object]]]
+    program: UserProgram,
+    rest_by_workout: dict[int, list[dict[str, object]]],
+    notes_by_workout: dict[int, list[dict[str, object]]],
 ) -> dict[str, object]:
     return {
         "id": program.id,
@@ -729,6 +734,7 @@ def _serialize_program(
                     ),
                 ),
                 "rest_sessions": rest_by_workout.get(workout.id, []),
+                "exercise_notes": notes_by_workout.get(workout.id, []),
                 "adaptations": [
                     _fields(
                         adaptation,
@@ -856,6 +862,33 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ),
             )
         )
+    notes_by_workout: dict[int, list[dict[str, object]]] = {}
+    for note in (
+        db.query(WorkoutExerciseNote)
+        .join(UserWorkout, UserWorkout.id == WorkoutExerciseNote.workout_id)
+        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .filter(UserProgram.user_id == user.id)
+        .order_by(WorkoutExerciseNote.workout_id, WorkoutExerciseNote.id)
+        .all()
+    ):
+        if note.body or note.tags:
+            notes_by_workout.setdefault(note.workout_id, []).append(
+                _fields(
+                    note,
+                    (
+                        "id",
+                        "workout_exercise_id",
+                        "exercise_id",
+                        "source_template_exercise_id",
+                        "plan_revision_number",
+                        "week_type",
+                        "body",
+                        "tags",
+                        "created_at",
+                        "updated_at",
+                    ),
+                )
+            )
     measurements = (
         db.query(BodyMeasurement)
         .options(
@@ -1604,7 +1637,9 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "hidden_program_templates": [
             _fields(row, ("id", "template_id", "hidden_at")) for row in hidden_templates
         ],
-        "programs": [_serialize_program(program, rest_by_workout) for program in programs],
+        "programs": [
+            _serialize_program(program, rest_by_workout, notes_by_workout) for program in programs
+        ],
         "exercise_setup_memories": [
             _fields(
                 row,

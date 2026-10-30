@@ -1,0 +1,156 @@
+.exercise-execution-note {
+  min-width: 0;
+  margin: 12px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.exercise-execution-note > summary {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.exercise-execution-note > summary::-webkit-details-marker {
+  display: none;
+}
+
+.exercise-execution-note > summary:focus-visible {
+  outline: 3px solid var(--v2-focus);
+  outline-offset: -3px;
+}
+
+.exercise-execution-note__summary {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.exercise-execution-note__summary strong,
+.exercise-execution-note label,
+.exercise-execution-note legend {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-strong);
+}
+
+.exercise-execution-note__summary small,
+.exercise-execution-note__past small,
+.exercise-execution-note__hint {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+  line-height: 1.35;
+}
+
+.exercise-execution-note__summary small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.exercise-execution-note[open] .exercise-execution-note__summary small {
+  display: none;
+}
+
+.exercise-execution-note__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-strong);
+}
+
+.exercise-execution-note__content {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.exercise-execution-note__past,
+.exercise-execution-note__editor {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.exercise-execution-note__past p,
+.exercise-execution-note__state p,
+.exercise-execution-note__status {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.exercise-execution-note textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 80px;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.exercise-execution-note textarea:focus-visible {
+  outline: 3px solid var(--v2-focus);
+  outline-offset: 2px;
+}
+
+.exercise-execution-note fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.exercise-execution-note legend {
+  margin-bottom: 7px;
+}
+
+.exercise-execution-note__tags,
+.exercise-execution-note__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.exercise-execution-note__tags button {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  font-size: var(--font-size-caption);
+}
+
+.exercise-execution-note__buttons .ui-button {
+  flex: 1 1 110px;
+  min-height: 44px;
+}
+
+.exercise-execution-note__state {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: var(--font-size-caption);
+}
+
+.exercise-execution-note__status {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+}

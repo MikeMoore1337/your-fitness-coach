@@ -30,6 +30,7 @@ export const USER_SCOPED_PERSISTENT_STORAGE_REGISTRY = [
     domain: 'exercise_setup_memory_draft',
     prefixes: ['fit_exercise_setup_memory_draft_v1_'],
   },
+  { domain: 'exercise_note', prefixes: ['fit_exercise_note_v1_'] },
   { domain: 'nutrition_draft', prefixes: ['fit_nutrition_draft_v2_', 'fit_nutrition_draft_'] },
   { domain: 'profile_draft', prefixes: ['fit_profile_draft_'] },
   { domain: 'training_preferences_draft', prefixes: ['fit_training_preferences_draft_'] },

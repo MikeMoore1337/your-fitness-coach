@@ -137,6 +137,10 @@ from fitminiapp_api.models.weekly_digest import (
     WeeklyDigestIssueItem,
     WeeklyDigestPreference,
 )
+from fitminiapp_api.models.workout_exercise_note import (
+    WorkoutExerciseNote,
+    WorkoutExerciseNoteMutation,
+)
 from fitminiapp_api.models.workout_rest import WorkoutRestAction, WorkoutRestSession
 
 __all__ = [
@@ -263,6 +267,8 @@ __all__ = [
     "WorkoutAdaptation",
     "WorkoutComment",
     "WorkoutCommentRevision",
+    "WorkoutExerciseNote",
+    "WorkoutExerciseNoteMutation",
     "WorkoutRestAction",
     "WorkoutRestSession",
     "WorkoutSetMutation",

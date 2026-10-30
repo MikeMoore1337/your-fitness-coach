@@ -3394,6 +3394,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/{workout_id}/exercise-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Exercise Notes */
+        get: operations["list_exercise_notes_api_v1_workouts__workout_id__exercise_notes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/exercise-notes/history/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Historical Exercise Note */
+        get: operations["get_historical_exercise_note_api_v1_workouts_exercise_notes_history__note_id__get"];
+        /** Put Historical Exercise Note */
+        put: operations["put_historical_exercise_note_api_v1_workouts_exercise_notes_history__note_id__put"];
+        post?: never;
+        /** Delete Historical Exercise Note */
+        delete: operations["delete_historical_exercise_note_api_v1_workouts_exercise_notes_history__note_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/exercise-notes/{workout_exercise_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Exercise Note */
+        get: operations["get_exercise_note_api_v1_workouts__workout_id__exercise_notes__workout_exercise_id__get"];
+        /** Put Exercise Note */
+        put: operations["put_exercise_note_api_v1_workouts__workout_id__exercise_notes__workout_exercise_id__put"];
+        post?: never;
+        /** Delete Exercise Note */
+        delete: operations["delete_exercise_note_api_v1_workouts__workout_id__exercise_notes__workout_exercise_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/previous-completion-note": {
         parameters: {
             query?: never;
@@ -10772,6 +10827,144 @@ export interface components {
             /** Completed At */
             completed_at?: string | null;
         };
+        /** ExerciseNoteHistoryItem */
+        ExerciseNoteHistoryItem: {
+            /** Id */
+            id: number;
+            /** Body */
+            body: string | null;
+            /** Tags */
+            tags: ("easy" | "hard" | "increase_weight")[];
+            /** Version */
+            version: number;
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string | null;
+        };
+        /** ExerciseNoteHistoryResult */
+        ExerciseNoteHistoryResult: {
+            /** Version */
+            version: number;
+            current_note: components["schemas"]["ExerciseNoteValue"] | null;
+        };
+        /** ExerciseNoteHistoryWrite */
+        ExerciseNoteHistoryWrite: {
+            /** Body */
+            body?: string | null;
+            /** Tags */
+            tags?: ("easy" | "hard" | "increase_weight")[];
+            /** Expected Version */
+            expected_version: number;
+            /** Mutation Id */
+            mutation_id: string;
+        };
+        /** ExerciseNoteIdentity */
+        ExerciseNoteIdentity: {
+            /** Expected Version */
+            expected_version: number;
+            /** Mutation Id */
+            mutation_id: string;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Source Template Exercise Id */
+            source_template_exercise_id?: number | null;
+            /** Plan Revision Number */
+            plan_revision_number?: number | null;
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /** Cycle Iteration */
+            cycle_iteration?: number | null;
+        };
+        /** ExerciseNoteLoad */
+        ExerciseNoteLoad: {
+            /** Set Number */
+            set_number: number;
+            /** Actual Weight */
+            actual_weight: number | null;
+            /** Actual Reps */
+            actual_reps: number | null;
+            /** Duration Minutes */
+            duration_minutes: number | null;
+            /** Distance Km */
+            distance_km: number | null;
+        };
+        /** ExerciseNoteResponse */
+        ExerciseNoteResponse: {
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Source Template Exercise Id */
+            source_template_exercise_id: number | null;
+            /** Plan Revision Number */
+            plan_revision_number: number | null;
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /** Source Cycle Week */
+            source_cycle_week: number | null;
+            /** Cycle Iteration */
+            cycle_iteration: number | null;
+            /** Version */
+            version: number;
+            current_note: components["schemas"]["ExerciseNoteValue"] | null;
+            previous_note: components["schemas"]["PreviousExerciseNote"] | null;
+        };
+        /** ExerciseNoteValue */
+        ExerciseNoteValue: {
+            /** Id */
+            id: number;
+            /** Body */
+            body: string | null;
+            /** Tags */
+            tags: ("easy" | "hard" | "increase_weight")[];
+            /** Version */
+            version: number;
+        };
+        /** ExerciseNoteVersion */
+        ExerciseNoteVersion: {
+            /** Expected Version */
+            expected_version: number;
+            /** Mutation Id */
+            mutation_id: string;
+        };
+        /** ExerciseNoteWrite */
+        ExerciseNoteWrite: {
+            /** Body */
+            body?: string | null;
+            /** Tags */
+            tags?: ("easy" | "hard" | "increase_weight")[];
+            /** Expected Version */
+            expected_version: number;
+            /** Mutation Id */
+            mutation_id: string;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Source Template Exercise Id */
+            source_template_exercise_id?: number | null;
+            /** Plan Revision Number */
+            plan_revision_number?: number | null;
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /** Cycle Iteration */
+            cycle_iteration?: number | null;
+        };
         /** ExercisePrescriptionPlan */
         ExercisePrescriptionPlan: {
             /**
@@ -14198,6 +14391,29 @@ export interface components {
             group_position?: number | null;
             /** Round Number */
             round_number?: number | null;
+        };
+        /** PreviousExerciseNote */
+        PreviousExerciseNote: {
+            /** Id */
+            id: number;
+            /** Body */
+            body: string | null;
+            /** Tags */
+            tags: ("easy" | "hard" | "increase_weight")[];
+            /** Version */
+            version: number;
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /**
+             * Completed On
+             * Format: date
+             */
+            completed_on: string;
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
+            load: components["schemas"]["ExerciseNoteLoad"] | null;
         };
         /** PreviousWorkoutNote */
         PreviousWorkoutNote: {
@@ -26062,6 +26278,242 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutCopyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_exercise_notes_api_v1_workouts__workout_id__exercise_notes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNoteHistoryItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_historical_exercise_note_api_v1_workouts_exercise_notes_history__note_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNoteHistoryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_historical_exercise_note_api_v1_workouts_exercise_notes_history__note_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExerciseNoteHistoryWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNoteHistoryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_historical_exercise_note_api_v1_workouts_exercise_notes_history__note_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExerciseNoteVersion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNoteHistoryResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_exercise_note_api_v1_workouts__workout_id__exercise_notes__workout_exercise_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+                workout_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_exercise_note_api_v1_workouts__workout_id__exercise_notes__workout_exercise_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+                workout_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExerciseNoteWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_exercise_note_api_v1_workouts__workout_id__exercise_notes__workout_exercise_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+                workout_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExerciseNoteIdentity"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseNoteResponse"];
                 };
             };
             /** @description Validation Error */

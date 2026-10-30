@@ -27,6 +27,7 @@ import '../../styles/pulse-concepts.css';
 import '../../styles/semantic-cards.css';
 import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { positiveIntegerParam } from '../../shared/navigation/routeParams';
+import { useExerciseNoteSync } from '../../features/workouts/useExerciseNoteSync';
 
 const NotificationsPanel = lazy(() =>
   import('../../features/account/NotificationsPanel').then((module) => ({
@@ -259,6 +260,7 @@ export default function MiniAppPage({
 } = {}) {
   const { user, reloadUser } = useAuth();
   const runtime = useRuntime();
+  useExerciseNoteSync(user?.id, runtime.kind === 'production');
   const capabilities = useRuntimeCapabilities();
   const { hash, navigate, search } = useNavigation();
   const { toast } = useFeedback();
@@ -510,6 +512,7 @@ export default function MiniAppPage({
                     ) : progressView === 'history' ? (
                       <WorkoutHistory
                         compact
+                        userId={user?.id}
                         readOnly={!capabilities.canMutateProgress}
                         timeZone={user?.profile?.timezone}
                         focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
