@@ -237,11 +237,16 @@ def test_only_an_earlier_completed_session_is_eligible(client, case, change):
             source.status = "in_progress"
         elif change == "missing_timestamp":
             source.completed_at = None
+            _session(db, db.get(UserProgram, case[2]), days_ago=14)
         else:
             source.completed_at = NOW
     rows = _read(client, case)["sets"]
     assert all(row["previous_workout"] is None for row in rows)
-    expected = "identity_unproven" if change == "later_than_start" else "no_previous_workout"
+    expected = (
+        "identity_unproven"
+        if change in {"later_than_start", "missing_timestamp"}
+        else "no_previous_workout"
+    )
     assert all(row["history_status"] == expected for row in rows)
 
 
@@ -352,11 +357,14 @@ def test_restart_follows_only_explicit_same_owner_lineage(client, case):
     assert all(row["previous_workout"] for row in _read(client, case)["sets"])
 
 
-def test_repeated_reads_are_one_select_without_materialization_or_side_effects(client, case):
+@pytest.mark.parametrize("plan_revision,materialized", [(0, True), (1, False)])
+def test_repeated_reads_are_one_select_without_materialization_or_side_effects(
+    client, case, plan_revision, materialized
+):
     with get_session_context() as db:
         current = db.get(UserWorkout, case[3])
         current.source_cycle_week, current.cycle_iteration = 1, 1
-        current.plan_revision_number, current.plan_materialized = 0, False
+        current.plan_revision_number, current.plan_materialized = plan_revision, materialized
         current.status = "planned"
     statements = []
 
@@ -379,7 +387,7 @@ def test_repeated_reads_are_one_select_without_materialization_or_side_effects(c
         assert not db.new and not db.dirty and not db.deleted
     assert all(row["history_status"] == "identity_unproven" for row in first["sets"])
     with get_session_context() as db:
-        assert db.get(UserWorkout, case[3]).plan_materialized is False
+        assert db.get(UserWorkout, case[3]).plan_materialized is materialized
 
 
 def test_conflict_and_reconnect_reads_observe_facts_without_writing_history(client, case):
@@ -407,13 +415,20 @@ def test_conflict_and_reconnect_reads_observe_facts_without_writing_history(clie
 
 
 def test_actual_k3_n16_assignment_matches_the_latest_execution_across_cycles(client, monkeypatch):
+    from datetime import UTC
+
     from fitminiapp_api.api.v1 import workouts as routes
-    from fitminiapp_api.services import program_versioning, programs
+    from fitminiapp_api.services import program_versioning, programs, workout_set_history
 
     day = date(2026, 10, 5)
     monkeypatch.setattr(programs, "today_for_user", lambda _user: day)
     monkeypatch.setattr(program_versioning, "today_for_user", lambda _user: day)
     monkeypatch.setattr(routes, "recovery_today_for_user", lambda _user: day)
+    monkeypatch.setattr(
+        workout_set_history,
+        "now_in_timezone",
+        lambda _zone: datetime(day.year, day.month, day.day, 12, tzinfo=UTC),
+    )
     headers = _auth(client, 113216)
     exercises = client.get("/api/v1/programs/exercises", headers=headers).json()
     bench = next(item for item in exercises if item["slug"] == "bench-press")
@@ -498,6 +513,17 @@ def test_actual_k3_n16_assignment_matches_the_latest_execution_across_cycles(cli
     facts = [item["previous_workout"] for item in response.json()["sets"]]
     assert [item["actual_weight"] if item else None for item in facts] == [160, 180, None, 190]
     assert all(item["workout_id"] == latest_id for item in facts if item)
+    with get_session_context() as db:
+        heavy = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=3).one()
+        heavy.started_at, heavy.completed_at = NOW - timedelta(hours=1), NOW
+        heavy_id = heavy.id
+        assert heavy.source_cycle_week == 3
+    cross_type = client.get(f"/api/v1/workouts/{today.json()['id']}/set-history", headers=headers)
+    assert cross_type.status_code == 200, cross_type.text
+    assert all(
+        item["previous_workout"]["workout_id"] == heavy_id for item in cross_type.json()["sets"]
+    )
+    assert "progression_guidance" not in cross_type.text
 
 
 @pytest.mark.parametrize(

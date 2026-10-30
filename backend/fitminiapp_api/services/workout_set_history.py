@@ -185,26 +185,33 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
     if current.started_at is not None:
         cutoff_min = current.started_at - timedelta(days=1)
         cutoff_max = current.started_at + timedelta(days=1)
-    elif current.completed_at is not None:
+    elif current.completed_at is not None or current.completed_at_utc is not None:
         cutoff_min, cutoff_max = _completion_bounds(current)
     else:
         cutoff_min = cutoff_max = now_in_timezone("UTC").replace(tzinfo=None)
     items = []
     for exercise, catalog, sets in exercises.get(workout_id, {}).values():
         topology = _topology(exercise, catalog)
-        candidates = [
+        matching_workouts = [
             workout
             for workout in workouts.values()
             if workout.id != workout_id
             and workout.status == "completed"
-            and workout.completed_at is not None
-            and _completion_bounds(workout)[0] < cutoff_max
             and workout.day_number == current.day_number
             and any(
                 other.exercise_id == exercise.exercise_id
                 and other.source_template_exercise_id == exercise.source_template_exercise_id
                 for other, _, _ in exercises.get(workout.id, {}).values()
             )
+        ]
+        unknown_completion = any(
+            row.completed_at is None and row.completed_at_utc is None for row in matching_workouts
+        )
+        candidates = [
+            row
+            for row in matching_workouts
+            if (row.completed_at is not None or row.completed_at_utc is not None)
+            and _completion_bounds(row)[0] < cutoff_max
         ]
         source = max(candidates, key=lambda row: (_completion_bounds(row)[0], row.id), default=None)
         source_entries = (
@@ -222,10 +229,15 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             if entry[0].source_template_exercise_id == exercise.source_template_exercise_id
         ]
         source_sets: list[UserWorkoutSet] = []
-        proven = topology is not None and len(current_slots) == 1
-        if source is not None and source.completed_at is not None:
+        proven = (
+            topology is not None
+            and len(current_slots) == 1
+            and not unknown_completion
+            and current.plan_materialized is not False
+        )
+        if source is not None:
             source_min, source_max = _completion_bounds(source)
-            proven = proven and source_max < cutoff_min
+            proven = proven and source.completed_at is not None and source_max < cutoff_min
             proven = proven and all(
                 other.id == source.id or _completion_bounds(other)[1] < source_min
                 for other in candidates
