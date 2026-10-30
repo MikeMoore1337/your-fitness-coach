@@ -7863,7 +7863,12 @@ for (const theme of ['light', 'dark'] as const) {
           }),
         ).toBe(true);
       }
-      if (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') {
+      if (
+        (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') ||
+        (process.env.YFC_1132_WEBKIT_CAPTURE === '1' &&
+          info.project.name === 'webkit' &&
+          width === 393)
+      ) {
         const directory = resolve(
           process.cwd(),
           '..',
@@ -7872,11 +7877,13 @@ for (const theme of ['light', 'dark'] as const) {
           'issue-1132-v12',
           'after',
         );
+        const prefix = info.project.name === 'webkit' ? 'webkit-' : '';
         await mkdir(directory, { recursive: true });
         await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
         await page.screenshot({
-          path: resolve(directory, `${theme}-${width}-four-sets.png`),
+          path: resolve(directory, `${prefix}${theme}-${width}-four-sets.png`),
           fullPage: true,
+          scale: 'css',
           animations: 'disabled',
         });
         if (width === 393) {
@@ -7887,7 +7894,7 @@ for (const theme of ['light', 'dark'] as const) {
             });
           });
           await page.screenshot({
-            path: resolve(directory, `${theme}-393-active-viewport.png`),
+            path: resolve(directory, `${prefix}${theme}-393-active-viewport.png`),
             animations: 'disabled',
           });
         }
@@ -7977,6 +7984,21 @@ for (const theme of ['light', 'dark'] as const) {
         return box.top >= 0 && box.bottom <= window.innerHeight && hit === element;
       }),
     ).toBe(true);
+    if (process.env.YFC_1132_KEYBOARD_CAPTURE === '1') {
+      const prefix = info.project.name === 'webkit' ? 'webkit-' : '';
+      await page.screenshot({
+        path: resolve(
+          process.cwd(),
+          '..',
+          'docs',
+          'ux-proposals',
+          'issue-1132-v12',
+          'after',
+          `${prefix}${theme}-393-keyboard-model.png`,
+        ),
+        animations: 'disabled',
+      });
+    }
   });
 
   test(`Issue #1132 allows the first set to use only its matching past result in ${theme}`, async ({

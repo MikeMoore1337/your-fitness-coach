@@ -97,15 +97,18 @@ CODEX_DESIGN_VISUAL_QA = PASS для просмотренного макета �
 
 ## Реальные AFTER после внедрения B / варианта 1
 
-Снимки ниже сделаны в Chromium в работающем React. Данные синтетические: `real-api` использует локальные FastAPI и PostgreSQL, остальные снимки — тестовые ответы API; TMA имитируется браузерным harness. Все снимки просмотрены в Codex.
+Снимки ниже сделаны в работающем React в Chromium и WebKit. Данные синтетические: `real-api` использует локальные FastAPI и PostgreSQL, остальные снимки — тестовые ответы API; TMA имитируется браузерным harness. Все снимки просмотрены в Codex.
 
 | Состояние | Светлая тема | Тёмная тема |
 | --- | --- | --- |
 | Первый подход, 393 × 844 | [локальный API](after/real-api-393-light.png) | [React](after/dark-393-first-viewport.png) |
 | Третий подход с таймером, 393 × 844 | [PNG](after/light-393-active-viewport.png) | [PNG](after/dark-393-active-viewport.png) |
+| Третий подход с таймером, WebKit 393 × 844 | [PNG](after/webkit-light-393-active-viewport.png) | [PNG](after/webkit-dark-393-active-viewport.png) |
 | Четыре подхода, 320 / 360 / 393 / 430 px | [320](after/light-320-four-sets.png) · [360](after/light-360-four-sets.png) · [393](after/light-393-four-sets.png) · [430](after/light-430-four-sets.png) | [320](after/dark-320-four-sets.png) · [360](after/dark-360-four-sets.png) · [393](after/dark-393-four-sets.png) · [430](after/dark-430-four-sets.png) |
+| Четыре подхода, WebKit 393 × 844 | [PNG](after/webkit-light-393-four-sets.png) | [PNG](after/webkit-dark-393-four-sets.png) |
 | Четыре подхода, desktop 1440 × 900 | [PNG](after/light-1440-four-sets.png) | [PNG](after/dark-1440-four-sets.png) |
 | Нет истории, 393 × 844 / desktop 1440 × 900 | [393](after/light-393-no-history.png) · [1440](after/light-1440-no-history.png) | [393](after/dark-393-no-history.png) · [1440](after/dark-1440-no-history.png) |
+| Фокус и модель клавиатуры, viewport 393 × 480 | [Chromium](after/light-393-keyboard-model.png) · [WebKit](after/webkit-light-393-keyboard-model.png) | [Chromium](after/dark-393-keyboard-model.png) · [WebKit](after/webkit-dark-393-keyboard-model.png) |
 | Имитированный TMA, 393 × 844 | — | [PNG](after/tma-mocked-dark-393-first.png) |
 
-Для изменённого интерфейса прошли PostgreSQL, Vitest, сквозной локальный API и браузерные сценарии Chromium/WebKit, включая offline/reconnect и 409. Уменьшенный viewport проверяет прокрутку и фокус при моделировании клавиатуры, но не доказывает работу нативной клавиатуры. Нужны отдельная визуальная приёмка AFTER и разрешение на интеграцию в dev.
+Для изменённого интерфейса прошли PostgreSQL, Vitest, сквозной локальный API и браузерные сценарии Chromium/WebKit, включая offline/reconnect и 409. Снимки модели клавиатуры показывают только уменьшенную видимую область приложения с фокусом ввода, без нативной клавиатуры. Нужны отдельная визуальная приёмка AFTER и разрешение на интеграцию в dev.
