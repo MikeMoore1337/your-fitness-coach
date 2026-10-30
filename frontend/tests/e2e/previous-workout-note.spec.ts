@@ -52,6 +52,7 @@ async function setupWorkout(
   let status = 'planned';
   let note: typeof previous | null = { ...previous };
   let noteStatus = 200;
+  let sourceTemplateExerciseId: number | null = null;
   const noteMethods: string[] = [];
   const sets = [1, 2, 3].map((number) => ({
     id: 200 + number,
@@ -79,6 +80,7 @@ async function setupWorkout(
         id: 101,
         exercise_id: 11,
         exercise_title: 'Жим штанги лёжа',
+        source_template_exercise_id: sourceTemplateExerciseId,
         metric_type: 'strength',
         sort_order: 1,
         prescribed_sets: 3,
@@ -140,6 +142,9 @@ async function setupWorkout(
     },
     setNoteStatus(value: number) {
       noteStatus = value;
+    },
+    setSourceTemplateExerciseId(value: number) {
+      sourceTemplateExerciseId = value;
     },
   };
 }
@@ -293,6 +298,57 @@ for (const theme of ['dark', 'light'] as const) {
     await capture(page, `${browserName}-${theme}-1440-active-older`);
   });
 }
+
+test('completion note and set history remain independent', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  const state = await setupWorkout(page);
+  state.setNote({ ...previous, note: 'В заметке: 999 кг × 99' });
+  state.setSourceTemplateExerciseId(71);
+  await page.route('**/api/v1/workouts/42/set-history', (route) =>
+    route.fulfill({
+      json: {
+        workout_id: 42,
+        user_program_id: 1,
+        program_revision_number: 1,
+        sets: [
+          {
+            set_id: 201,
+            set_number: 1,
+            set_version: 1,
+            workout_exercise_id: 101,
+            exercise_id: 11,
+            source_template_exercise_id: 71,
+            previous_today: null,
+            history_status: 'matched',
+            previous_workout: {
+              set_id: 1201,
+              set_number: 1,
+              set_version: 1,
+              workout_id: 41,
+              workout_exercise_id: 100,
+              completed_at: '2026-10-23T12:00:00',
+              performed_on: '2026-10-23',
+              actual_weight: 42.5,
+              actual_reps: 8,
+            },
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Начать тренировку', exact: true }).first().click();
+  const note = page.locator('.active-workout .previous-workout-note');
+  const set = page.locator('[data-workout-set-id="201"]');
+  await expect(note).toContainText('В заметке: 999 кг × 99');
+  await expect(set.locator('.active-workout-set__history')).toContainText('42.5 кг × 8');
+  await expect(set.getByLabel(/^Вес,/)).toHaveValue('');
+  await expect(set.getByLabel(/^Повторы,/)).toHaveValue('');
+  await set.getByRole('button', { name: 'Подставить из прошлой тренировки' }).click();
+  await expect(set.getByLabel(/^Вес,/)).toHaveValue('42.5');
+  await expect(set.getByLabel(/^Повторы,/)).toHaveValue('8');
+  await expect(note).toContainText('В заметке: 999 кг × 99');
+});
 
 test('long notes wrap at 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
