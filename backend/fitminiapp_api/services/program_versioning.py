@@ -1915,6 +1915,16 @@ def apply_imported_template_revision(
             schedule_weekdays=schedule_weekdays,
             send_notification=send_notification,
         )
+    current_template = program.template
+    if (
+        allow_structure_changes
+        and current_template is not None
+        and current_template.sessions_per_week != len(current_template.days)
+    ):
+        # The revision builder keys slots by week/day and cannot preserve repeated cycle days.
+        raise ProgramError(
+            "Изменение структуры чередующегося цикла пока не поддерживается. Создайте отдельную программу; текущие тренировки сохранены."
+        )
     if program.duration_weeks != template.effective_duration_weeks and not (
         allow_structure_changes and template.effective_duration_weeks == 1
     ):
