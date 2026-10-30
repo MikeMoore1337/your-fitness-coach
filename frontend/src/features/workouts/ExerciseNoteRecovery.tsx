@@ -107,6 +107,8 @@ function RecoveryItem({
   const [working, setWorking] = useState(false);
   const [open, setOpen] = useState(false);
   const last = data.pending.at(-1);
+  const hasVersionConflict = data.blocked === 'exercise_note_version_conflict';
+  const pendingDeletion = last?.action === 'delete';
   if (!last) return null;
 
   async function compare() {
@@ -166,7 +168,7 @@ function RecoveryItem({
       </summary>
       <div className="exercise-execution-note__content">
         <p>
-          {data.blocked === 'exercise_note_version_conflict'
+          {hasVersionConflict
             ? 'Заметка изменилась на другом устройстве. Ваши изменения остались здесь.'
             : 'Упражнение или тренировка изменились. Текст не будет перенесён к другому упражнению.'}
         </p>
@@ -178,7 +180,7 @@ function RecoveryItem({
               .join(' · ')}
           </p>
         ) : null}
-        {data.blocked === 'exercise_note_version_conflict' && (
+        {hasVersionConflict && (
           <Button
             type="button"
             variant="secondary"
@@ -216,7 +218,7 @@ function RecoveryItem({
                 }
               }}
             >
-              {last.action === 'delete' ? 'Удалить сохранённую заметку' : 'Сохранить мой вариант'}
+              {pendingDeletion ? 'Удалить сохранённую заметку' : 'Сохранить мой вариант'}
             </Button>
           </>
         )}

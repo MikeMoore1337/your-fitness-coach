@@ -80,6 +80,8 @@ export function ExerciseExecutionNote({
   });
   const data = query.data && sameNoteIdentity(query.data, identity) ? query.data : null;
   const last = queue?.pending.at(-1);
+  const hasVersionConflict = queue?.blocked === 'exercise_note_version_conflict';
+  const pendingDeletion = last?.action === 'delete';
   const differentExercise = Boolean(
     last && (last.target === 'history' || !sameNoteIdentity(last, identity)),
   );
@@ -183,8 +185,9 @@ export function ExerciseExecutionNote({
             : 'Нет сети. Заметка сохранена на устройстве и будет отправлена при подключении.',
         );
       } else {
+        const isBlocked = result === 'blocked';
         setMessage(
-          result === 'blocked'
+          isBlocked
             ? 'Сначала разберите несинхронизированную заметку.'
             : 'Не удалось сохранить заметку на устройстве. Не закрывайте приложение.',
         );
@@ -336,11 +339,11 @@ export function ExerciseExecutionNote({
             {queue?.blocked && (
               <div className="exercise-execution-note__state" role="alert">
                 <p>
-                  {queue.blocked === 'exercise_note_version_conflict'
+                  {hasVersionConflict
                     ? 'Заметка изменилась на другом устройстве. Ваш текст остался здесь.'
                     : 'Упражнение или сохранённая заметка изменились. Текст остался на устройстве.'}
                 </p>
-                {queue.blocked === 'exercise_note_version_conflict' && (
+                {hasVersionConflict && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -365,9 +368,7 @@ export function ExerciseExecutionNote({
                       disabled={working}
                       onClick={() => void saveAfterConflict()}
                     >
-                      {last?.action === 'delete'
-                        ? 'Удалить сохранённую заметку'
-                        : 'Сохранить мой вариант'}
+                      {pendingDeletion ? 'Удалить сохранённую заметку' : 'Сохранить мой вариант'}
                     </Button>
                   </>
                 )}

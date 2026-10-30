@@ -46,6 +46,8 @@ function HistoryEditor({ userId, note }: { userId: number; note: HistoryNote }) 
   const [message, setMessage] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const last = queue?.pending.at(-1);
+  const hasVersionConflict = queue?.blocked === 'exercise_note_version_conflict';
+  const pendingDeletion = last?.action === 'delete';
   const current = last?.target === 'history' ? last : note;
   const content = draft ?? {
     body: current.body ?? '',
@@ -117,8 +119,9 @@ function HistoryEditor({ userId, note }: { userId: number; note: HistoryNote }) 
             : 'Нет сети. Заметка сохранена на устройстве и будет отправлена при подключении.',
         );
       } else {
+        const isBlocked = result === 'blocked';
         setMessage(
-          result === 'blocked'
+          isBlocked
             ? 'Сначала разберите несинхронизированную заметку.'
             : 'Не удалось сохранить заметку на устройстве.',
         );
@@ -200,7 +203,7 @@ function HistoryEditor({ userId, note }: { userId: number; note: HistoryNote }) 
         <span className="exercise-execution-note__summary">
           <strong>{note.exercise_title ?? 'Упражнение'}</strong>
           <small>
-            {last?.action === 'delete'
+            {pendingDeletion
               ? 'Ожидает удаления'
               : current.body ||
                 current.tags
@@ -227,11 +230,11 @@ function HistoryEditor({ userId, note }: { userId: number; note: HistoryNote }) 
         {queue?.blocked && (
           <div className="exercise-execution-note__state" role="alert">
             <p>
-              {queue.blocked === 'exercise_note_version_conflict'
+              {hasVersionConflict
                 ? 'Заметка изменилась на другом устройстве. Ваш текст остался здесь.'
                 : 'Заметка или тренировка изменились. Текст остался на устройстве.'}
             </p>
-            {queue.blocked === 'exercise_note_version_conflict' && (
+            {hasVersionConflict && (
               <Button
                 type="button"
                 variant="secondary"
@@ -256,9 +259,7 @@ function HistoryEditor({ userId, note }: { userId: number; note: HistoryNote }) 
                   </p>
                 ) : null}
                 <Button type="button" disabled={working} onClick={() => void saveConflict()}>
-                  {last?.action === 'delete'
-                    ? 'Удалить сохранённую заметку'
-                    : 'Сохранить мой вариант'}
+                  {pendingDeletion ? 'Удалить сохранённую заметку' : 'Сохранить мой вариант'}
                 </Button>
               </>
             )}
