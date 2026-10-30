@@ -45,19 +45,19 @@ const SURFACES: Surface[] = [
     path: '/app?section=programs&view=manage&start=templates',
     root: '#appContent',
     heading: 'Программы и шаблоны',
-    proof: '.program-current-block',
-    state: 'Populated template library and revision history',
+    proof: '#program-library',
+    state: 'Focused template library; program history available in another destination',
   },
   {
     name: 'program-editor',
-    path: '/app?section=programs&view=manage&start=templates',
+    path: '/app?section=programs&view=manage',
     root: '[role="dialog"]',
     heading: /Редактирование программы|Редактировать программу|Редактирование шаблона/,
     proof: 'input',
     state:
       'Existing template with one empty workout and zero exercises; save disabled, no persistence assertion',
     prepare: async (page) => {
-      await expect(page.locator('.program-current-block h4')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
       await settle(page);
       await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
@@ -392,7 +392,10 @@ async function exerciseDisclosures(page: Page, root: Locator, label: string) {
       };
     });
     expect.soft(state.icon, `${label}: ${initial.label} has approved Icon-chevron`).not.toBeNull();
-    if (state.ariaExpanded !== null) expect.soft(state.ariaExpanded).toBe(String(state.open));
+    if (state.ariaExpanded !== null) {
+      // React-controlled disclosures sync aria-expanded after the native toggle.
+      await expect(summary).toHaveAttribute('aria-expanded', String(state.open));
+    }
     expect.soft(state.focusOutline, `${label}: ${initial.label} focus`).not.toBe('none');
     expect.soft(state.width, `${label}: ${initial.label} touch width`).toBeGreaterThanOrEqual(44);
     expect.soft(state.height, `${label}: ${initial.label} touch height`).toBeGreaterThanOrEqual(44);
@@ -425,16 +428,37 @@ async function exerciseDisclosures(page: Page, root: Locator, label: string) {
   await settle(page);
   const touchControls = [];
   if (label.startsWith('program-management-')) {
-    for (const name of ['Скачать XLSX-шаблон', 'Скачать CSV-шаблон', 'Удалить программу']) {
+    // #1326: import and destructive actions now live in separate focused destinations.
+    await page.getByRole('button', { name: 'К центру управления' }).click();
+    const deleteControl = root.getByRole('button', { name: 'Удалить программу', exact: true });
+    await expect(deleteControl).toBeVisible();
+    const deleteBox = await deleteControl.boundingBox();
+    expect(deleteBox).not.toBeNull();
+    expect(deleteBox!.width).toBeGreaterThanOrEqual(44);
+    expect(deleteBox!.height).toBeGreaterThanOrEqual(44);
+    touchControls.push({
+      name: 'Удалить программу',
+      width: deleteBox!.width,
+      height: deleteBox!.height,
+    });
+    await root
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Создать или импортировать/ })
+      .click();
+    for (const name of ['Скачать XLSX-шаблон', 'Скачать CSV-шаблон']) {
       const control = root.getByRole('button', { name, exact: true });
-      await expect(control).toHaveCount(1);
       await expect(control).toBeVisible();
       const box = await control.boundingBox();
-      expect(box, `${label}: ${name} geometry`).not.toBeNull();
-      expect(box!.width, `${label}: ${name} width`).toBeGreaterThanOrEqual(44);
-      expect(box!.height, `${label}: ${name} height`).toBeGreaterThanOrEqual(44);
+      expect(box, label + ': ' + name + ' geometry').not.toBeNull();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
       touchControls.push({ name, width: box!.width, height: box!.height });
     }
+    await page.getByRole('button', { name: 'К центру управления' }).click();
+    await root
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Программы и шаблоны/ })
+      .click();
   }
   const expanded = await computed(root);
   const expandedAudit = await collectUiAudit(page, {

@@ -149,7 +149,7 @@ for (const scenario of programImportViewports) {
       row.map(csvCell).join(','),
     ].join('\n');
 
-    await page.goto('/app?section=programs&view=manage&start=templates');
+    await page.goto('/app?section=programs&view=manage&panel=create');
     await expect(page.getByRole('heading', { name: 'Импорт программы' })).toBeVisible();
 
     const accessToken = await page.evaluate(() => sessionStorage.getItem('fit_access_token'));
@@ -223,6 +223,7 @@ for (const scenario of programImportViewports) {
     expect((await response.json()).template.title).toBe(programTitle);
     await expect(page.getByText('Программа импортирована в личные шаблоны')).toBeVisible();
 
+    await page.goto('/app?section=programs&view=manage&panel=library');
     await page.reload();
     await expect(page.getByText(programTitle, { exact: true })).toBeVisible();
   });
