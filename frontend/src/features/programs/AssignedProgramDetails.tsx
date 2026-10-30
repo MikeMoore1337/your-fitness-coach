@@ -884,7 +884,7 @@ export function AssignedProgramDetails({
                     onApply={
                       proposal.eligibility_status === 'eligible'
                         ? () =>
-                            progressionReview.mutate({
+                            progressionReview.mutateAsync({
                               exerciseId: item.exercise_id,
                               proposalId: proposal.proposal_id,
                               workoutId: proposal.target_workout_id,

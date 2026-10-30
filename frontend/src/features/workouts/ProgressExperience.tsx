@@ -42,11 +42,13 @@ import {
 } from '../../shared/ui/common';
 import { NutritionPeriodReport, type ControlledNutritionPeriod } from './NutritionReport';
 import { Icon } from '../../shared/ui/Icon';
+import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MuscleWorkloadDistribution } from './MuscleWorkload';
 import { ActivityHeatmap, type ActivityHeatmapData } from './ActivityHeatmap';
+import { weekTypeGenitive, weekTypeLabels, type WeekType } from './weekTypes';
 import {
   nutritionPeriodForProgress,
   parseProgressSelection,
@@ -758,8 +760,29 @@ function SetValue({ label, value }: { label: string; value: string | number | nu
   );
 }
 
-function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
+function ExerciseHistory({
+  analytics,
+  weekType,
+}: {
+  analytics: Pick<
+    TrainingAnalytics,
+    'exercises' | 'exercise_history_limit' | 'completed_workout_count'
+  > &
+    Partial<Pick<ApiSchemas['WeekTypeTrainingAnalyticsResponse'], 'unknown_type_workout_count'>>;
+  weekType: 'all' | WeekType;
+}) {
   if (!analytics.exercises.length) {
+    if (weekType !== 'all') {
+      return (
+        <p className="progress-note">
+          {analytics.completed_workout_count > 0
+            ? `В тренировках ${weekTypeGenitive[weekType]} типа пока нет записанных рабочих подходов.`
+            : analytics.unknown_type_workout_count
+              ? `За выбранный период нет подтверждённых тренировок ${weekTypeGenitive[weekType]} типа.`
+              : `За выбранный период тренировок ${weekTypeGenitive[weekType]} типа пока нет.`}
+        </p>
+      );
+    }
     return (
       <EmptyState
         title="История упражнений пока пуста"
@@ -860,6 +883,33 @@ function TrainingSection({
   summary?: ProgressSummary;
 }) {
   const quickAddTarget = useContext(QuickAddPlacementContext);
+  const online = useOnlineStatus();
+  const [weekType, setWeekType] = useState<'all' | WeekType>('all');
+  const showAllHistory = weekType === 'all';
+  const historyDescription = showAllHistory
+    ? 'Показаны все завершённые тренировки.'
+    : `Показаны тренировки: ${weekTypeLabels[weekType].toLowerCase()} неделя.`;
+  const weekTypeAnalytics = useQuery({
+    queryKey: [
+      'workout',
+      'training-analytics',
+      'week-type',
+      progressSelectionKey(selection),
+      weekType,
+    ],
+    queryFn: async () => {
+      const result = await api<ApiSchemas['WeekTypeTrainingAnalyticsResponse']>(
+        `/api/v1/workouts/progress/training-analytics/week-type${progressApiQuery(selection)}&week_type=${weekType}`,
+      );
+      if (result.week_type !== weekType) {
+        throw new Error('Полученная история не соответствует выбранному типу недели.');
+      }
+      return result;
+    },
+    enabled: !showAllHistory && Boolean(analytics.data),
+    staleTime: 0,
+    retry: false,
+  });
   const presetPeriod = selection.kind === 'preset';
   const periodLabel = presetPeriod ? `${selection.days} дней` : 'свой период';
   return (
@@ -951,11 +1001,53 @@ function TrainingSection({
             <div className="progress-subsection__head">
               <div>
                 <h3>История упражнений</h3>
-                <p>Раскройте упражнение, чтобы увидеть тренировки и записанные подходы.</p>
+                <p>Фильтр влияет только на историю. Общие показатели выше не меняются.</p>
               </div>
               <a href="#progress-methodology">Как читать данные</a>
             </div>
-            <ExerciseHistory analytics={analytics.data} />
+            <div className="progress-week-type">
+              <SegmentedControl
+                ariaLabel="Тип недели"
+                value={weekType}
+                onChange={(value) => setWeekType(value as 'all' | WeekType)}
+                options={[
+                  { value: 'all', label: 'Все' },
+                  { value: 'light', label: weekTypeLabels.light },
+                  { value: 'medium', label: weekTypeLabels.medium },
+                  { value: 'heavy', label: weekTypeLabels.heavy },
+                ]}
+              />
+            </div>
+            <p className="progress-training-meta">{historyDescription}</p>
+            <div aria-live="polite">
+              {showAllHistory ? (
+                <ExerciseHistory analytics={analytics.data} weekType={weekType} />
+              ) : !online && !weekTypeAnalytics.data ? (
+                <p className="progress-note">История выбранного типа недоступна офлайн.</p>
+              ) : weekTypeAnalytics.isLoading || (online && weekTypeAnalytics.isFetching) ? (
+                <LoadingState label="Загружаем историю выбранного типа недели…" />
+              ) : weekTypeAnalytics.error ? (
+                <ErrorState
+                  message={(weekTypeAnalytics.error as Error).message}
+                  retry={() => void weekTypeAnalytics.refetch()}
+                />
+              ) : weekTypeAnalytics.data ? (
+                <>
+                  {!online && (
+                    <p className="progress-note">Нет сети: показаны сохранённые данные.</p>
+                  )}
+                  <ExerciseHistory analytics={weekTypeAnalytics.data} weekType={weekType} />
+                  {(weekTypeAnalytics.data.untyped_workout_count > 0 ||
+                    weekTypeAnalytics.data.unknown_type_workout_count > 0) && (
+                    <p className="progress-note">
+                      Без типа недели: {weekTypeAnalytics.data.untyped_workout_count}; тип не
+                      удалось определить: {weekTypeAnalytics.data.unknown_type_workout_count}. Эти
+                      тренировки доступны в общей истории.
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
           <details className="progress-methodology" id="progress-methodology">
             <summary className="yfc-disclosure-summary">

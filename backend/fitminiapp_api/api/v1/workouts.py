@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import case, func
@@ -47,6 +48,7 @@ from fitminiapp_api.schemas.workout import (
     WarmupProposalApplyResponse,
     WarmupProposalPreviewRequest,
     WarmupProposalPreviewResponse,
+    WeekTypeTrainingAnalyticsResponse,
     WorkoutAdaptationApplyRequest,
     WorkoutAdaptationApplyResponse,
     WorkoutAdaptationPreviewResponse,
@@ -73,6 +75,7 @@ from fitminiapp_api.services.activity_heatmap import build_activity_heatmap
 from fitminiapp_api.services.analytics import (
     build_training_analytics_for_range,
     build_user_progress,
+    build_week_type_training_analytics,
 )
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.cardio import (
@@ -1182,6 +1185,34 @@ def workout_training_analytics(
             current_user,
             bounds.start,
             bounds.end,
+            exercise_history_limit=exercise_history_limit,
+        )
+    except PeriodBoundsError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
+
+
+@router.get(
+    "/progress/training-analytics/week-type", response_model=WeekTypeTrainingAnalyticsResponse
+)
+def workout_week_type_training_analytics(
+    week_type: Literal["light", "medium", "heavy"],
+    period_days: ProgressPeriodDays | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    exercise_history_limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        bounds = resolve_progress_bounds(
+            current_user, period_days, date_from=date_from, date_to=date_to
+        )
+        return build_week_type_training_analytics(
+            db,
+            current_user,
+            bounds.start,
+            bounds.end,
+            week_type=week_type,
             exercise_history_limit=exercise_history_limit,
         )
     except PeriodBoundsError as exc:

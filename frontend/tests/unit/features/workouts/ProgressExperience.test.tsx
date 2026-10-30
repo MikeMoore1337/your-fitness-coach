@@ -377,13 +377,14 @@ function renderExperience(search = '', measurementDiary?: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const result = render(
     <NavigationProvider>
       <QueryClientProvider client={queryClient}>
         <ProgressExperience measurementDiary={measurementDiary} />
       </QueryClientProvider>
     </NavigationProvider>,
   );
+  return { ...result, queryClient };
 }
 
 afterEach(() => {
@@ -392,6 +393,203 @@ afterEach(() => {
 });
 
 describe('ProgressExperience', () => {
+  it('filters only exercise history by week type and fails closed on errors', async () => {
+    const analytics = makeAnalytics();
+    installApi({ analytics });
+    const fallback = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    let mediumFails = true;
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (!path.includes('/training-analytics/week-type?')) return fallback(input, init);
+      const type = new URL(path, 'http://test.local').searchParams.get('week_type');
+      if (type === 'medium' && mediumFails) {
+        return new Response(JSON.stringify({ detail: 'История недоступна' }), { status: 503 });
+      }
+      const exercises =
+        type === 'light'
+          ? []
+          : [
+              {
+                ...analytics.exercises[0],
+                exercise_title: type === 'heavy' ? 'Тяжёлый жим' : 'Средний жим',
+              },
+            ];
+      return new Response(
+        JSON.stringify({
+          week_type: type,
+          period_start: analytics.period_start,
+          period_end: analytics.period_end,
+          exercise_history_limit: analytics.exercise_history_limit,
+          completed_workout_count: exercises.length,
+          completed_set_count: exercises.length,
+          volume_recorded_sets: exercises.length,
+          external_load_volume_kg: null,
+          untyped_workout_count: 1,
+          unknown_type_workout_count: 2,
+          exercises,
+        }),
+        { status: 200 },
+      );
+    });
+    renderExperience('?section=progress&progress_view=training');
+
+    const historyHeading = await screen.findByRole('heading', { name: 'История упражнений' });
+    const history = historyHeading.closest('.progress-subsection') as HTMLElement;
+    const tabs = within(history).getByRole('tablist', { name: 'Тип недели' });
+    const totals = screen.getByLabelText('Итоги тренировок');
+    expect(totals).toHaveTextContent('28');
+    expect(totals).toHaveTextContent(/12\s?400 кг/);
+
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Тяжёлая' }));
+    expect(await within(history).findByText('Тяжёлый жим')).toBeVisible();
+    expect(
+      within(history).getByText(/Без типа недели: 1; тип не удалось определить: 2/),
+    ).toBeVisible();
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/v1/workouts/progress/training-analytics/week-type?period_days=30&week_type=heavy',
+      expect.anything(),
+    );
+    expect(totals).toHaveTextContent('28');
+    expect(totals).toHaveTextContent(/12\s?400 кг/);
+
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Лёгкая' }));
+    expect(
+      await within(history).findByText(/нет подтверждённых тренировок лёгкого типа/),
+    ).toBeVisible();
+    expect(within(history).queryByText('Тяжёлый жим')).not.toBeInTheDocument();
+
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Средняя' }));
+    expect(await within(history).findByRole('alert')).toHaveTextContent(
+      'Не удалось загрузить данные',
+    );
+    expect(within(history).queryByText('Жим штанги лёжа')).not.toBeInTheDocument();
+    mediumFails = false;
+    fireEvent.click(within(history).getByRole('button', { name: 'Повторить' }));
+    expect(await within(history).findByText('Средний жим')).toBeVisible();
+
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Все' }));
+    expect(within(history).getByText('Жим штанги лёжа')).toBeVisible();
+    expect(totals).toHaveTextContent('28');
+  });
+
+  it('does not display a late response from another selected week type', async () => {
+    const analytics = makeAnalytics();
+    installApi({ analytics });
+    const fallback = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    let finishHeavy: (response: Response) => void = () => undefined;
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (!path.includes('/training-analytics/week-type?')) return fallback(input, init);
+      const type = new URL(path, 'http://test.local').searchParams.get('week_type');
+      const response = () =>
+        new Response(
+          JSON.stringify({
+            week_type: type,
+            exercise_history_limit: 20,
+            completed_workout_count: type === 'heavy' ? 1 : 0,
+            untyped_workout_count: 0,
+            unknown_type_workout_count: 0,
+            exercises:
+              type === 'heavy'
+                ? [{ ...analytics.exercises[0], exercise_title: 'Тяжёлый жим' }]
+                : [],
+          }),
+          { status: 200 },
+        );
+      if (type === 'heavy') return new Promise<Response>((resolve) => (finishHeavy = resolve));
+      return response();
+    });
+    const { queryClient } = renderExperience('?section=progress&progress_view=training');
+    const historyHeading = await screen.findByRole('heading', { name: 'История упражнений' });
+    const history = historyHeading.closest('.progress-subsection') as HTMLElement;
+    const tabs = within(history).getByRole('tablist', { name: 'Тип недели' });
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Тяжёлая' }));
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('week_type=heavy'),
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Лёгкая' }));
+    expect(await within(history).findByText(/тренировок лёгкого типа пока нет/)).toBeVisible();
+    finishHeavy(
+      new Response(
+        JSON.stringify({
+          week_type: 'heavy',
+          exercise_history_limit: 20,
+          completed_workout_count: 1,
+          untyped_workout_count: 0,
+          unknown_type_workout_count: 0,
+          exercises: [{ ...analytics.exercises[0], exercise_title: 'Тяжёлый жим' }],
+        }),
+        { status: 200 },
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData([
+          'workout',
+          'training-analytics',
+          'week-type',
+          'days:30',
+          'heavy',
+        ]),
+      ).toMatchObject({ week_type: 'heavy' }),
+    );
+    expect(within(history).queryByText('Тяжёлый жим')).not.toBeInTheDocument();
+    expect(within(tabs).getByRole('tab', { name: 'Лёгкая' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
+  it('rejects an analytics response for a different week type', async () => {
+    const analytics = makeAnalytics();
+    installApi({ analytics });
+    const fallback = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      if (!String(input).includes('/training-analytics/week-type?')) return fallback(input, init);
+      return new Response(JSON.stringify({ week_type: 'light', exercises: analytics.exercises }), {
+        status: 200,
+      });
+    });
+    renderExperience('?section=progress&progress_view=training');
+    const heading = await screen.findByRole('heading', { name: 'История упражнений' });
+    const history = heading.closest('.progress-subsection') as HTMLElement;
+    fireEvent.click(within(history).getByRole('tab', { name: 'Тяжёлая' }));
+    expect(await within(history).findByRole('alert')).toHaveTextContent(
+      'Полученная история не соответствует выбранному типу недели.',
+    );
+    expect(within(history).queryByText('Жим штанги лёжа')).not.toBeInTheDocument();
+  });
+
+  it('distinguishes completed typed workouts without working sets from no workouts', async () => {
+    installApi();
+    const fallback = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      if (!String(input).includes('/training-analytics/week-type?')) return fallback(input, init);
+      return new Response(
+        JSON.stringify({
+          week_type: 'heavy',
+          completed_workout_count: 1,
+          exercise_history_limit: 20,
+          untyped_workout_count: 0,
+          unknown_type_workout_count: 0,
+          exercises: [],
+        }),
+        { status: 200 },
+      );
+    });
+    renderExperience('?section=progress&progress_view=training');
+    const heading = await screen.findByRole('heading', { name: 'История упражнений' });
+    const history = heading.closest('.progress-subsection') as HTMLElement;
+    fireEvent.click(within(history).getByRole('tab', { name: 'Тяжёлая' }));
+    expect(await within(history).findByText(/пока нет записанных рабочих подходов/)).toBeVisible();
+    expect(
+      within(history).queryByText(/тренировок тяжёлого типа пока нет/),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows backend summaries, factual body points and workout detail', async () => {
     installApi();
     renderExperience();

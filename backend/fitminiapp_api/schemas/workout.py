@@ -253,6 +253,7 @@ class ProgressionSessionEvidence(BaseModel):
 
 
 class ProgressionEvidence(BaseModel):
+    week_type: Literal["light", "medium", "heavy"] | None = None
     target_reps_min: int | None = Field(default=None, ge=1)
     target_reps_max: int | None = Field(default=None, ge=1)
     prescribed_sets: int = Field(ge=1)
@@ -328,7 +329,7 @@ class ProgressionProposalReviewResponse(BaseModel):
 
 
 class ProgressionGuidance(BaseModel):
-    ruleset_version: Literal["progression-guidance-v2"]
+    ruleset_version: Literal["progression-guidance-v2", "progression-guidance-v3"]
     outcome: Literal["consider_progressing", "hold", "review", "consider_reducing"]
     message: str
     detail: str
@@ -745,6 +746,20 @@ class ExerciseTrainingProgression(BaseModel):
     volume_recorded_sets: int
     history_truncated: bool
     sessions: list[ExerciseTrainingSession]
+
+
+class WeekTypeTrainingAnalyticsResponse(BaseModel):
+    week_type: Literal["light", "medium", "heavy"]
+    period_start: date
+    period_end: date
+    exercise_history_limit: int = Field(ge=1, le=100)
+    completed_workout_count: int = Field(ge=0)
+    completed_set_count: int = Field(ge=0)
+    external_load_volume_kg: float | None = None
+    volume_recorded_sets: int = Field(ge=0)
+    untyped_workout_count: int = Field(ge=0)
+    unknown_type_workout_count: int = Field(ge=0)
+    exercises: list[ExerciseTrainingProgression]
 
 
 class ExerciseHistoryWorkout(BaseModel):

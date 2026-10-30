@@ -140,6 +140,95 @@ describe('AssignedProgramDetails', () => {
     window.history.replaceState({}, '', '/');
   });
 
+  it('refreshes a typed proposal after a 409 and permits a new explicit confirmation', async () => {
+    let version = 1;
+    const attempts: Array<Record<string, unknown>> = [];
+    apiMock.mockImplementation(
+      async (path: string, options?: { body?: Record<string, unknown> }) => {
+        if (path.endsWith('/lifecycle')) return defaultLifecycleSummary;
+        if (path.endsWith('/blocks')) return [block()];
+        if (path.endsWith('/progression-proposals')) {
+          return {
+            ...emptyProgressionProposalList,
+            exercises: [
+              {
+                exercise_id: 11,
+                exercise_title: 'Приседания',
+                guidance: {
+                  ruleset_version: 'progression-guidance-v3',
+                  outcome: 'consider_progressing',
+                  message: 'Можно рассмотреть увеличение',
+                  detail: 'Выполнено правило прогрессии.',
+                  suggested_weight: 42.5,
+                  load_unit: 'kg',
+                  evidence: {
+                    week_type: 'heavy',
+                    target_reps_min: 8,
+                    target_reps_max: 10,
+                    prescribed_sets: 1,
+                    comparable_session_count: 2,
+                    required_session_count: 2,
+                    working_set_count: 2,
+                    rir_recorded_set_count: 2,
+                    reason_keys: ['top_range_repeated'],
+                    sessions: [],
+                  },
+                  proposal: {
+                    proposal_id: 'a'.repeat(64),
+                    rule_id: 'b'.repeat(64),
+                    rule_kind: 'double_progression',
+                    rule_snapshot: {},
+                    target_program_id: 77,
+                    target_revision_number: 2,
+                    target_exercise_id: 11,
+                    target_workout_id: 42,
+                    current_weight: 40,
+                    proposed_weight: 42.5,
+                    proposed_action: 'set_load',
+                    target_set_updates: [
+                      { set_id: 201, set_number: 1, set_version: version, proposed_weight: 42.5 },
+                    ],
+                    source_evidence_ids: ['workout:31/set:20'],
+                    comparable_session_count: 2,
+                    reason_codes: ['top_range_repeated'],
+                    eligibility_status: 'eligible',
+                    requires_confirmation: true,
+                  },
+                },
+              },
+            ],
+          };
+        }
+        if (path.includes('/progression-proposals/') && path.endsWith('/review')) {
+          attempts.push(options?.body ?? {});
+          if (attempts.length === 1) {
+            version = 2;
+            throw new ApiError('Changed set', 409);
+          }
+          return {
+            proposal_id: 'a'.repeat(64),
+            decision: 'confirm',
+            applied_set_ids: [201],
+            current_revision_number: 2,
+          };
+        }
+        throw new Error(`Unexpected API path: ${path}`);
+      },
+    );
+    renderDetails();
+
+    const apply = await screen.findByRole('button', { name: 'Применить 42,5 кг' });
+    fireEvent.click(apply);
+    expect(
+      await screen.findByText('Программа или подход изменились. Данные обновлены.'),
+    ).toBeVisible();
+    await waitFor(() => {
+      fireEvent.click(apply);
+      expect(attempts).toHaveLength(2);
+    });
+    expect(attempts.map((item) => item.expected_set_versions)).toEqual([{ 201: 1 }, { 201: 2 }]);
+  });
+
   it('shows the current block first and exposes trainer, reason, readable diff and revision workout', async () => {
     const currentBlock = block();
     apiMock.mockImplementation(async (path: string) => {
