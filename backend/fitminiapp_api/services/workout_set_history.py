@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from pydantic import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from fitminiapp_api.core.timezone import now_for_user_naive
+from fitminiapp_api.core.timezone import now_in_timezone
 from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.program import (
     UserProgram,
@@ -23,8 +23,12 @@ class WorkoutSetHistoryNotFound(ValueError):
     pass
 
 
-# Legacy workout timestamps have no offset snapshot; two UTC offsets can differ by under 48h.
-_TIMESTAMP_ORDER_UNCERTAINTY = timedelta(days=2)
+def _completion_bounds(workout: UserWorkout) -> tuple[datetime, datetime]:
+    if workout.completed_at_utc is not None:
+        return workout.completed_at_utc, workout.completed_at_utc
+    assert workout.completed_at is not None
+    # Legacy offsets are unknown; each supported UTC offset is strictly within 24h.
+    return workout.completed_at - timedelta(days=1), workout.completed_at + timedelta(days=1)
 
 
 def _set_identity(item: UserWorkoutSet) -> tuple:
@@ -178,7 +182,13 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             )
             if item is not None:
                 entry[2].append(item)
-    cutoff = current.started_at or current.completed_at or now_for_user_naive(user)
+    if current.started_at is not None:
+        cutoff_min = current.started_at - timedelta(days=1)
+        cutoff_max = current.started_at + timedelta(days=1)
+    elif current.completed_at is not None:
+        cutoff_min, cutoff_max = _completion_bounds(current)
+    else:
+        cutoff_min = cutoff_max = now_in_timezone("UTC").replace(tzinfo=None)
     items = []
     for exercise, catalog, sets in exercises.get(workout_id, {}).values():
         topology = _topology(exercise, catalog)
@@ -188,7 +198,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             if workout.id != workout_id
             and workout.status == "completed"
             and workout.completed_at is not None
-            and workout.completed_at < cutoff + _TIMESTAMP_ORDER_UNCERTAINTY
+            and _completion_bounds(workout)[0] < cutoff_max
             and workout.day_number == current.day_number
             and any(
                 other.exercise_id == exercise.exercise_id
@@ -196,7 +206,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
                 for other, _, _ in exercises.get(workout.id, {}).values()
             )
         ]
-        source = max(candidates, key=lambda row: (row.completed_at, row.id), default=None)
+        source = max(candidates, key=lambda row: (_completion_bounds(row)[0], row.id), default=None)
         source_entries = (
             [
                 entry
@@ -214,13 +224,10 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
         source_sets: list[UserWorkoutSet] = []
         proven = topology is not None and len(current_slots) == 1
         if source is not None and source.completed_at is not None:
-            proven = proven and cutoff - source.completed_at > _TIMESTAMP_ORDER_UNCERTAINTY
+            source_min, source_max = _completion_bounds(source)
+            proven = proven and source_max < cutoff_min
             proven = proven and all(
-                other.id == source.id
-                or (
-                    other.completed_at is not None
-                    and source.completed_at - other.completed_at > _TIMESTAMP_ORDER_UNCERTAINTY
-                )
+                other.id == source.id or _completion_bounds(other)[1] < source_min
                 for other in candidates
             )
         if current.status == "planned" and current.source_cycle_week is not None:

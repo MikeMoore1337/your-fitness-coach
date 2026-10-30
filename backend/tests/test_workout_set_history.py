@@ -536,6 +536,40 @@ def test_legacy_timestamps_do_not_guess_order_across_unknown_timezone_changes(
     )
 
 
+def test_existing_utc_completion_fact_orders_sources_across_calendar_and_timezone_changes(
+    client, case
+):
+    with get_session_context() as db:
+        source = db.get(UserWorkout, case[4])
+        source.completed_at = datetime(2026, 10, 23, 23, 30)
+        source.completed_at_utc = datetime(2026, 10, 24, 6, 30)
+        other = _session(db, db.get(UserProgram, case[2]), days_ago=6)
+        other.completed_at = datetime(2026, 10, 24, 2)
+        other.completed_at_utc = datetime(2026, 10, 23, 23)
+    facts = [row["previous_workout"] for row in _read(client, case)["sets"]]
+    assert all(fact["workout_id"] == case[4] for fact in facts)
+    assert all(fact["performed_on"] == "2026-10-23" for fact in facts)
+
+
+def test_planned_workout_can_use_a_recent_proven_utc_fact_without_guessing_local_offset(
+    client, case, monkeypatch
+):
+    from datetime import UTC
+
+    from fitminiapp_api.services import workout_set_history
+
+    monkeypatch.setattr(
+        workout_set_history, "now_in_timezone", lambda _zone: NOW.replace(tzinfo=UTC)
+    )
+    with get_session_context() as db:
+        current = db.get(UserWorkout, case[3])
+        current.status, current.started_at = "planned", None
+        source = db.get(UserWorkout, case[4])
+        source.completed_at = NOW + timedelta(hours=2)
+        source.completed_at_utc = NOW - timedelta(hours=1)
+    assert all(row["previous_workout"] for row in _read(client, case)["sets"])
+
+
 def test_duplicate_slot_and_changed_superset_peer_are_not_proof(client, case):
     with get_session_context() as db:
         for workout_id in case[3:]:
