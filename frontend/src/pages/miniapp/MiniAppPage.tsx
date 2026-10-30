@@ -66,6 +66,11 @@ const ProfileForm = lazy(() =>
     default: module.ProfileForm,
   })),
 );
+const EquipmentProfilesWorkspace = lazy(() =>
+  import('../../features/equipment/EquipmentProfiles').then((module) => ({
+    default: module.EquipmentProfilesWorkspace,
+  })),
+);
 const ProgramBuilder = lazy(() =>
   import('../../features/programs/ProgramBuilder').then((module) => ({
     default: module.ProgramBuilder,
@@ -115,6 +120,16 @@ const sections: ReadonlyArray<AppSection> = [
   'nutrition',
   'profile',
 ];
+const sectionHero: Partial<Record<AppSection, { title: string; description: string }>> = {
+  profile: {
+    title: 'Профиль и настройки',
+    description: 'Личные данные, связи, уведомления и безопасность аккаунта.',
+  },
+  programs: {
+    title: 'План',
+    description: 'Активная программа, ближайшие тренировки и управление планом.',
+  },
+};
 
 const PROFILE_HASH_TARGETS = new Set([
   'profile-personal',
@@ -257,6 +272,10 @@ export default function MiniAppPage({
       : 'today';
   });
   const section = sectionOverride ?? requestedSection(search) ?? fallbackSection;
+  const equipmentProfilesView =
+    section === 'profile' &&
+    capabilities.canMutateProfile &&
+    new URLSearchParams(search).get('view') === 'equipment';
   const exerciseSlug = section === 'catalog' ? requestedExerciseSlug(search) : null;
   const aiCoachStatus = useAiCoachStatus(section === 'profile');
   const nutritionDate = requestedNutritionDate(search);
@@ -393,6 +412,13 @@ export default function MiniAppPage({
     return () => observer.disconnect();
   }, [hash, navigate, search, section]);
 
+  const showSectionHero =
+    !['today', 'progress', 'nutrition'].includes(section) && !equipmentProfilesView;
+  const showProfileSettings = section === 'profile' && !equipmentProfilesView;
+  const heroTitle =
+    sectionHero[section]?.title ?? (user?.profile?.full_name || user?.first_name || 'Мой фитнес');
+  const heroDescription =
+    sectionHero[section]?.description ?? 'Тренировки, питание и прогресс в одном месте.';
   const content = (
     <div
       className={`page-stack app-section app-section--${section} app-section--design-v2`}
@@ -402,24 +428,12 @@ export default function MiniAppPage({
       data-motion-surface={section === 'progress' ? 'progress' : undefined}
       onAnimationEnd={sectionMotion.onMotionAnimationEnd}
     >
-      {section !== 'today' && section !== 'progress' && section !== 'nutrition' && (
+      {showSectionHero && (
         <header className="card hero-card">
           <div>
             <span className="eyebrow">Your Fitness Coach</span>
-            <h1>
-              {section === 'profile'
-                ? 'Профиль и настройки'
-                : section === 'programs'
-                  ? 'План'
-                  : user?.profile?.full_name || user?.first_name || 'Мой фитнес'}
-            </h1>
-            <p className="muted">
-              {section === 'profile'
-                ? 'Личные данные, связи, уведомления и безопасность аккаунта.'
-                : section === 'programs'
-                  ? 'Активная программа, ближайшие тренировки и управление планом.'
-                  : 'Тренировки, питание и прогресс в одном месте.'}
-            </p>
+            <h1>{heroTitle}</h1>
+            <p className="muted">{heroDescription}</p>
           </div>
         </header>
       )}
@@ -573,7 +587,12 @@ export default function MiniAppPage({
               onSaved={async () => void (await reloadUser())}
             />
           )}
-          {section === 'profile' && (
+          {equipmentProfilesView && (
+            <fieldset className="profile-settings-fieldset" disabled={runtime.kind === 'demo'}>
+              <EquipmentProfilesWorkspace />
+            </fieldset>
+          )}
+          {showProfileSettings && (
             <fieldset className="profile-settings-fieldset" disabled={runtime.kind === 'demo'}>
               <div className="profile-settings">
                 {runtime.kind === 'demo' && (

@@ -82,6 +82,126 @@ def _bench_replacement_payload(workout: dict, replacement: dict) -> dict:
     }
 
 
+def test_active_profile_accessories_are_checked_again_and_stale_preview_is_rejected(client) -> None:
+    headers = _auth(client, 1203010)
+    workout = _assign_today_workout(client, headers, ["lat-pulldown"])
+    catalog = client.get("/api/v1/programs/exercises", headers=headers).json()
+    pullup_id = next(item["id"] for item in catalog if item["slug"] == "pull-up")
+    path = "/api/v1/me/equipment-profiles"
+    created = client.put(
+        path,
+        headers=headers,
+        json={"revision": 0, "profiles": [{"name": "Дом", "equipment_ids": ["bodyweight"]}]},
+    ).json()
+    created["active_profile_id"] = created["profiles"][0]["id"]
+    state = client.put(path, headers=headers, json=created).json()
+    alternatives_path = (
+        f"/api/v1/workouts/{workout['id']}/exercises/{workout['exercises'][0]['id']}/alternatives"
+    )
+    params = {"available_equipment_ids": ["bodyweight"]}
+    missing = client.get(alternatives_path, headers=headers, params=params)
+    assert missing.status_code == 200
+    assert pullup_id not in {item["exercise_id"] for item in missing.json()}
+
+    state["profiles"][0]["equipment_ids"].append("pullup_bar")
+    state = client.put(path, headers=headers, json=state).json()
+    present = client.get(alternatives_path, headers=headers, params=params)
+    assert present.status_code == 200
+    assert pullup_id in {item["exercise_id"] for item in present.json()}
+    spoofed = client.get(
+        alternatives_path, headers=headers, params={"available_equipment_ids": ["pullup_bar"]}
+    )
+    assert spoofed.status_code == 422
+
+    payload = {
+        "reason": "replace_exercise",
+        "target_workout_exercise_id": workout["exercises"][0]["id"],
+        "replacement_exercise_id": pullup_id,
+        "available_equipment_ids": ["bodyweight"],
+    }
+    preview = client.post(
+        f"/api/v1/workouts/{workout['id']}/adaptations/preview", headers=headers, json=payload
+    )
+    assert preview.status_code == 200, preview.text
+    state["profiles"][0]["equipment_ids"].remove("pullup_bar")
+    assert client.put(path, headers=headers, json=state).status_code == 200
+    applied = client.post(
+        f"/api/v1/workouts/{workout['id']}/adaptations/apply",
+        headers=headers,
+        json={**payload, "preview_token": preview.json()["preview_token"]},
+    )
+    assert applied.status_code == 409
+    after = client.get("/api/v1/workouts/today", headers=headers).json()
+    assert after["exercises"][0]["exercise_id"] == workout["exercises"][0]["exercise_id"]
+    with get_session_context() as db:
+        assert db.query(WorkoutAdaptation).count() == 0
+
+
+def test_different_environment_keeps_unknown_equipment_unchanged(client) -> None:
+    headers = _auth(client, 1203011)
+    workout = _assign_today_workout(client, headers, ["lat-pulldown"])
+    path = "/api/v1/me/equipment-profiles"
+    state = client.put(
+        path, headers=headers, json={"revision": 0, "profiles": [{"name": "Дом"}]}
+    ).json()
+    state["active_profile_id"] = state["profiles"][0]["id"]
+    assert client.put(path, headers=headers, json=state).status_code == 200
+    response = client.post(
+        f"/api/v1/workouts/{workout['id']}/adaptations/preview",
+        headers=headers,
+        json={"reason": "different_environment", "available_equipment_ids": ["bodyweight"]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["changes"] == []
+    assert any("оставлены без изменений" in warning for warning in response.json()["warnings"])
+    assert (
+        client.get("/api/v1/workouts/today", headers=headers).json()["exercises"][0]["exercise_id"]
+        == workout["exercises"][0]["exercise_id"]
+    )
+
+
+def test_profile_changes_preserve_completed_history_and_another_users_assignment(client) -> None:
+    owner = _auth(client, 1203012)
+    other = _auth(client, 1203013)
+    workout = _assign_today_workout(client, owner, ["bench-press"], prescribed_sets=1)
+    other_workout = _assign_today_workout(client, other, ["squat"], prescribed_sets=1)
+    started = client.post(f"/api/v1/workouts/{workout['id']}/start", headers=owner).json()
+    set_id = started["exercises"][0]["sets"][0]["id"]
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{set_id}",
+            headers=owner,
+            json={"actual_reps": 8, "actual_weight": 42, "is_completed": True},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/v1/workouts/{workout['id']}/finish",
+            headers=owner,
+            json={"confirm_incomplete": True},
+        ).status_code
+        == 200
+    )
+    history_before = client.get("/api/v1/workouts/history", headers=owner).json()
+    other_before = client.get("/api/v1/workouts/today", headers=other).json()
+    assert other_before["id"] == other_workout["id"]
+    path = "/api/v1/me/equipment-profiles"
+    state = client.put(
+        path,
+        headers=owner,
+        json={"revision": 0, "profiles": [{"name": "Дом", "equipment_ids": ["dumbbell"]}]},
+    ).json()
+    state["active_profile_id"] = state["profiles"][0]["id"]
+    state = client.put(path, headers=owner, json=state).json()
+    state["active_profile_id"] = None
+    state["profiles"] = []
+    assert client.put(path, headers=owner, json=state).status_code == 200
+    assert client.get("/api/v1/workouts/history", headers=owner).json() == history_before
+    assert client.get("/api/v1/workouts/today", headers=other).json() == other_before
+    assert client.get(path, headers=other).json()["profiles"] == []
+
+
 def test_time_budget_preview_cancel_apply_and_history_show_actual_workout(client) -> None:
     headers = _auth(client, 93501)
     original = _assign_today_workout(

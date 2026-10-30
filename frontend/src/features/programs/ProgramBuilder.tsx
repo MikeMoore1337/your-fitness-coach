@@ -16,6 +16,7 @@ import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
 import { ProgramDayEditor } from './ProgramDayEditor';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { ProgramSettingsPanel } from './ProgramSettingsPanel';
 import './ProgramBuilderFocus.css';
 import { DateInput } from '../../shared/ui/PickerInput';
@@ -92,6 +93,7 @@ export function ProgramBuilder({
   const sectionId = useId();
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
+  const { canMutateProfile } = useRuntimeCapabilities();
   const queryClient = useQueryClient();
   const draftScope = editingTemplate
     ? `template_${saveAsCopy ? 'copy_' : ''}${editingTemplate.id}`
@@ -523,6 +525,7 @@ export function ProgramBuilder({
               setDays={setDays}
               updateDay={updateDay}
               exercises={orderedExercises}
+              equipmentFilterEnabled={!targetTelegramId && canMutateProfile}
               defaultRestSeconds={defaultRestSeconds}
               onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
             />
