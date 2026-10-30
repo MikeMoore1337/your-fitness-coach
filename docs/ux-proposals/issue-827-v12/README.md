@@ -1,5 +1,7 @@
 # #827 — визуальный пакет A1
 
+**A1 утверждён 30.10.2026:** владелец написал «Принимаю A1. Можно катить в dev». Реализация и настоящие AFTER-снимки описаны в [отчёте runtime](runtime/README.md). Текст ниже сохраняет исходный дизайн-чекпоинт до утверждения; его `BLOCKED`/`NOT_RUN` относятся к тому этапу.
+
 Финальный baseline после слияния #835: `dev=b5212e1db7867ed2b0a8b9f297272988afc42b78`, обычный merge в эту ветку `db53e6fc7d9d8bded04dc06d07a8c87261ef7cf1`. Новый календарь активности, его год и inline «Добавить» сохраняются. Модуль #827 заменяет только существующее распределение внутри TrainingSection ниже календаря, показателей и DataConfidence. Training analytics не изменена; все 12 snapshots заново рассчитаны и совпали по значениям. Сервисный fixture календаря [before-activity.json](before-activity.json) честно содержит восемь legacy-тренировок без completed_at_utc; даты и нули не выдумывались.
 
 Актуализация перед публикацией: за время работы dev продвинулся до `0983d67c6b244225a21a0ac049811648201f6a44`. Второй обычный merge — `c8ce52d6e67f06a168a6693e8c87d5db09269b03`. Training analytics, её schema, AppShell, ProgressExperience, MuscleWorkload, shared tokens/fonts и зависимости не изменились. Единственное изменение общего CSS относится к `.program-wizard-result__facts`. Сервисные snapshots пересчитаны на новом baseline и по значениям совпали; BEFORE повторно снят с актуального React-source.
