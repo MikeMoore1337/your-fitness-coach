@@ -946,11 +946,14 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
           const timerSize = getComputedStyle(planned).fontSize;
           const actualSize = getComputedStyle(actual).fontSize;
           const actualFits = actual.scrollWidth <= actual.clientWidth + 1;
+          const plannedText = document.createRange();
+          plannedText.selectNodeContents(planned);
           const geometry = {
             timerSize,
             actualSize,
             actualFits,
-            plannedRight: planned.getBoundingClientRect().right,
+            plannedLeft: planned.getBoundingClientRect().left,
+            plannedRight: plannedText.getBoundingClientRect().right,
             statusLeft: status.getBoundingClientRect().left,
             actualLeft: actualBlock.getBoundingClientRect().left,
             actualRight: actualBlock.getBoundingClientRect().right,
@@ -961,7 +964,10 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
               document.documentElement.scrollWidth - document.documentElement.clientWidth,
             actions: Array.from(
               element.querySelectorAll<HTMLElement>('.active-workout-rest__actions button'),
-            ).map((button) => button.getBoundingClientRect().width),
+            ).map((button) => {
+              const box = button.getBoundingClientRect();
+              return { left: box.left, width: box.width };
+            }),
           };
           actual.textContent = original;
           return geometry;
@@ -980,7 +986,9 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
         expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.documentOverflow).toBeLessThanOrEqual(1);
         expect(result.actions).toHaveLength(4);
-        expect(result.actions.every((buttonWidth) => buttonWidth >= 44)).toBe(true);
+        expect(result.actions.every((button) => button.width >= 44)).toBe(true);
+        expect(Math.abs(result.plannedLeft - result.actions[0]!.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(result.actualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(1);
         await panel.screenshot({
           path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
           animations: 'disabled',
@@ -9027,30 +9035,17 @@ test.describe('#1338 v2 compact timer', () => {
             expect(control.right).toBeGreaterThanOrEqual(-1);
           }
           if (state === 'completed' || state === 'skipped') {
+            await expect(panel.locator('.active-workout-rest__complete-mark')).toHaveCount(0);
             const terminal = await panel.evaluate((element) => {
-              const mark = element.querySelector<HTMLElement>(
-                '.active-workout-rest__complete-mark',
-              )!;
               const copy = element.querySelector<HTMLElement>(
                 '.active-workout-rest__complete-copy',
               )!;
-              const markBox = mark.getBoundingClientRect();
               const copyBox = copy.getBoundingClientRect();
               const panelBox = element.getBoundingClientRect();
-              const radius = getComputedStyle(mark).borderTopLeftRadius;
               return {
-                width: markBox.width,
-                height: markBox.height,
-                radiusRatio: radius.endsWith('%')
-                  ? parseFloat(radius) / 100
-                  : parseFloat(radius) / Math.min(markBox.width, markBox.height),
                 copyOffset: (copyBox.top + copyBox.bottom - panelBox.top - panelBox.bottom) / 2,
               };
             });
-            expect(terminal.width, `${state}: circular mark width`).toBeCloseTo(terminal.height, 1);
-            expect(terminal.radiusRatio, `${state}: circular mark radius`).toBeGreaterThanOrEqual(
-              0.49,
-            );
             if (state === 'skipped') {
               expect(
                 Math.abs(terminal.copyOffset),

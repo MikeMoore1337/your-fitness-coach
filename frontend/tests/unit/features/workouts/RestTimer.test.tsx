@@ -65,6 +65,11 @@ describe('RestTimer', () => {
     expect(
       screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy'),
     ).toHaveTextContent('Нет достоверного замера отдыха');
+    expect(
+      screen
+        .getByRole('complementary')
+        .querySelector('.active-workout-rest__complete-mark [data-icon="warning"]'),
+    ).toBeInTheDocument();
     expect(loadRestJournal(7, 42)[0]).toMatchObject({ status: 'running' });
   });
 
@@ -396,6 +401,11 @@ describe('RestTimer', () => {
     expect(
       screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy'),
     ).toHaveTextContent('Отдых завершён');
+    expect(
+      screen
+        .getByRole('complementary')
+        .querySelector('.active-workout-rest__complete-mark [data-icon="sync"]'),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Скрыть' }));
     expect(

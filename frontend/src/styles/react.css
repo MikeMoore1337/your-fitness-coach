@@ -5861,8 +5861,9 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   min-width: 0;
   min-height: var(--touch-target, 44px);
 }
-.active-workout-rest__actual {
-  margin-inline-start: 8px;
+/* Match the first action's flex width, allowing for the different row gaps. */
+.active-workout-rest__time {
+  flex: 0 0 calc(21.0526% - 1.6842px);
 }
 .active-workout-rest__time,
 .active-workout-rest__actual-value {
@@ -5981,13 +5982,16 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
   cursor: pointer;
 }
 .active-workout-rest__complete-copy {
-  grid-column: 2;
+  grid-column: 1 / -1;
   font: var(--font-weight-medium) var(--font-size-caption)/var(--line-height-tight) var(--font-body);
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
-/* A single status spans both grid rows to align with its icon. */
-.active-workout-rest__complete-copy:nth-child(2):last-child {
+.active-workout-rest__complete-mark ~ .active-workout-rest__complete-copy {
+  grid-column: 2;
+}
+/* A single status spans both grid rows when an alert icon is present. */
+.active-workout-rest__complete-mark + .active-workout-rest__complete-copy:last-child {
   grid-row: 1 / span 2;
 }
 .active-workout-rest__complete-mark {
