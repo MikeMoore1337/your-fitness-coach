@@ -164,6 +164,8 @@ def _serialize_exercise(
     include_guide: bool = False,
     alternatives: list[dict[str, int | str]] | None = None,
 ) -> dict:
+    from fitminiapp_api.services.equipment_requirements import exercise_equipment_requirements
+
     guide = get_exercise_guide(exercise, alternatives=alternatives)
     muscles = exercise_muscle_payload(exercise)
     equipment = exercise_equipment_payload(exercise)
@@ -188,6 +190,7 @@ def _serialize_exercise(
             item["identifier"] for item in muscles if item["role"] == "secondary"
         ],
         "equipment_ids": [item["identifier"] for item in equipment],
+        "required_equipment_ids": exercise_equipment_requirements(exercise),
         "aliases": list(catalog_metadata["aliases"]) if catalog_metadata else [],
         "movement_pattern": catalog_metadata["movement_pattern"] if catalog_metadata else None,
         "machine_variant_tags": (

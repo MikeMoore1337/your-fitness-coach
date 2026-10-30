@@ -20,9 +20,17 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { Icon } from '../../shared/ui/Icon';
 import { IconButton } from '../../shared/ui/common';
 import { localizedEquipmentDisplayLabel } from '../../shared/equipmentLabels';
+import { AvailabilityControl, EquipmentProfileSelect } from '../equipment/EquipmentProfiles';
+import {
+  equipmentAvailability,
+  equipmentNeedsReview,
+  useEquipmentProfiles,
+  type EquipmentProfile,
+} from '../equipment/equipmentProfileState';
 
 export type ExercisePickerExercise = ExerciseSearchItem & {
   equipment_ids?: Exercise['equipment_ids'];
+  required_equipment_ids?: Exercise['required_equipment_ids'];
   metric_type?: Exercise['metric_type'] | null;
   difficulty_level?: Exercise['difficulty_level'];
   is_custom?: boolean;
@@ -33,16 +41,7 @@ export type ExercisePickerExercise = ExerciseSearchItem & {
   media_preferred_mode?: Exercise['media_preferred_mode'];
 };
 
-export function SearchableExercisePicker({
-  exercises,
-  value,
-  clearValue = '',
-  onChange,
-  onOpenGuide,
-  ariaLabel = 'Поиск упражнения',
-  portalResults = false,
-  mobileSheet = false,
-}: {
+type PickerProps = {
   exercises: ExercisePickerExercise[];
   value: number | '';
   clearValue?: number | '';
@@ -51,7 +50,35 @@ export function SearchableExercisePicker({
   ariaLabel?: string;
   portalResults?: boolean;
   mobileSheet?: boolean;
-}) {
+  equipmentFilterEnabled?: boolean;
+};
+
+export function SearchableExercisePicker(props: PickerProps) {
+  return props.equipmentFilterEnabled ? (
+    <EquipmentAwarePicker {...props} />
+  ) : (
+    <ExercisePicker {...props} />
+  );
+}
+
+function EquipmentAwarePicker(props: PickerProps) {
+  const { active } = useEquipmentProfiles();
+  return <ExercisePicker {...props} activeProfile={active} />;
+}
+
+function ExercisePicker({
+  exercises,
+  value,
+  clearValue = '',
+  onChange,
+  onOpenGuide,
+  ariaLabel = 'Поиск упражнения',
+  portalResults = false,
+  mobileSheet = false,
+  equipmentFilterEnabled = false,
+  activeProfile,
+}: PickerProps & { activeProfile?: EquipmentProfile }) {
+  const [availability, setAvailability] = useState<'available' | 'all'>('available');
   const selected = exercises.find((exercise) => exercise.id === value);
   const selectedTitle = selected?.title ?? '';
   const resultsId = `exercise-picker-results-${useId()}`;
@@ -85,9 +112,13 @@ export function SearchableExercisePicker({
   const sheetResultsRef = useRef<HTMLDivElement>(null);
   const [resultsStyle, setResultsStyle] = useState<CSSProperties>();
   const results = useMemo(() => {
-    if (!normalizeExerciseSearchText(query)) return exercises;
-    return rankExercisesForSearch(exercises, query);
-  }, [exercises, query]);
+    const ordered = !normalizeExerciseSearchText(query)
+      ? exercises
+      : rankExercisesForSearch(exercises, query);
+    return activeProfile && availability === 'available'
+      ? ordered.filter((item) => equipmentAvailability(item, activeProfile) !== 'unavailable')
+      : ordered;
+  }, [activeProfile, availability, exercises, query]);
   const currentActiveIndex = Math.max(0, Math.min(activeIndex, Math.max(0, results.length - 1)));
 
   useLayoutEffect(() => {
@@ -126,7 +157,7 @@ export function SearchableExercisePicker({
 
   const resultsPanel = open ? (
     <div
-      className={`exercise-picker__results${onOpenGuide ? ' exercise-picker__results--with-guides' : ''}`}
+      className={`exercise-picker__results${onOpenGuide ? ' exercise-picker__results--with-guides' : ''}${equipmentFilterEnabled && !compact ? ' exercise-picker__results--equipment' : ''}`}
       style={portalResults && !compact ? resultsStyle : undefined}
     >
       {results.length ? (
@@ -166,6 +197,9 @@ export function SearchableExercisePicker({
                       <span className="badge">{difficultyLabels[exercise.difficulty_level]}</span>
                     )}
                     {exercise.is_custom && <span className="badge">Своё</span>}
+                    {activeProfile && equipmentNeedsReview(exercise, activeProfile) && (
+                      <span className="badge">Проверить оборудование</span>
+                    )}
                   </span>
                 </span>
               </div>
@@ -187,7 +221,13 @@ export function SearchableExercisePicker({
                     if (event.detail === 0) onOpenGuide(exercise);
                   }}
                 >
-                  {exercise.has_guide ? 'Техника' : 'Подробнее'}
+                  {equipmentFilterEnabled ? (
+                    <Icon name="info" size={20} />
+                  ) : exercise.has_guide ? (
+                    'Техника'
+                  ) : (
+                    'Подробнее'
+                  )}
                 </button>
               ))}
             </div>
@@ -257,7 +297,12 @@ export function SearchableExercisePicker({
     <div
       className="exercise-picker"
       onBlur={(event) => {
-        if (!compact && !event.currentTarget.contains(event.relatedTarget as Node | null))
+        const next = event.relatedTarget as HTMLElement | null;
+        if (
+          !compact &&
+          !event.currentTarget.contains(next) &&
+          !next?.closest('[data-equipment-profile-dialog]')
+        )
           setOpen(false);
       }}
     >
@@ -277,6 +322,12 @@ export function SearchableExercisePicker({
         </button>
       ) : (
         searchInput
+      )}
+      {!compact && open && equipmentFilterEnabled && (
+        <div className="equipment-availability">
+          <EquipmentProfileSelect />
+          {activeProfile && <AvailabilityControl value={availability} onChange={setAvailability} />}
+        </div>
       )}
       {compact && open
         ? createPortal(
@@ -327,6 +378,14 @@ export function SearchableExercisePicker({
                     </IconButton>
                   )}
                 </div>
+                {equipmentFilterEnabled && (
+                  <div className="equipment-availability">
+                    <EquipmentProfileSelect />
+                    {activeProfile && (
+                      <AvailabilityControl value={availability} onChange={setAvailability} />
+                    )}
+                  </div>
+                )}
                 <div className="exercise-picker__results" id={resultsId} ref={sheetResultsRef}>
                   {results.length ? (
                     results.map((exercise) => (
@@ -360,6 +419,9 @@ export function SearchableExercisePicker({
                                 ? ` · ${difficultyLabels[exercise.difficulty_level]}`
                                 : ''}
                               {exercise.is_custom ? ' · Своё' : ''}
+                              {activeProfile && equipmentNeedsReview(exercise, activeProfile)
+                                ? ' · Проверить оборудование'
+                                : ''}
                             </small>
                           </span>
                         </button>

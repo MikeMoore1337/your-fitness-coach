@@ -14,9 +14,20 @@ import {
   LoadingState,
 } from '../../shared/ui/common';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { ExerciseGuideDialog } from './ExerciseGuideDialog';
 import { ExerciseMediaAsset } from './ExerciseMediaAsset';
 import { rankExercisesForSearch } from './exerciseSearch';
+import {
+  AvailabilityControl,
+  EquipmentProfileSelect,
+  EquipmentProfilesManager,
+} from '../equipment/EquipmentProfiles';
+import {
+  equipmentAvailability,
+  equipmentNeedsReview,
+  useEquipmentProfiles,
+} from '../equipment/equipmentProfileState';
 import {
   equipmentLabels,
   localizedEquipmentDisplayLabel,
@@ -48,6 +59,10 @@ export function ExerciseCatalog({
 }) {
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
+  const { canMutateProfile } = useRuntimeCapabilities();
+  const profileEnabled = !canAssign && !targetTelegramId && canMutateProfile;
+  const { active: activeProfile } = useEquipmentProfiles(profileEnabled);
+  const [availability, setAvailability] = useState<'available' | 'all'>('available');
   const [search, setSearch] = useState('');
   const [isCompactViewport, setIsCompactViewport] = useState(
     () =>
@@ -157,9 +172,9 @@ export function ExerciseCatalog({
     return [...values].sort((left, right) => left[1].localeCompare(right[1], 'ru'));
   }, [rows.data]);
 
-  const filtered = useMemo(() => {
+  const { filtered, hiddenCount } = useMemo(() => {
     const canonicalRows = rankExercisesForSearch(rows.data ?? [], search);
-    return canonicalRows.filter((item) => {
+    const matching = canonicalRows.filter((item) => {
       const matchesMuscle =
         !muscle ||
         (muscle.startsWith('legacy:')
@@ -174,7 +189,12 @@ export function ExerciseCatalog({
         matchesMuscle && matchesEquipment && (!difficulty || item.difficulty_level === difficulty)
       );
     });
-  }, [difficulty, equipment, muscle, rows.data, search]);
+    const filtered =
+      activeProfile && availability === 'available'
+        ? matching.filter((item) => equipmentAvailability(item, activeProfile) !== 'unavailable')
+        : matching;
+    return { filtered, hiddenCount: matching.length - filtered.length };
+  }, [activeProfile, availability, difficulty, equipment, muscle, rows.data, search]);
 
   const assignablePrograms = useMemo(
     () => (coachPrograms.data ?? []).filter((item) => item.is_active && item.workouts_planned > 0),
@@ -469,18 +489,32 @@ export function ExerciseCatalog({
     !rows.isLoading && !rows.error ? (
       <p className="exercise-catalog__count" aria-live="polite">
         Найдено: <strong>{filtered.length}</strong>
+        {hiddenCount > 0 && (
+          <>
+            {' '}
+            · Скрыто: <strong>{hiddenCount}</strong>
+          </>
+        )}
       </p>
     ) : null;
 
+  const canShowAll = Boolean(activeProfile && availability === 'available');
   const catalogResults = rows.isLoading ? (
     <LoadingState />
   ) : rows.error ? (
     <ErrorState message={(rows.error as Error).message} retry={() => void rows.refetch()} />
   ) : filtered.length === 0 ? (
-    <EmptyState
-      title="Ничего не найдено"
-      text="Попробуйте убрать один из фильтров или изменить запрос."
-    />
+    <>
+      <EmptyState
+        title="Ничего не найдено"
+        text="Попробуйте убрать один из фильтров или изменить запрос."
+      />
+      {canShowAll && (
+        <button type="button" className="secondary" onClick={() => setAvailability('all')}>
+          Показать все упражнения
+        </button>
+      )}
+    </>
   ) : (
     <>
       <div className="exercise-catalog-list" aria-live="polite">
@@ -512,6 +546,9 @@ export function ExerciseCatalog({
                   <Badge>{difficultyLabels[exercise.difficulty_level]}</Badge>
                   {isCardioMetric(exercise.metric_type) && <Badge>Время и дистанция</Badge>}
                   {exercise.is_custom && <Badge>Своё</Badge>}
+                  {activeProfile && equipmentNeedsReview(exercise, activeProfile) && (
+                    <Badge>Проверить оборудование</Badge>
+                  )}
                   {!!exercise.alternatives?.length && (
                     <Badge>{exercise.alternatives.length} проверенных замен</Badge>
                   )}
@@ -568,20 +605,45 @@ export function ExerciseCatalog({
     </>
   );
 
+  const availabilityControls = profileEnabled && (
+    <div className="equipment-availability">
+      <EquipmentProfileSelect />
+      <EquipmentProfilesManager label="Управлять профилями" />
+      {activeProfile && (
+        <AvailabilityControl
+          value={availability}
+          onChange={(value) => {
+            setAvailability(value);
+            setVisibleLimit(PAGE_SIZE);
+          }}
+        />
+      )}
+    </div>
+  );
+  const availabilityNotice = activeProfile && (
+    <p className="muted">
+      Свои упражнения и упражнения с неизвестным оборудованием остаются в списке с пометкой
+      «Проверить оборудование».
+    </p>
+  );
   const mobileSearchOrder = isCompactViewport && search.trim().length > 0;
   const catalogFlow = mobileSearchOrder ? (
     <>
+      {availabilityControls}
       {resultCount}
       {catalogResults}
+      {availabilityNotice}
       {createExercisePanel}
       {filterControls}
     </>
   ) : (
     <>
       {filterControls}
+      {availabilityControls}
       {createExercisePanel}
       {resultCount}
       {catalogResults}
+      {availabilityNotice}
     </>
   );
 

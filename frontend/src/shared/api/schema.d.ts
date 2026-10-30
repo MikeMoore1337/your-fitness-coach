@@ -709,6 +709,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/equipment-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Equipment Profiles */
+        get: operations["read_equipment_profiles_api_v1_me_equipment_profiles_get"];
+        /** Replace Equipment Profiles */
+        put: operations["replace_equipment_profiles_api_v1_me_equipment_profiles_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/acquisition": {
         parameters: {
             query?: never;
@@ -10289,6 +10307,45 @@ export interface components {
             /** Reason Keys */
             reason_keys: string[];
         };
+        /** EquipmentProfile */
+        EquipmentProfile: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Equipment Ids */
+            equipment_ids?: ("bodyweight" | "dumbbell" | "barbell" | "bench" | "cable" | "machine" | "kettlebell" | "cardio" | "other" | "rack" | "pullup_bar" | "dip_bars")[];
+        };
+        /** EquipmentProfileInput */
+        EquipmentProfileInput: {
+            /** Id */
+            id?: string | null;
+            /** Name */
+            name: string;
+            /** Equipment Ids */
+            equipment_ids?: ("bodyweight" | "dumbbell" | "barbell" | "bench" | "cable" | "machine" | "kettlebell" | "cardio" | "other" | "rack" | "pullup_bar" | "dip_bars")[];
+        };
+        /** EquipmentProfilesResponse */
+        EquipmentProfilesResponse: {
+            /** Revision */
+            revision: number;
+            /** Active Profile Id */
+            active_profile_id?: string | null;
+            /** Profiles */
+            profiles?: components["schemas"]["EquipmentProfile"][];
+        };
+        /** EquipmentProfilesUpdate */
+        EquipmentProfilesUpdate: {
+            /** Revision */
+            revision: number;
+            /** Active Profile Id */
+            active_profile_id?: string | null;
+            /** Profiles */
+            profiles?: components["schemas"]["EquipmentProfileInput"][];
+        };
         /** ExerciseAlternativeItem */
         ExerciseAlternativeItem: {
             /** Id */
@@ -10338,6 +10395,8 @@ export interface components {
             secondary_muscle_ids: string[];
             /** Equipment Ids */
             equipment_ids: string[];
+            /** Required Equipment Ids */
+            required_equipment_ids?: string[] | null;
             /** Aliases */
             aliases?: string[];
             /** Movement Pattern */
@@ -20098,6 +20157,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    read_equipment_profiles_api_v1_me_equipment_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentProfilesResponse"];
+                };
+            };
+        };
+    };
+    replace_equipment_profiles_api_v1_me_equipment_profiles_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EquipmentProfilesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentProfilesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
