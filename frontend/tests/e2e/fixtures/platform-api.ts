@@ -1758,6 +1758,9 @@ export async function installPlatformApi(
         ],
       });
     }
+    if (/\/workouts\/\d+\/previous-completion-note$/.test(path) && request.method() === 'GET') {
+      return route.fulfill({ json: { previous_note: null } });
+    }
     if (path.endsWith('/workouts/today')) {
       if (workoutStatus === 'none') {
         return route.fulfill({
