@@ -35,6 +35,7 @@ type Props = {
   setDays: Dispatch<SetStateAction<Day[]>>;
   updateDay: (index: number, next: Day | ((current: Day) => Day)) => void;
   exercises: Exercise[];
+  equipmentFilterEnabled: boolean;
   defaultRestSeconds: number;
   onOpenGuide: (exercise: Exercise) => void;
 };
@@ -44,6 +45,7 @@ export function ProgramDayEditor({
   setDays,
   updateDay,
   exercises,
+  equipmentFilterEnabled,
   defaultRestSeconds,
   onOpenGuide,
 }: Props) {
@@ -315,6 +317,7 @@ export function ProgramDayEditor({
           <span>Упражнение</span>
           <SearchableExercisePicker
             mobileSheet
+            equipmentFilterEnabled={equipmentFilterEnabled}
             exercises={exercises}
             value={activeRow.exercise_id}
             clearValue={0}

@@ -18,6 +18,10 @@ import { productEventSurface, trackProductEvent } from '../../shared/analytics/p
 import type { ActiveWorkoutMutation } from './activeWorkoutQueue';
 import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
 import { rankExercisesForSearch } from '../exercises/exerciseSearch';
+import { EquipmentProfileSelect } from '../equipment/EquipmentProfiles';
+import { useEquipmentProfiles } from '../equipment/equipmentProfileState';
+import { localizedEquipmentLabel } from '../../shared/equipmentLabels';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 
 type AdaptationReason = WorkoutAdaptationRequest['reason'];
 type EquipmentId = NonNullable<WorkoutAdaptationRequest['available_equipment_ids']>[number];
@@ -136,6 +140,9 @@ export function WorkoutAdaptation({
   const titleId = useId();
   const descriptionId = useId();
   const [open, setOpen] = useState(false);
+  const { canMutateProfile } = useRuntimeCapabilities();
+  const profiles = useEquipmentProfiles(open && !safetyOnly && canMutateProfile);
+  const profilesReady = !canMutateProfile || (profiles.query.isSuccess && !profiles.query.isError);
   const [reason, setReason] = useState<AdaptationReason>(
     initialTargetId ? 'replace_exercise' : 'limited_time',
   );
@@ -156,6 +163,28 @@ export function WorkoutAdaptation({
   const close = () => setOpen(false);
   const panelRef = useModalA11y<HTMLDivElement>(open, close, '.workout-adaptation-dialog__close');
 
+  const [appliedProfileKey, setAppliedProfileKey] = useState('');
+  const profileKey =
+    open && profiles.active ? `${profiles.active.id}:${profiles.query.data?.revision}` : '';
+  if (profileKey !== appliedProfileKey) {
+    setAppliedProfileKey(profileKey);
+    if (open && appliedProfileKey) {
+      setPreview(null);
+      setReplacementId('');
+    }
+    if (profiles.active && profileKey) {
+      const selected = new Set(profiles.active.equipment_ids ?? []);
+      setEquipmentIds(
+        equipment
+          .filter((item) => item.value === 'bodyweight' || selected.has(item.value))
+          .map((item) => item.value),
+      );
+      setReplacementId('');
+      setPreview(null);
+      setError(null);
+    }
+  }
+
   useEffect(() => {
     if (!error && !preview) return;
     panelRef.current
@@ -169,11 +198,22 @@ export function WorkoutAdaptation({
     'different_environment',
   ].includes(activeReason);
   const alternatives = useQuery({
-    queryKey: ['workout', 'adaptation-alternatives', workout.id, targetId, equipmentIds],
+    queryKey: [
+      'workout',
+      'adaptation-alternatives',
+      workout.id,
+      targetId,
+      equipmentIds,
+      profiles.query.data?.revision,
+    ],
     queryFn: () =>
       api<WorkoutAlternative[]>(alternativesPath(workout.id, Number(targetId), equipmentIds)),
     enabled:
-      online && activeReason === 'replace_exercise' && Boolean(targetId) && equipmentIds.length > 0,
+      online &&
+      profilesReady &&
+      activeReason === 'replace_exercise' &&
+      Boolean(targetId) &&
+      equipmentIds.length > 0,
     retry: false,
   });
 
@@ -336,6 +376,13 @@ export function WorkoutAdaptation({
       setError({ kind: 'preview', message: 'Замена требует подключения к интернету.' });
       return;
     }
+    if (needsEquipment && !profilesReady) {
+      setError({
+        kind: 'preview',
+        message: 'Не удалось проверить профиль оборудования. Обновите данные и повторите.',
+      });
+      return;
+    }
     const request = buildRequest();
     if (!request) return;
     setError(null);
@@ -437,7 +484,7 @@ export function WorkoutAdaptation({
               </header>
 
               <div
-                className={`workout-adaptation-dialog__body ${isQuickReplacement ? 'workout-adaptation-dialog__body--quick' : ''}`}
+                className={`workout-adaptation-dialog__body ${isQuickReplacement ? 'workout-adaptation-dialog__body--quick' : ''} ${profiles.active ? 'workout-adaptation-dialog__body--profile' : ''}`}
               >
                 {!safetyOnly && !isQuickReplacement && (
                   <fieldset className="adaptation-section adaptation-reasons">
@@ -573,6 +620,18 @@ export function WorkoutAdaptation({
                     className={`adaptation-section adaptation-equipment ${isQuickReplacement ? 'adaptation-equipment--quick' : ''}`}
                   >
                     <legend>Что доступно сейчас?</legend>
+                    <EquipmentProfileSelect enabled={canMutateProfile} />
+                    {profiles.active && (
+                      <p>
+                        Принадлежности из профиля:{' '}
+                        {profiles.active.equipment_ids
+                          ?.filter((id) => ['rack', 'pullup_bar', 'dip_bars'].includes(id))
+                          .map((id) => localizedEquipmentLabel(id))
+                          .join(' · ') || 'не выбраны'}
+                        . Упражнения с неизвестным оборудованием могут быть исключены из проверенных
+                        замен.
+                      </p>
+                    )}
                     <p>Отметьте всё подходящее оборудование.</p>
                     <div className="adaptation-equipment__grid">
                       {equipment.map((item) => (
@@ -710,7 +769,8 @@ export function WorkoutAdaptation({
                                   )
                                 }
                               >
-                                {equipment.find((entry) => entry.value === id)?.label ?? id}
+                                {equipment.find((entry) => entry.value === id)?.label ??
+                                  localizedEquipmentLabel(id)}
                               </Button>
                             ))}
                           </div>

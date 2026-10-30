@@ -3,11 +3,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileForm, validateProfileForm } from '../../../../src/features/profile/ProfileForm';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
+import { NavigationProvider } from '../../../../src/shared/navigation/router';
 
 const apiMock = vi.hoisted(() => vi.fn());
 const reloadUser = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../../src/shared/api/client', () => ({ api: apiMock }));
+vi.mock('../../../../src/shared/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/shared/api/client')>()),
+  api: apiMock,
+}));
 vi.mock('../../../../src/app/AuthProvider', () => ({
   useAuth: () => ({ user: { id: 10, profile: null }, reloadUser }),
 }));
@@ -34,9 +38,11 @@ function renderForm() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <FeedbackProvider>
-        <ProfileForm />
-      </FeedbackProvider>
+      <NavigationProvider>
+        <FeedbackProvider>
+          <ProfileForm />
+        </FeedbackProvider>
+      </NavigationProvider>
     </QueryClientProvider>,
   );
 }
