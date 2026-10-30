@@ -1773,8 +1773,6 @@ def _extract_document_rows(
             )
         warnings = tuple(warnings_list)
     duration_weeks = max((row.week_number or 1 for row in extracted), default=1)
-    if duration_weeks > 24:
-        raise ProgramImportError("week_limit", "Документ содержит более 24 недель")
     return (
         tuple(extracted),
         duration_weeks,
@@ -2189,8 +2187,6 @@ def _extract_generic_rows(
             )
         )
     duration_weeks = max(row.week_number or 1 for row in extracted)
-    if duration_weeks > 24:
-        raise ProgramImportError("week_limit", "Файл содержит более 24 недель")
     return tuple(extracted), duration_weeks, tuple(warnings)
 
 
@@ -2764,8 +2760,8 @@ def _row_from_values(
 def _add_domain_range_issues(row: _RowDraft, issues: list[_Issue]) -> None:
     row_number = row["row_number"]
     ranges = (
-        ("week_number", 1, 24, "Номер недели должен быть от 1 до 24"),
-        ("block_number", 1, 24, "Номер блока должен быть от 1 до 24"),
+        ("week_number", 1, None, "Номер недели должен быть положительным"),
+        ("block_number", 1, None, "Номер блока должен быть положительным"),
         ("day_number", 1, 8, "Номер дня должен быть от 1 до 8"),
         ("exercise_id", 1, 2_147_483_647, "ID упражнения должен быть положительным"),
         ("prescribed_sets", 1, 10, "Количество подходов должно быть от 1 до 10"),
@@ -2776,7 +2772,10 @@ def _add_domain_range_issues(row: _RowDraft, issues: list[_Issue]) -> None:
     )
     for field, minimum, maximum, message in ranges:
         value = row.get(field)
-        if value is not None and (not isinstance(value, int) or not minimum <= value <= maximum):
+        if value is not None and (
+            not isinstance(value, int)
+            or (value < minimum or (maximum is not None and value > maximum))
+        ):
             _append_issue(
                 issues,
                 "value_out_of_range",
@@ -3343,7 +3342,9 @@ def _import_blocks(
         return []
     if sorted(by_block) != list(range(1, len(by_block) + 1)):
         _append_issue(issues, "block_sequence", "blocking", "Номера блоков должны идти с 1")
-    if set(week_owners) != set(range(1, duration_weeks + 1)):
+    if len(week_owners) != duration_weeks or any(
+        week != index for index, week in enumerate(sorted(week_owners), 1)
+    ):
         _append_issue(
             issues,
             "block_week_coverage",
@@ -3353,7 +3354,7 @@ def _import_blocks(
     result: list[_ProgramBlock] = []
     for block_number, block in sorted(by_block.items()):
         weeks = sorted(weeks_by_block[block_number])
-        if weeks != list(range(weeks[0], weeks[-1] + 1)):
+        if weeks[-1] - weeks[0] + 1 != len(weeks):
             _append_issue(
                 issues,
                 "block_week_sequence",
@@ -3474,13 +3475,18 @@ def _build_draft(
         seen_signatures.add(signature)
 
     weeks = sorted({week for week, _ in days})
-    if duration_weeks < 1 or duration_weeks > 24:
+    if duration_weeks < 1:
         _append_issue(
-            global_issues, "week_limit", "blocking", "Программа может содержать от 1 до 24 недель"
+            global_issues,
+            "week_limit",
+            "blocking",
+            "Программа должна содержать хотя бы одну неделю",
         )
-        duration_weeks = max(1, min(duration_weeks, 24))
+        duration_weeks = 1
     blocks = _import_blocks(rows, duration_weeks=duration_weeks, issues=global_issues)
-    if weeks and weeks != list(range(1, duration_weeks + 1)):
+    if weeks and (
+        len(weeks) != duration_weeks or any(week != index for index, week in enumerate(weeks, 1))
+    ):
         _append_issue(
             global_issues,
             "week_sequence",
@@ -3553,7 +3559,9 @@ def _build_draft(
             for key, day_rows in days.items()
         }
         saw_weekly_exercise_variation = False
-        for week_number in range(2, duration_weeks + 1):
+        for week_number in weeks:
+            if week_number == 1:
+                continue
             for day_number in expected_days or []:
                 previous = rows_by_week_day.get((1, day_number), [])
                 current = rows_by_week_day.get((week_number, day_number), [])

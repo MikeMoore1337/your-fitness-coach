@@ -481,6 +481,26 @@ def sync_workout_reminders(db: Session) -> int:
     user_ids = [user.id for _, user, _ in rows]
     settings_by_user = {user.id: (setting, user, timezone) for setting, user, timezone in rows}
     min_today = min(now_for_user_naive(user).date() for _, user, _ in rows)
+    from fitminiapp_api.services.program_versioning import materialize_cycle_schedule
+
+    for program in (
+        db.query(UserProgram)
+        .filter(
+            UserProgram.user_id.in_(user_ids),
+            UserProgram.is_active.is_(True),
+            UserProgram.id.in_(
+                db.query(UserWorkout.user_program_id).filter(
+                    UserWorkout.source_cycle_week.is_not(None)
+                )
+            ),
+            UserProgram.status.in_({"scheduled", "active"}),
+        )
+        .order_by(UserProgram.id)
+    ):
+        setting, owner, _timezone = settings_by_user[program.user_id]
+        if setting.workout_reminders_enabled:
+            local_today = now_for_user_naive(owner).date()
+            materialize_cycle_schedule(db, program, local_today, local_today + timedelta(days=7))
 
     workouts = (
         db.query(UserWorkout, UserProgram.user_id)

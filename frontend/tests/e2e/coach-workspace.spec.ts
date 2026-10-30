@@ -2612,48 +2612,44 @@ test('mobile использует список и отдельный конте�
   await page.locator('#coach-client-program > summary').click();
   await page.getByText('Назначить новую программу').click();
   await expect(page.getByRole('heading', { name: 'Добавьте упражнения' })).toBeVisible();
-  const trainingFields = page.locator('.program-exercise-row__metrics .field');
-  await expect(trainingFields).toHaveCount(3);
+  const editor = page.locator('.copy-editor');
+  await expect(editor).toBeVisible();
+  const dayInput = editor.getByRole('textbox', { name: 'Название дня' });
+  await expect(dayInput).toHaveValue('Тренировка 1');
+  await expect(editor.getByRole('button', { name: 'Переместить день выше' })).toHaveCount(0);
+  await expect(editor.getByRole('button', { name: 'Переместить день ниже' })).toHaveCount(0);
+  await editor.getByRole('button', { name: 'Все дни' }).click();
+  const allDaysDialog = page.getByRole('dialog', { name: 'Все дни программы' });
+  await expect(allDaysDialog).toBeVisible();
+  await expect(allDaysDialog.getByRole('button', { name: 'Изменить порядок' })).toHaveCount(0);
+  await allDaysDialog.getByRole('button', { name: 'Закрыть список дней' }).click();
+  await expect(allDaysDialog).toHaveCount(0);
+  const exerciseRow = editor.locator('.copy-editor__exercise').first();
+  expect((await exerciseRow.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  const addExercise = editor.getByRole('button', { name: 'Добавить упражнение' });
+  expect((await addExercise.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+
+  await exerciseRow.click();
+  const parameters = page.getByRole('dialog', { name: 'Параметры упражнения' });
+  await expect(parameters).toBeVisible();
+  const trainingFields = parameters.locator('.copy-editor__metrics .field');
+  await expect(trainingFields).toHaveCount(2);
   const fieldBoxes = await trainingFields.evaluateAll((fields) =>
     fields.map((field) => field.getBoundingClientRect()),
   );
   expect(fieldBoxes.every((box) => box.width >= 70)).toBe(true);
-  expect(
-    Math.max(...fieldBoxes.map((box) => box.top)) - Math.min(...fieldBoxes.map((box) => box.top)),
-  ).toBeLessThan(2);
-  const dayHeader = page.locator('.program-day__head');
-  const dayInput = dayHeader.getByLabel('Название дня 1');
-  const dayControls = dayHeader.locator('.program-order-controls');
-  expect((await dayControls.boundingBox())?.y).toBeLessThan(
-    ((await dayInput.boundingBox())?.y ?? 0) + ((await dayInput.boundingBox())?.height ?? 0),
-  );
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
-  const exerciseActions = page.locator('.program-exercise-row__actions').first();
-  const exerciseHeading = page.locator('.program-exercise-row__heading').first();
-  const exerciseAdvanced = page.locator('.program-exercise-advanced').first();
-  const exerciseActionsBox = await exerciseActions.boundingBox();
-  const exerciseHeadingBox = await exerciseHeading.boundingBox();
-  const exerciseAdvancedBox = await exerciseAdvanced.boundingBox();
-  expect(Math.abs((exerciseActionsBox?.y ?? 0) - (exerciseHeadingBox?.y ?? 0))).toBeLessThan(4);
-  expect((exerciseActionsBox?.y ?? 0) < (exerciseAdvancedBox?.y ?? 0)).toBe(true);
   await expect(
-    exerciseActions.getByRole('button', { name: 'Переместить упражнение 1 выше' }),
-  ).toBeHidden();
-  await expect(
-    exerciseActions.getByRole('button', { name: 'Переместить упражнение 1 ниже' }),
-  ).toBeHidden();
-  await expect(exerciseAdvanced.getByText('Заметка, суперсет и замены')).toBeVisible();
-  await expect(exerciseAdvanced.getByText('Необязательные настройки упражнения')).toBeVisible();
+    parameters.getByRole('textbox', {
+      name: 'Повторы, включая последовательность по подходам',
+    }),
+  ).toBeVisible();
+  const advanced = parameters.locator('.copy-editor__advanced');
+  await expect(advanced.getByText('Заметка и дополнительные параметры')).toBeVisible();
+  await expect(advanced.getByText('Суперсеты, замены, комментарий')).toBeVisible();
   expect(
-    (
-      await exerciseActions
-        .getByRole('button', { name: 'Удалить упражнение 1 из дня 1' })
-        .boundingBox()
-    )?.height,
+    (await parameters.getByRole('button', { name: 'Удалить упражнение' }).boundingBox())?.height,
   ).toBeGreaterThanOrEqual(44);
-  const addExercise = page.getByRole('button', { name: 'Добавить упражнение' }).first();
-  await expect(addExercise).toHaveCSS('border-top-style', 'solid');
-  expect((await addExercise.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await parameters.getByRole('button', { name: 'Закрыть параметры' }).click();
 
   for (const viewport of [
     { width: 430, height: 932 },
@@ -2662,15 +2658,11 @@ test('mobile использует список и отдельный конте�
   ]) {
     await page.setViewportSize(viewport);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
-    const actionsBox = await exerciseActions.boundingBox();
-    const headingBox = await exerciseHeading.boundingBox();
-    expect(Math.abs((actionsBox?.y ?? 0) - (headingBox?.y ?? 0))).toBeLessThan(4);
+    expect((await addExercise.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
 
   await page.setViewportSize({ width: 1280, height: 900 });
-  const desktopActionsBox = await exerciseActions.boundingBox();
-  const desktopAdvancedBox = await exerciseAdvanced.boundingBox();
-  expect((desktopActionsBox?.y ?? 0) < (desktopAdvancedBox?.y ?? 0)).toBe(true);
+  await expect(editor.locator('.copy-editor__detail-rail')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1280);
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -2680,15 +2672,10 @@ test('mobile использует список и отдельный конте�
       fullPage: true,
     });
   }
-
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await page.keyboard.press('Escape');
-  await expect(dayInput).toHaveCSS('background-color', 'rgb(20, 23, 23)');
-  await expect(dayControls.getByRole('button', { name: 'Переместить день 1 выше' })).toHaveCSS(
-    'background-color',
-    'rgba(0, 0, 0, 0)',
-  );
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   if (captureAudit) {
     await page.screenshot({
       path: '../.artifacts/ui-audit/task-48/coach-mobile-program-dark-390.png',
@@ -2698,13 +2685,7 @@ test('mobile использует список и отдельный конте�
 
   await page.setViewportSize({ width: 360, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
-  expect(
-    (
-      await trainingFields.evaluateAll((fields) =>
-        fields.map((field) => field.getBoundingClientRect().width),
-      )
-    ).every((width) => width >= 65),
-  ).toBe(true);
+  await expect(dayInput).toBeVisible();
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Включить светлую тему' }).click();
   await page.keyboard.press('Escape');

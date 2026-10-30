@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -364,10 +364,10 @@ class ProgramCoachingRule(BaseModel):
         "deload",
     ]
     scope: Literal["program", "block", "exercise"] = "program"
-    block_number: int | None = Field(default=None, ge=1, le=24)
+    block_number: int | None = Field(default=None, ge=1)
     exercise_id: int | None = Field(default=None, ge=1)
-    week_start: int | None = Field(default=None, ge=1, le=24)
-    week_end: int | None = Field(default=None, ge=1, le=24)
+    week_start: int | None = Field(default=None, ge=1)
+    week_end: int | None = Field(default=None, ge=1)
     rep_target: PrescriptionRepTarget | None = None
     load_target: PrescriptionLoadTarget | None = None
     effort_target: PrescriptionEffortTarget | None = None
@@ -508,6 +508,21 @@ class ProgramTemplateDayCreate(BaseModel):
         return self
 
 
+class ProgramWeekCycle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    length_weeks: int = Field(ge=1, strict=True)
+    week_types: list[Literal["light", "medium", "heavy"]] | None = None
+    repeat: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def validate_week_types(self):
+        if self.week_types is not None and len(self.week_types) != self.length_weeks:
+            raise ValueError("week_types must contain one value per cycle week")
+        return self
+
+
 class ProgramTemplateCreate(BaseModel):
     title: str = Field(min_length=1, max_length=128)
     goal: ProgramRecommendationGoal
@@ -519,9 +534,10 @@ class ProgramTemplateCreate(BaseModel):
     expected_revision_number: int | None = Field(default=None, ge=0)
     assign_after_create: bool = True
     start_date: date | None = None
-    duration_weeks: int = Field(default=1, ge=1, le=24)
+    duration_weeks: int = Field(default=1, ge=1)
     schedule_weekdays: list[int] | None = Field(default=None, min_length=1, max_length=7)
     replace_active: bool = False
+    week_cycle: ProgramWeekCycle | None = None
 
     @model_validator(mode="after")
     def validate_assignment_schedule(self):
@@ -538,7 +554,7 @@ class ProgramTemplateCreate(BaseModel):
 
 class ProgramTemplateExerciseWeekResponse(BaseModel):
     exercise_id: int = Field(ge=1)
-    week_number: int = Field(ge=1, le=24)
+    week_number: int = Field(ge=1)
     prescribed_sets: int = Field(ge=1, le=10)
     prescribed_reps: str = Field(max_length=32)
     prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
@@ -600,7 +616,7 @@ class ProgramTemplateResponse(BaseModel):
     assigned_program_updated: bool = False
     future_workouts_updated: int = Field(default=0, ge=0)
     assigned_program_revision_number: int | None = None
-    default_duration_weeks: int = Field(default=1, ge=1, le=24)
+    default_duration_weeks: int = Field(default=1, ge=1)
     provenance_type: ProgramProvenanceType = "CUSTOM"
     provenance: dict[str, object] | None = None
     program_metadata: dict[str, object] | None = None
@@ -889,6 +905,11 @@ class TrainingBlockMutationResponse(BaseModel):
 class CoachProgramExerciseCreate(BaseModel):
     expected_revision_number: int = Field(ge=0)
     effective_scope: Literal["next_workout", "current_block", "future_program"]
+    from_week: int | None = Field(default=None, ge=1, strict=True)
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    occurrence_weeks: list[Annotated[int, Field(strict=True, ge=1)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
     effective_date: date | None = None
     exercise_id: int = Field(ge=1)
     day_number: int | None = Field(default=None, ge=1, le=14)
@@ -949,7 +970,7 @@ class AssignTemplateRequest(BaseModel):
 
 class AssignmentScheduleRequest(BaseModel):
     start_date: date | None = None
-    duration_weeks: int = Field(default=1, ge=1, le=24)
+    duration_weeks: int = Field(default=1, ge=1)
     schedule_weekdays: list[int] | None = Field(default=None, min_length=1, max_length=7)
     replace_active: bool = False
 
@@ -1123,3 +1144,15 @@ class ClientResponse(BaseModel):
     labels: list[str] = Field(default_factory=list, max_length=20)
     status: Literal["active", "pending"]
     operational_status: Literal["active", "paused", "archived"] = "active"
+
+
+class ProgramCycleRevisionRequest(BaseModel):
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    duration_weeks: int | None = Field(default=None, ge=1, strict=True)
+    source_week_order: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=20000
+    )
+    week_types: list[Literal["light", "medium", "heavy"]] | None = None
+    repeat: bool | None = Field(default=None, strict=True)
+    reason: str | None = Field(default=None, max_length=500)
