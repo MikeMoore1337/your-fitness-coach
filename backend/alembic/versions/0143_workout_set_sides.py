@@ -15,33 +15,13 @@ online_rollout_notes = "Add nullable execution metadata and an empty side facts 
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.execute("SET LOCAL lock_timeout = '3s'")
-        op.execute("SET LOCAL statement_timeout = '30s'")
     op.add_column(
         "user_workout_sets",
-        sa.Column(
-            "execution_mode",
-            sa.String(16),
-            sa.CheckConstraint(
-                "execution_mode IS NULL OR execution_mode IN ('bilateral', 'per_side', 'alternating')",
-                name="ck_user_workout_sets_execution_mode",
-            ),
-            nullable=True,
-        ),
+        sa.Column("execution_mode", sa.String(16), nullable=True),
     )
     op.add_column(
         "user_workout_sets",
-        sa.Column(
-            "first_side",
-            sa.String(5),
-            sa.CheckConstraint(
-                "first_side IS NULL OR first_side IN ('left', 'right')",
-                name="ck_user_workout_sets_first_side",
-            ),
-            nullable=True,
-        ),
+        sa.Column("first_side", sa.String(5), nullable=True),
     )
     op.create_table(
         "user_workout_set_sides",

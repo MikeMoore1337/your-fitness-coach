@@ -266,10 +266,7 @@ function RirSelector({
 }) {
   return (
     <fieldset className={`active-workout-rir${compact ? ' active-workout-rir--quick' : ''}`}>
-      <legend>
-        Повторы в запасе
-        {sideLabel ? ` · ${sideLabel}` : ''}
-      </legend>
+      <legend>{compact ? 'Повторы в запасе (RIR)' : 'Повторы в запасе'}</legend>
       <div className="active-workout-rir__options">
         {rirOptions.map((option) => (
           <button

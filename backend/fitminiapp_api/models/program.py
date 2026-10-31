@@ -607,6 +607,11 @@ class UserWorkoutSet(Base):
             name="ck_user_workout_sets_kind",
         ),
         CheckConstraint("version >= 1", name="ck_user_workout_sets_version_positive"),
+        CheckConstraint(
+            "(execution_mode IS NULL OR execution_mode IN ('bilateral', 'per_side', 'alternating')) "
+            "AND (first_side IS NULL OR first_side IN ('left', 'right'))",
+            name="ck_user_workout_sets_side_metadata",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -616,22 +621,8 @@ class UserWorkoutSet(Base):
     set_number: Mapped[int] = mapped_column(Integer)
     actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     actual_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
-    execution_mode: Mapped[str | None] = mapped_column(
-        String(16),
-        CheckConstraint(
-            "execution_mode IS NULL OR execution_mode IN ('bilateral', 'per_side', 'alternating')",
-            name="ck_user_workout_sets_execution_mode",
-        ),
-        nullable=True,
-    )
-    first_side: Mapped[str | None] = mapped_column(
-        String(5),
-        CheckConstraint(
-            "first_side IS NULL OR first_side IN ('left', 'right')",
-            name="ck_user_workout_sets_first_side",
-        ),
-        nullable=True,
-    )
+    execution_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    first_side: Mapped[str | None] = mapped_column(String(5), nullable=True)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
     average_heart_rate_bpm: Mapped[int | None] = mapped_column(Integer, nullable=True)

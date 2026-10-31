@@ -121,7 +121,7 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
     assert auth_families is not None
     assert relocated_marker is not None
     assert auth_families.down_revision == legacy_support.revision
-    assert revisions.get_heads() == ["0142_workout_history_import"]
+    assert revisions.get_heads() == ["0144_workout_side_metadata_ck"]
     assert {"0134_workout_completed_at_utc", "0136_program_week_unbounded"} <= {
         item.revision for item in revisions.iterate_revisions("head", "0133_profile_height_numeric")
     }
