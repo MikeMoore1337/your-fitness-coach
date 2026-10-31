@@ -2144,9 +2144,14 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   align-items: center;
   cursor: pointer;
 }
-.cardio-session-row__menu[open] {
+.cardio-session-row__menu-actions {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--v2-space-3);
+  padding-top: var(--v2-space-3);
+}
+.cardio-session-row__menu-actions > .ui-button {
+  width: 100%;
 }
 @media (max-width: 680px) {
   .progress-subsection {

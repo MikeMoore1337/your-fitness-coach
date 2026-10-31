@@ -441,6 +441,17 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
     await expectNoHorizontalOverflow(tmaPage);
+    const editAction = finalTmaRow.getByRole('button', { name: 'Изменить' });
+    const deleteAction = finalTmaRow.getByRole('button', { name: 'Удалить' });
+    await expect(editAction).toBeVisible();
+    await expect(deleteAction).toBeVisible();
+    const editBounds = await editAction.boundingBox();
+    const deleteBounds = await deleteAction.boundingBox();
+    expect(editBounds).not.toBeNull();
+    expect(deleteBounds).not.toBeNull();
+    expect(deleteBounds!.y - (editBounds!.y + editBounds!.height)).toBeGreaterThanOrEqual(11);
+    expect(editBounds!.height).toBeGreaterThanOrEqual(44);
+    expect(deleteBounds!.height).toBeGreaterThanOrEqual(44);
     await expectTouchTargets(
       tmaCardio.locator(
         '.cardio-session-row__actions > summary:visible, .cardio-session-row__actions .ui-button:visible',
