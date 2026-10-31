@@ -35,7 +35,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           git -c safe.directory="$GITHUB_WORKSPACE" cat-file -e "$EXPECTED_DEV_SHA^{commit}"
-          unexpected="$(git -c safe.directory="$GITHUB_WORKSPACE" diff --name-only "$EXPECTED_DEV_SHA" HEAD | grep -Ev '^(frontend/tests/e2e/mobile-ui-regression\.spec\.ts|\.github/workflows/verify-issue-1281\.yml)$' || true)"
+          changed="$(git -c safe.directory="$GITHUB_WORKSPACE" diff --name-only "$EXPECTED_DEV_SHA" HEAD)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(frontend/tests/e2e/mobile-ui-regression\.spec\.ts|\.github/workflows/verify-issue-1281\.yml)$' || true)"
           if [ -n "$unexpected" ]; then printf 'Unexpected changes:\n%s\n' "$unexpected"; exit 1; fi
           printf 'APP_SOURCES_IDENTICAL_TO_DEV=%s\n' "$EXPECTED_DEV_SHA"
           git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD
@@ -88,7 +89,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           git -c safe.directory="$GITHUB_WORKSPACE" cat-file -e "$EXPECTED_DEV_SHA^{commit}"
-          unexpected="$(git -c safe.directory="$GITHUB_WORKSPACE" diff --name-only "$EXPECTED_DEV_SHA" HEAD | grep -Ev '^(frontend/tests/e2e/mobile-ui-regression\.spec\.ts|\.github/workflows/verify-issue-1281\.yml)$' || true)"
+          changed="$(git -c safe.directory="$GITHUB_WORKSPACE" diff --name-only "$EXPECTED_DEV_SHA" HEAD)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(frontend/tests/e2e/mobile-ui-regression\.spec\.ts|\.github/workflows/verify-issue-1281\.yml)$' || true)"
           if [ -n "$unexpected" ]; then printf 'Unexpected changes:\n%s\n' "$unexpected"; exit 1; fi
           printf 'APP_SOURCES_IDENTICAL_TO_DEV=%s\n' "$EXPECTED_DEV_SHA"
           git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD
