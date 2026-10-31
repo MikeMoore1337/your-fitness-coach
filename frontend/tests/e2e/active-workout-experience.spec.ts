@@ -121,9 +121,37 @@ test('#832 раздельные стороны сохраняются одним
 async function capture832(page: Page, browser: string, theme: string, state: string) {
   const widths = browser === 'chromium' ? [320, 360, 393, 430, 1440] : [393];
   const directory = ISSUE_832_AFTER_DIR;
+  const row = page.locator('[data-workout-set-id="201"]');
+  const expectedValues =
+    state === 'same' || state === 'alternating'
+      ? ([
+          [/^Вес, на сторону/, state === 'same' ? '18' : '12'],
+          [/^Повторы, на сторону/, '10'],
+        ] as const)
+      : state === 'asymmetric' || state === 'partial'
+        ? ([
+            [/^Вес, Левая/, '18'],
+            [/^Повторы, Левая/, '10'],
+            [/^Вес, Правая/, '16'],
+            [/^Повторы, Правая/, '8'],
+          ] as const)
+        : state === 'offline' || state === 'error' || state === 'conflict'
+          ? ([
+              [/^Вес, Левая/, '18'],
+              [/^Повторы, Левая/, '10'],
+              [/^Вес, Правая/, ''],
+              [/^Повторы, Правая/, ''],
+            ] as const)
+          : [];
+  const assertValues = async () => {
+    for (const [label, value] of expectedValues) {
+      expect(await row.getByLabel(label).inputValue(), `${state} ${String(label)}`).toBe(value);
+    }
+  };
   if (process.env.CAPTURE_832_AFTER === '1') await mkdir(directory, { recursive: true });
   for (const width of widths) {
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+    await assertValues();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -147,6 +175,7 @@ async function capture832(page: Page, browser: string, theme: string, state: str
         fullPage: true,
         animations: 'disabled',
       });
+      await assertValues();
       if (
         width === 393 ||
         (width !== 1440 && ['same', 'asymmetric', 'partial', 'conflict'].includes(state))
@@ -156,6 +185,7 @@ async function capture832(page: Page, browser: string, theme: string, state: str
           path: resolve(directory, `${browser}-${theme}-${width}-${state}-viewport.png`),
           animations: 'disabled',
         });
+        await assertValues();
       }
     }
   }
