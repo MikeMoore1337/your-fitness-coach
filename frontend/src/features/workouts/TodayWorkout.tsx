@@ -95,6 +95,7 @@ import {
   isCompleteDecimalDraft,
   parseDecimalDraft,
 } from '../../shared/numeric/decimalDraft';
+import './SideWorkout.css';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -255,11 +256,13 @@ function RirSelector({
   disabled,
   value,
   onChange,
+  sideLabel,
 }: {
   compact?: boolean;
   disabled: boolean;
   value: RirValue | null;
   onChange: (value: RirValue | null) => void;
+  sideLabel?: string;
 }) {
   return (
     <fieldset className={`active-workout-rir${compact ? ' active-workout-rir--quick' : ''}`}>
@@ -269,7 +272,7 @@ function RirSelector({
           <button
             type="button"
             disabled={disabled}
-            aria-label={option.label}
+            aria-label={sideLabel ? `${sideLabel}: ${option.label}` : option.label}
             aria-pressed={value === option.value}
             data-yfc-choice="compact"
             className={value === option.value ? 'is-selected' : ''}
@@ -511,12 +514,17 @@ function WorkoutSetRow({
     historyState === 'ready' && pastHistory?.history_status === 'matched'
       ? pastHistory.previous_workout
       : null;
-  const pastResult = past ? formatSetResult(past.actual_reps, past.actual_weight) : null;
+  const pastResult = past?.sides
+    ? sideHistoryText(past.sides)
+    : past
+      ? formatSetResult(past.actual_reps, past.actual_weight)
+      : null;
   const canPrefillPast =
     isCurrent &&
     !disabled &&
     !completed &&
     past != null &&
+    !past.sides &&
     ((reps === '' && past.actual_reps != null) || (weight === '' && past.actual_weight != null));
   const pastMessage = {
     offline: 'История недоступна без сети',
@@ -824,7 +832,9 @@ function WorkoutSetRow({
                 : `Подход ${previousSetNumber} · ${previousPending ? (durable ? 'сохранён на устройстве' : 'не синхронизирован') : 'завершён'}`}
             </small>
           </span>
-          <strong>{previousResult ?? 'Нет завершённого подхода'}</strong>
+          <strong className="active-workout-sides__history-value">
+            {previousResult ?? 'Нет завершённого подхода'}
+          </strong>
         </div>
         <div className="active-workout-set__history-row">
           <span>
@@ -836,7 +846,7 @@ function WorkoutSetRow({
             </small>
             {past && <small>Справочно: тип недели может отличаться</small>}
           </span>
-          <strong>{pastMessage}</strong>
+          <strong className="active-workout-sides__history-value">{pastMessage}</strong>
         </div>
       </div>
       {isCurrent && (
@@ -1067,6 +1077,627 @@ function WorkoutSetRow({
           )}
         </div>
       </details>
+    </div>
+  );
+}
+
+type SideMode = 'per_side' | 'alternating';
+type SideName = 'left' | 'right';
+type SideFact = NonNullable<NonNullable<WorkoutSet['sides']>['left']>;
+type SideDraft = {
+  reps: string;
+  weight: string;
+  rir: RirValue | null;
+  failure: boolean | null;
+  completed: boolean;
+  present: boolean;
+};
+type SidesDraft = Record<SideName, SideDraft>;
+
+function sideDraft(value: SideFact | null | undefined): SideDraft {
+  return {
+    reps: value?.actual_reps == null ? '' : String(value.actual_reps),
+    weight: value?.actual_weight == null ? '' : String(value.actual_weight),
+    rir: value?.rir ?? null,
+    failure: value?.reached_failure ?? null,
+    completed: value?.is_completed ?? false,
+    present: value != null,
+  };
+}
+
+function sideDrafts(values: WorkoutSet['sides']): SidesDraft {
+  return { left: sideDraft(values?.left), right: sideDraft(values?.right) };
+}
+
+function encodeSide(value: SideDraft): SideFact | null | undefined {
+  if (!value.present) return null;
+  const reps = value.reps.trim() === '' ? null : Number(value.reps);
+  const weight = value.weight.trim() === '' ? null : parseDecimalDraft(value.weight);
+  if (
+    (reps !== null && (!Number.isInteger(reps) || reps < 0 || reps > 2147483647)) ||
+    (value.weight.trim() !== '' &&
+      (weight == null || weight < 0 || weight > 99999999.99 || !hasDecimalScale(value.weight, 2)))
+  )
+    return undefined;
+  return {
+    actual_reps: reps,
+    actual_weight: weight,
+    rir: value.rir,
+    reached_failure: value.failure,
+    is_completed: value.completed,
+  };
+}
+
+function sideHistoryText(sides: WorkoutSet['sides']): string {
+  if (!sides) return 'Нет данных по сторонам';
+  return (['left', 'right'] as const)
+    .map((key) => {
+      const side = sides[key];
+      const label = key === 'left' ? 'Левая' : 'Правая';
+      if (!side) return `${label}: нет данных`;
+      const value = formatSetResult(side.actual_reps, side.actual_weight) ?? 'значения не указаны';
+      return `${label}: ${value}${side.rir == null ? '' : ` · RIR ${side.rir}`}${side.reached_failure ? ' · до отказа' : ''}${side.is_completed ? '' : ' · не завершена'}`;
+    })
+    .join('\n');
+}
+
+function sideVersionText(value: {
+  execution_mode?: WorkoutSet['execution_mode'];
+  first_side?: WorkoutSet['first_side'];
+  sides?: WorkoutSet['sides'];
+  actual_reps?: number | null;
+  actual_weight?: number | null;
+  rir?: RirValue | null;
+  reached_failure?: boolean | null;
+  is_completed: boolean;
+}): string {
+  const mode =
+    value.execution_mode === 'per_side'
+      ? 'По сторонам'
+      : value.execution_mode === 'alternating'
+        ? 'Поочерёдно'
+        : 'Обычное';
+  const first = value.first_side
+    ? ` · первая: ${value.first_side === 'left' ? 'левая' : 'правая'}`
+    : '';
+  const state = value.is_completed ? 'подход завершён' : 'подход не завершён';
+  const effort = (rir: RirValue | null | undefined, failure: boolean | null | undefined) =>
+    `RIR ${rir ?? 'не указан'} · отказ ${failure == null ? 'не указан' : failure ? 'да' : 'нет'}`;
+  if (!value.sides)
+    return `${mode}${first} · ${state}\n${formatSetResult(value.actual_reps, value.actual_weight) ?? 'значения не указаны'} · ${effort(value.rir, value.reached_failure)}`;
+  return `${mode}${first} · ${state}\n${(['left', 'right'] as const)
+    .map((key) => {
+      const side = value.sides?.[key];
+      const label = key === 'left' ? 'Левая' : 'Правая';
+      return side
+        ? `${label}: ${formatSetResult(side.actual_reps, side.actual_weight) ?? 'значения не указаны'} · ${effort(side.rir, side.reached_failure)} · ${side.is_completed ? 'выполнена' : 'не завершена'}`
+        : `${label}: нет данных`;
+    })
+    .join('\n')}`;
+}
+
+function SideWorkoutSetRow({
+  set,
+  mode,
+  setPosition,
+  setTotal,
+  prescribedReps,
+  disabled,
+  isCurrent,
+  previousSet,
+  previousPending,
+  pastHistory,
+  historyState,
+  restSeconds,
+  userId,
+  workoutId,
+  exerciseTitle,
+  pending,
+  durable,
+  syncing,
+  exerciseNote,
+  enqueue,
+}: {
+  set: WorkoutSet;
+  mode: SideMode;
+  setPosition: number;
+  setTotal: number;
+  prescribedReps: string | null;
+  disabled: boolean;
+  isCurrent: boolean;
+  previousSet?: WorkoutSet;
+  previousPending?: ActiveWorkoutMutation;
+  pastHistory?: WorkoutSetHistory['sets'][number];
+  historyState: SetHistoryState;
+  restSeconds: number;
+  userId?: number;
+  workoutId: number;
+  exerciseTitle: string;
+  pending?: ActiveWorkoutMutation;
+  durable: boolean;
+  syncing: boolean;
+  exerciseNote?: ReactNode;
+  enqueue: (
+    setId: number,
+    serverVersion: number,
+    values: ActiveWorkoutSetValues,
+    immediate?: boolean,
+    completing?: boolean,
+  ) => Promise<boolean>;
+}) {
+  const { confirm } = useFeedback();
+  const sourceSides = pending?.values.sides ?? set.sides;
+  const [draft, setDraft] = useState<SidesDraft>(() => sideDrafts(sourceSides));
+  const [splitRequested, setSplitRequested] = useState(
+    () => JSON.stringify(sourceSides?.left ?? null) !== JSON.stringify(sourceSides?.right ?? null),
+  );
+  const [firstSide, setFirstSide] = useState<SideName | ''>(
+    pending?.values.first_side ?? set.first_side ?? '',
+  );
+  const [editingCompleted, setEditingCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const activeInput = useRef(false);
+  const inFlight = useRef(false);
+  const completed = pending?.values.is_completed ?? set.is_completed;
+  const split = splitRequested || JSON.stringify(draft.left) !== JSON.stringify(draft.right);
+  const setKind = pending?.values.set_kind ?? set.set_kind ?? 'working';
+  const past =
+    historyState === 'ready' && pastHistory?.history_status === 'matched'
+      ? pastHistory.previous_workout
+      : null;
+  const previousMode = previousPending?.values.execution_mode ?? previousSet?.execution_mode;
+  const previousSides = previousPending?.values.sides ?? previousSet?.sides;
+  const pastSides = past?.execution_mode === mode ? past.sides : null;
+  const canUsePrevious = previousMode === mode && !!previousSides;
+  const canUsePast = past?.execution_mode === mode && !!pastSides;
+
+  useEffect(() => {
+    if (activeInput.current || editingCompleted) return;
+    const incoming = pending?.values.sides ?? set.sides;
+    setDraft(sideDrafts(incoming));
+    setFirstSide(pending?.values.first_side ?? set.first_side ?? '');
+  }, [pending, set.sides, set.first_side, set.version, editingCompleted]);
+
+  const persist = async (
+    next: SidesDraft,
+    parentCompleted: boolean,
+    immediate = false,
+    startRest = false,
+    nextFirstSide = firstSide,
+  ) => {
+    const left = encodeSide(next.left);
+    const right = encodeSide(next.right);
+    if (left === undefined || right === undefined || inFlight.current) return false;
+    if (immediate) {
+      inFlight.current = true;
+      setSaving(true);
+    }
+    try {
+      const accepted = await enqueue(
+        set.id,
+        set.version ?? 1,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          rir: null,
+          reached_failure: null,
+          execution_mode: mode,
+          first_side: mode === 'alternating' ? nextFirstSide || null : null,
+          sides: { left, right },
+          set_kind: setKind,
+          is_completed: parentCompleted,
+          confirm_mode_change: pending?.values.confirm_mode_change ?? false,
+        },
+        immediate,
+        startRest && parentCompleted,
+      );
+      if (accepted && startRest && parentCompleted) {
+        haptic('success');
+        if (
+          userId &&
+          setKind === 'working' &&
+          !['warmup', 'activation'].includes(set.planned_role ?? '')
+        ) {
+          const rest = beginMeasuredRest(userId, workoutId, set.id, restSeconds, Date.now());
+          if (rest)
+            window.dispatchEvent(
+              new CustomEvent('fit:rest', {
+                detail: {
+                  workoutId,
+                  setId: set.id,
+                  seconds: restSeconds,
+                  deadline: rest.deadline,
+                },
+              }),
+            );
+        }
+      }
+      return accepted;
+    } finally {
+      if (immediate) {
+        inFlight.current = false;
+        setSaving(false);
+      }
+    }
+  };
+
+  const update = (next: SidesDraft) => {
+    setDraft(next);
+    if (!editingCompleted) void persist(next, false);
+  };
+  const updateOne = (key: SideName, changes: Partial<SideDraft>) => {
+    const next = { ...draft, [key]: { ...draft[key], ...changes, present: true } };
+    update(next);
+  };
+  const updateBoth = (changes: Partial<SideDraft>) => {
+    const shared = { ...draft.left, ...changes, present: true };
+    update({ left: shared, right: { ...shared } });
+  };
+  const applyHistory = (sides: WorkoutSet['sides']) => {
+    if (!sides) return;
+    const copy = (value: SideFact | null, current: SideDraft): SideDraft => {
+      if (!value?.is_completed || current.completed) return current;
+      return {
+        ...current,
+        reps: current.reps || (value.actual_reps == null ? '' : String(value.actual_reps)),
+        weight: current.weight || (value.actual_weight == null ? '' : String(value.actual_weight)),
+        present: true,
+      };
+    };
+    const next = { left: copy(sides.left, draft.left), right: copy(sides.right, draft.right) };
+    setSplitRequested(JSON.stringify(next.left) !== JSON.stringify(next.right));
+    update(next);
+  };
+  const switchToSame = async () => {
+    if (JSON.stringify(draft.left) !== JSON.stringify(draft.right)) {
+      const accepted = await confirm({
+        title: 'Сделать значения одинаковыми?',
+        message: 'Данные левой стороны заменят данные правой. Подтвердите изменение.',
+        confirmText: 'Использовать левую',
+        danger: false,
+      });
+      if (!accepted) return;
+    }
+    const shared = { ...draft.left, completed: completed && editingCompleted };
+    setSplitRequested(false);
+    update({ left: shared, right: { ...shared } });
+  };
+  const finish = async () => {
+    const next = split
+      ? draft
+      : {
+          left: { ...draft.left, present: true, completed: true },
+          right: { ...draft.left, present: true, completed: true },
+        };
+    setDraft(next);
+    await persist(next, true, true, true);
+  };
+  const reopen = async () => {
+    if (
+      !(await confirm({
+        title: 'Вернуть подход в работу?',
+        message: 'Сохранённые результаты сторон останутся.',
+        confirmText: 'Вернуть в работу',
+        danger: false,
+      }))
+    )
+      return;
+    await persist(draft, false, true);
+  };
+  const locked = disabled || saving || (completed && !editingCompleted);
+  const inputs = (key: SideName, label: string, shared: boolean) => {
+    const value = draft[key];
+    const blocked = locked || (!shared && value.completed && !editingCompleted);
+    const change = (changes: Partial<SideDraft>) =>
+      shared ? updateBoth(changes) : updateOne(key, changes);
+    return (
+      <>
+        <div className="active-workout-set__controls has-rir active-workout-sides__inputs">
+          <label className="active-workout-input">
+            <span>Вес · {shared ? 'на сторону' : label}, кг</span>
+            <input
+              data-workout-field="weight"
+              aria-label={`Вес, ${shared ? 'на сторону' : label}, ${exerciseTitle}, подход ${set.set_number}`}
+              type="text"
+              inputMode="decimal"
+              value={value.weight}
+              disabled={blocked}
+              onFocus={() => {
+                activeInput.current = true;
+              }}
+              onBlur={() => {
+                activeInput.current = false;
+              }}
+              onChange={(event) => change({ weight: event.target.value })}
+            />
+          </label>
+          <label className="active-workout-input">
+            <span>Повторы · {shared ? 'на сторону' : label}</span>
+            <input
+              data-workout-field="reps"
+              aria-label={`Повторы, ${shared ? 'на сторону' : label}, ${exerciseTitle}, подход ${set.set_number}`}
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={value.reps}
+              disabled={blocked}
+              onFocus={() => {
+                activeInput.current = true;
+              }}
+              onBlur={() => {
+                activeInput.current = false;
+              }}
+              onChange={(event) => change({ reps: event.target.value })}
+            />
+          </label>
+        </div>
+        <RirSelector
+          compact
+          sideLabel={shared ? undefined : label}
+          disabled={blocked}
+          value={value.rir}
+          onChange={(rir) => change({ rir })}
+        />
+        <label className="active-workout-failure">
+          <input
+            type="checkbox"
+            aria-label={shared ? 'До отказа на обе стороны' : `До отказа · ${label}`}
+            disabled={blocked}
+            checked={value.failure === true}
+            onChange={(event) => change({ failure: event.target.checked })}
+          />
+          <span>До отказа{shared ? ' на обе стороны' : ''}</span>
+        </label>
+      </>
+    );
+  };
+
+  return (
+    <div
+      className={`active-workout-set ${isCurrent ? 'is-current' : ''} ${completed ? 'is-completed' : ''}`}
+      data-workout-set-id={set.id}
+      aria-current={isCurrent ? 'step' : undefined}
+      aria-busy={syncing || undefined}
+    >
+      <div className="active-workout-set__head">
+        <div className="active-workout-set__identity">
+          <span className="active-workout-set__number">{set.set_number}</span>
+          <div>
+            <strong>
+              {isCurrent ? `Подход ${setPosition} из ${setTotal}` : `Подход ${set.set_number}`}
+            </strong>
+            {isCurrent && <span>Сначала вес, затем повторы</span>}
+          </div>
+        </div>
+        {(formatPlannedSetRole(set.planned_role) ||
+          formatPlannedGroupKind(set.planned_group_kind)) && (
+          <div className="active-workout-set__roles" aria-label="Структура подхода">
+            {formatPlannedSetRole(set.planned_role) && (
+              <span className="active-workout-set__role">
+                {formatPlannedSetRole(set.planned_role)}
+              </span>
+            )}
+            {formatPlannedGroupKind(set.planned_group_kind) && (
+              <span className="active-workout-set__role active-workout-set__role--group">
+                {formatPlannedGroupKind(set.planned_group_kind)}
+              </span>
+            )}
+          </div>
+        )}
+        {completed && (
+          <span className="active-workout-set__complete-label">
+            <CheckIcon />
+            {pending ? (durable ? 'Сохранено на устройстве' : 'Не сохранено') : 'Выполнен'}
+          </span>
+        )}
+      </div>
+      <div
+        className="active-workout-set__history"
+        role="group"
+        aria-label={`История подхода ${set.set_number}`}
+      >
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Предыдущий сегодня</b>
+            <small>{previousSet ? `Подход ${previousSet.set_number}` : 'В этом упражнении'}</small>
+          </span>
+          <strong className="active-workout-sides__history-value">
+            {canUsePrevious
+              ? sideHistoryText(previousSides)
+              : previousSet
+                ? 'Другой способ выполнения'
+                : 'Нет завершённого подхода'}
+          </strong>
+        </div>
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Прошлая тренировка</b>
+            <small>
+              {past
+                ? `Этот подход · №${past.set_number} · ${formatCalendarDate(past.performed_on, { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+                : 'Этот подход'}
+            </small>
+          </span>
+          <strong className="active-workout-sides__history-value">
+            {canUsePast
+              ? sideHistoryText(pastSides)
+              : historyState !== 'ready'
+                ? 'История временно недоступна'
+                : past
+                  ? 'Результат без сопоставимых сторон'
+                  : 'Нет прошлого результата'}
+          </strong>
+        </div>
+      </div>
+      {isCurrent && (
+        <p className="active-workout-set__context">
+          <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
+          <span aria-hidden="true">·</span>
+          <span>Отдых {restSeconds} с</span>
+        </p>
+      )}
+      {completed && (
+        <div className="active-workout-set__completed-actions app-action-group">
+          {editingCompleted ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDraft(sideDrafts(sourceSides));
+                  setEditingCompleted(false);
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  void persist(draft, true, true).then((ok) => {
+                    if (ok) setEditingCompleted(false);
+                  })
+                }
+              >
+                Сохранить
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={disabled || saving}
+                onClick={() => setEditingCompleted(true)}
+              >
+                Редактировать
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={disabled || saving}
+                onClick={() => void reopen()}
+              >
+                Вернуть в работу
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {mode === 'alternating' && (
+        <label className="active-workout-advanced-field">
+          <span>Первая сторона</span>
+          <select
+            value={firstSide}
+            disabled={locked}
+            onChange={(event) => {
+              const next = event.target.value as SideName | '';
+              setFirstSide(next);
+              if (!editingCompleted) void persist(draft, false, false, false, next);
+            }}
+          >
+            <option value="">Не указана</option>
+            <option value="left">Левая</option>
+            <option value="right">Правая</option>
+          </select>
+        </label>
+      )}
+      <div className="active-workout-sides__heading">
+        <span>
+          <b>{split ? 'Раздельно по сторонам' : 'Одинаково на обе стороны'}</b>
+          <small>
+            {split ? 'Вес и повторы для каждой стороны' : 'Значения относятся к каждой стороне'}
+          </small>
+        </span>
+        <button
+          type="button"
+          disabled={locked}
+          onClick={() => (split ? void switchToSame() : setSplitRequested(true))}
+        >
+          {split ? 'Одинаково' : 'Указать раздельно'}
+        </button>
+      </div>
+      {split ? (
+        (['left', 'right'] as const).map((key) => {
+          const label = key === 'left' ? 'Левая' : 'Правая';
+          return (
+            <section
+              className="active-workout-sides__side"
+              key={key}
+              aria-label={`${label} сторона`}
+            >
+              <div className="active-workout-sides__side-heading">
+                <strong>{label} сторона</strong>
+                <span className={draft[key].completed ? 'is-completed' : undefined}>
+                  {draft[key].completed ? 'Выполнена' : 'Не завершена'}
+                </span>
+              </div>
+              {inputs(key, label, false)}
+              {!completed && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={disabled || saving}
+                  onClick={() => {
+                    const next = {
+                      ...draft,
+                      [key]: { ...draft[key], present: true, completed: !draft[key].completed },
+                    };
+                    setDraft(next);
+                    void persist(next, false, true);
+                  }}
+                >
+                  {draft[key].completed ? 'Изменить' : 'Отметить выполненной'}
+                </Button>
+              )}
+            </section>
+          );
+        })
+      ) : (
+        <div className="active-workout-sides__side">
+          {inputs('left', 'Левая', true)}
+          <small>Завершая подход, подтверждаете обе стороны.</small>
+        </div>
+      )}
+      {!completed && (
+        <Button
+          type="button"
+          variant="primary"
+          data-workout-field="done"
+          disabled={
+            disabled || saving || (split && (!draft.left.completed || !draft.right.completed))
+          }
+          onClick={() => void finish()}
+        >
+          {saving ? 'Сохраняем…' : 'Завершить подход'}
+        </Button>
+      )}
+      {!completed && split && (!draft.left.completed || !draft.right.completed) && (
+        <small>Подход будет завершён после подтверждения обеих сторон.</small>
+      )}
+      {isCurrent && !completed && (
+        <div className="active-workout-set__prefill-actions active-workout-set__prefill-actions--history">
+          <button
+            className="active-workout-set__prefill"
+            type="button"
+            disabled={!canUsePrevious || disabled || saving}
+            onClick={() => applyHistory(previousSides)}
+          >
+            Подставить предыдущий подход сегодня
+          </button>
+          <button
+            className="active-workout-set__prefill"
+            type="button"
+            disabled={!canUsePast || disabled || saving}
+            onClick={() => applyHistory(pastSides)}
+          >
+            Подставить из прошлой тренировки
+          </button>
+        </div>
+      )}
+      {isCurrent && <RirContextualHelp />}
+      {isCurrent && exerciseNote}
     </div>
   );
 }
@@ -2510,6 +3141,9 @@ export function TodayWorkout({
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [dismissedGuidance, setDismissedGuidance] = useState<Set<number>>(() => new Set());
   const [expandedExercises, setExpandedExercises] = useState<Set<number>>(() => new Set());
+  const [executionModes, setExecutionModes] = useState<Record<number, 'bilateral' | SideMode>>({});
+  const [modeChoicesOpen, setModeChoicesOpen] = useState<Set<number>>(() => new Set());
+  const [modeSaving, setModeSaving] = useState<Set<number>>(() => new Set());
   const workout = useQuery({
     queryKey: ['workout', 'today'],
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
@@ -3183,6 +3817,163 @@ export function TodayWorkout({
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
             const metricType = exercise.metric_type === 'cardio' ? 'cardio' : 'strength';
+            const modeTarget =
+              currentSet?.exercise.id === exercise.id
+                ? currentSet.set
+                : exercise.sets.find(
+                    (item) =>
+                      !(
+                        activeSync.pendingBySet.get(item.id)?.values.is_completed ??
+                        item.is_completed
+                      ),
+                  );
+            const targetPending = modeTarget
+              ? activeSync.pendingBySet.get(modeTarget.id)?.values
+              : undefined;
+            const targetMode = targetPending?.execution_mode ?? modeTarget?.execution_mode;
+            const lastExplicitMode = [...exercise.sets]
+              .reverse()
+              .map(
+                (item) =>
+                  activeSync.pendingBySet.get(item.id)?.values.execution_mode ??
+                  item.execution_mode,
+              )
+              .find((mode) => mode != null);
+            const executionMode =
+              executionModes[exercise.id] ?? targetMode ?? lastExplicitMode ?? 'bilateral';
+            const supportsSides = !!modeTarget && Object.hasOwn(modeTarget, 'sides');
+            const modeBusy = modeSaving.has(exercise.id);
+            const chooseExecutionMode = async (nextMode: 'bilateral' | SideMode) => {
+              if (!modeTarget || !supportsSides || !started || activeSync.sideConflict || modeBusy)
+                return;
+              if (nextMode === targetMode) {
+                setExecutionModes((current) => ({ ...current, [exercise.id]: nextMode }));
+                setModeChoicesOpen((current) => {
+                  const next = new Set(current);
+                  next.delete(exercise.id);
+                  return next;
+                });
+                return;
+              }
+              const existing = targetPending ?? modeTarget;
+              const hasFacts =
+                existing.is_completed ||
+                existing.actual_reps != null ||
+                existing.actual_weight != null ||
+                existing.rir != null ||
+                existing.reached_failure != null ||
+                (!!existing.sides &&
+                  [existing.sides.left, existing.sides.right].some(
+                    (side) =>
+                      side &&
+                      (side.is_completed ||
+                        side.actual_reps != null ||
+                        side.actual_weight != null ||
+                        side.rir != null ||
+                        side.reached_failure != null),
+                  ));
+              if (
+                hasFacts &&
+                !(await confirm({
+                  title: 'Изменить способ выполнения?',
+                  message:
+                    'Введённые данные этого незавершённого подхода будут очищены. Завершённые подходы не изменятся.',
+                  confirmText: 'Изменить и очистить',
+                  danger: false,
+                }))
+              )
+                return;
+              setModeSaving((current) => new Set(current).add(exercise.id));
+              try {
+                const accepted = await enqueueSet(
+                  modeTarget.id,
+                  modeTarget.version ?? 1,
+                  {
+                    actual_reps: null,
+                    actual_weight: null,
+                    rir: null,
+                    reached_failure: null,
+                    execution_mode: nextMode,
+                    first_side: null,
+                    sides: nextMode === 'bilateral' ? null : { left: null, right: null },
+                    confirm_mode_change: true,
+                    set_kind: existing.set_kind ?? 'working',
+                    is_completed: false,
+                  },
+                  true,
+                  false,
+                );
+                if (accepted) {
+                  for (const other of exercise.sets) {
+                    if (other.id === modeTarget.id) continue;
+                    const pending = activeSync.pendingBySet.get(other.id)?.values;
+                    const value = pending ?? other;
+                    const sideHasFacts =
+                      value.sides &&
+                      [value.sides.left, value.sides.right].some(
+                        (side) =>
+                          side &&
+                          (side.is_completed ||
+                            side.actual_reps != null ||
+                            side.actual_weight != null ||
+                            side.rir != null ||
+                            side.reached_failure != null),
+                      );
+                    if (
+                      value.is_completed ||
+                      value.actual_reps != null ||
+                      value.actual_weight != null ||
+                      value.rir != null ||
+                      value.reached_failure != null ||
+                      sideHasFacts
+                    )
+                      continue;
+                    const saved = await activeSync.enqueue(
+                      other.id,
+                      other.version ?? 1,
+                      {
+                        actual_reps: null,
+                        actual_weight: null,
+                        rir: null,
+                        reached_failure: null,
+                        execution_mode: nextMode,
+                        first_side: null,
+                        sides: nextMode === 'bilateral' ? null : { left: null, right: null },
+                        confirm_mode_change: true,
+                        set_kind: value.set_kind ?? 'working',
+                        is_completed: false,
+                      },
+                      true,
+                      true,
+                    );
+                    if (!saved) {
+                      toast(
+                        'Не удалось сохранить способ выполнения для всех незаполненных подходов.',
+                        'error',
+                      );
+                      break;
+                    }
+                  }
+                  setExecutionModes((current) => ({ ...current, [exercise.id]: nextMode }));
+                  setModeChoicesOpen((current) => {
+                    const next = new Set(current);
+                    next.delete(exercise.id);
+                    return next;
+                  });
+                  if (navigator.onLine)
+                    void queryClient.invalidateQueries({
+                      queryKey: ['workout', 'today'],
+                      exact: true,
+                    });
+                }
+              } finally {
+                setModeSaving((current) => {
+                  const next = new Set(current);
+                  next.delete(exercise.id);
+                  return next;
+                });
+              }
+            };
             const exerciseCompleted = exercise.sets.filter(
               (set) => activeSync.pendingBySet.get(set.id)?.values.is_completed ?? set.is_completed,
             ).length;
@@ -3218,12 +4009,16 @@ export function TodayWorkout({
                   }`
                 : null;
             const suggestedWeight =
-              metricType === 'strength'
+              metricType === 'strength' && executionMode === 'bilateral'
                 ? (exercise.progression_guidance?.suggested_weight ?? null)
                 : null;
             const targetSetUpdates =
               exercise.progression_guidance?.proposal?.target_set_updates ?? [];
+            const sideProposal = exercise.progression_guidance?.proposal?.proposed_side_weights
+              ? exercise.progression_guidance.proposal
+              : null;
             const guidanceApplied =
+              !sideProposal &&
               targetSetUpdates.length > 0 &&
               targetSetUpdates.every((update) => {
                 const set = exercise.sets.find((item) => item.id === update.set_id);
@@ -3233,7 +4028,7 @@ export function TodayWorkout({
                   (pending?.actual_weight ?? set.actual_weight) === update.proposed_weight
                 );
               });
-            const applyGuidance =
+            const applyScalarGuidance =
               started && suggestedWeight != null && targetSetUpdates.length > 0
                 ? () => {
                     for (const update of targetSetUpdates) {
@@ -3243,7 +4038,7 @@ export function TodayWorkout({
                       if (pending?.is_completed ?? set.is_completed) continue;
                       activeSync.enqueue(set.id, update.set_version, {
                         actual_reps: pending?.actual_reps ?? set.actual_reps ?? null,
-                        actual_weight: update.proposed_weight,
+                        actual_weight: update.proposed_weight ?? null,
                         rir: pending?.rir ?? set.rir ?? null,
                         set_kind: pending?.set_kind ?? set.set_kind ?? 'working',
                         reached_failure: pending?.reached_failure ?? set.reached_failure ?? false,
@@ -3252,15 +4047,52 @@ export function TodayWorkout({
                     }
                   }
                 : undefined;
+            const applySideGuidance =
+              started && sideProposal?.eligibility_status === 'eligible'
+                ? async () => {
+                    if (!(await activeSync.flushNow())) {
+                      toast('Сначала синхронизируйте сохранённые подходы.', 'error');
+                      throw new Error('Очередь не синхронизирована');
+                    }
+                    try {
+                      await api(
+                        `/api/v1/programs/assigned/${sideProposal.target_program_id}/progression-proposals/${sideProposal.proposal_id}/review`,
+                        {
+                          method: 'POST',
+                          body: {
+                            decision: 'confirm',
+                            workout_id: sideProposal.target_workout_id,
+                            exercise_id: sideProposal.target_exercise_id,
+                            expected_revision_number: sideProposal.target_revision_number,
+                            expected_set_versions: Object.fromEntries(
+                              targetSetUpdates.map((item) => [item.set_id, item.set_version]),
+                            ),
+                          },
+                        },
+                      );
+                      await queryClient.invalidateQueries({
+                        queryKey: ['workout', 'today'],
+                        exact: true,
+                      });
+                    } catch (error) {
+                      toast(
+                        'Не удалось применить рекомендации. Обновите тренировку и проверьте данные.',
+                        'error',
+                      );
+                      throw error;
+                    }
+                  }
+                : undefined;
             const guidanceElement =
               metricType === 'strength' &&
               exercise.progression_guidance &&
+              (executionMode === 'bilateral' || exercise.progression_guidance.side_guidance) &&
               !dismissedGuidance.has(exercise.id) ? (
                 <ProgressionGuidance
                   applied={guidanceApplied}
                   exerciseKey={exercise.id}
                   guidance={exercise.progression_guidance}
-                  onApply={applyGuidance}
+                  onApply={sideProposal ? applySideGuidance : applyScalarGuidance}
                   onDismiss={() =>
                     setDismissedGuidance((current) => new Set(current).add(exercise.id))
                   }
@@ -3359,6 +4191,89 @@ export function TodayWorkout({
                   </div>
                 </header>
 
+                {metricType === 'strength' && supportsSides && exerciseOpen && started && (
+                  <div className="active-workout-sides__mode">
+                    <button
+                      type="button"
+                      aria-expanded={modeChoicesOpen.has(exercise.id)}
+                      aria-controls={`workout-mode-${exercise.id}`}
+                      onClick={() =>
+                        setModeChoicesOpen((current) => {
+                          const next = new Set(current);
+                          if (next.has(exercise.id)) next.delete(exercise.id);
+                          else next.add(exercise.id);
+                          return next;
+                        })
+                      }
+                    >
+                      Выполнение упражнения:{' '}
+                      {executionMode === 'per_side'
+                        ? 'по сторонам'
+                        : executionMode === 'alternating'
+                          ? 'поочерёдно'
+                          : 'обычное'}{' '}
+                      · изменить
+                    </button>
+                    <fieldset
+                      id={`workout-mode-${exercise.id}`}
+                      hidden={!modeChoicesOpen.has(exercise.id)}
+                    >
+                      <legend>Как выполняется упражнение?</legend>
+                      {(
+                        [
+                          ['bilateral', 'Обычное'],
+                          ['per_side', 'По сторонам'],
+                          ['alternating', 'Поочерёдно'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <label key={value}>
+                          <input
+                            type="radio"
+                            name={`workout-mode-${exercise.id}`}
+                            value={value}
+                            checked={executionMode === value}
+                            disabled={!!activeSync.sideConflict || modeBusy}
+                            onChange={() => void chooseExecutionMode(value)}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                      <small>Завершённые результаты не изменятся.</small>
+                    </fieldset>
+                  </div>
+                )}
+
+                {activeSync.sideConflict &&
+                  exercise.sets.some((item) => item.id === activeSync.sideConflict?.setId) && (
+                    <div className="active-workout-sides__conflict" role="alert">
+                      <strong>Сравнить версии подхода</strong>
+                      <p>
+                        Эта вкладка: <span>{sideVersionText(activeSync.sideConflict.local)}</span>
+                      </p>
+                      <p>
+                        Другая вкладка:{' '}
+                        <span>{sideVersionText(activeSync.sideConflict.server)}</span>
+                      </p>
+                      <p>Выберите полный вариант для обеих сторон.</p>
+                      <div className="app-action-group">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void activeSync.resolveSideConflict('local')}
+                        >
+                          Оставить эту версию
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void activeSync.resolveSideConflict('server')}
+                        >
+                          Выбрать другую версию
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                 {isCurrentExercise && currentSet && (
                   <ActiveSessionSummary
                     key={`active-session-summary-${exercise.id}-${exercise.exercise_id}`}
@@ -3453,21 +4368,39 @@ export function TodayWorkout({
                       const previousValues = previousSet
                         ? resolvePreviousSetValues(previousSet, previousPending)
                         : undefined;
-                      const previousResult = previousValues
-                        ? metricType === 'cardio'
-                          ? formatCardioResult(
-                              previousValues.duration_minutes,
-                              previousValues.distance_km,
-                            )
-                          : formatSetResult(
-                              previousValues.actual_reps,
-                              previousValues.actual_weight,
-                            )
-                        : null;
+                      const previousSides = previousPending?.values.sides ?? previousSet?.sides;
+                      const previousResult =
+                        previousSides && metricType === 'strength'
+                          ? sideHistoryText(previousSides)
+                          : previousValues
+                            ? metricType === 'cardio'
+                              ? formatCardioResult(
+                                  previousValues.duration_minutes,
+                                  previousValues.distance_km,
+                                )
+                              : formatSetResult(
+                                  previousValues.actual_reps,
+                                  previousValues.actual_weight,
+                                )
+                            : null;
                       const pastHistory =
                         metricType === 'strength' && historyState === 'ready'
                           ? boundSetHistory(setHistory.data, data.id, exercise, set)
                           : undefined;
+                      const pendingValues = activeSync.pendingBySet.get(set.id)?.values;
+                      const savedMode = pendingValues?.execution_mode ?? set.execution_mode;
+                      const scalar = pendingValues ?? set;
+                      const hasScalarFacts =
+                        scalar.actual_reps != null ||
+                        scalar.actual_weight != null ||
+                        scalar.rir != null ||
+                        scalar.reached_failure != null;
+                      const rowMode =
+                        savedMode === 'per_side' || savedMode === 'alternating'
+                          ? savedMode
+                          : savedMode === 'bilateral' || hasScalarFacts || set.is_completed
+                            ? 'bilateral'
+                            : executionMode;
                       return metricType === 'cardio' ? (
                         <CardioWorkoutRow
                           key={set.id}
@@ -3484,6 +4417,34 @@ export function TodayWorkout({
                           exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
                           enqueue={enqueueSet}
                         />
+                      ) : rowMode === 'per_side' || rowMode === 'alternating' ? (
+                        <SideWorkoutSetRow
+                          key={set.id}
+                          set={set}
+                          mode={rowMode}
+                          setPosition={setIndex + 1}
+                          setTotal={exercise.sets.length}
+                          prescribedReps={exercise.prescribed_reps}
+                          disabled={
+                            !started || modeBusy || activeSync.sideConflict?.setId === set.id
+                          }
+                          isCurrent={currentSet?.set.id === set.id}
+                          previousSet={previousSet}
+                          previousPending={previousPending}
+                          pastHistory={pastHistory}
+                          historyState={
+                            historyState === 'ready' && !pastHistory ? 'unavailable' : historyState
+                          }
+                          restSeconds={exercise.rest_seconds}
+                          userId={user?.id}
+                          workoutId={data.id}
+                          exerciseTitle={exercise.exercise_title}
+                          pending={activeSync.pendingBySet.get(set.id)}
+                          durable={activeSync.durable}
+                          syncing={activeSync.syncState === 'syncing'}
+                          exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
+                          enqueue={enqueueSet}
+                        />
                       ) : (
                         <WorkoutSetRow
                           key={set.id}
@@ -3493,7 +4454,7 @@ export function TodayWorkout({
                           prescribedReps={exercise.prescribed_reps}
                           restSeconds={exercise.rest_seconds}
                           userId={user?.id}
-                          disabled={!started}
+                          disabled={!started || modeBusy}
                           workoutId={data.id}
                           workoutExerciseId={exercise.id}
                           exerciseTitle={exercise.exercise_title}

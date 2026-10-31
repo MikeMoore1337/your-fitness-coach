@@ -4,7 +4,13 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from fitminiapp_api.models.program import UserWorkout, UserWorkoutSet, WorkoutSetMutation
+from fitminiapp_api.models.program import (
+    UserWorkout,
+    UserWorkoutSet,
+    UserWorkoutSetSide,
+    WorkoutSetMutation,
+)
+from fitminiapp_api.services.workout_sides import SIDE_MODES, serialize_sides, side_facts_present
 
 
 class WorkoutSetSyncError(Exception):
@@ -18,6 +24,9 @@ def serialize_workout_set(set_row: UserWorkoutSet) -> dict:
     return {
         "id": set_row.id,
         "set_number": set_row.set_number,
+        "execution_mode": set_row.execution_mode,
+        "first_side": set_row.first_side,
+        "sides": serialize_sides(set_row),
         "actual_reps": set_row.actual_reps,
         "actual_weight": (
             float(set_row.actual_weight) if set_row.actual_weight is not None else None
@@ -40,14 +49,17 @@ def serialize_workout_set(set_row: UserWorkoutSet) -> dict:
 
 
 def _request_fingerprint(changes: dict) -> str:
-    fingerprint_changes = {
-        key: float(value) if isinstance(value, Decimal) else value for key, value in changes.items()
-    }
+    def decimal_value(value):
+        if isinstance(value, Decimal):
+            return float(value)
+        raise TypeError(f"Unsupported fingerprint value: {type(value).__name__}")
+
     canonical = json.dumps(
-        fingerprint_changes,
+        changes,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
+        default=decimal_value,
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -111,7 +123,101 @@ def apply_workout_set_update(
             },
         )
 
+    previous_mode = set_row.execution_mode
+    next_mode = changes.get("execution_mode", previous_mode)
+    if previous_mode in SIDE_MODES and (
+        "execution_mode" not in changes
+        or (next_mode in SIDE_MODES and changes.get("sides") is None)
+    ):
+        raise WorkoutSetSyncError(
+            409,
+            {
+                "code": "workout_set_side_aware_required",
+                "message": "Обновите приложение, чтобы изменить подход со сторонами",
+                "current": serialize_workout_set(set_row),
+            },
+        )
+
+    if (previous_mode in SIDE_MODES or next_mode in SIDE_MODES) and (
+        expected_version is None or mutation_id is None
+    ):
+        raise WorkoutSetSyncError(422, "Для изменения сторон нужны версия и идентификатор операции")
+
+    if next_mode in SIDE_MODES:
+        if changes.get("execution_mode") not in SIDE_MODES or changes.get("sides") is None:
+            raise WorkoutSetSyncError(422, "Укажите обе стороны и способ выполнения")
+        if any(
+            changes.get(field) is not None
+            for field in ("actual_reps", "actual_weight", "rir", "reached_failure")
+        ):
+            raise WorkoutSetSyncError(422, "Общие значения нельзя смешивать со сторонами")
+        sides = changes["sides"]
+        completed = changes.get("is_completed")
+        if (set_row.is_completed if completed is None else completed) and not all(
+            sides.get(side) is not None and sides[side].get("is_completed") is True
+            for side in ("left", "right")
+        ):
+            raise WorkoutSetSyncError(422, "Подтвердите обе стороны перед завершением подхода")
+    elif changes.get("sides") is not None:
+        raise WorkoutSetSyncError(422, "Стороны доступны только при раздельном выполнении")
+
+    first_side = changes.get("first_side", set_row.first_side)
+    if first_side is not None and next_mode != "alternating":
+        if "first_side" in changes:
+            raise WorkoutSetSyncError(422, "Начальная сторона доступна только при чередовании")
+        first_side = None
+
+    if (
+        next_mode != previous_mode
+        and (
+            side_facts_present(set_row)
+            or any(
+                getattr(set_row, field) is not None
+                for field in ("actual_reps", "actual_weight", "rir", "reached_failure")
+            )
+            or set_row.is_completed
+        )
+        and not changes.get("confirm_mode_change")
+    ):
+        raise WorkoutSetSyncError(
+            409,
+            {
+                "code": "workout_set_mode_change_confirmation",
+                "message": "Подтвердите изменение способа выполнения: результаты могут измениться",
+                "current": serialize_workout_set(set_row),
+            },
+        )
+
     applied = False
+    if next_mode in SIDE_MODES:
+        existing = {item.side: item for item in set_row.side_results}
+        for side in ("left", "right"):
+            value = sides[side]
+            item = existing.get(side)
+            if value is None:
+                if item is not None:
+                    set_row.side_results.remove(item)
+                continue
+            if item is None:
+                item = UserWorkoutSetSide(side=side)
+                set_row.side_results.append(item)
+            for field in ("actual_reps", "actual_weight", "rir", "reached_failure"):
+                setattr(item, field, value.get(field))
+            item.is_completed = value.get("is_completed", False)
+        for field in ("actual_reps", "actual_weight", "rir", "reached_failure"):
+            setattr(set_row, field, None)
+        applied = True
+    elif previous_mode in SIDE_MODES and next_mode != previous_mode:
+        set_row.side_results.clear()
+        applied = True
+
+    if "execution_mode" in changes:
+        set_row.execution_mode = next_mode
+        applied = True
+    if "first_side" in changes or first_side != set_row.first_side:
+        set_row.first_side = first_side
+        applied = True
+
     for field in (
         "actual_reps",
         "actual_weight",

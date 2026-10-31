@@ -49,6 +49,7 @@ function history(): WorkoutSetHistory {
           set_id: 303,
           set_number: 3,
           set_version: 2,
+          is_completed: true,
           workout_id: 41,
           workout_exercise_id: 100,
           completed_at: '2030-01-03T12:00:00',
@@ -77,6 +78,20 @@ function pending(
 }
 
 describe('per-set history bindings', () => {
+  it('accepts explicit asymmetric or partial side facts without scalar values', () => {
+    const result = history();
+    const past = result.sets[0]!.previous_workout!;
+    past.actual_weight = null;
+    past.actual_reps = null;
+    past.execution_mode = 'per_side';
+    past.sides = {
+      left: { actual_weight: 18, actual_reps: 10, is_completed: true },
+      right: { actual_weight: 16, actual_reps: 8, is_completed: false },
+    };
+    expect(
+      boundSetHistory(result, 42, exercise, exercise.sets[2]!)?.previous_workout?.sides,
+    ).toEqual(past.sides);
+  });
   it('accepts the matching workout, exercise, slot, set and version including zero and partial facts', () => {
     const result = history();
     result.sets[0]!.previous_workout!.actual_weight = 0;
@@ -168,6 +183,19 @@ describe('per-set history bindings', () => {
 });
 
 describe('previous completed set today', () => {
+  it('finds a completed side-specific set even when scalar facts are empty', () => {
+    const sets = structuredClone(exercise.sets);
+    Object.assign(sets[0]!, {
+      actual_weight: null,
+      actual_reps: null,
+      execution_mode: 'per_side',
+      sides: {
+        left: { actual_weight: 18, actual_reps: 10, is_completed: true },
+        right: { actual_weight: 16, actual_reps: 8, is_completed: true },
+      },
+    });
+    expect(previousCompletedSet(sets, 2, new Map())?.set.id).toBe(201);
+  });
   it('skips unfinished results and uses the latest actual completed set', () => {
     expect(previousCompletedSet(exercise.sets, 2, new Map())?.set.id).toBe(201);
     expect(previousCompletedSet(exercise.sets, 0, new Map())).toBeUndefined();

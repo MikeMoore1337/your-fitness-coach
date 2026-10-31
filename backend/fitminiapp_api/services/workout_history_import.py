@@ -14,7 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import null
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.program import (
@@ -22,6 +22,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutExercise,
     UserWorkoutSet,
+    UserWorkoutSetSide,
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_history_import import ImportedWorkout, WorkoutHistoryImportDraft
@@ -31,7 +32,7 @@ from fitminiapp_api.services.workout_history_import_parser import parse_workout_
 from fitminiapp_api.services.workout_ownership import workout_owner_id
 
 PROVIDER = "yfc-neutral-csv"
-PARSER_VERSION = "1.0"
+PARSER_VERSION = "2.0"
 DRAFT_TTL = timedelta(hours=24)
 TOMBSTONE_TTL = timedelta(days=7)
 MAX_ACTIVE_DRAFTS = 3
@@ -120,6 +121,21 @@ def _rows(source: bytes, by_name: dict[str, list[int]]) -> list[dict[str, Any]]:
                 "set_number": item.set_number,
                 "reps": item.reps,
                 "weight_kg": str(item.weight_kg) if item.weight_kg is not None else None,
+                "sides": {
+                    side: (
+                        {
+                            **facts,
+                            "actual_weight": str(facts["actual_weight"])
+                            if facts["actual_weight"] is not None
+                            else None,
+                        }
+                        if facts
+                        else None
+                    )
+                    for side, facts in item.sides.items()
+                }
+                if item.sides is not None
+                else None,
                 "issues": [asdict(issue) for issue in item.issues],
                 "exercise_id": candidates[0] if len(candidates) == 1 else None,
                 "match_mode": "auto" if len(candidates) == 1 else None,
@@ -217,17 +233,29 @@ def create_history_import(db: Session, user: User, source: bytes) -> WorkoutHist
 
 
 def _source_set_facts(rows: list[dict]) -> list[list]:
-    facts = [
-        [
+    facts = []
+    for row in rows:
+        fact = [
             row["exercise_id"],
             row["set_number"],
             row["reps"],
             row["weight_kg"],
-            row["source"]["set_kind"],
+            row["source"]["set_kind"] or None,
             row["source"]["rir"] or None,
         ]
-        for row in rows
-    ]
+        mode = row["source"].get("execution_mode") or None
+        failure = row["source"].get("reached_failure") or None
+        if mode or failure or row.get("sides") is not None:
+            fact.extend(
+                [
+                    mode,
+                    row["source"].get("first_side") or None,
+                    row["source"]["set_status"] == "completed",
+                    row.get("sides"),
+                    None if failure is None else failure == "true",
+                ]
+            )
+        facts.append(fact)
     return sorted(facts, key=lambda item: json.dumps(item, ensure_ascii=False))
 
 
@@ -262,7 +290,10 @@ def _enriched_rows(db: Session, user: User, payload: dict) -> list[dict]:
                     "message": "Этот формат не переносит кардиопоказатели",
                 }
             )
-        elif chosen["unsupported_side"]:
+        elif chosen["unsupported_side"] and row["source"].get("execution_mode") not in {
+            "per_side",
+            "alternating",
+        }:
             row["blocking_issues"].append(
                 {
                     "code": "unsupported_side",
@@ -320,18 +351,16 @@ def _duplicates(
         }
         set_rows = (
             db.query(
-                UserWorkoutExercise.workout_id,
-                UserWorkoutExercise.exercise_id,
-                UserWorkoutSet.set_number,
-                UserWorkoutSet.actual_reps,
-                UserWorkoutSet.actual_weight,
-                UserWorkoutSet.set_kind,
-                UserWorkoutSet.rir,
+                UserWorkoutExercise.workout_id, UserWorkoutExercise.exercise_id, UserWorkoutSet
             )
             .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
+            .options(selectinload(UserWorkoutSet.side_results))
             .filter(
                 UserWorkoutExercise.workout_id.in_([workout.id for workout in existing]),
-                UserWorkoutSet.is_completed.is_(True),
+                (
+                    UserWorkoutSet.is_completed.is_(True)
+                    | UserWorkoutSet.execution_mode.in_(("per_side", "alternating"))
+                ),
             )
             .limit(MAX_CANDIDATE_SETS + 1)
             .all()
@@ -341,16 +370,39 @@ def _duplicates(
                 "candidate_limit", "Разделите файл на части для проверки совпадений", 409
             )
         for item in set_rows:
-            existing_facts[item.workout_id].append(
-                [
-                    item.exercise_id,
-                    item.set_number,
-                    item.actual_reps,
-                    str(item.actual_weight) if item.actual_weight is not None else None,
-                    item.set_kind,
-                    item.rir,
-                ]
-            )
+            workout_set = item.UserWorkoutSet
+            fact = [
+                item.exercise_id,
+                workout_set.set_number,
+                workout_set.actual_reps,
+                str(workout_set.actual_weight) if workout_set.actual_weight is not None else None,
+                workout_set.set_kind,
+                workout_set.rir,
+            ]
+            if workout_set.execution_mode or workout_set.reached_failure is not None:
+                sides: dict[str, dict[str, object] | None] | None = None
+                if workout_set.execution_mode in {"per_side", "alternating"}:
+                    sides = {"left": None, "right": None}
+                    for side in workout_set.side_results:
+                        sides[side.side] = {
+                            "actual_reps": side.actual_reps,
+                            "actual_weight": str(side.actual_weight)
+                            if side.actual_weight is not None
+                            else None,
+                            "rir": side.rir,
+                            "reached_failure": side.reached_failure,
+                            "is_completed": side.is_completed,
+                        }
+                fact.extend(
+                    [
+                        workout_set.execution_mode,
+                        workout_set.first_side,
+                        workout_set.is_completed,
+                        sides,
+                        workout_set.reached_failure,
+                    ]
+                )
+            existing_facts[item.workout_id].append(fact)
         for facts in existing_facts.values():
             facts.sort(key=lambda item: json.dumps(item, ensure_ascii=False))
     comparisons = sum(
@@ -523,7 +575,7 @@ def confirm_history_import(
     if (
         draft.provider != PROVIDER
         or draft.schema_version != 1
-        or draft.parser_version != PARSER_VERSION
+        or draft.parser_version not in {"1.0", PARSER_VERSION}
     ):
         raise HistoryImportError(
             "source_changed", "Версия источника изменилась. Загрузите файл снова", 409
@@ -610,19 +662,39 @@ def confirm_history_import(
             db.add(exercise)
             db.flush()
             for row in exercise_rows:
-                db.add(
-                    UserWorkoutSet(
-                        workout_exercise_id=exercise.id,
-                        set_number=row["set_number"],
-                        actual_reps=row["reps"],
-                        actual_weight=Decimal(row["weight_kg"])
-                        if row["weight_kg"] is not None
-                        else None,
-                        rir=row["source"]["rir"] or None,
-                        set_kind=row["source"]["set_kind"],
-                        is_completed=True,
-                    )
+                workout_set = UserWorkoutSet(
+                    workout_exercise_id=exercise.id,
+                    set_number=row["set_number"],
+                    actual_reps=row["reps"],
+                    actual_weight=Decimal(row["weight_kg"])
+                    if row["weight_kg"] is not None
+                    else None,
+                    rir=row["source"]["rir"] or None,
+                    set_kind=row["source"]["set_kind"] or None,
+                    is_completed=row["source"]["set_status"] == "completed",
+                    execution_mode=row["source"].get("execution_mode") or None,
+                    first_side=row["source"].get("first_side") or None,
+                    reached_failure=(
+                        None
+                        if not row["source"].get("reached_failure")
+                        else row["source"]["reached_failure"] == "true"
+                    ),
                 )
+                for side, side_facts in (row.get("sides") or {}).items():
+                    if side_facts is not None:
+                        workout_set.side_results.append(
+                            UserWorkoutSetSide(
+                                side=side,
+                                actual_reps=side_facts["actual_reps"],
+                                actual_weight=Decimal(side_facts["actual_weight"])
+                                if side_facts["actual_weight"] is not None
+                                else None,
+                                rir=side_facts["rir"],
+                                reached_failure=side_facts["reached_failure"],
+                                is_completed=side_facts["is_completed"],
+                            )
+                        )
+                db.add(workout_set)
         db.add(
             ImportedWorkout(
                 workout_id=workout.id,

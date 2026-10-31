@@ -304,6 +304,7 @@ async function mockFirstRunApi(
             completed_set_count: 0,
             recorded_set_count: 0,
             missing_set_count: 0,
+            mixed_side_set_count: 0,
             distribution: [],
           },
           primary_muscle_exposure: [],

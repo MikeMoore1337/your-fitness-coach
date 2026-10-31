@@ -221,6 +221,7 @@ function makeAnalytics(): TrainingAnalytics {
       completed_set_count: 28,
       recorded_set_count: 16,
       missing_set_count: 12,
+      mixed_side_set_count: 0,
       distribution: [],
     },
     primary_muscle_exposure: [
@@ -393,6 +394,36 @@ afterEach(() => {
 });
 
 describe('ProgressExperience', () => {
+  it('shows separate side facts instead of an empty scalar load', async () => {
+    const analytics = makeAnalytics();
+    const set = analytics.exercises[0]!.sessions[0]!.sets[0]!;
+    set.execution_mode = 'per_side';
+    set.external_load_kg = null;
+    set.reps = null;
+    set.rir = null;
+    set.sides = {
+      left: {
+        actual_weight: 18,
+        actual_reps: 10,
+        rir: '2',
+        reached_failure: false,
+        is_completed: true,
+      },
+      right: {
+        actual_weight: 16,
+        actual_reps: 8,
+        rir: '0',
+        reached_failure: true,
+        is_completed: true,
+      },
+    };
+    installApi({ analytics });
+    renderExperience('?section=progress&progress_view=training');
+    fireEvent.click(await screen.findByText('Жим штанги лёжа'));
+    expect(screen.getByText(/Левая: 18 кг × 10 повт.*RIR 2.*без отказа/)).toBeVisible();
+    expect(screen.getByText(/Правая: 16 кг × 8 повт.*RIR 0.*до отказа/)).toBeVisible();
+  });
+
   it('filters only exercise history by week type and fails closed on errors', async () => {
     const analytics = makeAnalytics();
     installApi({ analytics });

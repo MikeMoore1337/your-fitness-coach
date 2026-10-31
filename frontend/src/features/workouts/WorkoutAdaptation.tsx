@@ -98,7 +98,20 @@ export function hasWorkoutExecutionEvidence(
 ): boolean {
   return exercise.sets.some((set) => {
     const pending = pendingBySet?.get(set.id)?.values;
+    const hasSideFacts = (sides: WorkoutExercise['sets'][number]['sides']) =>
+      sides &&
+      [sides.left, sides.right].some(
+        (side) =>
+          side &&
+          (side.is_completed ||
+            side.actual_reps != null ||
+            side.actual_weight != null ||
+            side.rir != null ||
+            side.reached_failure != null),
+      );
     return Boolean(
+      hasSideFacts(pending?.sides) ||
+      hasSideFacts(set.sides) ||
       pending?.is_completed ||
       pending?.actual_reps != null ||
       pending?.actual_weight != null ||

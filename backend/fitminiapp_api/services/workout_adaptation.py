@@ -37,6 +37,7 @@ from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
     workout_exercise_metric_type,
 )
+from fitminiapp_api.services.workout_sides import side_facts_present
 
 RULESET_VERSION = "workout-adaptation-v2"
 ACTIVE_SECONDS_PER_SET = 45
@@ -410,6 +411,7 @@ def _ensure_replacement_unstarted(workout: UserWorkout, target: UserWorkoutExerc
             or item.heart_rate_zone is not None
             or item.rir is not None
             or item.reached_failure is not None
+            or side_facts_present(item)
         )
 
     if any(has_execution_evidence(item) for item in target.sets):

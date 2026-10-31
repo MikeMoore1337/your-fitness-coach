@@ -9,7 +9,7 @@ import tempfile
 import uuid
 import zipfile
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from fastapi.encoders import jsonable_encoder
@@ -19,6 +19,7 @@ from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.models.account import AccountDataExport
 from fitminiapp_api.models.user import User
 from fitminiapp_api.services.account_export import build_account_export
+from fitminiapp_api.services.workout_history_import_parser import CSV_COLUMNS_V2
 
 ACCOUNT_EXPORT_RETENTION = timedelta(minutes=15)
 ACCOUNT_EXPORT_DOWNLOAD_TOKEN_RETENTION = timedelta(minutes=2)
@@ -74,7 +75,11 @@ def _rows(value: object) -> list[dict[str, object]]:
 
 def _workout_rows(payload: dict[str, object]) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    for program in _rows(payload.get("programs")):
+    programs: list[dict[str, object]] = [
+        *_rows(payload.get("programs")),
+        {"workouts": _rows(payload.get("imported_workouts"))},
+    ]
+    for program in programs:
         for workout in _rows(program.get("workouts")):
             exercises = _rows(workout.get("exercises"))
             if not exercises:
@@ -93,6 +98,13 @@ def _workout_rows(payload: dict[str, object]) -> list[dict[str, object]]:
                 if not sets:
                     sets = [{}]
                 for workout_set in sets:
+                    sides = workout_set.get("sides")
+                    sides = sides if isinstance(sides, dict) else {}
+                    left_raw, right_raw = sides.get("left"), sides.get("right")
+                    left = cast(dict[str, object], left_raw) if isinstance(left_raw, dict) else {}
+                    right = (
+                        cast(dict[str, object], right_raw) if isinstance(right_raw, dict) else {}
+                    )
                     rows.append(
                         {
                             "program_id": program.get("id"),
@@ -110,9 +122,94 @@ def _workout_rows(payload: dict[str, object]) -> list[dict[str, object]]:
                             "set_kind": workout_set.get("set_kind"),
                             "reached_failure": workout_set.get("reached_failure"),
                             "is_completed": workout_set.get("is_completed"),
+                            "execution_mode": workout_set.get("execution_mode"),
+                            "first_side": workout_set.get("first_side"),
+                            **{
+                                f"{side}_{key}": facts.get(key)
+                                for side, facts in (("left", left), ("right", right))
+                                for key in (
+                                    "actual_reps",
+                                    "actual_weight",
+                                    "rir",
+                                    "reached_failure",
+                                    "is_completed",
+                                )
+                            },
                         }
                     )
     return rows
+
+
+def _neutral_history_csv(payload: dict[str, object]) -> bytes:
+    result: list[dict[str, object]] = []
+    programs: list[dict[str, object]] = [
+        *_rows(payload.get("programs")),
+        {"workouts": _rows(payload.get("imported_workouts"))},
+    ]
+    for program in programs:
+        for workout in _rows(program.get("workouts")):
+            if workout.get("status") != "completed":
+                continue
+            completed_at = workout.get("completed_at_utc")
+            timestamp = (
+                completed_at.replace(tzinfo=UTC).isoformat().replace("+00:00", "Z")
+                if isinstance(completed_at, datetime)
+                else ""
+            )
+            for exercise in _rows(workout.get("exercises")):
+                if exercise.get("metric_type") != "strength":
+                    continue
+                for workout_set in _rows(exercise.get("sets")):
+                    if not workout_set.get("is_completed") and not workout_set.get("sides"):
+                        continue
+                    row: dict[str, object] = {
+                        "workout_ref": str(workout.get("id")),
+                        "completed_at": timestamp,
+                        "timezone": "UTC",
+                        "performed_on": workout.get("scheduled_date"),
+                        "workout_title": workout.get("title"),
+                        "status": "completed",
+                        "exercise_ref": str(exercise.get("id")),
+                        "exercise_name": exercise.get("title"),
+                        "set_number": workout_set.get("set_number"),
+                        "set_status": "completed"
+                        if workout_set.get("is_completed")
+                        else "incomplete",
+                        "set_kind": workout_set.get("set_kind"),
+                        "reps": workout_set.get("actual_reps"),
+                        "weight": workout_set.get("actual_weight"),
+                        "weight_unit": "kg" if workout_set.get("actual_weight") is not None else "",
+                        "rir": workout_set.get("rir"),
+                        "execution_mode": workout_set.get("execution_mode"),
+                        "first_side": workout_set.get("first_side"),
+                    }
+                    failure = workout_set.get("reached_failure")
+                    row["reached_failure"] = str(failure).lower() if failure is not None else ""
+                    sides = workout_set.get("sides")
+                    if isinstance(sides, dict):
+                        for side in ("left", "right"):
+                            facts = sides.get(side)
+                            if not isinstance(facts, dict):
+                                continue
+                            row.update(
+                                {
+                                    f"{side}_reps": facts.get("actual_reps"),
+                                    f"{side}_weight": facts.get("actual_weight"),
+                                    f"{side}_weight_unit": "kg"
+                                    if facts.get("actual_weight") is not None
+                                    else "",
+                                    f"{side}_rir": facts.get("rir"),
+                                    f"{side}_status": "completed"
+                                    if facts.get("is_completed")
+                                    else "incomplete",
+                                }
+                            )
+                            side_failure = facts.get("reached_failure")
+                            row[f"{side}_reached_failure"] = (
+                                str(side_failure).lower() if side_failure is not None else ""
+                            )
+                    result.append(row)
+    return b"\xef\xbb\xbf" + b"yfc_workout_history,2\r\n" + _csv_bytes(result, CSV_COLUMNS_V2)[3:]
 
 
 def _custom_avatar_export_snapshot(
@@ -174,6 +271,7 @@ def build_account_export_archive(db: Session, user: User) -> tuple[bytes, str]:
     payload["custom_avatar"] = avatar_metadata
     files: dict[str, bytes] = {
         "account.json": _json_bytes(payload, indent=2),
+        "workout-history-neutral-v2.csv": _neutral_history_csv(payload),
         "measurements.csv": _csv_bytes(
             _rows(payload.get("measurements")),
             (
@@ -274,6 +372,18 @@ def build_account_export_archive(db: Session, user: User) -> tuple[bytes, str]:
                 "set_kind",
                 "reached_failure",
                 "is_completed",
+                "execution_mode",
+                "first_side",
+                "left_actual_reps",
+                "left_actual_weight",
+                "left_rir",
+                "left_reached_failure",
+                "left_is_completed",
+                "right_actual_reps",
+                "right_actual_weight",
+                "right_rir",
+                "right_reached_failure",
+                "right_is_completed",
             ),
         ),
     }
@@ -292,6 +402,7 @@ def build_account_export_archive(db: Session, user: User) -> tuple[bytes, str]:
         "notes": [
             "account.json is the complete portability document.",
             "CSV files are tabular views of selected account-owned domains.",
+            "The neutral workout CSV contains completed strength workouts; missing timestamps require review.",
             "Temporary report artifacts and authentication credentials are not included.",
             "A custom avatar, when present, is normalized WebP without source EXIF metadata.",
         ],

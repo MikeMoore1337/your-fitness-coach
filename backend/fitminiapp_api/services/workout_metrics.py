@@ -66,7 +66,16 @@ def validate_workout_set_changes(
     *,
     current_duration_minutes: int | None = None,
 ) -> None:
-    strength_fields = {"actual_reps", "actual_weight", "rir", "set_kind", "reached_failure"}
+    strength_fields = {
+        "actual_reps",
+        "actual_weight",
+        "rir",
+        "set_kind",
+        "reached_failure",
+        "execution_mode",
+        "first_side",
+        "sides",
+    }
     cardio_fields = {
         "duration_minutes",
         "distance_km",

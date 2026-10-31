@@ -139,4 +139,39 @@ describe('formatWorkoutCopy', () => {
     expect(result).toContain('Рабочий подход 1: вес и повторы не записаны');
     expect(result).toContain('Подход со снижением веса 2: вес и повторы не записаны');
   });
+
+  it('shows both sides within one logical set and labels a partial side', () => {
+    const result = formatWorkoutCopy({
+      ...workout,
+      exercises: [
+        {
+          exercise_title: 'Тяга рукой',
+          metric_type: 'strength',
+          sort_order: 1,
+          sets: [
+            {
+              set_number: 1,
+              set_kind: 'working',
+              is_completed: false,
+              execution_mode: 'per_side',
+              sides: {
+                left: { actual_weight: 18, actual_reps: 10, rir: '2', is_completed: true },
+                right: {
+                  actual_weight: 16,
+                  actual_reps: 8,
+                  rir: '0',
+                  reached_failure: true,
+                  is_completed: false,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(result).toContain(
+      'Рабочий подход 1 · не завершён: Левая: 18 кг × 10 повторений · RIR 2; Правая: 16 кг × 8 повторений · RIR 0 · до отказа · не завершена',
+    );
+    expect(result.match(/Рабочий подход/g)).toHaveLength(1);
+  });
 });

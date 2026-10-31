@@ -69,6 +69,7 @@ from fitminiapp_api.models.program import (
     UserProgram,
     UserWorkout,
     UserWorkoutExercise,
+    UserWorkoutSet,
 )
 from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.recipe import Recipe
@@ -86,12 +87,13 @@ from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery, WeeklyDige
 from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.services.profile import serialize_body_priority
+from fitminiapp_api.services.workout_sides import serialize_sides
 
 if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 25
+ACCOUNT_EXPORT_SCHEMA_VERSION = 26
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -147,6 +149,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "workout_adaptations": "programs",
     "user_workout_exercises": "programs",
     "user_workout_sets": "programs",
+    "user_workout_set_sides": "programs",
     "workout_rest_sessions": "programs",
     "exercise_setup_memories": "exercise_setup_memories",
     "exercises": "custom_exercises",
@@ -677,6 +680,7 @@ def _serialize_workout(
                 "status",
                 "started_at",
                 "completed_at",
+                "completed_at_utc",
                 "completion_feedback",
                 "completion_note",
                 "completion_feedback_updated_at",
@@ -727,29 +731,34 @@ def _serialize_workout(
                     exercise.exercise.metric_type or "strength" if exercise.exercise else "strength"
                 ),
                 "sets": [
-                    _fields(
-                        workout_set,
-                        (
-                            "id",
-                            "set_number",
-                            "actual_reps",
-                            "actual_weight",
-                            "duration_minutes",
-                            "distance_km",
-                            "average_heart_rate_bpm",
-                            "heart_rate_zone",
-                            "rir",
-                            "set_kind",
-                            "reached_failure",
-                            "planned_role",
-                            "planned_group_id",
-                            "planned_group_kind",
-                            "planned_position",
-                            "planned_round",
-                            "is_completed",
-                            "version",
+                    {
+                        **_fields(
+                            workout_set,
+                            (
+                                "id",
+                                "set_number",
+                                "actual_reps",
+                                "actual_weight",
+                                "duration_minutes",
+                                "distance_km",
+                                "average_heart_rate_bpm",
+                                "heart_rate_zone",
+                                "rir",
+                                "set_kind",
+                                "reached_failure",
+                                "planned_role",
+                                "planned_group_id",
+                                "planned_group_kind",
+                                "planned_position",
+                                "planned_round",
+                                "is_completed",
+                                "version",
+                                "execution_mode",
+                                "first_side",
+                            ),
                         ),
-                    )
+                        "sides": serialize_sides(workout_set),
+                    }
                     for workout_set in exercise.sets
                 ],
             }
@@ -832,7 +841,8 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             .joinedload(UserWorkoutExercise.exercise),
             selectinload(UserProgram.workouts)
             .selectinload(UserWorkout.exercises)
-            .selectinload(UserWorkoutExercise.sets),
+            .selectinload(UserWorkoutExercise.sets)
+            .selectinload(UserWorkoutSet.side_results),
             selectinload(UserProgram.workouts).selectinload(UserWorkout.adaptations),
             selectinload(UserProgram.revisions),
             selectinload(UserProgram.training_blocks)
@@ -848,7 +858,9 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .join(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .options(
             selectinload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
-            selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets),
+            selectinload(UserWorkout.exercises)
+            .selectinload(UserWorkoutExercise.sets)
+            .selectinload(UserWorkoutSet.side_results),
             selectinload(UserWorkout.adaptations),
         )
         .filter(ImportedWorkout.owner_user_id == user.id, UserWorkout.user_program_id.is_(None))

@@ -17,6 +17,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutExercise,
     UserWorkoutSet,
+    UserWorkoutSetSide,
 )
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.services.progression_guidance import (
@@ -1369,3 +1370,192 @@ def test_trainer_can_review_client_proposal_and_unrelated_user_cannot(client) ->
         assert event.actor_user_id == trainer_id
         assert event.target_user_id == athlete_id
         assert event.details["actor_role"] == "trainer"
+
+
+def test_progression_uses_each_side_only_in_matching_mode(client):
+    headers = _auth(client, 64_832)
+    workout = _assigned_workout(client, headers, prescribed_sets=1)
+    _add_history(workout["id"], [[(10, 18, "2", "working", False)]] * 3)
+    _set_coaching_rules(workout["id"], [_double_rule()])
+    with get_session_context() as db:
+        current = db.get(UserWorkout, workout["id"])
+        current.exercises[0].sets[0].execution_mode = "per_side"
+        old = (
+            db.query(UserWorkout)
+            .filter(
+                UserWorkout.user_program_id == current.user_program_id,
+                UserWorkout.status == "completed",
+            )
+            .order_by(UserWorkout.scheduled_date.desc())
+            .all()
+        )
+        for index, session in enumerate(old):
+            row = session.exercises[0].sets[0]
+            row.execution_mode = "alternating" if index == 0 else "per_side"
+            row.actual_reps = None
+            row.actual_weight = None
+            row.rir = None
+            row.reached_failure = None
+            row.side_results = [
+                UserWorkoutSetSide(
+                    side="left",
+                    actual_reps=10,
+                    actual_weight=18,
+                    rir="2",
+                    reached_failure=False,
+                    is_completed=True,
+                ),
+                UserWorkoutSetSide(
+                    side="right",
+                    actual_reps=10,
+                    actual_weight=16,
+                    rir="0",
+                    reached_failure=True,
+                    is_completed=True,
+                ),
+            ]
+    response = client.get("/api/v1/workouts/today", headers=headers)
+    assert response.status_code == 200, response.text
+    guidance = response.json()["exercises"][0]["progression_guidance"]
+    assert guidance["suggested_weight"] is None
+    sides = guidance["side_guidance"]
+    assert sides["execution_mode"] == "per_side"
+    assert sides["left"]["outcome"] == "consider_progressing"
+    assert sides["left"]["suggested_weight"] == 20.5
+    assert sides["right"]["outcome"] != "consider_progressing"
+    assert sides["right"]["suggested_weight"] is None
+    assert sides["left"]["evidence"]["comparable_session_count"] == 2
+    assert sides["right"]["evidence"]["comparable_session_count"] == 2
+    assert guidance["proposal"]["proposed_action"] != "set_load"
+
+
+def test_side_proposal_applies_both_weights_atomically_and_retries(client):
+    headers = _auth(client, 64_833)
+    workout = _assigned_workout(client, headers, prescribed_sets=2)
+    _add_history(workout["id"], [[(10, 18, "2", "working", False)] * 2] * 2)
+    _set_coaching_rules(workout["id"], [_double_rule()])
+    with get_session_context() as db:
+        current = db.get(UserWorkout, workout["id"])
+        for row in current.exercises[0].sets:
+            row.execution_mode = "per_side"
+        previous = (
+            db.query(UserWorkout)
+            .filter(
+                UserWorkout.user_program_id == current.user_program_id,
+                UserWorkout.status == "completed",
+            )
+            .all()
+        )
+        for session in previous:
+            for row in session.exercises[0].sets:
+                row.execution_mode = "per_side"
+                row.actual_reps = None
+                row.actual_weight = None
+                row.rir = None
+                row.reached_failure = None
+                row.side_results = [
+                    UserWorkoutSetSide(
+                        side="left",
+                        actual_reps=10,
+                        actual_weight=18,
+                        rir="2",
+                        reached_failure=False,
+                        is_completed=True,
+                    ),
+                    UserWorkoutSetSide(
+                        side="right",
+                        actual_reps=10,
+                        actual_weight=16,
+                        rir="2",
+                        reached_failure=False,
+                        is_completed=True,
+                    ),
+                ]
+    exercise = _proposal_exercise(client, headers, workout["id"])
+    proposal = exercise["guidance"]["proposal"]
+    assert proposal["proposed_weight"] is None
+    assert proposal["proposed_side_weights"] == {"left": 20.5, "right": 18.5}
+    assert proposal["eligibility_status"] == "eligible"
+    assert len(proposal["target_set_updates"]) == 2
+    body = {
+        "decision": "confirm",
+        "workout_id": workout["id"],
+        "exercise_id": exercise["exercise_id"],
+        "expected_revision_number": proposal["target_revision_number"],
+        "expected_set_versions": {
+            str(item["set_id"]): item["set_version"] for item in proposal["target_set_updates"]
+        },
+    }
+    url = (
+        f"/api/v1/programs/assigned/{proposal['target_program_id']}"
+        f"/progression-proposals/{proposal['proposal_id']}/review"
+    )
+    stale = deepcopy(body)
+    second_id = str(proposal["target_set_updates"][1]["set_id"])
+    stale["expected_set_versions"][second_id] += 1
+    assert client.post(url, headers=headers, json=stale).status_code == 409
+    with get_session_context() as db:
+        current = db.get(UserWorkout, workout["id"])
+        assert all(not row.side_results and row.version == 1 for row in current.exercises[0].sets)
+    response = client.post(url, headers=headers, json=body)
+    assert response.status_code == 200, response.text
+    assert client.post(url, headers=headers, json=body).json() == response.json()
+    with get_session_context() as db:
+        current = db.get(UserWorkout, workout["id"])
+        for row in current.exercises[0].sets:
+            assert row.actual_weight is None and row.is_completed is False and row.version == 2
+            assert {side.side: float(side.actual_weight) for side in row.side_results} == {
+                "left": 20.5,
+                "right": 18.5,
+            }
+            assert all(not side.is_completed for side in row.side_results)
+        for session in db.query(UserWorkout).filter(
+            UserWorkout.user_program_id == current.user_program_id,
+            UserWorkout.status == "completed",
+        ):
+            assert all(
+                {side.side: float(side.actual_weight) for side in row.side_results}
+                == {"left": 18, "right": 16}
+                for row in session.exercises[0].sets
+            )
+
+
+def test_side_records_do_not_mix_modes_sides_or_legacy_facts(client):
+    headers = _auth(client, 64_834)
+    workout = _assigned_workout(client, headers, prescribed_sets=1)
+    _add_history(workout["id"], [[(10, 60, "2", "working", False)]] * 3)
+    with get_session_context() as db:
+        current = db.get(UserWorkout, workout["id"])
+        previous = (
+            db.query(UserWorkout)
+            .filter(
+                UserWorkout.user_program_id == current.user_program_id,
+                UserWorkout.status == "completed",
+            )
+            .order_by(UserWorkout.scheduled_date.desc())
+            .all()
+        )
+        for session, mode, left, right in zip(
+            previous[:2], ("per_side", "alternating"), (18, 100), (16, 9), strict=True
+        ):
+            row = session.exercises[0].sets[0]
+            row.execution_mode = mode
+            row.actual_reps = row.actual_weight = row.rir = row.reached_failure = None
+            row.side_results = [
+                UserWorkoutSetSide(
+                    side="left", actual_reps=10, actual_weight=left, is_completed=True
+                ),
+                UserWorkoutSetSide(
+                    side="right", actual_reps=8, actual_weight=right, is_completed=True
+                ),
+            ]
+    exercise_id = workout["exercises"][0]["exercise_id"]
+    response = client.get(f"/api/v1/programs/exercises/{exercise_id}/history", headers=headers)
+    assert response.status_code == 200, response.text
+    history = response.json()
+    assert history["best_authoritative_load"]["value_kg"] == 60
+    records = {(row["execution_mode"], row["side"]): row for row in history["side_records"]}
+    assert records[("per_side", "left")]["best_authoritative_load"]["value_kg"] == 18
+    assert records[("per_side", "right")]["best_authoritative_load"]["value_kg"] == 16
+    assert records[("alternating", "left")]["best_authoritative_load"]["value_kg"] == 100
+    assert records[("alternating", "right")]["best_authoritative_load"]["value_kg"] == 9

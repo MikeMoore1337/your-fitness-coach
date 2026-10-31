@@ -23,6 +23,7 @@ from fitminiapp_api.schemas.workout import (
 )
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.workout_metrics import workout_exercise_metric_type
+from fitminiapp_api.services.workout_sides import side_facts_present
 
 RULESET_VERSION = "warmup-proposal-v1"
 MAX_ROWS = 5
@@ -193,6 +194,7 @@ def _has_execution_evidence(workout_set: UserWorkoutSet) -> bool:
         or workout_set.heart_rate_zone is not None
         or workout_set.rir is not None
         or workout_set.reached_failure is not None
+        or side_facts_present(workout_set)
     )
 
 

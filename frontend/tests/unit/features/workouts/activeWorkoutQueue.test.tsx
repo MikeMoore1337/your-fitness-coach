@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Workout } from '../../../../src/shared/api/types';
 import {
   acknowledgeWorkoutMutation,
+  acknowledgeLegacyWorkoutMutation,
   activeWorkoutLockName,
   activeWorkoutQueueKey,
   clearActiveWorkoutData,
@@ -13,6 +14,7 @@ import {
   enqueueWorkoutMutation,
   loadActiveWorkoutQueue,
   loadCurrentActiveWorkoutSnapshot,
+  legacyActiveWorkoutQueueKey,
   resolveWorkoutVersionConflict,
   saveActiveWorkoutQueue,
   saveActiveWorkoutSnapshot,
@@ -131,6 +133,44 @@ function renderHarness() {
   );
 }
 
+function SideHarness() {
+  const sync = useActiveWorkoutQueue(7, workout);
+  return (
+    <div>
+      <span data-testid="side-state">{sync.syncState}</span>
+      <span data-testid="side-local">
+        {sync.sideConflict?.local.sides?.left?.actual_weight ?? ''}
+      </span>
+      <span data-testid="side-server">
+        {sync.sideConflict?.server.sides?.left?.actual_weight ?? ''}
+      </span>
+      <button
+        onClick={() =>
+          void sync.enqueue(
+            201,
+            1,
+            {
+              actual_reps: null,
+              actual_weight: null,
+              execution_mode: 'per_side',
+              is_completed: false,
+              sides: {
+                left: { actual_reps: 10, actual_weight: 18, is_completed: true },
+                right: { actual_reps: 8, actual_weight: 16, is_completed: false },
+              },
+            },
+            true,
+          )
+        }
+      >
+        Сохранить стороны
+      </button>
+      <button onClick={() => void sync.resolveSideConflict('local')}>Оставить локальную</button>
+      <button onClick={() => void sync.resolveSideConflict('server')}>Выбрать серверную</button>
+    </div>
+  );
+}
+
 describe('active workout durable queue', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -141,6 +181,103 @@ describe('active workout durable queue', () => {
     cleanup();
     vi.restoreAllMocks();
     setOnline(true);
+  });
+
+  it('использует подтверждённую версию своего предыдущего сохранения для следующего ввода', async () => {
+    setOnline(true);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      const body = JSON.parse(init!.body as string);
+      return new Response(
+        JSON.stringify({
+          id: 201,
+          set_number: 1,
+          execution_mode: 'per_side',
+          is_completed: false,
+          sides: body.sides,
+          version: body.expected_version + 1,
+        }),
+        { status: 200 },
+      );
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SideHarness />
+      </QueryClientProvider>,
+    );
+    act(() => screen.getByRole('button', { name: 'Сохранить стороны' }).click());
+    await waitFor(() => expect(screen.getByTestId('side-state')).toHaveTextContent('idle'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    act(() => screen.getByRole('button', { name: 'Сохранить стороны' }).click());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetchMock.mock.calls[1]![1]!.body as string).expected_version).toBe(2);
+  });
+
+  it('не перебазирует стороны при 409 до явного выбора полной версии', async () => {
+    setOnline(true);
+    const server = {
+      id: 201,
+      set_number: 1,
+      version: 2,
+      is_completed: false,
+      execution_mode: 'per_side',
+      sides: {
+        left: { actual_reps: 9, actual_weight: 20, is_completed: true },
+        right: { actual_reps: 8, actual_weight: 15, is_completed: false },
+      },
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            detail: { code: 'workout_set_version_conflict', current: server },
+          }),
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...server,
+            version: 3,
+            sides: {
+              left: { actual_reps: 10, actual_weight: 18, is_completed: true },
+              right: { actual_reps: 8, actual_weight: 16, is_completed: false },
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SideHarness />
+      </QueryClientProvider>,
+    );
+    act(() => screen.getByRole('button', { name: 'Сохранить стороны' }).click());
+    await waitFor(() => expect(screen.getByTestId('side-state')).toHaveTextContent('conflict'));
+    expect(screen.getByTestId('side-local')).toHaveTextContent('18');
+    expect(screen.getByTestId('side-server')).toHaveTextContent('20');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    act(() => window.dispatchEvent(new Event('online')));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    act(() => screen.getByRole('button', { name: 'Оставить локальную' }).click());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const first = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string);
+    const second = JSON.parse(fetchMock.mock.calls[1]![1]!.body as string);
+    expect(first.is_completed).toBe('sides-v1');
+    expect(first.side_is_completed).toBe(false);
+    expect(second).toMatchObject({
+      expected_version: 2,
+      confirm_mode_change: true,
+      sides: { left: { actual_weight: 18 }, right: { actual_weight: 16 } },
+    });
+    expect(second.mutation_id).not.toBe(first.mutation_id);
+    await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0));
   });
 
   it('восстанавливает offline-изменение после remount и очищает очередь после reconnect', async () => {
@@ -455,7 +592,11 @@ describe('active workout durable queue', () => {
     });
     releaseClear();
     await Promise.all([clearing, laterEnqueue]);
-    expect(loadActiveWorkoutQueue(7, 42).queue.map((item) => item.set_id)).toEqual([204]);
+    expect(
+      loadActiveWorkoutQueue(7, 42)
+        .queue.map((item) => item.set_id)
+        .sort(),
+    ).toEqual([202, 203, 204, 205]);
   });
 
   it('мигрирует queue v1 только после получения актуального metric type', () => {
@@ -492,7 +633,7 @@ describe('active workout durable queue', () => {
 
     const restored = loadActiveWorkoutQueue(7, 42, new Set([201]), cardioWorkout);
 
-    expect(restored.schema_version).toBe(2);
+    expect(restored.schema_version).toBe(3);
     expect(restored.queue[0]?.values).toEqual({
       actual_reps: null,
       actual_weight: null,
@@ -501,6 +642,166 @@ describe('active workout durable queue', () => {
     expect(restored.workout_snapshot?.id).toBe(42);
     expect(restored.workout_snapshot?.exercises[0]?.metric_type).toBe('cardio');
     expect(loadCurrentActiveWorkoutSnapshot(7)?.exercises[0]?.metric_type).toBe('cardio');
+  });
+
+  it('сохраняет обе стороны отдельно от очереди старой вкладки и переносит v2 без потерь', () => {
+    const oldKey = legacyActiveWorkoutQueueKey(7, 42);
+    const oldMutation = {
+      mutation_id: 'legacy-v2-mutation-0001',
+      set_id: 201,
+      expected_version: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: false },
+      created_at: 1,
+    };
+    localStorage.setItem(
+      oldKey,
+      JSON.stringify({
+        schema_version: 2,
+        user_id: 7,
+        workout_id: 42,
+        queue: [oldMutation],
+        workout_snapshot: workout,
+      }),
+    );
+    const migrated = loadActiveWorkoutQueue(7, 42, new Set([201]), workout);
+    expect(migrated.schema_version).toBe(3);
+    expect(migrated.queue).toEqual([oldMutation]);
+    expect(JSON.parse(localStorage.getItem(oldKey)!).queue).toEqual([oldMutation]);
+    acknowledgeLegacyWorkoutMutation(7, 42, oldMutation.mutation_id);
+    expect(JSON.parse(localStorage.getItem(oldKey)!).queue).toEqual([]);
+
+    const sideState = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 2,
+      values: {
+        actual_reps: null,
+        actual_weight: null,
+        execution_mode: 'per_side',
+        is_completed: false,
+        sides: {
+          left: { actual_reps: 10, actual_weight: 18, rir: '2', is_completed: true },
+          right: { actual_reps: 8, actual_weight: 16, rir: '0', is_completed: false },
+        },
+      },
+    });
+    expect(saveActiveWorkoutQueue(sideState)).toBe(true);
+    localStorage.setItem(
+      oldKey,
+      JSON.stringify({
+        schema_version: 2,
+        user_id: 7,
+        workout_id: 42,
+        queue: [oldMutation],
+      }),
+    );
+    const combined = loadActiveWorkoutQueue(7, 42);
+    expect(combined.queue.map((item) => item.mutation_id)).toEqual([
+      oldMutation.mutation_id,
+      sideState.queue[0]!.mutation_id,
+    ]);
+    expect(combined.queue[1]?.values.sides).toEqual(sideState.queue[0]?.values.sides);
+    expect(JSON.parse(localStorage.getItem(oldKey)!).queue).toEqual([oldMutation]);
+  });
+
+  it('не объединяет версии одного подхода из разных вкладок до разрешения конфликта', () => {
+    const values = {
+      actual_reps: null,
+      actual_weight: null,
+      execution_mode: 'per_side' as const,
+      is_completed: false,
+      sides: {
+        left: { actual_reps: 10, actual_weight: 18, is_completed: true },
+        right: { actual_reps: 8, actual_weight: 16, is_completed: false },
+      },
+    };
+    let state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values,
+      originId: 'context-a-0000000001',
+    });
+    state = enqueueWorkoutMutation(state, {
+      setId: 201,
+      serverVersion: 1,
+      values: {
+        ...values,
+        sides: {
+          ...values.sides,
+          right: {
+            actual_reps: 9,
+            actual_weight: 17,
+            is_completed: true,
+          },
+        },
+      },
+      originId: 'context-b-0000000001',
+    });
+    expect(state.queue).toHaveLength(2);
+    expect(state.queue[1]?.expected_version).toBe(1);
+    const afterFirstSave = acknowledgeWorkoutMutation(state, state.queue[0]!.mutation_id, 2);
+    expect(afterFirstSave.queue[0]?.expected_version).toBe(1);
+    expect(afterFirstSave.queue[0]?.values.sides?.right?.actual_weight).toBe(17);
+  });
+
+  it('передаёт автору подтверждение, если его операцию отправила соседняя вкладка', () => {
+    const values = {
+      actual_reps: null,
+      actual_weight: null,
+      execution_mode: 'per_side' as const,
+      is_completed: false,
+      sides: { left: { actual_weight: 18, actual_reps: 10, is_completed: true }, right: null },
+    };
+    let state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values,
+      originId: 'context-a-0000000001',
+    });
+    state = acknowledgeWorkoutMutation(state, state.queue[0]!.mutation_id, 2);
+    saveActiveWorkoutQueue(state);
+    const restored = loadActiveWorkoutQueue(7, 42);
+    expect(
+      enqueueWorkoutMutation(restored, {
+        setId: 201,
+        serverVersion: 1,
+        values,
+        originId: 'context-a-0000000001',
+      }).queue[0]?.expected_version,
+    ).toBe(2);
+    expect(
+      enqueueWorkoutMutation(restored, {
+        setId: 201,
+        serverVersion: 1,
+        values,
+        originId: 'context-b-0000000001',
+      }).queue[0]?.expected_version,
+    ).toBe(1);
+  });
+
+  it('не удаляет локальные изменения при смене или завершении тренировки', () => {
+    const state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(state);
+    localStorage.setItem(activeWorkoutPointerStorageKey(7), '42');
+    saveActiveWorkoutSnapshot(7, { ...workout, id: 43 });
+    clearActiveWorkoutData(7, 42);
+    expect(loadActiveWorkoutQueue(7, 42).queue[0]?.mutation_id).toBe(state.queue[0]?.mutation_id);
+  });
+
+  it('сохраняет ожидающий подход, если текущий серверный снимок его больше не содержит', () => {
+    const state = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(state);
+    expect(loadActiveWorkoutQueue(7, 42, new Set([202])).queue[0]?.mutation_id).toBe(
+      state.queue[0]?.mutation_id,
+    );
+    expect(clearActiveWorkoutData(7, 42)).toBe(false);
   });
 
   it.each([null, '0', '1', '2', '3', '4+'] as const)(

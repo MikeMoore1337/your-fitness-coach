@@ -25,6 +25,7 @@ import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
 import { WorkoutCopyButton } from './WorkoutCopyButton';
 import { ExerciseNoteHistory } from './ExerciseNoteHistory';
 import { WorkoutHistoryImport } from './WorkoutHistoryImport';
+import { formatWorkoutSides } from './workoutSideDisplay';
 
 interface RestHistoryEntry {
   id: number;
@@ -253,7 +254,11 @@ export function WorkoutHistory({
               </div>
               <div className="metric">
                 <span>Объём</span>
-                <strong>{Math.round(summary.data?.volume_kg ?? 0)} кг</strong>
+                <strong>
+                  {summary.data?.volume_incomplete
+                    ? 'Указан не полностью'
+                    : `${Math.round(summary.data?.volume_kg ?? 0)} кг`}
+                </strong>
               </div>
             </div>
             <div className="list-grid top-gap">
@@ -272,16 +277,29 @@ export function WorkoutHistory({
                     </p>
                     <div className="workout-history__exercises" aria-label="Выполненные упражнения">
                       {item.exercises.map((exercise) => (
-                        <button
-                          type="button"
-                          className="text-button"
-                          key={exercise.workout_exercise_id}
-                          onClick={() =>
-                            setGuide({ id: exercise.exercise_id, title: exercise.title })
-                          }
-                        >
-                          {exercise.title}
-                        </button>
+                        <div key={exercise.workout_exercise_id}>
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() =>
+                              setGuide({ id: exercise.exercise_id, title: exercise.title })
+                            }
+                          >
+                            {exercise.title}
+                          </button>
+                          {exercise.side_sets?.map((set) => (
+                            <p className="workout-history__side-set" key={set.set_number}>
+                              Подход {set.set_number}
+                              {set.is_completed ? '' : ' · не завершён'} ·{' '}
+                              {set.execution_mode === 'alternating' ? 'поочерёдно' : 'по сторонам'}
+                              {set.first_side
+                                ? ` · первая: ${set.first_side === 'left' ? 'левая' : 'правая'}`
+                                : ''}
+                              <br />
+                              {formatWorkoutSides(set.sides)}
+                            </p>
+                          ))}
+                        </div>
                       ))}
                     </div>
                     <RestHistory
@@ -312,7 +330,9 @@ export function WorkoutHistory({
                       </div>
                     )}
                   </div>
-                  <strong>{item.volume_kg} кг</strong>
+                  <strong>
+                    {item.volume_incomplete ? 'Объём указан не полностью' : `${item.volume_kg} кг`}
+                  </strong>
                   {!item.is_imported && (
                     <WorkoutFeedbackDisclosure
                       workoutId={item.id}

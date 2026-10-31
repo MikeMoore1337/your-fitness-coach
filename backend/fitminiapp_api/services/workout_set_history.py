@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from pydantic import ValidationError
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.core.timezone import now_in_timezone
 from fitminiapp_api.models.exercise import Exercise
@@ -17,6 +17,7 @@ from fitminiapp_api.models.program import (
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program import ExercisePrescriptionPlan
 from fitminiapp_api.services.exercise_catalog_metadata import exercise_catalog_metadata
+from fitminiapp_api.services.workout_sides import SIDE_MODES, serialize_sides, side_facts_present
 
 
 class WorkoutSetHistoryNotFound(ValueError):
@@ -43,11 +44,13 @@ def _set_identity(item: UserWorkoutSet) -> tuple:
     )
 
 
-def _topology(exercise: UserWorkoutExercise, catalog: Exercise) -> tuple | None:
+def _topology(
+    exercise: UserWorkoutExercise, catalog: Exercise, *, explicit_sides: bool = False
+) -> tuple | None:
     metadata = exercise_catalog_metadata(catalog.slug)
-    # shortcut: sets have no side identity; enable per-side history only after the domain stores it.
-    if not metadata or {"unilateral", "alternating"}.intersection(
-        metadata["execution_variant_tags"]
+    if not metadata or (
+        not explicit_sides
+        and {"unilateral", "alternating"}.intersection(metadata["execution_variant_tags"])
     ):
         return None
     if exercise.source_template_exercise_id is None or exercise.prescription is None:
@@ -79,6 +82,10 @@ def _result(item: UserWorkoutSet) -> dict:
         "set_id": item.id,
         "set_number": item.set_number,
         "set_version": item.version,
+        "execution_mode": item.execution_mode,
+        "first_side": item.first_side,
+        "sides": serialize_sides(item),
+        "is_completed": item.is_completed,
         "actual_weight": float(item.actual_weight) if item.actual_weight is not None else None,
         "actual_reps": item.actual_reps,
     }
@@ -159,6 +166,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             .outerjoin(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
             .outerjoin(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
             .outerjoin(Exercise, Exercise.id == UserWorkoutExercise.exercise_id)
+            .options(joinedload(UserWorkoutSet.side_results))
             .filter(
                 UserProgram.id.in_(select(lineage.c.id)),
                 UserProgram.user_id == user.id,
@@ -180,7 +188,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             entry = exercises.setdefault(workout.id, {}).setdefault(
                 exercise.id, (exercise, catalog, [])
             )
-            if item is not None:
+            if item is not None and all(row.id != item.id for row in entry[2]):
                 entry[2].append(item)
     if current.started_at is not None:
         cutoff_min = current.started_at - timedelta(days=1)
@@ -191,7 +199,6 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
         cutoff_min = cutoff_max = now_in_timezone("UTC").replace(tzinfo=None)
     items = []
     for exercise, catalog, sets in exercises.get(workout_id, {}).values():
-        topology = _topology(exercise, catalog)
         matching_workouts = [
             workout
             for workout in workouts.values()
@@ -229,6 +236,10 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             if entry[0].source_template_exercise_id == exercise.source_template_exercise_id
         ]
         source_sets: list[UserWorkoutSet] = []
+        explicit_sides = any(item.execution_mode in SIDE_MODES for item in sets) or any(
+            item.execution_mode in SIDE_MODES for _, _, rows in source_entries for item in rows
+        )
+        topology = _topology(exercise, catalog, explicit_sides=explicit_sides)
         proven = (
             topology is not None
             and len(current_slots) == 1
@@ -248,7 +259,9 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             proven = proven and len(source_entries) == 1
             if proven:
                 source_exercise, source_catalog, source_sets = source_entries[0]
-                proven = topology == _topology(source_exercise, source_catalog)
+                proven = topology == _topology(
+                    source_exercise, source_catalog, explicit_sides=explicit_sides
+                )
 
                 proven = proven and _group_peers(exercises[workout_id], exercise) == _group_peers(
                     exercises[source.id], exercise
@@ -276,8 +289,12 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
                     and match is not None
                     and _matches_plan(exercise, item)
                     and _matches_plan(source_entries[0][0], match)
-                    and match.is_completed
-                    and (match.actual_weight is not None or match.actual_reps is not None)
+                    and (match.is_completed or side_facts_present(match))
+                    and (
+                        match.actual_weight is not None
+                        or match.actual_reps is not None
+                        or side_facts_present(match)
+                    )
                 ):
                     past = {
                         **_result(match),
@@ -301,7 +318,9 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
                 }
             )
             if item.is_completed and (
-                item.actual_weight is not None or item.actual_reps is not None
+                item.actual_weight is not None
+                or item.actual_reps is not None
+                or side_facts_present(item)
             ):
                 previous = _result(item)
     return {

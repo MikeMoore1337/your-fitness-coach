@@ -110,6 +110,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutExercise,
     UserWorkoutSet,
+    UserWorkoutSetSide,
     WorkoutAdaptation,
     WorkoutSetMutation,
 )
@@ -257,6 +258,7 @@ __all__ = [
     "UserWorkout",
     "UserWorkoutExercise",
     "UserWorkoutSet",
+    "UserWorkoutSetSide",
     "WebArticle",
     "WebArticleCandidate",
     "WebArticleRevision",

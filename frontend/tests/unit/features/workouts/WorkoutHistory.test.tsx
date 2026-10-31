@@ -194,6 +194,56 @@ describe('WorkoutHistory', () => {
     expect(await screen.findByRole('heading', { name: 'Техника пока не добавлена' })).toBeVisible();
   });
 
+  it('показывает обе стороны и предупреждает о неполном объёме', async () => {
+    const fallback = vi.mocked(globalThis.fetch).getMockImplementation()!;
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.startsWith('/api/v1/workouts/history?')) {
+        return new Response(
+          JSON.stringify([
+            {
+              ...history[0],
+              volume_incomplete: true,
+              exercises: [
+                {
+                  ...history[0]!.exercises[0],
+                  side_sets: [
+                    {
+                      set_number: 1,
+                      execution_mode: 'per_side',
+                      is_completed: false,
+                      sides: {
+                        left: { actual_weight: 18, actual_reps: 10, rir: '2', is_completed: true },
+                        right: { actual_weight: 16, actual_reps: 8, rir: '0', is_completed: false },
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      if (path === '/api/v1/workouts/history/summary')
+        return new Response(
+          JSON.stringify({
+            workouts_completed: 1,
+            completed_sets: 4,
+            volume_kg: 1200,
+            volume_incomplete: true,
+          }),
+          { status: 200 },
+        );
+      return fallback(input, init);
+    });
+    renderHistory(vi.fn(), { focusedWorkoutId: 43 });
+    expect(await screen.findByText(/Левая: 18 кг × 10 повт/)).toBeVisible();
+    expect(screen.getByText(/Правая: 16 кг × 8 повт.*не завершена/)).toBeVisible();
+    expect(screen.getByText('Объём указан не полностью')).toBeVisible();
+    expect(screen.getByText('Указан не полностью')).toBeVisible();
+  });
+
   it('открывает историю для deep-link тренировки до прокрутки к строке', async () => {
     renderHistory(vi.fn(), { focusedWorkoutId: 43, focusedCommentId: 1, focusedExerciseId: 55 });
 

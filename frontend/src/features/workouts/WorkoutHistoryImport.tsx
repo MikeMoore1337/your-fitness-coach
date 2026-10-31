@@ -45,6 +45,19 @@ function Note({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function sidesText(sides: NonNullable<WorkoutHistoryImportRow['sides']>): string {
+  return (['left', 'right'] as const)
+    .map((key) => {
+      const value = sides[key];
+      const label = key === 'left' ? 'Левая' : 'Правая';
+      if (!value) return `${label}: нет данных`;
+      const weight = value.actual_weight == null ? 'вес не указан' : `${value.actual_weight} кг`;
+      const reps = value.actual_reps == null ? 'повторы не указаны' : value.actual_reps;
+      return `${label}: ${weight} × ${reps}${value.rir == null ? '' : ` · RIR ${value.rir}`}${value.reached_failure ? ' · до отказа' : ''}${value.is_completed ? '' : ' · не завершена'}`;
+    })
+    .join('; ');
+}
+
 function setText(row: WorkoutHistoryImportRow): string {
   const labels: Record<string, string> = {
     warmup: 'Разминка',
@@ -52,6 +65,7 @@ function setText(row: WorkoutHistoryImportRow): string {
     drop: 'Дроп-сет',
   };
   const kind = labels[row.source.set_kind] ?? 'Подход';
+  if (row.sides) return `${kind} · ${sidesText(row.sides)}`;
   const weight = row.weight_kg === null ? 'вес не указан' : `${row.weight_kg} кг`;
   const sourceWeight = row.source.weight_unit === 'lb' ? ` (${row.source.weight} lb)` : '';
   const reps = row.reps === null ? 'повторы не указаны' : `${row.reps}`;
@@ -62,6 +76,7 @@ function factText(fact: Fact, names: Map<number, string>): string {
   const [exerciseId, , reps, weight, kind, rir] = fact;
   const label = names.get(exerciseId) ?? `Упражнение ${exerciseId}`;
   const type = kind === 'warmup' ? 'разминка' : kind === 'drop' ? 'дроп-сет' : 'рабочий';
+  if (fact.length > 6 && fact[9]) return `${label} · ${type} · ${sidesText(fact[9])}`;
   return `${label} · ${weight === null ? 'вес не указан' : `${weight} кг`} × ${reps === null ? 'повторы не указаны' : reps} · ${type}${rir ? ` · резерв ${rir}` : ''}`;
 }
 
@@ -340,14 +355,14 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
       setBusy(false);
     }
   };
-  const download = async () => {
+  const download = async (version: 1 | 2) => {
     setError(null);
     try {
-      const result = await apiFile(`${IMPORT_URL}/template.csv`);
+      const result = await apiFile(`${IMPORT_URL}/template.csv?version=${version}`);
       const url = URL.createObjectURL(result.blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = result.filename ?? 'yfc-workout-history-v1.csv';
+      anchor.download = result.filename ?? `yfc-workout-history-v${version}.csv`;
       anchor.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (reason) {
@@ -454,8 +469,11 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
             До подтверждения история и статистика не изменятся.
           </p>
           <div className="history-import__actions">
-            <Button variant="secondary" onClick={() => void download()}>
+            <Button variant="secondary" onClick={() => void download(1)}>
               Скачать шаблон
+            </Button>
+            <Button variant="secondary" onClick={() => void download(2)}>
+              Скачать шаблон со сторонами
             </Button>
             <Button variant="secondary" onClick={onClose}>
               Закрыть
@@ -683,8 +701,15 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
               </p>
             )}
             <p>
-              В файле: {selected.source.weight || 'вес не указан'} {selected.source.weight_unit} ×{' '}
-              {selected.source.reps || 'повторы не указаны'}
+              В файле:{' '}
+              {selected.sides ? (
+                sidesText(selected.sides)
+              ) : (
+                <>
+                  {selected.source.weight || 'вес не указан'} {selected.source.weight_unit} ×{' '}
+                  {selected.source.reps || 'повторы не указаны'}
+                </>
+              )}
             </p>
             {selected.source.rpe && <p>RPE: {selected.source.rpe}</p>}
             <p>{selected.blocking_issues.map((issue) => issue.message).join('. ')}</p>

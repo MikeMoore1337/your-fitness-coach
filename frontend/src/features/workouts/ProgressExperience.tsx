@@ -47,6 +47,7 @@ import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MuscleWorkloadDistribution } from './MuscleWorkload';
+import { formatWorkoutSides } from './workoutSideDisplay';
 import { ActivityHeatmap, type ActivityHeatmapData } from './ActivityHeatmap';
 import { weekTypeGenitive, weekTypeLabels, type WeekType } from './weekTypes';
 import {
@@ -844,18 +845,27 @@ function ExerciseHistory({
                   aria-label={`Подходы ${exercise.exercise_title}`}
                 >
                   {session.sets.map((set) => (
-                    <div className="progress-set" key={set.set_number}>
+                    <div
+                      className={`progress-set${set.sides ? ' progress-set--sides' : ''}`}
+                      key={set.set_number}
+                    >
                       <b>{set.set_number}</b>
-                      <SetValue
-                        label="Вес"
-                        value={
-                          set.external_load_kg == null
-                            ? '—'
-                            : `${formatNumber(set.external_load_kg, 2)} кг`
-                        }
-                      />
-                      <SetValue label="Повторы" value={set.reps} />
-                      <SetValue label="Повторы в запасе" value={set.rir} />
+                      {set.sides ? (
+                        <SetValue label="Стороны" value={formatWorkoutSides(set.sides)} />
+                      ) : (
+                        <>
+                          <SetValue
+                            label="Вес"
+                            value={
+                              set.external_load_kg == null
+                                ? '—'
+                                : `${formatNumber(set.external_load_kg, 2)} кг`
+                            }
+                          />
+                          <SetValue label="Повторы" value={set.reps} />
+                          <SetValue label="Повторы в запасе" value={set.rir} />
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
