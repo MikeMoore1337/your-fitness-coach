@@ -630,6 +630,7 @@ class WorkoutRestHistoryItem(BaseModel):
 
 class WorkoutHistoryItem(BaseModel):
     id: int
+    is_imported: bool = False
     scheduled_date: date
     scheduled_time: time | None = None
     title: str
@@ -649,8 +650,8 @@ class WorkoutHistoryExerciseItem(BaseModel):
     workout_exercise_id: int
     exercise_id: int
     title: str
-    prescribed_sets: int
-    prescribed_reps: str
+    prescribed_sets: int | None
+    prescribed_reps: str | None
     sort_order: int
 
 
@@ -784,7 +785,7 @@ class ExerciseHistorySet(BaseModel):
 class ExerciseHistorySession(BaseModel):
     workout: ExerciseHistoryWorkout
     workout_exercise_id: int = Field(ge=1)
-    prescribed_reps: str
+    prescribed_reps: str | None
     completed_set_count: int = Field(ge=0)
     authoritative_set_count: int = Field(ge=0)
     reps_total: int | None = Field(default=None, ge=0)

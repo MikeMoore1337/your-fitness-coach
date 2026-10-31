@@ -15,8 +15,10 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
 from fitminiapp_api.services.workout_metrics import exercise_metric_type
+from fitminiapp_api.services.workout_ownership import workout_owner_id
 from fitminiapp_api.services.workouts import (
     counts_toward_working_volume,
     is_pr_record_set,
@@ -378,10 +380,11 @@ def build_exercise_history(
     rows = (
         db.query(UserWorkoutExercise, UserWorkout, UserWorkoutSet)
         .join(UserWorkout, UserWorkout.id == UserWorkoutExercise.workout_id)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkoutExercise.exercise_id.in_(stored_exercise_ids),
             or_(

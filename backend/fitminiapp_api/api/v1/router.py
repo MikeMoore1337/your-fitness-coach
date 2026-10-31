@@ -20,6 +20,7 @@ from fitminiapp_api.api.v1 import (
     shares,
     workout_copy,
     workout_exercise_notes,
+    workout_history_import,
     workout_previous_note,
     workout_rest,
     workouts,
@@ -39,6 +40,11 @@ api_router.include_router(
 api_router.include_router(coach.router, prefix="/coach", tags=["coach"])
 api_router.include_router(workouts.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(workout_copy.router, prefix="/workouts", tags=["workouts"])
+api_router.include_router(
+    workout_history_import.router,
+    prefix="/workout-history-imports",
+    tags=["workout-history-imports"],
+)
 api_router.include_router(workout_exercise_notes.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(workout_previous_note.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(workout_rest.router, prefix="/workouts", tags=["workouts"])

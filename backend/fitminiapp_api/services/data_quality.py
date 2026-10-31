@@ -14,10 +14,12 @@ from fitminiapp_api.models.program import (
     UserWorkoutExercise,
     UserWorkoutSet,
 )
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.schemas.data_quality import (
     DataSufficiencyReasonKey,
     DataSufficiencyStatus,
 )
+from fitminiapp_api.services.workout_ownership import workout_owner_id
 
 RULESET_VERSION = "data-sufficiency-v1"
 NUTRITION_SUFFICIENT_DAYS = 7
@@ -225,7 +227,7 @@ def collect_training_data_counts(
         return {}
     rows = (
         db.query(
-            UserProgram.user_id.label("user_id"),
+            workout_owner_id().label("user_id"),
             UserWorkout.id.label("workout_id"),
             UserWorkoutExercise.id.label("workout_exercise_id"),
             UserWorkoutExercise.prescribed_sets.label("prescribed_sets"),
@@ -234,8 +236,9 @@ def collect_training_data_counts(
             UserWorkoutSet.set_kind.label("set_kind"),
             UserWorkoutSet.rir.label("rir"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .outerjoin(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .outerjoin(
             UserWorkoutSet,
@@ -253,7 +256,7 @@ def collect_training_data_counts(
             or_(
                 *(
                     and_(
-                        UserProgram.user_id == user_id,
+                        workout_owner_id() == user_id,
                         UserWorkout.scheduled_date.between(
                             period_starts[user_id],
                             period_ends[user_id],

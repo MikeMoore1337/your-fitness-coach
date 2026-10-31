@@ -14,6 +14,8 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
+from fitminiapp_api.services.workout_ownership import workout_owner_id
 from fitminiapp_api.services.workouts import working_volume_set_filter
 
 
@@ -33,10 +35,11 @@ def build_activity_heatmap(
         .astimezone(UTC)
         .replace(tzinfo=None)
     )
-    owned = (UserProgram.user_id == user.id, UserWorkout.status == "completed")
+    owned = (workout_owner_id() == user.id, UserWorkout.status == "completed")
     undated = (
         db.query(func.count(UserWorkout.id))
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .filter(*owned, UserWorkout.completed_at_utc.is_(None))
         .scalar()
         or 0
@@ -48,7 +51,8 @@ def build_activity_heatmap(
         )
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .join(UserWorkout, UserWorkout.id == UserWorkoutExercise.workout_id)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .filter(
             *owned,
             UserWorkout.completed_at_utc >= start_utc,
@@ -61,7 +65,8 @@ def build_activity_heatmap(
     )
     rows = (
         db.query(UserWorkout.completed_at_utc, func.coalesce(sets.c.sets, 0))
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .outerjoin(sets, sets.c.workout_id == UserWorkout.id)
         .filter(
             *owned,

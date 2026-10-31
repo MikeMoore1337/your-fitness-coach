@@ -17,6 +17,7 @@ ALLOWED_PHASES = {
     "constraint_swap",
     "rest_unique_swap",
     "numeric_precision",
+    "workout_history_nullable",
 }
 DESTRUCTIVE_CALLS = {
     "alter_column",
@@ -785,6 +786,85 @@ def _is_constant_false_server_default(value: ast.AST | None) -> bool:
     )
 
 
+def _validate_workout_history_nullable(
+    path: Path, tree: ast.Module, upgrade: ast.FunctionDef | ast.AsyncFunctionDef
+) -> None:
+    # This exception is scoped to one reviewed operation, not arbitrary ALTER SQL.
+    if path.name != "0141_workout_history_nullable.py":
+        raise OnlineMigrationError(f"{path} unapproved workout history nullable migration")
+    expected = ast.parse(
+        """
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+
+from alembic import op
+
+revision: str = "0141_workout_history_nullable"
+down_revision: str | None = "0140_workout_start_utc"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+online_rollout_phase = "workout_history_nullable"
+online_rollout_notes = "Relax only the stated plan columns under bounded PostgreSQL locks."
+
+
+def upgrade() -> None:
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("SET LOCAL lock_timeout = '3s'")
+        op.execute("SET LOCAL statement_timeout = '30s'")
+        op.execute("ALTER TABLE user_workouts ADD COLUMN history_imported BOOLEAN, ALTER COLUMN user_program_id DROP NOT NULL, ALTER COLUMN day_number DROP NOT NULL, ALTER COLUMN week_number DROP NOT NULL, ADD CONSTRAINT ck_user_workouts_plan_presence CHECK ((history_imported IS TRUE AND user_program_id IS NULL AND day_number IS NULL AND week_number IS NULL AND status = 'completed') OR (history_imported IS NOT TRUE AND user_program_id IS NOT NULL AND day_number IS NOT NULL AND week_number IS NOT NULL)) NOT VALID")
+        op.execute("ALTER TABLE user_workout_exercises ADD COLUMN history_imported BOOLEAN, ALTER COLUMN prescribed_sets DROP NOT NULL, ALTER COLUMN prescribed_reps DROP NOT NULL, ALTER COLUMN rest_seconds DROP NOT NULL, ADD CONSTRAINT ck_user_workout_exercises_plan_presence CHECK ((history_imported IS TRUE AND prescribed_sets IS NULL AND prescribed_reps IS NULL AND rest_seconds IS NULL) OR (history_imported IS NOT TRUE AND prescribed_sets IS NOT NULL AND prescribed_reps IS NOT NULL AND rest_seconds IS NOT NULL)) NOT VALID")
+        op.execute("ALTER TABLE user_workouts VALIDATE CONSTRAINT ck_user_workouts_plan_presence")
+        op.execute("ALTER TABLE user_workout_exercises VALIDATE CONSTRAINT ck_user_workout_exercises_plan_presence")
+    else:
+        if bind.execute(sa.text("PRAGMA foreign_keys")).scalar_one() and bind.execute(
+            sa.text("SELECT 1 FROM user_workouts LIMIT 1")
+        ).first():
+            raise RuntimeError("SQLite migration requires a connection with foreign keys disabled")
+        with op.batch_alter_table("user_workouts") as batch:
+            batch.add_column(sa.Column("history_imported", sa.Boolean(), nullable=True))
+            batch.alter_column("user_program_id", existing_type=sa.Integer(), nullable=True)
+            batch.alter_column("day_number", existing_type=sa.Integer(), nullable=True)
+            batch.alter_column("week_number", existing_type=sa.Integer(), nullable=True)
+            batch.create_check_constraint("ck_user_workouts_plan_presence", "(history_imported IS TRUE AND user_program_id IS NULL AND day_number IS NULL AND week_number IS NULL AND status = 'completed') OR (history_imported IS NOT TRUE AND user_program_id IS NOT NULL AND day_number IS NOT NULL AND week_number IS NOT NULL)")
+        with op.batch_alter_table("user_workout_exercises") as batch:
+            batch.add_column(sa.Column("history_imported", sa.Boolean(), nullable=True))
+            batch.alter_column("prescribed_sets", existing_type=sa.Integer(), nullable=True)
+            batch.alter_column("prescribed_reps", existing_type=sa.String(32), nullable=True)
+            batch.alter_column("rest_seconds", existing_type=sa.Integer(), nullable=True)
+            batch.create_check_constraint("ck_user_workout_exercises_plan_presence", "(history_imported IS TRUE AND prescribed_sets IS NULL AND prescribed_reps IS NULL AND rest_seconds IS NULL) OR (history_imported IS NOT TRUE AND prescribed_sets IS NOT NULL AND prescribed_reps IS NOT NULL AND rest_seconds IS NOT NULL)")
+
+"""
+    )
+    body = [
+        node
+        for node in tree.body
+        if not (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        )
+        and not (isinstance(node, ast.FunctionDef) and node.name == "downgrade")
+    ]
+    downgrades = [
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "downgrade"
+    ]
+    expected_downgrade = ast.parse("def downgrade() -> None:\n    pass").body[0]
+    assert isinstance(expected_downgrade, ast.FunctionDef)
+    if (
+        len(downgrades) != 1
+        or downgrades[0].decorator_list
+        or getattr(downgrades[0], "type_params", [])
+        or ast.dump(downgrades[0].args) != ast.dump(expected_downgrade.args)
+        or downgrades[0].returns is None
+        or ast.dump(downgrades[0].returns) != ast.dump(expected_downgrade.returns)
+        or ast.dump(ast.Module(body=body, type_ignores=[])) != ast.dump(expected)
+        or upgrade not in body
+    ):
+        raise OnlineMigrationError(f"{path} workout history nullable upgrade must be exact")
+
+
 def validate_added_migration(path: Path) -> None:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     upgrade = _upgrade_body(tree, path)
@@ -799,6 +879,10 @@ def validate_added_migration(path: Path) -> None:
         raise OnlineMigrationError(
             f"{path} must declare non-empty online_rollout_notes with lock/data bounds"
         )
+
+    if phase == "workout_history_nullable":
+        _validate_workout_history_nullable(path, tree, upgrade)
+        return
 
     if phase == "backfill":
         batch_size = _assignment(tree, "online_rollout_batch_size")

@@ -141,6 +141,7 @@ from fitminiapp_api.models.workout_exercise_note import (
     WorkoutExerciseNote,
     WorkoutExerciseNoteMutation,
 )
+from fitminiapp_api.models.workout_history_import import ImportedWorkout, WorkoutHistoryImportDraft
 from fitminiapp_api.models.workout_rest import WorkoutRestAction, WorkoutRestSession
 
 __all__ = [
@@ -204,6 +205,7 @@ __all__ = [
     "HydrationEntry",
     "HydrationGoal",
     "HydrationPreset",
+    "ImportedWorkout",
     "LifecycleMilestone",
     "LocalCredential",
     "Muscle",
@@ -269,6 +271,7 @@ __all__ = [
     "WorkoutCommentRevision",
     "WorkoutExerciseNote",
     "WorkoutExerciseNoteMutation",
+    "WorkoutHistoryImportDraft",
     "WorkoutRestAction",
     "WorkoutRestSession",
     "WorkoutSetMutation",

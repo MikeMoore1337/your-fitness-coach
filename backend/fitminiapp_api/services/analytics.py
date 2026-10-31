@@ -23,6 +23,7 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import BodyMeasurement, User
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.services.data_quality import (
     build_training_data_sufficiency,
     collect_training_data_counts,
@@ -30,6 +31,7 @@ from fitminiapp_api.services.data_quality import (
 from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
 from fitminiapp_api.services.period_bounds import MAX_REPORT_DAYS, resolve_progress_bounds
 from fitminiapp_api.services.program_versioning import workout_cycle_week_type
+from fitminiapp_api.services.workout_ownership import workout_owner_id
 from fitminiapp_api.services.workouts import (
     counts_toward_working_volume,
     is_pr_record_set,
@@ -52,13 +54,14 @@ def _load_workouts(
 ) -> list[UserWorkout]:
     query = (
         db.query(UserWorkout)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .options(
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
         )
     )
-    filters = [UserProgram.user_id == user.id]
+    filters = [workout_owner_id() == user.id]
     if workout_id is not None:
         filters.append(UserWorkout.id == workout_id)
     return (
@@ -74,17 +77,24 @@ def build_user_progress(db: Session, user: User) -> dict:
     due_workouts = [
         workout
         for workout in workouts
-        if workout.scheduled_date <= today and workout.status != "cancelled"
+        if workout.user_program_id is not None
+        and workout.scheduled_date <= today
+        and workout.status != "cancelled"
     ]
-    completed = [workout for workout in due_workouts if workout.status == "completed"]
+    scheduled_completed = [workout for workout in due_workouts if workout.status == "completed"]
+    completed = [
+        workout
+        for workout in workouts
+        if workout.scheduled_date <= today and workout.status == "completed"
+    ]
     skipped = [workout for workout in due_workouts if workout.status == "skipped"]
     missed = [
         workout
         for workout in due_workouts
         if workout.status in {"planned", "in_progress"} and workout.scheduled_date < today
     ]
-    adherence_base = len(completed) + len(skipped) + len(missed)
-    adherence = round(len(completed) * 100 / adherence_base, 1) if adherence_base else 0.0
+    adherence_base = len(scheduled_completed) + len(skipped) + len(missed)
+    adherence = round(len(scheduled_completed) * 100 / adherence_base, 1) if adherence_base else 0.0
 
     streak = 0
     for workout in reversed(due_workouts):
@@ -159,7 +169,7 @@ def build_user_progress(db: Session, user: User) -> dict:
                     )
 
     return {
-        "workouts_total": len(due_workouts),
+        "workouts_total": len(due_workouts) + sum(w.user_program_id is None for w in completed),
         "workouts_completed": len(completed),
         "workouts_skipped": len(skipped),
         "workouts_missed": len(missed),
@@ -209,12 +219,13 @@ def _period_exercise_aggregates(
             func.sum(case((UserWorkoutSet.rir == "3", 1), else_=0)).label("rir_3"),
             func.sum(case((UserWorkoutSet.rir == "4+", 1), else_=0)).label("rir_4_plus"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
             UserWorkoutSet.is_completed.is_(True),
@@ -242,12 +253,13 @@ def _period_exercise_session_aggregates(
             UserWorkout.scheduled_date.label("performed_on"),
             func.count(UserWorkoutSet.id).label("completed_set_count"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
             UserWorkoutSet.is_completed.is_(True),
@@ -266,10 +278,11 @@ def _period_exercise_session_aggregates(
 def _completed_workout_dates(db: Session, user: User, period_start, period_end) -> list:
     return (
         db.query(UserWorkout.scheduled_date)
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
         )
@@ -294,12 +307,13 @@ def _bounded_exercise_history(
             UserWorkout.id.label("workout_id"),
             UserWorkout.scheduled_date.label("performed_on"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
             UserWorkoutSet.is_completed.is_(True),
@@ -498,16 +512,17 @@ def build_week_type_training_analytics(
 ) -> dict:
     workouts = (
         db.query(UserWorkout)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .options(joinedload(UserWorkout.user_program))
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
         )
         .all()
     )
-    program_ids = {item.user_program_id for item in workouts}
+    program_ids = {item.user_program_id for item in workouts if item.user_program_id is not None}
     revisions_by_program: dict[int, list[ProgramRevision]] = defaultdict(list)
     if program_ids:
         revisions = (
@@ -521,6 +536,9 @@ def build_week_type_training_analytics(
     selected_ids = []
     untyped = unknown = 0
     for workout in workouts:
+        if workout.user_program_id is None:
+            untyped += 1
+            continue
         actual_type, known = workout_cycle_week_type(
             db, workout, revisions_by_program[workout.user_program_id]
         )

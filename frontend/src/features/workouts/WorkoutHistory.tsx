@@ -8,6 +8,7 @@ import type {
 } from '../../shared/api/types';
 import {
   Badge,
+  Button,
   Card,
   DisclosureIcon,
   EmptyState,
@@ -23,6 +24,7 @@ import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
 import { WorkoutCopyButton } from './WorkoutCopyButton';
 import { ExerciseNoteHistory } from './ExerciseNoteHistory';
+import { WorkoutHistoryImport } from './WorkoutHistoryImport';
 
 interface RestHistoryEntry {
   id: number;
@@ -103,6 +105,7 @@ export function WorkoutHistory({
   const queryClient = useQueryClient();
   const { confirm, toast } = useFeedback();
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const week = useQuery({
     queryKey: ['workout', 'week'],
     queryFn: () => api<WorkoutScheduleItem[]>('/api/v1/workouts/week'),
@@ -214,12 +217,24 @@ export function WorkoutHistory({
       )}
       <Card
         className="workout-history-card"
-        collapsible={!compact || Boolean(focusedWorkoutId)}
+        collapsible={!importOpen && (!compact || Boolean(focusedWorkoutId))}
         defaultOpen={Boolean(focusedWorkoutId)}
         key={focusedWorkoutId ?? 'history'}
-        title="История"
+        title={importOpen ? undefined : 'История'}
+        actions={
+          !importOpen && !readOnly ? (
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              Импортировать историю
+            </Button>
+          ) : undefined
+        }
       >
-        {history.isLoading || summary.isLoading ? (
+        {!importOpen && !readOnly && (
+          <p className="muted">Добавьте выполненные тренировки из подготовленного файла.</p>
+        )}
+        {importOpen ? (
+          <WorkoutHistoryImport onClose={() => setImportOpen(false)} />
+        ) : history.isLoading || summary.isLoading ? (
           <LoadingState />
         ) : history.error || summary.error ? (
           <ErrorState message={((history.error || summary.error) as Error).message} />
@@ -275,7 +290,7 @@ export function WorkoutHistory({
                           .rest_sessions
                       }
                     />
-                    {!readOnly && userId && (
+                    {!readOnly && userId && !item.is_imported && (
                       <ExerciseNoteHistory key={userId} userId={userId} workoutId={item.id} />
                     )}
                     {item.adaptations.map((adaptation) => (
@@ -283,7 +298,7 @@ export function WorkoutHistory({
                         Изменено перед тренировкой: {adaptationReasonLabels[adaptation.reason]}
                       </p>
                     ))}
-                    {!readOnly && (
+                    {!readOnly && !item.is_imported && (
                       <WorkoutCopyButton workoutId={item.id} workoutTitle={item.title} />
                     )}
                     {(item.completion_feedback || item.completion_note) && (
@@ -298,19 +313,21 @@ export function WorkoutHistory({
                     )}
                   </div>
                   <strong>{item.volume_kg} кг</strong>
-                  <WorkoutFeedbackDisclosure
-                    workoutId={item.id}
-                    workoutTitle={item.title}
-                    workoutDate={item.scheduled_date}
-                    exercises={item.exercises.map((exercise) => ({
-                      workoutExerciseId: exercise.workout_exercise_id,
-                      title: exercise.title,
-                    }))}
-                    viewer="client"
-                    focusedCommentId={focusedWorkoutId === item.id ? focusedCommentId : null}
-                    focusedExerciseId={focusedWorkoutId === item.id ? focusedExerciseId : null}
-                    defaultOpen={focusedWorkoutId === item.id && Boolean(focusedCommentId)}
-                  />
+                  {!item.is_imported && (
+                    <WorkoutFeedbackDisclosure
+                      workoutId={item.id}
+                      workoutTitle={item.title}
+                      workoutDate={item.scheduled_date}
+                      exercises={item.exercises.map((exercise) => ({
+                        workoutExerciseId: exercise.workout_exercise_id,
+                        title: exercise.title,
+                      }))}
+                      viewer="client"
+                      focusedCommentId={focusedWorkoutId === item.id ? focusedCommentId : null}
+                      focusedExerciseId={focusedWorkoutId === item.id ? focusedExerciseId : null}
+                      defaultOpen={focusedWorkoutId === item.id && Boolean(focusedCommentId)}
+                    />
+                  )}
                 </article>
               ))}
             </div>

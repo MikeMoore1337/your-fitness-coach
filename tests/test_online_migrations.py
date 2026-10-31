@@ -552,3 +552,60 @@ def test_sqlite_check_swap_rejects_undeclared_or_mismatching_operations(tmp_path
     invalid.write_text(source.replace(old, new), encoding="utf-8")
     with pytest.raises(checker["OnlineMigrationError"]):
         checker["validate_added_migration"](invalid)
+
+
+def test_workout_history_nullable_migration_has_exact_bounded_scope():
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0141_workout_history_nullable.py"
+    )
+    validate_added_migration(path)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("SET LOCAL lock_timeout = '3s'", "SET LOCAL lock_timeout = '30s'"),
+        ("user_program_id DROP NOT NULL", "user_program_id DROP DEFAULT"),
+        ("AND status = 'completed'", "AND status = 'planned'"),
+        (
+            "VALIDATE CONSTRAINT ck_user_workouts_plan_presence",
+            "DROP CONSTRAINT ck_user_workouts_plan_presence",
+        ),
+        ('batch.alter_column("rest_seconds"', 'batch.alter_column("exercise_id"'),
+        ("nullable=True)", "nullable=False)"),
+        ("import sqlalchemy as sa", "import sqlite3 as sa"),
+        ("def downgrade() -> None:", 'def downgrade(value=print("bad")) -> None:'),
+    ],
+)
+def test_workout_history_nullable_rejects_scope_changes(tmp_path: Path, old: str, new: str):
+    source_path = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0141_workout_history_nullable.py"
+    )
+    source = source_path.read_text(encoding="utf-8")
+    assert old in source
+    with pytest.raises(OnlineMigrationError, match="workout history nullable"):
+        validate_added_migration(
+            _migration(tmp_path / source_path.name, source.replace(old, new, 1))
+        )
+
+
+def test_workout_history_nullable_rejects_other_revision(tmp_path: Path):
+    source_path = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0141_workout_history_nullable.py"
+    )
+    with pytest.raises(OnlineMigrationError, match="unapproved"):
+        validate_added_migration(
+            _migration(tmp_path / "9999_other.py", source_path.read_text(encoding="utf-8"))
+        )

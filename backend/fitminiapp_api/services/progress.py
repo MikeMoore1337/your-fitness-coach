@@ -35,6 +35,7 @@ from fitminiapp_api.models.user import (
     UserProfile,
     UserProfilePriorityMuscle,
 )
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.services.data_quality import (
     build_anthropometry_signal,
     build_body_metric_signal,
@@ -49,6 +50,7 @@ from fitminiapp_api.services.period_bounds import (
     resolve_progress_bounds,
 )
 from fitminiapp_api.services.profile import serialize_body_priority
+from fitminiapp_api.services.workout_ownership import workout_owner_id
 from fitminiapp_api.services.workouts import working_volume_set_filter
 
 FORMULA_VERSION = "adherence-v1"
@@ -577,13 +579,14 @@ def build_progress_summaries(
 
     last_completed_rows = (
         db.query(
-            UserProgram.user_id,
+            workout_owner_id().label("user_id"),
             func.max(UserWorkout.completed_at).label("completed_at"),
             func.max(UserWorkout.scheduled_date).label("scheduled_on"),
         )
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
-        .filter(UserProgram.user_id.in_(user_ids), UserWorkout.status == "completed")
-        .group_by(UserProgram.user_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
+        .filter(workout_owner_id().in_(user_ids), UserWorkout.status == "completed")
+        .group_by(workout_owner_id())
         .all()
     )
     last_completed_by_user = {
@@ -769,13 +772,15 @@ def build_progress_summaries(
 
     set_rows = (
         db.query(
-            UserProgram.user_id,
+            workout_owner_id().label("user_id"),
             UserWorkoutExercise.exercise_id,
             UserWorkout.scheduled_date,
             UserWorkoutSet.actual_weight,
             UserWorkoutSet.actual_reps,
         )
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
@@ -786,7 +791,7 @@ def build_progress_summaries(
                 user_ids,
                 start_by_user,
                 today_by_user,
-                UserProgram.user_id,
+                workout_owner_id(),
                 UserWorkout.scheduled_date,
             ),
         )
@@ -804,14 +809,16 @@ def build_progress_summaries(
 
     previous_best_rows = (
         db.query(
-            UserProgram.user_id,
+            workout_owner_id().label("user_id"),
             UserWorkoutExercise.exercise_id,
             func.max(UserWorkoutSet.actual_weight).label("max_weight"),
             func.max(UserWorkoutSet.actual_weight * UserWorkoutSet.actual_reps).label(
                 "max_set_volume"
             ),
         )
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
@@ -821,14 +828,14 @@ def build_progress_summaries(
             or_(
                 *(
                     and_(
-                        UserProgram.user_id == user_id,
+                        workout_owner_id() == user_id,
                         UserWorkout.scheduled_date < start_by_user[user_id],
                     )
                     for user_id in user_ids
                 )
             ),
         )
-        .group_by(UserProgram.user_id, UserWorkoutExercise.exercise_id)
+        .group_by(workout_owner_id(), UserWorkoutExercise.exercise_id)
         .all()
     )
     previous_best = {
@@ -1039,9 +1046,11 @@ def build_progress_summaries(
             "period_end": current_day,
             "training": {
                 "planned_workouts": evaluated_count,
-                "completed_workouts": len(completed_workouts),
+                "completed_workouts": training_counts_by_user[user.id].completed_workout_count,
                 "skipped_workouts": len(skipped_workouts),
-                "frequency_per_week": round(len(completed_workouts) * 7 / period_days, 2),
+                "frequency_per_week": round(
+                    training_counts_by_user[user.id].completed_workout_count * 7 / period_days, 2
+                ),
                 "volume_kg": round(volume_by_user[user.id], 2),
                 "new_personal_records": new_records_by_user[user.id],
                 "last_completed_workout_on": last_completed_by_user.get(user.id),

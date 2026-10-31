@@ -24,6 +24,7 @@ from fitminiapp_api.models.account import AccountDataExport
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User, UserProfile
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.schemas.acquisition import FirstTouchAttributionRequest
 from fitminiapp_api.schemas.equipment_profiles import (
     EquipmentProfilesResponse,
@@ -133,6 +134,7 @@ from fitminiapp_api.services.trainer_capability import (
     trainer_capability_state,
 )
 from fitminiapp_api.services.training_preferences import serialize_training_preferences
+from fitminiapp_api.services.workout_ownership import workout_owner_id
 
 router = APIRouter()
 
@@ -193,8 +195,9 @@ def _build_user_response(db: Session, user) -> UserResponse:
     )
     workout_history_exists = (
         db.query(UserWorkout.id)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
-        .filter(UserProgram.user_id == user.id, UserWorkout.status == "completed")
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
+        .filter(workout_owner_id() == user.id, UserWorkout.status == "completed")
     )
     food_history_exists = db.query(FoodDiaryEntry.id).filter(FoodDiaryEntry.user_id == user.id)
     has_active_program, has_workout_history, has_food_history, profile = (
