@@ -118,3 +118,51 @@ jobs:
           path: .artifacts/runtime/tests/playwright-mobile-regression
           if-no-files-found: ignore
           retention-days: 7
+
+  webkit-isolated-failure-triage:
+    name: WebKit - independent diagnosis of two unrelated failures
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+    defaults:
+      run:
+        shell: bash
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 12
+          persist-credentials: false
+      - name: Prove exact app source tree
+        working-directory: .
+        run: |
+          set -Eeuo pipefail
+          changed="$(git -c safe.directory="$GITHUB_WORKSPACE" diff --name-only "$EXPECTED_DEV_SHA" HEAD)"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(frontend/tests/e2e/mobile-ui-regression\.spec\.ts|\.github/workflows/verify-issue-1281\.yml)$' || true)"
+          if [ -n "$unexpected" ]; then printf '%s\n' "$unexpected"; exit 1; fi
+          printf 'APP_SOURCES_IDENTICAL_TO_DEV=%s\n' "$EXPECTED_DEV_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and build
+        run: |
+          npm ci
+          npx vite build
+          npx playwright install webkit
+      - name: Reproduce original failed tests in WebKit without competing workers
+        run: |
+          npx playwright test --config=playwright.mobile-regression.config.ts \
+            --project=mobile-webkit \
+            --grep='@critical (mobile core surfaces keep the light visual contract|active workout keeps the current set primary across mobile widths)' \
+            --workers=1 --retries=0 --reporter=line --trace=retain-on-failure
+      - name: Preserve diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1281-webkit-failure-isolation
+          path: .artifacts/runtime/tests/playwright-mobile-regression
+          if-no-files-found: ignore
+          retention-days: 7
