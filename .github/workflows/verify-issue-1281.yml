@@ -1,0 +1,116 @@
+name: Issue 1281 isolated WebKit regression
+
+on:
+  push:
+    branches: [verify/issue-1281-regression-20261101]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-1281-isolated-verification
+  cancel-in-progress: true
+
+env:
+  EXPECTED_DEV_SHA: 4da8b93b83cac09187ce5a9b7f49de3496c380bc
+
+jobs:
+  webkit-100x4:
+    name: WebKit Linux - 100 repeats, 4 workers, no retries
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+          persist-credentials: false
+      - name: Prove application tree equals pinned dev
+        working-directory: .
+        run: |
+          set -Eeuo pipefail
+          git cat-file -e "$EXPECTED_DEV_SHA^{commit}"
+          unexpected="$(git diff --name-only "$EXPECTED_DEV_SHA" HEAD | grep -Ev '^(frontend/tests/e2e/mobile-ui-regression\.spec\.ts|\.github/workflows/verify-issue-1281\.yml)$' || true)"
+          if [ -n "$unexpected" ]; then printf 'Unexpected changes:\n%s\n' "$unexpected"; exit 1; fi
+          printf 'APP_SOURCES_IDENTICAL_TO_DEV=%s\n' "$EXPECTED_DEV_SHA"
+          git rev-parse HEAD
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install pinned frontend dependencies
+        run: npm ci
+      - name: Verify test formatting and build
+        run: |
+          npx prettier --check tests/e2e/mobile-ui-regression.spec.ts
+          npx vite build
+      - name: Verify WebKit runtime
+        run: npx playwright install webkit
+      - name: Cold WebKit TMA dock repetitions
+        run: |
+          npx playwright test --config=playwright.mobile-regression.config.ts \
+            --project=mobile-webkit \
+            --grep='@critical (mocked TMA keeps the dock inside the effective viewport and hit-testable|reduced motion keeps TMA dock clearance current)' \
+            --repeat-each=100 --workers=4 --retries=0 \
+            --reporter=line --trace=retain-on-failure
+      - name: Preserve failing traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1281-webkit-traces
+          path: .artifacts/runtime/tests/playwright-mobile-regression
+          if-no-files-found: ignore
+          retention-days: 7
+
+  mobile-coverage:
+    name: WebKit and Chromium - all critical mobile states
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+          persist-credentials: false
+      - name: Prove application tree equals pinned dev
+        working-directory: .
+        run: |
+          set -Eeuo pipefail
+          git cat-file -e "$EXPECTED_DEV_SHA^{commit}"
+          unexpected="$(git diff --name-only "$EXPECTED_DEV_SHA" HEAD | grep -Ev '^(frontend/tests/e2e/mobile-ui-regression\.spec\.ts|\.github/workflows/verify-issue-1281\.yml)$' || true)"
+          if [ -n "$unexpected" ]; then printf 'Unexpected changes:\n%s\n' "$unexpected"; exit 1; fi
+          printf 'APP_SOURCES_IDENTICAL_TO_DEV=%s\n' "$EXPECTED_DEV_SHA"
+          git rev-parse HEAD
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install pinned frontend dependencies
+        run: npm ci
+      - name: Build frontend
+        run: npx vite build
+      - name: Verify Chromium and WebKit runtimes
+        run: npx playwright install chromium webkit
+      - name: Run full mobile regression including normal motion, light and dark
+        run: |
+          npx playwright test --config=playwright.mobile-regression.config.ts \
+            --workers=4 --retries=0 \
+            --reporter=line --trace=retain-on-failure
+      - name: Preserve failing traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-1281-mobile-traces
+          path: .artifacts/runtime/tests/playwright-mobile-regression
+          if-no-files-found: ignore
+          retention-days: 7
