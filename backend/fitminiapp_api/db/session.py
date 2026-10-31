@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 
+from fastapi import Request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -33,8 +34,10 @@ install_sql_metrics(engine)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
-def get_db():
+def get_db(request: Request):
     db = SessionLocal()
+    if request.method == "GET":
+        db.info["releasable_cycle_read"] = True
     try:
         yield db
     finally:

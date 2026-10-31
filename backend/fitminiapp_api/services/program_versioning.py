@@ -903,6 +903,7 @@ def materialize_cycle_read_window(
 ) -> int:
     if not program_ids:
         return 0
+    _release_cycle_read_transaction(db)
     # Read projections own their transaction; never flush or commit the caller's work.
     with Session(bind=db.get_bind().engine, autoflush=False) as projection:
         programs = (
@@ -926,15 +927,34 @@ def materialize_cycle_read_window(
         return changed
 
 
+def _release_cycle_read_transaction(db: Session) -> None:
+    # A clean GET must release its connection before opening the independent projection.
+    if (
+        db.info.get("releasable_cycle_read")
+        and not (db.new or db.dirty or db.deleted)
+        and db.get_bind().dialect.name == "postgresql"
+        and db.connection()
+        .exec_driver_sql(
+            "SELECT pg_current_xact_id_if_assigned() IS NULL AND NOT EXISTS ("
+            "SELECT 1 FROM pg_locks WHERE pid = pg_backend_pid() AND granted AND ("
+            "locktype = 'advisory' OR (locktype = 'relation' AND mode <> 'AccessShareLock')))"
+        )
+        .scalar()
+    ):
+        db.rollback()
+
+
 def hydrate_cycle_read_workout(db: Session, workout: UserWorkout) -> bool:
     if workout.source_cycle_week is None or workout.status != "planned":
         return False
+    workout_id = workout.id
     loaded = [
         (exercise, list(inspect(exercise).dict.get("sets", [])))
         for exercise in inspect(workout).dict.get("exercises", [])
     ]
+    _release_cycle_read_transaction(db)
     with Session(bind=db.get_bind().engine, autoflush=False) as projection:
-        current = projection.get(UserWorkout, workout.id)
+        current = projection.get(UserWorkout, workout_id)
         changed = current is not None and hydrate_cycle_workout(projection, current)
         projection.commit()
     if changed:

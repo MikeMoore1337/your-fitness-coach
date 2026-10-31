@@ -6,9 +6,13 @@ from datetime import timedelta
 from threading import Barrier, Event
 
 import pytest
-from sqlalchemy import event, text
-from sqlalchemy.exc import IntegrityError
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import sessionmaker
+from starlette.requests import Request
 
+import fitminiapp_api.db.session as session_module
 from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
 from fitminiapp_api.models.program import (
     ProgramRevision,
@@ -24,6 +28,7 @@ from fitminiapp_api.schemas.program import (
     ProgramLifecycleActionRequest,
     ProgramWeekTypeRevisionRequest,
 )
+from fitminiapp_api.services import program_versioning
 from fitminiapp_api.services.program_common import ProgramError
 from fitminiapp_api.services.program_versioning import (
     apply_program_lifecycle_action,
@@ -232,6 +237,132 @@ def test_concurrent_cycle_materialization_creates_one_occurrence(client):
             == 1
         )
     _assert_facts_unchanged(facts)
+
+
+@pytest.mark.parametrize("read_case", ["schedule", "hydrate"])
+def test_parallel_cycle_http_reads_do_not_exhaust_a_small_pool(client, monkeypatch, read_case):
+    facts = _assigned_cycle_with_completed_facts(client)
+    if read_case == "hydrate":
+        with get_session_context() as db:
+            completed = db.get(UserWorkout, facts["workout_id"])
+            planned = (
+                db.query(UserWorkout)
+                .filter_by(user_program_id=facts["program_id"], week_number=2)
+                .one()
+            )
+            planned.scheduled_date = completed.scheduled_date
+    auth = client.post("/api/v1/auth/dev-login", json={"telegram_user_id": 916190})
+    headers = {"Authorization": f"Bearer {auth.json()['access_token']}"}
+    small_engine = create_engine(engine.url, pool_size=2, max_overflow=1, pool_timeout=2)
+    monkeypatch.setattr(
+        session_module,
+        "SessionLocal",
+        sessionmaker(bind=small_engine, autoflush=False, autocommit=False),
+    )
+    barrier = Barrier(3)
+    function_name = (
+        "materialize_cycle_read_window" if read_case == "schedule" else "hydrate_cycle_read_workout"
+    )
+    original = getattr(program_versioning, function_name)
+
+    def synchronized(*args, **kwargs):
+        barrier.wait(timeout=10)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(program_versioning, function_name, synchronized)
+    paths = (
+        (
+            "/api/v1/workouts/today",
+            "/api/v1/workouts/week",
+            f"/api/v1/programs/assigned/{facts['program_id']}/lifecycle",
+        )
+        if read_case == "schedule"
+        else ("/api/v1/workouts/today",) * 3
+    )
+    try:
+
+        def read(path):
+            return TestClient(client.app, raise_server_exceptions=False).get(path, headers=headers)
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            responses = list(executor.map(read, paths))
+        assert [response.status_code for response in responses] == [200, 200, 200]
+        _assert_facts_unchanged(facts)
+    finally:
+        small_engine.dispose()
+
+
+@pytest.mark.parametrize("pending", ["dirty", "flushed", "sql", "connection_sql"])
+def test_cycle_read_preserves_uncommitted_get_session_work(client, pending):
+    facts = _assigned_cycle_with_completed_facts(client)
+    db_generator = session_module.get_db(Request({"type": "http", "method": "GET"}))
+    db = next(db_generator)
+    try:
+        owner = db.get(User, facts["owner_id"])
+        original_name = owner.first_name
+        if pending in {"sql", "connection_sql"}:
+            executor = db if pending == "sql" else db.connection()
+            executor.execute(
+                text("UPDATE users SET first_name = :name WHERE id = :id"),
+                {"name": "Pending read caller", "id": owner.id},
+            )
+        else:
+            owner.first_name = "Pending read caller"
+            if pending == "flushed":
+                db.flush()
+        program_versioning.materialize_cycle_read_window(
+            db, [facts["program_id"]], facts["window_start"], facts["window_start"]
+        )
+        if pending == "dirty":
+            assert owner.first_name == "Pending read caller"
+        else:
+            assert (
+                db.execute(
+                    text("SELECT first_name FROM users WHERE id = :id"), {"id": owner.id}
+                ).scalar_one()
+                == "Pending read caller"
+            )
+        with SessionLocal() as observer:
+            assert observer.get(User, owner.id).first_name == original_name
+        db.rollback()
+        with SessionLocal() as observer:
+            assert observer.get(User, facts["owner_id"]).first_name == original_name
+            assert (
+                observer.query(UserWorkout)
+                .filter_by(user_program_id=facts["program_id"], week_number=10)
+                .count()
+                == 1
+            )
+    finally:
+        db_generator.close()
+
+
+@pytest.mark.parametrize("lock_kind", ["row", "advisory"])
+def test_cycle_read_preserves_existing_lock_in_get_session(client, lock_kind):
+    facts = _assigned_cycle_with_completed_facts(client)
+    db_generator = session_module.get_db(Request({"type": "http", "method": "GET"}))
+    db = next(db_generator)
+    try:
+        if lock_kind == "row":
+            db.query(User).filter_by(id=facts["owner_id"]).with_for_update().one()
+        else:
+            db.execute(text("SELECT pg_advisory_xact_lock(919919)"))
+        program_versioning.materialize_cycle_read_window(
+            db, [facts["program_id"]], facts["window_start"], facts["window_start"]
+        )
+        with SessionLocal() as other:
+            if lock_kind == "row":
+                other.execute(text("SET LOCAL lock_timeout = '250ms'"))
+                with pytest.raises(OperationalError, match="lock timeout"):
+                    other.execute(
+                        text("UPDATE users SET first_name = :name WHERE id = :id"),
+                        {"name": "Other caller", "id": facts["owner_id"]},
+                    )
+                other.rollback()
+            else:
+                assert not other.execute(text("SELECT pg_try_advisory_xact_lock(919919)")).scalar()
+    finally:
+        db_generator.close()
 
 
 def test_scoped_edit_and_materialization_serialize_without_losing_plan(client):
