@@ -201,7 +201,7 @@ test('@critical cardio datetime fits iPhone WebKit and Chromium', async ({ brows
 for (const theme of ['light', 'dark'] as const) {
   test(`@critical #1350 cardio actions in ${theme}`, async ({ page }, info) => {
     await preparePage(page, theme, 'browser', { cardioState: 'many' });
-    await page.goto('/app?section=today');
+    await page.goto('/app?section=today&cardio=1');
     await waitForSurface(page, 'today');
 
     const row = page
