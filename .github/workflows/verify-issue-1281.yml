@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 3
+          fetch-depth: 12
           persist-credentials: false
       - name: Prove application tree equals pinned dev
         working-directory: .
@@ -81,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 3
+          fetch-depth: 12
           persist-credentials: false
       - name: Prove application tree equals pinned dev
         working-directory: .
