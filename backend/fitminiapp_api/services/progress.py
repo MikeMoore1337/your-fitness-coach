@@ -51,6 +51,7 @@ from fitminiapp_api.services.period_bounds import (
 )
 from fitminiapp_api.services.profile import serialize_body_priority
 from fitminiapp_api.services.workout_ownership import workout_owner_id
+from fitminiapp_api.services.workout_sides import SIDE_MODES, sql_completed_set_volume
 from fitminiapp_api.services.workouts import working_volume_set_filter
 
 FORMULA_VERSION = "adherence-v1"
@@ -777,6 +778,8 @@ def build_progress_summaries(
             UserWorkout.scheduled_date,
             UserWorkoutSet.actual_weight,
             UserWorkoutSet.actual_reps,
+            UserWorkoutSet.execution_mode,
+            sql_completed_set_volume().label("set_volume"),
         )
         .select_from(UserWorkout)
         .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
@@ -799,7 +802,14 @@ def build_progress_summaries(
     )
     period_best: dict[tuple[int, int], tuple[float, float]] = {}
     volume_by_user: dict[int, float] = defaultdict(float)
+    incomplete_volume_by_user: dict[int, bool] = defaultdict(bool)
     for set_row in set_rows:
+        if set_row.execution_mode in SIDE_MODES:
+            if set_row.set_volume is None:
+                incomplete_volume_by_user[set_row.user_id] = True
+            else:
+                volume_by_user[set_row.user_id] += float(set_row.set_volume)
+            continue
         weight = float(set_row.actual_weight or 0)
         volume = weight * float(set_row.actual_reps or 0)
         volume_by_user[set_row.user_id] += volume
@@ -1052,6 +1062,7 @@ def build_progress_summaries(
                     training_counts_by_user[user.id].completed_workout_count * 7 / period_days, 2
                 ),
                 "volume_kg": round(volume_by_user[user.id], 2),
+                "volume_incomplete": incomplete_volume_by_user[user.id] or None,
                 "new_personal_records": new_records_by_user[user.id],
                 "last_completed_workout_on": last_completed_by_user.get(user.id),
                 "next_workout": next_workout,

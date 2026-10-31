@@ -5,6 +5,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -37,6 +38,7 @@ from fitminiapp_api.services.workout_metrics import (
     validate_workout_set_changes,
     workout_exercise_metric_type,
 )
+from fitminiapp_api.services.workout_sides import SIDE_MODES, serialize_sides
 from fitminiapp_api.services.workout_sync import (
     WorkoutSetSyncError,
     apply_workout_set_update,
@@ -460,11 +462,31 @@ def _driving_set_rows(
 def _session_facts_for_selection(
     exercise: UserWorkoutExercise,
     selection: ProgressionSetSelection,
+    *,
+    side: Literal["left", "right"] | None = None,
+    mode: str | None = None,
 ) -> SessionFacts:
     rows = _driving_set_rows(exercise, selection)
     completed = [item for item in rows if item.is_completed]
-    reps = [item.actual_reps for item in completed if item.actual_reps is not None]
-    weights = [float(item.actual_weight) for item in completed if item.actual_weight is not None]
+    facts = (
+        [
+            next(
+                (fact for fact in item.side_results if fact.side == side and fact.is_completed),
+                None,
+            )
+            if item.execution_mode == mode
+            else None
+            for item in completed
+        ]
+        if side is not None
+        else completed
+    )
+    reps = [item.actual_reps for item in facts if item is not None and item.actual_reps is not None]
+    weights = [
+        float(item.actual_weight)
+        for item in facts
+        if item is not None and item.actual_weight is not None
+    ]
     complete = (
         len(rows) == selection.expected_count
         and len(completed) == selection.expected_count
@@ -481,8 +503,8 @@ def _session_facts_for_selection(
         load=weights[0] if complete else None,
         reps_min=min(reps) if reps else None,
         reps_max=max(reps) if reps else None,
-        rir_values=tuple(item.rir for item in completed if item.rir is not None),
-        reached_failure=any(item.reached_failure is True for item in completed),
+        rir_values=tuple(item.rir for item in facts if item is not None and item.rir is not None),
+        reached_failure=any(item is not None and item.reached_failure is True for item in facts),
         complete=complete,
         completion_feedback=exercise.workout.completion_feedback,
         source_set_ids=tuple(item.id for item in completed),
@@ -1095,7 +1117,7 @@ def _target_set_updates(
     updates: list[dict[str, object]] = []
     direct_rows = _driving_set_rows(current, selection)
     if len(direct_rows) != selection.expected_count or any(
-        item.is_completed for item in direct_rows
+        item.is_completed or item.execution_mode in SIDE_MODES for item in direct_rows
     ):
         return []
     pending_rows = direct_rows
@@ -1133,7 +1155,9 @@ def _target_set_updates(
             if row is None:
                 return []
             backoff_rows.append((row, factor))
-        if any(row.is_completed for row, _factor in backoff_rows):
+        if any(
+            row.is_completed or row.execution_mode in SIDE_MODES for row, _factor in backoff_rows
+        ):
             return []
         for row, factor in backoff_rows:
             updates.append(
@@ -1229,6 +1253,130 @@ def _attach_proposal(
         "eligibility_status": eligibility,
         "requires_confirmation": True,
     }
+    return result
+
+
+def _attach_side_proposal(
+    result: dict,
+    *,
+    current: UserWorkoutExercise,
+    selection: ProgressionSetSelection,
+    mode: str,
+    sides: dict,
+    actions: dict[str, str],
+    sessions: dict[str, list[SessionFacts]],
+) -> dict:
+    left, right = sides["left"], sides["right"]
+    if (
+        actions != {"left": "set_load", "right": "set_load"}
+        or left["outcome"] != right["outcome"]
+        or left["evidence"]["reason_keys"] != right["evidence"]["reason_keys"]
+        or left.get("suggested_weight") is None
+        or right.get("suggested_weight") is None
+        or (
+            left["outcome"] == "consider_progressing"
+            and any(
+                _progression_failure(item) for values in sessions.values() for item in values[:3]
+            )
+        )
+    ):
+        return result
+    rows: list[tuple[UserWorkoutSet, float | None]] = [
+        (item, None) for item in _driving_set_rows(current, selection)
+    ]
+    if len(rows) != selection.expected_count:
+        return result
+    for position, factor in selection.relative_backoffs:
+        row = next(
+            (
+                item
+                for item in current.sets
+                if item.planned_position == position and item.planned_role == "backoff"
+            ),
+            None,
+        )
+        if row is None:
+            return result
+        rows.append((row, factor))
+    if any(
+        row.is_completed
+        or row.execution_mode != mode
+        or any(side.is_completed for side in row.side_results)
+        for row, _ in rows
+    ):
+        return result
+
+    updates = []
+    for row, target_factor in rows:
+        proposed = {}
+        for side in ("left", "right"):
+            try:
+                weight = Decimal(str(sides[side]["suggested_weight"])) * Decimal(
+                    str(target_factor or 1)
+                )
+                if (
+                    weight < 0
+                    or weight > Decimal("99999999.99")
+                    or weight != weight.quantize(Decimal("0.01"))
+                ):
+                    return result
+            except InvalidOperation:
+                return result
+            proposed[side] = float(weight)
+        updates.append(
+            {
+                "set_id": row.id,
+                "set_number": row.set_number,
+                "planned_role": row.planned_role,
+                "current_weight": None,
+                "set_version": row.version,
+                "relative_to_top": target_factor,
+                "proposed_weight": None,
+                "proposed_side_weights": proposed,
+            }
+        )
+    evidence = [
+        f"workout:{item.workout_id}/set:{set_id}/side:{side}"
+        for side in ("left", "right")
+        for item in sessions[side][:3]
+        for set_id in item.source_set_ids
+    ]
+    proposal = result["proposal"]
+    proposal.update(
+        {
+            "current_weight": None,
+            "proposed_weight": None,
+            "side_execution_mode": mode,
+            "proposed_side_weights": {
+                "left": left["suggested_weight"],
+                "right": right["suggested_weight"],
+            },
+            "proposed_action": "set_load",
+            "target_set_updates": updates,
+            "source_evidence_ids": evidence,
+            "comparable_session_count": min(
+                left["evidence"]["comparable_session_count"],
+                right["evidence"]["comparable_session_count"],
+            ),
+            "reason_codes": left["evidence"]["reason_keys"],
+            "eligibility_status": "eligible",
+        }
+    )
+    proposal["proposal_id"] = _sha256(
+        {
+            "rule_id": proposal["rule_id"],
+            "target": [
+                proposal["target_program_id"],
+                proposal["target_revision_number"],
+                proposal["target_workout_id"],
+                proposal["target_exercise_id"],
+            ],
+            "side_execution_mode": mode,
+            "updates": updates,
+            "sources": evidence,
+            "reasons": proposal["reason_codes"],
+        }
+    )
     return result
 
 
@@ -1340,7 +1488,10 @@ def build_progression_guidance(
         db.query(UserWorkoutExercise)
         .join(UserWorkout, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserProgram, UserWorkout.user_program_id == UserProgram.id)
-        .options(joinedload(UserWorkoutExercise.sets), joinedload(UserWorkoutExercise.workout))
+        .options(
+            joinedload(UserWorkoutExercise.sets).joinedload(UserWorkoutSet.side_results),
+            joinedload(UserWorkoutExercise.workout),
+        )
         .filter(
             UserProgram.user_id == user.id,
             UserWorkout.user_program_id == workout.user_program_id,
@@ -1395,6 +1546,17 @@ def build_progression_guidance(
             week_number=workout.week_number,
         )
         selection = _progression_set_selection(current, rule_kind=rule.kind if rule else None)
+        target_modes = {
+            item.execution_mode
+            for item in _driving_set_rows(current, selection)
+            if item.execution_mode is not None
+        }
+        side_mode = next(iter(target_modes)) if len(target_modes) == 1 else None
+        if side_mode not in SIDE_MODES:
+            side_mode = None
+        side_guidance = None
+        side_actions: dict[str, str] = {}
+        side_sessions: dict[str, list[SessionFacts]] = {}
         target_reps = (
             _rep_target_text(rule.rep_target)
             if rule is not None and rule.kind == "double_progression"
@@ -1552,6 +1714,70 @@ def build_progression_guidance(
             context_changed = bool(
                 (same_type if typed_context else same_exercise) and not comparable
             )
+            if side_mode is not None:
+                side_guidance = {"execution_mode": side_mode}
+                for side in ("left", "right"):
+                    matching = [
+                        item
+                        for item in comparable
+                        if any(
+                            row.execution_mode == side_mode
+                            for row in _driving_set_rows(item, selection)
+                        )
+                    ]
+                    side_facts = [
+                        _session_facts_for_selection(item, selection, side=side, mode=side_mode)
+                        for item in matching
+                    ]
+                    considered = side_facts[:3] if typed_context else side_facts
+                    if rule is not None:
+                        side_result, side_action, _, _ = _rule_guidance(
+                            rule=rule,
+                            selection=selection,
+                            current=current,
+                            sessions=considered,
+                            current_is_deload=scheduled_deload,
+                        )
+                    elif not isinstance(metadata, dict) or not metadata.get("coaching_rules"):
+                        side_result = evaluate_progression(
+                            prescribed_sets=selection.expected_count,
+                            prescribed_reps=target_reps or current.prescribed_reps,
+                            sessions=considered,
+                            load_unit="kg",
+                            context_changed=context_changed,
+                        )
+                        side_action = (
+                            "set_load"
+                            if side_result.get("suggested_weight") is not None
+                            else "hold"
+                        )
+                    else:
+                        side_result = _review_result(
+                            prescribed_sets=selection.expected_count,
+                            prescribed_reps=target_reps or current.prescribed_reps,
+                            reason_code="no_applicable_coaching_rule",
+                            detail="Для этого упражнения и недели программы нет применимого правила.",
+                        )
+                        side_action = "hold"
+                    if typed_context:
+                        side_result["ruleset_version"] = TYPED_RULESET_VERSION
+                        side_result["evidence"]["week_type"] = week_type
+                        side_result["evidence"]["comparable_session_count"] = sum(
+                            item.complete for item in side_facts
+                        )
+                    if considered and not considered[0].complete:
+                        side_result.update(
+                            outcome="review",
+                            message=_PROGRESS_MESSAGES["review"],
+                            detail="Последняя сопоставимая тренировка содержит неполный подход.",
+                            suggested_weight=None,
+                            suggested_increment=None,
+                        )
+                        side_result["evidence"]["reason_keys"].append("incomplete_session_facts")
+                        side_action = "hold"
+                    side_guidance[side] = side_result
+                    side_actions[side] = side_action
+                    side_sessions[side] = considered
             if rule is None:
                 if not isinstance(metadata, dict) or not metadata.get("coaching_rules"):
                     result = evaluate_progression(
@@ -1643,6 +1869,17 @@ def build_progression_guidance(
             deload_volume_percent=volume,
             deload_intensity_percent=intensity,
         )
+        if side_guidance is not None and side_mode is not None:
+            guidance[current.id]["side_guidance"] = side_guidance
+            _attach_side_proposal(
+                guidance[current.id],
+                current=current,
+                selection=selection,
+                mode=side_mode,
+                sides=side_guidance,
+                actions=side_actions,
+                sessions=side_sessions,
+            )
     return guidance
 
 
@@ -1876,19 +2113,58 @@ def review_assigned_program_progression_proposal(
         expected_ids = {int(item["set_id"]) for item in target_updates}
         if set(expected_set_versions) != expected_ids:
             raise ProgramError("Progression proposal target set versions are incomplete")
+        side_mode = proposal.get("side_execution_mode")
+        if side_mode is not None and decision == "adjust":
+            raise ProgramError("Adjust side weights separately in the workout")
+        for item in target_updates:
+            set_id = int(item["set_id"])
+            row = next((row for row in exercise.sets if row.id == set_id), None)
+            if (
+                row is None
+                or row.is_completed
+                or expected_set_versions[set_id] != row.version
+                or item["set_version"] != row.version
+                or (
+                    side_mode is not None
+                    and (
+                        row.execution_mode != side_mode
+                        or any(side.is_completed for side in row.side_results)
+                    )
+                )
+            ):
+                raise ProgramError("Progression proposal target set changed")
         for item in target_updates:
             set_id = int(item["set_id"])
             set_row = next((row for row in exercise.sets if row.id == set_id), None)
             if set_row is None or set_row.is_completed:
                 raise ProgramError("Progression proposal target set is no longer available")
-            chosen_weight = (
-                adjusted_weight if decision == "adjust" else float(item["proposed_weight"])
-            )
-            if chosen_weight is None:
-                raise ProgramError("Adjusted progression load is required")
-            if decision == "adjust" and item["relative_to_top"] is not None:
-                chosen_weight *= float(item["relative_to_top"])
-            changes = {"actual_weight": chosen_weight}
+            if side_mode is not None:
+                existing = serialize_sides(set_row) or {"left": None, "right": None}
+                sides = {}
+                for side in ("left", "right"):
+                    facts = existing[side] or {
+                        "actual_reps": None,
+                        "actual_weight": None,
+                        "rir": None,
+                        "reached_failure": None,
+                        "is_completed": False,
+                    }
+                    sides[side] = {**facts, "actual_weight": item["proposed_side_weights"][side]}
+                changes = {
+                    "execution_mode": side_mode,
+                    "first_side": set_row.first_side,
+                    "sides": sides,
+                    "is_completed": False,
+                }
+            else:
+                chosen_weight = (
+                    adjusted_weight if decision == "adjust" else float(item["proposed_weight"])
+                )
+                if chosen_weight is None:
+                    raise ProgramError("Adjusted progression load is required")
+                if decision == "adjust" and item["relative_to_top"] is not None:
+                    chosen_weight *= float(item["relative_to_top"])
+                changes = {"actual_weight": chosen_weight}
             mutation_id = _sha256(
                 {
                     "proposal_id": proposal_id,
@@ -1944,6 +2220,8 @@ def review_assigned_program_progression_proposal(
             "source_evidence_ids": proposal["source_evidence_ids"],
             "reason_codes": proposal["reason_codes"],
             "proposed_weight": proposal["proposed_weight"],
+            "proposed_side_weights": proposal.get("proposed_side_weights"),
+            "side_execution_mode": proposal.get("side_execution_mode"),
             "adjusted_weight": adjusted_weight,
             "actor_role": role,
             "changed_set_count": len(applied_set_ids),

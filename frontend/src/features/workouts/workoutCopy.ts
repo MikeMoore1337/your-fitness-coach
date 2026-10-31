@@ -35,13 +35,40 @@ function setLabel(set: CopySet): string {
   return set.set_kind === 'working' ? 'Рабочий подход' : 'Подход';
 }
 
-function strengthResult(set: CopySet): string {
+function strengthResult(set: Pick<CopySet, 'actual_weight' | 'actual_reps'>): string {
   const weight = set.actual_weight == null ? null : `${number(set.actual_weight)} кг`;
   const reps = set.actual_reps == null ? null : repetitions(set.actual_reps);
   if (weight && reps) return `${weight} × ${reps}`;
   if (weight) return `${weight} · повторы не записаны`;
   if (reps) return `${reps} · вес не записан`;
   return 'вес и повторы не записаны';
+}
+
+function sideResult(label: string, side: NonNullable<CopySet['sides']>['left']): string {
+  if (!side) return `${label}: нет данных`;
+  return [
+    `${label}: ${strengthResult(side)}`,
+    side.rir == null ? null : `RIR ${side.rir}`,
+    side.reached_failure ? 'до отказа' : null,
+    side.is_completed ? null : 'не завершена',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function hasSideFacts(set: CopySet): boolean {
+  return (
+    !!set.sides &&
+    [set.sides.left, set.sides.right].some(
+      (side) =>
+        side &&
+        (side.is_completed ||
+          side.actual_reps != null ||
+          side.actual_weight != null ||
+          side.rir != null ||
+          side.reached_failure != null),
+    )
+  );
 }
 
 function cardioResult(set: CopySet): string {
@@ -73,7 +100,7 @@ export function formatWorkoutCopy(workout: WorkoutCopyInput): string {
   );
   for (const exercise of exercises) {
     const sets = exercise.sets
-      .filter((set) => set.is_completed === true)
+      .filter((set) => set.is_completed === true || hasSideFacts(set))
       .sort((left, right) => {
         return (
           Number(isWarmup(right)) - Number(isWarmup(left)) || left.set_number - right.set_number
@@ -82,11 +109,22 @@ export function formatWorkoutCopy(workout: WorkoutCopyInput): string {
     if (!sets.length) continue;
     lines.push('', exercise.exercise_title);
     for (const set of sets) {
-      lines.push(
-        exercise.metric_type === 'cardio'
-          ? `Этап ${set.set_number}: ${cardioResult(set)}`
-          : `${setLabel(set)} ${set.set_number}: ${strengthResult(set)}`,
-      );
+      if (
+        exercise.metric_type === 'strength' &&
+        set.sides &&
+        (set.execution_mode === 'per_side' || set.execution_mode === 'alternating')
+      ) {
+        const state = set.is_completed ? '' : ' · не завершён';
+        lines.push(
+          `${setLabel(set)} ${set.set_number}${state}: ${sideResult('Левая', set.sides.left)}; ${sideResult('Правая', set.sides.right)}`,
+        );
+      } else {
+        lines.push(
+          exercise.metric_type === 'cardio'
+            ? `Этап ${set.set_number}: ${cardioResult(set)}`
+            : `${setLabel(set)} ${set.set_number}: ${strengthResult(set)}`,
+        );
+      }
     }
   }
   if (lines.length === 2) lines.push('', 'Выполненные подходы не записаны.');

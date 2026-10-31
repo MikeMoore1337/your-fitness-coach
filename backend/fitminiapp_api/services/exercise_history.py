@@ -1,24 +1,42 @@
 from __future__ import annotations
 
+import json
 import math
+from collections import defaultdict
 from datetime import date, timedelta
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from fitminiapp_api.core.timezone import today_for_user
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.program import (
+    ProgramRevision,
     UserProgram,
     UserWorkout,
     UserWorkoutExercise,
     UserWorkoutSet,
+    UserWorkoutSetSide,
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
+from fitminiapp_api.services.program_versioning import workout_cycle_week_type
+from fitminiapp_api.services.progression_guidance import (
+    _matches_cycle_plan,
+    _metadata_block_context,
+    _revision_for_completion,
+    _snapshot_block_context,
+    _snapshot_metadata,
+)
 from fitminiapp_api.services.workout_metrics import exercise_metric_type
 from fitminiapp_api.services.workout_ownership import workout_owner_id
+from fitminiapp_api.services.workout_sides import (
+    SIDE_MODES,
+    completed_set_reps,
+    completed_set_volume,
+    serialize_sides,
+)
 from fitminiapp_api.services.workouts import (
     counts_toward_working_volume,
     is_pr_record_set,
@@ -95,21 +113,23 @@ def _session_payload(
     *,
     strength_metrics: bool,
 ) -> dict:
-    authoritative = [item for item in sets if is_pr_record_set(item)]
-    reps = [item.actual_reps for item in sets if item.actual_reps is not None]
+    completed = [item for item in sets if item.is_completed]
+    authoritative = [item for item in completed if is_pr_record_set(item)]
+    scalar_authoritative = [item for item in authoritative if item.execution_mode not in SIDE_MODES]
+    reps = [value for item in completed if (value := completed_set_reps(item)) is not None]
     authoritative_loads = [
         float(item.actual_weight)
-        for item in authoritative
+        for item in scalar_authoritative
         if strength_metrics and item.actual_weight is not None and float(item.actual_weight) > 0
     ]
     volumes = [
         float(item.actual_reps) * float(item.actual_weight)
-        for item in authoritative
+        for item in scalar_authoritative
         if strength_metrics and item.actual_reps is not None and item.actual_weight is not None
     ]
     estimates = [
         estimate
-        for item in authoritative
+        for item in scalar_authoritative
         if strength_metrics
         if (
             estimate := _estimated_1rm(
@@ -126,30 +146,41 @@ def _session_payload(
             if strength_metrics and item.actual_weight is not None
             else None
         )
-        reps_value = item.actual_reps
-        volume = (
-            round(float(reps_value) * load, 2)
-            if reps_value is not None and load is not None
-            else None
+        reps_value = completed_set_reps(item) if item.is_completed else None
+        volume_value = (
+            completed_set_volume(item) if item.is_completed and strength_metrics else None
         )
-        serialized_sets.append(
-            {
-                "set_number": item.set_number,
-                "reps": reps_value,
-                "load_kg": load,
-                "volume_kg": volume,
-                "rir": item.rir,
-                "set_kind": item.set_kind,
-                "planned_role": item.planned_role,
-                "analytics_bucket": set_analytics_bucket(item),
-                "pr_eligible": strength_metrics and is_pr_record_set(item),
-            }
-        )
+        serialized = {
+            "set_number": item.set_number,
+            "reps": reps_value,
+            "load_kg": load,
+            "volume_kg": round(float(volume_value), 2) if volume_value is not None else None,
+            "rir": item.rir,
+            "set_kind": item.set_kind,
+            "planned_role": item.planned_role,
+            "analytics_bucket": set_analytics_bucket(item),
+            "pr_eligible": (
+                strength_metrics
+                and item.is_completed
+                and item.execution_mode not in SIDE_MODES
+                and is_pr_record_set(item)
+            ),
+        }
+        if item.execution_mode in SIDE_MODES:
+            serialized.update(
+                {
+                    "execution_mode": item.execution_mode,
+                    "first_side": item.first_side,
+                    "sides": serialize_sides(item),
+                    "is_completed": item.is_completed,
+                }
+            )
+        serialized_sets.append(serialized)
     return {
         "workout": _workout_ref(workout),
         "workout_exercise_id": exercise.id,
         "prescribed_reps": exercise.prescribed_reps,
-        "completed_set_count": len(sets),
+        "completed_set_count": len(completed),
         "authoritative_set_count": len(authoritative),
         "reps_total": sum(reps) if reps else None,
         "max_authoritative_load_kg": max(authoritative_loads) if authoritative_loads else None,
@@ -299,6 +330,141 @@ def _progression(session_facts: list[dict]) -> list[dict]:
     ]
 
 
+def _side_records(db: Session, rows: list) -> list[dict]:
+    side_rows = [
+        (exercise, workout, workout_set)
+        for exercise, workout, workout_set in rows
+        if workout_set.is_completed
+        and workout_set.execution_mode in SIDE_MODES
+        and is_pr_record_set(workout_set)
+    ]
+    if not side_rows:
+        return []
+    program_ids = {
+        workout.user_program_id for _, workout, _ in side_rows if workout.user_program_id
+    }
+    revisions: dict[int, list[ProgramRevision]] = defaultdict(list)
+    for revision in db.query(ProgramRevision).filter(
+        ProgramRevision.user_program_id.in_(program_ids)
+    ):
+        revisions[revision.user_program_id].append(revision)
+
+    grouped: dict[tuple, dict] = {}
+    for exercise, workout, workout_set in side_rows:
+        program_revisions = revisions.get(workout.user_program_id, [])
+        revision_number = workout.plan_revision_number or _revision_for_completion(
+            program_revisions, workout.completed_at
+        )
+        revision = next(
+            (item for item in program_revisions if item.revision_number == revision_number), None
+        )
+        week_type, week_known = workout_cycle_week_type(db, workout, program_revisions)
+        block = _snapshot_block_context(revision, workout) if revision is not None else ("invalid",)
+        metadata = _snapshot_metadata(revision)
+        metadata_block = (
+            _metadata_block_context(metadata, workout.week_number)
+            if (metadata is not None and workout.week_number is not None)
+            else "invalid"
+        )
+        verified = bool(
+            workout.user_program_id is not None
+            and workout.completed_at is not None
+            and revision is not None
+            and week_known
+            and block != ("invalid",)
+            and metadata_block != "invalid"
+        )
+        if verified and workout.source_cycle_week is not None:
+            verified = _matches_cycle_plan(
+                db, workout.user_program, program_revisions, workout, exercise
+            )
+        context = {
+            "program_id": workout.user_program_id,
+            "revision_number": revision_number or None,
+            "day_number": workout.day_number,
+            "source_template_exercise_id": exercise.source_template_exercise_id,
+            "week_type": week_type if week_known else None,
+            "planned_role": workout_set.planned_role,
+            "planned_position": workout_set.planned_position,
+            "verified": verified,
+        }
+        signature = json.dumps(exercise.prescription, sort_keys=True, ensure_ascii=False)
+        for side in workout_set.side_results:
+            if not side.is_completed:
+                continue
+            key = (
+                workout_set.execution_mode,
+                side.side,
+                workout.user_program_id,
+                revision_number,
+                workout.day_number,
+                exercise.exercise_id,
+                exercise.source_template_exercise_id,
+                exercise.sort_order,
+                exercise.prescribed_sets,
+                exercise.prescribed_reps,
+                signature,
+                workout_set.planned_role,
+                workout_set.planned_position,
+                week_type,
+                block,
+                metadata_block,
+                None if verified else workout.id,
+            )
+            group = grouped.setdefault(key, {"context": context, "sessions": {}})
+            session = group["sessions"].setdefault(
+                (workout.id, exercise.id),
+                {"workout": _workout_ref(workout), "sets": []},
+            )
+            session["sets"].append(
+                {
+                    "set_number": workout_set.set_number,
+                    "reps": side.actual_reps,
+                    "load_kg": float(side.actual_weight)
+                    if side.actual_weight is not None
+                    else None,
+                    "pr_eligible": True,
+                }
+            )
+
+    result = []
+    for key, group in grouped.items():
+        facts = list(group["sessions"].values())
+        for fact in facts:
+            weights = [
+                item["load_kg"]
+                for item in fact["sets"]
+                if item["load_kg"] is not None and item["load_kg"] > 0
+            ]
+            estimates = [
+                estimate
+                for item in fact["sets"]
+                if (estimate := _estimated_1rm(item["load_kg"], item["reps"])) is not None
+            ]
+            fact["max_authoritative_load_kg"] = max(weights) if weights else None
+            fact["estimated_1rm_kg"] = max(estimates) if estimates else None
+            fact["authoritative_set_count"] = len(fact["sets"])
+        facts.sort(
+            key=lambda item: (item["workout"]["performed_on"], item["workout"]["workout_id"]),
+            reverse=True,
+        )
+        estimates = [
+            fact["estimated_1rm_kg"] for fact in facts if fact["estimated_1rm_kg"] is not None
+        ]
+        result.append(
+            {
+                "execution_mode": key[0],
+                "side": key[1],
+                "context": group["context"],
+                "best_authoritative_load": _best_metric(facts, "max_authoritative_load_kg"),
+                "estimated_1rm_kg": max(estimates) if estimates else None,
+                "rep_prs": _rep_prs(facts),
+                "progression": _progression(facts),
+            }
+        )
+    return result
+
+
 def _progression_events(
     db: Session,
     user: User,
@@ -383,6 +549,7 @@ def build_exercise_history(
         .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
+        .options(selectinload(UserWorkoutSet.side_results))
         .filter(
             workout_owner_id() == user.id,
             UserWorkout.status == "completed",
@@ -391,7 +558,18 @@ def build_exercise_history(
                 UserWorkoutExercise.metric_type.is_(None),
                 UserWorkoutExercise.metric_type == metric_type,
             ),
-            UserWorkoutSet.is_completed.is_(True),
+            or_(
+                UserWorkoutSet.is_completed.is_(True),
+                UserWorkoutSet.side_results.any(
+                    or_(
+                        UserWorkoutSetSide.is_completed.is_(True),
+                        UserWorkoutSetSide.actual_reps.is_not(None),
+                        UserWorkoutSetSide.actual_weight.is_not(None),
+                        UserWorkoutSetSide.rir.is_not(None),
+                        UserWorkoutSetSide.reached_failure.is_not(None),
+                    )
+                ),
+            ),
         )
         .order_by(
             UserWorkout.scheduled_date.desc(),
@@ -469,6 +647,7 @@ def build_exercise_history(
         ),
         "estimated_1rm": estimated if metric_type == "strength" else None,
         "rep_prs": _rep_prs(session_facts),
+        "side_records": _side_records(db, rows) if metric_type == "strength" else [],
         "windows": _windows(session_facts, today_for_user(user)),
         "recent_sessions": recent_facts,
         "progression": _progression(all_facts_for_progression),

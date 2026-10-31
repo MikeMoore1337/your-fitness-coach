@@ -412,7 +412,11 @@ def build_weekly_summary(
         "anthropometry_trends": anthropometry_trends,
         "body_priority": body_progress["body"]["priority"],
         "progression": {
-            "training_volume_kg": progress["training"]["volume_kg"],
+            "training_volume_kg": (
+                None
+                if progress["training"].get("volume_incomplete")
+                else progress["training"]["volume_kg"]
+            ),
             "new_personal_records": progress["training"]["new_personal_records"],
         },
         "data_sufficiency": {

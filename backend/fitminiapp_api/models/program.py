@@ -607,6 +607,11 @@ class UserWorkoutSet(Base):
             name="ck_user_workout_sets_kind",
         ),
         CheckConstraint("version >= 1", name="ck_user_workout_sets_version_positive"),
+        CheckConstraint(
+            "(execution_mode IS NULL OR execution_mode IN ('bilateral', 'per_side', 'alternating')) "
+            "AND (first_side IS NULL OR first_side IN ('left', 'right'))",
+            name="ck_user_workout_sets_side_metadata",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -616,6 +621,8 @@ class UserWorkoutSet(Base):
     set_number: Mapped[int] = mapped_column(Integer)
     actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     actual_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    execution_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    first_side: Mapped[str | None] = mapped_column(String(5), nullable=True)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
     average_heart_rate_bpm: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -634,6 +641,45 @@ class UserWorkoutSet(Base):
 
     workout_exercise: Mapped[UserWorkoutExercise] = relationship(
         "UserWorkoutExercise", back_populates="sets"
+    )
+    side_results: Mapped[list[UserWorkoutSetSide]] = relationship(
+        "UserWorkoutSetSide",
+        back_populates="workout_set",
+        cascade="all, delete-orphan",
+        order_by="UserWorkoutSetSide.side",
+    )
+
+
+class UserWorkoutSetSide(Base):
+    __tablename__ = "user_workout_set_sides"
+    __table_args__ = (
+        UniqueConstraint("workout_set_id", "side", name="uq_user_workout_set_sides_set_side"),
+        CheckConstraint("side IN ('left', 'right')", name="ck_user_workout_set_sides_side"),
+        CheckConstraint(
+            "actual_reps IS NULL OR actual_reps >= 0", name="ck_user_workout_set_sides_reps"
+        ),
+        CheckConstraint(
+            "actual_weight IS NULL OR actual_weight >= 0", name="ck_user_workout_set_sides_weight"
+        ),
+        CheckConstraint(
+            "rir IS NULL OR rir IN ('0', '1', '2', '3', '4+')",
+            name="ck_user_workout_set_sides_rir",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workout_set_id: Mapped[int] = mapped_column(
+        ForeignKey("user_workout_sets.id", ondelete="CASCADE"), nullable=False
+    )
+    side: Mapped[str] = mapped_column(String(5), nullable=False)
+    actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actual_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    workout_set: Mapped[UserWorkoutSet] = relationship(
+        "UserWorkoutSet", back_populates="side_results"
     )
 
 

@@ -15,6 +15,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutExercise,
     UserWorkoutSet,
+    UserWorkoutSetSide,
 )
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.models.workout_exercise_note import (
@@ -108,6 +109,7 @@ def test_note_history_uses_its_own_workout_and_preserves_set_history(client, cas
             .filter_by(workout_exercise_id=case["recent_ex"], set_number=4)
             .one()
         )
+
         recent_set.actual_weight = 77
         db.get(UserWorkout, case["current"]).completion_note = "Общая заметка"
     history_before = client.get(
@@ -142,6 +144,53 @@ def test_note_history_uses_its_own_workout_and_preserves_set_history(client, cas
             .filter_by(workout_exercise_id=case["current_ex"])
             .all()
         )
+
+
+def test_previous_note_keeps_each_side_and_effort(client, case):
+    old = _read(client, case, "old", "old_ex")
+    response = client.put(
+        _url(case["old"], case["old_ex"]),
+        headers=case["headers"],
+        json=_payload(old, "old-sides", body="Разная нагрузка", tags=[]),
+    )
+    assert response.status_code == 200, response.text
+    with get_session_context() as db:
+        workout_set = (
+            db.query(UserWorkoutSet)
+            .filter_by(workout_exercise_id=case["old_ex"], set_number=4)
+            .one()
+        )
+        workout_set.execution_mode = "per_side"
+        workout_set.actual_weight = None
+        workout_set.actual_reps = None
+        db.add_all(
+            [
+                UserWorkoutSetSide(
+                    workout_set_id=workout_set.id,
+                    side="left",
+                    actual_weight=18,
+                    actual_reps=10,
+                    rir="2",
+                    reached_failure=False,
+                    is_completed=True,
+                ),
+                UserWorkoutSetSide(
+                    workout_set_id=workout_set.id,
+                    side="right",
+                    actual_weight=16,
+                    actual_reps=8,
+                    rir="0",
+                    reached_failure=True,
+                    is_completed=True,
+                ),
+            ]
+        )
+    load = _read(client, case)["previous_note"]["load"]
+    assert load["execution_mode"] == "per_side"
+    assert load["sides"]["left"]["actual_weight"] == 18
+    assert load["sides"]["left"]["reached_failure"] is False
+    assert load["sides"]["right"]["actual_reps"] == 8
+    assert load["sides"]["right"]["reached_failure"] is True
 
 
 def test_version_idempotency_delete_and_validation(client, case):

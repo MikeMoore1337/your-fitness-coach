@@ -237,6 +237,65 @@ export function ProgressionGuidance({
     );
   }, [exerciseKey]);
 
+  const apply = () => {
+    if (!onApply || applyStarted.current || applied) return;
+    applyStarted.current = true;
+    try {
+      const pending = onApply();
+      if (pending) {
+        void pending.catch(() => {
+          applyStarted.current = false;
+        });
+      }
+    } catch (error) {
+      applyStarted.current = false;
+      throw error;
+    }
+  };
+
+  if (guidance.side_guidance) {
+    const sides = guidance.side_guidance;
+    return (
+      <section aria-label="Рекомендации по сторонам" className="progression-guidance is-review">
+        <div className="progression-guidance__copy">
+          <span>Следующая нагрузка</span>
+          <strong>Прогрессия по сторонам</strong>
+          {(['left', 'right'] as const).map((key) => {
+            const result = sides[key];
+            return (
+              <div key={key}>
+                <strong>{key === 'left' ? 'Левая сторона' : 'Правая сторона'}</strong>
+                <p>
+                  {result.message}
+                  {result.suggested_weight == null
+                    ? ''
+                    : ` · ${formatNumber(result.suggested_weight)} ${unitLabel(result.load_unit)}`}
+                </p>
+                <p>{result.detail}</p>
+                <small>
+                  Сопоставимых тренировок: {result.evidence.comparable_session_count} из{' '}
+                  {result.evidence.required_session_count}
+                </small>
+              </div>
+            );
+          })}
+        </div>
+        <div className="progression-guidance__actions">
+          {guidance.proposal?.proposed_side_weights && onApply && (
+            <Button type="button" variant="secondary" disabled={applied} onClick={apply}>
+              {applied
+                ? 'Вес подставлен'
+                : `Применить: левая ${formatNumber(guidance.proposal.proposed_side_weights.left)} кг, правая ${formatNumber(guidance.proposal.proposed_side_weights.right)} кг`}
+            </Button>
+          )}
+          <Button type="button" variant="ghost" onClick={onDismiss}>
+            Оставить текущую нагрузку
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="Рекомендация по следующей нагрузке"
@@ -323,26 +382,7 @@ export function ProgressionGuidance({
 
       <div className="progression-guidance__actions">
         {exactSuggestion != null && onApply && (
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={applied}
-            onClick={() => {
-              if (applyStarted.current || applied) return;
-              applyStarted.current = true;
-              try {
-                const pending = onApply();
-                if (pending) {
-                  void pending.catch(() => {
-                    applyStarted.current = false;
-                  });
-                }
-              } catch (error) {
-                applyStarted.current = false;
-                throw error;
-              }
-            }}
-          >
+          <Button type="button" variant="secondary" disabled={applied} onClick={apply}>
             {applied
               ? 'Вес подставлен'
               : `Применить ${formatNumber(exactSuggestion)} ${unitLabel(guidance.load_unit)}`}

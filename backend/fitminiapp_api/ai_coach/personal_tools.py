@@ -950,6 +950,14 @@ def _get_workout_context_tool(
                                 )
                             }
                         )
+                        if workout_set.get("execution_mode") in {"per_side", "alternating"}:
+                            sets[-1].update(
+                                {
+                                    "execution_mode": workout_set.get("execution_mode"),
+                                    "first_side": workout_set.get("first_side"),
+                                    "sides": workout_set.get("sides"),
+                                }
+                            )
                 exercises.append(
                     {
                         "title": exercise.get("exercise_title"),

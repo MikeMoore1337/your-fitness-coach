@@ -28,6 +28,7 @@ from fitminiapp_api.schemas.workout_exercise_note import (
 )
 from fitminiapp_api.services.program_versioning import workout_cycle_week_type
 from fitminiapp_api.services.workout_set_history import _completion_bounds
+from fitminiapp_api.services.workout_sides import SIDE_MODES, serialize_sides
 
 
 class ExerciseNoteError(Exception):
@@ -245,6 +246,15 @@ def _previous(
             else None,
         }
     )
+    if latest_set is not None and latest_set.execution_mode in SIDE_MODES:
+        assert load is not None
+        load.update(
+            {
+                "execution_mode": latest_set.execution_mode,
+                "first_side": latest_set.first_side,
+                "sides": serialize_sides(latest_set),
+            }
+        )
     value = _value(note)
     assert value is not None
     return {

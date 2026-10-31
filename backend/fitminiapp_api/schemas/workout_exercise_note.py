@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from fitminiapp_api.schemas.workout import WorkoutExecutionMode, WorkoutSide, WorkoutSideResults
+
 ExerciseNoteTag = Literal["easy", "hard", "increase_weight"]
 
 
@@ -77,6 +79,11 @@ class ExerciseNoteLoad(BaseModel):
     actual_reps: int | None
     duration_minutes: int | None
     distance_km: float | None
+    execution_mode: WorkoutExecutionMode | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
+    first_side: WorkoutSide | None = Field(default=None, exclude_if=lambda v: v is None)
+    sides: WorkoutSideResults | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class PreviousExerciseNote(ExerciseNoteValue):

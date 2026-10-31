@@ -451,6 +451,27 @@ def test_online_constraint_swap_rejects_unbounded_validating_replacement(
         validate_added_migration(path)
 
 
+def test_side_metadata_migrations_allow_only_read_only_sqlite_foreign_key_guard(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions"
+    validate_added_migration(root / "0143_workout_set_sides.py")
+    source = (root / "0144_workout_side_metadata_ck.py").read_text(encoding="utf-8")
+    validate_added_migration(_migration(tmp_path / "0144_safe.py", source))
+    for unsafe in (
+        source.replace(".getconfig(", ".setconfig("),
+        source.replace("SQLITE_DBCONFIG_ENABLE_FKEY", "SQLITE_DBCONFIG_ENABLE_TRIGGER"),
+        source.replace(
+            'raise RuntimeError("SQLite migration requires a connection with foreign keys disabled")',
+            "pass",
+        ),
+    ):
+        with pytest.raises(
+            OnlineMigrationError, match="outside the 'constraint_swap' online allowlist"
+        ):
+            validate_added_migration(_migration(tmp_path / "0144_unsafe.py", unsafe))
+
+
 def test_rest_interval_migrations_use_strict_online_contract() -> None:
     root = Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions"
     validate_added_migration(root / "0131_rest_interval_expand.py")

@@ -910,6 +910,7 @@ export function AssignedProgramDetails({
                 adjustedWeights[proposal.proposal_id] ?? String(proposal.proposed_weight ?? '');
               const adjustedWeightValue = parseDecimalDraft(adjustedWeight) ?? Number.NaN;
               const alreadyApplied =
+                !proposal.proposed_side_weights &&
                 updates.length > 0 &&
                 updates.every((update) => update.current_weight === update.proposed_weight);
               return (
@@ -942,54 +943,56 @@ export function AssignedProgramDetails({
                       })
                     }
                   />
-                  {proposal.eligibility_status === 'eligible' && canManageProgram && (
-                    <div className="progression-proposals__adjust">
-                      <Field
-                        label="Изменить предложенный вес, кг"
-                        labelFor={`progression-adjust-${proposal.proposal_id}`}
-                        hint="Тренерское или пользовательское изменение применится к незавершённым подходам."
-                      >
-                        <Input
-                          id={`progression-adjust-${proposal.proposal_id}`}
-                          inputMode="decimal"
-                          type="text"
-                          min="0.01"
-                          max="100000"
-                          step="0.01"
-                          value={adjustedWeight}
-                          onChange={(event) =>
-                            setAdjustedWeights((current) => ({
-                              ...current,
-                              [proposal.proposal_id]: event.target.value,
-                            }))
+                  {proposal.eligibility_status === 'eligible' &&
+                    canManageProgram &&
+                    !proposal.proposed_side_weights && (
+                      <div className="progression-proposals__adjust">
+                        <Field
+                          label="Изменить предложенный вес, кг"
+                          labelFor={`progression-adjust-${proposal.proposal_id}`}
+                          hint="Тренерское или пользовательское изменение применится к незавершённым подходам."
+                        >
+                          <Input
+                            id={`progression-adjust-${proposal.proposal_id}`}
+                            inputMode="decimal"
+                            type="text"
+                            min="0.01"
+                            max="100000"
+                            step="0.01"
+                            value={adjustedWeight}
+                            onChange={(event) =>
+                              setAdjustedWeights((current) => ({
+                                ...current,
+                                [proposal.proposal_id]: event.target.value,
+                              }))
+                            }
+                          />
+                        </Field>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={
+                            progressionReview.isPending ||
+                            !Number.isFinite(adjustedWeightValue) ||
+                            adjustedWeightValue <= 0 ||
+                            !hasDecimalScale(adjustedWeight, 2)
                           }
-                        />
-                      </Field>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={
-                          progressionReview.isPending ||
-                          !Number.isFinite(adjustedWeightValue) ||
-                          adjustedWeightValue <= 0 ||
-                          !hasDecimalScale(adjustedWeight, 2)
-                        }
-                        onClick={() =>
-                          progressionReview.mutate({
-                            exerciseId: item.exercise_id,
-                            proposalId: proposal.proposal_id,
-                            workoutId: proposal.target_workout_id,
-                            decision: 'adjust',
-                            adjustedWeight: adjustedWeightValue,
-                            expectedRevisionNumber: proposal.target_revision_number,
-                            expectedSetVersions,
-                          })
-                        }
-                      >
-                        Применить изменённый вес
-                      </Button>
-                    </div>
-                  )}
+                          onClick={() =>
+                            progressionReview.mutate({
+                              exerciseId: item.exercise_id,
+                              proposalId: proposal.proposal_id,
+                              workoutId: proposal.target_workout_id,
+                              decision: 'adjust',
+                              adjustedWeight: adjustedWeightValue,
+                              expectedRevisionNumber: proposal.target_revision_number,
+                              expectedSetVersions,
+                            })
+                          }
+                        >
+                          Применить изменённый вес
+                        </Button>
+                      </div>
+                    )}
                 </article>
               );
             })}

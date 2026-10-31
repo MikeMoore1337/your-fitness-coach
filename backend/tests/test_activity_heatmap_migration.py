@@ -78,7 +78,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0142_workout_history_import",)
+            ("0144_workout_side_metadata_ck",)
         ]
         assert connection.exec_driver_sql(
             "SELECT user_id, equipment_profiles, active_equipment_profile_id, equipment_profiles_revision FROM user_profiles"
@@ -94,6 +94,9 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
             None if activity_first else 3,
         )
         assert connection.exec_driver_sql(
-            "SELECT actual_weight, actual_reps, is_completed, plan_version FROM user_workout_sets"
-        ).one() == (42.25, 8, 1, None if activity_first else 3)
+            "SELECT actual_weight, actual_reps, is_completed, plan_version, execution_mode, first_side FROM user_workout_sets"
+        ).one() == (42.25, 8, 1, None if activity_first else 3, None, None)
+        assert (
+            connection.exec_driver_sql("SELECT COUNT(*) FROM user_workout_set_sides").scalar() == 0
+        )
     engine.dispose()

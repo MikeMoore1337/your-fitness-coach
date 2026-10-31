@@ -35,6 +35,35 @@ class HistoryImportSource(BaseModel):
     rir: str
     rpe: str
     side: str
+    performed_on: str | None = None
+    execution_mode: str | None = None
+    first_side: str | None = None
+    reached_failure: str | None = None
+    left_reps: str | None = None
+    left_weight: str | None = None
+    left_weight_unit: str | None = None
+    left_rir: str | None = None
+    left_reached_failure: str | None = None
+    left_status: str | None = None
+    right_reps: str | None = None
+    right_weight: str | None = None
+    right_weight_unit: str | None = None
+    right_rir: str | None = None
+    right_reached_failure: str | None = None
+    right_status: str | None = None
+
+
+class HistoryImportSideFact(BaseModel):
+    actual_reps: int | None
+    actual_weight: str | None
+    rir: str | None
+    reached_failure: bool | None
+    is_completed: bool
+
+
+class HistoryImportSides(BaseModel):
+    left: HistoryImportSideFact | None
+    right: HistoryImportSideFact | None
 
 
 class HistoryImportRow(BaseModel):
@@ -45,6 +74,7 @@ class HistoryImportRow(BaseModel):
     set_number: int | None
     reps: int | None
     weight_kg: str | None
+    sides: HistoryImportSides | None = None
     issues: list[HistoryImportIssue]
     blocking_issues: list[HistoryImportIssue]
     exercise_id: int | None
@@ -55,7 +85,22 @@ class HistoryImportRow(BaseModel):
     excluded: bool
 
 
-HistoryImportSetFact = tuple[int, int, int | None, str | None, str | None, str | None]
+HistoryImportSetFact = (
+    tuple[int, int, int | None, str | None, str | None, str | None]
+    | tuple[
+        int,
+        int,
+        int | None,
+        str | None,
+        str | None,
+        str | None,
+        Literal["bilateral", "per_side", "alternating"] | None,
+        Literal["left", "right"] | None,
+        bool,
+        HistoryImportSides | None,
+        bool | None,
+    ]
+)
 
 
 class HistoryImportDuplicateCandidate(BaseModel):

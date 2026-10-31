@@ -124,6 +124,86 @@ def test_unsupported_rpe_and_per_side_values_are_not_discarded():
     assert row.source["side"] == "left"
 
 
+def test_v2_parses_asymmetric_and_partial_sides_without_inference():
+    columns = workout_history_import_parser.CSV_COLUMNS_V2
+    source = _row(
+        reps="",
+        weight="",
+        weight_unit="",
+        rir="",
+        execution_mode="alternating",
+        first_side="right",
+        performed_on="2025-10-11",
+        set_status="incomplete",
+        left_reps="10",
+        left_weight="18",
+        left_weight_unit="kg",
+        left_rir="2",
+        left_reached_failure="false",
+        left_status="completed",
+        right_status="incomplete",
+        right_reps="8",
+        right_weight="16",
+        right_weight_unit="kg",
+        right_rir="0",
+        right_reached_failure="true",
+    )
+    (row,) = parse_workout_history_csv(
+        _csv(source, columns=columns, marker=("yfc_workout_history", "2"))
+    )
+    assert row.issues == ()
+    assert row.completed_on == date(2025, 10, 11)
+    assert row.sides["left"]["actual_weight"] == Decimal("18.00")
+    assert row.sides["right"]["actual_weight"] == Decimal("16.00")
+    assert row.sides["right"]["reached_failure"] is True
+    assert row.sides["right"]["is_completed"] is False
+    assert row.source["first_side"] == "right"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"set_status": "completed", "right_status": "incomplete"},
+        {"set_status": "completed", "right_status": ""},
+        {"side": "left"},
+        {"first_side": "right", "execution_mode": "per_side"},
+        {"left_weight_unit": "stone"},
+        {"left_reached_failure": "maybe"},
+        {"reps": "10"},
+    ],
+)
+def test_v2_blocks_ambiguous_or_invalid_side_facts(changes):
+    source = (
+        _row(
+            reps="",
+            weight="",
+            weight_unit="",
+            rir="",
+            execution_mode="alternating",
+            first_side="right",
+            performed_on="2025-10-12",
+            set_status="completed",
+            left_reps="10",
+            left_weight="18",
+            left_weight_unit="kg",
+            left_status="completed",
+            right_reps="8",
+            right_weight="16",
+            right_weight_unit="kg",
+            right_status="completed",
+        )
+        | changes
+    )
+    (row,) = parse_workout_history_csv(
+        _csv(
+            source,
+            columns=workout_history_import_parser.CSV_COLUMNS_V2,
+            marker=("yfc_workout_history", "2"),
+        )
+    )
+    assert row.issues
+
+
 def test_duplicate_set_and_inconsistent_workout_or_exercise_are_reported():
     first, second = parse_workout_history_csv(
         _csv(_row(), _row(workout_title="Другая", exercise_name="Тяга"))

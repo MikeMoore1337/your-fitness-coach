@@ -364,6 +364,39 @@ def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict) -> bool:
     )
 
 
+def _is_sqlite_foreign_key_guard(call: ast.Call, links: dict) -> bool:
+    if not (
+        (isinstance(call.func, ast.Attribute) and call.func.attr == "getconfig")
+        or (isinstance(call.func, ast.Name) and call.func.id == "RuntimeError")
+    ):
+        return False
+    current: ast.AST = call
+    while current in links:
+        parent, _ = links[current]
+        if isinstance(parent, ast.If):
+            expected = ast.parse(
+                'bind.dialect.name != "sqlite" or '
+                "bind.connection.driver_connection.getconfig(sqlite3.SQLITE_DBCONFIG_ENABLE_FKEY)",
+                mode="eval",
+            ).body
+            return bool(
+                ast.dump(parent.test) == ast.dump(expected)
+                and len(parent.body) == 1
+                and isinstance(parent.body[0], ast.Raise)
+                and isinstance(parent.body[0].exc, ast.Call)
+                and isinstance(parent.body[0].exc.func, ast.Name)
+                and parent.body[0].exc.func.id == "RuntimeError"
+                and len(parent.body[0].exc.args) == 1
+                and isinstance(parent.body[0].exc.args[0], ast.Constant)
+                and isinstance(parent.body[0].exc.args[0].value, str)
+                and not parent.body[0].exc.keywords
+                and not parent.orelse
+                and _is_in_non_postgresql_branch(parent, links)
+            )
+        current = parent
+    return False
+
+
 def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object) -> None:
     links = _parent_links(upgrade)
     created_tables = {
@@ -430,6 +463,8 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 )
         elif phase == "numeric_precision" and isinstance(function, ast.Name):
             allowed = function.id == "_ensure_upgrade_safe"
+        if phase == "constraint_swap" and _is_sqlite_foreign_key_guard(call, links):
+            allowed = True
         if phase == "expand":
             if _is_index_validation(call, upgrade, links) or (
                 isinstance(function, ast.Attribute)
