@@ -665,3 +665,43 @@ def test_concurrent_commit_cannot_tear_target_versions_and_history_facts(client,
     assert after["sets"][0]["set_version"] == 2
     assert after["sets"][1]["previous_today"]["actual_weight"] == 170
     assert after["sets"][0]["previous_workout"]["actual_weight"] == 999
+
+
+def test_history_retains_labeled_side_facts_without_inference(client, case):
+    from fitminiapp_api.models.program import UserWorkoutSetSide
+
+    with get_session_context() as db:
+        source = _sets(db, case[4])[0]
+        source.execution_mode = "per_side"
+        source.actual_reps = source.actual_weight = None
+        source.side_results = [
+            UserWorkoutSetSide(side="left", actual_reps=10, actual_weight=18, is_completed=True),
+            UserWorkoutSetSide(side="right", actual_reps=8, actual_weight=16, is_completed=True),
+        ]
+        current = _sets(db, case[3])[0]
+        current.execution_mode = "per_side"
+        unilateral = db.query(Exercise).filter_by(slug="unilateral-leg-press").one()
+        source.workout_exercise.exercise_id = unilateral.id
+        current.workout_exercise.exercise_id = unilateral.id
+    result = _read(client, case)["sets"][0]["previous_workout"]
+    assert result["execution_mode"] == "per_side"
+    assert result["actual_reps"] is None
+    assert result["sides"]["left"]["actual_reps"] == 10
+    assert result["sides"]["right"]["actual_reps"] == 8
+
+
+def test_partial_side_remains_visible_after_workout_completion(client, case):
+    from fitminiapp_api.models.program import UserWorkoutSetSide
+
+    with get_session_context() as db:
+        source = _sets(db, case[4])[0]
+        source.execution_mode = "per_side"
+        source.actual_reps = source.actual_weight = None
+        source.is_completed = False
+        source.side_results = [
+            UserWorkoutSetSide(side="left", actual_reps=10, actual_weight=18, is_completed=True)
+        ]
+    result = _read(client, case)["sets"][0]["previous_workout"]
+    assert result["is_completed"] is False
+    assert result["sides"]["left"]["actual_reps"] == 10
+    assert result["sides"]["right"] is None

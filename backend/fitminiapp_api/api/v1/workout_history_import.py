@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+from typing import Literal
 
 from fastapi import (
     APIRouter,
@@ -45,6 +46,7 @@ from fitminiapp_api.services.workout_history_import import (
 )
 from fitminiapp_api.services.workout_history_import_parser import (
     CSV_COLUMNS,
+    CSV_COLUMNS_V2,
     MAX_BYTES,
     WorkoutHistoryImportError,
 )
@@ -88,11 +90,55 @@ def _valid_filename(name: str | None) -> bool:
 
 
 @router.get("/template.csv")
-def download_template(current_user: User = Depends(require_user)) -> Response:
+def download_template(
+    version: Literal["1", "2"] = "1", current_user: User = Depends(require_user)
+) -> Response:
     del current_user
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\n")
-    writer.writerow(["yfc_workout_history", "1"])
+    writer.writerow(["yfc_workout_history", version])
+    if version == "2":
+        writer.writerow(CSV_COLUMNS_V2)
+        example = {
+            "workout_ref": "example-workout",
+            "completed_at": "2025-10-12T18:30:00+03:00",
+            "timezone": "Europe/Moscow",
+            "workout_title": "Пример",
+            "status": "completed",
+            "exercise_ref": "example-exercise",
+            "exercise_name": "Тяга гантели одной рукой",
+            "set_number": "1",
+            "set_status": "completed",
+            "set_kind": "working",
+            "performed_on": "2025-10-12",
+            "execution_mode": "per_side",
+            "left_reps": "10",
+            "left_weight": "18",
+            "left_weight_unit": "kg",
+            "left_rir": "2",
+            "left_reached_failure": "false",
+            "left_status": "completed",
+            "right_reps": "8",
+            "right_weight": "16",
+            "right_weight_unit": "kg",
+            "right_rir": "0",
+            "right_reached_failure": "true",
+            "right_status": "completed",
+        }
+        writer.writerow([example.get(column, "") for column in CSV_COLUMNS_V2])
+    else:
+        _write_v1_template(writer)
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="yfc-workout-history-v{version}.csv"',
+            "Cache-Control": "no-store, private",
+        },
+    )
+
+
+def _write_v1_template(writer) -> None:
     writer.writerow(CSV_COLUMNS)
     writer.writerow(
         [
@@ -113,14 +159,6 @@ def download_template(current_user: User = Depends(require_user)) -> Response:
             "",
             "",
         ]
-    )
-    return Response(
-        content=output.getvalue().encode("utf-8-sig"),
-        media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": 'attachment; filename="yfc-workout-history-v1.csv"',
-            "Cache-Control": "no-store, private",
-        },
     )
 
 

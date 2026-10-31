@@ -5,6 +5,7 @@ import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
 import type { Workout, WorkoutStatus } from '../../shared/api/types';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../../shared/telegram/layout';
 import {
+  acknowledgeLegacyWorkoutMutation,
   acknowledgeWorkoutMutation,
   activeWorkoutLockName,
   activeWorkoutQueueKey,
@@ -12,7 +13,9 @@ import {
   emptyActiveWorkoutQueue,
   enqueueWorkoutMutation,
   latestMutationForSet,
+  legacyActiveWorkoutQueueKey,
   loadActiveWorkoutQueue,
+  resolveSideWorkoutConflict,
   resolveWorkoutVersionConflict,
   saveActiveWorkoutSnapshot,
   saveActiveWorkoutQueue,
@@ -26,6 +29,17 @@ interface ConflictDetail {
   code?: unknown;
   message?: unknown;
   current?: unknown;
+}
+
+interface SideConflict {
+  setId: number;
+  mutationIds: string[];
+  local: ActiveWorkoutSetValues;
+  server: WorkoutStatus;
+}
+
+function hasSideMode(mode: WorkoutStatus['execution_mode']): boolean {
+  return mode === 'per_side' || mode === 'alternating';
 }
 
 function conflictDetail(error: ApiError): ConflictDetail | null {
@@ -96,6 +110,8 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const state = storedState.key === key ? storedState.data : loadedState;
   const [syncState, setSyncState] = useState<SyncState>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [sideConflict, setSideConflict] = useState<SideConflict | null>(null);
+  const sideConflictRef = useRef<SideConflict | null>(null);
   const inFlightId = useRef<string | null>(null);
   const flushPromise = useRef<Promise<boolean> | null>(null);
   const enqueuePromise = useRef<Promise<void> | null>(null);
@@ -168,6 +184,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   }, [persistSnapshotWithLock]);
 
   const runQueue = useCallback(async (): Promise<boolean> => {
+    if (sideConflictRef.current) return false;
     if (!userId || !workoutId || !navigator.onLine) {
       setSyncState('offline');
       setMessage(
@@ -188,23 +205,72 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
         setSyncState('idle');
         return true;
       }
+      if (!validSetIds.has(pending.set_id)) {
+        persist(fresh);
+        setSyncState('conflict');
+        setMessage(
+          'Подход больше не найден в тренировке. Локальные данные сохранены на устройстве.',
+        );
+        return false;
+      }
       inFlightId.current = pending.mutation_id;
       try {
+        const usesSideContract =
+          pending.values.execution_mode === 'per_side' ||
+          pending.values.execution_mode === 'alternating' ||
+          pending.values.confirm_mode_change === true;
         const saved = await api<WorkoutStatus>(`/api/v1/workouts/sets/${pending.set_id}`, {
           method: 'PATCH',
           body: {
             ...pending.values,
+            ...(usesSideContract
+              ? { is_completed: 'sides-v1', side_is_completed: pending.values.is_completed }
+              : {}),
             expected_version: pending.expected_version,
             mutation_id: pending.mutation_id,
           },
         });
+        if (usesSideContract && !Object.hasOwn(saved, 'sides')) {
+          setSyncState('error');
+          setMessage(
+            'Сервер не подтвердил сохранение сторон. Локальные данные сохранены на устройстве.',
+          );
+          return false;
+        }
         await updateCachedSet(queryClient, saved);
         persist(acknowledgeWorkoutMutation(readFresh(), pending.mutation_id, saved.version));
+        acknowledgeLegacyWorkoutMutation(userId, workoutId, pending.mutation_id);
         conflictAttempts = 0;
       } catch (reason) {
         if (reason instanceof ApiError && reason.status === 409) {
           const detail = conflictDetail(reason);
           const current = detail?.current;
+          if (
+            [
+              'workout_set_version_conflict',
+              'workout_set_side_aware_required',
+              'workout_set_mode_change_confirmation',
+            ].includes(String(detail?.code)) &&
+            validWorkoutStatus(current) &&
+            (hasSideMode(pending.values.execution_mode) || hasSideMode(current.execution_mode))
+          ) {
+            await updateCachedSet(queryClient, current);
+            const fresh = readFresh();
+            const local = latestMutationForSet(fresh, pending.set_id) ?? pending;
+            const conflict = {
+              setId: pending.set_id,
+              mutationIds: fresh.queue
+                .filter((item) => item.set_id === pending.set_id)
+                .map((item) => item.mutation_id),
+              local: local.values,
+              server: current,
+            };
+            sideConflictRef.current = conflict;
+            setSideConflict(conflict);
+            setSyncState('conflict');
+            setMessage('Подход изменён в другой вкладке. Сравните версии перед сохранением.');
+            return false;
+          }
           if (detail?.code === 'workout_set_version_conflict' && validWorkoutStatus(current)) {
             await updateCachedSet(queryClient, current);
             persist(
@@ -254,7 +320,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     setSyncState('conflict');
     setMessage('Тренировка часто меняется в другой вкладке. Повторите синхронизацию.');
     return false;
-  }, [persist, queryClient, readFresh, userId, workoutId]);
+  }, [persist, queryClient, readFresh, userId, validSetIds, workoutId]);
 
   const flushNow = useCallback((): Promise<boolean> => {
     if (flushPromise.current) return flushPromise.current;
@@ -281,6 +347,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       serverVersion: number,
       values: ActiveWorkoutSetValues,
       immediate = false,
+      onlyIfNoPending = false,
     ): Promise<boolean> => {
       if (!userId || !workoutId || !lockName) return false;
       let releaseEnqueue!: () => void;
@@ -293,8 +360,12 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       try {
         setSyncState(navigator.onLine ? 'pending' : 'offline');
         try {
-          const durable = await crossContextCoordinator.run(lockName, () => {
-            const next = enqueueWorkoutMutation(readFresh(), {
+          const result = await crossContextCoordinator.run(lockName, () => {
+            const fresh = readFresh();
+            if (onlyIfNoPending && latestMutationForSet(fresh, setId)) {
+              return { durable: false, skipped: true };
+            }
+            const next = enqueueWorkoutMutation(fresh, {
               setId,
               serverVersion,
               values,
@@ -308,8 +379,10 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
                   : 'Нет сети. Изменения сохранены на этом устройстве.'
                 : 'Хранилище устройства недоступно. Не закрывайте приложение до синхронизации.',
             );
-            return durable;
+            return { durable, skipped: false };
           });
+          if (result.skipped) return false;
+          const { durable } = result;
           if (!navigator.onLine) {
             setSyncState(durable ? 'offline' : 'error');
             return durable;
@@ -338,7 +411,15 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const clear = useCallback(async () => {
     if (!userId || !workoutId || !lockName) return;
     await crossContextCoordinator.run(lockName, () => {
-      clearActiveWorkoutData(userId, workoutId);
+      if (!clearActiveWorkoutData(userId, workoutId)) {
+        const fresh = readFresh();
+        setStoredState({ key: activeWorkoutQueueKey(userId, workoutId), data: fresh });
+        setSyncState('conflict');
+        setMessage(
+          'После завершения появились несохранённые изменения. Они остались на устройстве.',
+        );
+        return;
+      }
       storageAvailable.current = true;
       setDurable(true);
       memoryState.current = emptyActiveWorkoutQueue(userId, workoutId);
@@ -348,8 +429,60 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       });
       setSyncState('idle');
       setMessage(null);
+      sideConflictRef.current = null;
+      setSideConflict(null);
     });
-  }, [lockName, userId, workoutId]);
+  }, [lockName, readFresh, userId, workoutId]);
+
+  const resolveSideConflict = useCallback(
+    async (choice: 'local' | 'server') => {
+      const conflict = sideConflictRef.current;
+      if (!conflict || !lockName || !userId || !workoutId) return false;
+      const resolved = await crossContextCoordinator.run(lockName, () => {
+        const fresh = readFresh();
+        const mutations = fresh.queue.filter((item) => item.set_id === conflict.setId);
+        if (
+          mutations.map((item) => item.mutation_id).join(',') !== conflict.mutationIds.join(',')
+        ) {
+          const latest = mutations.at(-1);
+          if (latest) {
+            const updated = {
+              ...conflict,
+              local: latest.values,
+              mutationIds: mutations.map((item) => item.mutation_id),
+            };
+            sideConflictRef.current = updated;
+            setSideConflict(updated);
+          }
+          setMessage('Локальная версия изменилась. Сравните её ещё раз.');
+          return false;
+        }
+        const next = resolveSideWorkoutConflict(
+          fresh,
+          conflict.setId,
+          conflict.server.version,
+          choice,
+        );
+        if (!persist(next, true)) {
+          setMessage(
+            'Не удалось сохранить выбор на устройстве. Локальная версия сохранена в памяти.',
+          );
+          return false;
+        }
+        for (const mutation of mutations) {
+          acknowledgeLegacyWorkoutMutation(userId, workoutId, mutation.mutation_id);
+        }
+        sideConflictRef.current = null;
+        setSideConflict(null);
+        setSyncState('pending');
+        setMessage(null);
+        return true;
+      });
+      if (resolved) void flushNow();
+      return resolved;
+    },
+    [flushNow, lockName, persist, readFresh, userId, workoutId],
+  );
 
   useEffect(() => {
     if (
@@ -379,7 +512,8 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       await queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true });
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== key) return;
+      if (event.key !== key && event.key !== legacyActiveWorkoutQueueKey(userId!, workoutId!))
+        return;
       const fresh = readFresh();
       memoryState.current = fresh;
       setStoredState({ key, data: fresh });
@@ -402,7 +536,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [flushNow, key, queryClient, readFresh]);
+  }, [flushNow, key, queryClient, readFresh, userId, workoutId]);
 
   const pendingBySet = useMemo(() => {
     const result = new Map<number, ReturnType<typeof latestMutationForSet>>();
@@ -419,6 +553,8 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     durable,
     syncState,
     message,
+    sideConflict,
+    resolveSideConflict,
     enqueue,
     flushNow,
     clear,

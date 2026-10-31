@@ -24,6 +24,7 @@ import {
   type NoteResponse,
 } from './exerciseNoteQueue';
 import './ExerciseExecutionNote.css';
+import { formatWorkoutSides } from './workoutSideDisplay';
 
 const tags = NOTE_TAGS;
 const weekTypes = { light: 'лёгкая неделя', medium: 'средняя неделя', heavy: 'тяжёлая неделя' };
@@ -31,6 +32,7 @@ type NoteDraft = NoteContent & { expectedVersion: number };
 
 function describeLoad(load: NonNullable<NoteResponse['previous_note']>['load']): string | null {
   if (!load) return null;
+  if (load.sides) return `Подход ${load.set_number} · ${formatWorkoutSides(load.sides)}`;
   const parts = [
     load.actual_weight == null ? null : `${load.actual_weight} кг`,
     load.actual_reps == null ? null : `${load.actual_reps} повторений`,

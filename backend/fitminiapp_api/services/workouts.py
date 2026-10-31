@@ -205,9 +205,11 @@ def complete_workout(db: Session, workout: UserWorkout) -> UserWorkout:
 
 
 def _sets_volume(sets: list[UserWorkoutSet]) -> float:
+    from fitminiapp_api.services.workout_sides import completed_set_volume
+
     return float(
         sum(
-            (row.actual_reps or 0) * (row.actual_weight or 0)
+            completed_set_volume(row) or 0
             for row in sets
             if row.is_completed and counts_toward_working_volume(row)
         )

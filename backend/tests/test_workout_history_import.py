@@ -18,6 +18,7 @@ from fitminiapp_api.models.program import (
 from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_history_import import ImportedWorkout, WorkoutHistoryImportDraft
 from fitminiapp_api.services.account_export import build_account_export
+from fitminiapp_api.services.account_exports import _neutral_history_csv, _workout_rows
 from fitminiapp_api.services.accounts import delete_user_cascade
 from fitminiapp_api.services.program_common import ProgramError
 from fitminiapp_api.services.program_versioning import _lifecycle_block_summary
@@ -27,8 +28,27 @@ from fitminiapp_api.services.progression_guidance import (
 )
 from fitminiapp_api.services.training_preferences import _estimated_minutes
 from fitminiapp_api.services.workout_history_import import expire_history_import_drafts
+from fitminiapp_api.services.workout_history_import_parser import (
+    CSV_COLUMNS_V2,
+    parse_workout_history_csv,
+)
 
 URL = "/api/v1/workout-history-imports"
+
+
+def test_templates_preserve_v1_and_offer_parseable_v2_sides(client):
+    headers = _auth(client, 833_010)
+    for version in ("1", "2"):
+        response = client.get(f"{URL}/template.csv?version={version}", headers=headers)
+        assert response.status_code == 200
+        assert f"v{version}.csv" in response.headers["content-disposition"]
+        (row,) = parse_workout_history_csv(response.content)
+        assert row.issues == ()
+        if version == "2":
+            assert row.sides["left"]["actual_weight"] == Decimal("18")
+            assert row.sides["right"]["actual_weight"] == Decimal("16")
+            assert row.sides["right"]["reached_failure"] is True
+    assert client.get(f"{URL}/template.csv?version=3", headers=headers).status_code == 422
 
 
 def _upload(client, headers, *rows):
@@ -134,6 +154,91 @@ def test_import_confirmation_is_atomic_idempotent_and_visible_in_history_and_exp
         client.get("/api/v1/workouts/history/summary", headers=headers).json()["workouts_completed"]
         == 1
     )
+
+
+def test_v2_import_preserves_asymmetric_and_partial_sides(client):
+    headers = _auth(client, 833_020)
+    common = {
+        "exercise_name": "barbell bench press",
+        "reps": "",
+        "weight": "",
+        "weight_unit": "",
+        "rir": "",
+        "execution_mode": "per_side",
+        "performed_on": "2025-10-12",
+        "left_reps": "10",
+        "left_weight": "18",
+        "left_weight_unit": "kg",
+        "left_rir": "2",
+        "left_status": "completed",
+        "left_reached_failure": "false",
+    }
+    complete = _row(
+        **common,
+        right_reps="8",
+        right_weight="16",
+        right_weight_unit="kg",
+        right_rir="0",
+        right_reached_failure="true",
+        right_status="completed",
+    )
+    partial = _row(**(common | {"set_number": "2", "set_status": "incomplete"}))
+    content = _csv(complete, partial, columns=CSV_COLUMNS_V2, marker=("yfc_workout_history", "2"))
+    uploaded = client.post(
+        URL, headers=headers, files={"file": ("history.csv", content, "text/csv")}
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    preview = uploaded.json()
+    assert all(not row["blocking_issues"] for row in preview["rows"])
+    assert preview["rows"][0]["sides"]["right"]["actual_weight"] == "16.00"
+    confirmed = _confirm(client, headers, preview)
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["result"]["set_count"] == 2
+    assert _confirm(client, headers, preview).json() == confirmed.json()
+    copy = client.get(
+        f"/api/v1/workouts/{confirmed.json()['result']['workout_ids'][0]}/copy", headers=headers
+    )
+    assert copy.status_code == 200, copy.text
+    copied_sets = copy.json()["exercises"][0]["sets"]
+    assert copied_sets[0]["sides"]["right"]["actual_weight"] == 16
+    assert copied_sets[1]["is_completed"] is False
+    assert copied_sets[1]["sides"]["left"]["actual_weight"] == 18
+    summary = client.get("/api/v1/workouts/history/summary", headers=headers).json()
+    assert summary == {"workouts_completed": 1, "completed_sets": 1, "volume_kg": 308.0}
+    with get_session_context() as db:
+        owner = db.get(User, _user_id(833_020))
+        exported = build_account_export(db, owner)
+        sets = exported["imported_workouts"][0]["exercises"][0]["sets"]
+        assert sets[0]["sides"]["left"]["actual_weight"] == 18
+        assert sets[0]["sides"]["right"]["reached_failure"] is True
+        assert sets[1]["is_completed"] is False
+        assert sets[1]["sides"]["right"] is None
+        assert len(_workout_rows(exported)) == 2
+        neutral_export = _neutral_history_csv(exported)
+    destination = _auth(client, 833_021)
+    roundtrip = client.post(
+        URL, headers=destination, files={"file": ("history.csv", neutral_export, "text/csv")}
+    )
+    assert roundtrip.status_code == 201, roundtrip.text
+    assert all(not row["blocking_issues"] for row in roundtrip.json()["rows"])
+    restored = _confirm(client, destination, roundtrip.json())
+    assert restored.status_code == 200, restored.text
+    assert client.get("/api/v1/workouts/history/summary", headers=destination).json() == summary
+    with get_session_context() as db:
+        workout = db.get(UserWorkout, restored.json()["result"]["workout_ids"][0])
+        left, right = workout.exercises[0].sets[0].side_results
+        assert (left.side, left.actual_reps, left.actual_weight, left.rir) == ("left", 10, 18, "2")
+        assert (right.side, right.actual_reps, right.actual_weight, right.reached_failure) == (
+            "right",
+            8,
+            16,
+            True,
+        )
+        assert workout.exercises[0].sets[1].is_completed is False
+    again = client.post(URL, headers=headers, files={"file": ("history.csv", content, "text/csv")})
+    assert again.status_code == 201, again.text
+    assert again.json()["duplicates"][0]["candidates"][0]["kind"] == "exact"
+    assert _confirm(client, headers, again.json()).status_code == 409
 
 
 def test_unresolved_and_unsupported_rows_cannot_change_history(client):

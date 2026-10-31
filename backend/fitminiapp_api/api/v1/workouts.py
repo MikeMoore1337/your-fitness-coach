@@ -178,6 +178,13 @@ from fitminiapp_api.services.workout_set_history import (
     WorkoutSetHistoryNotFound,
     build_workout_set_history,
 )
+from fitminiapp_api.services.workout_sides import (
+    SIDE_MODES,
+    completed_set_volume,
+    serialize_sides,
+    side_facts_present,
+    sql_completed_set_volume,
+)
 from fitminiapp_api.services.workout_sync import (
     WorkoutSetSyncError,
     apply_workout_set_update,
@@ -557,6 +564,9 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                     {
                         "id": set_item.id,
                         "set_number": set_item.set_number,
+                        "execution_mode": set_item.execution_mode,
+                        "first_side": set_item.first_side,
+                        "sides": serialize_workout_set(set_item)["sides"],
                         "actual_reps": set_item.actual_reps,
                         "actual_weight": (
                             float(set_item.actual_weight)
@@ -1491,6 +1501,8 @@ def update_workout_set(
     changes = payload.model_dump(exclude_unset=True)
     expected_version = changes.pop("expected_version", None)
     mutation_id = changes.pop("mutation_id", None)
+    if changes.get("is_completed") == "sides-v1":
+        changes["is_completed"] = changes.pop("side_is_completed")
     # Exact retries depend on the original request, not today's mutable set state.
     try:
         replayed = replayed_workout_set(db, set_row, mutation_id, changes)
@@ -1648,6 +1660,9 @@ def workout_history(
         .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .options(
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
+            joinedload(UserWorkout.exercises)
+            .joinedload(UserWorkoutExercise.sets)
+            .joinedload(UserWorkoutSet.side_results),
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
             joinedload(UserWorkout.adaptations),
         )
@@ -1678,7 +1693,7 @@ def workout_history(
         sets = [set_row for exercise in item.exercises for set_row in exercise.sets]
         completed_sets = [set_row for set_row in sets if set_row.is_completed]
         volume_kg = sum(
-            (set_row.actual_weight or 0) * (set_row.actual_reps or 0)
+            completed_set_volume(set_row) or 0
             for set_row in completed_sets
             if counts_toward_working_volume(set_row)
         )
@@ -1694,6 +1709,13 @@ def workout_history(
                 "completed_at": item.completed_at.isoformat() if item.completed_at else None,
                 "completed_sets": len(completed_sets),
                 "volume_kg": round(volume_kg, 2),
+                "volume_incomplete": any(
+                    set_row.execution_mode in SIDE_MODES
+                    and counts_toward_working_volume(set_row)
+                    and completed_set_volume(set_row) is None
+                    for set_row in completed_sets
+                )
+                or None,
                 "completion_feedback": item.completion_feedback,
                 "completion_note": item.completion_note,
                 "rest_sessions": rest_by_workout.get(item.id, []),
@@ -1705,6 +1727,17 @@ def workout_history(
                         "prescribed_sets": exercise.prescribed_sets,
                         "prescribed_reps": exercise.prescribed_reps,
                         "sort_order": exercise.sort_order,
+                        "side_sets": [
+                            {
+                                "set_number": set_row.set_number,
+                                "execution_mode": set_row.execution_mode,
+                                "first_side": set_row.first_side,
+                                "is_completed": set_row.is_completed,
+                                "sides": serialize_sides(set_row),
+                            }
+                            for set_row in sorted(exercise.sets, key=lambda row: row.set_number)
+                            if side_facts_present(set_row)
+                        ],
                     }
                     for exercise in sorted(
                         item.exercises,
@@ -1737,14 +1770,17 @@ def workout_history_summary(
             func.count(func.distinct(UserWorkout.id)),
             func.count(UserWorkoutSet.id).filter(UserWorkoutSet.is_completed.is_(True)),
             func.coalesce(
-                func.sum(
-                    func.coalesce(UserWorkoutSet.actual_reps, 0)
-                    * func.coalesce(UserWorkoutSet.actual_weight, 0)
-                ).filter(
+                func.sum(sql_completed_set_volume()).filter(
                     UserWorkoutSet.is_completed.is_(True),
                     working_volume_set_filter(),
                 ),
                 0,
+            ),
+            func.count(UserWorkoutSet.id).filter(
+                UserWorkoutSet.is_completed.is_(True),
+                UserWorkoutSet.execution_mode.in_(SIDE_MODES),
+                working_volume_set_filter(),
+                sql_completed_set_volume().is_(None),
             ),
         )
         .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
@@ -1764,6 +1800,7 @@ def workout_history_summary(
         "workouts_completed": int(row[0] or 0),
         "completed_sets": int(row[1] or 0),
         "volume_kg": round(float(row[2] or 0), 2),
+        "volume_incomplete": bool(row[3]) or None,
     }
 
 

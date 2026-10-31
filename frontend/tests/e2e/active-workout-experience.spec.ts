@@ -51,6 +51,441 @@ const ISSUE_996_AFTER_DIR = resolve(
   process.env.YFC_ISSUE_996_AFTER_DIR ??
     resolve(process.cwd(), '..', '.artifacts', 'tasks', '996', 'evidence', 'after'),
 );
+const ISSUE_832_AFTER_DIR = resolve(
+  process.env.YFC_832_CAPTURE_DIR ??
+    resolve(process.cwd(), '..', '.artifacts', 'tasks', '832', 'evidence', 'after'),
+);
+
+test('#832 раздельные стороны сохраняются одним подходом', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    true,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+  await page.getByLabel('По сторонам', { exact: true }).click();
+  await expect.poll(() => server.readSet(201).execution_mode).toBe('per_side');
+  await expect(page.getByLabel('По сторонам', { exact: true })).toBeChecked();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await expect(row.getByText('Одинаково на обе стороны')).toBeVisible();
+  await row.getByLabel(/^Вес, на сторону/).fill('18');
+  await row.getByLabel(/^Повторы, на сторону/).fill('10');
+  await row.getByRole('button', { name: 'Указать раздельно' }).click();
+  await expect(row.getByLabel(/^Вес, Правая/)).toHaveValue('18');
+  await row.getByLabel(/^Вес, Правая/).fill('16');
+  await row.getByLabel(/^Повторы, Правая/).fill('8');
+  await row.getByRole('button', { name: /^Левая: 2 —/ }).click();
+  await row.getByRole('button', { name: /^Правая: 0 —/ }).click();
+  await row.getByLabel('До отказа · Правая').check();
+  await row
+    .getByRole('region', { name: 'Левая сторона' })
+    .getByRole('button', { name: 'Отметить выполненной' })
+    .click();
+  await expect(row.getByRole('button', { name: 'Завершить подход' })).toBeDisabled();
+  await expect.poll(() => server.readSet(201).sides?.left?.is_completed).toBe(true);
+  await expect.poll(() => server.readSet(201).sides?.right?.is_completed).toBe(false);
+  await row
+    .getByRole('region', { name: 'Правая сторона' })
+    .getByRole('button', { name: 'Отметить выполненной' })
+    .click();
+  await row.getByRole('button', { name: 'Завершить подход' }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  expect(server.readSet(201).sides).toMatchObject({
+    left: { actual_weight: 18, actual_reps: 10, rir: '2', is_completed: true },
+    right: {
+      actual_weight: 16,
+      actual_reps: 8,
+      rir: '0',
+      reached_failure: true,
+      is_completed: true,
+    },
+  });
+  expect(
+    server.patches
+      .filter((patch) => patch.setId === 201)
+      .every((patch) => patch.body.is_completed === 'sides-v1'),
+  ).toBe(true);
+});
+
+async function capture832(page: Page, browser: string, theme: string, state: string) {
+  const widths = browser === 'chromium' ? [320, 360, 393, 430, 1440] : [393];
+  const directory = ISSUE_832_AFTER_DIR;
+  if (process.env.CAPTURE_832_AFTER === '1') await mkdir(directory, { recursive: true });
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+      `${browser} ${theme} ${state} ${width}px overflow`,
+    ).toBeLessThanOrEqual(1);
+    if (state === 'asymmetric' || state === 'partial') {
+      const buttons = page.locator(
+        '[data-workout-set-id="201"] .active-workout-sides__side[aria-label] > button',
+      );
+      await expectTouchTargets(buttons);
+      expect(
+        await buttons.evaluateAll((items) =>
+          items.every((item) => item.scrollWidth <= item.clientWidth + 1),
+        ),
+      ).toBe(true);
+    }
+    if (process.env.CAPTURE_832_AFTER === '1') {
+      await page.screenshot({
+        path: resolve(directory, `${browser}-${theme}-${width}-${state}.png`),
+        fullPage: true,
+        animations: 'disabled',
+      });
+      if (
+        width === 393 ||
+        (width !== 1440 && ['same', 'asymmetric', 'partial', 'conflict'].includes(state))
+      ) {
+        await page.locator('[data-workout-set-id="201"]').scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: resolve(directory, `${browser}-${theme}-${width}-${state}-viewport.png`),
+          animations: 'disabled',
+        });
+      }
+    }
+  }
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#832 AFTER состояния и размеры ${theme}`, async ({ page, browserName }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+      true,
+    );
+    await mockSetHistory(page, server, true);
+    await mockRestSessions(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const row = page.locator('[data-workout-set-id="201"]');
+    await capture832(page, browserName, theme, 'bilateral');
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('По сторонам', { exact: true }).click();
+    await expect.poll(() => server.readSet(201).execution_mode).toBe('per_side');
+    await expect(row.getByText('Одинаково на обе стороны')).toBeVisible();
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    await expect(row.locator('.active-workout-set__history')).toContainText('Левая: 18 кг × 9', {
+      timeout: 15000,
+    });
+    await page.getByRole('button', { name: 'Что делать сейчас?' }).click();
+    await expect(page.getByText('Прогрессия по сторонам')).toBeVisible();
+    await capture832(page, browserName, theme, 'history-progression');
+    await row.getByLabel(/^Вес, на сторону/).fill('18');
+    await row.getByLabel(/^Повторы, на сторону/).fill('10');
+    await capture832(page, browserName, theme, 'same');
+    await row.getByRole('button', { name: 'Указать раздельно' }).click();
+    await row.getByLabel(/^Вес, Правая/).fill('16');
+    await row.getByLabel(/^Повторы, Правая/).fill('8');
+    await row.getByRole('button', { name: /^Левая: 2 —/ }).click();
+    await row.getByRole('button', { name: /^Правая: 0 —/ }).click();
+    await row.getByLabel('До отказа · Правая').check();
+    await capture832(page, browserName, theme, 'asymmetric');
+    await row
+      .getByRole('region', { name: 'Левая сторона' })
+      .getByRole('button', { name: 'Отметить выполненной' })
+      .click();
+    await expect.poll(() => server.readSet(201).sides?.left?.is_completed).toBe(true);
+    await expect(row.getByRole('button', { name: 'Завершить подход' })).toBeDisabled();
+    await capture832(page, browserName, theme, 'partial');
+    await row
+      .getByRole('region', { name: 'Правая сторона' })
+      .getByRole('button', { name: 'Отметить выполненной' })
+      .click();
+    await row.getByRole('button', { name: 'Завершить подход' }).click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    await capture832(page, browserName, theme, 'completed');
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+    await expect(
+      page.locator('[data-workout-set-id="202"] .active-workout-set__history'),
+    ).toContainText('Левая: 18 кг × 10');
+    await expect(
+      page.locator('[data-workout-set-id="202"] .active-workout-set__history'),
+    ).toContainText('Правая: 16 кг × 8');
+    const next = page.locator('[data-workout-set-id="202"]');
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 500 });
+      await next.getByLabel(/^Вес, на сторону/).focus();
+      await expect(next.getByLabel(/^Вес, на сторону/)).toBeFocused();
+      await expect
+        .poll(() =>
+          next.getByLabel(/^Вес, на сторону/).evaluate((field) => {
+            const rect = field.getBoundingClientRect();
+            const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+            return rect.bottom <= innerHeight && (!timer || rect.top >= timer.bottom);
+          }),
+        )
+        .toBe(true);
+      if (process.env.CAPTURE_832_AFTER === '1') {
+        const directory = ISSUE_832_AFTER_DIR;
+        await page.screenshot({
+          path: resolve(directory, `${browserName}-${theme}-${width}-keyboard-viewport-model.png`),
+          animations: 'disabled',
+        });
+      }
+    }
+  });
+
+  test(`#832 offline, ошибка и конфликт версий ${theme}`, async ({ page, browserName }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+    );
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('По сторонам', { exact: true }).click();
+    await expect.poll(() => server.readSet(203).execution_mode).toBe('per_side');
+    const row = page.locator('[data-workout-set-id="201"]');
+    await row.getByRole('button', { name: 'Указать раздельно' }).click();
+    await setNetworkOffline(page, true);
+    await row.getByLabel(/^Вес, Левая/).fill('18');
+    await row.getByLabel(/^Повторы, Левая/).fill('10');
+    await row
+      .getByRole('region', { name: 'Левая сторона' })
+      .getByRole('button', { name: 'Отметить выполненной' })
+      .click();
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBeGreaterThan(0);
+    await expect(page.locator('.active-workout-sync')).toContainText('Сохранено на устройстве');
+    await capture832(page, browserName, theme, 'offline');
+    server.failSetPatch(true);
+    await setNetworkOffline(page, false);
+    await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+    await capture832(page, browserName, theme, 'error');
+    const remote = server.readSet(201);
+    Object.assign(remote, {
+      version: remote.version + 1,
+      execution_mode: 'per_side',
+      sides: {
+        left: { actual_weight: 22, actual_reps: 7, is_completed: true },
+        right: { actual_weight: 15, actual_reps: 8, is_completed: false },
+      },
+    });
+    server.failSetPatch(false);
+    await page.locator('.active-workout-sync').getByRole('button', { name: 'Повторить' }).click();
+    const conflict = page.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' });
+    await expect(conflict).toBeVisible();
+    await expect(conflict).toContainText('18 кг × 10');
+    await expect(conflict).toContainText('22 кг × 7');
+    await capture832(page, browserName, theme, 'conflict');
+    await conflict.getByRole('button', { name: 'Оставить эту версию' }).click();
+    await expect.poll(() => server.readSet(201).sides?.left?.actual_weight).toBe(18);
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    expect(server.readSet(201).sides?.right).toBeNull();
+  });
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#832 чередование сохраняет первую сторону и общие значения ${theme}`, async ({
+    page,
+    browserName,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+    );
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('Поочерёдно', { exact: true }).click();
+    await expect.poll(() => server.readSet(201).execution_mode).toBe('alternating');
+    const row = page.locator('[data-workout-set-id="201"]');
+    await row.getByLabel('Первая сторона').selectOption('right');
+    await row.getByLabel(/^Вес, на сторону/).fill('12');
+    await row.getByLabel(/^Повторы, на сторону/).fill('10');
+    await capture832(page, browserName, theme, 'alternating');
+    await row.getByRole('button', { name: 'Завершить подход' }).click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    expect(server.readSet(201).first_side).toBe('right');
+    expect(server.readSet(201).sides).toMatchObject({
+      left: { actual_weight: 12, actual_reps: 10, is_completed: true },
+      right: { actual_weight: 12, actual_reps: 10, is_completed: true },
+    });
+  });
+}
+
+for (const surface of ['pwa', 'telegram'] as const) {
+  test(`#832 история сторон в ${surface}`, async ({ page, browserName }) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    if (surface === 'telegram') {
+      await installTelegramHarness(page, {
+        platform: 'ios',
+        colorScheme: 'dark',
+        safeAreaInset: { top: 20, right: 0, bottom: 16, left: 0 },
+        contentSafeAreaInset: { top: 8, right: 0, bottom: 0, left: 0 },
+      });
+    } else {
+      await page.addInitScript(() => {
+        const nativeMatchMedia = window.matchMedia.bind(window);
+        window.matchMedia = (query) => {
+          const result = nativeMatchMedia(query);
+          if (query === '(display-mode: standalone)')
+            Object.defineProperty(result, 'matches', { value: true });
+          return result;
+        };
+        Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+      });
+    }
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+    );
+    await mockSetHistory(page, server, true);
+    await page.goto(surface === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
+    if (surface === 'telegram')
+      await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+    else await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const row = page.locator('[data-workout-set-id="201"]');
+    await expect(row.locator('.active-workout-set__history')).toContainText('Левая: 18 кг × 9');
+    await expect(
+      row.getByRole('button', { name: 'Подставить из прошлой тренировки' }),
+    ).toBeDisabled();
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('По сторонам', { exact: true }).click();
+    await expect.poll(() => server.readSet(203).execution_mode).toBe('per_side');
+    const prefill = row.getByRole('button', { name: 'Подставить из прошлой тренировки' });
+    await expect(prefill).toBeEnabled();
+    await prefill.click();
+    await expect(row.getByLabel(/^Вес, Левая/)).toHaveValue('18');
+    await expect(row.getByLabel(/^Повторы, Левая/)).toHaveValue('9');
+    await expect(row.getByLabel(/^Вес, Правая/)).toHaveValue('16');
+    await expect(row.getByLabel(/^Повторы, Правая/)).toHaveValue('8');
+    if (process.env.CAPTURE_832_AFTER === '1') {
+      const directory = ISSUE_832_AFTER_DIR;
+      await mkdir(directory, { recursive: true });
+      await row.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: resolve(directory, `${browserName}-${surface}-393-prefill.png`),
+        animations: 'disabled',
+      });
+    }
+  });
+}
+
+test('#832 две вкладки сохраняют разные подходы без потери сторон', async ({ page, context }) => {
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    true,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+  await page.getByLabel('По сторонам', { exact: true }).click();
+  await expect.poll(() => server.readSet(203).execution_mode).toBe('per_side');
+  const other = await context.newPage();
+  await mockActiveWorkout(
+    other,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    true,
+    false,
+    server.sets,
+  );
+  const token = await page.evaluate(() => sessionStorage.getItem('fit_access_token'));
+  expect(token).toBeTruthy();
+  await other.addInitScript((value) => sessionStorage.setItem('fit_access_token', value!), token);
+  await other.goto('/app');
+  await other.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  const second = other.locator('[data-workout-set-id="202"]');
+  await page.bringToFront();
+  await first.getByLabel(/^Вес, на сторону/).fill('18');
+  await first.getByLabel(/^Повторы, на сторону/).fill('10');
+  await first.getByRole('button', { name: 'Завершить подход' }).click();
+  await other.bringToFront();
+  await second.getByLabel(/^Вес, на сторону/).fill('16');
+  await second.getByLabel(/^Повторы, на сторону/).fill('8');
+  await second.getByRole('button', { name: 'Завершить подход' }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect
+    .poll(
+      async () =>
+        server.readSet(202).is_completed ||
+        (await page
+          .getByRole('alert')
+          .filter({ hasText: 'Сравнить версии подхода' })
+          .isVisible()) ||
+        (await other.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' }).isVisible()),
+    )
+    .toBe(true);
+  if (!server.readSet(202).is_completed) {
+    const firstConflict = page.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' });
+    const conflict = (await firstConflict.isVisible())
+      ? firstConflict
+      : other.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' });
+    await expect(conflict).toContainText('16 кг × 8');
+    await conflict.getByRole('button', { name: 'Оставить эту версию' }).click();
+  }
+  await expect.poll(() => server.readSet(202).is_completed).toBe(true);
+  expect(server.readSet(201).sides?.left?.actual_weight).toBe(18);
+  expect(server.readSet(201).sides?.right?.actual_reps).toBe(10);
+  expect(server.readSet(202).sides?.left?.actual_weight).toBe(16);
+  expect(server.readSet(202).sides?.right?.actual_reps).toBe(8);
+  await other.close();
+});
 
 const captureLandingProductProofs =
   (
@@ -77,6 +512,9 @@ type SetState = {
   reached_failure: boolean | null;
   is_completed: boolean;
   version: number;
+  execution_mode?: 'bilateral' | 'per_side' | 'alternating' | null;
+  first_side?: 'left' | 'right' | null;
+  sides?: { left: SideState | null; right: SideState | null } | null;
   planned_role?:
     | 'warmup'
     | 'working'
@@ -99,6 +537,14 @@ type SetState = {
     | null;
 };
 
+type SideState = {
+  actual_reps?: number | null;
+  actual_weight?: number | null;
+  rir?: '0' | '1' | '2' | '3' | '4+' | null;
+  reached_failure?: boolean | null;
+  is_completed: boolean;
+};
+
 async function mockActiveWorkout(
   page: Page,
   mixed = false,
@@ -107,6 +553,9 @@ async function mockActiveWorkout(
   setupMemoryBody: string | null = null,
   longWorkout = false,
   exerciseTitleOverride: string | null = null,
+  supportsSides = false,
+  exampleSideGuidance = false,
+  sharedSets?: Map<number, SetState>,
 ) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
@@ -142,67 +591,73 @@ async function mockActiveWorkout(
   const cardioCompleted = new Promise<void>((resolve) => {
     resolveCardioCompleted = resolve;
   });
-  const sets = new Map<number, SetState>([
-    [
-      201,
-      {
-        actual_reps: targetStarted ? 1 : null,
-        actual_weight: null,
-        rir: null,
-        set_kind: 'working',
-        reached_failure: null,
-        is_completed: false,
-        version: 1,
-        planned_role: 'top',
-      },
-    ],
-    [
-      202,
-      {
-        actual_reps: null,
-        actual_weight: null,
-        rir: null,
-        set_kind: 'working',
-        reached_failure: null,
-        is_completed: false,
-        version: 1,
-        planned_role: 'backoff',
-      },
-    ],
-    [
-      203,
-      {
-        actual_reps: null,
-        actual_weight: null,
-        rir: null,
-        set_kind: 'working',
-        reached_failure: null,
-        is_completed: false,
-        version: 1,
-        planned_role: 'backoff',
-      },
-    ],
-    ...(mixed
-      ? ([
-          [
-            204,
-            {
-              actual_reps: null,
-              actual_weight: null,
-              duration_minutes: null,
-              distance_km: null,
-              average_heart_rate_bpm: null,
-              heart_rate_zone: null,
-              rir: null,
-              set_kind: null,
-              reached_failure: null,
-              is_completed: false,
-              version: 1,
-            },
-          ],
-        ] as Array<[number, SetState]>)
-      : []),
-  ]);
+  const sets =
+    sharedSets ??
+    new Map<number, SetState>([
+      [
+        201,
+        {
+          actual_reps: targetStarted ? 1 : null,
+          actual_weight: null,
+          rir: null,
+          set_kind: 'working',
+          reached_failure: null,
+          is_completed: false,
+          version: 1,
+          planned_role: 'top',
+        },
+      ],
+      [
+        202,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          rir: null,
+          set_kind: 'working',
+          reached_failure: null,
+          is_completed: false,
+          version: 1,
+          planned_role: 'backoff',
+        },
+      ],
+      [
+        203,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          rir: null,
+          set_kind: 'working',
+          reached_failure: null,
+          is_completed: false,
+          version: 1,
+          planned_role: 'backoff',
+        },
+      ],
+      ...(mixed
+        ? ([
+            [
+              204,
+              {
+                actual_reps: null,
+                actual_weight: null,
+                duration_minutes: null,
+                distance_km: null,
+                average_heart_rate_bpm: null,
+                heart_rate_zone: null,
+                rir: null,
+                set_kind: null,
+                reached_failure: null,
+                is_completed: false,
+                version: 1,
+              },
+            ],
+          ] as Array<[number, SetState]>)
+        : []),
+    ]);
+  if (supportsSides && !sharedSets) {
+    for (const set of sets.values())
+      Object.assign(set, { execution_mode: null, first_side: null, sides: null });
+  }
   const workout = () => ({
     id: 42,
     scheduled_date: today,
@@ -231,6 +686,41 @@ async function mockActiveWorkout(
         media_state: mediaState,
         media_thumbnail_url: mediaState === 'approved_animated' ? mediaThumbnailUrl : null,
         media_animation_url: mediaState === 'approved_animated' ? mediaAnimationUrl : null,
+        ...(exampleSideGuidance && sets.get(201)?.execution_mode === 'per_side'
+          ? {
+              progression_guidance: {
+                outcome: 'review',
+                message: 'Рекомендации по сторонам',
+                detail: '',
+                suggested_weight: null,
+                load_unit: 'kg',
+                proposal: null,
+                evidence: {
+                  comparable_session_count: 2,
+                  required_session_count: 2,
+                  sessions: [],
+                  reason_keys: [],
+                },
+                side_guidance: {
+                  execution_mode: 'per_side',
+                  left: {
+                    message: 'Можно рассмотреть увеличение',
+                    detail: 'Повторы достигнуты.',
+                    suggested_weight: 20.5,
+                    load_unit: 'kg',
+                    evidence: { comparable_session_count: 2, required_session_count: 2 },
+                  },
+                  right: {
+                    message: 'Пока оставьте текущую нагрузку',
+                    detail: 'Отмечен отказ.',
+                    suggested_weight: null,
+                    load_unit: 'kg',
+                    evidence: { comparable_session_count: 2, required_session_count: 2 },
+                  },
+                },
+              },
+            }
+          : {}),
         sets: [...sets]
           .filter(([id]) => id !== 204)
           .sort(([leftId, leftState], [rightId, rightState]) => {
@@ -726,7 +1216,9 @@ async function mockActiveWorkout(
     const setMatch = path.match(/\/workouts\/sets\/(\d+)$/);
     if (setMatch) {
       const setId = Number(setMatch[1]);
-      const body = request.postDataJSON() as Partial<SetState> & {
+      const body = request.postDataJSON() as Omit<Partial<SetState>, 'is_completed'> & {
+        is_completed?: boolean | 'sides-v1';
+        side_is_completed?: boolean;
         expected_version: number;
         mutation_id: string;
       };
@@ -768,7 +1260,17 @@ async function mockActiveWorkout(
         rir: body.rir ?? null,
         set_kind: body.set_kind ?? null,
         reached_failure: body.reached_failure ?? null,
-        is_completed: body.is_completed ?? false,
+        is_completed:
+          body.is_completed === 'sides-v1'
+            ? (body.side_is_completed ?? false)
+            : (body.is_completed ?? false),
+        ...(supportsSides
+          ? {
+              execution_mode: body.execution_mode ?? null,
+              first_side: body.first_side ?? null,
+              sides: body.sides ?? null,
+            }
+          : {}),
         version: current.version + 1,
       };
       sets.set(setId, next);
@@ -800,6 +1302,7 @@ async function mockActiveWorkout(
   );
 
   return {
+    sets,
     patches,
     readWorkout: workout,
     readSet: (setId: number) => sets.get(setId)!,
@@ -841,7 +1344,11 @@ async function mockActiveWorkout(
   };
 }
 
-async function mockSetHistory(page: Page, server: Awaited<ReturnType<typeof mockActiveWorkout>>) {
+async function mockSetHistory(
+  page: Page,
+  server: Awaited<ReturnType<typeof mockActiveWorkout>>,
+  sideHistory = false,
+) {
   let hasHistory = true;
   let requests = 0;
   await page.route('**/api/v1/workouts/42/set-history', async (route) => {
@@ -872,6 +1379,17 @@ async function mockSetHistory(page: Page, server: Awaited<ReturnType<typeof mock
                 performed_on: '2026-10-23',
                 actual_weight: [160, 180, 200, 190][set.set_number - 1],
                 actual_reps: 8,
+                ...(sideHistory
+                  ? {
+                      actual_weight: null,
+                      actual_reps: null,
+                      execution_mode: 'per_side',
+                      sides: {
+                        left: { actual_weight: 18, actual_reps: 9, rir: '2', is_completed: true },
+                        right: { actual_weight: 16, actual_reps: 8, rir: '1', is_completed: true },
+                      },
+                    }
+                  : {}),
               }
             : null,
         })),
@@ -902,7 +1420,7 @@ async function captureIssue1162State(page: Page, info: TestInfo, theme: string, 
 
 async function activeWorkoutQueueLength(page: Page) {
   return page.evaluate(() => {
-    const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42');
+    const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
     return stored ? ((JSON.parse(stored) as { queue?: unknown[] }).queue?.length ?? 0) : 0;
   });
 }
@@ -2866,7 +3384,7 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
             .getAttribute('data-workout-set-id'),
           timers: await page.getByRole('timer', { name: 'Отдых' }).count(),
           queue: await page.evaluate(() =>
-            JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42') ?? '{}'),
+            JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
           ),
         },
         null,
@@ -3142,7 +3660,7 @@ for (const width of [320, 360, 393, 430]) {
       );
       expect(rests).toHaveLength(1);
       const queue = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42') ?? '{}'),
+        JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
       );
       expect(queue.queue).toEqual([]);
       await page.screenshot({ path: info.outputPath(`completion-after-${width}-${theme}.png`) });
@@ -5758,7 +6276,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42');
+        const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
         if (!stored) return -1;
         return (JSON.parse(stored) as { queue: unknown[] }).queue.length;
       }),

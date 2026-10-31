@@ -75,6 +75,64 @@ function proposal(
 }
 
 describe('ProgressionGuidance', () => {
+  it('показывает рекомендации каждой стороны отдельно без общего повышения', () => {
+    const left = guidance({ suggested_weight: 20.5, message: 'Можно рассмотреть увеличение' });
+    const right = guidance({
+      outcome: 'hold',
+      suggested_weight: null,
+      message: 'Пока оставьте текущую нагрузку',
+      detail: 'Отмечен отказ.',
+    });
+    const onApply = vi.fn();
+    render(
+      <ProgressionGuidance
+        exerciseKey={832}
+        guidance={guidance({
+          suggested_weight: null,
+          side_guidance: { execution_mode: 'per_side', left, right },
+        })}
+        onApply={onApply}
+        onDismiss={() => undefined}
+      />,
+    );
+    expect(screen.getByText('Левая сторона')).toBeVisible();
+    expect(screen.getByText(/Можно рассмотреть увеличение · 20,5 кг/)).toBeVisible();
+    expect(screen.getByText('Правая сторона')).toBeVisible();
+    expect(screen.getByText('Отмечен отказ.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Применить/ })).not.toBeInTheDocument();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('применяет проверенное предложение для обеих сторон одним действием', () => {
+    const left = guidance({ suggested_weight: 20.5 });
+    const right = guidance({ suggested_weight: 18.5 });
+    const onApply = vi.fn();
+    render(
+      <ProgressionGuidance
+        exerciseKey={833}
+        guidance={guidance({
+          suggested_weight: null,
+          side_guidance: { execution_mode: 'per_side', left, right },
+          proposal: proposal(
+            'double_progression',
+            {},
+            {
+              proposed_action: 'set_load',
+              eligibility_status: 'eligible',
+              side_execution_mode: 'per_side',
+              proposed_side_weights: { left: 20.5, right: 18.5 },
+            },
+          ),
+        })}
+        onApply={onApply}
+        onDismiss={() => undefined}
+      />,
+    );
+    const apply = screen.getByRole('button', { name: 'Применить: левая 20,5 кг, правая 18,5 кг' });
+    fireEvent.click(apply);
+    fireEvent.click(apply);
+    expect(onApply).toHaveBeenCalledOnce();
+  });
   it('shows factual evidence and applies an exact configured step only once', () => {
     const onApply = vi.fn();
     render(

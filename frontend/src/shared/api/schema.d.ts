@@ -10973,6 +10973,8 @@ export interface components {
             estimated_1rm?: components["schemas"]["ExerciseEstimated1RM"] | null;
             /** Rep Prs */
             rep_prs: components["schemas"]["ExerciseRepPR"][];
+            /** Side Records */
+            side_records?: components["schemas"]["ExerciseSideRecord"][];
             /** Windows */
             windows: components["schemas"]["ExerciseHistoryWindow"][];
             /** Recent Sessions */
@@ -11032,6 +11034,13 @@ export interface components {
             analytics_bucket: "working" | "preparation" | "intensifier";
             /** Pr Eligible */
             pr_eligible: boolean;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
+            /** Is Completed */
+            is_completed?: boolean | null;
         };
         /** ExerciseHistoryWindow */
         ExerciseHistoryWindow: {
@@ -11146,6 +11155,11 @@ export interface components {
             duration_minutes: number | null;
             /** Distance Km */
             distance_km: number | null;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
         };
         /** ExerciseNoteResponse */
         ExerciseNoteResponse: {
@@ -11355,6 +11369,46 @@ export interface components {
             body: string;
             /** Expected Version */
             expected_version?: number | null;
+        };
+        /** ExerciseSideRecord */
+        ExerciseSideRecord: {
+            /**
+             * Execution Mode
+             * @enum {string}
+             */
+            execution_mode: "per_side" | "alternating";
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "left" | "right";
+            context: components["schemas"]["ExerciseSideRecordContext"];
+            best_authoritative_load: components["schemas"]["ExerciseHistoryMetric"] | null;
+            /** Estimated 1Rm Kg */
+            estimated_1rm_kg: number | null;
+            /** Rep Prs */
+            rep_prs: components["schemas"]["ExerciseRepPR"][];
+            /** Progression */
+            progression: components["schemas"]["ExerciseProgressionPoint"][];
+        };
+        /** ExerciseSideRecordContext */
+        ExerciseSideRecordContext: {
+            /** Program Id */
+            program_id: number | null;
+            /** Revision Number */
+            revision_number: number | null;
+            /** Day Number */
+            day_number: number | null;
+            /** Source Template Exercise Id */
+            source_template_exercise_id: number | null;
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
+            /** Planned Role */
+            planned_role: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /** Planned Position */
+            planned_position: number | null;
+            /** Verified */
+            verified: boolean;
         };
         /** ExerciseTaxonomyItem */
         ExerciseTaxonomyItem: {
@@ -12598,14 +12652,26 @@ export interface components {
             /** Workout Ref */
             workout_ref: string;
             /** Source Sets */
-            source_sets: [
+            source_sets: ([
                 number,
                 number,
                 number | null,
                 string | null,
                 string | null,
                 string | null
-            ][];
+            ] | [
+                number,
+                number,
+                number | null,
+                string | null,
+                string | null,
+                string | null,
+                ("bilateral" | "per_side" | "alternating") | null,
+                ("left" | "right") | null,
+                boolean,
+                components["schemas"]["HistoryImportSides"] | null,
+                boolean | null
+            ])[];
             /** Candidates */
             candidates: components["schemas"]["HistoryImportDuplicateCandidate"][];
             /** Choice */
@@ -12627,14 +12693,26 @@ export interface components {
             /** Completed At Utc */
             completed_at_utc: string | null;
             /** Sets */
-            sets: [
+            sets: ([
                 number,
                 number,
                 number | null,
                 string | null,
                 string | null,
                 string | null
-            ][];
+            ] | [
+                number,
+                number,
+                number | null,
+                string | null,
+                string | null,
+                string | null,
+                ("bilateral" | "per_side" | "alternating") | null,
+                ("left" | "right") | null,
+                boolean,
+                components["schemas"]["HistoryImportSides"] | null,
+                boolean | null
+            ])[];
         };
         /** HistoryImportExerciseCandidate */
         HistoryImportExerciseCandidate: {
@@ -12726,6 +12804,7 @@ export interface components {
             reps: number | null;
             /** Weight Kg */
             weight_kg: string | null;
+            sides?: components["schemas"]["HistoryImportSides"] | null;
             /** Issues */
             issues: components["schemas"]["HistoryImportIssue"][];
             /** Blocking Issues */
@@ -12745,6 +12824,24 @@ export interface components {
             candidates: components["schemas"]["HistoryImportExerciseCandidate"][];
             /** Excluded */
             excluded: boolean;
+        };
+        /** HistoryImportSideFact */
+        HistoryImportSideFact: {
+            /** Actual Reps */
+            actual_reps: number | null;
+            /** Actual Weight */
+            actual_weight: string | null;
+            /** Rir */
+            rir: string | null;
+            /** Reached Failure */
+            reached_failure: boolean | null;
+            /** Is Completed */
+            is_completed: boolean;
+        };
+        /** HistoryImportSides */
+        HistoryImportSides: {
+            left: components["schemas"]["HistoryImportSideFact"] | null;
+            right: components["schemas"]["HistoryImportSideFact"] | null;
         };
         /** HistoryImportSource */
         HistoryImportSource: {
@@ -12780,6 +12877,38 @@ export interface components {
             rpe: string;
             /** Side */
             side: string;
+            /** Performed On */
+            performed_on?: string | null;
+            /** Execution Mode */
+            execution_mode?: string | null;
+            /** First Side */
+            first_side?: string | null;
+            /** Reached Failure */
+            reached_failure?: string | null;
+            /** Left Reps */
+            left_reps?: string | null;
+            /** Left Weight */
+            left_weight?: string | null;
+            /** Left Weight Unit */
+            left_weight_unit?: string | null;
+            /** Left Rir */
+            left_rir?: string | null;
+            /** Left Reached Failure */
+            left_reached_failure?: string | null;
+            /** Left Status */
+            left_status?: string | null;
+            /** Right Reps */
+            right_reps?: string | null;
+            /** Right Weight */
+            right_weight?: string | null;
+            /** Right Weight Unit */
+            right_weight_unit?: string | null;
+            /** Right Rir */
+            right_rir?: string | null;
+            /** Right Reached Failure */
+            right_reached_failure?: string | null;
+            /** Right Status */
+            right_status?: string | null;
         };
         /**
          * HydrationBeverageType
@@ -13023,6 +13152,11 @@ export interface components {
             id: number;
             /** Set Number */
             set_number: number;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
             /** Actual Reps */
             actual_reps?: number | null;
             /** Actual Weight */
@@ -16393,6 +16527,8 @@ export interface components {
             completed_workouts: number;
             /** Volume Kg */
             volume_kg: number;
+            /** Volume Incomplete */
+            volume_incomplete?: boolean | null;
         };
         /** ProgressWeeklyActionResponse */
         ProgressWeeklyActionResponse: {
@@ -16483,6 +16619,7 @@ export interface components {
             load_unit: "kg" | "lb";
             evidence: components["schemas"]["ProgressionEvidence"];
             proposal?: components["schemas"]["ProgressionProposal"] | null;
+            side_guidance?: components["schemas"]["SideProgressionPair"] | null;
         };
         /** ProgressionProposal */
         ProgressionProposal: {
@@ -16511,6 +16648,9 @@ export interface components {
             current_weight?: number | null;
             /** Proposed Weight */
             proposed_weight?: number | null;
+            /** Side Execution Mode */
+            side_execution_mode?: ("per_side" | "alternating") | null;
+            proposed_side_weights?: components["schemas"]["ProgressionSideWeights"] | null;
             /** Deload Volume Percent */
             deload_volume_percent?: number | null;
             /** Deload Intensity Percent */
@@ -16605,6 +16745,13 @@ export interface components {
             /** Completion Feedback */
             completion_feedback?: ("easier_than_expected" | "as_expected" | "harder_than_expected") | null;
         };
+        /** ProgressionSideWeights */
+        ProgressionSideWeights: {
+            /** Left */
+            left: number;
+            /** Right */
+            right: number;
+        };
         /** ProgressionTargetSetUpdate */
         ProgressionTargetSetUpdate: {
             /** Set Id */
@@ -16620,7 +16767,8 @@ export interface components {
             /** Relative To Top */
             relative_to_top?: number | null;
             /** Proposed Weight */
-            proposed_weight: number;
+            proposed_weight?: number | null;
+            proposed_side_weights?: components["schemas"]["ProgressionSideWeights"] | null;
         };
         /** PublicExerciseDetail */
         PublicExerciseDetail: {
@@ -17402,6 +17550,11 @@ export interface components {
             recorded_set_count: number;
             /** Missing Set Count */
             missing_set_count: number;
+            /**
+             * Mixed Side Set Count
+             * @default 0
+             */
+            mixed_side_set_count: number;
             /** Distribution */
             distribution: components["schemas"]["RirDistributionBucket"][];
         };
@@ -17424,6 +17577,43 @@ export interface components {
              * @enum {string}
              */
             unit: "g" | "ml";
+        };
+        /** SideProgressionGuidance */
+        SideProgressionGuidance: {
+            /**
+             * Ruleset Version
+             * @enum {string}
+             */
+            ruleset_version: "progression-guidance-v2" | "progression-guidance-v3";
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "consider_progressing" | "hold" | "review" | "consider_reducing";
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: string;
+            /** Suggested Increment */
+            suggested_increment?: number | null;
+            /** Suggested Weight */
+            suggested_weight?: number | null;
+            /**
+             * Load Unit
+             * @enum {string}
+             */
+            load_unit: "kg" | "lb";
+            evidence: components["schemas"]["ProgressionEvidence"];
+        };
+        /** SideProgressionPair */
+        SideProgressionPair: {
+            /**
+             * Execution Mode
+             * @enum {string}
+             */
+            execution_mode: "per_side" | "alternating";
+            left: components["schemas"]["SideProgressionGuidance"];
+            right: components["schemas"]["SideProgressionGuidance"];
         };
         /** SourceFact */
         SourceFact: {
@@ -17663,6 +17853,11 @@ export interface components {
             set_kind?: ("warmup" | "working" | "drop") | null;
             /** Reached Failure */
             reached_failure?: boolean | null;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
         } & {
             [key: string]: unknown;
         };
@@ -17828,6 +18023,8 @@ export interface components {
             volume_kg: number;
             /** New Personal Records */
             new_personal_records: number;
+            /** Volume Incomplete */
+            volume_incomplete?: boolean | null;
             /** Last Completed Workout On */
             last_completed_workout_on?: string | null;
             next_workout?: components["schemas"]["NextWorkoutSummary"] | null;
@@ -18459,7 +18656,7 @@ export interface components {
         /** WeeklyCheckInProgressionSummary */
         WeeklyCheckInProgressionSummary: {
             /** Training Volume Kg */
-            training_volume_kg: number;
+            training_volume_kg: number | null;
             /** New Personal Records */
             new_personal_records: number;
         };
@@ -19116,9 +19313,13 @@ export interface components {
             /**
              * Is Completed
              * @default true
-             * @constant
              */
-            is_completed: true;
+            is_completed: boolean;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
         };
         /** WorkoutExerciseItem */
         WorkoutExerciseItem: {
@@ -19204,6 +19405,8 @@ export interface components {
             prescribed_reps: string | null;
             /** Sort Order */
             sort_order: number;
+            /** Side Sets */
+            side_sets?: components["schemas"]["WorkoutHistorySideSet"][];
         };
         /** WorkoutHistoryItem */
         WorkoutHistoryItem: {
@@ -19233,6 +19436,8 @@ export interface components {
             completed_sets: number;
             /** Volume Kg */
             volume_kg: number;
+            /** Volume Incomplete */
+            volume_incomplete?: boolean | null;
             /** Completion Feedback */
             completion_feedback?: ("easier_than_expected" | "as_expected" | "harder_than_expected") | null;
             /** Completion Note */
@@ -19244,6 +19449,21 @@ export interface components {
             /** Rest Sessions */
             rest_sessions?: components["schemas"]["RestSessionResponse"][];
         };
+        /** WorkoutHistorySideSet */
+        WorkoutHistorySideSet: {
+            /** Set Number */
+            set_number: number;
+            /**
+             * Execution Mode
+             * @enum {string}
+             */
+            execution_mode: "per_side" | "alternating";
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            /** Is Completed */
+            is_completed: boolean;
+            sides: components["schemas"]["WorkoutSideResults"];
+        };
         /** WorkoutHistorySummary */
         WorkoutHistorySummary: {
             /** Workouts Completed */
@@ -19252,6 +19472,8 @@ export interface components {
             completed_sets: number;
             /** Volume Kg */
             volume_kg: number;
+            /** Volume Incomplete */
+            volume_incomplete?: boolean | null;
         };
         /** WorkoutPersonalRecord */
         WorkoutPersonalRecord: {
@@ -19475,6 +19697,16 @@ export interface components {
             set_number: number;
             /** Set Version */
             set_version: number;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
+            /**
+             * Is Completed
+             * @default true
+             */
+            is_completed: boolean;
             /** Actual Weight */
             actual_weight?: number | null;
             /** Actual Reps */
@@ -19502,6 +19734,16 @@ export interface components {
             set_number: number;
             /** Set Version */
             set_version: number;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
+            /**
+             * Is Completed
+             * @default true
+             */
+            is_completed: boolean;
             /** Actual Weight */
             actual_weight?: number | null;
             /** Actual Reps */
@@ -19531,11 +19773,65 @@ export interface components {
             /** Reached Failure */
             reached_failure?: boolean | null;
             /** Is Completed */
-            is_completed?: boolean | null;
+            is_completed?: boolean | "sides-v1" | null;
+            /** Side Is Completed */
+            side_is_completed?: boolean | null;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideFacts"] | null;
+            /**
+             * Confirm Mode Change
+             * @default false
+             */
+            confirm_mode_change: boolean;
             /** Expected Version */
             expected_version?: number | null;
             /** Mutation Id */
             mutation_id?: string | null;
+        };
+        /** WorkoutSideFact */
+        WorkoutSideFact: {
+            /** Actual Reps */
+            actual_reps?: number | null;
+            /** Actual Weight */
+            actual_weight?: number | string | null;
+            /**
+             * Rir
+             * @description Optional repetitions-in-reserve category after the set; 4+ means many repetitions remained, not an exact value of four
+             */
+            rir?: ("0" | "1" | "2" | "3" | "4+") | null;
+            /** Reached Failure */
+            reached_failure?: boolean | null;
+            /**
+             * Is Completed
+             * @default false
+             */
+            is_completed: boolean;
+        };
+        /** WorkoutSideFacts */
+        WorkoutSideFacts: {
+            left: components["schemas"]["WorkoutSideFact"] | null;
+            right: components["schemas"]["WorkoutSideFact"] | null;
+        };
+        /** WorkoutSideResult */
+        WorkoutSideResult: {
+            /** Actual Reps */
+            actual_reps?: number | null;
+            /** Actual Weight */
+            actual_weight?: number | null;
+            /** Rir */
+            rir?: ("0" | "1" | "2" | "3" | "4+") | null;
+            /** Reached Failure */
+            reached_failure?: boolean | null;
+            /** Is Completed */
+            is_completed: boolean;
+        };
+        /** WorkoutSideResults */
+        WorkoutSideResults: {
+            left: components["schemas"]["WorkoutSideResult"] | null;
+            right: components["schemas"]["WorkoutSideResult"] | null;
         };
         /** WorkoutStatusResponse */
         WorkoutStatusResponse: {
@@ -19543,6 +19839,11 @@ export interface components {
             id: number;
             /** Set Number */
             set_number: number;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
             /** Actual Reps */
             actual_reps?: number | null;
             /** Actual Weight */
@@ -19617,6 +19918,8 @@ export interface components {
             completed_sets: number;
             /** Volume Kg */
             volume_kg: number;
+            /** Volume Incomplete */
+            volume_incomplete?: boolean | null;
             /** Completion Feedback */
             completion_feedback?: ("easier_than_expected" | "as_expected" | "harder_than_expected") | null;
             /** Completion Note */
@@ -19643,6 +19946,11 @@ export interface components {
             reached_failure?: boolean | null;
             /** Is Completed */
             is_completed: boolean;
+            /** Execution Mode */
+            execution_mode?: ("bilateral" | "per_side" | "alternating") | null;
+            /** First Side */
+            first_side?: ("left" | "right") | null;
+            sides?: components["schemas"]["WorkoutSideResults"] | null;
         } & {
             [key: string]: unknown;
         };
@@ -27145,7 +27453,9 @@ export interface operations {
     };
     download_template_api_v1_workout_history_imports_template_csv_get: {
         parameters: {
-            query?: never;
+            query?: {
+                version?: "1" | "2";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -27159,6 +27469,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

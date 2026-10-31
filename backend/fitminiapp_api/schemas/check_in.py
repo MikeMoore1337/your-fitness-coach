@@ -101,7 +101,7 @@ class WeeklyCheckInAdaptiveSummary(BaseModel):
 
 
 class WeeklyCheckInProgressionSummary(BaseModel):
-    training_volume_kg: float = Field(ge=0)
+    training_volume_kg: float | None = Field(ge=0)
     new_personal_records: int = Field(ge=0)
 
 

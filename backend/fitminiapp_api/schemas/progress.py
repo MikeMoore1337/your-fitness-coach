@@ -66,6 +66,7 @@ class TrainingPeriodSummary(BaseModel):
     frequency_per_week: float
     volume_kg: float
     new_personal_records: int
+    volume_incomplete: bool | None = Field(default=None, exclude_if=lambda value: value is None)
     last_completed_workout_on: date | None = None
     next_workout: NextWorkoutSummary | None = None
 

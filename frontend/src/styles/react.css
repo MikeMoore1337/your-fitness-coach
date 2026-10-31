@@ -2244,6 +2244,12 @@ details:not([open]) > :not(summary) {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+.workout-history__side-set {
+  margin: 2px 0 8px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
 @media (max-width: 620px) {
   .exercise-guide-modal__body {
     padding-top: 14px;
@@ -7851,6 +7857,12 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   display: grid;
   gap: 1px;
   min-width: 0;
+}
+
+.progress-set--sides > span {
+  grid-column: 2 / -1;
+  overflow: visible;
+  overflow-wrap: anywhere;
 }
 
 .progress-set small {

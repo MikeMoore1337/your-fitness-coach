@@ -1,4 +1,4 @@
-"""Bounded parser for the neutral workout-history CSV v1 format.
+"""Bounded parser for the neutral workout-history CSV formats.
 
 This module does not persist data or resolve catalog exercises.
 """
@@ -39,6 +39,18 @@ CSV_COLUMNS = (
     "rpe",
     "side",
 )
+CSV_COLUMNS_V2 = (
+    *CSV_COLUMNS,
+    "performed_on",
+    "execution_mode",
+    "first_side",
+    "reached_failure",
+    *(
+        f"{side}_{field}"
+        for side in ("left", "right")
+        for field in ("reps", "weight", "weight_unit", "rir", "reached_failure", "status")
+    ),
+)
 _TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})")
 _NUMBER = re.compile(r"\d{1,10}(?:\.\d{1,4})?")
 _INTEGER = re.compile(r"\d{1,10}")
@@ -67,6 +79,7 @@ class ImportRow:
     reps: int | None
     weight_kg: Decimal | None
     issues: tuple[ImportIssue, ...]
+    sides: dict[str, dict | None] | None = None
 
 
 def _issue(issues: list[ImportIssue], code: str, field: str, message: str) -> None:
@@ -155,7 +168,7 @@ def _weight(value: str, unit: str, issues: list[ImportIssue]) -> Decimal | None:
     return weight_kg
 
 
-def _parse_row(line: int, source: dict[str, str]) -> ImportRow:
+def _parse_row(line: int, source: dict[str, str], version: str) -> ImportRow:
     issues: list[ImportIssue] = []
     for field in ("workout_ref", "workout_title", "exercise_ref", "exercise_name"):
         value = source[field]
@@ -167,9 +180,15 @@ def _parse_row(line: int, source: dict[str, str]) -> ImportRow:
         _issue(
             issues, "not_completed", "status", "Можно импортировать только завершённые тренировки"
         )
-    if source["set_status"] != "completed":
+    mode = source.get("execution_mode", "")
+    side_mode = version == "2" and mode in {"per_side", "alternating"}
+    if source["set_status"] != "completed" and not (
+        side_mode and source["set_status"] == "incomplete"
+    ):
         _issue(issues, "set_not_completed", "set_status", "Подход должен быть отмечен выполненным")
-    if source["set_kind"] not in {"warmup", "working", "drop"}:
+    if source["set_kind"] not in (
+        {"", "warmup", "working", "drop"} if version == "2" else {"warmup", "working", "drop"}
+    ):
         _issue(issues, "invalid_set_kind", "set_kind", "Укажите поддерживаемый тип подхода")
     if source["rir"] not in {"", "0", "1", "2", "3", "4+"}:
         _issue(issues, "invalid_rir", "rir", "Укажите RIR: 0, 1, 2, 3 или 4+")
@@ -178,13 +197,98 @@ def _parse_row(line: int, source: dict[str, str]) -> ImportRow:
     if source["side"]:
         _issue(issues, "unsupported_side", "side", "Раздельные стороны пока не поддерживаются")
     completed_at, completed_on = _completion(source["completed_at"], source["timezone"], issues)
+    if version == "2":
+        try:
+            completed_on = date.fromisoformat(source["performed_on"])
+            if completed_on.isoformat() != source["performed_on"]:
+                raise ValueError
+        except ValueError:
+            _issue(issues, "invalid_performed_on", "performed_on", "Укажите дату тренировки")
+            completed_on = None
+        if mode not in {"", "bilateral", "per_side", "alternating"}:
+            _issue(issues, "invalid_execution_mode", "execution_mode", "Укажите способ выполнения")
+        if source["first_side"] not in {"", "left", "right"} or (
+            source["first_side"] and mode != "alternating"
+        ):
+            _issue(issues, "invalid_first_side", "first_side", "Проверьте начальную сторону")
+        if source["reached_failure"] not in {"", "true", "false"}:
+            _issue(issues, "invalid_failure", "reached_failure", "Укажите true или false")
     set_number = _integer(source["set_number"], "set_number", issues, required=True, minimum=1)
     reps = _integer(source["reps"], "reps", issues, required=False, minimum=0)
     weight_kg = _weight(source["weight"], source["weight_unit"], issues)
-    if not source["reps"] and not source["weight"]:
+    if not side_mode and not source["reps"] and not source["weight"]:
         _issue(issues, "result_missing", "reps", "Укажите фактические повторы или вес")
+    sides: dict[str, dict | None] | None = None
+    if version == "2":
+        sides = {}
+        for side in ("left", "right"):
+            fields = {
+                key: source[f"{side}_{key}"]
+                for key in ("reps", "weight", "weight_unit", "rir", "reached_failure", "status")
+            }
+            if not side_mode and any(fields.values()):
+                _issue(
+                    issues, "unexpected_side", side, "Стороны не соответствуют способу выполнения"
+                )
+            if not any(fields.values()):
+                sides[side] = None
+                continue
+            if fields["status"] not in {"completed", "incomplete"}:
+                _issue(issues, "invalid_side_status", f"{side}_status", "Укажите состояние стороны")
+            if fields["rir"] not in {"", "0", "1", "2", "3", "4+"}:
+                _issue(issues, "invalid_rir", f"{side}_rir", "Укажите допустимый RIR")
+            if fields["reached_failure"] not in {"", "true", "false"}:
+                _issue(
+                    issues, "invalid_failure", f"{side}_reached_failure", "Укажите true или false"
+                )
+            side_reps = _integer(fields["reps"], f"{side}_reps", issues, required=False, minimum=0)
+            weight_issues: list[ImportIssue] = []
+            side_weight = _weight(fields["weight"], fields["weight_unit"], weight_issues)
+            issues.extend(
+                ImportIssue(issue.code, f"{side}_{issue.field}", issue.message)
+                for issue in weight_issues
+            )
+            sides[side] = {
+                "actual_reps": side_reps,
+                "actual_weight": side_weight,
+                "rir": fields["rir"] or None,
+                "reached_failure": (
+                    None if not fields["reached_failure"] else fields["reached_failure"] == "true"
+                ),
+                "is_completed": fields["status"] == "completed",
+            }
+        if side_mode:
+            if any(
+                source[key] for key in ("reps", "weight", "weight_unit", "rir", "reached_failure")
+            ):
+                _issue(
+                    issues,
+                    "mixed_side_facts",
+                    "execution_mode",
+                    "Не смешивайте общие значения и стороны",
+                )
+            if not any(sides.values()):
+                _issue(
+                    issues,
+                    "result_missing",
+                    "execution_mode",
+                    "Укажите данные хотя бы одной стороны",
+                )
+            both_complete = all(
+                fact is not None and fact["is_completed"]
+                for fact in (sides["left"], sides["right"])
+            )
+            if (source["set_status"] == "completed") != both_complete:
+                _issue(
+                    issues,
+                    "side_completion_mismatch",
+                    "set_status",
+                    "Завершение подхода должно совпадать с состоянием сторон",
+                )
+        else:
+            sides = None
     return ImportRow(
-        line, source, completed_at, completed_on, set_number, reps, weight_kg, tuple(issues)
+        line, source, completed_at, completed_on, set_number, reps, weight_kg, tuple(issues), sides
     )
 
 
@@ -205,10 +309,22 @@ def parse_workout_history_csv(content: bytes) -> tuple[ImportRow, ...]:
     exercise_names: dict[tuple[str, str], str] = {}
     seen_sets: set[tuple[str, str, int]] = set()
     try:
-        if next(reader, None) != ["yfc_workout_history", CSV_VERSION]:
-            raise WorkoutHistoryImportError("version", "Нужен шаблон истории YFC версии 1")
+        marker = next(reader, None)
+        if (
+            not marker
+            or len(marker) != 2
+            or marker[0] != "yfc_workout_history"
+            or marker[1] not in {"1", "2"}
+        ):
+            raise WorkoutHistoryImportError("version", "Нужен шаблон истории YFC версии 1 или 2")
+        version = marker[1]
+        expected_columns = CSV_COLUMNS if version == "1" else CSV_COLUMNS_V2
         header = next(reader, None)
-        if header is None or len(header) != len(CSV_COLUMNS) or set(header) != set(CSV_COLUMNS):
+        if (
+            header is None
+            or len(header) != len(expected_columns)
+            or set(header) != set(expected_columns)
+        ):
             raise WorkoutHistoryImportError("columns", "Проверьте колонки шаблона истории")
         for values in reader:
             if monotonic() > deadline:
@@ -232,7 +348,7 @@ def parse_workout_history_csv(content: bytes) -> tuple[ImportRow, ...]:
                     "control_character", f"Недопустимый символ в строке {line}"
                 )
             source = dict(zip(header, (value.strip() for value in values), strict=True))
-            row = _parse_row(line, source)
+            row = _parse_row(line, source, version)
             issues = list(row.issues)
             workout_ref = source["workout_ref"]
             exercise_ref = source["exercise_ref"]
@@ -276,6 +392,7 @@ def parse_workout_history_csv(content: bytes) -> tuple[ImportRow, ...]:
                     row.reps,
                     row.weight_kg,
                     tuple(issues),
+                    row.sides,
                 )
             )
     except csv.Error as exc:

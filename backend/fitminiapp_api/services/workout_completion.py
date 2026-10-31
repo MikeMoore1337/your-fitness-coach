@@ -13,6 +13,7 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.services.workout_sides import completed_set_has_load, completed_set_reps
 from fitminiapp_api.services.workouts import (
     is_pr_record_set,
     pr_record_set_filter,
@@ -22,9 +23,9 @@ from fitminiapp_api.services.workouts import (
 def _exercise_result(exercise: UserWorkoutExercise, title: str, metric_type: str) -> dict:
     completed_sets = [workout_set for workout_set in exercise.sets if workout_set.is_completed]
     reps = [
-        workout_set.actual_reps
+        value
         for workout_set in completed_sets
-        if workout_set.actual_reps is not None
+        if (value := completed_set_reps(workout_set)) is not None
     ]
     loads = [
         float(workout_set.actual_weight)
@@ -68,7 +69,7 @@ def _exercise_result(exercise: UserWorkoutExercise, title: str, metric_type: str
         "reps_total": sum(reps) if reps else None,
         "reps_recorded_sets": len(reps),
         "max_load_kg": max(loads) if loads else None,
-        "load_recorded_sets": len(loads),
+        "load_recorded_sets": sum(completed_set_has_load(row) for row in completed_sets),
         "duration_minutes": sum(durations) if durations else None,
         "distance_km": round(sum(distances), 2) if distances else None,
         "average_heart_rate_bpm": weighted_heart_rate,
@@ -248,10 +249,10 @@ def build_workout_completion_summary(
     ]
     performed = [result for result in exercise_results if result["completed_sets"] > 0]
     reps = [
-        workout_set.actual_reps
+        value
         for exercise in workout.exercises
         for workout_set in exercise.sets
-        if workout_set.is_completed and workout_set.actual_reps is not None
+        if workout_set.is_completed and (value := completed_set_reps(workout_set)) is not None
     ]
     completed_sets = [
         workout_set
@@ -272,7 +273,7 @@ def build_workout_completion_summary(
         "reps_total": sum(reps) if reps else None,
         "reps_recorded_sets": len(reps),
         "load_recorded_sets": sum(
-            workout_set.actual_weight is not None for workout_set in completed_sets
+            completed_set_has_load(workout_set) for workout_set in completed_sets
         ),
         "exercises": performed,
         "personal_records": _personal_records(db, user, workout, exercise_titles, metric_types),
