@@ -365,6 +365,26 @@ def test_cycle_read_preserves_existing_lock_in_get_session(client, lock_kind):
         db_generator.close()
 
 
+@pytest.mark.parametrize("transaction_kind", ["explicit", "nested"])
+def test_cycle_read_preserves_explicit_transaction_scope(client, transaction_kind):
+    facts = _assigned_cycle_with_completed_facts(client)
+    db_generator = session_module.get_db(Request({"type": "http", "method": "GET"}))
+    db = next(db_generator)
+    try:
+        if transaction_kind == "nested":
+            db.execute(text("SELECT 1"))
+        transaction = db.begin() if transaction_kind == "explicit" else db.begin_nested()
+        with transaction:
+            db.execute(text("SELECT 1"))
+            program_versioning.materialize_cycle_read_window(
+                db, [facts["program_id"]], facts["window_start"], facts["window_start"]
+            )
+            assert db.execute(text("SELECT 1")).scalar_one() == 1
+            assert transaction.is_active
+    finally:
+        db_generator.close()
+
+
 def test_scoped_edit_and_materialization_serialize_without_losing_plan(client):
     facts = _assigned_cycle_with_completed_facts(client)
     results = _run_parallel(lambda db: _materialize(db, facts), lambda db: _edit(db, facts, 4))

@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from itertools import pairwise
 
 from sqlalchemy import and_, inspect, or_
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, SessionTransactionOrigin, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
 from fitminiapp_api.models.exercise import Exercise, Muscle
@@ -929,8 +929,12 @@ def materialize_cycle_read_window(
 
 def _release_cycle_read_transaction(db: Session) -> None:
     # A clean GET must release its connection before opening the independent projection.
+    transaction = db.get_transaction()
     if (
         db.info.get("releasable_cycle_read")
+        and transaction is not None
+        and transaction.origin is SessionTransactionOrigin.AUTOBEGIN
+        and not db.in_nested_transaction()
         and not (db.new or db.dirty or db.deleted)
         and db.get_bind().dialect.name == "postgresql"
         and db.connection()
