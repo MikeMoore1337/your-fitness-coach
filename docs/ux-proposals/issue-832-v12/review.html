@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ru" data-color-scheme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YFC · Стороны подхода · #832 — макет</title>
+<link rel="stylesheet" href="../../../frontend/src/styles/design-system.css">
+<style>
+@font-face{font-family:Inter;src:url('../../../frontend/public/assets/fonts/inter-cyrillic.woff2')}
+@font-face{font-family:Inter;src:url('../../../frontend/public/assets/fonts/inter-latin.woff2');unicode-range:U+0000-00FF}
+@font-face{font-family:Oswald;src:url('../../../frontend/public/assets/fonts/oswald-cyrillic.woff2')}
+@font-face{font-family:Oswald;src:url('../../../frontend/public/assets/fonts/oswald-latin.woff2');unicode-range:U+0000-00FF}
+*{box-sizing:border-box}html{color-scheme:dark}html[data-color-scheme=light]{color-scheme:light}
+body{margin:0;background:var(--v2-canvas);color:var(--v2-text-primary);font:14px/1.35 Inter,sans-serif;font-variant-numeric:tabular-nums}
+button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid var(--v2-focus);outline-offset:2px}
+button:disabled{cursor:default;opacity:.55}.review{font-size:11px;color:var(--v2-text-secondary);text-align:center;padding:8px 12px;border-bottom:1px solid var(--v2-border)}
+.layout{max-width:1184px;margin:auto;padding:14px 28px 160px;display:grid;grid-template-columns:160px minmax(0,1fr);gap:28px}
+.sidebar{position:sticky;top:145px;align-self:start}.brand{font:22px Oswald,sans-serif;margin-bottom:24px}.brand b{color:var(--v2-lime)}
+.sidebar div{padding:12px;border-radius:99px;color:var(--v2-text-secondary)}.sidebar div:first-of-type{background:var(--v2-surface-secondary);color:var(--v2-text-primary);box-shadow:inset 0 0 0 1px var(--v2-accent-text)}
+main{min-width:0;max-width:760px}.eyebrow{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--v2-accent-text);font-weight:800;margin:15px 0 3px}
+h1,h2{font-family:Oswald,sans-serif;margin:0}h1{font-size:26px}h2{font-size:24px}.meta{font-size:12px;color:var(--v2-text-secondary);margin:4px 0}.progress{height:4px;background:var(--v2-border);margin:8px 0 18px}.progress i{display:block;width:50%;height:100%;background:var(--v2-lime)}
+.exercise{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 12px}.exercise button{flex:none}.execution{text-align:left;border:0;background:transparent;color:var(--v2-accent-text);font-weight:800;font-size:12px;min-height:44px;padding:6px 0}.execution-panel{border:1px solid var(--v2-border);border-radius:14px;padding:12px;background:var(--v2-surface);margin:0 0 12px}.execution-panel label{display:flex;gap:8px;align-items:center;min-height:44px;font-size:12px}.execution-panel input{width:18px;height:18px;accent-color:var(--v2-lime)}
+.secondary{border:1px solid var(--v2-border);border-radius:14px;background:var(--v2-surface-secondary);color:var(--v2-text-primary);min-height:44px;padding:8px 12px;font-weight:700}
+.timer{position:sticky;top:0;z-index:3;margin:0 auto;width:min(640px,calc(100% - 24px));padding:5px 8px 8px;border:1px solid var(--glass-edge);border-radius:22px;background:var(--glass-solid);box-shadow:var(--glass-shadow)}
+.timer-top{display:flex;align-items:center;gap:10px;min-height:44px}.clock{min-width:65px}.clock span{display:block;color:var(--v2-text-secondary);font-size:9px;font-weight:800}.clock strong{font-size:25px;line-height:1;font-weight:800;letter-spacing:-.04em}.clock.remaining strong{color:var(--v2-accent-text)}.collapse{width:44px;min-width:44px;padding:0;display:grid;place-items:center}.collapse svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.timer-status{margin-left:auto;color:var(--v2-text-secondary);font-size:10px;text-align:right}.timer-actions{display:flex;gap:4px}
+.timer-actions button{flex:1;min-width:44px;min-height:44px;border:1px solid var(--v2-border-strong);border-radius:14px;background:transparent;color:inherit;font-size:12px;font-weight:800}.timer-actions button:nth-child(1),.timer-actions button:nth-child(2){flex:.8}.timer-actions button:last-child{flex:1.25;overflow-wrap:anywhere}.timer-actions .stop{background:var(--v2-lime);color:#090b0b;border-color:transparent}
+.card{background:var(--v2-surface-secondary);border:1px solid var(--v2-lime);border-radius:24px;padding:18px;min-width:0}
+.card.completed{background:var(--v2-surface);border-color:var(--v2-border)}.card-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}.number{font-weight:800;min-width:28px;text-align:center}.head-copy{flex:1}.head-copy strong{display:block}.head-copy small{color:var(--v2-text-secondary);font-size:11px}.role{border:1px solid var(--v2-lime);border-radius:99px;padding:5px 9px;color:var(--v2-accent-text);font-weight:700;font-size:10px;text-align:center}
+.history{display:grid;gap:8px;font-size:12px;color:var(--v2-text-secondary)}.history-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,45%);gap:8px;align-items:center}.history-row+.history-row{border-top:1px solid var(--v2-border);padding-top:8px}.history small{display:block}.history strong{text-align:right;color:var(--v2-text-primary);overflow-wrap:anywhere}.history strong span{display:block}
+.context{color:var(--v2-text-secondary);font-size:12px;font-weight:700;margin:14px 0 9px}
+.mode{border-top:1px solid var(--v2-border);border-bottom:1px solid var(--v2-border);padding:8px 0;display:flex;align-items:center;justify-content:space-between;gap:8px}.mode-copy{font-size:12px;min-width:0}.mode-copy strong,.mode-copy small{display:block}.mode-copy small{font-size:11px;color:var(--v2-text-secondary)}.mode button{flex:none;border:0;background:none;color:var(--v2-accent-text);padding:6px;min-height:44px;font-size:12px;font-weight:800}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0 12px}.fields label{min-width:0;color:var(--v2-text-secondary);font-size:11px;font-weight:800}.fields input{display:block;margin-top:5px;width:100%;min-width:0;height:72px;border:1px solid #c5c8c7;border-radius:14px;background:#fff;color:#111;text-align:center;font-size:36px;font-weight:800}.split .fields input{height:58px;font-size:29px}
+.first-side{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;font-size:12px}.first-side select{min-height:44px;max-width:58%;padding:5px 8px;border:1px solid var(--v2-border);border-radius:12px;color:var(--v2-text-primary);background:var(--v2-surface)}.side{padding:12px 0;border-bottom:1px solid var(--v2-border);min-width:0}.side-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.side-head strong{font-size:14px}.side-head span{font-size:11px;color:var(--v2-text-secondary);text-align:right}.side-head span.done{color:var(--v2-accent-text);font-weight:800}
+.rir{border:0;padding:0;margin:8px 0 12px;min-width:0}.rir legend{font-size:11px;font-weight:800}.rir div{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:5px}.rir button{min-height:44px;border:1px solid var(--v2-border);border-radius:12px;background:transparent;color:inherit;font-weight:800}.rir button[aria-pressed=true]{border-color:var(--v2-accent-text);box-shadow:var(--v2-selected-relief);background:var(--v2-selected-surface);color:var(--v2-selected-ink)}
+.side-foot{display:flex;justify-content:space-between;align-items:center;gap:8px}.failure{min-height:44px;font-size:11px;color:var(--v2-text-secondary);display:flex;align-items:center;gap:5px}.failure input{width:18px;height:18px;accent-color:var(--v2-lime)}
+.side-mark{border:1px solid var(--v2-border);border-radius:12px;background:transparent;color:inherit;min-height:44px;padding:5px 9px;font-size:11px;font-weight:800}
+.action{width:100%;min-height:50px;border:0;border-radius:14px;background:var(--v2-lime);color:#090b0b;font-weight:800;margin-top:12px}.action:disabled{background:var(--v2-surface-strong);color:var(--v2-text-secondary)}
+.muted-action{width:100%;margin-top:8px}.help{color:var(--v2-text-secondary);font-size:12px;line-height:1.45;margin:10px 0}
+.state{border:1px solid var(--v2-border-strong);border-radius:14px;padding:10px 12px;margin:10px 0;background:var(--v2-surface);font-size:12px}.state strong,.state span{display:block}.state strong{margin-bottom:4px}.state button{margin-top:8px}
+.result-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.result-actions button{width:100%;font-size:12px}
+.summary{margin-top:14px;border:1px solid var(--v2-border);border-radius:14px;padding:12px;background:var(--v2-surface)}.summary strong{display:block;margin-bottom:5px}.summary p{font-size:12px;color:var(--v2-text-secondary);margin:4px 0}
+.dock{display:none}.keyboard{display:none}
+@media(max-width:360px){.timer-actions button{font-size:10px;white-space:nowrap}}@media(max-width:700px){.layout{display:block;padding:12px 12px 140px}.sidebar{display:none}.dock{display:flex;position:fixed;z-index:4;bottom:10px;left:10px;right:10px;align-items:stretch;border:1px solid var(--glass-edge);border-radius:99px;background:var(--glass-solid);box-shadow:var(--glass-shadow);padding:3px}.dock button{flex:1;min-width:0;min-height:54px;border:0;border-radius:99px;background:transparent;color:var(--v2-text-primary);font-size:10px;font-weight:800;padding:3px}.dock button.selected{background:var(--v2-selected-surface);box-shadow:var(--v2-selected-relief);color:var(--v2-selected-ink)}.dock svg{display:block;margin:0 auto 2px;width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}}
+.full-capture .dock,.keyboard-mode .dock{display:none}.keyboard-mode .layout{padding-bottom:450px}.keyboard-mode .keyboard{display:block;position:fixed;bottom:0;left:0;right:0;z-index:5;height:278px;padding:7px;background:#cbd0d6;color:#151515}.keyboard small{display:block;text-align:center;font-size:10px;margin:0 0 5px}.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:520px;margin:auto}.keys span{display:grid;place-items:center;height:47px;background:#fafafa;border-radius:6px;box-shadow:0 1px 1px #777;font-size:22px}
+input{scroll-margin-top:145px}body.keyboard-mode .timer{top:0}
+</style>
+</head>
+<body>
+<div class="review">#832 · макет, синтетические данные · <span id="state-name"></span></div>
+<div class="timer" aria-label="Модель компактного таймера отдыха">
+  <div class="timer-top"><div class="clock remaining"><span>ОСТАЛОСЬ</span><strong>1:30</strong></div><div class="clock"><span>ФАКТ</span><strong>0:12</strong></div><div class="timer-status">Отдых идёт</div><button class="secondary collapse" aria-label="Свернуть таймер"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg></button></div>
+  <div class="timer-actions"><button>+ 30 сек</button><button>+ 60 сек</button><button class="stop">Стоп</button><button>Пропустить</button></div>
+</div>
+<div class="layout">
+  <aside class="sidebar" aria-label="Навигация"><p class="brand">YOUR FITNESS <b>COACH</b></p><div>Сегодня</div><div>План</div><div>Питание</div><div>Прогресс</div></aside>
+  <main>
+    <p class="eyebrow">Тренировка · день 1</p><h1>Силовая база</h1><p class="meta" id="progress-label">В процессе · 1 из 3 подходов</p><div class="progress"><i></i></div>
+    <div class="exercise"><div><p class="eyebrow">Упражнение 1 из 3</p><h2 id="exercise-name"></h2><p class="meta">3 × 8–10 · отдых 90 сек</p></div><button class="secondary">Техника</button></div>
+    <button class="execution" id="execution" type="button"></button><div id="execution-panel"></div><div id="message"></div>
+    <article class="card" aria-label="Подход 2">
+      <div class="card-head"><span class="number">2</span><div class="head-copy"><strong>Подход 2 из 3</strong><small>Сначала вес, затем повторы</small></div><span class="role">Рабочий<br>подход</span></div>
+      <div class="history" aria-label="История подхода">
+        <div class="history-row"><div><b>Предыдущий сегодня</b><small>Подход 1 · завершён</small></div><strong id="previous"></strong></div>
+        <div class="history-row"><div><b>Прошлая тренировка</b><small>Этот подход · №2 · 23.10.2026</small><small>Справочно: тип недели может отличаться</small></div><strong id="past"></strong></div>
+      </div>
+      <p class="context">8–10 повторений · Отдых 90 с</p>
+      <div id="content"></div>
+      <div id="bottom"></div>
+    </article>
+    <div id="progression"></div>
+    <p class="help">Заметка к упражнению · Разминка и блины · Дополнительно</p>
+  </main>
+</div>
+<nav class="dock" aria-label="Основная навигация">
+<button class="selected"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v3M16 2v3M3 10h18M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>Сегодня</button>
+<button><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 10v4M5 7v10M8 5v14M8 12h8M16 5v14M19 7v10M22 10v4"/></svg>План</button>
+<button><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2v7a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 2v20M21 2c-4 0-5 5-5 10h5"/></svg>Питание</button>
+<button><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18M7 16v2M12 12v6M17 8v10M6 11l5-5 4 3 5-5"/></svg>Прогресс</button>
+<button><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Добавить</button>
+</nav>
+<div class="keyboard" aria-label="Схематичная клавиатура"><small>МОДЕЛЬ КЛАВИАТУРЫ · не системная клавиатура iPhone</small><div class="keys"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>,</span><span>0</span><span>Удалить</span></div></div>
+<script>
+const params=new URLSearchParams(location.search);
+const state=params.get('state')||'same';
+const theme=params.get('theme')==='light'?'light':'dark';
+document.documentElement.dataset.colorScheme=theme;
+const names={bilateral:'двусторонний подход',same:'одинаково на обе стороны',asymmetric:'разные стороны',partial:'одна сторона не завершена',completed:'подход завершён',alternating:'чередование сторон',history:'история и прогрессия',offline:'нет сети',error:'ошибка сохранения',conflict:'конфликт двух вкладок','conflict-review':'сравнение версий',keyboard:'фокус ввода и модель клавиатуры','choose-mode':'выбор выполнения'};
+document.querySelector('#state-name').textContent=names[state]||names.same;
+const bilateral=state==='bilateral';
+const split=['asymmetric','partial','completed','alternating','history','offline','error','conflict','conflict-review','keyboard'].includes(state);
+document.querySelector('#exercise-name').textContent=bilateral?'Жим штанги лёжа':'Тяга гантели в наклоне';
+document.querySelector('#previous').innerHTML=bilateral?'40 кг × 8':state==='same'?'<span>Левая: 18 кг × 10</span><span>Правая: 18 кг × 10</span>':'<span>Левая: 18 кг × 10</span><span>Правая: 16 кг × 8</span>';
+document.querySelector('#past').innerHTML=bilateral?'42 кг × 8':state==='same'?'<span>Левая: 18 кг × 9</span><span>Правая: 18 кг × 9</span>':'<span>Левая: 18 кг × 9</span><span>Правая: 16 кг × 8</span>';
+const rir=(side,selected)=>'<fieldset class="rir"><legend>Повторы в запасе (RIR)'+(side?' · '+side:'')+'</legend><div>'+['0','1','2','3','4+'].map(v=>'<button type="button" aria-pressed="'+(v===selected)+'">'+v+'</button>').join('')+'</div></fieldset>';
+const fields=(side,weight,reps)=>'<div class="fields"><label>Вес'+(side?' · '+side:'')+', кг<input inputmode="decimal" aria-label="Вес '+side+'" value="'+weight+'"></label><label>Повторы'+(side?' · '+side:'')+'<input inputmode="numeric" aria-label="Повторы '+side+'" value="'+reps+'"></label></div>';
+const side=(title,w,r,ready,effort,failure)=>'<section class="side" aria-label="'+title+' сторона"><div class="side-head"><strong>'+title+' сторона</strong><span class="'+(ready?'done':'')+'">'+(ready?'Выполнена':'Не завершена')+'</span></div>'+fields(title,w,r)+rir(title,effort)+'<div class="side-foot"><label class="failure"><input type="checkbox" '+(failure?'checked':'')+'>До отказа</label><button class="side-mark">'+(ready?'Изменить':'Отметить выполненной')+'</button></div></section>';
+const execution=document.querySelector('#execution');
+execution.textContent='Выполнение упражнения: '+(bilateral?'обычное':state==='alternating'?'поочерёдно':'по сторонам')+' · изменить';
+function showModes(){document.querySelector('#execution-panel').innerHTML='<fieldset class="execution-panel"><legend>Как выполняется упражнение?</legend><label><input type="radio" name="mode" value="bilateral">Обычное</label><label><input type="radio" name="mode" value="same" checked>По сторонам</label><label><input type="radio" name="mode" value="alternating">Поочерёдно</label><small>Завершённые результаты не изменятся.</small></fieldset>';document.querySelectorAll('input[name="mode"]').forEach(input=>input.addEventListener('change',()=>{const p=new URLSearchParams(location.search);p.set('state',input.value);location.search=p.toString()}))}
+execution.addEventListener('click',showModes);
+if(state==='choose-mode')showModes();
+const content=document.querySelector('#content');
+let form='';
+if(bilateral){
+ form=fields('', '40','8')+rir('', '2');
+}else if(!split){
+ form='<div class="mode"><div class="mode-copy"><strong>Одинаково на обе стороны</strong><small>Значения относятся к каждой стороне</small></div><button id="split">Указать раздельно</button></div>'+fields('на сторону','18','10')+rir('', '2')+'<p class="help">Завершая подход, подтверждаете обе стороны.</p>';
+}else{
+ const incomplete=state==='partial'||state==='keyboard';
+ const completed=state==='completed';
+ const alt=state==='alternating';
+ form='<div class="mode"><div class="mode-copy"><strong>'+(alt?'Поочерёдно':'Раздельно по сторонам')+'</strong><small>'+(alt?'Повторы отдельно для каждой стороны':'Вес и повторы для каждой стороны')+'</small></div><button id="same">Одинаково</button></div>'+(alt?'<label class="first-side">Начали с<select aria-label="Первая сторона"><option>Не указана</option><option>Левая</option><option selected>Правая</option></select></label>':'')+'<div class="split">'+side('Левая','18','10',true,'2',false)+side('Правая',incomplete?'':'16',incomplete?'':'8',!incomplete,incomplete?'':alt?'1':'0',!incomplete&&state!=='history'&&state!=='keyboard')+'</div>';
+ if(completed) form='<div class="result-actions"><button class="secondary">Редактировать</button><button class="secondary">Вернуть в работу</button></div>'+form;
+}
+content.innerHTML=form;
+if(state==='completed'){
+ document.querySelector('.card').classList.add('completed');
+ document.querySelector('#progress-label').textContent='В процессе · 2 из 3 подходов';
+ document.querySelector('.head-copy strong').textContent='Подход 2 · выполнен';
+ content.querySelectorAll('input,.rir button,#same').forEach(element=>element.disabled=true);
+ content.querySelectorAll('.side-mark').forEach(element=>element.remove());
+}
+const bottom=document.querySelector('#bottom');
+bottom.innerHTML='<button class="action" '+(['partial','keyboard','completed','conflict','conflict-review'].includes(state)?'disabled':'')+'>'+(state==='completed'?'Подход выполнен':'Завершить подход')+'</button>'+(state==='completed'?'':state==='conflict'||state==='conflict-review'?'<p class="help">Сначала выберите версию подхода.</p>':state==='partial'||state==='keyboard'?'<p class="help">Подход будет завершён после подтверждения обеих сторон.</p>':'<button class="secondary muted-action" disabled>Подставить предыдущий подход сегодня</button><button class="secondary muted-action" disabled>Подставить из прошлой тренировки</button>')+'<p class="help">Что такое RIR?</p>';
+const messages={
+ offline:'<strong>Нет сети</strong><span>Результат сохранён на устройстве и будет отправлен при подключении.</span>',
+ error:'<strong>Не удалось сохранить подход</strong><span>Введённые результаты остаются на экране.</span><button class="secondary">Повторить сохранение</button>',
+ conflict:'<strong>Подход изменён в другой вкладке</strong><span>Проверьте обе версии, чтобы сохранить нужные данные сторон.</span><button id="compare" class="secondary">Посмотреть версии</button>'
+};
+messages['conflict-review']='<strong>Сравнить версии подхода</strong><span><b>Эта вкладка:</b> левая 18 кг × 10, правая 16 кг × 8</span><span><b>Другая вкладка:</b> левая 18 кг × 9, правая 14 кг × 8</span><p>Выберите полный вариант для обеих сторон.</p><button class="secondary">Оставить эту версию</button> <button class="secondary">Выбрать другую версию</button>';
+if(messages[state])document.querySelector('#message').innerHTML='<div class="state" role="status">'+messages[state]+'</div>';
+document.querySelector('#compare')?.addEventListener('click',()=>{const p=new URLSearchParams(location.search);p.set('state','conflict-review');location.search=p.toString()});
+if(state==='history')document.querySelector('#progression').innerHTML='<section class="summary"><strong>История и прогрессия</strong><p>Левая: 18 кг × 9 → 18 кг × 10</p><p>Правая: 16 кг × 8 → 16 кг × 8</p><p>Стороны сравниваются отдельно. Для рекомендации пока недостаточно сопоставимых результатов.</p></section>';
+document.querySelector('#split')?.addEventListener('click',()=>{const p=new URLSearchParams(location.search);p.set('state','asymmetric');location.search=p.toString()});
+document.querySelector('#same')?.addEventListener('click',()=>{alert('Разные значения сторон сохранятся до явного подтверждения изменения режима.')});
+document.querySelectorAll('.rir').forEach(group=>group.addEventListener('click',event=>{if(event.target.tagName!=='BUTTON')return;group.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===event.target)))}));
+if(state==='keyboard'){document.body.classList.add('keyboard-mode');window.addEventListener('load',()=>{const target=document.querySelectorAll('.side')[1].querySelector('input');target.focus({preventScroll:true});target.scrollIntoView({block:'center'})})}
+window.prototypeReady=document.fonts.ready;
+</script>
+</body>
+</html>
