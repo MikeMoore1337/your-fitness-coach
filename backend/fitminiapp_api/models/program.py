@@ -449,14 +449,26 @@ class UserWorkout(Base):
             "completion_note IS NULL OR length(completion_note) <= 500",
             name="ck_user_workouts_completion_note_length",
         ),
+        CheckConstraint(
+            "(history_imported IS TRUE AND user_program_id IS NULL AND day_number IS NULL "
+            "AND week_number IS NULL AND status = 'completed') OR "
+            "(history_imported IS NOT TRUE AND user_program_id IS NOT NULL "
+            "AND day_number IS NOT NULL AND week_number IS NOT NULL)",
+            name="ck_user_workouts_plan_presence",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_program_id: Mapped[int] = mapped_column(ForeignKey("user_programs.id"), index=True)
+    user_program_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_programs.id"), index=True, nullable=True
+    )
+    history_imported: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     scheduled_date: Mapped[date] = mapped_column(Date, index=True)
     scheduled_time: Mapped[time | None] = mapped_column(Time, nullable=True)
-    day_number: Mapped[int] = mapped_column(Integer)
-    week_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    day_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    week_number: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=1, server_default="1"
+    )
     plan_materialized: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=True)
     source_cycle_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cycle_iteration: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -471,7 +483,9 @@ class UserWorkout(Base):
     completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     completion_feedback_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user_program: Mapped[UserProgram] = relationship("UserProgram", back_populates="workouts")
+    user_program: Mapped[UserProgram | None] = relationship(
+        "UserProgram", back_populates="workouts"
+    )
     exercises: Mapped[list[UserWorkoutExercise]] = relationship(
         "UserWorkoutExercise",
         back_populates="workout",
@@ -537,19 +551,27 @@ class UserWorkoutExercise(Base):
             "superset_group >= 1 AND superset_order IN (1, 2))",
             name="ck_user_workout_exercises_superset",
         ),
+        CheckConstraint(
+            "(history_imported IS TRUE AND prescribed_sets IS NULL AND prescribed_reps IS NULL "
+            "AND rest_seconds IS NULL) OR (history_imported IS NOT TRUE "
+            "AND prescribed_sets IS NOT NULL AND prescribed_reps IS NOT NULL "
+            "AND rest_seconds IS NOT NULL)",
+            name="ck_user_workout_exercises_plan_presence",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    history_imported: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
     source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_weekly_prescription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
-    prescribed_sets: Mapped[int] = mapped_column(Integer)
-    prescribed_reps: Mapped[str] = mapped_column(String(32))
+    prescribed_sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescribed_reps: Mapped[str | None] = mapped_column(String(32), nullable=True)
     prescribed_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
+    rest_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True, default=90)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)

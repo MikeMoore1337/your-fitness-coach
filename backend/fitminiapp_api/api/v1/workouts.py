@@ -20,6 +20,7 @@ from fitminiapp_api.models.program import (
     WorkoutAdaptation,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.schemas.cardio import (
     CardioSessionCreate,
@@ -160,6 +161,7 @@ from fitminiapp_api.services.workout_metrics import (
     validate_workout_set_changes,
     workout_exercise_metric_type,
 )
+from fitminiapp_api.services.workout_ownership import workout_owner_id
 from fitminiapp_api.services.workout_recovery import (
     WorkoutRecoveryError,
     apply_recovery,
@@ -1635,14 +1637,15 @@ def workout_history(
 ):
     workouts = (
         db.query(UserWorkout)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .options(
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
             joinedload(UserWorkout.adaptations),
         )
         .filter(
-            UserProgram.user_id == current_user.id,
+            workout_owner_id() == current_user.id,
             UserWorkout.status == "completed",
         )
         .order_by(UserWorkout.scheduled_date.desc(), UserWorkout.id.desc())
@@ -1675,6 +1678,7 @@ def workout_history(
         rows.append(
             {
                 "id": item.id,
+                "is_imported": item.user_program_id is None,
                 "scheduled_date": str(item.scheduled_date),
                 "scheduled_time": item.scheduled_time,
                 "title": item.title,
@@ -1736,14 +1740,15 @@ def workout_history_summary(
                 0,
             ),
         )
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .outerjoin(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .outerjoin(
             UserWorkoutSet,
             UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id,
         )
         .filter(
-            UserProgram.user_id == current_user.id,
+            workout_owner_id() == current_user.id,
             UserWorkout.status == "completed",
         )
         .one()
@@ -1885,9 +1890,10 @@ def clear_workout_history(
     workout_ids = [
         item.id
         for item in db.query(UserWorkout.id)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .filter(
-            UserProgram.user_id == current_user.id,
+            workout_owner_id() == current_user.id,
             UserWorkout.status == "completed",
         )
         .all()

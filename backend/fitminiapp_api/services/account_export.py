@@ -83,6 +83,7 @@ from fitminiapp_api.models.user import (
     User,
 )
 from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery, WeeklyDigestPreference
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.services.profile import serialize_body_priority
 
@@ -90,7 +91,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 24
+ACCOUNT_EXPORT_SCHEMA_VERSION = 25
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -142,6 +143,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "training_blocks": "programs",
     "training_block_priority_muscles": "programs",
     "user_workouts": "programs",
+    "imported_workouts": "imported_workouts",
     "workout_adaptations": "programs",
     "user_workout_exercises": "programs",
     "user_workout_sets": "programs",
@@ -192,6 +194,9 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "workout_rest_actions": "idempotency fingerprints and mutation ids used only for sync correctness",
     "workout_exercise_notes": "private exercise notes excluded until an explicit export policy exists",
     "workout_exercise_note_mutations": "idempotency fingerprints used only for sync correctness",
+    "workout_history_import_drafts": (
+        "short-lived owner-scoped workout import drafts; normalized source is removed at expiry"
+    ),
     "program_imports": (
         "short-lived owner-scoped import drafts; source is never persisted and normalized content "
         "is cleared on terminal state"
@@ -656,6 +661,103 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
     }
 
 
+def _serialize_workout(
+    workout: UserWorkout, rest_by_workout: dict[int, list[dict[str, object]]]
+) -> dict[str, object]:
+    return {
+        **_fields(
+            workout,
+            (
+                "id",
+                "scheduled_date",
+                "scheduled_time",
+                "day_number",
+                "week_number",
+                "title",
+                "status",
+                "started_at",
+                "completed_at",
+                "completion_feedback",
+                "completion_note",
+                "completion_feedback_updated_at",
+            ),
+        ),
+        "rest_sessions": rest_by_workout.get(workout.id, []),
+        "adaptations": [
+            _fields(
+                adaptation,
+                (
+                    "id",
+                    "reason",
+                    "request_payload",
+                    "original_snapshot",
+                    "applied_diff",
+                    "ruleset_version",
+                    "applied_at",
+                ),
+            )
+            for adaptation in workout.adaptations
+        ],
+        "exercises": [
+            {
+                **_fields(
+                    exercise,
+                    (
+                        "id",
+                        "exercise_id",
+                        "sort_order",
+                        "prescribed_sets",
+                        "prescribed_reps",
+                        "prescribed_duration_minutes",
+                        "rest_seconds",
+                        "notes",
+                        "superset_group",
+                        "superset_order",
+                        "source_template_exercise_id",
+                        "source_weekly_prescription_id",
+                        "group_id",
+                        "group_kind",
+                        "group_order",
+                        "prescription",
+                    ),
+                ),
+                "title": exercise.exercise.title if exercise.exercise else None,
+                "metric_type": exercise.metric_type
+                or (
+                    exercise.exercise.metric_type or "strength" if exercise.exercise else "strength"
+                ),
+                "sets": [
+                    _fields(
+                        workout_set,
+                        (
+                            "id",
+                            "set_number",
+                            "actual_reps",
+                            "actual_weight",
+                            "duration_minutes",
+                            "distance_km",
+                            "average_heart_rate_bpm",
+                            "heart_rate_zone",
+                            "rir",
+                            "set_kind",
+                            "reached_failure",
+                            "planned_role",
+                            "planned_group_id",
+                            "planned_group_kind",
+                            "planned_position",
+                            "planned_round",
+                            "is_completed",
+                            "version",
+                        ),
+                    )
+                    for workout_set in exercise.sets
+                ],
+            }
+            for exercise in workout.exercises
+        ],
+    }
+
+
 def _serialize_program(
     program: UserProgram, rest_by_workout: dict[int, list[dict[str, object]]]
 ) -> dict[str, object]:
@@ -712,100 +814,7 @@ def _serialize_program(
             for block in program.training_blocks
         ],
         "workouts": [
-            {
-                **_fields(
-                    workout,
-                    (
-                        "id",
-                        "scheduled_date",
-                        "scheduled_time",
-                        "day_number",
-                        "week_number",
-                        "title",
-                        "status",
-                        "started_at",
-                        "completed_at",
-                        "completion_feedback",
-                        "completion_note",
-                        "completion_feedback_updated_at",
-                    ),
-                ),
-                "rest_sessions": rest_by_workout.get(workout.id, []),
-                "adaptations": [
-                    _fields(
-                        adaptation,
-                        (
-                            "id",
-                            "reason",
-                            "request_payload",
-                            "original_snapshot",
-                            "applied_diff",
-                            "ruleset_version",
-                            "applied_at",
-                        ),
-                    )
-                    for adaptation in workout.adaptations
-                ],
-                "exercises": [
-                    {
-                        **_fields(
-                            exercise,
-                            (
-                                "id",
-                                "exercise_id",
-                                "sort_order",
-                                "prescribed_sets",
-                                "prescribed_reps",
-                                "prescribed_duration_minutes",
-                                "rest_seconds",
-                                "notes",
-                                "superset_group",
-                                "superset_order",
-                                "source_template_exercise_id",
-                                "source_weekly_prescription_id",
-                                "group_id",
-                                "group_kind",
-                                "group_order",
-                                "prescription",
-                            ),
-                        ),
-                        "title": exercise.exercise.title if exercise.exercise else None,
-                        "metric_type": exercise.metric_type
-                        or (
-                            exercise.exercise.metric_type or "strength"
-                            if exercise.exercise
-                            else "strength"
-                        ),
-                        "sets": [
-                            _fields(
-                                workout_set,
-                                (
-                                    "id",
-                                    "set_number",
-                                    "actual_reps",
-                                    "actual_weight",
-                                    "duration_minutes",
-                                    "distance_km",
-                                    "average_heart_rate_bpm",
-                                    "heart_rate_zone",
-                                    "rir",
-                                    "set_kind",
-                                    "reached_failure",
-                                    "planned_role",
-                                    "planned_group_id",
-                                    "planned_group_kind",
-                                    "planned_position",
-                                    "planned_round",
-                                    "is_completed",
-                                    "version",
-                                ),
-                            )
-                            for workout_set in exercise.sets
-                        ],
-                    }
-                    for exercise in workout.exercises
-                ],
-            }
+            _serialize_workout(workout, rest_by_workout)
             for workout in sorted(program.workouts, key=lambda row: (row.scheduled_date, row.id))
         ],
     }
@@ -832,6 +841,18 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         )
         .filter(UserProgram.user_id == user.id)
         .order_by(UserProgram.assigned_at.asc(), UserProgram.id.asc())
+        .all()
+    )
+    imported_workouts = (
+        db.query(UserWorkout, ImportedWorkout)
+        .join(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
+        .options(
+            selectinload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
+            selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets),
+            selectinload(UserWorkout.adaptations),
+        )
+        .filter(ImportedWorkout.owner_user_id == user.id, UserWorkout.user_program_id.is_(None))
+        .order_by(UserWorkout.scheduled_date, UserWorkout.id)
         .all()
     )
     rest_by_workout: dict[int, list[dict[str, object]]] = {}
@@ -1607,6 +1628,16 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             _fields(row, ("id", "template_id", "hidden_at")) for row in hidden_templates
         ],
         "programs": [_serialize_program(program, rest_by_workout) for program in programs],
+        "imported_workouts": [
+            {
+                **_serialize_workout(workout, rest_by_workout),
+                "completed_at_utc": workout.completed_at_utc,
+                "source_timezone": provenance.source_timezone,
+                "source_provider": provenance.provider,
+                "parser_version": provenance.parser_version,
+            }
+            for workout, provenance in imported_workouts
+        ],
         "exercise_setup_memories": [
             _fields(
                 row,

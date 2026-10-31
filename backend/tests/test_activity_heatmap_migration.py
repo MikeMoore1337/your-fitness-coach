@@ -47,6 +47,8 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
             "CREATE TABLE program_templates (id INTEGER PRIMARY KEY, default_duration_weeks INTEGER)",
             "CREATE TABLE program_template_exercise_weeks (id INTEGER PRIMARY KEY, week_number INTEGER CONSTRAINT ck_program_template_exercise_weeks_number CHECK (week_number >= 1 AND week_number <= 24))",
             "CREATE TABLE user_workouts (id INTEGER PRIMARY KEY, user_program_id INTEGER NOT NULL, week_number INTEGER NOT NULL, day_number INTEGER NOT NULL, status TEXT, completed_at TEXT)",
+            "CREATE TABLE user_workout_exercises (id INTEGER PRIMARY KEY, prescribed_sets INTEGER NOT NULL, prescribed_reps VARCHAR(32) NOT NULL, rest_seconds INTEGER NOT NULL)",
+            "CREATE TABLE users (id INTEGER PRIMARY KEY)",
             "CREATE TABLE user_workout_sets (id INTEGER PRIMARY KEY, actual_weight NUMERIC, actual_reps INTEGER, is_completed BOOLEAN)",
             "CREATE TABLE user_profiles (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL)",
             "INSERT INTO program_templates VALUES (1, 16)",
@@ -76,7 +78,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0140_workout_start_utc",)
+            ("0142_workout_history_import",)
         ]
         assert connection.exec_driver_sql(
             "SELECT user_id, equipment_profiles, active_equipment_profile_id, equipment_profiles_revision FROM user_profiles"

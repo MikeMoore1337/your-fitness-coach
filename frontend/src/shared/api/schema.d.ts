@@ -3530,6 +3530,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workout-history-imports/template.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Template */
+        get: operations["download_template_api_v1_workout_history_imports_template_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout-history-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Drafts */
+        get: operations["list_drafts_api_v1_workout_history_imports_get"];
+        put?: never;
+        /** Upload History */
+        post: operations["upload_history_api_v1_workout_history_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout-history-imports/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search Catalog */
+        post: operations["search_catalog_api_v1_workout_history_imports_catalog_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout-history-imports/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get History Import */
+        get: operations["get_history_import_api_v1_workout_history_imports__draft_id__get"];
+        put?: never;
+        post?: never;
+        /** Cancel History */
+        delete: operations["cancel_history_api_v1_workout_history_imports__draft_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout-history-imports/{draft_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve History */
+        post: operations["resolve_history_api_v1_workout_history_imports__draft_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workout-history-imports/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm History */
+        post: operations["confirm_history_api_v1_workout_history_imports__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/exercise-notes": {
         parameters: {
             query?: never;
@@ -7629,6 +7733,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_history_api_v1_workout_history_imports_post */
+        Body_upload_history_api_v1_workout_history_imports_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_program_import_api_v1_programs_imports_post */
         Body_upload_program_import_api_v1_programs_imports_post: {
             /** File */
@@ -10881,7 +10990,7 @@ export interface components {
             /** Workout Exercise Id */
             workout_exercise_id: number;
             /** Prescribed Reps */
-            prescribed_reps: string;
+            prescribed_reps: string | null;
             /** Completed Set Count */
             completed_set_count: number;
             /** Authoritative Set Count */
@@ -12455,6 +12564,222 @@ export interface components {
             editorial_value: number;
             /** Web Article Potential Reasons */
             web_article_potential_reasons?: string[];
+        };
+        /** HistoryImportCatalogSearch */
+        HistoryImportCatalogSearch: {
+            /** Q */
+            q: string;
+        };
+        /** HistoryImportConfirm */
+        HistoryImportConfirm: {
+            /** Version */
+            version: number;
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** HistoryImportDraftSummary */
+        HistoryImportDraftSummary: {
+            /** Id */
+            id: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed";
+            /** Created At */
+            created_at: string;
+            /** Expires At */
+            expires_at: string;
+        };
+        /** HistoryImportDuplicate */
+        HistoryImportDuplicate: {
+            /** Workout Ref */
+            workout_ref: string;
+            /** Source Sets */
+            source_sets: [
+                number,
+                number,
+                number | null,
+                string | null,
+                string | null,
+                string | null
+            ][];
+            /** Candidates */
+            candidates: components["schemas"]["HistoryImportDuplicateCandidate"][];
+            /** Choice */
+            choice: ("keep" | "skip") | null;
+        };
+        /** HistoryImportDuplicateCandidate */
+        HistoryImportDuplicateCandidate: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "exact" | "source" | "possible";
+            /** Workout Id */
+            workout_id?: number | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Title */
+            title: string;
+            /** Completed At Utc */
+            completed_at_utc: string | null;
+            /** Sets */
+            sets: [
+                number,
+                number,
+                number | null,
+                string | null,
+                string | null,
+                string | null
+            ][];
+        };
+        /** HistoryImportExerciseCandidate */
+        HistoryImportExerciseCandidate: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Title */
+            title: string;
+            /** Metric Type */
+            metric_type: string;
+            /** Unsupported Side */
+            unsupported_side: boolean;
+        };
+        /** HistoryImportIssue */
+        HistoryImportIssue: {
+            /** Code */
+            code: string;
+            /** Field */
+            field: string;
+            /** Message */
+            message: string;
+        };
+        /** HistoryImportPreview */
+        HistoryImportPreview: {
+            /** Id */
+            id: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed";
+            /** Provider */
+            provider?: string | null;
+            /** Schema Version */
+            schema_version?: number | null;
+            /** Parser Version */
+            parser_version?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Rows */
+            rows?: components["schemas"]["HistoryImportRow"][];
+            /** Duplicates */
+            duplicates?: components["schemas"]["HistoryImportDuplicate"][];
+            /** Duplicate Choices */
+            duplicate_choices?: {
+                [key: string]: "keep" | "skip";
+            };
+            /** Preview Signature */
+            preview_signature?: string | null;
+            result?: components["schemas"]["HistoryImportResult"] | null;
+        };
+        /** HistoryImportResolve */
+        HistoryImportResolve: {
+            /** Version */
+            version: number;
+            /** Exercise Choices */
+            exercise_choices?: {
+                [key: string]: number;
+            };
+            /** Excluded Lines */
+            excluded_lines?: number[];
+            /** Duplicate Choices */
+            duplicate_choices?: {
+                [key: string]: "keep" | "skip";
+            };
+        };
+        /** HistoryImportResult */
+        HistoryImportResult: {
+            /** Workout Ids */
+            workout_ids: number[];
+            /** Workout Count */
+            workout_count: number;
+            /** Set Count */
+            set_count: number;
+        };
+        /** HistoryImportRow */
+        HistoryImportRow: {
+            /** Line */
+            line: number;
+            source: components["schemas"]["HistoryImportSource"];
+            /** Completed At Utc */
+            completed_at_utc: string | null;
+            /** Completed On */
+            completed_on: string | null;
+            /** Set Number */
+            set_number: number | null;
+            /** Reps */
+            reps: number | null;
+            /** Weight Kg */
+            weight_kg: string | null;
+            /** Issues */
+            issues: components["schemas"]["HistoryImportIssue"][];
+            /** Blocking Issues */
+            blocking_issues: components["schemas"]["HistoryImportIssue"][];
+            /** Exercise Id */
+            exercise_id: number | null;
+            /** Match Mode */
+            match_mode: ("auto" | "manual") | null;
+            /**
+             * Match Status
+             * @enum {string}
+             */
+            match_status: "matched" | "ambiguous" | "unknown";
+            /** Resolved Title */
+            resolved_title: string | null;
+            /** Candidates */
+            candidates: components["schemas"]["HistoryImportExerciseCandidate"][];
+            /** Excluded */
+            excluded: boolean;
+        };
+        /** HistoryImportSource */
+        HistoryImportSource: {
+            /** Workout Ref */
+            workout_ref: string;
+            /** Completed At */
+            completed_at: string;
+            /** Timezone */
+            timezone: string;
+            /** Workout Title */
+            workout_title: string;
+            /** Status */
+            status: string;
+            /** Exercise Ref */
+            exercise_ref: string;
+            /** Exercise Name */
+            exercise_name: string;
+            /** Set Number */
+            set_number: string;
+            /** Set Status */
+            set_status: string;
+            /** Set Kind */
+            set_kind: string;
+            /** Reps */
+            reps: string;
+            /** Weight */
+            weight: string;
+            /** Weight Unit */
+            weight_unit: string;
+            /** Rir */
+            rir: string;
+            /** Rpe */
+            rpe: string;
+            /** Side */
+            side: string;
         };
         /**
          * HydrationBeverageType
@@ -18874,9 +19199,9 @@ export interface components {
             /** Title */
             title: string;
             /** Prescribed Sets */
-            prescribed_sets: number;
+            prescribed_sets: number | null;
             /** Prescribed Reps */
-            prescribed_reps: string;
+            prescribed_reps: string | null;
             /** Sort Order */
             sort_order: number;
         };
@@ -18884,6 +19209,11 @@ export interface components {
         WorkoutHistoryItem: {
             /** Id */
             id: number;
+            /**
+             * Is Imported
+             * @default false
+             */
+            is_imported: boolean;
             /**
              * Scheduled Date
              * Format: date
@@ -26800,6 +27130,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutCopyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_template_api_v1_workout_history_imports_template_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_drafts_api_v1_workout_history_imports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryImportDraftSummary"][];
+                };
+            };
+        };
+    };
+    upload_history_api_v1_workout_history_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_history_api_v1_workout_history_imports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_catalog_api_v1_workout_history_imports_catalog_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryImportCatalogSearch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryImportExerciseCandidate"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_history_import_api_v1_workout_history_imports__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_history_api_v1_workout_history_imports__draft_id__delete: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_history_api_v1_workout_history_imports__draft_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryImportResolve"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_history_api_v1_workout_history_imports__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryImportConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryImportPreview"];
                 };
             };
             /** @description Validation Error */
