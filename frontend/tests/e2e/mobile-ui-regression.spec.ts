@@ -698,6 +698,59 @@ test('@critical reduced motion keeps TMA dock clearance current', async ({ page 
 });
 
 for (const theme of ['dark', 'light'] as const) {
+  test(`@critical #1281 normal-motion TMA dock clearance tracks viewport and safe-area in ${theme}`, async ({
+    page,
+  }) => {
+    const prepared = await preparePage(page, theme, 'telegram');
+    if (!prepared.tma) throw new Error('TMA harness was not installed');
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'no-preference' });
+    await page.goto('/app?tgWebAppPlatform=ios');
+    await waitForSurface(page, 'today');
+    await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
+
+    const assertClearance = async () => {
+      const geometry = await page.evaluate(() => {
+        const style = getComputedStyle(document.documentElement);
+        const dock = document.getElementById('appBottomNav');
+        if (!dock) throw new Error('Mobile dock is missing');
+        const rect = dock.getBoundingClientRect();
+        const dockHeight = Number.parseFloat(style.getPropertyValue('--app-bottom-nav-height'));
+        const viewportBottom = Number.parseFloat(style.getPropertyValue('--yfc-viewport-bottom'));
+        const safeBottom = Math.max(
+          Number.parseFloat(style.getPropertyValue('--yfc-tg-safe-bottom')) || 0,
+          Number.parseFloat(style.getPropertyValue('--yfc-content-safe-bottom')) || 0,
+        );
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2,
+        );
+        return {
+          bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom),
+          requiredPadding: dockHeight + 24 + Math.max(8, safeBottom) + viewportBottom,
+          dockBottom: rect.bottom,
+          effectiveViewportBottom: window.innerHeight - viewportBottom,
+          dockHit: hit?.closest('#appBottomNav') === dock,
+        };
+      });
+      expect(geometry.bodyPaddingBottom).toBeGreaterThanOrEqual(geometry.requiredPadding - 1);
+      expect(geometry.dockBottom).toBeLessThanOrEqual(geometry.effectiveViewportBottom + 1);
+      expect(geometry.dockHit).toBe(true);
+      const startWorkout = page.getByRole('button', { name: 'Начать тренировку' });
+      await startWorkout.scrollIntoViewIfNeeded();
+      await expectNoOverlap(startWorkout, page.locator('#appBottomNav'));
+    };
+
+    await assertClearance();
+    await prepared.tma.setSafeArea({ top: 28, right: 2, bottom: 34, left: 2 });
+    await prepared.tma.setContentSafeArea({ top: 44, right: 0, bottom: 40, left: 0 });
+    await prepared.tma.setViewport(720, 844);
+    await expect(page.locator('html')).toHaveCSS('--yfc-tg-safe-bottom', '34px');
+    await expect(page.locator('html')).toHaveCSS('--yfc-tg-content-safe-bottom', '40px');
+    await assertClearance();
+  });
+}
+
+for (const theme of ['dark', 'light'] as const) {
   for (const width of [320, 360, 390, 393, 430]) {
     test(`@critical mocked TMA keeps Active Workout RIR and finish controls clear at ${width}px ${theme}`, async ({
       page,
