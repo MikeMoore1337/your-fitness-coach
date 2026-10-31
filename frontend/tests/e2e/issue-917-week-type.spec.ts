@@ -367,6 +367,12 @@ for (const theme of ['dark', 'light'] as const) {
         }
         if (type === 'heavy' && ['393', 'desktop'].includes(viewport.name)) {
           await guidance.getByText('Почему такой вес?').click();
+          await expect(
+            guidance
+              .getByRole('list', { name: 'Последние тренировки' })
+              .getByRole('listitem')
+              .first(),
+          ).toContainText(/10 повторов\s+1 раб\. подх\./);
           await expect(guidance).toContainText('workout:17/set:41');
           await expect(guidance).toContainText('progression-guidance-v3');
           await screenshot(guidance, `workout-heavy-details-${theme}-${viewport.name}.png`);
@@ -385,6 +391,12 @@ for (const theme of ['dark', 'light'] as const) {
         await screenshot(proposal, `program-${type}-${theme}-${viewport.name}.png`);
         if (type === 'heavy' && ['393', 'desktop'].includes(viewport.name)) {
           await proposal.getByText('Почему такой вес?').click();
+          await expect(
+            proposal
+              .getByRole('list', { name: 'Последние тренировки' })
+              .getByRole('listitem')
+              .first(),
+          ).toContainText(/10 повторов\s+1 раб\. подх\./);
           await expect(proposal).toContainText('workout:17/set:41');
           await screenshot(proposal, `program-heavy-details-${theme}-${viewport.name}.png`);
         }

@@ -284,7 +284,7 @@ export function ProgressionGuidance({
             <ol className="progression-guidance__history" aria-label="Последние тренировки">
               {guidance.evidence.sessions.map((session) => (
                 <li key={session.workout_id}>
-                  <span>{sessionLabel(session)}</span>
+                  <span>{sessionLabel(session)} </span>
                   <small>
                     {session.working_set_count} раб. подх.
                     {session.rir_recorded_set_count > 0
