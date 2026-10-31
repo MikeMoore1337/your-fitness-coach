@@ -57,6 +57,12 @@ BLOCK_STATUS_TRANSITIONS = {
 }
 
 
+def _required_plan_number(value: int | None) -> int:
+    if value is None:
+        raise ProgramError("Для тренировки нет данных плана")
+    return value
+
+
 def _validate_workout_group_assignments(
     exercises: list[UserWorkoutExercise],
     *,
@@ -514,6 +520,12 @@ def workout_cycle_week_type(
     """Resolve the type from the workout's saved plan revision; false means unknown."""
     if workout.source_cycle_week is None:
         return None, workout.plan_revision_number is None
+    if (
+        workout.user_program is None
+        or workout.user_program_id is None
+        or workout.week_number is None
+    ):
+        return None, False
     number = workout.plan_revision_number
     if number is None or not any(item.revision_number == number for item in revisions):
         return None, False
@@ -581,7 +593,7 @@ def cycle_workout_count(
         if resolved is None:
             if not missing_only:
                 total += sum(
-                    left <= row.week_number < right
+                    left <= _required_plan_number(row.week_number) < right
                     and (start is None or row.scheduled_date >= start)
                     and (end is None or row.scheduled_date <= end)
                     for row in program.workouts
@@ -611,8 +623,8 @@ def cycle_workout_count(
             total += (last - first) // length + 1
             if missing_only:
                 total -= sum(
-                    first <= row.week_number <= last
-                    and (row.week_number - first) % length == 0
+                    first <= _required_plan_number(row.week_number) <= last
+                    and (_required_plan_number(row.week_number) - first) % length == 0
                     and row.day_number == plan["day_number"]
                     for row in program.workouts
                 )
@@ -644,6 +656,8 @@ def _cycle_plan_sets(plan: dict) -> list[dict]:
 def _write_cycle_exercises(
     db: Session, workout: UserWorkout, plan: dict, *, target_slot: int | None = None
 ) -> None:
+    if workout.user_program is None:
+        raise ProgramError("Для тренировки нет данных плана")
     if (
         workout.status != "planned"
         or workout.started_at is not None
@@ -724,6 +738,8 @@ def hydrate_cycle_workout(db: Session, workout: UserWorkout) -> bool:
     db.refresh(workout)
     if workout.status != "planned" or _workout_has_recorded_data(workout):
         return False
+    if workout.week_number is None or workout.day_number is None:
+        raise ProgramError("Для тренировки нет данных плана")
     if (
         workout.plan_materialized is not False
         and workout.plan_revision_number == program.current_revision_number
@@ -1062,7 +1078,9 @@ def revise_program_cycle(
         changed_fields={
             "operation": "cycle_revised",
             "duration_cancelled_workout_ids": [
-                row.id for row in affected if row.week_number > duration and row.status == "planned"
+                row.id
+                for row in affected
+                if _required_plan_number(row.week_number) > duration and row.status == "planned"
             ],
             "duration_weeks": duration,
             **({"cycle_configuration": config} if config else {}),
@@ -1078,6 +1096,8 @@ def revise_program_cycle(
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
     revised_sets = 0
     for workout in affected:
+        if workout.week_number is None or workout.day_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         if workout.week_number > duration:
             workout.status = "cancelled"
             cancel_workout_reminder(db, workout.id)
@@ -1293,11 +1313,11 @@ def enable_program_cycle(
     revised_sets = sum(
         len(item["sets"])
         for row in existing
-        if row.week_number <= duration
+        if _required_plan_number(row.week_number) <= duration
         and row.status == "planned"
         and row.scheduled_date >= today
         and not _workout_has_recorded_data(row)
-        for plan in plans(row.week_number)
+        for plan in plans(_required_plan_number(row.week_number))
         if plan["day_number"] == row.day_number
         for item in plan["exercises"]
     )
@@ -1321,6 +1341,8 @@ def enable_program_cycle(
     for row in existing:
         if row.scheduled_date < today or row.status != "planned" or _workout_has_recorded_data(row):
             continue
+        if row.week_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         target_plan: dict | None = next(
             (item for item in plans(row.week_number) if item["day_number"] == row.day_number), None
         )
@@ -1467,6 +1489,8 @@ def disable_program_cycle(
     existing_by_week: dict[int, list[UserWorkout]] = {}
     dates_by_week: dict[int, dict[int, date]] = {}
     for row in existing:
+        if row.week_number is None or row.day_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         existing_by_week.setdefault(row.week_number, []).append(row)
         dates_by_week.setdefault(row.week_number, {})[row.day_number] = row.scheduled_date
     if preview:
@@ -1570,6 +1594,8 @@ def disable_program_cycle(
         },
     )
     for row in existing:
+        if row.week_number is None or row.day_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         target_plan = plans_by_key.get((row.week_number, row.day_number))
         if (
             target_plan is None
@@ -1665,6 +1691,8 @@ def revise_program_week_type(
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
     dates_by_week: dict[int, dict[int, date]] = {}
     for row in existing:
+        if row.week_number is None or row.day_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         dates_by_week.setdefault(row.week_number, {})[row.day_number] = row.scheduled_date
     if preview:
         result = []
@@ -1755,6 +1783,8 @@ def revise_program_week_type(
 
     candidates = []
     for row in existing:
+        if row.week_number is None or row.day_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         config = _cycle_plan_at(db, program, row.week_number, revisions=revisions)
         if config is None or row.scheduled_date < today:
             continue
@@ -1864,7 +1894,7 @@ def _lifecycle_block_summary(
     workouts: list[UserWorkout],
 ) -> dict[str, object]:
     block_weeks = [
-        workout.week_number
+        _required_plan_number(workout.week_number)
         for workout in workouts
         if block.start_date <= workout.scheduled_date <= block.end_date
     ]
@@ -2166,7 +2196,7 @@ def apply_program_lifecycle_action(
                 workout,
                 program_id=new_program.id,
                 scheduled_date=workout.scheduled_date + date_shift,
-                week_number=workout.week_number,
+                week_number=_required_plan_number(workout.week_number),
             )
         for block in source_blocks:
             if block.status != "archived":
@@ -2556,7 +2586,7 @@ def _import_cycle_revision(
     if any(row.status == "in_progress" for row in historical):
         raise ProgramError("Дождитесь завершения текущей тренировки перед изменением цикла")
     boundary = max(
-        max((row.week_number for row in historical), default=0) + 1,
+        max((_required_plan_number(row.week_number) for row in historical), default=0) + 1,
         max(1, (today - program.start_date).days // 7 + 1),
     )
     if boundary > program.duration_weeks:
@@ -2720,6 +2750,8 @@ def _import_cycle_revision(
             raise ProgramError(
                 "Изменение цикла не может затрагивать выполненные или начатые тренировки"
             )
+        if workout.week_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         effective = next(
             (
                 item
@@ -2879,12 +2911,16 @@ def apply_imported_template_revision(
         today = today_for_user(target_user)
         existing_by_pair: dict[tuple[int, int], UserWorkout] = {}
         for row in all_workouts:
+            if row.week_number is None or row.day_number is None:
+                raise ProgramError("Для тренировки нет данных плана")
             pair = (row.week_number, row.day_number)
             if pair in existing_by_pair:
                 raise ProgramError("Assigned program contains duplicate workout days")
             existing_by_pair[pair] = row
 
         for workout in future_workouts:
+            if workout.week_number is None or workout.day_number is None:
+                raise ProgramError("Для тренировки нет данных плана")
             day = days_by_number.get(workout.day_number)
             if day is None:
                 workout.status = "cancelled"
@@ -2945,6 +2981,8 @@ def apply_imported_template_revision(
             program.schedule_weekdays = [weekday % 7 for weekday in program.schedule_weekdays]
     else:
         for workout in future_workouts:
+            if workout.day_number is None:
+                raise ProgramError("Для тренировки нет данных плана")
             day = days_by_number[workout.day_number]
             workout.title = day.title
             _replace_workout_exercises_from_template(db, workout, day, visible_by_id)
@@ -3440,8 +3478,8 @@ def repeat_training_block(
     )
     if not workouts:
         raise ProgramError("Training block has no scheduled workouts to repeat")
-    first_source_week = min(workout.week_number for workout in workouts)
-    last_source_week = max(workout.week_number for workout in workouts)
+    first_source_week = min(_required_plan_number(workout.week_number) for workout in workouts)
+    last_source_week = max(_required_plan_number(workout.week_number) for workout in workouts)
     source_week_start = program.start_date + timedelta(weeks=first_source_week - 1)
     start_offset = (source.start_date - source_week_start).days
     duration_days = (source.end_date - source.start_date).days + 1
@@ -3470,6 +3508,8 @@ def repeat_training_block(
     )
     week_shift = old_duration_weeks + 1 - first_source_week
     for workout in workouts:
+        if workout.week_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
         new_week = workout.week_number + week_shift
         old_week_start = program.start_date + timedelta(weeks=workout.week_number - 1)
         day_offset = (workout.scheduled_date - old_week_start).days
@@ -3674,6 +3714,8 @@ def upsert_future_program_exercise(
         ):
             if row.scheduled_date.isoformat() < scope.get("not_before_date", ""):
                 continue
+            if row.week_number is None:
+                raise ProgramError("Для тренировки нет данных плана")
             config = _cycle_plan_at(db, program, row.week_number)
             if config is None:
                 continue
@@ -3741,6 +3783,8 @@ def upsert_future_program_exercise(
         revised_sets = 0
         updated_count = 0
         for workout in existing:
+            if workout.week_number is None or workout.day_number is None:
+                raise ProgramError("Для тренировки нет данных плана")
             effective = next(
                 (
                     item
@@ -3843,7 +3887,9 @@ def upsert_future_program_exercise(
         selected_day = next_workout.day_number
         planned_workouts = [next_workout]
     else:
-        available_days = sorted({workout.day_number for workout in future_workouts})
+        available_days = sorted(
+            {_required_plan_number(workout.day_number) for workout in future_workouts}
+        )
         if payload.target_template_exercise_id is None and selected_day is None:
             if len(available_days) != 1:
                 raise ProgramError("Choose a program day for the exercise")

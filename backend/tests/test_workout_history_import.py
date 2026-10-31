@@ -2,16 +2,30 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from fastapi import HTTPException
 from test_training_analytics import _auth, _user_id
 from test_workout_history_import_parser import _csv, _row
 
+from fitminiapp_api.api.v1.workout_rest import _validate_source_set
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.exercise import Exercise
-from fitminiapp_api.models.program import UserWorkout, UserWorkoutExercise, UserWorkoutSet
+from fitminiapp_api.models.program import (
+    TrainingBlock,
+    UserWorkout,
+    UserWorkoutExercise,
+    UserWorkoutSet,
+)
 from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_history_import import ImportedWorkout, WorkoutHistoryImportDraft
 from fitminiapp_api.services.account_export import build_account_export
 from fitminiapp_api.services.accounts import delete_user_cascade
+from fitminiapp_api.services.program_common import ProgramError
+from fitminiapp_api.services.program_versioning import _lifecycle_block_summary
+from fitminiapp_api.services.progression_guidance import (
+    _progression_set_selection,
+    build_progression_guidance,
+)
+from fitminiapp_api.services.training_preferences import _estimated_minutes
 from fitminiapp_api.services.workout_history_import import expire_history_import_drafts
 
 URL = "/api/v1/workout-history-imports"
@@ -52,6 +66,11 @@ def test_import_confirmation_is_atomic_idempotent_and_visible_in_history_and_exp
     receipt = result.json()["result"]
     assert receipt["workout_count"] == 1 and receipt["set_count"] == 1
     assert _confirm(client, headers, preview).json()["result"] == receipt
+    for action in ("start", "skip"):
+        response = client.post(
+            f"/api/v1/workouts/{receipt['workout_ids'][0]}/{action}", headers=headers
+        )
+        assert response.status_code == 404
     history = client.get("/api/v1/workouts/history", headers=headers).json()
     assert history[0]["is_imported"] is True
     assert history[0]["exercises"][0]["prescribed_sets"] is None
@@ -91,7 +110,19 @@ def test_import_confirmation_is_atomic_idempotent_and_visible_in_history_and_exp
         )
         assert workout.exercises[0].rest_seconds is None
         assert workout.exercises[0].sets[0].actual_weight == Decimal("45.36")
+        with pytest.raises(HTTPException) as rest_error:
+            _validate_source_set(workout.exercises[0].sets[0], workout.exercises[0])
+        assert rest_error.value.status_code == 422
+        with pytest.raises(ValueError, match="Missing planned exercise parameters"):
+            _estimated_minutes(workout.exercises)
         owner = db.get(User, _user_id(833_001))
+        assert (
+            _progression_set_selection(workout.exercises[0]).reason_code == "invalid_prescription"
+        )
+        assert build_progression_guidance(db, owner, workout) == {}
+        block = TrainingBlock(start_date=workout.scheduled_date, end_date=workout.scheduled_date)
+        with pytest.raises(ProgramError, match="нет данных плана"):
+            _lifecycle_block_summary(block, [workout])
         exported = build_account_export(db, owner)["imported_workouts"]
         assert len(exported) == 1 and exported[0]["source_timezone"] == "Europe/Moscow"
         assert exported[0]["exercises"][0]["sets"][0]["actual_reps"] == 8

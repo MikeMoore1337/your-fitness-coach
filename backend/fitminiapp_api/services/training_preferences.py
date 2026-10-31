@@ -159,12 +159,16 @@ def _editor_payload(db: Session, owner: User, editor_id: int | None) -> dict | N
 
 
 def _estimated_minutes(items: list[UserWorkoutExercise]) -> int:
-    seconds = sum(
-        item.prescribed_sets * ACTIVE_SECONDS_PER_SET
-        + max(item.prescribed_sets - 1, 0) * item.rest_seconds
-        + TRANSITION_SECONDS_PER_EXERCISE
-        for item in items
-    )
+    seconds = 0
+    for item in items:
+        sets, rest = item.prescribed_sets, item.rest_seconds
+        if sets is None or rest is None:
+            raise ValueError("Missing planned exercise parameters")
+        seconds += (
+            sets * ACTIVE_SECONDS_PER_SET
+            + max(sets - 1, 0) * rest
+            + TRANSITION_SECONDS_PER_EXERCISE
+        )
     return math.ceil(seconds / 60) if seconds else 0
 
 

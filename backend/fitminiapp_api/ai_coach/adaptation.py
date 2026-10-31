@@ -743,6 +743,9 @@ class AiCoachAdaptationService:
 
         applied = False
         if payload.decision == "confirm" and patch.operation != "explanation_only":
+            rest_seconds = patch.rest_seconds or exercise.rest_seconds
+            if rest_seconds is None:
+                raise AdaptationError("AI proposal target prescription is no longer available")
             candidate_id = token_payload.get("candidate_id")
             if proposal_type == AiCoachAdaptationProposalType.EXERCISE_SUBSTITUTION.value:
                 if (
@@ -760,7 +763,7 @@ class AiCoachAdaptationService:
                     prescribed_sets=exercise.prescribed_sets,
                     prescribed_reps=exercise.prescribed_reps,
                     prescribed_duration_minutes=exercise.prescribed_duration_minutes,
-                    rest_seconds=patch.rest_seconds or exercise.rest_seconds,
+                    rest_seconds=rest_seconds,
                     notes=exercise.notes,
                     prescription=None,
                     target_template_exercise_id=exercise.source_template_exercise_id,
@@ -777,7 +780,7 @@ class AiCoachAdaptationService:
                     exercise_id=exercise.exercise_id,
                     prescribed_sets=patch.prescribed_sets or exercise.prescribed_sets,
                     prescribed_reps=patch.prescribed_reps or exercise.prescribed_reps,
-                    rest_seconds=patch.rest_seconds or exercise.rest_seconds,
+                    rest_seconds=rest_seconds,
                     notes=exercise.notes,
                     reason="AI Coach proposal confirmed",
                 )

@@ -324,7 +324,7 @@ def _get_user_workout_or_404(
     if refresh:
         query = query.populate_existing()
     workout = query.first()
-    if not workout:
+    if not workout or workout.user_program_id is None:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
     from fitminiapp_api.services.program_versioning import (
         hydrate_cycle_read_workout,
@@ -338,6 +338,13 @@ def _get_user_workout_or_404(
     else:
         hydrate_cycle_read_workout(db, workout)
     return workout
+
+
+def _workout_program_or_404(workout: UserWorkout) -> UserProgram:
+    program = workout.user_program
+    if program is None:
+        raise HTTPException(status_code=404, detail="Тренировка не найдена")
+    return program
 
 
 def _lock_program(db: Session, program_id: int) -> UserProgram:
@@ -1257,7 +1264,7 @@ def delete_today_workout(
         .first()
     )
 
-    if not workout:
+    if not workout or workout.user_program_id is None:
         raise HTTPException(status_code=404, detail="На сегодня тренировка не назначена")
 
     program = _lock_program(db, workout.user_program_id)
@@ -1298,7 +1305,7 @@ def start_workout(
     db: Session = Depends(get_db),
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id, lock=True)
-    program = workout.user_program
+    program = _workout_program_or_404(workout)
 
     if workout.status == "completed":
         raise HTTPException(status_code=409, detail="Тренировка уже завершена")
@@ -1362,7 +1369,7 @@ def finish_workout(
     db: Session = Depends(get_db),
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id, lock=True)
-    program = workout.user_program
+    program = _workout_program_or_404(workout)
 
     if workout.status == "completed":
         return _serialize_workout(workout, db, current_user)
@@ -1533,7 +1540,7 @@ def reschedule_workout(
     db: Session = Depends(get_db),
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id, lock=True)
-    program = workout.user_program
+    program = _workout_program_or_404(workout)
     _require_active_program(program)
     if workout.status != "planned":
         raise HTTPException(
@@ -1604,7 +1611,7 @@ def skip_workout(
     db: Session = Depends(get_db),
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id, lock=True)
-    program = workout.user_program
+    program = _workout_program_or_404(workout)
     _require_active_program(program)
     if workout.status != "planned":
         raise HTTPException(

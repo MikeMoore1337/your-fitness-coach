@@ -340,6 +340,8 @@ def _progression_set_selection(
         return ProgressionSetSelection(None, (), 0, None, reason_code="invalid_prescription")
 
     if plan is None:
+        if exercise.prescribed_sets is None:
+            return ProgressionSetSelection(None, (), 0, None, reason_code="invalid_prescription")
         if rule_kind == "amrap_success_failure" and exercise.prescribed_sets != 1:
             return ProgressionSetSelection(None, (), 0, None, reason_code="ambiguous_amrap_sets")
         return ProgressionSetSelection(
@@ -718,7 +720,11 @@ def _matches_cycle_plan(
     exercise: UserWorkoutExercise,
 ) -> bool:
     try:
-        if workout.plan_revision_number is None or exercise.source_template_exercise_id is None:
+        if (
+            workout.plan_revision_number is None
+            or workout.week_number is None
+            or exercise.source_template_exercise_id is None
+        ):
             return False
         available = [
             item for item in revisions if item.revision_number <= workout.plan_revision_number
@@ -808,6 +814,8 @@ def _rule_guidance(
     sessions: list[SessionFacts],
     current_is_deload: bool,
 ) -> tuple[dict, str, int | None, int | None]:
+    if current.prescribed_sets is None or current.prescribed_reps is None:
+        raise ProgramError("Для упражнения нет данных плана тренировки")
     base = _review_result(
         prescribed_sets=selection.expected_count or current.prescribed_sets,
         prescribed_reps=selection.target_reps or current.prescribed_reps,
@@ -1238,7 +1246,7 @@ def build_progression_guidance(
         return {}
 
     program, revision, metadata, program_error = _current_program_snapshot(db, workout)
-    if program is None:
+    if program is None or workout.week_number is None:
         return {}
     revision_number = program.current_revision_number
     revisions = (
@@ -1353,6 +1361,8 @@ def build_progression_guidance(
     for current in workout.exercises:
         if workout_exercise_metric_type(current) == "cardio":
             continue
+        if current.prescribed_sets is None or current.prescribed_reps is None:
+            raise ProgramError("Для упражнения нет данных плана тренировки")
         if workout.status not in {"planned", "in_progress"}:
             result = _review_result(
                 prescribed_sets=current.prescribed_sets,
@@ -1455,6 +1465,8 @@ def build_progression_guidance(
                         same_type.append(item)
                         break
                     continue
+                if item.workout.week_number is None:
+                    raise ProgramError("Для тренировки нет данных плана")
                 historical_metadata = metadata
                 if typed_context:
                     historical_type, historical_known = workout_cycle_week_type(

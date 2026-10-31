@@ -221,7 +221,7 @@ def _validate_today_state(
             "Изменить состав можно только до начала тренировки",
             outcome="rejected_stale",
         )
-    if not workout.user_program.is_active:
+    if workout.user_program is None or not workout.user_program.is_active:
         raise WorkoutAdaptationError("Программа сейчас неактивна", outcome="rejected_stale")
 
 
