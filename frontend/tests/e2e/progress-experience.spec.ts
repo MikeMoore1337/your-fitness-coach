@@ -3427,7 +3427,17 @@ for (const theme of ['light', 'dark'] as const) {
       await withMetrics.getByText('Дополнительные показатели').click();
       await expect(withMetrics).toContainText('8,1 км');
       await withMetrics.getByText('Действия с записью').click();
-      await expect(withMetrics.getByRole('button', { name: 'Изменить' })).toBeVisible();
+      const editAction = withMetrics.getByRole('button', { name: 'Изменить' });
+      const deleteAction = withMetrics.getByRole('button', { name: 'Удалить' });
+      await expect(editAction).toBeVisible();
+      await expect(deleteAction).toBeVisible();
+      const editBounds = await editAction.boundingBox();
+      const deleteBounds = await deleteAction.boundingBox();
+      expect(editBounds).not.toBeNull();
+      expect(deleteBounds).not.toBeNull();
+      expect(deleteBounds!.y - (editBounds!.y + editBounds!.height)).toBeGreaterThanOrEqual(11);
+      expect(editBounds!.height).toBeGreaterThanOrEqual(44);
+      expect(deleteBounds!.height).toBeGreaterThanOrEqual(44);
       await expectTouchTargets(withMetrics.locator('.cardio-session-row__menu > summary'));
 
       await expectNoHorizontalOverflow(page);
