@@ -146,7 +146,7 @@ def _validate_active_workout(workout: UserWorkout, current_user: User) -> None:
             "Разминку можно добавить только во время тренировки",
             code="warmup_workout_not_active",
         )
-    if not workout.user_program.is_active:
+    if workout.user_program is None or not workout.user_program.is_active:
         raise WarmupProposalError("Программа сейчас неактивна", code="warmup_workout_not_active")
 
 

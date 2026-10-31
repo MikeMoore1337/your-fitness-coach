@@ -342,6 +342,8 @@ def _target_preview(
     removal_seen = False
     template_day_numbers = {day.day_number for day in template.days}
     for workout in future_workouts:
+        if workout.week_number is None:
+            continue
         desired = (
             _desired_rows(template, workout.week_number, workout.day_number)
             if workout.day_number in template_day_numbers

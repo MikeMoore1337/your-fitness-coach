@@ -145,7 +145,7 @@ def add_or_update_set(
         raise WorkoutValidationError("Exercise does not belong to workout")
     if payload.set_number < 1:
         raise WorkoutValidationError("set_number must be >= 1")
-    if payload.set_number > exercise.prescribed_sets:
+    if exercise.prescribed_sets is None or payload.set_number > exercise.prescribed_sets:
         raise WorkoutValidationError("set_number exceeds prescribed_sets")
 
     row = (
