@@ -285,6 +285,27 @@ def validate_program_payload(
     payload: ProgramTemplateCreate,
     require_coach_target: bool = True,
 ) -> None:
+    weekly = [exercise.weekly_prescriptions for day in payload.days for exercise in day.exercises]
+    if sum(len(items) for items in weekly) > MAX_GENERATED_SETS:
+        raise ProgramError("Размер плана превышает допустимый объём одной операции")
+    if any(weekly):
+        source_weeks = (
+            payload.week_cycle.length_weeks
+            if payload.week_cycle
+            else max(item.week_number for items in weekly for item in items)
+        )
+        if source_weeks > MAX_GENERATED_SETS or any(
+            len(items) != source_weeks
+            or {item.week_number for item in items} != set(range(1, source_weeks + 1))
+            for items in weekly
+        ):
+            raise ProgramError("Периодизированный шаблон содержит неполную недельную схему")
+    if (
+        payload.week_cycle is not None
+        and not payload.week_cycle.repeat
+        and payload.duration_weeks > payload.week_cycle.length_weeks
+    ):
+        raise ProgramError("Длительность программы превышает длину цикла без повторения")
     if payload.goal not in GOALS:
         raise ProgramError("Unsupported goal")
     if payload.level not in LEVELS:
@@ -349,6 +370,36 @@ def _can_manage_template(db: Session, current_user: User, template: ProgramTempl
     )
 
 
+def _add_weekly_prescriptions(
+    template_exercise: ProgramTemplateExercise,
+    exercise_payload: ProgramTemplateExerciseCreate,
+    visible_by_effective_id: dict[int, Exercise],
+) -> None:
+    for weekly in exercise_payload.weekly_prescriptions:
+        weekly_exercise = visible_by_effective_id.get(weekly.exercise_id)
+        if weekly_exercise is None:
+            raise ProgramError("Weekly exercise is not available for program owner")
+        weekly_plan, weekly_prescription = _input_prescription(
+            weekly_exercise,
+            prescription=weekly.prescription,
+            prescribed_sets=weekly.prescribed_sets,
+            prescribed_reps=weekly.prescribed_reps,
+            prescribed_duration_minutes=weekly.prescribed_duration_minutes,
+            rest_seconds=weekly.rest_seconds,
+        )
+        template_exercise.weekly_prescriptions.append(
+            ProgramTemplateExerciseWeekPrescription(
+                exercise_id=weekly.exercise_id,
+                week_number=weekly.week_number,
+                prescribed_sets=weekly_prescription.prescribed_sets,
+                prescribed_reps=weekly_prescription.prescribed_reps,
+                prescribed_duration_minutes=weekly_prescription.prescribed_duration_minutes,
+                rest_seconds=weekly_prescription.rest_seconds,
+                prescription=weekly_plan if weekly.prescription is not None else None,
+            )
+        )
+
+
 def create_template(
     db: Session,
     current_user: User,
@@ -371,6 +422,19 @@ def create_template(
         owner_user_id=None if is_public else owner_user.id,
         created_by_user_id=current_user.id,
         is_public=is_public,
+        default_duration_weeks=(
+            payload.duration_weeks
+            if payload.week_cycle
+            else max(
+                (
+                    item.week_number
+                    for day in payload.days
+                    for exercise in day.exercises
+                    for item in exercise.weekly_prescriptions
+                ),
+                default=1,
+            )
+        ),
         provenance_type="CUSTOM",
         provenance=None,
         program_metadata=(
@@ -409,24 +473,24 @@ def create_template(
             )
             group_id, group_kind, group_order = _group_projection(ex)
 
-            db.add(
-                ProgramTemplateExercise(
-                    day_id=day_row.id,
-                    exercise_id=ex.exercise_id,
-                    sort_order=sort_order,
-                    prescribed_sets=prescription.prescribed_sets,
-                    prescribed_reps=prescription.prescribed_reps,
-                    prescribed_duration_minutes=prescription.prescribed_duration_minutes,
-                    rest_seconds=prescription.rest_seconds,
-                    notes=ex.notes,
-                    superset_group=ex.superset_group,
-                    superset_order=ex.superset_order,
-                    group_id=group_id,
-                    group_kind=group_kind,
-                    group_order=group_order,
-                    prescription=(structured_prescription if ex.prescription is not None else None),
-                )
+            template_exercise = ProgramTemplateExercise(
+                day_id=day_row.id,
+                exercise_id=ex.exercise_id,
+                sort_order=sort_order,
+                prescribed_sets=prescription.prescribed_sets,
+                prescribed_reps=prescription.prescribed_reps,
+                prescribed_duration_minutes=prescription.prescribed_duration_minutes,
+                rest_seconds=prescription.rest_seconds,
+                notes=ex.notes,
+                superset_group=ex.superset_group,
+                superset_order=ex.superset_order,
+                group_id=group_id,
+                group_kind=group_kind,
+                group_order=group_order,
+                prescription=(structured_prescription if ex.prescription is not None else None),
             )
+            db.add(template_exercise)
+            _add_weekly_prescriptions(template_exercise, ex, visible_by_effective_id)
 
     db.flush()
     return template
@@ -529,7 +593,7 @@ def assign_template_to_user(
     assignment_week_prescriptions: dict[tuple[int, int], ExercisePrescription] = {}
     assignment_week_plans: dict[tuple[int, int], dict] = {}
     effective_duration_weeks = template.effective_duration_weeks
-    has_weekly_prescriptions = effective_duration_weeks > 1 or any(
+    has_weekly_prescriptions = (effective_duration_weeks > 1 and not cycle) or any(
         exercise_item.weekly_prescriptions
         for day in ordered_days
         for exercise_item in day.exercises
@@ -1219,7 +1283,9 @@ def _update_periodized_template_preserving_structure(
             weekly_by_number = {
                 item.week_number: item for item in existing_exercise.weekly_prescriptions
             }
-            if set(weekly_by_number) != set(range(1, template.effective_duration_weeks + 1)):
+            cycle = (template.program_metadata or {}).get("week_cycle")
+            source_weeks = cycle["length_weeks"] if cycle else template.effective_duration_weeks
+            if set(weekly_by_number) != set(range(1, source_weeks + 1)):
                 raise ProgramError(
                     "Периодизированный шаблон содержит неполную недельную схему; измените его повторным импортом"
                 )
@@ -1264,14 +1330,51 @@ def _update_periodized_template_preserving_structure(
             existing_exercise.prescription = (
                 structured_plan if payload_exercise.prescription is not None else None
             )
-            base_weekly.exercise_id = payload_exercise.exercise_id
-            base_weekly.prescribed_sets = prescription.prescribed_sets
-            base_weekly.prescribed_reps = prescription.prescribed_reps
-            base_weekly.prescribed_duration_minutes = prescription.prescribed_duration_minutes
-            base_weekly.rest_seconds = prescription.rest_seconds
-            base_weekly.prescription = (
-                structured_plan if payload_exercise.prescription is not None else None
-            )
+            if payload_exercise.weekly_prescriptions:
+                existing_by_week = {
+                    item.week_number: item for item in existing_exercise.weekly_prescriptions
+                }
+                desired = {item.week_number for item in payload_exercise.weekly_prescriptions}
+                for old_weekly in list(existing_exercise.weekly_prescriptions):
+                    if old_weekly.week_number not in desired:
+                        existing_exercise.weekly_prescriptions.remove(old_weekly)
+                for weekly_input in payload_exercise.weekly_prescriptions:
+                    weekly_exercise = visible_by_effective_id.get(weekly_input.exercise_id)
+                    if weekly_exercise is None:
+                        raise ProgramError("Weekly exercise is not available for program owner")
+                    weekly_plan, weekly_projection = _input_prescription(
+                        weekly_exercise,
+                        prescription=weekly_input.prescription,
+                        prescribed_sets=weekly_input.prescribed_sets,
+                        prescribed_reps=weekly_input.prescribed_reps,
+                        prescribed_duration_minutes=weekly_input.prescribed_duration_minutes,
+                        rest_seconds=weekly_input.rest_seconds,
+                    )
+                    saved = existing_by_week.get(weekly_input.week_number)
+                    if saved is None:
+                        saved = ProgramTemplateExerciseWeekPrescription(
+                            week_number=weekly_input.week_number
+                        )
+                        existing_exercise.weekly_prescriptions.append(saved)
+                    saved.exercise_id = weekly_input.exercise_id
+                    saved.prescribed_sets = weekly_projection.prescribed_sets
+                    saved.prescribed_reps = weekly_projection.prescribed_reps
+                    saved.prescribed_duration_minutes = (
+                        weekly_projection.prescribed_duration_minutes
+                    )
+                    saved.rest_seconds = weekly_projection.rest_seconds
+                    saved.prescription = (
+                        weekly_plan if weekly_input.prescription is not None else None
+                    )
+            else:
+                base_weekly.exercise_id = payload_exercise.exercise_id
+                base_weekly.prescribed_sets = prescription.prescribed_sets
+                base_weekly.prescribed_reps = prescription.prescribed_reps
+                base_weekly.prescribed_duration_minutes = prescription.prescribed_duration_minutes
+                base_weekly.rest_seconds = prescription.rest_seconds
+                base_weekly.prescription = (
+                    structured_plan if payload_exercise.prescription is not None else None
+                )
 
 
 def update_template_for_user(
@@ -1299,9 +1402,6 @@ def update_template_for_user(
 
     if not _can_manage_template(db, current_user, template):
         raise ProgramError("No permission to edit template")
-
-    if payload.week_cycle is not None:
-        raise ProgramError("Изменение цикла недель пока недоступно")
 
     validate_program_payload(
         payload,
@@ -1338,10 +1438,27 @@ def update_template_for_user(
             raise ProgramError("Active program revision is required")
         if active_program.current_revision_number != expected_revision_number:
             raise ProgramError("Program revision conflict")
+        requested_cycle = payload.week_cycle.model_dump() if payload.week_cycle else None
+        if "week_cycle" in payload.model_fields_set and requested_cycle != (
+            template.program_metadata or {}
+        ).get("week_cycle"):
+            raise ProgramError("Измените цикл назначенной программы через будущую ревизию")
 
-    is_periodized = template.effective_duration_weeks > 1 or any(
-        exercise.weekly_prescriptions for day in template.days for exercise in day.exercises
-    )
+    is_periodized = (
+        template.effective_duration_weeks > 1
+        and not (template.program_metadata or {}).get("week_cycle")
+    ) or any(exercise.weekly_prescriptions for day in template.days for exercise in day.exercises)
+    if (
+        payload.week_cycle is not None
+        and any(
+            exercise.weekly_prescriptions
+            and len(exercise.weekly_prescriptions) != payload.week_cycle.length_weeks
+            for day in template.days
+            for exercise in day.exercises
+        )
+        and not all(ex.weekly_prescriptions for day in payload.days for ex in day.exercises)
+    ):
+        raise ProgramError("Длина цикла должна соответствовать сохранённой недельной схеме")
     if is_periodized:
         _update_periodized_template_preserving_structure(
             template,
@@ -1387,30 +1504,41 @@ def update_template_for_user(
                     rest_seconds=ex.rest_seconds,
                 )
 
-                db.add(
-                    ProgramTemplateExercise(
-                        day_id=day_row.id,
-                        exercise_id=ex.exercise_id,
-                        sort_order=sort_order,
-                        prescribed_sets=prescription.prescribed_sets,
-                        prescribed_reps=prescription.prescribed_reps,
-                        prescribed_duration_minutes=prescription.prescribed_duration_minutes,
-                        rest_seconds=prescription.rest_seconds,
-                        notes=ex.notes,
-                        superset_group=ex.superset_group,
-                        superset_order=ex.superset_order,
-                        group_id=_group_projection(ex)[0],
-                        group_kind=_group_projection(ex)[1],
-                        group_order=_group_projection(ex)[2],
-                        prescription=(
-                            structured_prescription if ex.prescription is not None else None
-                        ),
-                    )
+                template_exercise = ProgramTemplateExercise(
+                    day_id=day_row.id,
+                    exercise_id=ex.exercise_id,
+                    sort_order=sort_order,
+                    prescribed_sets=prescription.prescribed_sets,
+                    prescribed_reps=prescription.prescribed_reps,
+                    prescribed_duration_minutes=prescription.prescribed_duration_minutes,
+                    rest_seconds=prescription.rest_seconds,
+                    notes=ex.notes,
+                    superset_group=ex.superset_group,
+                    superset_order=ex.superset_order,
+                    group_id=_group_projection(ex)[0],
+                    group_kind=_group_projection(ex)[1],
+                    group_order=_group_projection(ex)[2],
+                    prescription=(structured_prescription if ex.prescription is not None else None),
                 )
+                db.add(template_exercise)
+                _add_weekly_prescriptions(template_exercise, ex, visible_by_effective_id)
 
     template.title = payload.title
     template.goal = payload.goal
     template.level = payload.level
+    if "week_cycle" in payload.model_fields_set:
+        metadata = dict(template.program_metadata or {})
+        previous_cycle = metadata.get("week_cycle")
+        if payload.week_cycle is None:
+            metadata.pop("week_cycle", None)
+            if previous_cycle:
+                template.default_duration_weeks = (
+                    previous_cycle["length_weeks"] if is_periodized else 1
+                )
+        else:
+            metadata["week_cycle"] = payload.week_cycle.model_dump()
+            template.default_duration_weeks = payload.duration_weeks
+        template.program_metadata = metadata or None
     if not template.is_public and payload.mode == "coach" and payload.target_telegram_user_id:
         template.owner_user_id = target_user.id
     elif (

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
-import type { ApiSchemas } from '../../shared/api/types';
+import type { ApiSchemas, Exercise } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
 import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import {
@@ -19,6 +19,8 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
 import { AiAdaptationProposal } from '../ai/AiAdaptationProposal';
 import { ProgressionGuidance } from '../workouts/ProgressionGuidance';
+import { ActiveProgramPeriodization } from './ActiveProgramPeriodization';
+import './ProgramBuilderFocus.css';
 import { hasDecimalScale, parseDecimalDraft } from '../../shared/numeric/decimalDraft';
 import {
   blockStatusLabel,
@@ -279,6 +281,7 @@ export function AssignedProgramDetails({
   currentRevisionNumber,
   startDate,
   durationWeeks,
+  periodizationReadOnly = false,
   showAiAdaptation = false,
   workoutHistoryReturnPath,
 }: {
@@ -286,6 +289,7 @@ export function AssignedProgramDetails({
   currentRevisionNumber: number;
   startDate: string;
   durationWeeks: number;
+  periodizationReadOnly?: boolean;
   showAiAdaptation?: boolean;
   workoutHistoryReturnPath?: string;
 }) {
@@ -297,6 +301,7 @@ export function AssignedProgramDetails({
   const [editingBlock, setEditingBlock] = useState<TrainingBlock | 'new' | null>(null);
   const [historyReason, setHistoryReason] = useState('');
   const [lifecycleActionsOpen, setLifecycleActionsOpen] = useState(false);
+  const [periodizationOpen, setPeriodizationOpen] = useState(false);
   const [dismissedProposals, setDismissedProposals] = useState<Set<string>>(() => new Set());
   const [adjustedWeights, setAdjustedWeights] = useState<Record<string, string>>({});
   const returnedRevisionRef = useRef<HTMLDetailsElement>(null);
@@ -317,6 +322,11 @@ export function AssignedProgramDetails({
   const blocks = useQuery({
     queryKey: ['assigned-program', programId, 'blocks'],
     queryFn: () => api<TrainingBlock[]>(`/api/v1/programs/assigned/${programId}/blocks`),
+  });
+  const exercises = useQuery({
+    queryKey: ['exercises'],
+    queryFn: () => api<Exercise[]>('/api/v1/programs/exercises'),
+    enabled: periodizationOpen,
   });
   const progressionProposals = useQuery({
     queryKey: ['assigned-program', programId, 'progression-proposals'],
@@ -753,6 +763,34 @@ export function AssignedProgramDetails({
           </article>
         </>
       ) : null}
+
+      {canManageProgram && (
+        <details
+          open={periodizationOpen}
+          onToggle={(event) => setPeriodizationOpen(event.currentTarget.open)}
+        >
+          <summary className="yfc-disclosure-summary">
+            <span>Периодизация и будущие недели</span>
+            <DisclosureIcon />
+          </summary>
+          {periodizationOpen && (
+            <ActiveProgramPeriodization
+              programId={programId}
+              revision={revisionNumber}
+              duration={lifecycle.data?.duration_weeks ?? durationWeeks}
+              initialWeek={lifecycle.data?.current_week_number ?? 1}
+              exercises={exercises.data ?? []}
+              dirty={false}
+              readOnly={periodizationReadOnly}
+              onChanged={(nextRevision) => {
+                setMutationRevisionNumber(nextRevision);
+                void invalidateProgramContext();
+                toast('Будущий план обновлён');
+              }}
+            />
+          )}
+        </details>
+      )}
 
       {blocks.isLoading ? (
         <LoadingState label="Загружаем текущий этап…" />

@@ -28,6 +28,9 @@ vi.mock('../../../../src/shared/api/client', () => {
   return {
     api: (...args: unknown[]) => apiMock(...args),
     ApiError: MockApiError,
+    apiErrorDetailIncludes: (error: unknown, phrase: string) =>
+      error instanceof MockApiError &&
+      JSON.stringify(error.body).toLowerCase().includes(phrase.toLowerCase()),
   };
 });
 
@@ -266,6 +269,97 @@ describe('ProgramBuilder type-aware prescription', () => {
     expect(
       await screen.findByText('Программа сохранена. Будущие тренировки обновлены'),
     ).toBeInTheDocument();
+  });
+
+  it('при изменении первой недели сохраняет остальные недельные предписания', async () => {
+    const user = userEvent.setup();
+    const exercise = activeTemplate.days[0]!.exercises[0]!;
+    const template = {
+      ...activeTemplate,
+      is_active_for_current_user: false,
+      assigned_program_id: null,
+      program_metadata: {
+        week_cycle: {
+          schema_version: 1,
+          length_weeks: 3,
+          repeat: true,
+          week_types: ['heavy', null, 'light'],
+        },
+      },
+      default_duration_weeks: 16,
+      days: [
+        {
+          ...activeTemplate.days[0]!,
+          exercises: [
+            {
+              ...exercise,
+              weekly_prescriptions: [1, 2, 3].map((week) => ({
+                exercise_id: 11,
+                week_number: week,
+                prescribed_sets: 3,
+                prescribed_reps: `${week + 7}`,
+                prescribed_duration_minutes: null,
+                rest_seconds: 90,
+                prescription: null,
+              })),
+            },
+          ],
+        },
+      ],
+    } as ProgramTemplate;
+    renderBuilder({ editingTemplate: template });
+    const sets = await screen.findByRole('spinbutton', { name: 'Рабочие подходы' });
+    await user.clear(sets);
+    await user.type(sets, '4');
+    await user.click(screen.getByRole('button', { name: 'Проверить и сохранить' }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
+    const call = apiMock.mock.calls.find(
+      ([path, options]) => path === '/api/v1/programs/templates/9' && options?.method === 'PATCH',
+    );
+    expect(call).toBeDefined();
+    const weekly = call![1].body.days[0].exercises[0].weekly_prescriptions;
+    expect(weekly.map((item: { prescribed_sets: number }) => item.prescribed_sets)).toEqual([
+      4, 3, 3,
+    ]);
+    expect(
+      weekly.slice(1).map((item: { prescribed_reps: string }) => item.prescribed_reps),
+    ).toEqual(['9', '10']);
+  });
+
+  it('сохраняет разные предписания исходных недель при создании цикла', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    const picker = await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await user.click(picker);
+    await user.click(screen.getByRole('option', { name: /Жим штанги лёжа/ }));
+    await user.click(screen.getByText('Настройки программы'));
+    await user.click(screen.getByRole('checkbox', { name: /Включить периодизацию/ }));
+    const length = screen.getByRole('spinbutton', { name: 'Исходных недель' });
+    await user.clear(length);
+    await user.type(length, '3');
+    await user.click(screen.getByRole('checkbox', { name: /Повторять исходный цикл/ }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить настройки' }));
+    const source = screen.getByRole('spinbutton', { name: 'Исходная неделя' });
+    await user.clear(source);
+    await user.type(source, '2');
+    const sets = screen.getByRole('spinbutton', { name: 'Рабочие подходы' });
+    await user.clear(sets);
+    await user.type(sets, '5');
+    await user.clear(source);
+    await user.type(source, '1');
+    expect(screen.getByRole('spinbutton', { name: 'Рабочие подходы' })).toHaveValue(3);
+    await user.click(screen.getByRole('button', { name: 'Проверить и назначить' }));
+    await user.click(screen.getByRole('button', { name: 'Создать и назначить' }));
+    const call = apiMock.mock.calls.find(
+      ([path, options]) => path === '/api/v1/programs/templates' && options?.method === 'POST',
+    );
+    expect(call).toBeDefined();
+    expect(call![1].body.week_cycle.week_types).toEqual([null, null, null]);
+    expect(
+      call![1].body.days[0].exercises[0].weekly_prescriptions.map(
+        (item: { prescribed_sets: number }) => item.prescribed_sets,
+      ),
+    ).toEqual([3, 5, 3]);
   });
 
   it('редактирует только выбранное упражнение и сохраняет порядок без потери назначений', async () => {

@@ -641,25 +641,25 @@ test('Issue 1186 keeps a wide poster square in Active Workout', async ({ page })
   }
 });
 
-test('Issue 1186 fills the real wide MP4 in Guide, lightbox and Active Workout', async ({
-  page,
-}) => {
-  await installTelegramHarness(page, { platform: 'android', colorScheme: 'dark' });
-  const telegramHarness = new TelegramHarness(page);
-  await installPlatformApi(page, { browserSession: true });
-  await installWideMediaRoutes(page);
-  await installWideCatalogRoutes(page);
-  await installWideActiveWorkoutRoutes(page);
-  const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
-  if (afterDir) {
-    await mkdir(afterDir, { recursive: true });
-  }
-
-  for (const colorScheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'no-preference' });
-    for (const width of [320, 360, 393, 430]) {
+for (const colorScheme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 393, 430]) {
+    test(`Issue 1186 fills the real wide MP4 in Guide, lightbox and Active Workout: ${colorScheme} ${width}px`, async ({
+      page,
+    }) => {
+      await installTelegramHarness(page, { platform: 'android', colorScheme });
+      const telegramHarness = new TelegramHarness(page);
+      await installPlatformApi(page, { browserSession: true });
+      await installWideMediaRoutes(page);
+      await installWideCatalogRoutes(page);
+      await installWideActiveWorkoutRoutes(page);
+      const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
+      if (afterDir) {
+        await mkdir(afterDir, { recursive: true });
+      }
+      await page.emulateMedia({ colorScheme, reducedMotion: 'no-preference' });
       await page.setViewportSize({ width, height: width < 500 ? 844 : 932 });
       const dialog = await openWideCatalogDetail(page, colorScheme);
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', colorScheme);
       const cardSurface = dialog.locator('.exercise-guide-image__frame').first();
       const cardVideo = cardSurface.locator('video');
       await expect(cardVideo).toHaveAttribute('src', wideVideoUrl);
@@ -715,9 +715,9 @@ test('Issue 1186 fills the real wide MP4 in Guide, lightbox and Active Workout',
           path: resolve(afterDir, `${colorScheme}-${width}-active-workout-mp4.png`),
         });
       }
-    }
+    });
   }
-});
+}
 
 test('Issue 1186 keeps the native square GIF in Guide, lightbox and Active Workout', async ({
   page,

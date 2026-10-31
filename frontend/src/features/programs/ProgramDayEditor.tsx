@@ -19,6 +19,57 @@ import './ProgramDayEditor.css';
 type Day = ProgramTemplateCreate['days'][number];
 type Row = Day['exercises'][number];
 
+function complexPrescription(row: Row, sourceWeek: number): boolean {
+  const plans = [
+    row.prescription,
+    row.weekly_prescriptions?.find((item) => item.week_number === sourceWeek)?.prescription,
+  ];
+  return (
+    Boolean(row.prescription && row.weekly_prescriptions?.some((item) => !item.prescription)) ||
+    plans.some((plan) =>
+      Boolean(
+        plan &&
+        ((plan.groups?.length ?? 0) > 0 ||
+          plan.segments.some(
+            (segment) =>
+              segment.role !== 'working' ||
+              (segment.load_target?.kind ?? 'user_selected') !== 'user_selected' ||
+              (segment.effort_target?.kind ?? 'none') !== 'none',
+          )),
+      ),
+    )
+  );
+}
+
+function changedRow(row: Row, next: Row, sourceWeek: number): Row {
+  const changed =
+    row.exercise_id !== next.exercise_id ||
+    row.prescribed_sets !== next.prescribed_sets ||
+    row.prescribed_reps !== next.prescribed_reps ||
+    row.prescribed_duration_minutes !== next.prescribed_duration_minutes ||
+    row.rest_seconds !== next.rest_seconds;
+  if (!changed) return next;
+  const prescription =
+    row.prescription && !complexPrescription(row, sourceWeek) ? null : next.prescription;
+  return {
+    ...next,
+    prescription,
+    weekly_prescriptions: next.weekly_prescriptions?.map((item) =>
+      item.week_number === sourceWeek
+        ? {
+            ...item,
+            exercise_id: next.exercise_id,
+            prescribed_sets: next.prescribed_sets ?? 1,
+            prescribed_reps: next.prescribed_reps ?? '',
+            prescribed_duration_minutes: next.prescribed_duration_minutes,
+            rest_seconds: next.rest_seconds,
+            prescription,
+          }
+        : item,
+    ),
+  };
+}
+
 function newExercise(restSeconds: number): Row {
   return {
     exercise_id: 0,
@@ -38,6 +89,7 @@ type Props = {
   equipmentFilterEnabled: boolean;
   defaultRestSeconds: number;
   onOpenGuide: (exercise: Exercise) => void;
+  sourceWeek?: number;
 };
 
 export function ProgramDayEditor({
@@ -48,6 +100,7 @@ export function ProgramDayEditor({
   equipmentFilterEnabled,
   defaultRestSeconds,
   onOpenGuide,
+  sourceWeek = 1,
 }: Props) {
   const { confirm } = useFeedback();
   const [selectedDay, setSelectedDay] = useState(0);
@@ -209,7 +262,9 @@ export function ProgramDayEditor({
   const changeRow = (index: number, change: (row: Row) => Row) => {
     updateDay(dayIndex, (current) => ({
       ...current,
-      exercises: current.exercises.map((row, rowIndex) => (rowIndex === index ? change(row) : row)),
+      exercises: current.exercises.map((row, rowIndex) =>
+        rowIndex === index ? changedRow(row, change(row), sourceWeek) : row,
+      ),
     }));
   };
 
@@ -313,100 +368,111 @@ export function ProgramDayEditor({
             </button>
           )}
         </div>
-        <div className="field">
-          <span>Упражнение</span>
-          <SearchableExercisePicker
-            mobileSheet
-            equipmentFilterEnabled={equipmentFilterEnabled}
-            exercises={exercises}
-            value={activeRow.exercise_id}
-            clearValue={0}
-            onOpenGuide={(exercise) => {
-              const known = available(exercise.id);
-              if (known) onOpenGuide(known);
-            }}
-            onChange={(id) => selectExerciseId(exerciseIndex, typeof id === 'number' ? id : 0)}
-          />
-        </div>
-        {selected && (
-          <button type="button" className="text-button" onClick={() => onOpenGuide(selected)}>
-            {selected.has_guide ? 'Техника и детали' : 'Подробнее об упражнении'}
-          </button>
+        {complexPrescription(activeRow, sourceWeek) && (
+          <p className="muted">
+            Сложное предписание сохранится в исходном виде. Его параметры нельзя изменить в этом
+            редакторе.
+          </p>
         )}
-        {cardio ? (
-          <label className="field">
-            <span>Плановая длительность, мин</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="1"
-              max="600"
-              required
-              value={activeRow.prescribed_duration_minutes ?? ''}
-              onChange={(event) =>
-                changeRow(exerciseIndex, (row) => ({
-                  ...row,
-                  prescribed_duration_minutes: Number(event.target.value),
-                }))
-              }
+        <fieldset
+          className="copy-editor__prescription-fields"
+          disabled={complexPrescription(activeRow, sourceWeek)}
+        >
+          <div className="field">
+            <span>Упражнение</span>
+            <SearchableExercisePicker
+              mobileSheet
+              equipmentFilterEnabled={equipmentFilterEnabled}
+              exercises={exercises}
+              value={activeRow.exercise_id}
+              clearValue={0}
+              onOpenGuide={(exercise) => {
+                const known = available(exercise.id);
+                if (known) onOpenGuide(known);
+              }}
+              onChange={(id) => selectExerciseId(exerciseIndex, typeof id === 'number' ? id : 0)}
             />
-          </label>
-        ) : (
-          <>
-            <div className="copy-editor__metrics">
-              <label className="field">
-                <span>Рабочие подходы</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  max="10"
-                  required
-                  value={activeRow.prescribed_sets ?? ''}
-                  onChange={(event) =>
-                    changeRow(exerciseIndex, (row) => ({
-                      ...row,
-                      prescribed_sets: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Отдых, сек</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min="15"
-                  max="600"
-                  required
-                  value={activeRow.rest_seconds ?? ''}
-                  onChange={(event) =>
-                    changeRow(exerciseIndex, (row) => ({
-                      ...row,
-                      rest_seconds: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-            </div>
+          </div>
+          {selected && (
+            <button type="button" className="text-button" onClick={() => onOpenGuide(selected)}>
+              {selected.has_guide ? 'Техника и детали' : 'Подробнее об упражнении'}
+            </button>
+          )}
+          {cardio ? (
             <label className="field">
-              <span>Повторы, включая последовательность по подходам</span>
+              <span>Плановая длительность, мин</span>
               <input
-                type="text"
-                maxLength={32}
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="600"
                 required
-                value={activeRow.prescribed_reps ?? ''}
-                placeholder="Например: 12/10/8/15"
+                value={activeRow.prescribed_duration_minutes ?? ''}
                 onChange={(event) =>
                   changeRow(exerciseIndex, (row) => ({
                     ...row,
-                    prescribed_reps: event.target.value,
+                    prescribed_duration_minutes: Number(event.target.value),
                   }))
                 }
               />
             </label>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="copy-editor__metrics">
+                <label className="field">
+                  <span>Рабочие подходы</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max="10"
+                    required
+                    value={activeRow.prescribed_sets ?? ''}
+                    onChange={(event) =>
+                      changeRow(exerciseIndex, (row) => ({
+                        ...row,
+                        prescribed_sets: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span>Отдых, сек</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="15"
+                    max="600"
+                    required
+                    value={activeRow.rest_seconds ?? ''}
+                    onChange={(event) =>
+                      changeRow(exerciseIndex, (row) => ({
+                        ...row,
+                        rest_seconds: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <label className="field">
+                <span>Повторы, включая последовательность по подходам</span>
+                <input
+                  type="text"
+                  maxLength={32}
+                  required
+                  value={activeRow.prescribed_reps ?? ''}
+                  placeholder="Например: 12/10/8/15"
+                  onChange={(event) =>
+                    changeRow(exerciseIndex, (row) => ({
+                      ...row,
+                      prescribed_reps: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </>
+          )}
+        </fieldset>
         <details className="compact-disclosure copy-editor__advanced">
           <summary className="yfc-disclosure-summary">
             <span>
@@ -420,6 +486,7 @@ export function ProgramDayEditor({
               <span>Заметка к упражнению</span>
               <input
                 maxLength={2000}
+                disabled={sourceWeek !== 1}
                 value={activeRow.notes ?? ''}
                 placeholder="Например: выполнять медленно, без рывков"
                 onChange={(event) =>
@@ -435,6 +502,7 @@ export function ProgramDayEditor({
                 <input
                   type="checkbox"
                   checked={isPairedWithPrevious(day, exerciseIndex)}
+                  disabled={sourceWeek !== 1 || complexPrescription(activeRow, sourceWeek)}
                   onChange={(event) =>
                     updateDay(dayIndex, (current) =>
                       toggleSuperset(current, exerciseIndex, event.target.checked),
@@ -452,6 +520,7 @@ export function ProgramDayEditor({
                     key={alternative.id}
                     type="button"
                     className="text-button"
+                    disabled={complexPrescription(activeRow, sourceWeek)}
                     onClick={() => selectExerciseId(exerciseIndex, alternative.id)}
                   >
                     Заменить на «{alternative.title}»
@@ -473,7 +542,7 @@ export function ProgramDayEditor({
             <button
               type="button"
               className="secondary"
-              disabled={exerciseIndex === 0}
+              disabled={sourceWeek !== 1 || exerciseIndex === 0}
               onClick={() => {
                 updateDay(dayIndex, (current) => ({
                   ...current,
@@ -487,7 +556,7 @@ export function ProgramDayEditor({
             <button
               type="button"
               className="secondary"
-              disabled={exerciseIndex === day.exercises.length - 1}
+              disabled={sourceWeek !== 1 || exerciseIndex === day.exercises.length - 1}
               onClick={() => {
                 updateDay(dayIndex, (current) => ({
                   ...current,
@@ -503,6 +572,7 @@ export function ProgramDayEditor({
         <button
           type="button"
           className="text-button copy-editor__danger"
+          disabled={sourceWeek !== 1}
           onClick={() => void deleteRow(exerciseIndex)}
         >
           <Icon name="trash" size={16} /> Удалить упражнение
@@ -535,7 +605,7 @@ export function ProgramDayEditor({
           <button
             type="button"
             className="secondary"
-            disabled={index === 0}
+            disabled={sourceWeek !== 1 || index === 0}
             onClick={() => moveDay(index, -1)}
             aria-label={`Переместить день ${index + 1} раньше`}
           >
@@ -544,7 +614,7 @@ export function ProgramDayEditor({
           <button
             type="button"
             className="secondary"
-            disabled={index === dayCount - 1}
+            disabled={sourceWeek !== 1 || index === dayCount - 1}
             onClick={() => moveDay(index, 1)}
             aria-label={`Переместить день ${index + 1} позже`}
           >
@@ -698,6 +768,7 @@ export function ProgramDayEditor({
               <input
                 ref={dayTitleRef}
                 maxLength={128}
+                disabled={sourceWeek !== 1}
                 required
                 value={day.title}
                 onChange={(event) =>
@@ -717,6 +788,7 @@ export function ProgramDayEditor({
                 <button
                   type="button"
                   className="secondary"
+                  disabled={sourceWeek !== 1}
                   onClick={() => {
                     dayTitleRef.current?.focus();
                     dayTitleRef.current?.select();
@@ -727,7 +799,7 @@ export function ProgramDayEditor({
                 <button
                   type="button"
                   className="secondary"
-                  disabled={dayCount >= 8}
+                  disabled={sourceWeek !== 1 || dayCount >= 8}
                   onClick={() => {
                     if (days.length >= 8) return;
                     const copy = structuredClone(day);
@@ -744,6 +816,7 @@ export function ProgramDayEditor({
                   <button
                     type="button"
                     className="text-button copy-editor__danger"
+                    disabled={sourceWeek !== 1}
                     onClick={() => void deleteDay()}
                   >
                     Удалить день
@@ -816,6 +889,7 @@ export function ProgramDayEditor({
             <button
               type="button"
               className="secondary copy-editor__add"
+              disabled={sourceWeek !== 1}
               onClick={() => {
                 updateDay(dayIndex, (current) => ({
                   ...current,
@@ -837,6 +911,7 @@ export function ProgramDayEditor({
               <button
                 type="button"
                 className="secondary copy-editor__add"
+                disabled={sourceWeek !== 1}
                 onClick={() => {
                   setDays((current) => [
                     ...current,
