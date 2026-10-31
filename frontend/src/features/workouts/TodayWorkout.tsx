@@ -79,6 +79,7 @@ import {
   PWA_SAFE_UPDATE_EVENT,
 } from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
+import { weekTypeLabels } from './weekTypes';
 import { useScreenWakeLock } from './useScreenWakeLock';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { WarmupProposal } from './WarmupProposal';
@@ -3073,6 +3074,14 @@ export function TodayWorkout({
             <div className="active-workout-hero__copy">
               <span className="eyebrow">Тренировка · день {data.day_number}</span>
               <h2>{data.title}</h2>
+              {data.source_cycle_week != null && data.week_type_known && (
+                <p>
+                  Неделя {data.week_number} ·{' '}
+                  {data.week_type
+                    ? `${weekTypeLabels[data.week_type]} неделя`
+                    : 'тип недели не задан'}
+                </p>
+              )}
               <p>
                 {data.scheduled_date}
                 {data.scheduled_time ? ` · ${data.scheduled_time.slice(0, 5)}` : ''}

@@ -25,6 +25,10 @@ from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.prescription_semantics import parse_prescription_plan
 from fitminiapp_api.services.program_common import ProgramError
 from fitminiapp_api.services.program_versioning import (
+    _cycle_assignment,
+    _cycle_configurations,
+    _cycle_occurrence_overrides,
+    _cycle_plan_at,
     _cycle_workout_plans,
     get_program_for_actor,
     workout_cycle_week_type,
@@ -1247,7 +1251,58 @@ def build_progression_guidance(
     target_plan_revision = next(
         (item for item in revisions if item.revision_number == workout.plan_revision_number), None
     )
-    if week_type is not None:
+    target_cycle = (
+        _cycle_plan_at(
+            db,
+            program,
+            workout.week_number,
+            revisions=[
+                item for item in revisions if item.revision_number <= workout.plan_revision_number
+            ],
+        )
+        if workout.source_cycle_week is not None and workout.plan_revision_number is not None
+        else None
+    )
+    available = (
+        [item for item in revisions if item.revision_number <= workout.plan_revision_number]
+        if workout.plan_revision_number is not None
+        else []
+    )
+    assignment = _cycle_assignment(db, program, revisions=available) if target_cycle else None
+    first_cycle = (
+        assignment.changed_fields.get("week_cycle")
+        or (assignment.snapshot["program"].get("program_metadata") or {}).get("week_cycle")
+        if assignment
+        else None
+    )
+    has_typed_history = any(
+        item is not None
+        for cycle in (
+            [first_cycle]
+            + [
+                config["week_cycle"]
+                for config in _cycle_configurations(db, program, revisions=available)
+            ]
+        )
+        if cycle
+        for item in (cycle.get("week_types") or [])
+    )
+    typed_context = (
+        week_type is not None
+        or (target_cycle is not None and has_typed_history)
+        or (
+            target_cycle is not None
+            and any(
+                "week_type" in override
+                for override in _cycle_occurrence_overrides(
+                    db,
+                    program.id,
+                    revisions=available,
+                )
+            )
+        )
+    )
+    if typed_context:
         target_metadata = _snapshot_metadata(target_plan_revision)
         if target_metadata is None:
             week_type_known = False
@@ -1355,7 +1410,7 @@ def build_progression_guidance(
             action = "hold"
         elif not (
             _matches_cycle_plan(db, program, revisions, workout, current)
-            if week_type is not None
+            if typed_context
             else _snapshot_matches_target(revision, workout, current)
         ):
             result = _review_result(
@@ -1389,19 +1444,19 @@ def build_progression_guidance(
             comparable: list[UserWorkoutExercise] = []
             same_type: list[UserWorkoutExercise] = []
             for item in same_exercise:
-                if week_type is not None and (
+                if typed_context and (
                     item.workout.day_number != workout.day_number
                     or item.sort_order != current.sort_order
                     or item.source_template_exercise_id != current.source_template_exercise_id
                 ):
                     continue
                 if item.workout.completed_at is None:
-                    if week_type is not None:
+                    if typed_context:
                         same_type.append(item)
                         break
                     continue
                 historical_metadata = metadata
-                if week_type is not None:
+                if typed_context:
                     historical_type, historical_known = workout_cycle_week_type(
                         db, item.workout, revisions
                     )
@@ -1454,18 +1509,18 @@ def build_progression_guidance(
                 if item.source_template_exercise_id != current.source_template_exercise_id:
                     continue
                 if _selection_signature(item) != _selection_signature(current):
-                    if week_type is not None:
+                    if typed_context:
                         break
                     continue
                 if _block_id_for_date(blocks, item.workout.scheduled_date) != current_block_id:
-                    if week_type is not None:
+                    if typed_context:
                         break
                     continue
                 if (
                     _week_block_number(historical_metadata, item.workout.week_number)
                     != current_block_number
                 ):
-                    if week_type is not None:
+                    if typed_context:
                         break
                     continue
                 historical_rule, historical_error = _resolve_coaching_rule(
@@ -1476,14 +1531,14 @@ def build_progression_guidance(
                 if historical_error is not None or _rule_snapshot(
                     historical_rule
                 ) != _rule_snapshot(rule):
-                    if week_type is not None:
+                    if typed_context:
                         break
                     continue
                 comparable.append(item)
             all_facts = [_session_facts_for_selection(item, selection) for item in comparable]
-            facts = all_facts[:3] if week_type is not None else all_facts
+            facts = all_facts[:3] if typed_context else all_facts
             context_changed = bool(
-                (same_type if week_type is not None else same_exercise) and not comparable
+                (same_type if typed_context else same_exercise) and not comparable
             )
             if rule is None:
                 if not isinstance(metadata, dict) or not metadata.get("coaching_rules"):
@@ -1504,7 +1559,7 @@ def build_progression_guidance(
                         reason_code="no_applicable_coaching_rule",
                         detail="Для этого упражнения и недели программы нет применимого правила.",
                     )
-                    if week_type is not None:
+                    if typed_context:
                         facts = []
                         all_facts = []
                 action = "set_load" if result.get("suggested_weight") is not None else "hold"
@@ -1519,13 +1574,13 @@ def build_progression_guidance(
                 if context_changed and not facts:
                     result["evidence"]["reason_keys"].append("program_context_changed")
                     result["outcome"] = "review"
-                    if week_type is not None:
+                    if typed_context:
                         result["message"] = _PROGRESS_MESSAGES["review"]
                     result["suggested_weight"] = None
                     result["suggested_increment"] = None
                     action = "hold"
 
-            if week_type is not None:
+            if typed_context:
                 result["evidence"]["comparable_session_count"] = sum(
                     item.complete for item in all_facts
                 )
@@ -1540,11 +1595,11 @@ def build_progression_guidance(
                     result["evidence"]["reason_keys"].append("incomplete_session_facts")
                     action = "hold"
 
-        if week_type is not None or not week_type_known:
+        if typed_context or not week_type_known:
             result["ruleset_version"] = TYPED_RULESET_VERSION
             result["evidence"]["week_type"] = week_type if week_type_known else None
             reasons = result["evidence"].get("reason_keys", [])
-            if week_type is not None and (
+            if typed_context and (
                 any(
                     reason in reasons
                     for reason in ("too_few_comparable_sessions", "need_one_more_stable_session")

@@ -1505,6 +1505,125 @@ export interface paths {
         patch: operations["update_assigned_cycle_api_v1_programs_assigned__program_id__cycle_patch"];
         trace?: never;
     };
+    "/api/v1/programs/assigned/{program_id}/cycle/week-type/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Assigned Week Type */
+        post: operations["preview_assigned_week_type_api_v1_programs_assigned__program_id__cycle_week_type_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/disable/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Disabled Cycle */
+        post: operations["preview_disabled_cycle_api_v1_programs_assigned__program_id__cycle_disable_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/enable/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Enabled Cycle */
+        post: operations["preview_enabled_cycle_api_v1_programs_assigned__program_id__cycle_enable_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Enabled Cycle */
+        post: operations["update_enabled_cycle_api_v1_programs_assigned__program_id__cycle_enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/duration/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Assigned Cycle Duration */
+        post: operations["preview_assigned_cycle_duration_api_v1_programs_assigned__program_id__cycle_duration_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Disabled Cycle */
+        post: operations["update_disabled_cycle_api_v1_programs_assigned__program_id__cycle_disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/week-type": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Assigned Week Type */
+        post: operations["update_assigned_week_type_api_v1_programs_assigned__program_id__cycle_week_type_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/assigned/{program_id}/exercises": {
         parameters: {
             query?: never;
@@ -8937,6 +9056,11 @@ export interface components {
             source_cycle_week?: number | null;
             /** Occurrence Weeks */
             occurrence_weeks?: number[] | null;
+            /**
+             * Skip Protected
+             * @default false
+             */
+            skip_protected: boolean;
             /** Effective Date */
             effective_date?: string | null;
             /** Exercise Id */
@@ -14513,6 +14637,47 @@ export interface components {
             /** Deload Intensity Percent */
             deload_intensity_percent?: number | null;
         };
+        /** ProgramCycleDisableRequest */
+        ProgramCycleDisableRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Effective From Week */
+            effective_from_week: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
+        /** ProgramCycleDurationPreviewRequest */
+        ProgramCycleDurationPreviewRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Effective From Week */
+            effective_from_week: number;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
+        /** ProgramCycleEnableRequest */
+        ProgramCycleEnableRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Effective From Week */
+            effective_from_week: number;
+            /** Duration Weeks */
+            duration_weeks: number;
+            week_cycle: components["schemas"]["ProgramWeekCycle"];
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
         /** ProgramCycleRevisionRequest */
         ProgramCycleRevisionRequest: {
             /** Expected Revision Number */
@@ -14524,7 +14689,7 @@ export interface components {
             /** Source Week Order */
             source_week_order?: number[] | null;
             /** Week Types */
-            week_types?: ("light" | "medium" | "heavy")[] | null;
+            week_types?: (("light" | "medium" | "heavy") | null)[] | null;
             /** Repeat */
             repeat?: boolean | null;
             /** Reason */
@@ -15438,6 +15603,8 @@ export interface components {
             group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
             /** Group Order */
             group_order?: number | null;
+            /** Weekly Prescriptions */
+            weekly_prescriptions?: components["schemas"]["ProgramTemplateExerciseWeekResponse"][];
         };
         /** ProgramTemplateExerciseResponse */
         ProgramTemplateExerciseResponse: {
@@ -15605,9 +15772,27 @@ export interface components {
             /** Length Weeks */
             length_weeks: number;
             /** Week Types */
-            week_types?: ("light" | "medium" | "heavy")[] | null;
+            week_types?: (("light" | "medium" | "heavy") | null)[] | null;
             /** Repeat */
             repeat: boolean;
+        };
+        /** ProgramWeekTypeRevisionRequest */
+        ProgramWeekTypeRevisionRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
+            /** From Week */
+            from_week?: number | null;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
         };
         /** ProgressDataSufficiency */
         ProgressDataSufficiency: {
@@ -19157,6 +19342,10 @@ export interface components {
             source_cycle_week?: number | null;
             /** Cycle Iteration */
             cycle_iteration?: number | null;
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
+            /** Week Type Known */
+            week_type_known?: boolean | null;
             /** Plan Revision Number */
             plan_revision_number?: number | null;
             /** Started At */
@@ -22379,6 +22568,251 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProgramCycleRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_assigned_week_type_api_v1_programs_assigned__program_id__cycle_week_type_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramWeekTypeRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_disabled_cycle_api_v1_programs_assigned__program_id__cycle_disable_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleDisableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_enabled_cycle_api_v1_programs_assigned__program_id__cycle_enable_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleEnableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_enabled_cycle_api_v1_programs_assigned__program_id__cycle_enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleEnableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_assigned_cycle_duration_api_v1_programs_assigned__program_id__cycle_duration_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleDurationPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_disabled_cycle_api_v1_programs_assigned__program_id__cycle_disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleDisableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_assigned_week_type_api_v1_programs_assigned__program_id__cycle_week_type_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramWeekTypeRevisionRequest"];
             };
         };
         responses: {

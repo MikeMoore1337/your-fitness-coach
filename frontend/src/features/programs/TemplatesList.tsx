@@ -18,7 +18,7 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { ProgramBuilder } from './ProgramBuilder';
 import { shouldSaveTemplateAsCopy } from './templateEditing';
-import { programWeeklySessions } from './programPreviewFacts';
+import { programWeeklySessions, templateWeekCycle } from './programPreviewFacts';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { ProgramRecommendation } from './ProgramRecommendation';
 import { LegacyProgramRecommendation } from './LegacyProgramRecommendation';
@@ -391,6 +391,14 @@ export function TemplatesList({
     },
   });
 
+  const assignmentCycle = templateWeekCycle(assignmentTemplate);
+  const assignmentMax = assignmentCycle
+    ? assignmentCycle.repeat
+      ? undefined
+      : assignmentCycle.length_weeks
+    : assignmentTemplate && assignmentTemplate.default_duration_weeks > 1
+      ? assignmentTemplate.default_duration_weeks
+      : 24;
   const assignmentOffsets = assignmentWeekdays.map(
     (weekday) => (weekday - (assignmentWeekdays[0] ?? weekday) + 7) % 7,
   );
@@ -408,7 +416,11 @@ export function TemplatesList({
   const openAssignment = (template: ProgramTemplate) => {
     setAssignmentStartDate(defaultStartDate);
     setAssignmentDuration(
-      template.default_duration_weeks > 1 ? template.default_duration_weeks : 4,
+      templateWeekCycle(template)
+        ? template.default_duration_weeks
+        : template.default_duration_weeks > 1
+          ? template.default_duration_weeks
+          : 4,
     );
     setAssignmentWeekdays(defaultWeekdays(template, defaultStartDate));
     setAssignmentTemplate(template);
@@ -788,6 +800,10 @@ export function TemplatesList({
                 currentRevisionNumber={activeTemplate.current_revision_number}
                 startDate={activeTemplate.assigned_program_start_date}
                 durationWeeks={activeTemplate.assigned_program_duration_weeks}
+                periodizationReadOnly={
+                  activeTemplate.assigned_by_user_id != null &&
+                  activeTemplate.assigned_by_user_id !== user?.id
+                }
                 showAiAdaptation
                 workoutHistoryReturnPath="/app?section=programs&view=manage&panel=operations"
               />
@@ -1189,18 +1205,22 @@ export function TemplatesList({
                   <input
                     type="number"
                     min="1"
-                    max={
-                      assignmentTemplate.default_duration_weeks > 1
-                        ? assignmentTemplate.default_duration_weeks
-                        : 24
-                    }
+                    max={assignmentMax}
                     value={assignmentDuration}
                     onChange={(event) => setAssignmentDuration(Number(event.target.value))}
                     required
                   />
                 </label>
               </div>
-              {assignmentTemplate.default_duration_weeks > 1 && (
+              {assignmentCycle && (
+                <p className="auth-notice">
+                  Исходных недель: {assignmentCycle.length_weeks}.{' '}
+                  {assignmentCycle.repeat
+                    ? 'Цикл повторяется до конца программы.'
+                    : 'Повтор цикла выключен.'}
+                </p>
+              )}
+              {!assignmentCycle && assignmentTemplate.default_duration_weeks > 1 && (
                 <p className="auth-notice">
                   Для этого шаблона доступны назначения на{' '}
                   {assignmentTemplate.default_duration_weeks} недель с сохранённой схемой
@@ -1253,7 +1273,8 @@ export function TemplatesList({
                   assignmentMutation.isPending ||
                   !assignmentScheduleIsValid ||
                   assignmentDuration < 1 ||
-                  assignmentDuration > 24
+                  !Number.isSafeInteger(assignmentDuration) ||
+                  (assignmentMax != null && assignmentDuration > assignmentMax)
                 }
               >
                 {assignmentMutation.isPending ? 'Назначаем…' : 'Назначить по расписанию'}

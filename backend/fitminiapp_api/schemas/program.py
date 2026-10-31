@@ -439,6 +439,16 @@ class ProgramCoachingRule(BaseModel):
         return self
 
 
+class ProgramTemplateExerciseWeekResponse(BaseModel):
+    exercise_id: int = Field(ge=1)
+    week_number: int = Field(ge=1)
+    prescribed_sets: int = Field(ge=1, le=10)
+    prescribed_reps: str = Field(max_length=32)
+    prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
+    rest_seconds: int = Field(ge=0, le=600)
+    prescription: ExercisePrescriptionPlan | None = None
+
+
 class ProgramTemplateExerciseCreate(BaseModel):
     exercise_id: int = Field(ge=1)
     prescribed_sets: int | None = Field(default=None, ge=1, le=10)
@@ -452,6 +462,9 @@ class ProgramTemplateExerciseCreate(BaseModel):
     group_id: int | None = Field(default=None, ge=1)
     group_kind: PrescriptionGroupKind | None = None
     group_order: int | None = Field(default=None, ge=1, le=100)
+    weekly_prescriptions: list[ProgramTemplateExerciseWeekResponse] = Field(
+        default_factory=list, max_length=20000
+    )
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
@@ -513,7 +526,7 @@ class ProgramWeekCycle(BaseModel):
 
     schema_version: Literal[1] = 1
     length_weeks: int = Field(ge=1, strict=True)
-    week_types: list[Literal["light", "medium", "heavy"]] | None = None
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
     repeat: bool = Field(strict=True)
 
     @model_validator(mode="after")
@@ -550,16 +563,6 @@ class ProgramTemplateCreate(BaseModel):
         if len(set(self.schedule_weekdays)) != len(self.schedule_weekdays):
             raise ValueError("schedule_weekdays must be unique")
         return self
-
-
-class ProgramTemplateExerciseWeekResponse(BaseModel):
-    exercise_id: int = Field(ge=1)
-    week_number: int = Field(ge=1)
-    prescribed_sets: int = Field(ge=1, le=10)
-    prescribed_reps: str = Field(max_length=32)
-    prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
-    rest_seconds: int = Field(ge=0, le=600)
-    prescription: ExercisePrescriptionPlan | None = None
 
 
 class ProgramTemplateExerciseResponse(BaseModel):
@@ -910,6 +913,7 @@ class CoachProgramExerciseCreate(BaseModel):
     occurrence_weeks: list[Annotated[int, Field(strict=True, ge=1)]] | None = Field(
         default=None, min_length=1, max_length=100
     )
+    skip_protected: bool = False
     effective_date: date | None = None
     exercise_id: int = Field(ge=1)
     day_number: int | None = Field(default=None, ge=1, le=14)
@@ -929,6 +933,11 @@ class CoachProgramExerciseCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
+        if self.skip_protected and (
+            self.effective_scope != "future_program"
+            or (self.occurrence_weeks is None and self.source_cycle_week is None)
+        ):
+            raise ValueError("skip_protected requires an explicit future cycle scope")
         if self.effective_scope == "next_workout" and self.effective_date is not None:
             raise ValueError("effective_date cannot be combined with next_workout scope")
         if self.effective_scope == "current_block" and self.effective_date is not None:
@@ -1154,6 +1163,56 @@ class ProgramCycleRevisionRequest(BaseModel):
     source_week_order: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
         default=None, min_length=1, max_length=20000
     )
-    week_types: list[Literal["light", "medium", "heavy"]] | None = None
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
     repeat: bool | None = Field(default=None, strict=True)
     reason: str | None = Field(default=None, max_length=500)
+
+
+class ProgramWeekTypeRevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    week_type: Literal["light", "medium", "heavy"] | None
+    occurrence_weeks: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    from_week: int | None = Field(default=None, ge=1, strict=True)
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if (self.occurrence_weeks is None) == (self.from_week is None):
+            raise ValueError("Выберите недели или начало повторения")
+        if self.occurrence_weeks is not None and self.source_cycle_week is not None:
+            raise ValueError("Нельзя совмещать отдельные недели и повторение")
+        if self.from_week is not None and self.source_cycle_week is None:
+            raise ValueError("Укажите исходную неделю цикла")
+        return self
+
+
+class ProgramCycleDisableRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+
+class ProgramCycleDurationPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    duration_weeks: int = Field(ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+
+class ProgramCycleEnableRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    duration_weeks: int = Field(ge=1, strict=True)
+    week_cycle: ProgramWeekCycle
+    offset: int = Field(default=0, ge=0)
