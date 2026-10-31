@@ -26,6 +26,7 @@ const allowedLatinWords = new Map([
   ['PDF', 'file format abbreviation'],
   ['PWA', 'web application abbreviation'],
   ['QR', 'common technical abbreviation'],
+  ['RPE', 'common fitness effort abbreviation'],
   ['TMA', 'Telegram Mini App abbreviation'],
   ['TELEGRAM', 'official external platform name'],
   ['UI', 'interface abbreviation'],
@@ -236,6 +237,17 @@ function isCandidate(node) {
     !ts.isStringLiteral(node) &&
     !ts.isNoSubstitutionTemplateLiteral(node) &&
     !ts.isTemplateExpression(node)
+  ) {
+    return false;
+  }
+  if (
+    ts.isBinaryExpression(node.parent) &&
+    [
+      ts.SyntaxKind.EqualsEqualsToken,
+      ts.SyntaxKind.EqualsEqualsEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsEqualsToken,
+    ].includes(node.parent.operatorToken.kind)
   ) {
     return false;
   }

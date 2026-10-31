@@ -20,6 +20,11 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     '<Button>Schedule follow-up</Button>',
     '<input aria-label="Review date" />',
     'const message = `Schedule follow-up for ${clientName}`;',
+    "<span>{status === 'pending' ? 'Review' : 'Готово'}</span>",
+    "<span>{status === 'pending' && 'Review'}</span>",
+    "<input aria-label={status === 'pending' ? 'Review' : 'Готово'} />",
+    "<span>{'pending' === status ? 'Готово' : 'Review'}</span>",
+    '<span>RPE review</span>',
   ])('rejects new English user-facing copy: %s', (source) => {
     const result = runGuard(source);
     expect(result.status).toBe(1);
@@ -34,6 +39,10 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     '<span>Как работает Coach OS</span>',
     '<span>Client 360 / обзор клиента</span>',
     '<input aria-label="Дата проверки" />',
+    "<span>{status === 'pending' ? 'Ожидает' : 'Готово'}</span>",
+    "<span>{status !== 'confirmed' && <b>Черновик</b>}</span>",
+    "<span>{'pending' === status ? 'Ожидает' : 'Готово'}</span>",
+    '<p>RPE: 8</p>',
   ])('allows Russian copy, identifiers, and documented exceptions: %s', (source) => {
     const result = runGuard(source);
     expect(result.status).toBe(0);
