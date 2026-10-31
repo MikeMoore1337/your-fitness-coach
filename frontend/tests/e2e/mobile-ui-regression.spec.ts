@@ -234,6 +234,7 @@ for (const theme of ['light', 'dark'] as const) {
     }
   });
 }
+
 for (const theme of ['light', 'dark'] as const) {
   test(`@critical mobile core surfaces keep the ${theme} visual contract`, async ({ page }) => {
     await preparePage(page, theme);
