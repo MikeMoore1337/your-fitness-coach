@@ -199,6 +199,44 @@ test('@critical cardio datetime fits iPhone WebKit and Chromium', async ({ brows
 });
 
 for (const theme of ['light', 'dark'] as const) {
+  test(`@critical #1350 cardio actions stay separated on iPhone in ${theme}`, async ({
+    page,
+  }, info) => {
+    await preparePage(page, theme, 'browser', { cardioState: 'many' });
+    await page.goto('/app?section=today');
+    await waitForSurface(page, 'today');
+
+    const row = page
+      .locator('.cardio-log--quick .cardio-session-row')
+      .filter({ hasText: 'Эллиптический тренажёр' });
+    await expect(row).toBeVisible();
+    await row.getByText('Действия с записью', { exact: true }).click();
+    const edit = row.getByRole('button', { name: 'Изменить' });
+    const remove = row.getByRole('button', { name: 'Удалить' });
+
+    for (const width of [320, 360, 390, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(edit).toBeVisible();
+      await expect(remove).toBeVisible();
+      const editBounds = await edit.boundingBox();
+      const removeBounds = await remove.boundingBox();
+      expect(editBounds).not.toBeNull();
+      expect(removeBounds).not.toBeNull();
+      expect(removeBounds!.y - (editBounds!.y + editBounds!.height)).toBeGreaterThanOrEqual(11);
+      expect(editBounds!.height).toBeGreaterThanOrEqual(44);
+      expect(removeBounds!.height).toBeGreaterThanOrEqual(44);
+      await expectNoHorizontalOverflow(page);
+
+      if (width === 390) {
+        await row.screenshot({
+          path: info.outputPath(`cardio-actions-${theme}-390.png`),
+          ...screenshotOptions,
+        });
+      }
+    }
+  });
+}
+for (const theme of ['light', 'dark'] as const) {
   test(`@critical mobile core surfaces keep the ${theme} visual contract`, async ({ page }) => {
     await preparePage(page, theme);
     await page.goto('/app?section=today');
