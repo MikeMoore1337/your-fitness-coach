@@ -16,7 +16,10 @@ Use this order for the current work:
 
 GitHub is the operational source of truth:
 
-`Issue -> short-lived branch -> Pull Request -> Checks -> protected master -> Actions deploy/smoke`.
+`Issue -> short-lived branch -> PR to dev -> Checks -> DEV acceptance -> release PR to master -> Actions deploy/smoke`.
+
+The single GitHub Project holds current Status, Priority, Area and Release. Issues retain scope,
+dependencies and acceptance criteria; PRs, Checks and Actions provide the evidence for transitions.
 
 An Issue is the task contract. A tracked Markdown specification may be linked from it when the
 scope is large. A local mirror, fingerprint, database, lease, queue, owner record, lifecycle
@@ -27,12 +30,15 @@ request unless the owner sends a new prompt.
 
 ## GitHub Flow
 
-- Start from a fresh `origin/master` and use one short-lived branch for the change.
-- Open a PR targeting protected `master`; direct pushes and force-pushes to `master` are forbidden.
+- Start from a fresh `origin/dev` and use one short-lived branch for the change.
+- Open implementation and documentation PRs against `dev`; delivery to `master` is a separate
+  release step after applicable DEV acceptance. Direct pushes and force-pushes to protected
+  branches are forbidden.
 - Required deterministic Checks are the merge gate. The aggregate `checks` result must be green.
 - GitHub PR head, branch rules and Checks are sufficient for current-base/exact-head decisions.
 - Merge only after required Checks and applicable human/legal/security/destructive gates pass.
 - A merged `master` revision is the release revision. GitHub Actions records deployment and smoke.
+  Merge into `dev`, green CI and DEV acceptance do not prove production delivery or product DoD.
 - If a session is interrupted, continue from `git status`, `git branch`, `git log`, `git worktree
   list`, `gh pr view/status` and `gh run list`. No local recovery database is needed.
 
@@ -254,16 +260,24 @@ legal review, data schemas, review processes and owner approval take precedence.
 Clear Voice does not replace domain-specific expertise or grant permission to
 publish content, write data or bypass the Hermes manual review process.
 
-## Issue governance (2026-10-12 owner-approved)
+## Issue governance (owner-approved policy, Projects migration #1106)
 
-Use [`docs/ISSUE_GOVERNANCE.md`](docs/ISSUE_GOVERNANCE.md) for approved Issue prefixes, labels, DoR/DoD, Priority/Effort/Status, templates and migration rules; [`docs/PARALLEL_DEVELOPMENT.md`](docs/PARALLEL_DEVELOPMENT.md) for independent three-worktree development. GitHub remains the sole operational source of truth. Migration of existing Issues requires owner review of [`docs/issue-governance-migration-review.md`](docs/issue-governance-migration-review.md). Do not infer owner approval, implement a new controller/queue, or auto-start the next product Issue.
+Use [`docs/ISSUE_GOVERNANCE.md`](docs/ISSUE_GOVERNANCE.md) for approved Issue prefixes, labels,
+DoR/DoD, Status/Priority/Area/Release, templates and migration rules;
+[`docs/PARALLEL_DEVELOPMENT.md`](docs/PARALLEL_DEVELOPMENT.md) for independent three-worktree
+development. GitHub remains the sole operational source of truth. The owner authorized the bounded
+Projects migration in [#1106](https://github.com/MikeMoore1337/your-fitness-coach/issues/1106);
+[`docs/issue-governance-migration-review.md`](docs/issue-governance-migration-review.md) remains
+historical context, not a second queue or a new approval requirement for that scope. Do not infer
+owner approval for other migrations, implement a new controller/queue, or auto-start the next
+product Issue. Documented target configuration is not proof that the live Project is configured.
 
 ### Mandatory Issue creation and update procedure (ChatGPT, Codex, humans)
 
 1. **Inspect first.** Read the current request, relevant specs and existing open/closed Issues and
    PRs. Search for duplicates and active implementation before creating or reopening anything.
    Update the existing Issue if it has the same scope; preserve its number, history, attachments,
-   linked PRs and release. Never relocate V11/V12/V13 work without an owner decision.
+   linked PRs and release. Never relocate V11/V12/V13/V14 work without an owner decision.
 2. **Classify and specify.** Apply exactly one approved title prefix from
    `docs/ISSUE_GOVERNANCE.md`. Distinguish a broken UI ([Bug]) from a proposed UI enhancement
    ([UI Backlog]). Pick Task, Epic or Spike, add problem/current-versus-expected behavior,
@@ -273,25 +287,31 @@ Use [`docs/ISSUE_GOVERNANCE.md`](docs/ISSUE_GOVERNANCE.md) for approved Issue pr
    and `regression` labels as appropriate. Use native Parent/Sub-issues for epics and
    Blocked by/Blocking for hard prerequisites. A reference to another Issue is not automatically
    a blocking dependency. Gates mean approval **is needed**, not approval received.
-4. **Populate the one Project.** Ensure the Issue appears in
-   [YFC Development](https://github.com/users/MikeMoore1337/projects/1), with `Status=Backlog`
-   for new tasks unless there is separately verified evidence for a different status.
-   Set `Priority` (normally P2 for a new nonurgent task) and a justified `Effort` (XS-XL;
-   optional for Epic). Set these Project fields **in GitHub Project**, never as duplicate labels.
-   If the estimate is not defensible, leave Backlog and report the missing field rather than
-   inventing certainty. Auto-add is asynchronous; recheck the live item after it appears.
+4. **Populate the one Project.** Check the documented existing
+   [Project #1](https://github.com/users/MikeMoore1337/projects/1), previously `YFC Development`,
+   before creating anything. The target name is `Your Fitness Coach - Delivery Board`.
+   New Issues start in `Backlog` unless a different status is supported by current evidence.
+   Set justified `Priority` (P0/P1/P2/P3, normally P2) and one primary `Area`; set `Release` only
+   when assigned. Keep fields **in GitHub Project**, never as duplicate status/priority labels.
+   Existing optional `Effort` data may remain; do not require it or create additional fields.
+   Preserve native dependencies and historical links. Auto-add is asynchronous; re-read the live
+   item. If access or assignment evidence is missing, report the exact gap rather than success.
 5. **Verify after the write.** Re-read the live Issue and Project item, including its labels,
-   Priority/Effort/Status, parent/blockers and PR links. When `gh` has `project` scope, run
-   `python scripts/issue_project_fields.py --issue <NUMBER> --strict` to check Project metadata.
-   If access is unavailable, perform equivalent authenticated GitHub queries or explicitly report
-   verification as incomplete. Never say "fully created/synchronized" based only on a POST.
+   Status/Priority/Area/Release, parent/blockers and PR links. Use the read-only
+   `scripts/issue_project_fields.py` only when that revision supports the live schema; see
+   `docs/ISSUE_GOVERNANCE.md` for the migration-aware audit commands. Equivalent authenticated
+   GitHub queries are sufficient. If access is unavailable, explicitly report verification as
+   incomplete. Never say "fully created/synchronized" based only on a POST or a local test.
 6. **Respect lifecycle boundaries.** DoR and owner activation, not metadata alone, permit
    `Ready` and new coding work. For a revision, change only named scope and re-check new gates,
-   dependencies, tests and metadata. PR creation means Review, not Done. Owner Approval requires
-   an explicit owner decision; closing or merging alone never proves DoD or production smoke.
-   Record verified closeout evidence, then move to Done only if DoD is satisfied.
-7. **Report the result.** Give Issue number/link, classification, Status, Priority, Effort,
-   dependencies, approval gates and any missing facts or access limitations. Do not launch
+   dependencies, tests and metadata. An open PR has `In review`; merge completes that PR only.
+   The parent Issue remains `In review` or `Blocked` until its DoD is proven. Required owner
+   decisions need explicit evidence. HOLD stays `Blocked`; V13/V14 stay inactive until authorized.
+   Closing or merging alone never proves DoD or production smoke. Record closeout evidence,
+   then set `Done` only when DoD is satisfied. Do not close parent Issues from Project status
+   or linked-PR automation before release acceptance.
+7. **Report the result.** Give Issue/PR number/link, classification, Status, Priority, Area,
+   Release, dependencies, approval gates and any missing facts or access limitations. Do not launch
    implementation, merge or release unless separately authorized.
 
 Project verification is a stateless **read-only metadata check**, not a controller, background
@@ -315,3 +335,4 @@ security и GitHub Flow остаются главнее.
 ## UX/UI Design Orchestra - visual design preflight (2026-10-21)
 
 For requests for **one consolidated UX/UI audit and design proposal** with Impeccable, accessibility, motion or external skills, use `$ux-ui-design-orchestra` from `.agents/skills/ux-ui-design-orchestra/SKILL.md` (Toolkit protocol pinned at `0d3849e040e09b4e350e0bf97af66b4d107e94d6`). Default `audit-proposal`: read-only application/source inspection, evidence-linked specialist critique (maximum three concurrent if the client truly supports spawning, else sequential), one YFC-branded design concept, and implementation/testing plan. **No frontend, TMA, tokens, tests, AGENTS.md, DESIGN.md or runtime changes by the orchestration task before owner visual acceptance.** For a new composition submit one complete PNG/HTML review pack and request «Принимаю»; after acceptance run a separately authorized implementation task, then real AFTER evidence, independent owner acceptance and release approval. Existing owner/CI/security/legal and three-independent-task limits are unchanged. Refer to `docs/development/ux-ui-design-orchestra.md`.
+
