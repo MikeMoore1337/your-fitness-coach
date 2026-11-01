@@ -72,6 +72,7 @@ def _weekly_matrix_xlsx(
     reorder_exercises: bool = False,
     weeks: int = 12,
     week_type_text: tuple[str, ...] | None = None,
+    merge_week_header: bool = False,
 ) -> bytes:
     day_header_rows = (2, 7, 12, 17)
     day_names = (
@@ -192,6 +193,11 @@ def _generic_xlsx_with_header_in_first_row() -> bytes:
         "3",
         "8-12",
     ]
+    if merge_week_header:
+        if weeks != 1:
+            raise ValueError("merged week header fixture only supports a single week")
+        merge_ranges.append("C2:D2")
+
     rows_xml = "".join(
         f'<row r="{row_number}">'
         + "".join(
@@ -2097,3 +2103,24 @@ def test_xlsx_matrix_ambiguous_rep_count_and_load_list_require_manual_resolution
         ).status_code
         == 200
     )
+
+
+def test_xlsx_matrix_merged_week_header_keeps_single_source_anchor(client):
+    headers = _auth(client, 931178)
+    uploaded = _upload(
+        client,
+        headers,
+        "merged-week-header.xlsx",
+        _weekly_matrix_xlsx(
+            weeks=1,
+            week_type_text=("Лёгкая",),
+            merge_week_header=True,
+        ),
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    preview = uploaded.json()
+    assert preview["layout_version"] == "weekly-matrix-v1"
+    assert preview["duration_weeks"] == 1
+    assert preview["summary"]["row_count"] == 12
+    assert preview["week_type_candidates"][0]["source_cell"] == "C2"
+    assert preview["week_type_candidates"][0]["week_type"] == "light"
