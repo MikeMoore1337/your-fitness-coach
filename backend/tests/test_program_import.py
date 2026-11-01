@@ -89,9 +89,10 @@ def _weekly_matrix_xlsx(
     for week_number in range(1, weeks + 1):
         block_start = 1 + (week_number - 1) * 3
         source_order = (1, 2, 3, 4) if week_number == 1 else (1, 3, 2, 4)
-        add_cell(2, block_start + 2, f"Неделя {week_number}")
+        label = f"Неделя {week_number}"
         if week_type_text is not None:
-            add_cell(2, block_start + 1, week_type_text[week_number - 1])
+            label += f" - {week_type_text[week_number - 1]}"
+        add_cell(2, block_start + 2, label)
         for slot, source_day_number in enumerate(source_order):
             header_row = day_header_rows[slot]
             add_cell(header_row, block_start, f"ДЕНЬ {source_day_number}")
@@ -1825,9 +1826,9 @@ def test_xlsx_matrix_k1_n16_explicit_week_type_and_planned_loads(client):
     assert preview["duration_weeks"] == 1
     assert preview["week_types"] == [None]
     assert preview["week_type_candidates"][0]["week_type"] == "light"
-    assert preview["week_type_candidates"][0]["source_cell"] == "B2"
+    assert preview["week_type_candidates"][0]["source_cell"] == "C2"
     row = next(item for item in preview["rows"] if item["source_auxiliary"])
-    assert row["manual_planned_loads"] is None if "manual_planned_loads" in row else True
+    assert row.get("manual_planned_loads") is None
     assert row["prescription"] is None
 
     resolved = client.post(
