@@ -844,6 +844,7 @@ def test_cycle_revision_checks_current_trainer_and_assignment_owner(client):
     response = client.patch(endpoint, headers=headers, json=change)
     assert response.status_code == 200, response.text
 
+
 def test_cycle_impact_preview_supports_all_future_weeks_and_rejects_stale_revision(client):
     headers, program_id, _, _ = assigned_cycle(client, k=3, n=116)
     endpoint = f"/api/v1/programs/assigned/{program_id}/cycle/week-type/preview"
@@ -851,9 +852,7 @@ def test_cycle_impact_preview_supports_all_future_weeks_and_rejects_stale_revisi
     page_request = {"expected_revision_number": expected_revision, "from_week": 8}
     all_weeks = []
     for offset, first, last in ((0, 8, 57), (50, 58, 107), (100, 108, 116)):
-        response = client.post(
-            endpoint, headers=headers, json={**page_request, "offset": offset}
-        )
+        response = client.post(endpoint, headers=headers, json={**page_request, "offset": offset})
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["total_weeks"] == 109
@@ -861,12 +860,16 @@ def test_cycle_impact_preview_supports_all_future_weeks_and_rejects_stale_revisi
         assert [row["week_number"] for row in body["weeks"]] == list(range(first, last + 1))
         all_weeks.extend(body["weeks"])
     assert [row["week_number"] for row in all_weeks] == list(range(8, 117))
-    assert [
-        (row["source_cycle_week"], row["cycle_iteration"])
-        for row in all_weeks[:4]
-    ] == [(2, 3), (3, 3), (1, 4), (2, 4)]
+    assert [(row["source_cycle_week"], row["cycle_iteration"]) for row in all_weeks[:4]] == [
+        (2, 3),
+        (3, 3),
+        (1, 4),
+        (2, 4),
+    ]
     assert [row["workouts"][0]["exercises"][0]["prescribed_reps"] for row in all_weeks[:3]] == [
-        "7", "8", "6"
+        "7",
+        "8",
+        "6",
     ]
     repeating = client.post(
         endpoint, headers=headers, json={**page_request, "source_cycle_week": 2}
@@ -893,12 +896,8 @@ def test_cycle_preview_keeps_saved_exercises_for_started_and_completed_after_fut
 
     headers, program_id, slot, exercise_id = assigned_cycle(client, k=3, n=16)
     with get_session_context() as db:
-        completed = db.query(UserWorkout).filter_by(
-            user_program_id=program_id, week_number=1
-        ).one()
-        started = db.query(UserWorkout).filter_by(
-            user_program_id=program_id, week_number=4
-        ).one()
+        completed = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=1).one()
+        started = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=4).one()
         now = now_msk_naive()
         completed.status = "completed"
         completed.started_at = now
@@ -949,9 +948,7 @@ def test_cycle_preview_keeps_saved_exercises_for_started_and_completed_after_fut
     assert rows[1]["status"] == "completed" and rows[1]["changeable"] is False
     assert rows[4]["status"] == "in_progress" and rows[4]["changeable"] is False
     assert rows[7]["changeable"] is True
-    assert [rows[week]["exercises"][0]["prescribed_reps"] for week in (1, 4, 7)] == [
-        "6", "6", "12"
-    ]
+    assert [rows[week]["exercises"][0]["prescribed_reps"] for week in (1, 4, 7)] == ["6", "6", "12"]
     assert [len(rows[week]["exercises"]) for week in (1, 4, 7)] == [1, 1, 1]
     with get_session_context() as db:
         for week, (workout_id, set_id, reps) in recorded.items():
@@ -961,5 +958,3 @@ def test_cycle_preview_keeps_saved_exercises_for_started_and_completed_after_fut
             result_set = db.get(UserWorkoutSet, set_id)
             assert result_set.actual_reps == reps
             assert result_set.is_completed is True
-
-

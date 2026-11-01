@@ -26,9 +26,9 @@ from fitminiapp_api.models.user import CoachClient, User, UserProfile
 from fitminiapp_api.schemas.program import (
     CoachProgramExerciseCreate,
     ProgramCycleDisableRequest,
-    ProgramCycleImpactPreviewRequest,
     ProgramCycleDurationPreviewRequest,
     ProgramCycleEnableRequest,
+    ProgramCycleImpactPreviewRequest,
     ProgramCycleRevisionRequest,
     ProgramLifecycleActionRequest,
     ProgramWeekTypeRevisionRequest,

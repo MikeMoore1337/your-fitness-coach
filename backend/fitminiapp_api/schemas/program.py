@@ -1191,7 +1191,6 @@ class ProgramWeekTypeRevisionRequest(BaseModel):
         return self
 
 
-
 class ProgramCycleImpactPreviewRequest(BaseModel):
     """Read-only impact view; unlike a week-type mutation it may cover all future weeks."""
 
