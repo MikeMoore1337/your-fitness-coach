@@ -85,6 +85,13 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw 'HARNESS2_TOOLKIT_MODIFIED'
 }
+# A clean working tree alone is insufficient: a locally committed replacement
+# of acceptance.ps1 could otherwise inherit the legitimate Toolkit origin.
+# Compare the four executable scripts to the reviewed Toolkit #479 Git tree.
+& git.exe -C $toolkitRootPath diff --quiet $minimumToolkitCommit HEAD -- @relativeFiles 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw 'HARNESS2_TOOLKIT_SOURCE_REVISION_MISMATCH'
+}
 $cliPath = Join-Path $toolkitRootPath 'integrations/harness2/cli.sh'
 $expectedPinLine = 'readonly UPSTREAM_SHA="' + $upstreamPin + '"'
 if (-not [IO.File]::ReadAllText($cliPath).Contains($expectedPinLine)) {
