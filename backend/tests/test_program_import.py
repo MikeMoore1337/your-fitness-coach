@@ -1991,3 +1991,74 @@ def test_xlsx_cycle_conflicts_manual_ambiguities_and_owner_gate(client):
     assert client.post(f"/api/v1/programs/imports/{import_id}/cancel", headers=owner).status_code == 204
     assert client.post(f"/api/v1/programs/imports/{import_id}/confirm", headers=owner).status_code == 409
 
+
+
+
+def test_xlsx_matrix_ambiguous_rep_count_and_load_list_require_manual_resolution(client):
+    headers = _auth(client, 931177)
+    original = _weekly_matrix_xlsx(weeks=1)
+    with zipfile.ZipFile(io.BytesIO(original)) as archive:
+        entries = {item.filename: archive.read(item.filename) for item in archive.infolist()}
+    sheet = entries["xl/worksheets/sheet1.xml"]
+    assert "3×9".encode() in sheet
+    entries["xl/worksheets/sheet1.xml"] = sheet.replace("3×9".encode(), "3×9×7".encode(), 1)
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content)
+    response = _upload(client, headers, "ambiguous-reps.xlsx", output.getvalue())
+    assert response.status_code == 201, response.text
+    body = response.json()
+    bad_row = next(
+        row for row in body["rows"]
+        if any(issue["code"] == "planned_reps_ambiguous" for issue in row["issues"])
+    )
+    error = next(issue for issue in bad_row["issues"] if issue["code"] == "planned_reps_ambiguous")
+    assert error["source_sheet"] == "План"
+    assert error["source_cell"] is not None
+    assert body["summary"]["blocking_issue_count"] > 0
+
+    bad_loads = client.post(
+        f"/api/v1/programs/imports/{body['id']}/resolve",
+        headers=headers,
+        json={
+            "expected_draft_version": body["draft_version"],
+            "title": "Исправление XLSX",
+            "goal": "maintenance",
+            "level": "intermediate",
+            "rows": [
+                {
+                    "row_number": bad_row["row_number"],
+                    "prescribed_reps": "9/7/5",
+                    "planned_loads": "70/80",
+                }
+            ],
+        },
+    )
+    assert bad_loads.status_code == 200, bad_loads.text
+    bad_draft = bad_loads.json()
+    assert any(
+        issue["code"] == "planned_load_count"
+        for row in bad_draft["rows"] for issue in row["issues"]
+    )
+    assert client.post(
+        f"/api/v1/programs/imports/{body['id']}/confirm",
+        headers=headers,
+        json={"expected_draft_version": bad_draft["draft_version"]},
+    ).status_code == 409
+
+    fixed = client.post(
+        f"/api/v1/programs/imports/{body['id']}/resolve",
+        headers=headers,
+        json={
+            "expected_draft_version": bad_draft["draft_version"],
+            "rows": [{"row_number": bad_row["row_number"], "planned_loads": "70/80/90"}],
+        },
+    )
+    assert fixed.status_code == 200, fixed.text
+    assert fixed.json()["summary"]["blocking_issue_count"] == 0
+    assert client.post(
+        f"/api/v1/programs/imports/{body['id']}/confirm",
+        headers=headers,
+        json={"expected_draft_version": fixed.json()["draft_version"]},
+    ).status_code == 200
