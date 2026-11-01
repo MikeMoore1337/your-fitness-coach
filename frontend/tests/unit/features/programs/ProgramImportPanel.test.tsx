@@ -532,4 +532,143 @@ describe('ProgramImportPanel', () => {
     expect(picker).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Ничего не найдено')).not.toBeInTheDocument();
   });
+
+  it('lets an imported K=3 matrix repeat to N=16 without inferring week types', async () => {
+    const matrix = {
+      ...resolvedPreview,
+      source_format: 'xlsx',
+      layout_version: 'weekly-matrix-v1',
+      draft_version: 1,
+      duration_weeks: 3,
+      assignment_duration_weeks: 3,
+      repeat: false,
+      week_types: [null, null, null],
+      week_type_candidates: [
+        { week_number: 1, week_type: 'light', source_text: 'Лёгкая', source_cell: 'C2' },
+        { week_number: 2, week_type: 'heavy', source_text: 'Тяжёлая', source_cell: 'F2' },
+        { week_number: 3, week_type: 'medium', source_text: 'Средняя', source_cell: 'I2' },
+      ],
+      rows: [1, 2, 3].map((week) => ({
+        ...resolvedPreview.rows[0],
+        row_number: week + 2,
+        week_number: week,
+        source_auxiliary: '70/72.5/75',
+        source_cells: { source_auxiliary: `C${week + 2}` },
+      })),
+    };
+    const next = {
+      ...matrix,
+      draft_version: 2,
+      assignment_duration_weeks: 16,
+      repeat: true,
+      week_types: ['light', 'heavy', 'medium'],
+    };
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/programs/imports' && init?.method === 'POST') {
+        return new Response(JSON.stringify(matrix), { status: 201 });
+      }
+      if (path === '/api/v1/programs/exercises' || path === '/api/v1/programs/imports/targets') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (path.endsWith('/resolve')) {
+        return new Response(JSON.stringify(next), { status: 200 });
+      }
+      if (path.endsWith('/confirm')) {
+        return new Response(JSON.stringify({
+          import_id: 'import-1', template: { id: 501 },
+          workouts_created: 0, workouts_updated: 0,
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
+      target: { files: [new File(['xlsx'], 'matrix.xlsx')] },
+    });
+    expect(await screen.findByText('K = 3')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox', { name: /Тип исходной недели/ })).toHaveLength(3);
+    expect(screen.getByRole('combobox', { name: 'Тип исходной недели 1' })).toHaveValue('');
+
+    fireEvent.change(screen.getByLabelText('Всего недель программы (N)'), {
+      target: { value: '16' },
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('включите повтор');
+    fireEvent.click(screen.getByRole('checkbox', {
+      name: 'Повторять исходные недели до конца срока',
+    }));
+    expect(screen.getByText('Неделя 16 → исходная 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Принять текстовые подсказки' }));
+    expect(screen.getByRole('combobox', { name: 'Тип исходной недели 2' })).toHaveValue('heavy');
+    const confirmButton = screen.getByRole('button', { name: 'Подтвердить и сохранить шаблон' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Применить исправления' }));
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    const requests = vi.mocked(globalThis.fetch).mock.calls;
+    const resolve = requests.find(([input]) => String(input).endsWith('/resolve'));
+    expect(JSON.parse(String(resolve?.[1]?.body))).toMatchObject({
+      expected_draft_version: 1,
+      assignment_duration_weeks: 16,
+      repeat: true,
+      week_types: ['light', 'heavy', 'medium'],
+    });
+    fireEvent.click(confirmButton);
+    await waitFor(() => expect(screen.getByText('Программа импортирована в личные шаблоны')).toBeInTheDocument());
+    const confirm = requests.find(([input]) => String(input).endsWith('/confirm'));
+    expect(JSON.parse(String(confirm?.[1]?.body))).toMatchObject({ expected_draft_version: 2 });
+  });
+
+  it('requires explicit correction before treating auxiliary XLSX values as planned loads', async () => {
+    const matrix = {
+      ...resolvedPreview,
+      source_format: 'xlsx',
+      layout_version: 'weekly-matrix-v1',
+      draft_version: 1,
+      duration_weeks: 1,
+      assignment_duration_weeks: 1,
+      repeat: false,
+      week_types: [null],
+      week_type_candidates: [],
+      rows: [{
+        ...resolvedPreview.rows[0],
+        source_auxiliary: '70/72.5/75',
+        source_cells: { source_auxiliary: 'C3' },
+      }],
+    };
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/programs/imports' && init?.method === 'POST') {
+        return new Response(JSON.stringify(matrix), { status: 201 });
+      }
+      if (path === '/api/v1/programs/exercises' || path === '/api/v1/programs/imports/targets') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (path.endsWith('/resolve')) {
+        return new Response(JSON.stringify({ ...matrix, draft_version: 2, rows: [{
+          ...matrix.rows[0], manual_planned_loads: '70/72.5/75',
+        }] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
+      target: { files: [new File(['xlsx'], 'matrix.xlsx')] },
+    });
+    await screen.findByText('K = 1');
+    expect(screen.getByText(/не считается плановым весом без подтверждения/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Исправить назначение'));
+    const weights = screen.getByLabelText('Плановые веса, кг');
+    expect(weights).toHaveValue('');
+    fireEvent.change(weights, { target: { value: '70/72.5/75' } });
+    expect(screen.getByRole('button', { name: 'Подтвердить и сохранить шаблон' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Применить исправления' }));
+    await waitFor(() => {
+      const resolve = vi.mocked(globalThis.fetch).mock.calls.find(([input]) => String(input).endsWith('/resolve'));
+      expect(JSON.parse(String(resolve?.[1]?.body))).toMatchObject({
+        expected_draft_version: 1,
+        rows: [{ row_number: 3, planned_loads: '70/72.5/75' }],
+      });
+    });
+  });
+
 });
