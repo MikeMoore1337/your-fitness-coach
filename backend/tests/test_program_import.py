@@ -68,7 +68,9 @@ def _xlsx_inline_cell(row_number: int, column_number: int, value: str) -> str:
 
 
 def _weekly_matrix_xlsx(
-    *, reorder_exercises: bool = False, weeks: int = 12,
+    *,
+    reorder_exercises: bool = False,
+    weeks: int = 12,
     week_type_text: tuple[str, ...] | None = None,
 ) -> bytes:
     day_header_rows = (2, 7, 12, 17)
@@ -1772,7 +1774,6 @@ def test_sparse_enormous_week_import_is_bounded_and_rejected(client):
     assert "week_sequence" in {item["code"] for item in body["issues"]}
 
 
-
 def _matrix_with_color(source: bytes, fill_rgb: str) -> bytes:
     """Recolor identical XLSX data using valid OOXML stylesheet entries."""
     with zipfile.ZipFile(io.BytesIO(source)) as archive:
@@ -1790,11 +1791,11 @@ def _matrix_with_color(source: bytes, fill_rgb: str) -> bytes:
         '</cellStyleXfs><cellXfs count="2">'
         '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
         '<xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0"/>'
-        '</cellXfs></styleSheet>'
+        "</cellXfs></styleSheet>"
     )
     entries["xl/styles.xml"] = styles.encode()
     entries["xl/worksheets/sheet1.xml"] = entries["xl/worksheets/sheet1.xml"].replace(
-        b'<c r=', b'<c s="1" r='
+        b"<c r=", b'<c s="1" r='
     )
     entries["xl/_rels/workbook.xml.rels"] = entries["xl/_rels/workbook.xml.rels"].replace(
         b"</Relationships>",
@@ -1817,7 +1818,9 @@ def _matrix_with_color(source: bytes, fill_rgb: str) -> bytes:
 def test_xlsx_matrix_k1_n16_explicit_week_type_and_planned_loads(client):
     headers = _auth(client, 931172)
     uploaded = _upload(
-        client, headers, "single-week.xlsx",
+        client,
+        headers,
+        "single-week.xlsx",
         _weekly_matrix_xlsx(weeks=1, week_type_text=("Лёгкая",)),
     )
     assert uploaded.status_code == 201, uploaded.text
@@ -1851,7 +1854,9 @@ def test_xlsx_matrix_k1_n16_explicit_week_type_and_planned_loads(client):
     assert draft["assignment_duration_weeks"] == 16
     assert draft["week_types"] == ["light"]
     corrected = next(item for item in draft["rows"] if item["row_number"] == row["row_number"])
-    assert [segment["load_target"]["value"] for segment in corrected["prescription"]["segments"]] == [
+    assert [
+        segment["load_target"]["value"] for segment in corrected["prescription"]["segments"]
+    ] == [
         32.5,
     ] * corrected["prescribed_sets"]
 
@@ -1888,7 +1893,9 @@ def test_xlsx_matrix_k1_n16_explicit_week_type_and_planned_loads(client):
 def test_xlsx_matrix_k3_to_n16_preserves_week_types_and_original_prescriptions(client):
     headers = _auth(client, 931173)
     preview_response = _upload(
-        client, headers, "three-week.xlsx",
+        client,
+        headers,
+        "three-week.xlsx",
         _weekly_matrix_xlsx(weeks=3, week_type_text=("Лёгкая", "Тяжёлая", "Средняя")),
     )
     assert preview_response.status_code == 201, preview_response.text
@@ -1896,7 +1903,9 @@ def test_xlsx_matrix_k3_to_n16_preserves_week_types_and_original_prescriptions(c
     assert preview["duration_weeks"] == 3
     assert preview["week_types"] == [None, None, None]
     assert [item["week_type"] for item in preview["week_type_candidates"]] == [
-        "light", "heavy", "medium"
+        "light",
+        "heavy",
+        "medium",
     ]
     assert {row["week_number"] for row in preview["rows"]} == {1, 2, 3}
 
@@ -1923,9 +1932,7 @@ def test_xlsx_matrix_k3_to_n16_preserves_week_types_and_original_prescriptions(c
     template = confirmed.json()["template"]
     assert template["default_duration_weeks"] == 16
     assert template["program_metadata"]["week_cycle"]["length_weeks"] == 3
-    assert template["program_metadata"]["week_cycle"]["week_types"] == [
-        "light", "heavy", "medium"
-    ]
+    assert template["program_metadata"]["week_cycle"]["week_types"] == ["light", "heavy", "medium"]
     exercise = template["days"][0]["exercises"][0]
     assert len(exercise["weekly_prescriptions"]) == 3
     assert len({item["prescribed_reps"] for item in exercise["weekly_prescriptions"]}) == 3
@@ -1935,20 +1942,33 @@ def test_xlsx_matrix_k3_to_n16_preserves_week_types_and_original_prescriptions(c
 def test_xlsx_matrix_preview_is_independent_of_fill_color(client):
     headers = _auth(client, 931174)
     source = _weekly_matrix_xlsx(weeks=3, week_type_text=("Лёгкая", "Тяжёлая", "Средняя"))
-    variants = [source, _matrix_with_color(source, "FFFF9900"), _matrix_with_color(source, "FF0066FF")]
+    variants = [
+        source,
+        _matrix_with_color(source, "FFFF9900"),
+        _matrix_with_color(source, "FF0066FF"),
+    ]
     normalized = []
     for index, content in enumerate(variants):
         preview = _upload(client, headers, f"colors-{index}.xlsx", content)
         assert preview.status_code == 201, preview.text
         body = preview.json()
-        normalized.append((
-            body["week_type_candidates"],
-            body["week_types"],
-            [(
-                row["week_number"], row["day_number"], row["exercise_name"],
-                row["prescribed_sets"], row["prescribed_reps"], row["source_cells"],
-            ) for row in body["rows"]],
-        ))
+        normalized.append(
+            (
+                body["week_type_candidates"],
+                body["week_types"],
+                [
+                    (
+                        row["week_number"],
+                        row["day_number"],
+                        row["exercise_name"],
+                        row["prescribed_sets"],
+                        row["prescribed_reps"],
+                        row["source_cells"],
+                    )
+                    for row in body["rows"]
+                ],
+            )
+        )
     assert normalized[0] == normalized[1] == normalized[2]
 
 
@@ -1968,7 +1988,10 @@ def test_xlsx_cycle_conflicts_manual_ambiguities_and_owner_gate(client):
         },
     )
     assert rejected.status_code == 422
-    assert client.get(f"/api/v1/programs/imports/{import_id}", headers=owner).json()["draft_version"] == 1
+    assert (
+        client.get(f"/api/v1/programs/imports/{import_id}", headers=owner).json()["draft_version"]
+        == 1
+    )
     valid = client.post(
         f"/api/v1/programs/imports/{import_id}/resolve",
         headers=owner,
@@ -1988,10 +2011,14 @@ def test_xlsx_cycle_conflicts_manual_ambiguities_and_owner_gate(client):
         json={"expected_draft_version": 1, "week_types": ["heavy"]},
     )
     assert stale.status_code == 409
-    assert client.post(f"/api/v1/programs/imports/{import_id}/cancel", headers=owner).status_code == 204
-    assert client.post(f"/api/v1/programs/imports/{import_id}/confirm", headers=owner).status_code == 409
-
-
+    assert (
+        client.post(f"/api/v1/programs/imports/{import_id}/cancel", headers=owner).status_code
+        == 204
+    )
+    assert (
+        client.post(f"/api/v1/programs/imports/{import_id}/confirm", headers=owner).status_code
+        == 409
+    )
 
 
 def test_xlsx_matrix_ambiguous_rep_count_and_load_list_require_manual_resolution(client):
@@ -2010,7 +2037,8 @@ def test_xlsx_matrix_ambiguous_rep_count_and_load_list_require_manual_resolution
     assert response.status_code == 201, response.text
     body = response.json()
     bad_row = next(
-        row for row in body["rows"]
+        row
+        for row in body["rows"]
         if any(issue["code"] == "planned_reps_ambiguous" for issue in row["issues"])
     )
     error = next(issue for issue in bad_row["issues"] if issue["code"] == "planned_reps_ambiguous")
@@ -2039,13 +2067,17 @@ def test_xlsx_matrix_ambiguous_rep_count_and_load_list_require_manual_resolution
     bad_draft = bad_loads.json()
     assert any(
         issue["code"] == "planned_load_count"
-        for row in bad_draft["rows"] for issue in row["issues"]
+        for row in bad_draft["rows"]
+        for issue in row["issues"]
     )
-    assert client.post(
-        f"/api/v1/programs/imports/{body['id']}/confirm",
-        headers=headers,
-        json={"expected_draft_version": bad_draft["draft_version"]},
-    ).status_code == 409
+    assert (
+        client.post(
+            f"/api/v1/programs/imports/{body['id']}/confirm",
+            headers=headers,
+            json={"expected_draft_version": bad_draft["draft_version"]},
+        ).status_code
+        == 409
+    )
 
     fixed = client.post(
         f"/api/v1/programs/imports/{body['id']}/resolve",
@@ -2057,8 +2089,11 @@ def test_xlsx_matrix_ambiguous_rep_count_and_load_list_require_manual_resolution
     )
     assert fixed.status_code == 200, fixed.text
     assert fixed.json()["summary"]["blocking_issue_count"] == 0
-    assert client.post(
-        f"/api/v1/programs/imports/{body['id']}/confirm",
-        headers=headers,
-        json={"expected_draft_version": fixed.json()["draft_version"]},
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/api/v1/programs/imports/{body['id']}/confirm",
+            headers=headers,
+            json={"expected_draft_version": fixed.json()["draft_version"]},
+        ).status_code
+        == 200
+    )
