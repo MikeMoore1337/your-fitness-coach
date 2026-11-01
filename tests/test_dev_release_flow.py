@@ -428,3 +428,46 @@ def test_local_dev_updater_registration_uses_supported_interactive_logon_and_saf
     assert "error_id=" in source
     assert "hresult=" in source
     assert "[REDACTED]" in source
+
+
+def test_local_dev_updater_failure_handler_preserves_explicit_exit_codes() -> None:
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+    handler = source.rsplit("\n} catch {\n", 1)[1]
+    write_error = (
+        "Write-Error ('[{0}] {1}' -f $script:FailureCode, "
+        "$script:FailureSummary) -ErrorAction Continue"
+    )
+    assert handler.count(write_error) == 1
+    assert handler.index(write_error) < handler.index("exit $script:ExitCode")
+
+
+@pytest.mark.parametrize("exit_code", [1, 2])
+def test_local_dev_updater_failure_handler_exit_codes_in_powershell(
+    tmp_path: Path, exit_code: int
+) -> None:
+    shell = shutil.which("powershell.exe") or shutil.which("pwsh")
+    if shell is None:
+        pytest.skip("PowerShell is unavailable on this runner")
+
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8-sig")
+    handler = source.rsplit("\n} catch {\n", 1)[1]
+    harness = (
+        "$ErrorActionPreference = 'Stop'\n"
+        f"$script:ExitCode = {exit_code}\n"
+        "$script:FailureCode = 'SIMULATED_FAILURE'\n"
+        "$script:FailureSummary = 'SIMULATED_FAILURE'\n"
+        "$script:CurrentResult = @{result='STARTED'; error_code=''}\n"
+        "function Save-Result { }\n"
+        "try { throw 'synthetic failure' } catch {\n"
+        + handler
+    )
+    probe = tmp_path / "failure handler with spaces.ps1"
+    probe.write_text(harness, encoding="utf-8-sig")
+    completed = subprocess.run(
+        [shell, "-NoProfile", "-NonInteractive", "-File", str(probe)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert completed.returncode == exit_code, completed.stderr
