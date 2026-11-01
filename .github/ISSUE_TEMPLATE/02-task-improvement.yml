@@ -3,7 +3,7 @@ description: "Функция, доработка, UI, инженерная ил�
 body:
   - type: markdown
     attributes:
-      value: "Начните заголовок с [Product Vxx], [UI Backlog], [Improvement], [Engineering], [Operations] или [Growth]. Если это ошибка, выберите Bug Report."
+      value: "Начните заголовок с [Product Vxx], [UI Backlog], [Improvement], [Engineering], [Operations] или [Growth]. Если это ошибка, выберите Bug Report. После создания проверьте карточку в едином GitHub Project: Status=Backlog, обоснованные Priority и Area, Release только при назначении выпуска. Правила: https://github.com/MikeMoore1337/your-fitness-coach/blob/dev/docs/ISSUE_GOVERNANCE.md"
   - type: textarea
     id: goal
     attributes:
