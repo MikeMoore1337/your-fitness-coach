@@ -28,6 +28,7 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_history_import import ImportedWorkout, WorkoutHistoryImportDraft
 from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
 from fitminiapp_api.services.exercise_catalog_metadata import exercise_catalog_metadata
+from fitminiapp_api.services.workout_history_adapters import ADAPTERS
 from fitminiapp_api.services.workout_history_import_parser import parse_workout_history_csv
 from fitminiapp_api.services.workout_ownership import workout_owner_id
 
@@ -97,8 +98,14 @@ def _catalog(db: Session, user: User) -> tuple[dict[int, dict], dict[str, list[i
     return by_id, by_name
 
 
-def _rows(source: bytes, by_name: dict[str, list[int]]) -> list[dict[str, Any]]:
-    parsed = parse_workout_history_csv(source)
+def _rows(
+    source: bytes, by_name: dict[str, list[int]], provider: str, weight_unit: str
+) -> list[dict[str, Any]]:
+    parsed = (
+        parse_workout_history_csv(source)
+        if provider == PROVIDER
+        else ADAPTERS[provider](source, weight_unit=weight_unit)
+    )
     workout_refs = {item.source["workout_ref"] for item in parsed}
     if len(workout_refs) > MAX_WORKOUTS:
         raise HistoryImportError("workout_limit", "В файле слишком много тренировок")
@@ -114,6 +121,8 @@ def _rows(source: bytes, by_name: dict[str, list[int]]) -> list[dict[str, Any]]:
             {
                 "line": item.line,
                 "source": item.source,
+                "provider_fields": item.provider_fields,
+                "manual_set_kind": None,
                 "completed_at_utc": item.completed_at_utc.isoformat()
                 if item.completed_at_utc
                 else None,
@@ -194,7 +203,11 @@ def expire_history_import_drafts(
     return len(rows)
 
 
-def create_history_import(db: Session, user: User, source: bytes) -> WorkoutHistoryImportDraft:
+def create_history_import(
+    db: Session, user: User, source: bytes, provider: str = PROVIDER, weight_unit: str = ""
+) -> WorkoutHistoryImportDraft:
+    if provider not in {PROVIDER, *ADAPTERS} or weight_unit not in {"", "kg", "lb"}:
+        raise HistoryImportError("invalid_provider", "Проверьте источник и единицу веса", 422)
     _lock_user(db, user)
     expire_history_import_drafts(db)
     active = (
@@ -212,14 +225,14 @@ def create_history_import(db: Session, user: User, source: bytes) -> WorkoutHist
         )
     by_id, by_name = _catalog(db, user)
     del by_id
-    rows = _rows(source, by_name)
+    rows = _rows(source, by_name, provider, weight_unit)
     draft = WorkoutHistoryImportDraft(
         id=str(uuid4()),
         owner_user_id=user.id,
-        provider=PROVIDER,
+        provider=provider,
         source_sha256=hashlib.sha256(source).hexdigest(),
-        schema_version=1,
-        parser_version=PARSER_VERSION,
+        schema_version=1 if provider == PROVIDER else 3,
+        parser_version=PARSER_VERSION if provider == PROVIDER else "1.0",
         status="pending",
         version=1,
         draft_json={"rows": rows, "duplicate_choices": {}},
@@ -240,7 +253,7 @@ def _source_set_facts(rows: list[dict]) -> list[list]:
             row["set_number"],
             row["reps"],
             row["weight_kg"],
-            row["source"]["set_kind"] or None,
+            row.get("manual_set_kind") or row["source"]["set_kind"] or None,
             row["source"]["rir"] or None,
         ]
         mode = row["source"].get("execution_mode") or None
@@ -306,7 +319,7 @@ def _enriched_rows(db: Session, user: User, payload: dict) -> list[dict]:
 
 
 def _duplicates(
-    db: Session, user: User, rows: list[dict], choices: dict, source_sha256: str
+    db: Session, user: User, rows: list[dict], choices: dict, source_sha256: str, provider: str
 ) -> list[dict]:
     grouped: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
@@ -435,7 +448,10 @@ def _duplicates(
                 and workout.completed_at_utc.isoformat() == instant
                 and facts == source_facts
             )
-            same_source = existing_sources.get(workout.id) == _hash([source_sha256, ref])
+            source_identity = _hash(
+                [source_sha256, ref] if provider == PROVIDER else [provider, ref]
+            )
+            same_source = existing_sources.get(workout.id) == source_identity
             candidates.append(
                 {
                     "kind": "exact" if exact else ("source" if same_source else "possible"),
@@ -451,7 +467,11 @@ def _duplicates(
             if other_ref == ref or other[0]["completed_on"] != date_value:
                 continue
             facts = _source_set_facts(other)
-            exact = other[0]["completed_at_utc"] == instant and facts == source_facts
+            exact = (
+                instant is not None
+                and other[0]["completed_at_utc"] == instant
+                and facts == source_facts
+            )
             candidates.append(
                 {
                     "kind": "exact" if exact else "possible",
@@ -486,7 +506,7 @@ def history_import_preview(db: Session, user: User, draft: WorkoutHistoryImportD
     assert draft.draft_json is not None
     rows = _enriched_rows(db, user, draft.draft_json)
     duplicates = _duplicates(
-        db, user, rows, draft.draft_json["duplicate_choices"], draft.source_sha256
+        db, user, rows, draft.draft_json["duplicate_choices"], draft.source_sha256, draft.provider
     )
     signature = _hash({"rows": rows, "duplicates": duplicates})
     return {
@@ -511,6 +531,7 @@ def resolve_history_import(
     *,
     version: int,
     exercise_choices: dict[int, int],
+    set_kind_choices: Mapping[int, str | None],
     excluded_lines: list[int],
     duplicate_choices: Mapping[str, str],
 ) -> WorkoutHistoryImportDraft:
@@ -527,6 +548,13 @@ def resolve_history_import(
     ):
         raise HistoryImportError("invalid_lines", "Некоторые строки не найдены", 422)
     by_id, _ = _catalog(db, user)
+    for line, kind in set_kind_choices.items():
+        selected_row = row_by_line.get(line)
+        if selected_row is None or draft.provider == PROVIDER or selected_row["source"]["set_kind"]:
+            raise HistoryImportError("invalid_set_kind", "Тип этого подхода нельзя изменить", 422)
+        if kind not in {None, "warmup", "working", "drop"}:
+            raise HistoryImportError("invalid_set_kind", "Проверьте тип подхода", 422)
+        selected_row["manual_set_kind"] = kind
     selected_groups: dict[tuple[str, str], int] = {}
     for line, exercise_id in exercise_choices.items():
         row = row_by_line.get(line)
@@ -572,11 +600,14 @@ def confirm_history_import(
         return draft
     _require_pending(draft, version)
     assert draft.draft_json is not None
-    if (
-        draft.provider != PROVIDER
-        or draft.schema_version != 1
-        or draft.parser_version not in {"1.0", PARSER_VERSION}
-    ):
+    supported = (
+        draft.provider == PROVIDER
+        and draft.schema_version == 1
+        and draft.parser_version in {"1.0", PARSER_VERSION}
+    ) or (
+        draft.provider in ADAPTERS and draft.schema_version == 3 and draft.parser_version == "1.0"
+    )
+    if not supported:
         raise HistoryImportError(
             "source_changed", "Версия источника изменилась. Загрузите файл снова", 409
         )
@@ -629,7 +660,16 @@ def confirm_history_import(
     workout_ids = []
     for ref, group in groups.items():
         first = group[0]
-        timestamp = datetime.fromisoformat(first["source"]["completed_at"].replace("Z", "+00:00"))
+        timestamp = (
+            datetime.fromisoformat(first["source"]["completed_at"].replace("Z", "+00:00"))
+            if first["source"]["completed_at"]
+            else None
+        )
+        started = (
+            datetime.fromisoformat(first["source"]["started_at"].replace("Z", "+00:00"))
+            if first["source"].get("started_at")
+            else None
+        )
         workout = UserWorkout(
             user_program_id=None,
             history_imported=True,
@@ -640,8 +680,14 @@ def confirm_history_import(
             plan_materialized=null(),
             title=first["source"]["workout_title"],
             status="completed",
-            completed_at=timestamp.replace(tzinfo=None),
-            completed_at_utc=datetime.fromisoformat(first["completed_at_utc"]),
+            started_at=started.replace(tzinfo=None) if started else None,
+            started_at_utc=started.astimezone(UTC).replace(tzinfo=None)
+            if started and started.tzinfo is not None
+            else None,
+            completed_at=timestamp.replace(tzinfo=None) if timestamp else None,
+            completed_at_utc=datetime.fromisoformat(first["completed_at_utc"])
+            if first["completed_at_utc"]
+            else None,
         )
         db.add(workout)
         db.flush()
@@ -670,7 +716,11 @@ def confirm_history_import(
                     if row["weight_kg"] is not None
                     else None,
                     rir=row["source"]["rir"] or None,
-                    set_kind=row["source"]["set_kind"] or None,
+                    set_kind=row.get("manual_set_kind") or row["source"]["set_kind"] or null(),
+                    set_kind_known=False
+                    if draft.provider != PROVIDER
+                    and not (row.get("manual_set_kind") or row["source"]["set_kind"])
+                    else None,
                     is_completed=row["source"]["set_status"] == "completed",
                     execution_mode=row["source"].get("execution_mode") or None,
                     first_side=row["source"].get("first_side") or None,
@@ -700,10 +750,38 @@ def confirm_history_import(
                 workout_id=workout.id,
                 owner_user_id=user.id,
                 provider=draft.provider,
-                source_ref_hash=_hash([draft.source_sha256, ref]),
-                fact_hash=_hash([first["completed_at_utc"], _source_set_facts(group)]),
+                source_ref_hash=_hash(
+                    [draft.source_sha256, ref]
+                    if draft.provider == PROVIDER
+                    else [draft.provider, ref]
+                ),
+                fact_hash=_hash(
+                    [first["completed_at_utc"], _source_set_facts(group)]
+                    if first["completed_at_utc"]
+                    else [
+                        "no-instant",
+                        draft.provider,
+                        ref,
+                        first["completed_on"],
+                        _source_set_facts(group),
+                    ]
+                ),
                 parser_version=draft.parser_version,
-                source_timezone=first["source"]["timezone"],
+                source_timezone=first["source"]["timezone"] or None,
+                source_data={
+                    "sets": [
+                        {
+                            "exercise_ref": item["source"]["exercise_ref"],
+                            "set_number": item["set_number"],
+                            "weight_unit_used": item["source"]["weight_unit"],
+                            "user_set_kind": item.get("manual_set_kind"),
+                            "fields": item["provider_fields"],
+                        }
+                        for item in group
+                    ]
+                }
+                if draft.provider != PROVIDER
+                else None,
             )
         )
         workout_ids.append(workout.id)

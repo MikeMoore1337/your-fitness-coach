@@ -895,7 +895,7 @@ class ExerciseHistorySet(BaseModel):
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
     set_kind: SetKind | None = None
     planned_role: PrescriptionRole | None = None
-    analytics_bucket: Literal["working", "preparation", "intensifier"]
+    analytics_bucket: Literal["working", "preparation", "intensifier", "unknown"]
     pr_eligible: bool
     execution_mode: WorkoutExecutionMode | None = Field(
         default=None, exclude_if=lambda v: v is None

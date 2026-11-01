@@ -80,6 +80,7 @@ class ImportRow:
     weight_kg: Decimal | None
     issues: tuple[ImportIssue, ...]
     sides: dict[str, dict | None] | None = None
+    provider_fields: dict[str, str] | None = None
 
 
 def _issue(issues: list[ImportIssue], code: str, field: str, message: str) -> None:
@@ -181,13 +182,15 @@ def _parse_row(line: int, source: dict[str, str], version: str) -> ImportRow:
             issues, "not_completed", "status", "Можно импортировать только завершённые тренировки"
         )
     mode = source.get("execution_mode", "")
-    side_mode = version == "2" and mode in {"per_side", "alternating"}
+    side_mode = version in {"2", "3"} and mode in {"per_side", "alternating"}
     if source["set_status"] != "completed" and not (
         side_mode and source["set_status"] == "incomplete"
     ):
         _issue(issues, "set_not_completed", "set_status", "Подход должен быть отмечен выполненным")
     if source["set_kind"] not in (
-        {"", "warmup", "working", "drop"} if version == "2" else {"warmup", "working", "drop"}
+        {"", "warmup", "working", "drop"}
+        if version in {"2", "3"}
+        else {"warmup", "working", "drop"}
     ):
         _issue(issues, "invalid_set_kind", "set_kind", "Укажите поддерживаемый тип подхода")
     if source["rir"] not in {"", "0", "1", "2", "3", "4+"}:
@@ -196,8 +199,28 @@ def _parse_row(line: int, source: dict[str, str], version: str) -> ImportRow:
         _issue(issues, "unsupported_rpe", "rpe", "RPE пока нельзя перенести без потери смысла")
     if source["side"]:
         _issue(issues, "unsupported_side", "side", "Раздельные стороны пока не поддерживаются")
-    completed_at, completed_on = _completion(source["completed_at"], source["timezone"], issues)
-    if version == "2":
+    if version == "3":
+        completed_at = None
+        completed_on = None
+        if source["completed_at"]:
+            try:
+                timestamp = datetime.fromisoformat(source["completed_at"].replace("Z", "+00:00"))
+                if timestamp.tzinfo is not None:
+                    completed_at = timestamp.astimezone(UTC).replace(tzinfo=None)
+                    if completed_at > datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=5):
+                        _issue(
+                            issues,
+                            "future_completed_at",
+                            "completed_at",
+                            "Дата завершения ещё не наступила",
+                        )
+            except ValueError, OverflowError:
+                _issue(
+                    issues, "invalid_completed_at", "completed_at", "Дата завершения не распознана"
+                )
+    else:
+        completed_at, completed_on = _completion(source["completed_at"], source["timezone"], issues)
+    if version in {"2", "3"}:
         try:
             completed_on = date.fromisoformat(source["performed_on"])
             if completed_on.isoformat() != source["performed_on"]:
@@ -205,6 +228,14 @@ def _parse_row(line: int, source: dict[str, str], version: str) -> ImportRow:
         except ValueError:
             _issue(issues, "invalid_performed_on", "performed_on", "Укажите дату тренировки")
             completed_on = None
+        if (
+            version == "3"
+            and completed_on
+            and completed_on > datetime.now(UTC).date() + timedelta(days=1)
+        ):
+            _issue(
+                issues, "future_performed_on", "performed_on", "Дата тренировки ещё не наступила"
+            )
         if mode not in {"", "bilateral", "per_side", "alternating"}:
             _issue(issues, "invalid_execution_mode", "execution_mode", "Укажите способ выполнения")
         if source["first_side"] not in {"", "left", "right"} or (
@@ -219,7 +250,7 @@ def _parse_row(line: int, source: dict[str, str], version: str) -> ImportRow:
     if not side_mode and not source["reps"] and not source["weight"]:
         _issue(issues, "result_missing", "reps", "Укажите фактические повторы или вес")
     sides: dict[str, dict | None] | None = None
-    if version == "2":
+    if version in {"2", "3"}:
         sides = {}
         for side in ("left", "right"):
             fields = {

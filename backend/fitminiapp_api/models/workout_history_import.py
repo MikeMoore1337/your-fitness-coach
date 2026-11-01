@@ -65,4 +65,5 @@ class ImportedWorkout(Base):
     source_ref_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     fact_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     parser_version: Mapped[str] = mapped_column(String(32), nullable=False)
-    source_timezone: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_timezone: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -7737,6 +7737,18 @@ export interface components {
         Body_upload_history_api_v1_workout_history_imports_post: {
             /** File */
             file: string;
+            /**
+             * Provider
+             * @default yfc-neutral-csv
+             * @enum {string}
+             */
+            provider: "yfc-neutral-csv" | "hevy" | "strong" | "fitnotes";
+            /**
+             * Weight Unit
+             * @default
+             * @enum {string}
+             */
+            weight_unit: "" | "kg" | "lb";
         };
         /** Body_upload_program_import_api_v1_programs_imports_post */
         Body_upload_program_import_api_v1_programs_imports_post: {
@@ -11031,7 +11043,7 @@ export interface components {
              * Analytics Bucket
              * @enum {string}
              */
-            analytics_bucket: "working" | "preparation" | "intensifier";
+            analytics_bucket: "working" | "preparation" | "intensifier" | "unknown";
             /** Pr Eligible */
             pr_eligible: boolean;
             /** Execution Mode */
@@ -12773,6 +12785,10 @@ export interface components {
             exercise_choices?: {
                 [key: string]: number;
             };
+            /** Set Kind Choices */
+            set_kind_choices?: {
+                [key: string]: ("warmup" | "working" | "drop") | null;
+            };
             /** Excluded Lines */
             excluded_lines?: number[];
             /** Duplicate Choices */
@@ -12794,6 +12810,12 @@ export interface components {
             /** Line */
             line: number;
             source: components["schemas"]["HistoryImportSource"];
+            /** Provider Fields */
+            provider_fields?: {
+                [key: string]: string;
+            } | null;
+            /** Manual Set Kind */
+            manual_set_kind?: ("warmup" | "working" | "drop") | null;
             /** Completed At Utc */
             completed_at_utc: string | null;
             /** Completed On */
@@ -12847,6 +12869,8 @@ export interface components {
         HistoryImportSource: {
             /** Workout Ref */
             workout_ref: string;
+            /** Started At */
+            started_at?: string | null;
             /** Completed At */
             completed_at: string;
             /** Timezone */
