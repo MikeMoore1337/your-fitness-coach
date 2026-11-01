@@ -629,6 +629,7 @@ class UserWorkoutSet(Base):
     heart_rate_zone: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
     set_kind: Mapped[str | None] = mapped_column(String(16), nullable=True, default="working")
+    set_kind_known: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     planned_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
     planned_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

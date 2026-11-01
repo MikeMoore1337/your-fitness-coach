@@ -16,6 +16,7 @@ import {
   type PlatformApiOptions,
 } from './fixtures/platform-api';
 import { expectUiAuditClean } from './fixtures/ui-audit';
+import { installIssue834ImportApi } from './fixtures/issue-834-import';
 
 const FIXED_DATE = '2026-09-06';
 const MOBILE_VIEWPORTS = [
@@ -237,6 +238,8 @@ for (const theme of ['light', 'dark'] as const) {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`@critical mobile core surfaces keep the ${theme} visual contract`, async ({ page }) => {
+    // Four navigations and pixel comparisons can contend for WebKit screenshot rendering in CI.
+    test.setTimeout(60_000);
     await preparePage(page, theme);
     await page.goto('/app?section=today');
     await waitForSurface(page, 'today');
@@ -267,7 +270,9 @@ for (const theme of ['light', 'dark'] as const) {
       } else {
         await expect(page.locator(surface.locator)).toHaveScreenshot(
           `${surface.name}-390x844-${theme}.png`,
-          surface.name === 'profile' ? longSurfaceScreenshotOptions : screenshotOptions,
+          surface.name === 'profile'
+            ? { ...longSurfaceScreenshotOptions, timeout: 15_000 }
+            : screenshotOptions,
         );
       }
     }
@@ -468,6 +473,9 @@ for (const theme of ['light', 'dark'] as const) {
 test('@critical active workout keeps the current set primary across mobile widths', async ({
   page,
 }) => {
+  // This single scenario reopens the workout and captures two screenshots at three viewports.
+  // Its observed 30s limit expires during WebKit's last paint-only capture at four workers.
+  test.setTimeout(60_000);
   await preparePage(page, 'dark', 'browser', { workoutStatus: 'in_progress' });
 
   for (const viewport of MOBILE_VIEWPORTS) {
@@ -1062,4 +1070,51 @@ for (const theme of ['light', 'dark'] as const) {
       expect(lastInteractiveGeometry.hit).toBe(true);
     });
   }
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  test('@critical #834 provider import preview on mobile in ' + theme, async ({ page }, info) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await preparePage(page, theme, 'browser', { progressState: 'populated' });
+    const mock = await installIssue834ImportApi(page, 'fitnotes');
+    await page.goto('/app?section=progress&progress_view=history');
+    await page.getByRole('button', { name: 'Импортировать историю' }).click();
+    await page.getByLabel('Источник').selectOption('fitnotes');
+    await page.getByLabel('Выбрать CSV-файл').setInputFiles({
+      name: 'synthetic-fitnotes.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Date,Exercise\n2025-10-12,Example', 'utf8'),
+    });
+    await expect(page.getByText(/В FitNotes нет времени и типа подхода/)).toBeVisible();
+    await expect(page.getByLabel('Тип подхода, если знаете')).toHaveValue('');
+    await expectNoHorizontalOverflow(page);
+    expect(mock.uploads()).toBe(1);
+    await page.screenshot({
+      path: info.outputPath('issue-834-' + theme + '-fitnotes-mobile-context.png'),
+      fullPage: true,
+      animations: 'disabled',
+      caret: 'hide',
+    });
+    const navigation = page.locator('#appBottomNav');
+    await navigation.evaluateAll((elements) =>
+      elements.forEach((element) => {
+        (element as HTMLElement).style.visibility = 'hidden';
+      }),
+    );
+    try {
+      await page.locator('.workout-history-card').screenshot({
+        path: info.outputPath('issue-834-' + theme + '-fitnotes-mobile-panel.png'),
+        animations: 'disabled',
+        caret: 'hide',
+      });
+    } finally {
+      await navigation.evaluateAll((elements) =>
+        elements.forEach((element) => {
+          (element as HTMLElement).style.visibility = '';
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+  });
 }

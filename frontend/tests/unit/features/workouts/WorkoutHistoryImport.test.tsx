@@ -105,6 +105,62 @@ afterEach(() => {
 });
 
 describe('WorkoutHistoryImport', () => {
+  it('sends the chosen source and explicit Strong weight unit', async () => {
+    let uploadBody: FormData | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/workout-history-imports' && (init?.method ?? 'GET') === 'GET')
+        return Response.json([]);
+      if (path === '/api/v1/workout-history-imports' && init?.method === 'POST') {
+        uploadBody = init.body as FormData;
+        return Response.json({ ...resolved, provider: 'strong' }, { status: 201 });
+      }
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderImport();
+    await userEvent.selectOptions(await screen.findByLabelText('Источник'), 'strong');
+    await userEvent.selectOptions(screen.getByLabelText('Единица веса в файле'), 'lb');
+    fireEvent.change(screen.getByLabelText('Выбрать CSV-файл'), {
+      target: { files: [new File(['fixture'], 'strong.csv')] },
+    });
+    await screen.findByText(/45.36 кг/);
+    expect(uploadBody?.get('provider')).toBe('strong');
+    expect(uploadBody?.get('weight_unit')).toBe('lb');
+  });
+
+  it('shows the original unsupported value before excluding a row', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      if ((init?.method ?? 'GET') === 'GET') return Response.json([]);
+      return Response.json(
+        {
+          ...resolved,
+          provider: 'hevy',
+          rows: [
+            {
+              ...resolved.rows[0],
+              provider_fields: { duration_seconds: '75' },
+              blocking_issues: [
+                {
+                  code: 'unsupported_field',
+                  field: 'duration_seconds',
+                  message: 'Длительность не поддерживается',
+                },
+              ],
+            },
+          ],
+        },
+        { status: 201 },
+      );
+    });
+    renderImport();
+    fireEvent.change(await screen.findByLabelText('Выбрать CSV-файл'), {
+      target: { files: [new File(['fixture'], 'hevy.csv')] },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Проверить записи' }));
+    expect(screen.getByText('Длительность в секундах: 75')).toBeInTheDocument();
+    expect(screen.getByText('Длительность не поддерживается')).toBeInTheDocument();
+  });
+
   it('requires manual mapping and explicit confirmation, then recovers an unknown save result', async () => {
     const calls: Array<{ path: string; method: string; body: unknown }> = [];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {

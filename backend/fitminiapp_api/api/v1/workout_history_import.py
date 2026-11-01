@@ -8,6 +8,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     Query,
     Request,
@@ -211,6 +212,8 @@ async def upload_history(
     request: Request,
     response: Response,
     file: UploadFile = File(...),
+    provider: Literal["yfc-neutral-csv", "hevy", "strong", "fitnotes"] = Form("yfc-neutral-csv"),
+    weight_unit: Literal["", "kg", "lb"] = Form(""),
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
@@ -220,7 +223,9 @@ async def upload_history(
         if not _valid_filename(file.filename):
             raise HistoryImportError("filename", "Выберите CSV-файл с допустимым именем", 415)
         source = await file.read(MAX_BYTES + 1)
-        draft = await run_in_threadpool(create_history_import, db, current_user, source)
+        draft = await run_in_threadpool(
+            create_history_import, db, current_user, source, provider, weight_unit
+        )
         preview_data = await run_in_threadpool(history_import_preview, db, current_user, draft)
         preview = HistoryImportPreview.model_validate(preview_data)
         db.commit()
@@ -270,6 +275,7 @@ def resolve_history(
             draft_id,
             version=payload.version,
             exercise_choices=payload.exercise_choices,
+            set_kind_choices=payload.set_kind_choices,
             excluded_lines=payload.excluded_lines,
             duplicate_choices=payload.duplicate_choices,
         )
