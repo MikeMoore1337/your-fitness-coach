@@ -144,7 +144,7 @@ _WEEK_TYPE_LABELS: Final = {
     "heavy": "heavy",
 }
 _EXACT_REP_LIST_PATTERN = re.compile(r"\d+(?:/\d+)*\Z")
-_PLANNED_LOADS_PATTERN = re.compile(r"\d+(?:[.,]\d{1,2})?(?:\s*[/;]\s*\d+(?:[.,]\d{1,2})?)*\Z")
+_PLANNED_LOADS_PATTERN = re.compile(r"\d+(?:[.,]\d{1,2})?(?:\s*[/;x×х]\s*\d+(?:[.,]\d{1,2})?)*\Z")
 _DAY_HEADER_PATTERN = re.compile(r"^день\s*(\d+)$", re.IGNORECASE)
 _DOCUMENT_DAY_PATTERN = re.compile(
     r"^(?:[-*•]\s*)?(?:день|day)\s*(\d+)\s*(?:[-:–—]\s*(.*))?$", re.IGNORECASE
@@ -2304,7 +2304,7 @@ def _matrix_plan_from_row(row: _RowDraft, issues: list[_Issue]) -> None:
                 field="source_auxiliary",
             )
             return
-        values = [float(value.replace(",", ".")) for value in re.split(r"\s*[/;]\s*", raw)]
+        values = [float(value.replace(",", ".")) for value in re.split(r"\s*[/;x×х]\s*", raw)]
         if len(values) not in {1, sets} or any(value < 0 or value > 100_000 for value in values):
             _append_issue(
                 issues,
@@ -4627,10 +4627,20 @@ def resolve_program_import(
         raise ProgramImportError("import_not_editable", "Этот импорт больше нельзя изменить", 409)
     draft = cast(_Draft, dict(import_row.draft_json))
     current_version = draft.get("draft_version")
-    if (
-        current_version is not None
-        and expected_draft_version is not None
-        and expected_draft_version != current_version
+    if current_version is not None and (
+        (expected_draft_version is not None and expected_draft_version != current_version)
+        or (
+            expected_draft_version is None
+            and (
+                assignment_duration_weeks is not None
+                or repeat is not None
+                or week_types is not None
+                or any(
+                    sets is not None or reps is not None or loads is not None
+                    for _, _, sets, reps, loads in row_resolutions
+                )
+            )
+        )
     ):
         raise ProgramImportError(
             "draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409
@@ -4691,12 +4701,12 @@ def resolve_program_import(
     )
     if current_version is not None:
         source_weeks = rebuilt["duration_weeks"]
-        new_types: list[str | None] = [
-            value
-            for value in (
-                week_types if week_types is not None else draft.get("week_types", [None] * source_weeks)
-            )
-        ]
+        selected_types = (
+            week_types
+            if week_types is not None
+            else draft.get("week_types", [None] * source_weeks)
+        )
+        new_types: list[str | None] = list(selected_types)
         if len(new_types) != source_weeks or any(
             value not in {None, "light", "medium", "heavy"} for value in new_types
         ):
@@ -5032,14 +5042,22 @@ def confirm_program_import(
         )
 
     draft = cast(_Draft, dict(import_row.draft_json))
-    if (
-        draft.get("draft_version") is not None
-        and expected_draft_version is not None
-        and expected_draft_version != draft["draft_version"]
-    ):
-        raise ProgramImportError(
-            "draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409
+    if draft.get("draft_version") is not None:
+        current_version = draft["draft_version"]
+        strict_draft = (
+            draft.get("repeat", False)
+            or draft.get("assignment_duration_weeks", draft["duration_weeks"])
+            != draft["duration_weeks"]
+            or any(value is not None for value in draft.get("week_types", []))
+            or any(row.get("manual_planned_loads") is not None for row in draft["rows"])
         )
+        if (
+            expected_draft_version != current_version
+            and (expected_draft_version is not None or strict_draft)
+        ):
+            raise ProgramImportError(
+                "draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409
+            )
     rebuilt = _build_draft(
         db,
         current_user,
