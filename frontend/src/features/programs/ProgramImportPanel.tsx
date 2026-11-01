@@ -672,14 +672,14 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                   <span className="eyebrow">Периодизация · по желанию</span>
                   <h4 id="import-cycle-heading">Исходные недели и срок программы</h4>
                   <p className="muted">
-                    В файле распознано {sourceWeeks} исходных недель (K). Типы недель не зависят от цвета.
+                    В файле распознано {sourceWeeks} исходных недель. Типы недель не зависят от цвета.
                   </p>
                 </div>
-                <strong>K = {sourceWeeks}</strong>
+                <strong>Исходных недель: {sourceWeeks}</strong>
               </div>
               <div className="program-import-cycle__fields">
                 <label htmlFor="program-import-duration">
-                  Всего недель программы (N)
+                  Всего недель программы
                   <Input
                     id="program-import-duration"
                     type="number"
@@ -701,7 +701,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               </div>
               {invalidDuration && (
                 <p className="field-error" role="alert">
-                  Укажите положительное число недель. Если N больше K, включите повтор.
+                  Укажите положительное число недель. Если срок больше исходного цикла, включите повтор.
                 </p>
               )}
               <div className="program-import-week-map" aria-label="Пример повторения исходных недель">
@@ -798,7 +798,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               )}
               <p className="muted">
                 Тип недели можно оставить пустым. Повтор не копирует выполненные тренировки.
-                Если недели распознаны неправильно, исправьте заголовки в Excel и загрузите файл повторно.
+                Если недели распознаны неправильно, исправьте заголовки в исходном файле и загрузите его повторно.
               </p>
             </section>
           )}
