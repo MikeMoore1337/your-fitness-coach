@@ -4364,12 +4364,6 @@ def parse_program_import(
         duration_weeks=duration_weeks,
         layout_warnings=layout_warnings,
     )
-    if layout_version == PROGRAM_IMPORT_MATRIX_LAYOUT and table is not None:
-        draft["draft_version"] = 1
-        draft["assignment_duration_weeks"] = duration_weeks
-        draft["repeat"] = False
-        draft["week_types"] = [None] * duration_weeks
-        draft["week_type_candidates"] = _week_type_candidates(table, duration_weeks)
     draft = _run_ai_assistance(
         db,
         current_user,
@@ -4378,6 +4372,12 @@ def parse_program_import(
         layout_warnings=layout_warnings,
         ai_port=ai_port,
     )
+    if layout_version == PROGRAM_IMPORT_MATRIX_LAYOUT and table is not None:
+        draft["draft_version"] = 1
+        draft["assignment_duration_weeks"] = duration_weeks
+        draft["repeat"] = False
+        draft["week_types"] = [None] * duration_weeks
+        draft["week_type_candidates"] = _week_type_candidates(table, duration_weeks)
     for row in draft["rows"]:
         row.pop("source_evidence", None)
         row.pop("rest_defaulted", None)
@@ -4722,9 +4722,7 @@ def resolve_program_import(
     if current_version is not None:
         source_weeks = rebuilt["duration_weeks"]
         selected_types = (
-            week_types
-            if week_types is not None
-            else draft.get("week_types", [None] * source_weeks)
+            week_types if week_types is not None else draft.get("week_types", [None] * source_weeks)
         )
         new_types: list[str | None] = list(selected_types)
         if len(new_types) != source_weeks or any(
@@ -5071,9 +5069,8 @@ def confirm_program_import(
             or any(value is not None for value in draft.get("week_types", []))
             or any(row.get("manual_planned_loads") is not None for row in draft["rows"])
         )
-        if (
-            expected_draft_version != current_version
-            and (expected_draft_version is not None or strict_draft)
+        if expected_draft_version != current_version and (
+            expected_draft_version is not None or strict_draft
         ):
             raise ProgramImportError(
                 "draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409
