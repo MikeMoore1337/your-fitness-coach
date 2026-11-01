@@ -1191,6 +1191,30 @@ class ProgramWeekTypeRevisionRequest(BaseModel):
         return self
 
 
+
+class ProgramCycleImpactPreviewRequest(BaseModel):
+    """Read-only impact view; unlike a week-type mutation it may cover all future weeks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    week_type: Literal["light", "medium", "heavy"] | None = None
+    occurrence_weeks: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    from_week: int | None = Field(default=None, ge=1, strict=True)
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if (self.occurrence_weeks is None) == (self.from_week is None):
+            raise ValueError("Выберите недели или начало будущей области")
+        if self.occurrence_weeks is not None and self.source_cycle_week is not None:
+            raise ValueError("Нельзя совмещать отдельные недели и повторение")
+        return self
+
+
 class ProgramCycleDisableRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

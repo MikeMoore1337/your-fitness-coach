@@ -26,6 +26,7 @@ from fitminiapp_api.models.user import CoachClient, User, UserProfile
 from fitminiapp_api.schemas.program import (
     CoachProgramExerciseCreate,
     ProgramCycleDisableRequest,
+    ProgramCycleImpactPreviewRequest,
     ProgramCycleDurationPreviewRequest,
     ProgramCycleEnableRequest,
     ProgramCycleRevisionRequest,
@@ -512,6 +513,30 @@ def _cycle_type_for_date(
         ):
             result = override["week_type"]
     return result
+
+
+def _preview_cycle_exercises(plan: dict, frozen: UserWorkout | None) -> list[dict]:
+    """Use persisted prescriptions for protected workouts, not a future plan projection."""
+    fields = (
+        "source_template_exercise_id",
+        "exercise_id",
+        "prescribed_sets",
+        "prescribed_reps",
+        "prescribed_duration_minutes",
+        "rest_seconds",
+        "notes",
+        "prescription",
+        "metric_type",
+    )
+    if frozen is None or frozen.plan_materialized is False:
+        return [{key: item.get(key) for key in fields} for item in plan["exercises"]]
+    return [
+        {
+            **{key: getattr(item, key) for key in fields if key != "metric_type"},
+            "metric_type": workout_exercise_metric_type(item),
+        }
+        for item in sorted(frozen.exercises, key=lambda item: (item.sort_order, item.id))
+    ]
 
 
 def workout_cycle_week_type(
@@ -1649,10 +1674,12 @@ def revise_program_week_type(
     db: Session,
     actor: User,
     program_id: int,
-    payload: ProgramWeekTypeRevisionRequest,
+    payload: ProgramWeekTypeRevisionRequest | ProgramCycleImpactPreviewRequest,
     *,
     preview: bool,
 ) -> dict:
+    if not preview and isinstance(payload, ProgramCycleImpactPreviewRequest):
+        raise ProgramError("Для изменения типа недели требуется явная область повторений")
     program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
@@ -1680,30 +1707,38 @@ def revise_program_week_type(
             raise ProgramError("У назначения нет сохранённого цикла")
         cycle, _source, boundary = resolved
         source_week = payload.source_cycle_week
-        if source_week is None or source_week > cycle["length_weeks"]:
+        if source_week is not None and source_week > cycle["length_weeks"]:
             raise ProgramError("Некорректный номер исходной недели цикла")
-        end = min(
-            [program.duration_weeks]
-            + [
-                config["effective_from_week"] - 1
-                for config in _cycle_configurations(db, program, revisions=revisions)
-                if config["effective_from_week"] > first
+        if source_week is None:
+            # Impact-only projection: the edit contract already supports every future week.
+            # Do not truncate at an intervening cycle revision: resolve each week's phase.
+            end = program.duration_weeks
+            total = end - first + 1
+            page = list(range(first + payload.offset, min(first + payload.offset + 50, end + 1)))
+            scope = {"from_week": payload.from_week, "to_week": end}
+        else:
+            end = min(
+                [program.duration_weeks]
+                + [
+                    config["effective_from_week"] - 1
+                    for config in _cycle_configurations(db, program, revisions=revisions)
+                    if config["effective_from_week"] > first
+                ]
+            )
+            if not cycle["repeat"]:
+                end = min(end, boundary + cycle["length_weeks"] - 1)
+            first += (boundary + source_week - 1 - first) % cycle["length_weeks"]
+            total = max(0, (end - first) // cycle["length_weeks"] + 1)
+            page = [
+                first + index * cycle["length_weeks"]
+                for index in range(payload.offset, min(payload.offset + 50, total))
             ]
-        )
-        if not cycle["repeat"]:
-            end = min(end, boundary + cycle["length_weeks"] - 1)
-        first += (boundary + source_week - 1 - first) % cycle["length_weeks"]
-        total = max(0, (end - first) // cycle["length_weeks"] + 1)
-        page = [
-            first + index * cycle["length_weeks"]
-            for index in range(payload.offset, min(payload.offset + 50, total))
-        ]
-        scope = {
-            "from_week": payload.from_week,
-            "to_week": end,
-            "source_cycle_week": source_week,
-            "source_cycle_boundary": boundary,
-        }
+            scope = {
+                "from_week": payload.from_week,
+                "to_week": end,
+                "source_cycle_week": source_week,
+                "source_cycle_boundary": boundary,
+            }
     scope["not_before_date"] = today.isoformat()
     existing = (
         db.query(UserWorkout)
@@ -1773,23 +1808,9 @@ def revise_program_week_type(
                         "needs_refresh": needs_refresh,
                         "week_type": current_type,
                         "day_number": plan["day_number"],
-                        "exercises": [
-                            {
-                                key: exercise.get(key)
-                                for key in (
-                                    "source_template_exercise_id",
-                                    "exercise_id",
-                                    "prescribed_sets",
-                                    "prescribed_reps",
-                                    "prescribed_duration_minutes",
-                                    "rest_seconds",
-                                    "notes",
-                                    "prescription",
-                                    "metric_type",
-                                )
-                            }
-                            for exercise in plan["exercises"]
-                        ],
+                        "exercises": _preview_cycle_exercises(
+                            plan, row if row is not None and not changeable else None
+                        ),
                     }
                 )
             result.append(
