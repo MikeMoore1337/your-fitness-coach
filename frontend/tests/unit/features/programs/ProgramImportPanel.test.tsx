@@ -575,10 +575,15 @@ describe('ProgramImportPanel', () => {
         return new Response(JSON.stringify(next), { status: 200 });
       }
       if (path.endsWith('/confirm')) {
-        return new Response(JSON.stringify({
-          import_id: 'import-1', template: { id: 501 },
-          workouts_created: 0, workouts_updated: 0,
-        }), { status: 200 });
+        return new Response(
+          JSON.stringify({
+            import_id: 'import-1',
+            template: { id: 501 },
+            workouts_created: 0,
+            workouts_updated: 0,
+          }),
+          { status: 200 },
+        );
       }
       return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
     });
@@ -594,9 +599,11 @@ describe('ProgramImportPanel', () => {
       target: { value: '16' },
     });
     expect(screen.getByRole('alert')).toHaveTextContent('включите повтор');
-    fireEvent.click(screen.getByRole('checkbox', {
-      name: 'Повторять исходные недели до конца срока',
-    }));
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Повторять исходные недели до конца срока',
+      }),
+    );
     expect(screen.getByText('Неделя 16 → исходная 1')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Принять текстовые подсказки' }));
     expect(screen.getByRole('combobox', { name: 'Тип исходной недели 2' })).toHaveValue('heavy');
@@ -613,7 +620,9 @@ describe('ProgramImportPanel', () => {
       week_types: ['light', 'heavy', 'medium'],
     });
     fireEvent.click(confirmButton);
-    await waitFor(() => expect(screen.getByText('Программа импортирована в личные шаблоны')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Программа импортирована в личные шаблоны')).toBeInTheDocument(),
+    );
     const confirm = requests.find(([input]) => String(input).endsWith('/confirm'));
     expect(JSON.parse(String(confirm?.[1]?.body))).toMatchObject({ expected_draft_version: 2 });
   });
@@ -629,11 +638,13 @@ describe('ProgramImportPanel', () => {
       repeat: false,
       week_types: [null],
       week_type_candidates: [],
-      rows: [{
-        ...resolvedPreview.rows[0],
-        source_auxiliary: '70/72.5/75',
-        source_cells: { source_auxiliary: 'C3' },
-      }],
+      rows: [
+        {
+          ...resolvedPreview.rows[0],
+          source_auxiliary: '70/72.5/75',
+          source_cells: { source_auxiliary: 'C3' },
+        },
+      ],
     };
     vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
       const path = String(input);
@@ -644,9 +655,19 @@ describe('ProgramImportPanel', () => {
         return new Response(JSON.stringify([]), { status: 200 });
       }
       if (path.endsWith('/resolve')) {
-        return new Response(JSON.stringify({ ...matrix, draft_version: 2, rows: [{
-          ...matrix.rows[0], manual_planned_loads: '70/72.5/75',
-        }] }), { status: 200 });
+        return new Response(
+          JSON.stringify({
+            ...matrix,
+            draft_version: 2,
+            rows: [
+              {
+                ...matrix.rows[0],
+                manual_planned_loads: '70/72.5/75',
+              },
+            ],
+          }),
+          { status: 200 },
+        );
       }
       return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
     });
@@ -663,12 +684,13 @@ describe('ProgramImportPanel', () => {
     expect(screen.getByRole('button', { name: 'Подтвердить и сохранить шаблон' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Применить исправления' }));
     await waitFor(() => {
-      const resolve = vi.mocked(globalThis.fetch).mock.calls.find(([input]) => String(input).endsWith('/resolve'));
+      const resolve = vi
+        .mocked(globalThis.fetch)
+        .mock.calls.find(([input]) => String(input).endsWith('/resolve'));
       expect(JSON.parse(String(resolve?.[1]?.body))).toMatchObject({
         expected_draft_version: 1,
         rows: [{ row_number: 3, planned_loads: '70/72.5/75' }],
       });
     });
   });
-
 });
