@@ -4746,12 +4746,18 @@ def _program_payload_from_draft(draft: _Draft) -> ProgramTemplateCreate:
     if draft.get("draft_version") is not None:
         source_weeks = draft["duration_weeks"]
         selected_types = draft.get("week_types", [None] * source_weeks)
-        cycle = {
-            "schema_version": 1,
-            "length_weeks": source_weeks,
-            "repeat": draft.get("repeat", False),
-            "week_types": selected_types if any(value is not None for value in selected_types) else None,
-        }
+        repeat = draft.get("repeat", False)
+        assigned_weeks = draft.get("assignment_duration_weeks", source_weeks)
+        # Preserve legacy matrix scheduling unless cycle semantics were explicitly chosen.
+        if repeat or any(value is not None for value in selected_types) or assigned_weeks != source_weeks:
+            cycle = {
+                "schema_version": 1,
+                "length_weeks": source_weeks,
+                "repeat": repeat,
+                "week_types": (
+                    selected_types if any(value is not None for value in selected_types) else None
+                ),
+            }
     return ProgramTemplateCreate.model_validate(
         {
             "week_cycle": cycle,
