@@ -2212,12 +2212,26 @@ def _extract_generic_rows(
     return tuple(extracted), duration_weeks, tuple(warnings)
 
 
+def _merged_follower_cells(table: _Table) -> set[tuple[int, int]]:
+    """Ignore copies expanded from a merged header; retain the original anchor."""
+    followers: set[tuple[int, int]] = set()
+    for first_row, first_column, last_row, last_column in table.merged_ranges:
+        for row in range(first_row, last_row + 1):
+            for column in range(first_column, last_column + 1):
+                if (row, column) != (first_row, first_column):
+                    followers.add((row, column))
+    return followers
+
+
 def _week_type_candidates(table: _Table, source_weeks: int) -> list[dict[str, object]]:
     """Suggest week types only from explicit text, never XLSX styles."""
     by_coord = {(cell.row, cell.column): cell for cell in table.grid}
+    followers = _merged_follower_cells(table)
     result: dict[int, dict[str, object]] = {}
     conflicts: set[int] = set()
     for cell in table.grid:
+        if (cell.row, cell.column) in followers:
+            continue
         match = _WEEK_HEADER_PATTERN.fullmatch(cell.value)
         if match is None:
             continue
@@ -2355,8 +2369,11 @@ def _extract_weekly_matrix_rows(
     for cell in table.grid:
         if cell.value:
             cells_by_row[cell.row].append(cell)
+    followers = _merged_follower_cells(table)
     week_labels: list[tuple[int, int, int]] = []
     for cell in table.grid:
+        if (cell.row, cell.column) in followers:
+            continue
         match = _WEEK_HEADER_PATTERN.fullmatch(cell.value)
         if match is not None:
             week_labels.append((cell.row, cell.column, int(match.group(1))))
@@ -2372,13 +2389,16 @@ def _extract_weekly_matrix_rows(
         return None
     blocks: list[tuple[int, int]] = []
     for label_column, week_number in labels_by_week:
-        candidate_start = label_column - 2
-        if candidate_start >= 1 and _DAY_HEADER_PATTERN.fullmatch(
-            cells_by_coordinate.get((header_row, candidate_start), _GridCell(0, 0, "", "")).value
-        ):
-            block_start = candidate_start
-        else:
-            block_start = label_column
+        starts = [
+            cell.column
+            for cell in table.grid
+            if cell.row == header_row
+            and cell.column < label_column
+            and (cell.row, cell.column) not in followers
+            and (match := _DAY_HEADER_PATTERN.fullmatch(cell.value)) is not None
+            and int(match.group(1)) == 1
+        ]
+        block_start = max(starts, default=label_column)
         blocks.append((week_number, block_start))
     block_starts = [start for _, start in blocks]
     if any(right <= left for left, right in pairwise(block_starts)):
