@@ -959,6 +959,7 @@ def test_cycle_preview_keeps_saved_exercises_for_started_and_completed_after_fut
             assert result_set.actual_reps == reps
             assert result_set.is_completed is True
 
+
 @pytest.mark.parametrize(
     ("scope", "affected"),
     [
