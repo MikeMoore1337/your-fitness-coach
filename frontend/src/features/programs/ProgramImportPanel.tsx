@@ -488,7 +488,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
         body: {
           target_program_id: selectedTarget?.program_id ?? null,
           expected_revision_number: selectedTarget?.current_revision_number ?? null,
-          expected_draft_version: preview.draft_version ?? null,
+          expected_draft_version: preview.draft_version ?? undefined,
         },
       });
       setPreview(null);
