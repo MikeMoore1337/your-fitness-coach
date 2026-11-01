@@ -4605,7 +4605,7 @@ def resolve_program_import(
         raise ProgramImportError("import_not_editable", "Этот импорт больше нельзя изменить", 409)
     draft = cast(_Draft, dict(import_row.draft_json))
     current_version = draft.get("draft_version")
-    if current_version is not None and expected_draft_version != current_version:
+    if current_version is not None and expected_draft_version is not None and expected_draft_version != current_version:
         raise ProgramImportError("draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409)
     rows = [cast(_RowDraft, dict(row)) for row in draft["rows"]]
     row_by_number = {row["row_number"]: row for row in rows}
@@ -4987,7 +4987,7 @@ def confirm_program_import(
         )
 
     draft = cast(_Draft, dict(import_row.draft_json))
-    if draft.get("draft_version") is not None and expected_draft_version != draft["draft_version"]:
+    if draft.get("draft_version") is not None and expected_draft_version is not None and expected_draft_version != draft["draft_version"]:
         raise ProgramImportError("draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409)
     rebuilt = _build_draft(
         db,
