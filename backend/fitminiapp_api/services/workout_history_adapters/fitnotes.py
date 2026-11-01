@@ -85,7 +85,9 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
                 )
             elif any(char in "dt" for char in kind):
                 issues.append(
-                    ImportIssue("unsupported_metric", "Kind", "Время или расстояние пока не поддерживаются")
+                    ImportIssue(
+                        "unsupported_metric", "Kind", "Время или расстояние пока не поддерживаются"
+                    )
                 )
         elif named_android:
             if fields["Weight (kgs)"] and fields["Weight (lbs)"]:

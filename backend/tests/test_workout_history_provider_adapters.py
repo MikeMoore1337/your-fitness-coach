@@ -214,11 +214,18 @@ def test_strong_semicolon_export_uses_its_weight_header_and_reports_rest_rows():
     assert rest.provider_fields["Seconds"] == "120"
 
 
-
 def test_fitnotes_android_named_weight_columns_and_conflicts():
     columns = (
-        "Date", "Exercise", "Category", "Weight (kgs)", "Weight (lbs)",
-        "Reps", "Distance", "Distance Unit", "Time", "Comment",
+        "Date",
+        "Exercise",
+        "Category",
+        "Weight (kgs)",
+        "Weight (lbs)",
+        "Reps",
+        "Distance",
+        "Distance Unit",
+        "Time",
+        "Comment",
     )
     source = {
         "Date": "2025-12-22",
@@ -234,45 +241,64 @@ def test_fitnotes_android_named_weight_columns_and_conflicts():
     assert kg.weight_kg == Decimal("100")
     assert lb.weight_kg == Decimal("61.23")
     assert lb.source["weight_unit"] == "lb"
-    (ambiguous,) = fitnotes.parse(
-        csv_file(columns, [source | {"Weight (lbs)": "220"}])
-    )
+    (ambiguous,) = fitnotes.parse(csv_file(columns, [source | {"Weight (lbs)": "220"}]))
     assert any(issue.code == "ambiguous_weight" for issue in ambiguous.issues)
 
 
 def test_fitnotes_ios_distance_kind_cannot_be_silently_dropped():
     columns = (
-        "Date", "Exercise", "Category", "Weight (kg)", "Weight (lbs)",
-        "Reps", "Distance", "Distance Unit", "Time", "Notes", "Kind",
+        "Date",
+        "Exercise",
+        "Category",
+        "Weight (kg)",
+        "Weight (lbs)",
+        "Reps",
+        "Distance",
+        "Distance Unit",
+        "Time",
+        "Notes",
+        "Kind",
     )
     (parsed,) = fitnotes.parse(
-        csv_file(columns, [{
-            "Date": "2025-12-22",
-            "Exercise": "Жим",
-            "Weight (kg)": "45",
-            "Reps": "8",
-            "Kind": "wrd",
-        }])
+        csv_file(
+            columns,
+            [
+                {
+                    "Date": "2025-12-22",
+                    "Exercise": "Жим",
+                    "Weight (kg)": "45",
+                    "Reps": "8",
+                    "Kind": "wrd",
+                }
+            ],
+        )
     )
     assert any(
-        issue.code == "unsupported_metric" and issue.field == "Kind"
-        for issue in parsed.issues
+        issue.code == "unsupported_metric" and issue.field == "Kind" for issue in parsed.issues
     )
     assert parsed.provider_fields["Kind"] == "wrd"
 
 
 def test_strong_modern_workout_number_and_high_precision_weight():
     columns = (
-        "Workout #", "Date", "Workout Name", "Duration (sec)", "Exercise Name",
-        "Set Order", "Weight (kg)", "Reps", "RPE", "Distance (meters)",
-        "Seconds", "Notes", "Workout Notes",
+        "Workout #",
+        "Date",
+        "Workout Name",
+        "Duration (sec)",
+        "Exercise Name",
+        "Set Order",
+        "Weight (kg)",
+        "Reps",
+        "RPE",
+        "Distance (meters)",
+        "Seconds",
+        "Notes",
+        "Workout Notes",
     )
 
     def modern_file(rows):
         output = io.StringIO(newline="")
-        writer = csv.DictWriter(
-            output, fieldnames=columns, delimiter=";", quoting=csv.QUOTE_ALL
-        )
+        writer = csv.DictWriter(output, fieldnames=columns, delimiter=";", quoting=csv.QUOTE_ALL)
         writer.writeheader()
         writer.writerows(rows)
         return output.getvalue().encode()
