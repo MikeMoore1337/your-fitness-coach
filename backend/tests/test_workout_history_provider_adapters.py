@@ -416,7 +416,7 @@ def test_provider_preview_commit_and_overlapping_export(
         assert workout.completed_at_utc is None
         assert workout.scheduled_date == date(2025, 12, 22)
         assert workout.exercises[0].sets[0].actual_weight == Decimal("45.36")
-        assert provenance.source_timezone is None
+        assert provenance.source_timezone == ""
         assert provenance.source_data["sets"][0]["fields"]
         if provider == "fitnotes":
             assert workout.completed_at is None

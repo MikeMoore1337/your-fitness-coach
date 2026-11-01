@@ -60,6 +60,13 @@ def test_online_migration_accepts_declared_additive_expand(tmp_path: Path) -> No
     validate_added_migration(path)
 
 
+def test_provider_provenance_migration_is_additive_and_online_safe() -> None:
+    root = Path(__file__).resolve().parents[1]
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0145_history_provider_provenance.py"
+    )
+
+
 def test_online_migration_accepts_empty_table_and_its_index(tmp_path: Path) -> None:
     path = _migration(
         tmp_path / "0065_empty_table.py",

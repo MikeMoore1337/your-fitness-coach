@@ -767,7 +767,7 @@ def confirm_history_import(
                     ]
                 ),
                 parser_version=draft.parser_version,
-                source_timezone=first["source"]["timezone"] or None,
+                source_timezone=first["source"]["timezone"],
                 source_data={
                     "sets": [
                         {
