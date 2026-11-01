@@ -1119,8 +1119,9 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
-
-test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409', async ({ browser }, info) => {
+test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409', async ({
+  browser,
+}, info) => {
   test.setTimeout(180_000);
   for (const theme of ['light', 'dark'] as const) {
     const page = await browser.newPage({
@@ -1131,11 +1132,13 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
       timezoneId: 'Europe/Moscow',
     });
     const pageErrors: string[] = [];
-    page.on('pageerror', error => pageErrors.push(error.message));
+    page.on('pageerror', (error) => pageErrors.push(error.message));
     try {
       await preparePage(page, theme, 'browser');
-      await page.route('**/api/v1/programs/exercises', route => route.fulfill({ json: [] }));
-      await page.route('**/api/v1/programs/imports/targets', route => route.fulfill({ json: [] }));
+      await page.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: [] }));
+      await page.route('**/api/v1/programs/imports/targets', (route) =>
+        route.fulfill({ json: [] }),
+      );
       const preview = (resolved: boolean) => ({
         id: 'issue-872-matrix',
         status: 'pending',
@@ -1148,36 +1151,49 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
         assignment_duration_weeks: resolved ? 16 : 3,
         repeat: resolved,
         week_types: resolved ? ['light', null, null] : [null, null, null],
-        week_type_candidates: [{
-          week_number: 1, week_type: 'light', source_text: 'Лёгкая', source_sheet: 'План', source_cell: 'C2',
-        }],
+        week_type_candidates: [
+          {
+            week_number: 1,
+            week_type: 'light',
+            source_text: 'Лёгкая',
+            source_sheet: 'План',
+            source_cell: 'C2',
+          },
+        ],
         expires_at: '2030-01-01T00:00:00Z',
         program_title: 'Трёхнедельный цикл',
         goal: 'maintenance',
         level: 'intermediate',
         provenance: { provenance_type: 'CUSTOM' },
-        rows: [{
-          row_number: 3,
-          source_sheet: 'План',
-          source_range: 'A3:C3',
-          source_cells: { week_number: 'C2', day_number: 'A2', exercise_name: 'A3', source_auxiliary: 'C3' },
-          week_number: 1,
-          day_number: 1,
-          day_title: 'День 1',
-          exercise_name: 'Приседания',
-          metric_type: 'strength',
-          prescribed_sets: 3,
-          prescribed_reps: '8',
-          rest_seconds: 90,
-          source_auxiliary: '70/72.5/75',
-          block_is_deload: false,
-          resolved_exercise_id: 11,
-          resolved_exercise_title: 'Приседания',
-          match_status: 'matched',
-          match_type: 'title',
-          candidates: [],
-          issues: [],
-        }],
+        rows: [
+          {
+            row_number: 3,
+            source_sheet: 'План',
+            source_range: 'A3:C3',
+            source_cells: {
+              week_number: 'C2',
+              day_number: 'A2',
+              exercise_name: 'A3',
+              source_auxiliary: 'C3',
+            },
+            week_number: 1,
+            day_number: 1,
+            day_title: 'День 1',
+            exercise_name: 'Приседания',
+            metric_type: 'strength',
+            prescribed_sets: 3,
+            prescribed_reps: '8',
+            rest_seconds: 90,
+            source_auxiliary: '70/72.5/75',
+            block_is_deload: false,
+            resolved_exercise_id: 11,
+            resolved_exercise_title: 'Приседания',
+            match_status: 'matched',
+            match_type: 'title',
+            candidates: [],
+            issues: [],
+          },
+        ],
         issues: [],
         blocks: [],
         coaching_rules: [],
@@ -1190,16 +1206,16 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
           warning_count: 0,
         },
       });
-      await page.route('**/api/v1/programs/imports', route =>
+      await page.route('**/api/v1/programs/imports', (route) =>
         route.fulfill({ json: preview(false) }),
       );
       let resolveBody: Record<string, unknown> | null = null;
-      await page.route('**/api/v1/programs/imports/issue-872-matrix/resolve', async route => {
+      await page.route('**/api/v1/programs/imports/issue-872-matrix/resolve', async (route) => {
         resolveBody = route.request().postDataJSON() as Record<string, unknown>;
         await route.fulfill({ json: preview(true) });
       });
       let confirmCount = 0;
-      await page.route('**/api/v1/programs/imports/issue-872-matrix/confirm', async route => {
+      await page.route('**/api/v1/programs/imports/issue-872-matrix/confirm', async (route) => {
         confirmCount += 1;
         if (confirmCount === 1) {
           await route.fulfill({ status: 409, json: { detail: 'Конфликт версии' } });
@@ -1214,12 +1230,16 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
         mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         buffer: Buffer.from('synthetic-e2e-upload'),
       });
-      await expect(page.getByRole('heading', { name: 'Проверьте план перед сохранением' })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Проверьте план перед сохранением' }),
+      ).toBeVisible();
       const cycle = page.locator('.program-import-cycle');
       await expect(cycle).toContainText('В файле распознано 3');
       await expect(cycle).toContainText('C2');
       await page.getByLabel('Всего недель программы').fill('16');
-      await page.getByRole('checkbox', { name: 'Повторять исходные недели до конца срока' }).check();
+      await page
+        .getByRole('checkbox', { name: 'Повторять исходные недели до конца срока' })
+        .check();
       await page.getByRole('button', { name: 'Принять текстовые подсказки' }).click();
       await expect(page.locator('.program-import-week-map')).toContainText('Неделя 16');
       await expect(page.locator('.program-import-week-map')).toContainText('исходная 1');
