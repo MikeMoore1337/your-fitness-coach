@@ -143,22 +143,24 @@ const sourceLabels: Record<string, string> = {
   set_type: 'Тип подхода',
   Kind: 'Тип результата',
   'Distance (meters)': 'Расстояние в метрах',
+  'Weight (kg)': 'Исходный вес, кг',
 };
 
 function sourceDetails(row: WorkoutHistoryImportRow) {
   return Object.entries(row.provider_fields ?? {}).filter(
     ([key, value]) =>
       value &&
-      [
-        'description',
-        'exercise_notes',
-        'Workout Notes',
-        'Notes',
-        'Comment',
-        'Category',
-        'Duration',
-        'Duration (sec)',
-      ].includes(key),
+      ((key === 'Weight (kg)' && value !== row.source.weight) ||
+        [
+          'description',
+          'exercise_notes',
+          'Workout Notes',
+          'Notes',
+          'Comment',
+          'Category',
+          'Duration',
+          'Duration (sec)',
+        ].includes(key)),
   );
 }
 

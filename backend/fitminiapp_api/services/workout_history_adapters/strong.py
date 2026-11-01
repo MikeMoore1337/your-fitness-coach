@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from fitminiapp_api.services.workout_history_adapters.common import (
     check_columns,
@@ -50,12 +51,17 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
     groups: dict[str, tuple[str, int, str]] = {}
     counters: defaultdict[tuple[str, str], int] = defaultdict(int)
     seen_sets: set[tuple[str, str, str]] = set()
-    workout_numbers: dict[str, str] = {}
+    workout_metadata: dict[str, tuple[str, str]] = {}
     rows = []
     for line, fields in values:
         check_deadline(limit)
         start = timestamp(fields["Date"], ("%Y-%m-%d %H:%M",))
-        workout_ref = ref("strong", fields["Date"], fields["Workout Name"])
+        workout_number = fields["Workout #"] if new_format else ""
+        workout_ref = (
+            ref("strong", workout_number)
+            if new_format and workout_number
+            else ref("strong", fields["Date"], fields["Workout Name"])
+        )
         name = fields["Exercise Name"]
         previous_name, occurrence, exercise_ref = groups.get(workout_ref, ("", 0, ""))
         if name != previous_name:
@@ -71,16 +77,21 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
                 ImportIssue("invalid_time", "Date", "Дата или время тренировки не распознаны")
             )
         if new_format:
-            number = fields["Workout #"]
-            if workout_ref in workout_numbers and workout_numbers[workout_ref] != number:
+            if not workout_number.isdigit() or int(workout_number) < 1:
+                issues.append(
+                    ImportIssue("invalid_source_id", "Workout #", "Номер тренировки не распознан")
+                )
+            previous = workout_metadata.get(workout_ref)
+            identity = (fields["Date"], fields["Workout Name"])
+            if previous is not None and previous != identity:
                 issues.append(
                     ImportIssue(
                         "workout_conflict",
                         "Workout #",
-                        "Тренировки с одинаковым временем нельзя различить",
+                        "Один номер тренировки содержит разные даты или названия",
                     )
                 )
-            workout_numbers[workout_ref] = number
+            workout_metadata[workout_ref] = identity
         if (not order.isdigit() and order not in kinds) or (order.isdigit() and int(order) < 1):
             issues.append(
                 ImportIssue(
@@ -100,6 +111,16 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
             zero_is_empty=True,
         )
         weight = fields["Weight (kg)" if new_format else "Weight"]
+        normalized_weight = weight
+        if new_format and weight:
+            try:
+                precise = Decimal(weight)
+                if precise.is_finite():
+                    normalized_weight = str(
+                        precise.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    )
+            except InvalidOperation:
+                pass  # The common parser reports invalid/out-of-range numbers.
         source = {
             "workout_ref": workout_ref,
             "started_at": start.isoformat() if start else "",
@@ -112,7 +133,7 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
             "set_status": "completed",
             "set_kind": kinds.get(order, "working" if order.isdigit() else ""),
             "reps": fields["Reps"],
-            "weight": weight,
+            "weight": normalized_weight,
             "weight_unit": ("kg" if new_format else unit(weight_unit)) if weight else "",
             "rpe": fields["RPE"],
             "reached_failure": "true" if order == "f" else "",

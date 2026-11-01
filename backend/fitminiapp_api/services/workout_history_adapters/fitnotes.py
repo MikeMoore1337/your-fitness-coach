@@ -35,6 +35,10 @@ _IOS_COLUMNS = (_COLUMNS - {"Weight", "Weight Unit", "Comment"}) | {
     "Notes",
     "Kind",
 }
+_ANDROID_NAMED_COLUMNS = (_COLUMNS - {"Weight", "Weight Unit"}) | {
+    "Weight (kgs)",
+    "Weight (lbs)",
+}
 
 
 def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
@@ -42,7 +46,8 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
     limit = deadline()
     header, values = read_table(content, ",", limit)
     ios = "Kind" in header
-    columns = _IOS_COLUMNS if ios else _COLUMNS
+    named_android = not ios and "Weight (kgs)" in header
+    columns = _IOS_COLUMNS if ios else (_ANDROID_NAMED_COLUMNS if named_android else _COLUMNS)
     check_columns(header, columns, columns)
     groups: dict[str, tuple[str, int, str]] = {}
     counters: defaultdict[tuple[str, str], int] = defaultdict(int)
@@ -73,10 +78,22 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
                 )
             weight = fields["Weight (kg)"] or fields["Weight (lbs)"]
             source_unit = "kg" if fields["Weight (kg)"] else "lb"
-            if fields["Kind"] and any(char not in "wrdt" for char in fields["Kind"].casefold()):
+            kind = fields["Kind"].casefold()
+            if kind and any(char not in "wrdt" for char in kind):
                 issues.append(
                     ImportIssue("unsupported_metric", "Kind", "Тип результата не поддерживается")
                 )
+            elif any(char in "dt" for char in kind):
+                issues.append(
+                    ImportIssue("unsupported_metric", "Kind", "Время или расстояние пока не поддерживаются")
+                )
+        elif named_android:
+            if fields["Weight (kgs)"] and fields["Weight (lbs)"]:
+                issues.append(
+                    ImportIssue("ambiguous_weight", "Weight (kgs)", "Указан вес в двух единицах")
+                )
+            weight = fields["Weight (kgs)"] or fields["Weight (lbs)"]
+            source_unit = "kg" if fields["Weight (kgs)"] else "lb"
         else:
             weight = fields["Weight"]
             source_unit = unit(fields["Weight Unit"])
