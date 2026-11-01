@@ -3581,6 +3581,9 @@ def _build_draft(
             )
         _resolve_row(row, row_issues, by_id=by_id, by_key=by_key)
         if layout_version == PROGRAM_IMPORT_MATRIX_LAYOUT:
+            # Matrix plans are derived exclusively from the reviewed source/set fields.
+            # Discard the previous derived plan before a versioned resolve rebuild.
+            row["prescription"] = None
             _matrix_plan_from_row(row, row_issues)
         _normalize_coaching_rule(row, row_issues)
         if row.get("metric_type") != "cardio" and (
