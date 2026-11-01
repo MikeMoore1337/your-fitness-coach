@@ -958,3 +958,127 @@ def test_cycle_preview_keeps_saved_exercises_for_started_and_completed_after_fut
             result_set = db.get(UserWorkoutSet, set_id)
             assert result_set.actual_reps == reps
             assert result_set.is_completed is True
+
+@pytest.mark.parametrize(
+    ("scope", "affected"),
+    [
+        ({"occurrence_weeks": [8]}, {8}),
+        ({"from_week": 8, "source_cycle_week": 2}, {8, 11, 14}),
+    ],
+)
+def test_first_five_completed_weeks_keep_facts_after_week_eight_edit(
+    client, monkeypatch, scope, affected
+):
+    headers, program_id, slot, exercise_id = assigned_cycle(client, k=3, n=16)
+    for week in range(1, 6):
+        current_day = TODAY + timedelta(weeks=week - 1)
+        monkeypatch.setattr(
+            routes, "recovery_today_for_user", lambda _user, day=current_day: day
+        )
+        workout = client.get("/api/v1/workouts/today", headers=headers)
+        assert workout.status_code == 200, workout.text
+        started = client.post(
+            f"/api/v1/workouts/{workout.json()['id']}/start", headers=headers
+        )
+        assert started.status_code == 200, started.text
+        for item in started.json()["exercises"][0]["sets"]:
+            recorded = client.patch(
+                f"/api/v1/workouts/sets/{item['id']}",
+                headers=headers,
+                json={
+                    "actual_reps": 8,
+                    "actual_weight": 40,
+                    "rir": "2",
+                    "is_completed": True,
+                },
+            )
+            assert recorded.status_code == 200, recorded.text
+        finished = client.post(
+            f"/api/v1/workouts/{workout.json()['id']}/finish", headers=headers
+        )
+        assert finished.status_code == 200, finished.text
+
+    def completed_facts():
+        with get_session_context() as db:
+            workouts = (
+                db.query(UserWorkout)
+                .filter_by(user_program_id=program_id, status="completed")
+                .order_by(UserWorkout.week_number)
+                .all()
+            )
+            return [
+                (
+                    workout.id,
+                    workout.week_number,
+                    workout.completed_at,
+                    tuple(
+                        (
+                            item.id,
+                            item.actual_reps,
+                            item.actual_weight,
+                            item.rir,
+                            item.is_completed,
+                            item.version,
+                        )
+                        for exercise in workout.exercises
+                        for item in exercise.sets
+                    ),
+                )
+                for workout in workouts
+            ]
+
+    before = completed_facts()
+    assert [item[1] for item in before] == [1, 2, 3, 4, 5]
+    assert sum(len(item[3]) for item in before) == 10
+    assert sum(set_data[1] * set_data[2] for row in before for set_data in row[3]) == 3200
+
+    request = {
+        "expected_revision_number": revision(program_id),
+        "effective_scope": "future_program",
+        "day_number": 1,
+        "target_template_exercise_id": slot,
+        "exercise_id": exercise_id,
+        "prescribed_sets": 3,
+        "prescribed_reps": "12",
+        "rest_seconds": 90,
+        **scope,
+    }
+    endpoint = f"/api/v1/programs/assigned/{program_id}/exercises"
+    applied = client.post(endpoint, headers=headers, json=request)
+    assert applied.status_code == 200, applied.text
+    stale = client.post(endpoint, headers=headers, json=request)
+    assert stale.status_code == 409, stale.text
+    assert completed_facts() == before
+
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        for week in (2, 5, 8, 11, 14):
+            plan = program_versioning._cycle_workout_plans(db, program, week)
+            assert len(plan) == 1
+            assert plan[0]["exercises"][0]["prescribed_reps"] == (
+                "12" if week in affected else "7"
+            )
+        assert db.query(UserWorkout).filter_by(
+            user_program_id=program_id, status="completed"
+        ).count() == 5
+    preview = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/week-type/preview",
+        headers=headers,
+        json={
+            "expected_revision_number": applied.json()["current_revision_number"],
+            "occurrence_weeks": [2, 5, 8, 11, 14],
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    projected = {
+        row["week_number"]: row["workouts"][0] for row in preview.json()["weeks"]
+    }
+    for week in (2, 5):
+        assert projected[week]["status"] == "completed"
+        assert projected[week]["changeable"] is False
+        assert projected[week]["exercises"][0]["prescribed_reps"] == "7"
+    for week in (8, 11, 14):
+        assert projected[week]["exercises"][0]["prescribed_reps"] == (
+            "12" if week in affected else "7"
+        )
+    assert completed_facts() == before

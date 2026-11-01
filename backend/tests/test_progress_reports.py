@@ -63,6 +63,7 @@ def _seed_report_data(
     def fact_date(days_ago: int) -> date:
         candidate = today - timedelta(days=days_ago)
         return max(candidate, earliest_fact_date) if earliest_fact_date else candidate
+
     with get_session_context() as db:
         user = db.get(User, user_id)
         assert user is not None and user.profile is not None
