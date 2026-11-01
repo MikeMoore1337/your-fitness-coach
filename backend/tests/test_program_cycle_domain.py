@@ -973,14 +973,10 @@ def test_first_five_completed_weeks_keep_facts_after_week_eight_edit(
     headers, program_id, slot, exercise_id = assigned_cycle(client, k=3, n=16)
     for week in range(1, 6):
         current_day = TODAY + timedelta(weeks=week - 1)
-        monkeypatch.setattr(
-            routes, "recovery_today_for_user", lambda _user, day=current_day: day
-        )
+        monkeypatch.setattr(routes, "recovery_today_for_user", lambda _user, day=current_day: day)
         workout = client.get("/api/v1/workouts/today", headers=headers)
         assert workout.status_code == 200, workout.text
-        started = client.post(
-            f"/api/v1/workouts/{workout.json()['id']}/start", headers=headers
-        )
+        started = client.post(f"/api/v1/workouts/{workout.json()['id']}/start", headers=headers)
         assert started.status_code == 200, started.text
         for item in started.json()["exercises"][0]["sets"]:
             recorded = client.patch(
@@ -994,9 +990,7 @@ def test_first_five_completed_weeks_keep_facts_after_week_eight_edit(
                 },
             )
             assert recorded.status_code == 200, recorded.text
-        finished = client.post(
-            f"/api/v1/workouts/{workout.json()['id']}/finish", headers=headers
-        )
+        finished = client.post(f"/api/v1/workouts/{workout.json()['id']}/finish", headers=headers)
         assert finished.status_code == 200, finished.text
 
     def completed_facts():
@@ -1056,12 +1050,11 @@ def test_first_five_completed_weeks_keep_facts_after_week_eight_edit(
         for week in (2, 5, 8, 11, 14):
             plan = program_versioning._cycle_workout_plans(db, program, week)
             assert len(plan) == 1
-            assert plan[0]["exercises"][0]["prescribed_reps"] == (
-                "12" if week in affected else "7"
-            )
-        assert db.query(UserWorkout).filter_by(
-            user_program_id=program_id, status="completed"
-        ).count() == 5
+            assert plan[0]["exercises"][0]["prescribed_reps"] == ("12" if week in affected else "7")
+        assert (
+            db.query(UserWorkout).filter_by(user_program_id=program_id, status="completed").count()
+            == 5
+        )
     preview = client.post(
         f"/api/v1/programs/assigned/{program_id}/cycle/week-type/preview",
         headers=headers,
@@ -1071,9 +1064,7 @@ def test_first_five_completed_weeks_keep_facts_after_week_eight_edit(
         },
     )
     assert preview.status_code == 200, preview.text
-    projected = {
-        row["week_number"]: row["workouts"][0] for row in preview.json()["weeks"]
-    }
+    projected = {row["week_number"]: row["workouts"][0] for row in preview.json()["weeks"]}
     for week in (2, 5):
         assert projected[week]["status"] == "completed"
         assert projected[week]["changeable"] is False
