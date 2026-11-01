@@ -16,6 +16,7 @@ import {
   type PlatformApiOptions,
 } from './fixtures/platform-api';
 import { expectUiAuditClean } from './fixtures/ui-audit';
+import { installIssue834ImportApi } from './fixtures/issue-834-import';
 
 const FIXED_DATE = '2026-09-06';
 const MOBILE_VIEWPORTS = [
@@ -1062,4 +1063,32 @@ for (const theme of ['light', 'dark'] as const) {
       expect(lastInteractiveGeometry.hit).toBe(true);
     });
   }
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  test('@critical #834 provider import preview on mobile in ' + theme, async ({ page }, info) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await preparePage(page, theme, 'browser', { progressState: 'populated' });
+    const mock = await installIssue834ImportApi(page, 'fitnotes');
+    await page.goto('/app?section=progress&progress_view=history');
+    await page.getByRole('button', { name: 'Импортировать историю' }).click();
+    await page.getByLabel('Источник').selectOption('fitnotes');
+    await page.getByLabel('Выбрать CSV-файл').setInputFiles({
+      name: 'synthetic-fitnotes.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Date,Exercise\n2025-10-12,Example', 'utf8'),
+    });
+    await expect(page.getByText(/В FitNotes нет времени и типа подхода/)).toBeVisible();
+    await expect(page.getByLabel('Тип подхода, если знаете')).toHaveValue('');
+    await expectNoHorizontalOverflow(page);
+    expect(mock.uploads()).toBe(1);
+    await page.screenshot({
+      path: info.outputPath('issue-834-' + theme + '-fitnotes-mobile.png'),
+      fullPage: true,
+      animations: 'disabled',
+      caret: 'hide',
+    });
+    expect(errors).toEqual([]);
+  });
 }
