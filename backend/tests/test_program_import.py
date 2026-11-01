@@ -2084,7 +2084,7 @@ def test_xlsx_matrix_ambiguous_rep_count_and_load_list_require_manual_resolution
         headers=headers,
         json={
             "expected_draft_version": bad_draft["draft_version"],
-            "rows": [{"row_number": bad_row["row_number"], "planned_loads": "70/80/90"}],
+            "rows": [{"row_number": bad_row["row_number"], "planned_loads": "70x80x90"}],
         },
     )
     assert fixed.status_code == 200, fixed.text
