@@ -4594,21 +4594,38 @@ def resolve_program_import(
     goal: str | None,
     level: str | None,
     provenance: dict[str, object] | None,
-    row_resolutions: list[tuple[int, int | None]],
+    row_resolutions: list[tuple[int, int | None, int | None, str | None, str | None]],
+    expected_draft_version: int | None = None,
+    assignment_duration_weeks: int | None = None,
+    repeat: bool | None = None,
+    week_types: list[str | None] | None = None,
 ) -> ProgramImport:
     import_row = get_program_import(db, current_user, import_id, for_update=True)
     if import_row.status != "pending":
         raise ProgramImportError("import_not_editable", "Этот импорт больше нельзя изменить", 409)
     draft = cast(_Draft, dict(import_row.draft_json))
+    current_version = draft.get("draft_version")
+    if current_version is not None and expected_draft_version != current_version:
+        raise ProgramImportError("draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409)
     rows = [cast(_RowDraft, dict(row)) for row in draft["rows"]]
     row_by_number = {row["row_number"]: row for row in rows}
-    for row_number, exercise_id in row_resolutions:
+    for row_number, exercise_id, sets, reps, loads in row_resolutions:
         row = row_by_number.get(row_number)
         if row is None:
             raise ProgramImportError("row_not_found", "Строка импорта не найдена")
-        row["manual_exercise_id"] = exercise_id
+        if exercise_id is not None:
+            row["manual_exercise_id"] = exercise_id
+        if sets is not None:
+            row["prescribed_sets"] = sets
+            row["prescription"] = None
+        if reps is not None:
+            row["prescribed_reps"] = reps
+            row["prescription"] = None
+        if loads is not None:
+            row["manual_planned_loads"] = loads or None
+            row["prescription"] = None
         resolution_key = row.get("resolution_key")
-        if resolution_key:
+        if resolution_key and exercise_id is not None:
             for related_row in rows:
                 if related_row.get("resolution_key") == resolution_key:
                     related_row["manual_exercise_id"] = exercise_id
@@ -4644,6 +4661,30 @@ def resolve_program_import(
         ),
         ai_metadata=draft.get("ai"),
     )
+    if current_version is not None:
+        source_weeks = rebuilt["duration_weeks"]
+        new_types = (
+            week_types if week_types is not None
+            else draft.get("week_types", [None] * source_weeks)
+        )
+        if len(new_types) != source_weeks or any(
+            value not in {None, "light", "medium", "heavy"} for value in new_types
+        ):
+            raise ProgramImportError("week_types_length", "Укажите корректные типы недель", 422)
+        new_repeat = repeat if repeat is not None else draft.get("repeat", False)
+        new_duration = (
+            assignment_duration_weeks if assignment_duration_weeks is not None
+            else draft.get("assignment_duration_weeks", source_weeks)
+        )
+        if new_duration < 1 or (new_duration > source_weeks and not new_repeat):
+            raise ProgramImportError("cycle_duration", "Для срока больше K включите повтор цикла", 422)
+        if new_duration > settings.program_import_max_cells:
+            raise ProgramImportError("cycle_duration", "Срок программы превышает безопасный предел", 422)
+        rebuilt["draft_version"] = current_version + 1
+        rebuilt["assignment_duration_weeks"] = new_duration
+        rebuilt["repeat"] = new_repeat
+        rebuilt["week_types"] = new_types
+        rebuilt["week_type_candidates"] = draft.get("week_type_candidates", [])
     import_row.draft_json = dict(rebuilt)
     import_row.blocking_issue_count = rebuilt["summary"]["blocking_issue_count"]
     import_row.warning_count = rebuilt["summary"]["warning_count"]
@@ -4701,8 +4742,20 @@ def _program_payload_from_draft(draft: _Draft) -> ProgramTemplateCreate:
     level = _optional_text(draft["level"])
     if title is None or goal is None or level is None:
         raise ProgramImportError("domain_invalid", "Заполните название, цель и уровень программы")
+    cycle = None
+    if draft.get("draft_version") is not None:
+        source_weeks = draft["duration_weeks"]
+        selected_types = draft.get("week_types", [None] * source_weeks)
+        cycle = {
+            "schema_version": 1,
+            "length_weeks": source_weeks,
+            "repeat": draft.get("repeat", False),
+            "week_types": selected_types if any(value is not None for value in selected_types) else None,
+        }
     return ProgramTemplateCreate.model_validate(
         {
+            "week_cycle": cycle,
+            "duration_weeks": draft.get("assignment_duration_weeks", draft["duration_weeks"]),
             "title": title,
             "goal": goal,
             "level": level,
@@ -4825,7 +4878,7 @@ def _create_weekly_prescriptions(
                         prescription=structured_plan.model_dump(mode="json"),
                     )
                 )
-    template.default_duration_weeks = duration_weeks
+    template.default_duration_weeks = draft.get("assignment_duration_weeks", duration_weeks)
     db.flush()
 
 
@@ -4886,6 +4939,7 @@ def confirm_program_import(
     *,
     target_program_id: int | None = None,
     expected_revision_number: int | None = None,
+    expected_draft_version: int | None = None,
 ) -> tuple[ProgramImport, ProgramTemplate, UserProgram | None, int, int | None]:
     import_row = get_program_import(db, current_user, import_id, for_update=True)
     if import_row.status == "confirmed" and import_row.confirmed_template_id is not None:
@@ -4933,6 +4987,8 @@ def confirm_program_import(
         )
 
     draft = cast(_Draft, dict(import_row.draft_json))
+    if draft.get("draft_version") is not None and expected_draft_version != draft["draft_version"]:
+        raise ProgramImportError("draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409)
     rebuilt = _build_draft(
         db,
         current_user,
@@ -4953,6 +5009,9 @@ def confirm_program_import(
         ),
         ai_metadata=draft.get("ai"),
     )
+    for field in ("draft_version", "assignment_duration_weeks", "repeat", "week_types", "week_type_candidates"):
+        if field in draft:
+            rebuilt[field] = draft[field]
     import_row.draft_json = dict(rebuilt)
     import_row.blocking_issue_count = rebuilt["summary"]["blocking_issue_count"]
     import_row.warning_count = rebuilt["summary"]["warning_count"]
@@ -4988,7 +5047,7 @@ def confirm_program_import(
         )
         template.provenance_type = provenance_type
         template.provenance = provenance
-        template.program_metadata = program_metadata
+        template.program_metadata = {**(template.program_metadata or {}), **program_metadata}
         _create_weekly_prescriptions(db, template, rebuilt, template_owner)
         target_program = None
         workouts_updated = 0
