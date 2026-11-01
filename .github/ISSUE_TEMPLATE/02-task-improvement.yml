@@ -46,4 +46,3 @@ body:
       placeholder: "Тесты, измерения, скриншоты, безопасность."
     validations:
       required: false
-

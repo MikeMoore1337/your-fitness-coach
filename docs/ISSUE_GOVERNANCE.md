@@ -209,7 +209,7 @@ gh project field-list 1 --owner MikeMoore1337 --format json
 
 ```bash
 # Полное покрытие открытых Issues и PR, допустимые поля и дубликаты:
-python scripts/issue_project_fields.py --schema delivery
+python scripts/issue_project_fields.py --schema delivery --strict
 
 # Проверка конкретной Issue после создания/триажа:
 python scripts/issue_project_fields.py --schema delivery --issue 123 --strict
@@ -235,4 +235,3 @@ python scripts/issue_project_fields.py --schema legacy
 - [Штатные автоматизации](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-built-in-automations)
 - [Фильтрация представлений](https://docs.github.com/en/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/filtering-projects)
 - [Связь Pull Request и Issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue)
-

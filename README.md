@@ -334,4 +334,3 @@ bootstrap инфраструктуры и опасные data operations ост�
 - Repository не хранит production secrets, off-host backups, provider consoles, alert destinations
   или restricted deletion ledger.
 - Owner-only roadmap, findings и task-файлы не публикуются в Git и не являются частью runtime.
-
