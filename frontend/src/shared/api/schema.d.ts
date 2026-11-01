@@ -15503,6 +15503,8 @@ export interface components {
         };
         /** ProgramImportConfirmRequest */
         ProgramImportConfirmRequest: {
+            /** Expected Draft Version */
+            expected_draft_version?: number | null;
             /** Target Program Id */
             target_program_id?: number | null;
             /** Expected Revision Number */
@@ -15576,6 +15578,14 @@ export interface components {
         };
         /** ProgramImportResolveRequest */
         ProgramImportResolveRequest: {
+            /** Expected Draft Version */
+            expected_draft_version?: number | null;
+            /** Assignment Duration Weeks */
+            assignment_duration_weeks?: number | null;
+            /** Repeat */
+            repeat?: boolean | null;
+            /** Week Types */
+            week_types?: (("light" | "medium" | "heavy") | null)[] | null;
             /** Title */
             title?: string | null;
             /** Goal */
@@ -15608,6 +15618,16 @@ export interface components {
             layout_version?: string | null;
             /** Duration Weeks */
             duration_weeks?: number | null;
+            /** Draft Version */
+            draft_version?: number | null;
+            /** Assignment Duration Weeks */
+            assignment_duration_weeks?: number | null;
+            /** Repeat */
+            repeat?: boolean | null;
+            /** Week Types */
+            week_types?: (("light" | "medium" | "heavy") | null)[] | null;
+            /** Week Type Candidates */
+            week_type_candidates?: components["schemas"]["ProgramImportWeekTypeCandidate"][];
             /**
              * Expires At
              * Format: date-time
@@ -15669,6 +15689,8 @@ export interface components {
             notes?: string | null;
             /** Source Auxiliary */
             source_auxiliary?: string | null;
+            /** Manual Planned Loads */
+            manual_planned_loads?: string | null;
             /** Superset Group */
             superset_group?: number | null;
             /** Superset Order */
@@ -15710,6 +15732,12 @@ export interface components {
             row_number: number;
             /** Exercise Id */
             exercise_id?: number | null;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+            /** Planned Loads */
+            planned_loads?: string | null;
         };
         /** ProgramImportSummary */
         ProgramImportSummary: {
@@ -15745,6 +15773,22 @@ export interface components {
             status: "scheduled" | "active";
             /** Day Numbers */
             day_numbers: number[];
+        };
+        /** ProgramImportWeekTypeCandidate */
+        ProgramImportWeekTypeCandidate: {
+            /** Week Number */
+            week_number: number;
+            /**
+             * Week Type
+             * @enum {string}
+             */
+            week_type: "light" | "medium" | "heavy";
+            /** Source Text */
+            source_text: string;
+            /** Source Sheet */
+            source_sheet?: string | null;
+            /** Source Cell */
+            source_cell: string;
         };
         /** ProgramLifecycleActionRequest */
         ProgramLifecycleActionRequest: {
