@@ -685,7 +685,10 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
                         )}
                         {sourceDetails(row).length > 0 && (
                           <details>
-                            <summary>Другие данные из файла</summary>
+                            <summary className="yfc-disclosure-summary">
+                              Другие данные из файла
+                              <Icon name="chevron-down" size={16} />
+                            </summary>
                             <p>Сохраним их вместе с источником; в показатели они не попадут.</p>
                             {sourceDetails(row).map(([key, value]) => (
                               <p key={key}>
