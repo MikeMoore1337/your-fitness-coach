@@ -1095,7 +1095,10 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                       )}
                       {isMatrix && row.metric_type !== 'cardio' && (
                         <details className="program-import-edit">
-                          <summary>Исправить назначение</summary>
+                          <summary className="yfc-disclosure-summary">
+                            Исправить назначение
+                            <DisclosureIcon />
+                          </summary>
                           <label>
                             Подходы
                             <Input
