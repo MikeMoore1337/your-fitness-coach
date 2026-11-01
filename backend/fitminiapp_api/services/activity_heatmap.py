@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.timezone import get_timezone, get_user_timezone_name
@@ -40,9 +40,21 @@ def build_activity_heatmap(
         db.query(func.count(UserWorkout.id))
         .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
-        .filter(*owned, UserWorkout.completed_at_utc.is_(None))
+        .filter(
+            *owned,
+            UserWorkout.completed_at_utc.is_(None),
+            UserWorkout.history_imported.is_not(True),
+        )
         .scalar()
         or 0
+    )
+    in_period = or_(
+        and_(UserWorkout.completed_at_utc >= start_utc, UserWorkout.completed_at_utc < end_utc),
+        and_(
+            UserWorkout.history_imported.is_(True),
+            UserWorkout.completed_at_utc.is_(None),
+            UserWorkout.scheduled_date.between(start, min(end, today)),
+        ),
     )
     sets = (
         db.query(
@@ -55,8 +67,7 @@ def build_activity_heatmap(
         .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .filter(
             *owned,
-            UserWorkout.completed_at_utc >= start_utc,
-            UserWorkout.completed_at_utc < end_utc,
+            in_period,
             UserWorkoutSet.is_completed.is_(True),
             working_volume_set_filter(),
         )
@@ -64,20 +75,25 @@ def build_activity_heatmap(
         .subquery()
     )
     rows = (
-        db.query(UserWorkout.completed_at_utc, func.coalesce(sets.c.sets, 0))
+        db.query(
+            UserWorkout.completed_at_utc, UserWorkout.scheduled_date, func.coalesce(sets.c.sets, 0)
+        )
         .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .outerjoin(sets, sets.c.workout_id == UserWorkout.id)
         .filter(
             *owned,
-            UserWorkout.completed_at_utc >= start_utc,
-            UserWorkout.completed_at_utc < end_utc,
+            in_period,
         )
         .all()
     )
     totals: defaultdict[date, list[int]] = defaultdict(lambda: [0, 0])
-    for completed_at, working_sets in rows:
-        day = completed_at.replace(tzinfo=UTC).astimezone(timezone).date()
+    for completed_at, scheduled_date, working_sets in rows:
+        day = (
+            completed_at.replace(tzinfo=UTC).astimezone(timezone).date()
+            if completed_at
+            else scheduled_date
+        )
         totals[day][0] += 1
         totals[day][1] += working_sets
     days = []

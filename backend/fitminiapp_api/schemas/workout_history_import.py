@@ -20,6 +20,7 @@ class HistoryImportExerciseCandidate(BaseModel):
 
 class HistoryImportSource(BaseModel):
     workout_ref: str
+    started_at: str | None = None
     completed_at: str
     timezone: str
     workout_title: str
@@ -69,6 +70,8 @@ class HistoryImportSides(BaseModel):
 class HistoryImportRow(BaseModel):
     line: int
     source: HistoryImportSource
+    provider_fields: dict[str, str] | None = None
+    manual_set_kind: Literal["warmup", "working", "drop"] | None = None
     completed_at_utc: str | None
     completed_on: str | None
     set_number: int | None
@@ -153,6 +156,9 @@ class HistoryImportResolve(BaseModel):
 
     version: int = Field(ge=1)
     exercise_choices: dict[int, int] = Field(default_factory=dict, max_length=5000)
+    set_kind_choices: dict[int, Literal["warmup", "working", "drop"] | None] = Field(
+        default_factory=dict, max_length=5000
+    )
     excluded_lines: list[int] = Field(default_factory=list, max_length=5000)
     duplicate_choices: dict[str, Literal["keep", "skip"]] = Field(
         default_factory=dict, max_length=200

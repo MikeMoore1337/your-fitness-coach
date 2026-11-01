@@ -25,6 +25,7 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     "<input aria-label={status === 'pending' ? 'Review' : 'Готово'} />",
     "<span>{'pending' === status ? 'Готово' : 'Review'}</span>",
     '<span>RPE review</span>',
+    '<span>Hevy review</span>',
   ])('rejects new English user-facing copy: %s', (source) => {
     const result = runGuard(source);
     expect(result.status).toBe(1);
@@ -43,6 +44,7 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     "<span>{status !== 'confirmed' && <b>Черновик</b>}</span>",
     "<span>{'pending' === status ? 'Ожидает' : 'Готово'}</span>",
     '<p>RPE: 8</p>',
+    '<span>Импорт из Hevy, Strong и FitNotes</span>',
   ])('allows Russian copy, identifiers, and documented exceptions: %s', (source) => {
     const result = runGuard(source);
     expect(result.status).toBe(0);
