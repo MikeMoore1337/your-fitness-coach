@@ -56,9 +56,11 @@ class Harness2YfcContract(unittest.TestCase):
             "HARNESS2_TOOLKIT_REVISION_TOO_OLD_OR_SHALLOW",
             "HARNESS2_TOOLKIT_UNTRACKED_INTEGRATION",
             "HARNESS2_TOOLKIT_MODIFIED",
+            "HARNESS2_TOOLKIT_SOURCE_REVISION_MISMATCH",
             "HARNESS2_UPSTREAM_PIN_CHANGED",
             "merge-base --is-ancestor",
             "diff --quiet HEAD -- @relativeFiles",
+            "diff --quiet $minimumToolkitCommit HEAD -- @relativeFiles",
         ):
             self.assertIn(required, source)
 
@@ -96,7 +98,11 @@ function global:git.exe {
     } elseif ($args[2] -eq 'merge-base') {
         $global:LASTEXITCODE = [int]$env:YFC_TEST_TOO_OLD
     } elseif ($args[2] -eq 'diff') {
-        $global:LASTEXITCODE = [int]$env:YFC_TEST_DIRTY
+        if ($args[5] -eq 'HEAD') {
+            $global:LASTEXITCODE = [int]$env:YFC_TEST_COMMITTED_DRIFT
+        } else {
+            $global:LASTEXITCODE = [int]$env:YFC_TEST_DIRTY
+        }
     } else {
         throw 'UNEXPECTED_GIT_COMMAND'
     }
@@ -116,6 +122,7 @@ try {
                 "YFC_TEST_ORIGIN": "https://github.com/MikeMoore1337/ai-development-toolkit.git",
                 "YFC_TEST_TOO_OLD": "0",
                 "YFC_TEST_DIRTY": "0",
+                "YFC_TEST_COMMITTED_DRIFT": "0",
                 "YFC_TEST_UNTRACKED": "0",
                 "YFC_TEST_DISTRIBUTION": "Ubuntu-24.04",
                 "YFC_TEST_UPSTREAM_REFUSAL": "0",
@@ -179,6 +186,11 @@ try {
                         "HARNESS2_TOOLKIT_UNTRACKED_INTEGRATION",
                     ),
                     ("dirty", {"YFC_TEST_DIRTY": "1"}, "HARNESS2_TOOLKIT_MODIFIED"),
+                    (
+                        "committed-drift",
+                        {"YFC_TEST_COMMITTED_DRIFT": "1"},
+                        "HARNESS2_TOOLKIT_SOURCE_REVISION_MISMATCH",
+                    ),
                     ("upstream", {"YFC_TEST_UPSTREAM_REFUSAL": "1"}, "UPSTREAM_REFUSED"),
                     ("docker", {"YFC_TEST_DISTRIBUTION": "docker-desktop"}, "docker-desktop"),
                     ("forbidden-action", {}, "Install"),
