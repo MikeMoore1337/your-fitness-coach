@@ -51,7 +51,12 @@ export async function installIssue834ImportApi(page: Page, provider: ImportProvi
     match_status: 'matched',
     resolved_title: 'Жим штанги лёжа',
     candidates: [
-      { exercise_id: 11, title: 'Жим штанги лёжа', metric_type: 'strength', unsupported_side: false },
+      {
+        exercise_id: 11,
+        title: 'Жим штанги лёжа',
+        metric_type: 'strength',
+        unsupported_side: false,
+      },
     ],
     excluded: false,
   };

@@ -21,8 +21,9 @@ async function screenshot834(
 ) {
   await expectNoHorizontalOverflow(page);
   await mkdir(evidenceDir, { recursive: true });
+  const name = [info.project.name, theme, width, state].join('-') + '.png';
   await page.screenshot({
-    path: resolve(evidenceDir, info.project.name + '-' + theme + '-' + width + '-' + state + '.png'),
+    path: resolve(evidenceDir, name),
     fullPage: true,
     animations: 'disabled',
     caret: 'hide',
@@ -31,7 +32,7 @@ async function screenshot834(
 
 for (const theme of ['dark', 'light'] as const) {
   for (const viewport of viewports) {
-    test('issue #834 provider interface and import history ' + theme + ' ' + viewport.width, async ({ page }, info) => {
+    test('#834 provider UI ' + theme + ' ' + viewport.width, async ({ page }, info) => {
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       await page.setViewportSize(viewport);
@@ -79,7 +80,7 @@ for (const theme of ['dark', 'light'] as const) {
       expect(errors).toEqual([]);
     });
 
-    test('issue #834 unsupported Hevy metrics stay visible ' + theme + ' ' + viewport.width, async ({ page }, info) => {
+    test('#834 Hevy unsupported ' + theme + ' ' + viewport.width, async ({ page }, info) => {
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       await page.setViewportSize(viewport);
