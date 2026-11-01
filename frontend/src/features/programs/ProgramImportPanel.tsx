@@ -1036,12 +1036,12 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         {row.source_range ?? `строка ${row.row_number}`}
                       </small>
                     </th>
-                    <td>{row.week_number ?? '—'}</td>
-                    <td>
+                    <td data-label="Неделя">{row.week_number ?? '—'}</td>
+                    <td data-label="День">
                       <strong>{row.day_number ?? '—'}</strong>
                       <small>{row.day_title || 'Название дня не указано'}</small>
                     </td>
-                    <td>
+                    <td data-label="Упражнение">
                       {row.match_status === 'matched' ? (
                         <strong>{rowExerciseLabel(row)}</strong>
                       ) : (
@@ -1080,7 +1080,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         </small>
                       ))}
                     </td>
-                    <td>
+                    <td data-label="Назначение">
                       {row.metric_type === 'cardio'
                         ? `${row.prescribed_duration_minutes ?? '—'} мин`
                         : `${row.prescribed_sets ?? '—'} × ${row.prescribed_reps ?? '—'}`}
@@ -1145,7 +1145,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         </details>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Статус">
                       <span
                         className={
                           row.match_status === 'matched'
