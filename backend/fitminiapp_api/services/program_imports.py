@@ -134,9 +134,14 @@ _CELL_RANGE_PATTERN = re.compile(r"([A-Z]+)(\d+):([A-Z]+)(\d+)\Z")
 _REL_NAMESPACE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _WEEK_HEADER_PATTERN = re.compile(r"^неделя\s*(\d+)(?:\s*[-–—:]\s*(.+))?$", re.IGNORECASE)
 _WEEK_TYPE_LABELS: Final = {
-    "лёгкая": "light", "легкая": "light", "light": "light",
-    "средняя": "medium", "medium": "medium",
-    "тяжёлая": "heavy", "тяжелая": "heavy", "heavy": "heavy",
+    "лёгкая": "light",
+    "легкая": "light",
+    "light": "light",
+    "средняя": "medium",
+    "medium": "medium",
+    "тяжёлая": "heavy",
+    "тяжелая": "heavy",
+    "heavy": "heavy",
 }
 _EXACT_REP_LIST_PATTERN = re.compile(r"\d+(?:/\d+)*\Z")
 _PLANNED_LOADS_PATTERN = re.compile(r"\d+(?:[.,]\d{1,2})?(?:\s*[/;]\s*\d+(?:[.,]\d{1,2})?)*\Z")
@@ -2207,7 +2212,6 @@ def _extract_generic_rows(
     return tuple(extracted), duration_weeks, tuple(warnings)
 
 
-
 def _week_type_candidates(table: _Table, source_weeks: int) -> list[dict[str, object]]:
     """Suggest week types only from explicit text, never XLSX styles."""
     by_coord = {(cell.row, cell.column): cell for cell in table.grid}
@@ -2277,9 +2281,12 @@ def _matrix_plan_from_row(row: _RowDraft, issues: list[_Issue]) -> None:
     if targets is None:
         if "/" in reps or explicit_loads is not None:
             _append_issue(
-                issues, "planned_reps_ambiguous", "blocking",
+                issues,
+                "planned_reps_ambiguous",
+                "blocking",
                 "Повторы неоднозначны или не совпадают с количеством подходов",
-                row_number=row["row_number"], field="prescribed_reps",
+                row_number=row["row_number"],
+                field="prescribed_reps",
             )
         return
     if explicit_loads is None and "/" not in reps:
@@ -2289,26 +2296,35 @@ def _matrix_plan_from_row(row: _RowDraft, issues: list[_Issue]) -> None:
         raw = explicit_loads.strip()
         if not _PLANNED_LOADS_PATTERN.fullmatch(raw):
             _append_issue(
-                issues, "planned_load_invalid", "blocking",
+                issues,
+                "planned_load_invalid",
+                "blocking",
                 "Укажите плановый вес числом или списком весов по подходам",
-                row_number=row["row_number"], field="source_auxiliary",
+                row_number=row["row_number"],
+                field="source_auxiliary",
             )
             return
         values = [float(value.replace(",", ".")) for value in re.split(r"\s*[/;]\s*", raw)]
         if len(values) not in {1, sets} or any(value < 0 or value > 100_000 for value in values):
             _append_issue(
-                issues, "planned_load_count", "blocking",
+                issues,
+                "planned_load_count",
+                "blocking",
                 "Количество плановых весов должно совпадать с числом подходов",
-                row_number=row["row_number"], field="source_auxiliary",
+                row_number=row["row_number"],
+                field="source_auxiliary",
             )
             return
         loads = values * sets if len(values) == 1 else values
     if row.get("prescription") is not None:
         if loads is not None:
             _append_issue(
-                issues, "planned_load_conflict", "blocking",
+                issues,
+                "planned_load_conflict",
+                "blocking",
                 "Структурированное назначение уже задано, нужен ручной выбор",
-                row_number=row["row_number"], field="prescription",
+                row_number=row["row_number"],
+                field="prescription",
             )
         return
     rest = row.get("rest_seconds")
@@ -2319,7 +2335,8 @@ def _matrix_plan_from_row(row: _RowDraft, issues: list[_Issue]) -> None:
             "rep_target": target,
             "load_target": (
                 {"kind": "absolute", "value": loads[position - 1]}
-                if loads is not None else {"kind": "user_selected"}
+                if loads is not None
+                else {"kind": "user_selected"}
             ),
             "rest_after_seconds": 90 if rest is None else rest,
         }
@@ -2400,7 +2417,8 @@ def _extract_weekly_matrix_rows(
     saw_auxiliary = False
     for block_index, (week_number, block_start) in enumerate(blocks):
         block_end = (
-            blocks[block_index + 1][1] if block_index + 1 < len(blocks)
+            blocks[block_index + 1][1]
+            if block_index + 1 < len(blocks)
             else max((cell.column for cell in table.grid), default=block_start) + 1
         )
         auxiliary_column = next(column for column, number in labels if number == week_number)
@@ -2432,7 +2450,8 @@ def _extract_weekly_matrix_rows(
                     exercise_name = main.value
                 auxiliary_cell = (
                     cells_by_coordinate.get((source_row, auxiliary_column))
-                    if auxiliary_column != block_start else None
+                    if auxiliary_column != block_start
+                    else None
                 )
                 auxiliary = _optional_text(auxiliary_cell.value if auxiliary_cell else None)
                 saw_auxiliary = saw_auxiliary or auxiliary is not None
@@ -4598,15 +4617,21 @@ def resolve_program_import(
     expected_draft_version: int | None = None,
     assignment_duration_weeks: int | None = None,
     repeat: bool | None = None,
-    week_types: list[str | None] | None = None,
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None,
 ) -> ProgramImport:
     import_row = get_program_import(db, current_user, import_id, for_update=True)
     if import_row.status != "pending":
         raise ProgramImportError("import_not_editable", "Этот импорт больше нельзя изменить", 409)
     draft = cast(_Draft, dict(import_row.draft_json))
     current_version = draft.get("draft_version")
-    if current_version is not None and expected_draft_version is not None and expected_draft_version != current_version:
-        raise ProgramImportError("draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409)
+    if (
+        current_version is not None
+        and expected_draft_version is not None
+        and expected_draft_version != current_version
+    ):
+        raise ProgramImportError(
+            "draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409
+        )
     rows = [cast(_RowDraft, dict(row)) for row in draft["rows"]]
     row_by_number = {row["row_number"]: row for row in rows}
     for row_number, exercise_id, sets, reps, loads in row_resolutions:
@@ -4663,23 +4688,30 @@ def resolve_program_import(
     )
     if current_version is not None:
         source_weeks = rebuilt["duration_weeks"]
-        new_types = (
-            week_types if week_types is not None
-            else draft.get("week_types", [None] * source_weeks)
-        )
+        new_types: list[str | None] = [
+            value
+            for value in (
+                week_types if week_types is not None else draft.get("week_types", [None] * source_weeks)
+            )
+        ]
         if len(new_types) != source_weeks or any(
             value not in {None, "light", "medium", "heavy"} for value in new_types
         ):
             raise ProgramImportError("week_types_length", "Укажите корректные типы недель", 422)
         new_repeat = repeat if repeat is not None else draft.get("repeat", False)
         new_duration = (
-            assignment_duration_weeks if assignment_duration_weeks is not None
+            assignment_duration_weeks
+            if assignment_duration_weeks is not None
             else draft.get("assignment_duration_weeks", source_weeks)
         )
         if new_duration < 1 or (new_duration > source_weeks and not new_repeat):
-            raise ProgramImportError("cycle_duration", "Для срока больше K включите повтор цикла", 422)
+            raise ProgramImportError(
+                "cycle_duration", "Для срока больше K включите повтор цикла", 422
+            )
         if new_duration > settings.program_import_max_cells:
-            raise ProgramImportError("cycle_duration", "Срок программы превышает безопасный предел", 422)
+            raise ProgramImportError(
+                "cycle_duration", "Срок программы превышает безопасный предел", 422
+            )
         rebuilt["draft_version"] = current_version + 1
         rebuilt["assignment_duration_weeks"] = new_duration
         rebuilt["repeat"] = new_repeat
@@ -4749,7 +4781,11 @@ def _program_payload_from_draft(draft: _Draft) -> ProgramTemplateCreate:
         repeat = draft.get("repeat", False)
         assigned_weeks = draft.get("assignment_duration_weeks", source_weeks)
         # Preserve legacy matrix scheduling unless cycle semantics were explicitly chosen.
-        if repeat or any(value is not None for value in selected_types) or assigned_weeks != source_weeks:
+        if (
+            repeat
+            or any(value is not None for value in selected_types)
+            or assigned_weeks != source_weeks
+        ):
             cycle = {
                 "schema_version": 1,
                 "length_weeks": source_weeks,
@@ -4993,8 +5029,14 @@ def confirm_program_import(
         )
 
     draft = cast(_Draft, dict(import_row.draft_json))
-    if draft.get("draft_version") is not None and expected_draft_version is not None and expected_draft_version != draft["draft_version"]:
-        raise ProgramImportError("draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409)
+    if (
+        draft.get("draft_version") is not None
+        and expected_draft_version is not None
+        and expected_draft_version != draft["draft_version"]
+    ):
+        raise ProgramImportError(
+            "draft_version_conflict", "Черновик изменился. Обновите предпросмотр", 409
+        )
     rebuilt = _build_draft(
         db,
         current_user,
@@ -5015,7 +5057,13 @@ def confirm_program_import(
         ),
         ai_metadata=draft.get("ai"),
     )
-    for field in ("draft_version", "assignment_duration_weeks", "repeat", "week_types", "week_type_candidates"):
+    for field in (
+        "draft_version",
+        "assignment_duration_weeks",
+        "repeat",
+        "week_types",
+        "week_type_candidates",
+    ):
         if field in draft:
             rebuilt[field] = draft[field]
     import_row.draft_json = dict(rebuilt)
