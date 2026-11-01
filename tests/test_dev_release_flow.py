@@ -458,8 +458,7 @@ def test_local_dev_updater_failure_handler_exit_codes_in_powershell(
         "$script:FailureSummary = 'SIMULATED_FAILURE'\n"
         "$script:CurrentResult = @{result='STARTED'; error_code=''}\n"
         "function Save-Result { }\n"
-        "try { throw 'synthetic failure' } catch {\n"
-        + handler
+        "try { throw 'synthetic failure' } catch {\n" + handler
     )
     probe = tmp_path / "failure handler with spaces.ps1"
     probe.write_text(harness, encoding="utf-8-sig")
