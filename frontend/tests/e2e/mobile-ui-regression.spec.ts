@@ -1084,11 +1084,30 @@ for (const theme of ['dark', 'light'] as const) {
     await expectNoHorizontalOverflow(page);
     expect(mock.uploads()).toBe(1);
     await page.screenshot({
-      path: info.outputPath('issue-834-' + theme + '-fitnotes-mobile.png'),
+      path: info.outputPath('issue-834-' + theme + '-fitnotes-mobile-context.png'),
       fullPage: true,
       animations: 'disabled',
       caret: 'hide',
     });
+    const navigation = page.locator('#appBottomNav');
+    await navigation.evaluateAll((elements) =>
+      elements.forEach((element) => {
+        (element as HTMLElement).style.visibility = 'hidden';
+      }),
+    );
+    try {
+      await page.locator('.workout-history-card').screenshot({
+        path: info.outputPath('issue-834-' + theme + '-fitnotes-mobile-panel.png'),
+        animations: 'disabled',
+        caret: 'hide',
+      });
+    } finally {
+      await navigation.evaluateAll((elements) =>
+        elements.forEach((element) => {
+          (element as HTMLElement).style.visibility = '';
+        }),
+      );
+    }
     expect(errors).toEqual([]);
   });
 }

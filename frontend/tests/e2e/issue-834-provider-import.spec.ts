@@ -22,12 +22,33 @@ async function screenshot834(
   await expectNoHorizontalOverflow(page);
   await mkdir(evidenceDir, { recursive: true });
   const name = [info.project.name, theme, width, state].join('-') + '.png';
-  await page.screenshot({
-    path: resolve(evidenceDir, name),
-    fullPage: true,
-    animations: 'disabled',
-    caret: 'hide',
-  });
+  if (['01-strong-upload', '03-fitnotes-preview', '08-hevy-unsupported'].includes(state)) {
+    await page.screenshot({
+      path: resolve(evidenceDir, name.replace('.png', '-context.png')),
+      fullPage: true,
+      animations: 'disabled',
+      caret: 'hide',
+    });
+  }
+  const navigation = page.locator('#appBottomNav');
+  await navigation.evaluateAll((elements) =>
+    elements.forEach((element) => {
+      (element as HTMLElement).style.visibility = 'hidden';
+    }),
+  );
+  try {
+    await page.locator('.workout-history-card').screenshot({
+      path: resolve(evidenceDir, name),
+      animations: 'disabled',
+      caret: 'hide',
+    });
+  } finally {
+    await navigation.evaluateAll((elements) =>
+      elements.forEach((element) => {
+        (element as HTMLElement).style.visibility = '';
+      }),
+    );
+  }
 }
 
 for (const theme of ['dark', 'light'] as const) {
