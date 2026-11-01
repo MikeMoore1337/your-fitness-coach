@@ -586,11 +586,11 @@ describe('ProgramImportPanel', () => {
     fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
       target: { files: [new File(['xlsx'], 'matrix.xlsx')] },
     });
-    expect(await screen.findByText('K = 3')).toBeInTheDocument();
+    expect(await screen.findByText('Исходных недель: 3')).toBeInTheDocument();
     expect(screen.getAllByRole('combobox', { name: /Тип исходной недели/ })).toHaveLength(3);
     expect(screen.getByRole('combobox', { name: 'Тип исходной недели 1' })).toHaveValue('');
 
-    fireEvent.change(screen.getByLabelText('Всего недель программы (N)'), {
+    fireEvent.change(screen.getByLabelText('Всего недель программы'), {
       target: { value: '16' },
     });
     expect(screen.getByRole('alert')).toHaveTextContent('включите повтор');
@@ -654,7 +654,7 @@ describe('ProgramImportPanel', () => {
     fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
       target: { files: [new File(['xlsx'], 'matrix.xlsx')] },
     });
-    await screen.findByText('K = 1');
+    await screen.findByText('Исходных недель: 1');
     expect(screen.getByText(/не считается плановым весом без подтверждения/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Исправить назначение'));
     const weights = screen.getByLabelText('Плановые веса, кг');
