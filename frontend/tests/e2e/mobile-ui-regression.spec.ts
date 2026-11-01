@@ -237,6 +237,8 @@ for (const theme of ['light', 'dark'] as const) {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`@critical mobile core surfaces keep the ${theme} visual contract`, async ({ page }) => {
+    // Four navigations and pixel comparisons can contend for WebKit screenshot rendering in CI.
+    test.setTimeout(60_000);
     await preparePage(page, theme);
     await page.goto('/app?section=today');
     await waitForSurface(page, 'today');
@@ -267,7 +269,9 @@ for (const theme of ['light', 'dark'] as const) {
       } else {
         await expect(page.locator(surface.locator)).toHaveScreenshot(
           `${surface.name}-390x844-${theme}.png`,
-          surface.name === 'profile' ? longSurfaceScreenshotOptions : screenshotOptions,
+          surface.name === 'profile'
+            ? { ...longSurfaceScreenshotOptions, timeout: 15_000 }
+            : screenshotOptions,
         );
       }
     }
@@ -468,6 +472,9 @@ for (const theme of ['light', 'dark'] as const) {
 test('@critical active workout keeps the current set primary across mobile widths', async ({
   page,
 }) => {
+  // This single scenario reopens the workout and captures two screenshots at three viewports.
+  // Its observed 30s limit expires during WebKit's last paint-only capture at four workers.
+  test.setTimeout(60_000);
   await preparePage(page, 'dark', 'browser', { workoutStatus: 'in_progress' });
 
   for (const viewport of MOBILE_VIEWPORTS) {
