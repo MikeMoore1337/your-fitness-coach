@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "harness2_dev.ps1"
 PIN = "1cfe254e8d25b15f37048c3730134686abe60335"
@@ -23,8 +23,12 @@ class Harness2YfcContract(unittest.TestCase):
         )
         self.assertIn("integrations/harness2/acceptance.ps1", source)
         for forbidden in (
-            "wsl.exe", "bash -c", "harness2-demo", "harness2-judge",
-            "Invoke-Expression", "codex exec",
+            "wsl.exe",
+            "bash -c",
+            "harness2-demo",
+            "harness2-judge",
+            "Invoke-Expression",
+            "codex exec",
         ):
             self.assertNotIn(forbidden, source)
 
@@ -120,8 +124,15 @@ try {
             def run(shell: str, action: str, **changes: str) -> subprocess.CompletedProcess[str]:
                 environment = {**base_env, "YFC_TEST_ACTION": action, **changes}
                 return subprocess.run(
-                    [shell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                     "-Command", mock],
+                    [
+                        shell,
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-Command",
+                        mock,
+                    ],
                     capture_output=True,
                     text=True,
                     encoding="utf-8",
@@ -139,15 +150,34 @@ try {
                 with self.subTest(interpreter=shell, case="idempotent"):
                     result = run(shell, "Status")
                     self.assertEqual(result.returncode, 0, result.stderr)
-                for action in ("Preflight", "SetupPreview", "Check", "RunPreview", "Report", "Artifacts"):
+                for action in (
+                    "Preflight",
+                    "SetupPreview",
+                    "Check",
+                    "RunPreview",
+                    "Report",
+                    "Artifacts",
+                ):
                     with self.subTest(interpreter=shell, action=action):
                         result = run(shell, action)
                         self.assertEqual(result.returncode, 0, result.stderr)
                         self.assertIn("ACTION=" + action + ";", result.stdout)
                 for case, changes, expected in (
-                    ("origin", {"YFC_TEST_ORIGIN": "https://example.invalid/x"}, "HARNESS2_TOOLKIT_ORIGIN_MISMATCH"),
-                    ("revision", {"YFC_TEST_TOO_OLD": "1"}, "HARNESS2_TOOLKIT_REVISION_TOO_OLD_OR_SHALLOW"),
-                    ("untracked", {"YFC_TEST_UNTRACKED": "1"}, "HARNESS2_TOOLKIT_UNTRACKED_INTEGRATION"),
+                    (
+                        "origin",
+                        {"YFC_TEST_ORIGIN": "https://example.invalid/x"},
+                        "HARNESS2_TOOLKIT_ORIGIN_MISMATCH",
+                    ),
+                    (
+                        "revision",
+                        {"YFC_TEST_TOO_OLD": "1"},
+                        "HARNESS2_TOOLKIT_REVISION_TOO_OLD_OR_SHALLOW",
+                    ),
+                    (
+                        "untracked",
+                        {"YFC_TEST_UNTRACKED": "1"},
+                        "HARNESS2_TOOLKIT_UNTRACKED_INTEGRATION",
+                    ),
                     ("dirty", {"YFC_TEST_DIRTY": "1"}, "HARNESS2_TOOLKIT_MODIFIED"),
                     ("upstream", {"YFC_TEST_UPSTREAM_REFUSAL": "1"}, "UPSTREAM_REFUSED"),
                     ("docker", {"YFC_TEST_DISTRIBUTION": "docker-desktop"}, "docker-desktop"),
