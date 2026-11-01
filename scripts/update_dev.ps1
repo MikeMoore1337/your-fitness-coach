@@ -970,6 +970,6 @@ try {
     }
     $script:CurrentResult.result = if ($script:ExitCode -eq 2) { 'DEFERRED' } else { 'FAIL' }
     try { Save-Result } catch { }
-    Write-Error ('[{0}] {1}' -f $script:FailureCode, $script:FailureSummary)
+    Write-Error ('[{0}] {1}' -f $script:FailureCode, $script:FailureSummary) -ErrorAction Continue
     exit $script:ExitCode
 }
