@@ -739,6 +739,7 @@ def _serialize_workout(
                                 "set_number",
                                 "actual_reps",
                                 "actual_weight",
+                                "set_kind_known",
                                 "duration_minutes",
                                 "distance_km",
                                 "average_heart_rate_bpm",
@@ -1645,6 +1646,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 **_serialize_workout(workout, rest_by_workout),
                 "completed_at_utc": workout.completed_at_utc,
                 "source_timezone": provenance.source_timezone,
+                "source_data": provenance.source_data,
                 "source_provider": provenance.provider,
                 "parser_version": provenance.parser_version,
             }

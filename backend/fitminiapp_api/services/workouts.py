@@ -28,7 +28,7 @@ class WorkoutValidationError(ValueError):
 def counts_toward_working_volume(workout_set: UserWorkoutSet) -> bool:
     """Legacy null kinds retain their historical working-volume behavior."""
 
-    if workout_set.set_kind == "warmup":
+    if workout_set.set_kind_known is False or workout_set.set_kind == "warmup":
         return False
     if workout_set.planned_role in {"warmup", "activation"}:
         return False
@@ -44,6 +44,8 @@ def is_pr_record_set(workout_set: UserWorkoutSet) -> bool:
 
 
 def set_analytics_bucket(workout_set: UserWorkoutSet) -> str:
+    if getattr(workout_set, "set_kind_known", None) is False:
+        return "unknown"
     if workout_set.planned_role in {"drop", "mini_set", "cluster_member"}:
         return "intensifier"
     if workout_set.planned_role in {"warmup", "activation"}:
@@ -52,19 +54,22 @@ def set_analytics_bucket(workout_set: UserWorkoutSet) -> str:
 
 
 def working_volume_set_filter():
-    return or_(
-        and_(
-            UserWorkoutSet.planned_role.is_(None),
-            or_(
-                UserWorkoutSet.set_kind.is_(None),
-                UserWorkoutSet.set_kind.in_(("working", "drop")),
+    return and_(
+        UserWorkoutSet.set_kind_known.is_not(False),
+        or_(
+            and_(
+                UserWorkoutSet.planned_role.is_(None),
+                or_(
+                    UserWorkoutSet.set_kind.is_(None),
+                    UserWorkoutSet.set_kind.in_(("working", "drop")),
+                ),
             ),
-        ),
-        and_(
-            UserWorkoutSet.planned_role.notin_(("warmup", "activation")),
-            or_(
-                UserWorkoutSet.set_kind.is_(None),
-                UserWorkoutSet.set_kind.in_(("working", "drop")),
+            and_(
+                UserWorkoutSet.planned_role.notin_(("warmup", "activation")),
+                or_(
+                    UserWorkoutSet.set_kind.is_(None),
+                    UserWorkoutSet.set_kind.in_(("working", "drop")),
+                ),
             ),
         ),
     )

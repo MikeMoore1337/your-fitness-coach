@@ -78,7 +78,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0144_workout_side_metadata_ck",)
+            ("0145_history_provider_provenance",)
         ]
         assert connection.exec_driver_sql(
             "SELECT user_id, equipment_profiles, active_equipment_profile_id, equipment_profiles_revision FROM user_profiles"
