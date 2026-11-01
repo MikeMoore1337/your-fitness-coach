@@ -118,6 +118,11 @@ def _weekly_matrix_xlsx(
                 if week_number == 1:
                     add_cell(source_row, block_start + 2, "32.5")
 
+    if merge_week_header:
+        if weeks != 1:
+            raise ValueError("merged week header fixture only supports a single week")
+        merge_ranges.append("C2:D2")
+
     rows_xml = "".join(
         f'<row r="{row_number}">{"".join(value for _, value in sorted(cells))}</row>'
         for row_number, cells in sorted(cells_by_row.items())
@@ -193,11 +198,6 @@ def _generic_xlsx_with_header_in_first_row() -> bytes:
         "3",
         "8-12",
     ]
-    if merge_week_header:
-        if weeks != 1:
-            raise ValueError("merged week header fixture only supports a single week")
-        merge_ranges.append("C2:D2")
-
     rows_xml = "".join(
         f'<row r="{row_number}">'
         + "".join(
