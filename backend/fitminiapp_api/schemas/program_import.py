@@ -131,6 +131,7 @@ class ProgramImportRow(BaseModel):
     rest_seconds: int | None = Field(default=None, ge=0, le=600)
     notes: str | None = Field(default=None, max_length=2_000)
     source_auxiliary: str | None = Field(default=None, max_length=512)
+    manual_planned_loads: str | None = Field(default=None, max_length=256)
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
     prescription: ExercisePrescriptionPlan | None = None
@@ -176,6 +177,14 @@ class ProgramImportAiInfo(BaseModel):
     fallback: Literal["deterministic_manual"] = "deterministic_manual"
 
 
+class ProgramImportWeekTypeCandidate(BaseModel):
+    week_number: int = Field(ge=1)
+    week_type: Literal["light", "medium", "heavy"]
+    source_text: str = Field(min_length=1, max_length=128)
+    source_sheet: str | None = Field(default=None, max_length=31)
+    source_cell: str = Field(min_length=1, max_length=32)
+
+
 class ProgramImportResponse(BaseModel):
     id: str
     status: ImportStatus
@@ -184,6 +193,11 @@ class ProgramImportResponse(BaseModel):
     parser_version: str
     layout_version: str | None = None
     duration_weeks: int | None = Field(default=None, ge=1)
+    draft_version: int | None = Field(default=None, ge=1)
+    assignment_duration_weeks: int | None = Field(default=None, ge=1)
+    repeat: bool | None = None
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
+    week_type_candidates: list[ProgramImportWeekTypeCandidate] = Field(default_factory=list)
     expires_at: datetime
     program_title: str | None = None
     goal: ImportGoal | None = None
@@ -200,9 +214,16 @@ class ProgramImportResponse(BaseModel):
 class ProgramImportRowResolution(BaseModel):
     row_number: int = Field(ge=3)
     exercise_id: int | None = Field(default=None, ge=1)
+    prescribed_sets: int | None = Field(default=None, ge=1, le=10)
+    prescribed_reps: str | None = Field(default=None, min_length=1, max_length=32)
+    planned_loads: str | None = Field(default=None, max_length=256)
 
 
 class ProgramImportResolveRequest(BaseModel):
+    expected_draft_version: int | None = Field(default=None, ge=1)
+    assignment_duration_weeks: int | None = Field(default=None, ge=1)
+    repeat: bool | None = None
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
     title: str | None = Field(default=None, min_length=1, max_length=128)
     goal: ImportGoal | None = None
     level: ImportLevel | None = None
@@ -211,6 +232,7 @@ class ProgramImportResolveRequest(BaseModel):
 
 
 class ProgramImportConfirmRequest(BaseModel):
+    expected_draft_version: int | None = Field(default=None, ge=1)
     target_program_id: int | None = Field(default=None, ge=1)
     expected_revision_number: int | None = Field(default=None, ge=0)
 
