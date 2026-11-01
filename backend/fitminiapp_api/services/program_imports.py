@@ -77,7 +77,7 @@ from fitminiapp_api.services.workout_metrics import (
 logger = logging.getLogger(__name__)
 
 PROGRAM_IMPORT_SCHEMA_VERSION: Final = 3
-PROGRAM_IMPORT_PARSER_VERSION: Final = "program-import-v4"
+PROGRAM_IMPORT_PARSER_VERSION: Final = "program-import-v5"
 PROGRAM_IMPORT_CANONICAL_LAYOUT: Final = "canonical-table-v1"
 PROGRAM_IMPORT_MATRIX_LAYOUT: Final = "weekly-matrix-v1"
 PROGRAM_IMPORT_GENERIC_LAYOUT: Final = "generic-table-v1"
@@ -132,7 +132,14 @@ _COLUMN_PATTERN = re.compile(r"[A-Z]+")
 _CELL_REFERENCE_PATTERN = re.compile(r"([A-Z]+)(\d+)\Z")
 _CELL_RANGE_PATTERN = re.compile(r"([A-Z]+)(\d+):([A-Z]+)(\d+)\Z")
 _REL_NAMESPACE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-_WEEK_HEADER_PATTERN = re.compile(r"^неделя\s*(\d+)$", re.IGNORECASE)
+_WEEK_HEADER_PATTERN = re.compile(r"^неделя\s*(\d+)(?:\s*[-–—:]\s*(.+))?$", re.IGNORECASE)
+_WEEK_TYPE_LABELS: Final = {
+    "лёгкая": "light", "легкая": "light", "light": "light",
+    "средняя": "medium", "medium": "medium",
+    "тяжёлая": "heavy", "тяжелая": "heavy", "heavy": "heavy",
+}
+_EXACT_REP_LIST_PATTERN = re.compile(r"\d+(?:/\d+)*\Z")
+_PLANNED_LOADS_PATTERN = re.compile(r"\d+(?:[.,]\d{1,2})?(?:\s*[/;]\s*\d+(?:[.,]\d{1,2})?)*\Z")
 _DAY_HEADER_PATTERN = re.compile(r"^день\s*(\d+)$", re.IGNORECASE)
 _DOCUMENT_DAY_PATTERN = re.compile(
     r"^(?:[-*•]\s*)?(?:день|day)\s*(\d+)\s*(?:[-:–—]\s*(.*))?$", re.IGNORECASE
@@ -359,6 +366,7 @@ class _RowDraft(TypedDict, total=False):
     source_cells: dict[str, str]
     week_number: int | None
     source_auxiliary: str | None
+    manual_planned_loads: str | None
     resolution_key: str | None
     exercise_match_name: str | None
     name_normalized: bool
@@ -423,6 +431,11 @@ class _Draft(TypedDict):
     parser_version: str
     layout_version: str
     duration_weeks: int
+    draft_version: NotRequired[int]
+    assignment_duration_weeks: NotRequired[int]
+    repeat: NotRequired[bool]
+    week_types: NotRequired[list[str | None]]
+    week_type_candidates: NotRequired[list[dict[str, object]]]
     program_title: str | None
     goal: str | None
     level: str | None
@@ -1832,6 +1845,10 @@ def _exercise_name_and_prescription(value: str | None) -> tuple[str | None, int 
         or _SETS_REPS_TEXT_PATTERN.fullmatch(last_line) is not None
     )
     parsed = _parse_prescription(last_line) if is_standalone_prescription else None
+    if parsed is None and len(lines) > 1 and _EXACT_REP_LIST_PATTERN.fullmatch(last_line):
+        targets = last_line.split("/")
+        if 1 < len(targets) <= 10:
+            parsed = (len(targets), last_line)
     if parsed is not None:
         name_lines = lines[:-1]
         if not name_lines:
@@ -2190,6 +2207,129 @@ def _extract_generic_rows(
     return tuple(extracted), duration_weeks, tuple(warnings)
 
 
+
+def _week_type_candidates(table: _Table, source_weeks: int) -> list[dict[str, object]]:
+    """Suggest week types only from explicit text, never XLSX styles."""
+    by_coord = {(cell.row, cell.column): cell for cell in table.grid}
+    result: dict[int, dict[str, object]] = {}
+    conflicts: set[int] = set()
+    for cell in table.grid:
+        match = _WEEK_HEADER_PATTERN.fullmatch(cell.value)
+        if match is None:
+            continue
+        week = int(match.group(1))
+        if not 1 <= week <= source_weeks:
+            continue
+        label = _optional_text(match.group(2))
+        source_cell = cell
+        if label is None and cell.column > 1:
+            neighbour = by_coord.get((cell.row, cell.column - 1))
+            if neighbour is not None:
+                label = neighbour.value
+                source_cell = neighbour
+        if label is None:
+            continue
+        normalized = re.sub(r"^тип\s+недели\s*[:：-]?\s*", "", label.casefold()).strip()
+        value = _WEEK_TYPE_LABELS.get(normalized)
+        if value is None:
+            continue
+        existing = result.get(week)
+        if existing is not None and existing["week_type"] != value:
+            result.pop(week, None)
+            conflicts.add(week)
+            continue
+        if week not in conflicts:
+            result[week] = {
+                "week_number": week,
+                "week_type": value,
+                "source_text": label,
+                "source_sheet": table.sheet_name,
+                "source_cell": source_cell.address,
+            }
+    return [result[week] for week in sorted(result)]
+
+
+def _planned_rep_targets(reps: str, sets: int) -> list[dict[str, object]] | None:
+    if _EXACT_REP_LIST_PATTERN.fullmatch(reps):
+        numbers = [int(value) for value in reps.split("/")]
+        if len(numbers) not in {1, sets} or any(not 1 <= value <= 1000 for value in numbers):
+            return None
+        if len(numbers) == 1:
+            numbers *= sets
+        return [{"kind": "exact", "value": value} for value in numbers]
+    match = re.fullmatch(r"(\d+)\s*[-–]\s*(\d+)", reps)
+    if match:
+        low, high = int(match.group(1)), int(match.group(2))
+        if 1 <= low <= high <= 1000:
+            return [{"kind": "range", "min_reps": low, "max_reps": high} for _ in range(sets)]
+    return None
+
+
+def _matrix_plan_from_row(row: _RowDraft, issues: list[_Issue]) -> None:
+    """Structured set targets are only generated when the source is unambiguous."""
+    if row.get("metric_type") != "strength":
+        return
+    sets, reps = row.get("prescribed_sets"), row.get("prescribed_reps")
+    if not isinstance(sets, int) or not 1 <= sets <= 10 or not isinstance(reps, str):
+        return
+    targets = _planned_rep_targets(reps, sets)
+    explicit_loads = row.get("manual_planned_loads")
+    if targets is None:
+        if "/" in reps or explicit_loads is not None:
+            _append_issue(
+                issues, "planned_reps_ambiguous", "blocking",
+                "Повторы неоднозначны или не совпадают с количеством подходов",
+                row_number=row["row_number"], field="prescribed_reps",
+            )
+        return
+    if explicit_loads is None and "/" not in reps:
+        return
+    loads: list[float] | None = None
+    if explicit_loads is not None:
+        raw = explicit_loads.strip()
+        if not _PLANNED_LOADS_PATTERN.fullmatch(raw):
+            _append_issue(
+                issues, "planned_load_invalid", "blocking",
+                "Укажите плановый вес числом или списком весов по подходам",
+                row_number=row["row_number"], field="source_auxiliary",
+            )
+            return
+        values = [float(value.replace(",", ".")) for value in re.split(r"\s*[/;]\s*", raw)]
+        if len(values) not in {1, sets} or any(value < 0 or value > 100_000 for value in values):
+            _append_issue(
+                issues, "planned_load_count", "blocking",
+                "Количество плановых весов должно совпадать с числом подходов",
+                row_number=row["row_number"], field="source_auxiliary",
+            )
+            return
+        loads = values * sets if len(values) == 1 else values
+    if row.get("prescription") is not None:
+        if loads is not None:
+            _append_issue(
+                issues, "planned_load_conflict", "blocking",
+                "Структурированное назначение уже задано, нужен ручной выбор",
+                row_number=row["row_number"], field="prescription",
+            )
+        return
+    rest = row.get("rest_seconds")
+    segments = [
+        {
+            "position": position,
+            "role": "working",
+            "rep_target": target,
+            "load_target": (
+                {"kind": "absolute", "value": loads[position - 1]}
+                if loads is not None else {"kind": "user_selected"}
+            ),
+            "rest_after_seconds": 90 if rest is None else rest,
+        }
+        for position, target in enumerate(targets, start=1)
+    ]
+    row["prescription"] = ExercisePrescriptionPlan.model_validate(
+        {"version": 1, "metric_type": "strength", "segments": segments}
+    ).model_dump(mode="json")
+
+
 def _extract_weekly_matrix_rows(
     table: _Table,
 ) -> tuple[tuple[_ExtractedRow, ...], int, tuple[tuple[str, str, str], ...]] | None:
@@ -2209,8 +2349,6 @@ def _extract_weekly_matrix_rows(
     for row_number, column_number, week_number in week_labels:
         by_label_row[row_number].append((column_number, week_number))
     header_row, labels = max(by_label_row.items(), key=lambda item: (len(item[1]), -item[0]))
-    if len(labels) < 2:
-        return None
     labels = sorted(labels)
     labels_by_week = sorted(labels, key=lambda item: item[1])
     if [week for _, week in labels_by_week] != list(range(1, len(labels_by_week) + 1)):
@@ -2226,7 +2364,7 @@ def _extract_weekly_matrix_rows(
             block_start = label_column
         blocks.append((week_number, block_start))
     block_starts = [start for _, start in blocks]
-    if any(right - left != 3 for left, right in pairwise(block_starts)):
+    if any(right <= left for left, right in pairwise(block_starts)):
         return None
 
     day_headers_by_week: dict[int, list[tuple[int, int]]] = {}
@@ -2260,7 +2398,14 @@ def _extract_weekly_matrix_rows(
     next_row_number = 3
     source_day_orders: dict[int, list[int]] = {}
     saw_auxiliary = False
-    for week_number, block_start in blocks:
+    for block_index, (week_number, block_start) in enumerate(blocks):
+        block_end = (
+            blocks[block_index + 1][1] if block_index + 1 < len(blocks)
+            else max((cell.column for cell in table.grid), default=block_start) + 1
+        )
+        auxiliary_column = next(column for column, number in labels if number == week_number)
+        if auxiliary_column == block_start:
+            auxiliary_column = min(block_start + 2, block_end - 1)
         day_headers = day_headers_by_week[week_number]
         source_day_orders[week_number] = [day for _, day in day_headers]
         week_label_column = next(column for column, value in labels if value == week_number)
@@ -2273,7 +2418,7 @@ def _extract_weekly_matrix_rows(
                 for row_number, cells in cells_by_row.items()
                 if row_number > day_header_row
                 and (end_row is None or row_number < end_row)
-                and any(block_start <= cell.column <= block_start + 2 for cell in cells)
+                and any(block_start <= cell.column < block_end for cell in cells)
             ]
             if not block_rows:
                 continue
@@ -2285,7 +2430,10 @@ def _extract_weekly_matrix_rows(
                 exercise_name, sets, reps = _exercise_name_and_prescription(main.value)
                 if exercise_name is None:
                     exercise_name = main.value
-                auxiliary_cell = cells_by_coordinate.get((source_row, block_start + 2))
+                auxiliary_cell = (
+                    cells_by_coordinate.get((source_row, auxiliary_column))
+                    if auxiliary_column != block_start else None
+                )
                 auxiliary = _optional_text(auxiliary_cell.value if auxiliary_cell else None)
                 saw_auxiliary = saw_auxiliary or auxiliary is not None
                 source_cells = {
@@ -2316,7 +2464,7 @@ def _extract_weekly_matrix_rows(
                         source_row=source_row,
                         source_range=(
                             f"{_xlsx_column_label(block_start)}{source_row}:"
-                            f"{_xlsx_column_label(block_start + 2)}{source_row}"
+                            f"{_xlsx_column_label(block_end - 1)}{source_row}"
                         ),
                         source_cells=source_cells,
                         values=values,
@@ -3413,6 +3561,8 @@ def _build_draft(
                 field="day_title",
             )
         _resolve_row(row, row_issues, by_id=by_id, by_key=by_key)
+        if layout_version == PROGRAM_IMPORT_MATRIX_LAYOUT:
+            _matrix_plan_from_row(row, row_issues)
         _normalize_coaching_rule(row, row_issues)
         if row.get("metric_type") != "cardio" and (
             row.get("prescribed_sets") is None or not row.get("prescribed_reps")
@@ -4172,6 +4322,12 @@ def parse_program_import(
         duration_weeks=duration_weeks,
         layout_warnings=layout_warnings,
     )
+    if layout_version == PROGRAM_IMPORT_MATRIX_LAYOUT and table is not None:
+        draft["draft_version"] = 1
+        draft["assignment_duration_weeks"] = duration_weeks
+        draft["repeat"] = False
+        draft["week_types"] = [None] * duration_weeks
+        draft["week_type_candidates"] = _week_type_candidates(table, duration_weeks)
     draft = _run_ai_assistance(
         db,
         current_user,
@@ -4250,6 +4406,13 @@ def serialize_import(import_row: ProgramImport) -> dict[str, object]:
         "parser_version": import_row.parser_version,
         "layout_version": draft.get("layout_version") if draft is not None else None,
         "duration_weeks": draft.get("duration_weeks") if draft is not None else None,
+        "draft_version": draft.get("draft_version") if draft is not None else None,
+        "assignment_duration_weeks": (
+            draft.get("assignment_duration_weeks") if draft is not None else None
+        ),
+        "repeat": draft.get("repeat") if draft is not None else None,
+        "week_types": draft.get("week_types") if draft is not None else None,
+        "week_type_candidates": draft.get("week_type_candidates", []) if draft is not None else [],
         "expires_at": import_row.expires_at,
         "program_title": draft["program_title"] if draft is not None else None,
         "goal": draft["goal"] if draft is not None else None,
