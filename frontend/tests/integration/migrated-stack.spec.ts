@@ -1,5 +1,136 @@
 import { expect, test } from '@playwright/test';
 
+const historyImports = [
+  {
+    label: 'hevy',
+    provider: 'hevy',
+    csv: 'title,start_time,end_time,description,exercise_title,superset_id,exercise_notes,set_index,set_type,weight_lbs,reps,distance_miles,duration_seconds,rpe\nSynthetic,"22 Dec 2025, 08:00","22 Dec 2025, 08:37",,barbell bench press,,,0,normal,100,8,0,0,\n',
+  },
+  {
+    label: 'strong-legacy',
+    provider: 'strong',
+    csv: 'Date,Workout Name,Duration,Exercise Name,Set Order,Weight,Reps,Distance,Seconds,Notes,Workout Notes,RPE\n2025-12-22 08:00:00,Synthetic,37m,barbell bench press,1,100,8,0,0,,,\n',
+  },
+  {
+    label: 'strong-6.2',
+    provider: 'strong',
+    csv: 'Workout #;Date;Workout Name;Duration (sec);Exercise Name;Set Order;Weight (kg);Reps;RPE;Distance (meters);Seconds;Notes;Workout Notes\n21;2025-12-22 08:00:00;Synthetic;2220;barbell bench press;1;45.3599;8;;0;0;;\n',
+  },
+  {
+    label: 'fitnotes-android',
+    provider: 'fitnotes',
+    csv: 'Date,Exercise,Category,Weight,Weight Unit,Reps,Distance,Distance Unit,Time,Comment\n2025-12-22,barbell bench press,Chest,100,lbs,8,,,,\n',
+  },
+  {
+    label: 'fitnotes-ios',
+    provider: 'fitnotes',
+    csv: 'Date,Exercise,Category,Weight (kg),Weight (lbs),Reps,Distance,Distance Unit,Time,Notes,Kind\n2025-12-22,barbell bench press,Chest,,100,8,,,,,wr\n',
+  },
+] as const;
+
+for (const [index, scenario] of historyImports.entries()) {
+  test(`PostgreSQL browser workout history import: ${scenario.label}`, async ({ page }) => {
+    const login = await page.request.post('/api/v1/auth/dev-login', {
+      data: { telegram_user_id: Date.now() * 10 + index, full_name: 'Synthetic QA' },
+    });
+    expect(login.status()).toBe(200);
+    const token = (await login.json()).access_token as string;
+    const headers = { Authorization: `Bearer ${token}` };
+    await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+    await page.goto('/app?section=progress&progress_view=history');
+    await page.getByRole('button', { name: 'Импортировать историю' }).click();
+    await page.getByLabel('Источник').selectOption(scenario.provider);
+    if (scenario.provider === 'strong')
+      await page.getByLabel('Единица веса в файле').selectOption('lb');
+    const upload = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/v1/workout-history-imports',
+    );
+    await page.getByLabel('Выбрать CSV-файл').setInputFiles({
+      name: 'synthetic.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(
+        scenario.csv +
+          (scenario.label === 'fitnotes-android'
+            ? '2025-12-22,barbell bench press,Chest,110,lbs,2,,,,\n'
+            : scenario.label === 'fitnotes-ios'
+              ? '2025-12-22,barbell bench press,Chest,,110,2,,,,,wr\n'
+              : ''),
+      ),
+    });
+    const uploaded = await upload;
+    expect(uploaded.status()).toBe(201);
+    const preview = await uploaded.json();
+    expect(preview.rows[0].blocking_issues).toEqual([]);
+    expect(preview.rows[0].weight_kg).toBe('45.36');
+    if (scenario.label === 'strong-6.2')
+      expect(preview.rows[0].provider_fields['Weight (kg)']).toBe('45.3599');
+    if (scenario.provider === 'fitnotes') {
+      expect(preview.rows[0].source.set_status).toBe('');
+      expect(preview.rows).toHaveLength(2);
+      const excluding = page.waitForResponse((response) =>
+        new URL(response.url()).pathname.endsWith('/resolve'),
+      );
+      await page.getByRole('button', { name: `Исключить строку ${preview.rows[1].line}` }).click();
+      const excluded = await excluding;
+      expect(excluded.status()).toBe(200);
+      expect((await excluded.json()).rows[1].excluded).toBe(true);
+      const resolved = page.waitForResponse((response) =>
+        new URL(response.url()).pathname.endsWith('/resolve'),
+      );
+      await page.getByLabel('Тип подхода, если знаете').first().selectOption('working');
+      expect((await resolved).status()).toBe(200);
+    }
+    const before = await page.request.get('/api/v1/workouts/history/summary', { headers });
+    expect((await before.json()).workouts_completed).toBe(0);
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    if (scenario.provider === 'fitnotes') {
+      await expect(page.getByRole('button', { name: 'Сохранить историю' })).toBeDisabled();
+      await page
+        .getByRole('checkbox', { name: 'Подтверждаю, что выбранные подходы выполнены' })
+        .check();
+    }
+    const confirming = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith('/confirm'),
+    );
+    await page.getByRole('button', { name: 'Сохранить историю' }).click();
+    const confirmed = await confirming;
+    expect(confirmed.status()).toBe(200);
+    const result = await confirmed.json();
+    expect(result.result).toMatchObject({ workout_count: 1, set_count: 1 });
+    await expect(page.getByText('История дополнена')).toBeVisible();
+    const retry = await page.request.post(new URL(confirmed.url()).pathname, {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      data: confirmed.request().postData(),
+    });
+    expect(retry.status()).toBe(200);
+    expect((await retry.json()).result).toEqual(result.result);
+    const summary = await page.request.get('/api/v1/workouts/history/summary', { headers });
+    expect(await summary.json()).toMatchObject({
+      workouts_completed: 1,
+      completed_sets: 1,
+      volume_kg: 362.88,
+    });
+    const analytics = await page.request.get(
+      '/api/v1/workouts/progress/training-analytics?date_from=2025-12-22&date_to=2025-12-22',
+      { headers },
+    );
+    expect(analytics.status()).toBe(200);
+    expect(await analytics.json()).toMatchObject({
+      completed_workout_count: 1,
+      completed_set_count: 1,
+      external_load_volume_kg: 362.88,
+    });
+    await page.getByRole('button', { name: 'Открыть историю' }).click();
+    await expect(
+      page.getByRole('article', {
+        name: `Тренировка ${scenario.provider === 'fitnotes' ? 'FitNotes' : 'Synthetic'} в истории`,
+      }),
+    ).toBeVisible();
+  });
+}
+
 test('migrated PostgreSQL serves a real browser nutrition transaction and idempotent retry', async ({
   page,
 }) => {

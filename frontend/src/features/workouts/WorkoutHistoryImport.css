@@ -141,6 +141,19 @@
   gap: 10px;
   margin-top: 20px;
 }
+.history-import__completion {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.history-import__completion .checkbox-row {
+  align-items: flex-start;
+  min-height: 44px;
+}
+.history-import__completion input {
+  flex: 0 0 18px;
+  margin-top: 2px;
+}
 .history-import__actions button {
   min-height: 44px;
 }

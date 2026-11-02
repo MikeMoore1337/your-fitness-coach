@@ -104,14 +104,12 @@ def parse(content: bytes, *, weight_unit: str = "") -> tuple[ImportRow, ...]:
             "workout_ref": workout_ref,
             "performed_on": day.isoformat() if day else "",
             "workout_title": "FitNotes",
-            "status": "completed",
             "exercise_ref": exercise_ref,
             "exercise_name": name,
             "set_number": str(counters[(workout_ref, exercise_ref)]),
-            "set_status": "completed",
             "reps": fields["Reps"],
             "weight": weight,
             "weight_unit": source_unit if weight else "",
         }
-        rows.append(row(line, fields, source, issues))
+        rows.append(row(line, fields, source, issues, completion_unknown=True))
     return tuple(rows)

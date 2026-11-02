@@ -308,6 +308,7 @@ def confirm_history(
             draft_id,
             version=payload.version,
             preview_signature=payload.preview_signature,
+            completion_confirmed=payload.completion_confirmed is True,
         )
         result = HistoryImportPreview.model_validate(
             history_import_preview(db, current_user, draft)

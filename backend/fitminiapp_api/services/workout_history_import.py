@@ -232,7 +232,9 @@ def create_history_import(
         provider=provider,
         source_sha256=hashlib.sha256(source).hexdigest(),
         schema_version=1 if provider == PROVIDER else 3,
-        parser_version=PARSER_VERSION if provider == PROVIDER else "1.0",
+        parser_version=PARSER_VERSION
+        if provider == PROVIDER
+        else ("1.1" if provider == "fitnotes" else "1.0"),
         status="pending",
         version=1,
         draft_json={"rows": rows, "duplicate_choices": {}},
@@ -586,7 +588,13 @@ def resolve_history_import(
 
 
 def confirm_history_import(
-    db: Session, user: User, draft_id: str, *, version: int, preview_signature: str
+    db: Session,
+    user: User,
+    draft_id: str,
+    *,
+    version: int,
+    preview_signature: str,
+    completion_confirmed: bool = False,
 ) -> WorkoutHistoryImportDraft:
     _lock_user(db, user)
     draft = _get_draft(db, user, draft_id, lock=True)
@@ -605,7 +613,12 @@ def confirm_history_import(
         and draft.schema_version == 1
         and draft.parser_version in {"1.0", PARSER_VERSION}
     ) or (
-        draft.provider in ADAPTERS and draft.schema_version == 3 and draft.parser_version == "1.0"
+        draft.provider in ADAPTERS
+        and draft.schema_version == 3
+        and (
+            draft.parser_version == "1.0"
+            or (draft.provider == "fitnotes" and draft.parser_version == "1.1")
+        )
     )
     if not supported:
         raise HistoryImportError(
@@ -653,6 +666,13 @@ def confirm_history_import(
             raise HistoryImportError("duplicate_decision", "Проверьте возможные совпадения", 409)
         if any(candidate["kind"] in {"exact", "source"} for candidate in item["candidates"]):
             raise HistoryImportError("duplicate_exact", "Исключите повторяющуюся тренировку", 409)
+
+    if draft.provider == "fitnotes" and not completion_confirmed:
+        raise HistoryImportError(
+            "completion_confirmation_required",
+            "Подтвердите, что выбранные подходы выполнены",
+            409,
+        )
 
     groups: dict[str, list[dict]] = defaultdict(list)
     for row in included:
@@ -721,7 +741,8 @@ def confirm_history_import(
                     if draft.provider != PROVIDER
                     and not (row.get("manual_set_kind") or row["source"]["set_kind"])
                     else None,
-                    is_completed=row["source"]["set_status"] == "completed",
+                    is_completed=draft.provider == "fitnotes"
+                    or row["source"]["set_status"] == "completed",
                     execution_mode=row["source"].get("execution_mode") or None,
                     first_side=row["source"].get("first_side") or None,
                     reached_failure=(
@@ -769,6 +790,7 @@ def confirm_history_import(
                 parser_version=draft.parser_version,
                 source_timezone=first["source"]["timezone"],
                 source_data={
+                    **({"completion_confirmation": "user"} if draft.provider == "fitnotes" else {}),
                     "sets": [
                         {
                             "exercise_ref": item["source"]["exercise_ref"],
@@ -778,7 +800,7 @@ def confirm_history_import(
                             "fields": item["provider_fields"],
                         }
                         for item in group
-                    ]
+                    ],
                 }
                 if draft.provider != PROVIDER
                 else None,

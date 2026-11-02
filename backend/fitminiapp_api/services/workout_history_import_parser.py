@@ -169,7 +169,9 @@ def _weight(value: str, unit: str, issues: list[ImportIssue]) -> Decimal | None:
     return weight_kg
 
 
-def _parse_row(line: int, source: dict[str, str], version: str) -> ImportRow:
+def _parse_row(
+    line: int, source: dict[str, str], version: str, *, completion_unknown: bool = False
+) -> ImportRow:
     issues: list[ImportIssue] = []
     for field in ("workout_ref", "workout_title", "exercise_ref", "exercise_name"):
         value = source[field]
@@ -177,14 +179,16 @@ def _parse_row(line: int, source: dict[str, str], version: str) -> ImportRow:
             _issue(issues, "invalid_text", field, "Заполните поле: не более 128 символов")
         elif value[0] in "=+-@":
             _issue(issues, "unsafe_text", field, "Значение начинается с недопустимого символа")
-    if source["status"] != "completed":
+    if source["status"] != "completed" and not (completion_unknown and not source["status"]):
         _issue(
             issues, "not_completed", "status", "Можно импортировать только завершённые тренировки"
         )
     mode = source.get("execution_mode", "")
     side_mode = version in {"2", "3"} and mode in {"per_side", "alternating"}
-    if source["set_status"] != "completed" and not (
-        side_mode and source["set_status"] == "incomplete"
+    if (
+        source["set_status"] != "completed"
+        and not (side_mode and source["set_status"] == "incomplete")
+        and not (completion_unknown and not source["set_status"])
     ):
         _issue(issues, "set_not_completed", "set_status", "Подход должен быть отмечен выполненным")
     if source["set_kind"] not in (
