@@ -1806,7 +1806,7 @@ def _normalized_header_key(value: str) -> str:
 def _normalize_repetitions(value: str) -> str:
     normalized = _text(value)
     normalized = re.sub(
-        r"\b(?:макс(?:имум)?|[mм][aа][xх])\b", "MAX", normalized, flags=re.IGNORECASE
+        r"\b(?:макс(?:имум)?|[mм][aа][xх])\b", "AMRAP", normalized, flags=re.IGNORECASE
     )
     normalized = re.sub(r"\s*(?:×|x|х)\s*", "/", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\s*/\s*", "/", normalized)
@@ -2627,13 +2627,13 @@ def _expand_extracted_rows(
             if is_compound and isinstance(raw_reps, str)
             else []
         )
-        # A two-part MAX/number target belongs to the two exercise names,
+        # A two-part AMRAP/number target belongs to the two exercise names,
         # not to two of the four sets. Purely numeric lists remain unchanged.
         split_component_reps = (
             len(component_reps) == 2
-            and "MAX" in component_reps
+            and "AMRAP" in component_reps
             and all(
-                item == "MAX" or (item.isascii() and item.isdecimal() and 1 <= int(item) <= 1000)
+                item == "AMRAP" or (item.isascii() and item.isdecimal() and 1 <= int(item) <= 1000)
                 for item in component_reps
             )
         )
