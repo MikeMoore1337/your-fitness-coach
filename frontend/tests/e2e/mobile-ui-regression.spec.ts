@@ -322,6 +322,9 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await expect(finish).toBeVisible();
   await expectNoOverlap(finish, page.locator('#appBottomNav'));
   await expectTouchTargets(page.locator('.active-workout-set__done'));
+  const editPlan = page.getByRole('button', { name: 'Изменить план подхода' });
+  await expect(editPlan).toBeVisible();
+  await expectTouchTargets(editPlan);
 
   const reps = page.getByRole('spinbutton', { name: /Повторы, .*подход 1/ });
   await reps.focus();
