@@ -1236,6 +1236,38 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
       const cycle = page.locator('.program-import-cycle');
       await expect(cycle).toContainText('В файле распознано 3');
       await expect(cycle).toContainText('C2');
+      const matchedContrast = await page
+        .locator('.program-import-ok')
+        .first()
+        .evaluate((element) => {
+          const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+          const linear = (value: number) => {
+            const normalized = value / 255;
+            return normalized <= 0.04045
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          };
+          const luminance = (values: number[]) =>
+            linear(values[0]) * 0.2126 + linear(values[1]) * 0.7152 + linear(values[2]) * 0.0722;
+          const foreground = rgb(getComputedStyle(element).color);
+          let background = [255, 255, 255];
+          let ancestor: Element | null = element;
+          while (ancestor) {
+            const values = rgb(getComputedStyle(ancestor).backgroundColor);
+            const opacity = Number(
+              (getComputedStyle(ancestor).backgroundColor.match(/[\d.]+/g) ?? [])[3] ?? 1,
+            );
+            if (values.length === 3 && opacity === 1) {
+              background = values;
+              break;
+            }
+            ancestor = ancestor.parentElement;
+          }
+          const high = Math.max(luminance(foreground), luminance(background));
+          const low = Math.min(luminance(foreground), luminance(background));
+          return (high + 0.05) / (low + 0.05);
+        });
+      expect(matchedContrast).toBeGreaterThanOrEqual(4.5);
       await page.getByLabel('Всего недель программы').fill('16');
       await page
         .getByRole('checkbox', { name: 'Повторять исходные недели до конца срока' })

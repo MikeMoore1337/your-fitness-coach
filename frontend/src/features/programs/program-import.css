@@ -212,7 +212,7 @@
 }
 
 .program-import-ok {
-  color: var(--success-strong, var(--success));
+  color: var(--v2-success-text, var(--success-text, var(--success)));
   font-weight: 700;
 }
 
