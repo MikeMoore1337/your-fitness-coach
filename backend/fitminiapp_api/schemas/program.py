@@ -935,7 +935,11 @@ class CoachProgramExerciseCreate(BaseModel):
     def validate_superset_pair(self):
         if self.skip_protected and (
             self.effective_scope != "future_program"
-            or (self.occurrence_weeks is None and self.source_cycle_week is None)
+            or (
+                self.occurrence_weeks is None
+                and self.source_cycle_week is None
+                and self.from_week is None
+            )
         ):
             raise ValueError("skip_protected requires an explicit future cycle scope")
         if self.effective_scope == "next_workout" and self.effective_date is not None:
@@ -1186,8 +1190,29 @@ class ProgramWeekTypeRevisionRequest(BaseModel):
             raise ValueError("Выберите недели или начало повторения")
         if self.occurrence_weeks is not None and self.source_cycle_week is not None:
             raise ValueError("Нельзя совмещать отдельные недели и повторение")
-        if self.from_week is not None and self.source_cycle_week is None:
-            raise ValueError("Укажите исходную неделю цикла")
+        return self
+
+
+class ProgramCycleImpactPreviewRequest(BaseModel):
+    """Read-only impact view; unlike a week-type mutation it may cover all future weeks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    week_type: Literal["light", "medium", "heavy"] | None = None
+    occurrence_weeks: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    from_week: int | None = Field(default=None, ge=1, strict=True)
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if (self.occurrence_weeks is None) == (self.from_week is None):
+            raise ValueError("Выберите недели или начало будущей области")
+        if self.occurrence_weeks is not None and self.source_cycle_week is not None:
+            raise ValueError("Нельзя совмещать отдельные недели и повторение")
         return self
 
 
