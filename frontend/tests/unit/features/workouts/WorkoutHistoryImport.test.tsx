@@ -105,6 +105,50 @@ afterEach(() => {
 });
 
 describe('WorkoutHistoryImport', () => {
+  it('lets the user exclude and restore one matched FitNotes set', async () => {
+    const first = resolved.rows[0]!;
+    let current = {
+      ...resolved,
+      provider: 'fitnotes',
+      rows: [first, { ...first, line: 4, set_number: 2 }],
+    };
+    const resolutions: Array<{ excluded_lines: number[] }> = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/workout-history-imports' && (init?.method ?? 'GET') === 'GET')
+        return Response.json([]);
+      if (path === '/api/v1/workout-history-imports' && init?.method === 'POST')
+        return Response.json(current, { status: 201 });
+      if (path.endsWith('/resolve')) {
+        const payload = JSON.parse(String(init?.body)) as { excluded_lines: number[] };
+        resolutions.push(payload);
+        current = {
+          ...current,
+          version: current.version + 1,
+          rows: current.rows.map((item) => ({
+            ...item,
+            excluded: payload.excluded_lines.includes(item.line),
+          })),
+        };
+        return Response.json(current);
+      }
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderImport();
+    await userEvent.selectOptions(await screen.findByLabelText('Источник'), 'fitnotes');
+    fireEvent.change(screen.getByLabelText('Выбрать CSV-файл'), {
+      target: { files: [new File(['fixture'], 'fitnotes.csv')] },
+    });
+    expect(await screen.findByText(/В файле FitNotes нет отметок выполнения/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Исключить строку 4' }));
+    await screen.findByRole('button', { name: 'Вернуть строку' });
+    expect(resolutions[0]?.excluded_lines).toEqual([4]);
+    expect(screen.getByRole('button', { name: 'Исключить строку 3' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Вернуть строку' }));
+    await screen.findByRole('button', { name: 'Исключить строку 4' });
+    expect(resolutions[1]?.excluded_lines).toEqual([]);
+  });
+
   it('requires renewed confirmation that FitNotes sets were completed', async () => {
     let body: Record<string, unknown> | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {

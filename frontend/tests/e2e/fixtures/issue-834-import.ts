@@ -18,11 +18,11 @@ export async function installIssue834ImportApi(page: Page, provider: ImportProvi
     started_at: provider === 'fitnotes' ? '' : '2025-10-12T18:50:00',
     timezone: '',
     workout_title: provider === 'fitnotes' ? 'FitNotes' : 'Верх тела',
-    status: 'completed',
+    status: provider === 'fitnotes' ? '' : 'completed',
     exercise_ref: 'exercise-1',
     exercise_name: 'Жим штанги лёжа',
     set_number: '1',
-    set_status: 'completed',
+    set_status: provider === 'fitnotes' ? '' : 'completed',
     set_kind: provider === 'fitnotes' ? '' : 'working',
     reps: '8',
     weight: provider === 'fitnotes' ? '100' : '60',
@@ -66,7 +66,7 @@ export async function installIssue834ImportApi(page: Page, provider: ImportProvi
     status: 'pending',
     provider,
     schema_version: 3,
-    parser_version: '1.0',
+    parser_version: provider === 'fitnotes' ? '1.1' : '1.0',
     expires_at: '2027-11-01T12:00:00Z',
     rows: [row],
     duplicate_choices: {},
@@ -96,6 +96,7 @@ export async function installIssue834ImportApi(page: Page, provider: ImportProvi
       resolves += 1;
       const input = request.postDataJSON() as {
         set_kind_choices?: Record<string, 'working' | 'warmup' | 'drop' | null>;
+        excluded_lines?: number[];
       };
       const manualKind = input.set_kind_choices?.['3'];
       const previous = preview.rows ?? [];
@@ -106,6 +107,7 @@ export async function installIssue834ImportApi(page: Page, provider: ImportProvi
         rows: previous.map((item) => ({
           ...item,
           manual_set_kind: manualKind === undefined ? item.manual_set_kind : manualKind,
+          excluded: input.excluded_lines?.includes(item.line) ?? item.excluded,
         })),
       };
       return route.fulfill({ json: preview });

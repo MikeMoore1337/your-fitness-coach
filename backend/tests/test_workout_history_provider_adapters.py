@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 from datetime import date
 from decimal import Decimal
 
@@ -392,6 +393,41 @@ def test_hevy_unsupported_duration_is_visible_and_blocks_the_row():
     (parsed,) = hevy.parse(csv_file(HEVY, [hevy_row(duration_seconds="75")]))
     assert any(issue.field == "duration_seconds" for issue in parsed.issues)
     assert parsed.provider_fields["duration_seconds"] == "75"
+
+
+def test_import_logs_and_errors_do_not_echo_csv_or_filename(client, caplog, monkeypatch):
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from fitminiapp_api.api.v1 import workout_history_import as endpoint
+
+    marker = "synthetic_private_import_marker"
+    headers = _auth(client, 834_106)
+    content = csv_file(FITNOTES, [fitnotes_row(Comment=marker)])
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    def upload(data):
+        return client.post(
+            "/api/v1/workout-history-imports",
+            headers=headers,
+            data={"provider": "fitnotes"},
+            files={"file": (f"{marker}.csv", data, "text/csv")},
+        )
+
+    assert upload(content).status_code == 201
+    malformed = upload(f"{marker}\nvalue\n".encode())
+    assert malformed.status_code == 400
+    assert marker not in malformed.text
+
+    def fail_storage(*args, **kwargs):
+        raise SQLAlchemyError(marker)
+
+    monkeypatch.setattr(endpoint, "create_history_import", fail_storage)
+    failed = upload(content)
+    assert failed.status_code == 503
+    assert marker not in failed.text
+    assert any(record.name == "app.http" for record in caplog.records)
+    assert all(marker not in repr(record.__dict__) for record in caplog.records)
 
 
 def test_existing_fitnotes_draft_requires_completion_confirmation(client):

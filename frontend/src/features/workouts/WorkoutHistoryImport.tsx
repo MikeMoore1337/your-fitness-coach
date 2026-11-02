@@ -626,8 +626,9 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
           </div>
           {preview.provider === 'fitnotes' && (
             <p className="history-import__muted">
-              В FitNotes нет времени и типа подхода. Записи одного дня объединены; подходы без типа
-              не участвуют в рабочих показателях и рекордах. Если знаете тип, выберите его ниже.
+              В файле FitNotes нет отметок выполнения. Исключите невыполненные подходы. Время и тип
+              подхода тоже не указаны. Записи одного дня объединены; подходы без типа не участвуют в
+              рабочих показателях и рекордах. Если знаете тип, выберите его ниже.
             </p>
           )}
           {(unresolved || unresolvedDuplicates) && (
@@ -709,6 +710,16 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
                               </p>
                             ))}
                           </details>
+                        )}
+                        {preview.provider === 'fitnotes' && !row.excluded && (
+                          <Button
+                            variant="secondary"
+                            disabled={busy}
+                            aria-label={`Исключить строку ${row.line}`}
+                            onClick={() => exclude(row.line, true)}
+                          >
+                            Исключить строку
+                          </Button>
                         )}
                         {row.excluded && (
                           <>

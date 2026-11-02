@@ -50,7 +50,14 @@ for (const [index, scenario] of historyImports.entries()) {
     await page.getByLabel('Выбрать CSV-файл').setInputFiles({
       name: 'synthetic.csv',
       mimeType: 'text/csv',
-      buffer: Buffer.from(scenario.csv),
+      buffer: Buffer.from(
+        scenario.csv +
+          (scenario.label === 'fitnotes-android'
+            ? '2025-12-22,barbell bench press,Chest,110,lbs,2,,,,\n'
+            : scenario.label === 'fitnotes-ios'
+              ? '2025-12-22,barbell bench press,Chest,,110,2,,,,,wr\n'
+              : ''),
+      ),
     });
     const uploaded = await upload;
     expect(uploaded.status()).toBe(201);
@@ -61,10 +68,18 @@ for (const [index, scenario] of historyImports.entries()) {
       expect(preview.rows[0].provider_fields['Weight (kg)']).toBe('45.3599');
     if (scenario.provider === 'fitnotes') {
       expect(preview.rows[0].source.set_status).toBe('');
+      expect(preview.rows).toHaveLength(2);
+      const excluding = page.waitForResponse((response) =>
+        new URL(response.url()).pathname.endsWith('/resolve'),
+      );
+      await page.getByRole('button', { name: `Исключить строку ${preview.rows[1].line}` }).click();
+      const excluded = await excluding;
+      expect(excluded.status()).toBe(200);
+      expect((await excluded.json()).rows[1].excluded).toBe(true);
       const resolved = page.waitForResponse((response) =>
         new URL(response.url()).pathname.endsWith('/resolve'),
       );
-      await page.getByLabel('Тип подхода, если знаете').selectOption('working');
+      await page.getByLabel('Тип подхода, если знаете').first().selectOption('working');
       expect((await resolved).status()).toBe(200);
     }
     const before = await page.request.get('/api/v1/workouts/history/summary', { headers });
