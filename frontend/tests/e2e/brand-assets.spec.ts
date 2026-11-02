@@ -345,6 +345,10 @@ async function installPublicSurfaceApi(page: Page): Promise<Set<string>> {
       await route.fulfill({ json: { status: 'clear', missed_workouts: [], next_workout: null } });
       return;
     }
+    if (path === '/api/v1/workouts/session-rotation') {
+      await route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
+      return;
+    }
     if (path.startsWith('/api/v1/workouts/cardio?')) {
       await route.fulfill({ json: [] });
       return;
