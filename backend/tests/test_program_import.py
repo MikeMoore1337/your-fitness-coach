@@ -1997,12 +1997,18 @@ def test_xlsx_matrix_source_headers_four_to_six_use_source_positions_one_to_thre
     assert preview["duration_weeks"] == 3
     assert preview["week_types"] == [None, None, None]
     assert {row["week_number"] for row in preview["rows"]} == {1, 2, 3}
-    assert [(item["week_number"], item["week_type"], item["source_cell"]) for item in preview["week_type_candidates"]] == [
+    candidates = [
+        (item["week_number"], item["week_type"], item["source_cell"])
+        for item in preview["week_type_candidates"]
+    ]
+    assert candidates == [
         (1, "light", "C2"),
         (2, "medium", "F2"),
         (3, "heavy", "I2"),
     ]
-    assert "source_week_numbers_normalized" in {issue["code"] for issue in preview["issues"]}
+    assert "source_week_numbers_normalized" in {
+        issue["code"] for issue in preview["issues"]
+    }
     assert preview["summary"]["blocking_issue_count"] == 0
     resolved = client.post(
         f"/api/v1/programs/imports/{preview['id']}/resolve",
