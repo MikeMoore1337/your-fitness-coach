@@ -53,6 +53,8 @@ const actionValues = {
 const changeValues = { added: 'added', removed: 'removed' } as const;
 const selectedScope: Scope = 'selected';
 const strengthMetric = 'strength';
+const conflictMessage =
+  'План уже изменился. Введённые значения сохранены. Обновите план и проверьте изменения заново.';
 const typeLabels: Record<Exclude<WeekType, null>, string> = {
   light: 'Лёгкая',
   medium: 'Средняя',
@@ -107,6 +109,14 @@ export function ActiveProgramPeriodization({
     preview: Preview;
     body: Record<string, unknown>;
     action: Action;
+    exercise: {
+      workout: PlanWorkout;
+      exercise: PlanExercise;
+      sets: number;
+      reps: string;
+      minutes: number;
+      rest: number;
+    } | null;
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -118,6 +128,7 @@ export function ActiveProgramPeriodization({
   const checkButton = useRef<HTMLButtonElement>(null);
   const wasPreview = useRef(false);
   const impactOpen = impact !== null;
+  const impactStale = impact !== null && impact.body.expected_revision_number !== revision;
   useLayoutEffect(() => {
     if (!impactOpen && !wasPreview.current) return;
     if (impactOpen) {
@@ -161,7 +172,7 @@ export function ActiveProgramPeriodization({
     setConflict(reason instanceof ApiError && reason.status === 409);
     setError(
       reason instanceof ApiError && reason.status === 409
-        ? 'План уже изменился. Введённые значения сохранены. Обновите план и проверьте изменения заново.'
+        ? conflictMessage
         : reason instanceof Error
           ? reason.message
           : 'Не удалось проверить изменения.',
@@ -196,12 +207,14 @@ export function ActiveProgramPeriodization({
       : { occurrence_weeks: scope === selectedScope ? futureSelectedWeeks : [week] };
 
   const check = async (offset = 0, requestedAction = action) => {
+    if (impactStale) return;
     setBusy(true);
     setError('');
     setConflict(false);
     try {
-      const body =
-        requestedAction === 'enable'
+      const body = impact
+        ? { ...impact.body, offset }
+        : requestedAction === 'enable'
           ? {
               expected_revision_number: revision,
               effective_from_week: week,
@@ -224,11 +237,16 @@ export function ActiveProgramPeriodization({
                   ...scopeBody(),
                   offset,
                 };
+      const checkedExercise = impact
+        ? impact.exercise
+        : requestedAction === actionValues.exercise && selectedExercise
+          ? { ...selectedExercise, sets, reps, minutes, rest }
+          : null;
       const preview = await api<Preview>(
         `${basePath}/${requestedAction === 'enable' ? 'enable' : requestedAction === actionValues.disable ? 'disable' : requestedAction === actionValues.duration ? 'duration' : 'week-type'}/preview`,
         { method: 'POST', body },
       );
-      setImpact({ preview, body, action: requestedAction });
+      setImpact({ preview, body, action: requestedAction, exercise: checkedExercise });
     } catch (reason) {
       showError(reason);
     } finally {
@@ -236,24 +254,29 @@ export function ActiveProgramPeriodization({
     }
   };
   const apply = async () => {
-    if (!impact || busy) return;
+    if (!impact || busy || impactStale) return;
     setBusy(true);
     setError('');
     setConflict(false);
     try {
       let result: { current_revision_number: number };
-      if (impact.action === actionValues.exercise && !selectedExercise)
+      if (impact.action === actionValues.exercise && !impact.exercise)
         throw new Error('Выберите упражнение и проверьте изменения заново.');
-      if (impact.action === actionValues.exercise && selectedExercise) {
-        const { workout, exercise } = selectedExercise;
+      if (impact.action === actionValues.exercise && impact.exercise) {
+        const { workout, exercise, sets, reps, minutes, rest } = impact.exercise;
         result = await api<{ current_revision_number: number }>(
           `/api/v1/programs/assigned/${programId}/exercises`,
           {
             method: 'POST',
             body: {
-              expected_revision_number: revision,
+              expected_revision_number: impact.body.expected_revision_number,
               effective_scope: 'future_program',
-              ...scopeBody(),
+              ...(impact.body.from_week !== undefined
+                ? {
+                    from_week: impact.body.from_week,
+                    source_cycle_week: impact.body.source_cycle_week,
+                  }
+                : { occurrence_weeks: impact.body.occurrence_weeks }),
               skip_protected: true,
               day_number: workout.day_number,
               target_template_exercise_id: exercise.source_template_exercise_id,
@@ -270,9 +293,9 @@ export function ActiveProgramPeriodization({
         result = await api<{ current_revision_number: number }>(basePath, {
           method: 'PATCH',
           body: {
-            expected_revision_number: revision,
-            effective_from_week: week,
-            duration_weeks: nextDuration,
+            expected_revision_number: impact.body.expected_revision_number,
+            effective_from_week: impact.body.effective_from_week,
+            duration_weeks: impact.body.duration_weeks,
           },
         });
       } else {
@@ -291,6 +314,7 @@ export function ActiveProgramPeriodization({
   };
 
   if (impact) {
+    const checkedWeekType = impact.body.week_type as WeekType;
     return (
       <section
         className="program-builder-section program-periodization stack"
@@ -305,13 +329,13 @@ export function ActiveProgramPeriodization({
             <p>Выполненные и начатые тренировки и записанные подходы не изменятся.</p>
           </div>
           <p className="muted">Проверяемых недель: {impact.preview.total_weeks}</p>
-          {impact.action === actionValues.exercise && selectedExercise && (
+          {impact.action === actionValues.exercise && impact.exercise && (
             <p className="muted">
               Новое предписание:{' '}
-              {selectedExercise.exercise.metric_type === strengthMetric
-                ? `${sets} подх. × ${reps}`
-                : `${minutes} мин`}{' '}
-              · отдых {rest} сек.
+              {impact.exercise.exercise.metric_type === strengthMetric
+                ? `${impact.exercise.sets} подх. × ${impact.exercise.reps}`
+                : `${impact.exercise.minutes} мин`}{' '}
+              · отдых {impact.exercise.rest} сек.
             </p>
           )}
           {impact.preview.weeks.map((item) => (
@@ -331,7 +355,7 @@ export function ActiveProgramPeriodization({
                 .filter(
                   (workout) =>
                     impact.action !== actionValues.exercise ||
-                    workout.day_number === selectedExercise?.workout.day_number,
+                    workout.day_number === impact.exercise?.workout.day_number,
                 )
                 .map((workout) => (
                   <p key={`${workout.day_number}:${workout.id}`} className="muted">
@@ -341,7 +365,7 @@ export function ActiveProgramPeriodization({
                     !workout.exercises?.some(
                       (exercise) =>
                         exercise.source_template_exercise_id ===
-                        selectedExercise?.exercise.source_template_exercise_id,
+                        impact.exercise?.exercise.source_template_exercise_id,
                     )
                       ? 'исходная позиция отсутствует, не изменится'
                       : workout.changeable
@@ -353,7 +377,7 @@ export function ActiveProgramPeriodization({
                           : 'не изменится'}
                     {impact.action === actionValues.type &&
                       workout.changeable &&
-                      ` · ${workout.week_type ? typeLabels[workout.week_type] : 'Тип не задан'} → ${weekType ? typeLabels[weekType] : 'тип не задан'}`}
+                      ` · ${workout.week_type ? typeLabels[workout.week_type] : 'Тип не задан'} → ${checkedWeekType ? typeLabels[checkedWeekType] : 'тип не задан'}`}
                   </p>
                 ))}
             </div>
@@ -363,7 +387,7 @@ export function ActiveProgramPeriodization({
               <button
                 type="button"
                 className="secondary"
-                disabled={busy || impact.preview.offset === 0}
+                disabled={busy || impactStale || impact.preview.offset === 0}
                 onClick={() => void check(Math.max(0, impact.preview.offset - 50), impact.action)}
               >
                 Предыдущие недели
@@ -371,20 +395,22 @@ export function ActiveProgramPeriodization({
               <button
                 type="button"
                 className="secondary"
-                disabled={busy || impact.preview.offset + 50 >= impact.preview.total_weeks}
+                disabled={
+                  busy || impactStale || impact.preview.offset + 50 >= impact.preview.total_weeks
+                }
                 onClick={() => void check(impact.preview.offset + 50, impact.action)}
               >
                 Следующие недели
               </button>
             </div>
           )}
-          {error && (
+          {(error || impactStale) && (
             <div
-              className={conflict ? 'program-periodization__warning' : 'field-error'}
+              className={conflict || impactStale ? 'program-periodization__warning' : 'field-error'}
               role="alert"
             >
-              <p>{error}</p>
-              {conflict && (
+              <p>{impactStale ? conflictMessage : error}</p>
+              {(conflict || impactStale) && (
                 <button type="button" disabled={busy} onClick={() => void refreshPlan()}>
                   Обновить план
                 </button>
@@ -392,7 +418,11 @@ export function ActiveProgramPeriodization({
             </div>
           )}
           <div className="program-periodization__actions">
-            <button type="button" disabled={busy || dirty || conflict} onClick={() => void apply()}>
+            <button
+              type="button"
+              disabled={busy || dirty || conflict || impactStale}
+              onClick={() => void apply()}
+            >
               {busy ? 'Применяем…' : 'Применить изменения'}
             </button>
             <button

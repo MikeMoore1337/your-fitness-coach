@@ -116,6 +116,95 @@ describe('Изменение назначенной периодизации', (
     expect(changed).not.toHaveBeenCalled();
   });
 
+  it('не применяет предпросмотр после обновления ревизии родителем', async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = (revision: number) => (
+      <QueryClientProvider client={queryClient}>
+        <ActiveProgramPeriodization
+          programId={9}
+          revision={revision}
+          duration={16}
+          initialWeek={7}
+          exercises={[]}
+          dirty={false}
+          onChanged={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(view(4));
+    await screen.findByText(/Неделя 7 · исходная 1 · проход 3/);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Что изменить' }), 'duration');
+    await user.clear(screen.getByRole('spinbutton', { name: 'Всего недель' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Всего недель' }), '20');
+    await user.click(screen.getByRole('button', { name: 'Проверить изменения' }));
+    expect(await screen.findByRole('button', { name: 'Применить изменения' })).toBeEnabled();
+
+    rerender(view(5));
+    expect(screen.getByRole('button', { name: 'Применить изменения' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('План уже изменился');
+    expect(apiMock).not.toHaveBeenCalledWith(
+      '/api/v1/programs/assigned/9/cycle',
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
+
+  it('применяет предписание, проверенное до завершения предпросмотра', async () => {
+    const user = userEvent.setup();
+    const initial = week(7);
+    const plannedWeek = {
+      ...initial,
+      workouts: [
+        {
+          ...initial.workouts[0],
+          exercises: [
+            {
+              source_template_exercise_id: 3,
+              exercise_id: 11,
+              metric_type: 'strength',
+              prescribed_sets: 3,
+              prescribed_reps: '8-12',
+              prescribed_duration_minutes: null,
+              rest_seconds: 90,
+              notes: null,
+              prescription: null,
+            },
+          ],
+        },
+      ],
+    };
+    const preview = { weeks: [plannedWeek], total_weeks: 1, offset: 0 };
+    let resolvePreview: (value: typeof preview) => void = () => {};
+    let previews = 0;
+    apiMock.mockImplementation((path: string) => {
+      if (path.endsWith('/preview')) {
+        previews += 1;
+        return previews === 1
+          ? Promise.resolve(preview)
+          : new Promise<typeof preview>((resolve) => {
+              resolvePreview = resolve;
+            });
+      }
+      if (path.endsWith('/exercises')) return Promise.resolve({ current_revision_number: 5 });
+      throw new Error('Unexpected path');
+    });
+    setup();
+    await screen.findByText(/Неделя 7 · исходная 1 · проход 3/);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Что изменить' }), 'exercise');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Упражнение' }), '1:3');
+    await user.click(screen.getByRole('button', { name: 'Проверить изменения' }));
+    await user.clear(screen.getByRole('spinbutton', { name: 'Подходы' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Подходы' }), '7');
+    resolvePreview(preview);
+
+    expect(await screen.findByText(/Новое предписание: 3 подх./)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Применить изменения' }));
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/programs/assigned/9/exercises',
+      expect.objectContaining({ body: expect.objectContaining({ prescribed_sets: 3 }) }),
+    );
+  });
+
   it('показывает программу тренера без действий изменения', async () => {
     setup(vi.fn(), true);
     expect(await screen.findByText(/План подготовлен тренером/)).toBeVisible();

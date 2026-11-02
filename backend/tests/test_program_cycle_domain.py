@@ -701,6 +701,81 @@ def test_future_edit_does_not_touch_a_started_workout(client):
         assert row.status == "in_progress" and row.exercises[0].prescribed_reps == "6"
 
 
+def test_offline_set_retry_survives_future_edit_without_changing_started_workout(client):
+    headers, program_id, slot, exercise = assigned_cycle(client)
+    workout_id = client.get("/api/v1/workouts/today", headers=headers).json()["id"]
+    started = client.post(f"/api/v1/workouts/{workout_id}/start", headers=headers)
+    assert started.status_code == 200, started.text
+    first, second = started.json()["exercises"][0]["sets"]
+    first_change = {
+        "actual_reps": 8,
+        "actual_weight": 40,
+        "rir": "2",
+        "is_completed": True,
+        "expected_version": first["version"],
+        "mutation_id": "920-offline-first-mutation",
+    }
+    recorded = client.patch(
+        f"/api/v1/workouts/sets/{first['id']}", headers=headers, json=first_change
+    )
+    assert recorded.status_code == 200, recorded.text
+    edit = {
+        "expected_revision_number": revision(program_id),
+        "effective_scope": "future_program",
+        "from_week": 1,
+        "source_cycle_week": 1,
+        "skip_protected": True,
+        "day_number": 1,
+        "target_template_exercise_id": slot,
+        "exercise_id": exercise,
+        "prescribed_sets": 3,
+        "prescribed_reps": "12",
+        "rest_seconds": 90,
+    }
+    updated = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises", headers=headers, json=edit
+    )
+    assert updated.status_code == 200, updated.text
+    replayed = client.patch(
+        f"/api/v1/workouts/sets/{first['id']}", headers=headers, json=first_change
+    )
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json() == recorded.json()
+    pending = client.patch(
+        f"/api/v1/workouts/sets/{second['id']}",
+        headers=headers,
+        json={
+            "actual_reps": 7,
+            "actual_weight": 37.5,
+            "rir": "3",
+            "is_completed": True,
+            "expected_version": second["version"],
+            "mutation_id": "920-offline-second-mutation",
+        },
+    )
+    assert pending.status_code == 200, pending.text
+    assert (
+        client.post(
+            f"/api/v1/programs/assigned/{program_id}/exercises", headers=headers, json=edit
+        ).status_code
+        == 409
+    )
+    with get_session_context() as db:
+        active = db.get(UserWorkout, workout_id)
+        assert active.status == "in_progress"
+        assert active.exercises[0].prescribed_reps == "6"
+        assert [item.id for item in active.exercises[0].sets] == [first["id"], second["id"]]
+        assert [
+            (item.actual_reps, float(item.actual_weight), item.rir)
+            for item in active.exercises[0].sets
+        ] == [
+            (8, 40, "2"),
+            (7, 37.5, "3"),
+        ]
+        future = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=4).one()
+        assert future.exercises[0].prescribed_reps == "12"
+
+
 def test_future_edit_in_current_week_uses_workout_date(client, monkeypatch):
     headers, program_id, _, exercise = assigned_cycle(client, days=3)
     middle = TODAY + timedelta(days=1)
