@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, 
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
@@ -90,7 +91,9 @@ async def upload_program_import(
             detail="Поддерживаются только файлы .xlsx, .csv, .txt и .docx",
         )
     try:
-        source = await file.read()
+        source = await file.read(settings.program_import_max_file_bytes + 1)
+        if len(source) > settings.program_import_max_file_bytes:
+            raise ProgramImportError("file_too_large", "Файл превышает допустимый размер", 413)
         import_row = create_program_import(
             db,
             current_user,
@@ -152,7 +155,20 @@ def resolve_import_preview(
                 if payload.provenance is not None
                 else None
             ),
-            row_resolutions=[(item.row_number, item.exercise_id) for item in payload.rows],
+            row_resolutions=[
+                (
+                    item.row_number,
+                    item.exercise_id,
+                    item.prescribed_sets,
+                    item.prescribed_reps,
+                    item.planned_loads,
+                )
+                for item in payload.rows
+            ],
+            expected_draft_version=payload.expected_draft_version,
+            assignment_duration_weeks=payload.assignment_duration_weeks,
+            repeat=payload.repeat,
+            week_types=payload.week_types,
         )
         return serialize_import(import_row)
     except ProgramImportError as exc:
@@ -174,6 +190,7 @@ def confirm_import_preview(
             import_id,
             target_program_id=payload.target_program_id if payload else None,
             expected_revision_number=payload.expected_revision_number if payload else None,
+            expected_draft_version=payload.expected_draft_version if payload else None,
         )
         assigned_program_id = program.id if program is not None else import_row.confirmed_program_id
         target = (

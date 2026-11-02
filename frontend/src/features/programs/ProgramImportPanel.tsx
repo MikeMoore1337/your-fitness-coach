@@ -15,6 +15,28 @@ import { SearchableExercisePicker, type ExercisePickerExercise } from './Searcha
 import './program-import.css';
 
 const PAGE_SIZE = 50;
+const WEEK_PAGE_SIZE = 8;
+type WeekType = 'light' | 'medium' | 'heavy' | null;
+type MatrixImport = ProgramImport & {
+  draft_version?: number | null;
+  assignment_duration_weeks?: number | null;
+  repeat?: boolean | null;
+  week_types?: WeekType[] | null;
+  week_type_candidates?: {
+    week_number: number;
+    week_type: Exclude<WeekType, null>;
+    source_text: string;
+    source_sheet?: string | null;
+    source_cell: string;
+  }[];
+  rows: (ProgramImport['rows'][number] & { manual_planned_loads?: string | null })[];
+};
+const weekTypeLabels: Record<Exclude<WeekType, null>, string> = {
+  light: 'Лёгкая',
+  medium: 'Средняя',
+  heavy: 'Тяжёлая',
+};
+
 type ImportProvenance = NonNullable<ProgramImport['provenance']>;
 type ImportCoachingRule = NonNullable<ProgramImport['coaching_rules']>[number];
 
@@ -267,7 +289,7 @@ function importLayoutLabel(layoutVersion: string | null | undefined): string {
 export function ProgramImportPanel({ onImported }: { onImported?: () => void } = {}) {
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
-  const [preview, setPreview] = useState<ProgramImport | null>(null);
+  const [preview, setPreview] = useState<MatrixImport | null>(null);
   const [title, setTitle] = useState('');
   const [goal, setGoal] = useState('');
   const [level, setLevel] = useState('');
@@ -276,6 +298,13 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   });
   const [targetProgramId, setTargetProgramId] = useState<number | ''>('');
   const [selectedExercises, setSelectedExercises] = useState<Record<number, number | ''>>({});
+  const [rowSets, setRowSets] = useState<Record<number, string>>({});
+  const [rowReps, setRowReps] = useState<Record<number, string>>({});
+  const [plannedLoads, setPlannedLoads] = useState<Record<number, string>>({});
+  const [weekTypes, setWeekTypes] = useState<WeekType[]>([]);
+  const [assignmentWeeks, setAssignmentWeeks] = useState('1');
+  const [repeatCycle, setRepeatCycle] = useState(false);
+  const [weekPage, setWeekPage] = useState(0);
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -301,6 +330,40 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   const pageCount = preview ? Math.max(1, Math.ceil(preview.rows.length / PAGE_SIZE)) : 1;
   const previewBlocks = preview?.blocks ?? [];
   const previewCoachingRules = preview?.coaching_rules ?? [];
+  const sourceWeeks = preview?.duration_weeks ?? 1;
+  const isMatrix = preview?.layout_version === 'weekly-matrix-v1' && preview.draft_version != null;
+  const totalWeeks = Number(assignmentWeeks);
+  const invalidDuration =
+    isMatrix &&
+    (!Number.isSafeInteger(totalWeeks) ||
+      totalWeeks < 1 ||
+      totalWeeks > 20000 ||
+      (!repeatCycle && totalWeeks > sourceWeeks));
+  const previewWeeks = [...new Set([1, Math.ceil(totalWeeks / 2), totalWeeks])].filter(
+    (week) => Number.isSafeInteger(week) && week > 0 && week <= 20000,
+  );
+  const hasPendingChanges = Boolean(
+    preview &&
+    (title !== (preview.program_title ?? '') ||
+      goal !== (preview.goal ?? '') ||
+      level !== (preview.level ?? '') ||
+      JSON.stringify(provenance) !==
+        JSON.stringify(preview.provenance ?? { provenance_type: 'CUSTOM' }) ||
+      (isMatrix &&
+        (assignmentWeeks !== String(preview.assignment_duration_weeks ?? sourceWeeks) ||
+          repeatCycle !== Boolean(preview.repeat) ||
+          JSON.stringify(weekTypes) !==
+            JSON.stringify(preview.week_types ?? Array(sourceWeeks).fill(null)))) ||
+      preview.rows.some(
+        (row) =>
+          (selectedExercises[row.row_number] !== undefined &&
+            selectedExercises[row.row_number] !== (row.resolved_exercise_id ?? '')) ||
+          rowSets[row.row_number] !== undefined ||
+          rowReps[row.row_number] !== undefined ||
+          (plannedLoads[row.row_number] !== undefined &&
+            plannedLoads[row.row_number] !== (row.manual_planned_loads ?? '')),
+      )),
+  );
   const selectedTarget = importTargets.data?.find(
     (target) => target.program_id === targetProgramId,
   );
@@ -313,11 +376,19 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     : [];
 
   const targetMatchesImport = (target: ProgramImportTarget) =>
-    target.duration_weeks === (preview?.duration_weeks ?? 1) &&
+    target.duration_weeks ===
+      (preview?.assignment_duration_weeks ?? preview?.duration_weeks ?? 1) &&
     target.day_numbers.join(',') === previewDayNumbers.join(',');
 
-  const applyPreview = (next: ProgramImport) => {
+  const applyPreview = (next: MatrixImport) => {
     setPreview(next);
+    setWeekTypes(next.week_types ?? Array(next.duration_weeks ?? 1).fill(null));
+    setAssignmentWeeks(String(next.assignment_duration_weeks ?? next.duration_weeks ?? 1));
+    setRepeatCycle(Boolean(next.repeat));
+    setWeekPage(0);
+    setRowSets({});
+    setRowReps({});
+    setPlannedLoads({});
     setTitle(next.program_title ?? '');
     setGoal(next.goal ?? '');
     setLevel(next.level ?? '');
@@ -343,7 +414,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     try {
       const body = new FormData();
       body.append('file', file);
-      const next = await api<ProgramImport>('/api/v1/programs/imports', {
+      const next = await api<MatrixImport>('/api/v1/programs/imports', {
         method: 'POST',
         body,
         timeoutMs: 30_000,
@@ -359,13 +430,17 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   };
 
   const resolve = async () => {
-    if (!preview) return;
+    if (!preview || invalidDuration) return;
     setBusy(true);
     setError(null);
     try {
-      const next = await api<ProgramImport>(`/api/v1/programs/imports/${preview.id}/resolve`, {
+      const next = await api<MatrixImport>(`/api/v1/programs/imports/${preview.id}/resolve`, {
         method: 'POST',
         body: {
+          expected_draft_version: preview.draft_version ?? undefined,
+          assignment_duration_weeks: isMatrix ? totalWeeks : undefined,
+          repeat: isMatrix ? repeatCycle : undefined,
+          week_types: isMatrix ? weekTypes : undefined,
           title: title.trim() || undefined,
           goal: goal || undefined,
           level: level || undefined,
@@ -379,11 +454,21 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             source_date: provenance.source_date || null,
             adaptation_notes: provenance.adaptation_notes?.trim() || null,
           },
-          rows: Object.entries(selectedExercises)
-            .filter(([, exerciseId]) => exerciseId !== '')
-            .map(([rowNumber, exerciseId]) => ({
-              row_number: Number(rowNumber),
-              exercise_id: exerciseId,
+          rows: preview.rows
+            .filter(
+              (row) =>
+                selectedExercises[row.row_number] !== undefined ||
+                rowSets[row.row_number] !== undefined ||
+                rowReps[row.row_number] !== undefined ||
+                plannedLoads[row.row_number] !== undefined,
+            )
+            .map((row) => ({
+              row_number: row.row_number,
+              exercise_id: selectedExercises[row.row_number] || undefined,
+              prescribed_sets:
+                rowSets[row.row_number] !== undefined ? Number(rowSets[row.row_number]) : undefined,
+              prescribed_reps: rowReps[row.row_number],
+              planned_loads: plannedLoads[row.row_number],
             })),
         },
       });
@@ -396,7 +481,13 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   };
 
   const confirm = async () => {
-    if (!preview || preview.summary.blocking_issue_count > 0) return;
+    if (
+      !preview ||
+      preview.summary.blocking_issue_count > 0 ||
+      hasPendingChanges ||
+      invalidDuration
+    )
+      return;
     if (targetProgramId !== '' && !selectedTarget) return;
     setBusy(true);
     setError(null);
@@ -406,6 +497,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
         body: {
           target_program_id: selectedTarget?.program_id ?? null,
           expected_revision_number: selectedTarget?.current_revision_number ?? null,
+          expected_draft_version: preview.draft_version ?? undefined,
         },
       });
       setPreview(null);
@@ -420,7 +512,11 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
       );
       trackProductEvent({ name: 'program_import_confirmed', surface: productEventSurface() });
     } catch (reason) {
-      setError(formatError(reason));
+      setError(
+        reason instanceof ApiError && reason.status === 409
+          ? 'Черновик или программа изменились. Проверьте актуальные данные и повторите подтверждение.'
+          : formatError(reason),
+      );
       trackProductEvent({ name: 'program_import_failed', surface: productEventSurface() });
     } finally {
       setBusy(false);
@@ -576,6 +672,154 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               </Select>
             </Field>
           </div>
+
+          {isMatrix && (
+            <section className="program-import-cycle" aria-labelledby="import-cycle-heading">
+              <div className="program-import-cycle__heading">
+                <div>
+                  <span className="eyebrow">Периодизация · по желанию</span>
+                  <h4 id="import-cycle-heading">Исходные недели и срок программы</h4>
+                  <p className="muted">
+                    В файле распознано {sourceWeeks} исходных недель. Типы недель не зависят от
+                    цвета.
+                  </p>
+                </div>
+                <strong>Исходных недель: {sourceWeeks}</strong>
+              </div>
+              <div className="program-import-cycle__fields">
+                <label htmlFor="program-import-duration">
+                  Всего недель программы
+                  <Input
+                    id="program-import-duration"
+                    type="number"
+                    min={1}
+                    max={20000}
+                    value={assignmentWeeks}
+                    onChange={(event) => setAssignmentWeeks(event.target.value)}
+                    aria-invalid={invalidDuration}
+                  />
+                </label>
+                <label className="program-import-cycle__repeat">
+                  <input
+                    type="checkbox"
+                    checked={repeatCycle}
+                    onChange={(event) => setRepeatCycle(event.target.checked)}
+                  />
+                  Повторять исходные недели до конца срока
+                </label>
+              </div>
+              {invalidDuration && (
+                <p className="field-error" role="alert">
+                  Укажите положительное число недель. Если срок больше исходного цикла, включите
+                  повтор.
+                </p>
+              )}
+              <div
+                className="program-import-week-map"
+                aria-label="Пример повторения исходных недель"
+              >
+                {previewWeeks.map((week) => {
+                  const sourceWeek = repeatCycle ? ((week - 1) % sourceWeeks) + 1 : week;
+                  return (
+                    <span key={week}>
+                      Неделя {week} → исходная {sourceWeek}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="program-import-cycle__heading">
+                <strong>Типы исходных недель</strong>
+                {!!preview.week_type_candidates?.length && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      setWeekTypes((current) =>
+                        current.map(
+                          (currentType, index) =>
+                            currentType ??
+                            preview.week_type_candidates?.find(
+                              (item) => item.week_number === index + 1,
+                            )?.week_type ??
+                            null,
+                        ),
+                      )
+                    }
+                  >
+                    Принять текстовые подсказки
+                  </Button>
+                )}
+              </div>
+              <div className="program-import-week-types">
+                {weekTypes
+                  .slice(weekPage * WEEK_PAGE_SIZE, (weekPage + 1) * WEEK_PAGE_SIZE)
+                  .map((weekType, index) => {
+                    const number = weekPage * WEEK_PAGE_SIZE + index + 1;
+                    const candidate = preview.week_type_candidates?.find(
+                      (item) => item.week_number === number,
+                    );
+                    return (
+                      <label key={number}>
+                        Неделя {number}
+                        <Select
+                          aria-label={`Тип исходной недели ${number}`}
+                          value={weekType ?? ''}
+                          onChange={(event) => {
+                            const value = (event.target.value || null) as WeekType;
+                            setWeekTypes((current) =>
+                              current.map((item, position) =>
+                                position === number - 1 ? value : item,
+                              ),
+                            );
+                          }}
+                        >
+                          <option value="">Без типа</option>
+                          {Object.entries(weekTypeLabels).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </Select>
+                        {candidate && (
+                          <small>
+                            В файле: {candidate.source_text} · {candidate.source_cell}. Подсказка не
+                            применяется автоматически.
+                          </small>
+                        )}
+                      </label>
+                    );
+                  })}
+              </div>
+              {sourceWeeks > WEEK_PAGE_SIZE && (
+                <nav className="program-import-pagination" aria-label="Страницы типов недель">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={weekPage === 0}
+                    onClick={() => setWeekPage((current) => current - 1)}
+                  >
+                    Ранее
+                  </Button>
+                  <span>
+                    {weekPage + 1} из {Math.ceil(sourceWeeks / WEEK_PAGE_SIZE)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={(weekPage + 1) * WEEK_PAGE_SIZE >= sourceWeeks}
+                    onClick={() => setWeekPage((current) => current + 1)}
+                  >
+                    Далее
+                  </Button>
+                </nav>
+              )}
+              <p className="muted">
+                Тип недели можно оставить пустым. Повтор не копирует выполненные тренировки. Если
+                недели распознаны неправильно, исправьте заголовки в исходном файле и загрузите его
+                повторно.
+              </p>
+            </section>
+          )}
 
           <details className="program-import-provenance">
             <summary className="yfc-disclosure-summary">
@@ -763,7 +1007,8 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
           <p className="muted program-import-layout-summary">
             Формат: {importLayoutLabel(preview.layout_version)} · Дней:{' '}
             {new Set(preview.rows.map((row) => row.day_number).filter((day) => day != null)).size}
-            {preview.duration_weeks ? ` · Недель: ${preview.duration_weeks}` : ''}
+            {preview.duration_weeks ? ` · Исходных недель: ${preview.duration_weeks}` : ''}
+            {isMatrix ? ` · Срок: ${preview.assignment_duration_weeks ?? sourceWeeks}` : ''}
           </p>
 
           {preview.ai && preview.ai.status !== 'not_needed' && (
@@ -809,12 +1054,12 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         {row.source_range ?? `строка ${row.row_number}`}
                       </small>
                     </th>
-                    <td>{row.week_number ?? '—'}</td>
-                    <td>
+                    <td data-label="Неделя">{row.week_number ?? '—'}</td>
+                    <td data-label="День">
                       <strong>{row.day_number ?? '—'}</strong>
                       <small>{row.day_title || 'Название дня не указано'}</small>
                     </td>
-                    <td>
+                    <td data-label="Упражнение">
                       {row.match_status === 'matched' ? (
                         <strong>{rowExerciseLabel(row)}</strong>
                       ) : (
@@ -853,7 +1098,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         </small>
                       ))}
                     </td>
-                    <td>
+                    <td data-label="Назначение">
                       {row.metric_type === 'cardio'
                         ? `${row.prescribed_duration_minutes ?? '—'} мин`
                         : `${row.prescribed_sets ?? '—'} × ${row.prescribed_reps ?? '—'}`}
@@ -864,10 +1109,69 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         </small>
                       ))}
                       {row.source_auxiliary && (
-                        <small>Из файла: {row.source_auxiliary} (не импортируется как вес)</small>
+                        <small>
+                          Дополнительная ячейка: {row.source_auxiliary} (не считается плановым весом
+                          без подтверждения)
+                        </small>
+                      )}
+                      {isMatrix && row.metric_type !== 'cardio' && (
+                        <details className="program-import-edit">
+                          <summary className="yfc-disclosure-summary">
+                            Исправить назначение
+                            <DisclosureIcon />
+                          </summary>
+                          <label>
+                            Подходы
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={rowSets[row.row_number] ?? String(row.prescribed_sets ?? '')}
+                              onChange={(event) =>
+                                setRowSets((current) => ({
+                                  ...current,
+                                  [row.row_number]: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            Повторы
+                            <Input
+                              value={rowReps[row.row_number] ?? row.prescribed_reps ?? ''}
+                              maxLength={32}
+                              onChange={(event) =>
+                                setRowReps((current) => ({
+                                  ...current,
+                                  [row.row_number]: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            Плановые веса, кг
+                            <Input
+                              value={plannedLoads[row.row_number] ?? row.manual_planned_loads ?? ''}
+                              maxLength={256}
+                              placeholder={row.source_auxiliary ?? 'например, 70/72.5/75/77.5'}
+                              onChange={(event) =>
+                                setPlannedLoads((current) => ({
+                                  ...current,
+                                  [row.row_number]: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          {row.source_cells?.source_auxiliary && (
+                            <small>
+                              Ячейка: {row.source_cells.source_auxiliary}. Значение из файла
+                              применяется только после вашего ввода и подтверждения.
+                            </small>
+                          )}
+                        </details>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Статус">
                       <span
                         className={
                           row.match_status === 'matched'
@@ -920,7 +1224,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               Отменить
             </Button>
             <Button
-              disabled={busy}
+              disabled={busy || Boolean(invalidDuration)}
               type="button"
               variant="secondary"
               onClick={() => void resolve()}
@@ -931,6 +1235,8 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               disabled={
                 busy ||
                 preview.summary.blocking_issue_count > 0 ||
+                hasPendingChanges ||
+                Boolean(invalidDuration) ||
                 (targetProgramId !== '' &&
                   (!selectedTarget || !targetMatchesImport(selectedTarget)))
               }
@@ -944,6 +1250,12 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                   : 'Подтвердить и сохранить шаблон'}
             </Button>
           </div>
+          {hasPendingChanges && (
+            <p className="muted" role="status">
+              Сначала нажмите «Применить исправления», проверьте обновлённый план, затем подтвердите
+              импорт.
+            </p>
+          )}
           <p className="muted program-import-retention">
             Черновик доступен {new Date(preview.expires_at).toLocaleString('ru-RU')}. После
             подтверждения исходные данные предпросмотра удаляются.

@@ -1118,3 +1118,258 @@ for (const theme of ['dark', 'light'] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409', async ({
+  browser,
+}, info) => {
+  test.setTimeout(180_000);
+  for (const theme of ['light', 'dark'] as const) {
+    const page = await browser.newPage({
+      viewport: { width: 393, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      locale: 'ru-RU',
+      timezoneId: 'Europe/Moscow',
+    });
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    try {
+      await preparePage(page, theme, 'browser');
+      await page.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: [] }));
+      await page.route('**/api/v1/programs/imports/targets', (route) =>
+        route.fulfill({ json: [] }),
+      );
+      const preview = (resolved: boolean) => ({
+        id: 'issue-872-matrix',
+        status: 'pending',
+        source_format: 'xlsx',
+        schema_version: 3,
+        parser_version: 'program-import-v5',
+        layout_version: 'weekly-matrix-v1',
+        draft_version: resolved ? 2 : 1,
+        duration_weeks: 3,
+        assignment_duration_weeks: resolved ? 16 : 3,
+        repeat: resolved,
+        week_types: resolved ? ['light', null, null] : [null, null, null],
+        week_type_candidates: [
+          {
+            week_number: 1,
+            week_type: 'light',
+            source_text: 'Лёгкая',
+            source_sheet: 'План',
+            source_cell: 'C2',
+          },
+        ],
+        expires_at: '2030-01-01T00:00:00Z',
+        program_title: 'Трёхнедельный цикл',
+        goal: 'maintenance',
+        level: 'intermediate',
+        provenance: { provenance_type: 'CUSTOM' },
+        rows: [
+          {
+            row_number: 3,
+            source_sheet: 'План',
+            source_range: 'A3:C3',
+            source_cells: {
+              week_number: 'C2',
+              day_number: 'A2',
+              exercise_name: 'A3',
+              source_auxiliary: 'C3',
+            },
+            week_number: 1,
+            day_number: 1,
+            day_title: 'День 1',
+            exercise_name: 'Приседания',
+            metric_type: 'strength',
+            prescribed_sets: 3,
+            prescribed_reps: '8',
+            rest_seconds: 90,
+            source_auxiliary: '70/72.5/75',
+            block_is_deload: false,
+            resolved_exercise_id: 11,
+            resolved_exercise_title: 'Приседания',
+            match_status: 'matched',
+            match_type: 'title',
+            candidates: [],
+            issues: [],
+          },
+        ],
+        issues: [],
+        blocks: [],
+        coaching_rules: [],
+        summary: {
+          row_count: 1,
+          cell_count: 9,
+          matched_row_count: 1,
+          unresolved_row_count: 0,
+          blocking_issue_count: 0,
+          warning_count: 0,
+        },
+      });
+      await page.route('**/api/v1/programs/imports', (route) =>
+        route.fulfill({ json: preview(false) }),
+      );
+      let resolveBody: Record<string, unknown> | null = null;
+      await page.route('**/api/v1/programs/imports/issue-872-matrix/resolve', async (route) => {
+        resolveBody = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({ json: preview(true) });
+      });
+      let confirmCount = 0;
+      await page.route('**/api/v1/programs/imports/issue-872-matrix/confirm', async (route) => {
+        confirmCount += 1;
+        if (confirmCount === 1) {
+          await route.fulfill({ status: 409, json: { detail: 'Конфликт версии' } });
+        } else {
+          await route.fulfill({ json: {} });
+        }
+      });
+
+      await page.goto('/app?section=programs&view=manage&start=create');
+      await page.getByLabel('Загрузить документ программы').setInputFiles({
+        name: 'matrix-3-weeks.xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        buffer: Buffer.from('synthetic-e2e-upload'),
+      });
+      await expect(
+        page.getByRole('heading', { name: 'Проверьте план перед сохранением' }),
+      ).toBeVisible();
+      const cycle = page.locator('.program-import-cycle');
+      await expect(cycle).toContainText('В файле распознано 3');
+      await expect(cycle).toContainText('C2');
+      const matchedContrast = await page
+        .locator('.program-import-ok')
+        .first()
+        .evaluate((element) => {
+          const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+          const linear = (value: number) => {
+            const normalized = value / 255;
+            return normalized <= 0.04045
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          };
+          const luminance = (values: number[]) => {
+            const [red, green, blue] = values;
+            if (red === undefined || green === undefined || blue === undefined) {
+              throw new Error('Не удалось определить RGB для проверки контраста');
+            }
+            return linear(red) * 0.2126 + linear(green) * 0.7152 + linear(blue) * 0.0722;
+          };
+          const foreground = rgb(getComputedStyle(element).color);
+          let background = [255, 255, 255];
+          let ancestor: Element | null = element;
+          while (ancestor) {
+            const values = rgb(getComputedStyle(ancestor).backgroundColor);
+            const opacity = Number(
+              (getComputedStyle(ancestor).backgroundColor.match(/[\d.]+/g) ?? [])[3] ?? 1,
+            );
+            if (values.length === 3 && opacity === 1) {
+              background = values;
+              break;
+            }
+            ancestor = ancestor.parentElement;
+          }
+          const high = Math.max(luminance(foreground), luminance(background));
+          const low = Math.min(luminance(foreground), luminance(background));
+          return (high + 0.05) / (low + 0.05);
+        });
+      expect(matchedContrast).toBeGreaterThanOrEqual(4.5);
+      await page.getByLabel('Всего недель программы').fill('16');
+      await page
+        .getByRole('checkbox', { name: 'Повторять исходные недели до конца срока' })
+        .check();
+      await page.getByRole('button', { name: 'Принять текстовые подсказки' }).click();
+      await expect(page.locator('.program-import-week-map')).toContainText('Неделя 16');
+      await expect(page.locator('.program-import-week-map')).toContainText('исходная 1');
+      const confirm = page.getByRole('button', { name: 'Подтвердить и сохранить шаблон' });
+      await expect(confirm).toBeDisabled();
+
+      for (const width of [320, 360, 393, 430]) {
+        await page.setViewportSize({ width, height: 844 });
+        await expectNoHorizontalOverflow(page);
+        await page.locator('.program-import-preview').screenshot({
+          path: info.outputPath('issue-872-' + theme + '-' + width + '.png'),
+          animations: 'disabled',
+          caret: 'hide',
+        });
+      }
+      const desktop = await browser.newPage({
+        viewport: { width: 1440, height: 900 },
+        locale: 'ru-RU',
+        timezoneId: 'Europe/Moscow',
+      });
+      const desktopErrors: string[] = [];
+      desktop.on('pageerror', (reason) => desktopErrors.push(reason.message));
+      try {
+        await preparePage(desktop, theme, 'browser');
+        await desktop.setViewportSize({ width: 1440, height: 900 });
+        await desktop.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: [] }));
+        await desktop.route('**/api/v1/programs/imports/targets', (route) =>
+          route.fulfill({ json: [] }),
+        );
+        await desktop.route('**/api/v1/programs/imports', (route) =>
+          route.fulfill({ json: preview(false) }),
+        );
+        await desktop.route('**/api/v1/programs/imports/issue-872-matrix/resolve', (route) =>
+          route.fulfill({ json: preview(true) }),
+        );
+        await desktop.route('**/api/v1/programs/imports/issue-872-matrix/confirm', (route) =>
+          route.fulfill({ status: 409, json: { detail: 'Конфликт версии' } }),
+        );
+        await desktop.goto('/app?section=programs&view=manage&start=create');
+        await desktop.getByLabel('Загрузить документ программы').setInputFiles({
+          name: 'matrix-3-weeks.xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: Buffer.from('synthetic-e2e-upload'),
+        });
+        await expect(desktop.locator('.program-import-cycle')).toContainText('Исходных недель: 3');
+        await desktop.getByLabel('Всего недель программы').fill('16');
+        await desktop
+          .getByRole('checkbox', { name: 'Повторять исходные недели до конца срока' })
+          .check();
+        await expectNoHorizontalOverflow(desktop);
+        await desktop.locator('.program-import-preview').screenshot({
+          path: info.outputPath('issue-872-desktop-' + theme + '-1440.png'),
+          animations: 'disabled',
+          caret: 'hide',
+        });
+        await desktop.getByRole('button', { name: 'Принять текстовые подсказки' }).click();
+        await desktop.getByRole('button', { name: 'Применить исправления' }).click();
+        await desktop.getByRole('button', { name: 'Подтвердить и сохранить шаблон' }).click();
+        await expect(desktop.getByRole('alert')).toContainText('Черновик или программа изменились');
+        await desktop.locator('.program-import-card').screenshot({
+          path: info.outputPath('issue-872-desktop-' + theme + '-409.png'),
+          animations: 'disabled',
+          caret: 'hide',
+        });
+        expect(desktopErrors).toEqual([]);
+      } finally {
+        await desktop.close();
+      }
+
+      await page.getByRole('button', { name: 'Применить исправления' }).click();
+      await expect.poll(() => resolveBody).not.toBeNull();
+      expect(resolveBody).toMatchObject({
+        expected_draft_version: 1,
+        assignment_duration_weeks: 16,
+        repeat: true,
+        week_types: ['light', null, null],
+      });
+      await expect(confirm).toBeEnabled();
+      await confirm.click();
+      await expect(page.getByRole('alert')).toContainText('Черновик или программа изменились');
+      await expect(page.locator('.program-import-preview')).toBeVisible();
+      await page.setViewportSize({ width: 393, height: 844 });
+      await page.locator('.program-import-card').screenshot({
+        path: info.outputPath('issue-872-' + theme + '-393-409.png'),
+        animations: 'disabled',
+        caret: 'hide',
+      });
+      await confirm.click();
+      await expect(page.locator('.program-import-preview')).toHaveCount(0);
+      expect(confirmCount).toBe(2);
+      expect(pageErrors).toEqual([]);
+    } finally {
+      await page.close();
+    }
+  }
+});

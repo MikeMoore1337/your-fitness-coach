@@ -212,7 +212,7 @@
 }
 
 .program-import-ok {
-  color: var(--success-strong, var(--success));
+  color: var(--v2-success-text, var(--success-text, var(--success)));
   font-weight: 700;
 }
 
@@ -268,5 +268,167 @@
 
   .program-import-template-links {
     justify-content: center;
+  }
+}
+
+/* #872: bounded owner-approved XLSX cycle review inside the existing panel. */
+.program-import-cycle {
+  display: grid;
+  gap: var(--v2-space-3, 12px);
+  padding: var(--v2-space-4, 16px);
+  background: var(--v2-surface-muted, var(--bg-soft));
+  border: 1px solid var(--v2-border, var(--border));
+  border-radius: var(--v2-control-radius, 10px);
+}
+
+.program-import-cycle__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3, 12px);
+}
+
+.program-import-cycle__heading h4 {
+  margin: 4px 0 0;
+}
+
+.program-import-cycle__heading p {
+  margin: 6px 0 0;
+}
+
+.program-import-cycle__fields {
+  display: grid;
+  grid-template-columns: minmax(160px, 240px) minmax(0, 1fr);
+  gap: var(--v2-space-4, 16px);
+  align-items: center;
+}
+
+.program-import-cycle__fields > label,
+.program-import-week-types label,
+.program-import-edit label {
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.program-import-cycle__repeat {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--touch-target, 44px);
+}
+
+.program-import-cycle__repeat input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent-strong);
+}
+
+.program-import-week-map {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2, 8px);
+}
+
+.program-import-week-map span {
+  padding: 8px 10px;
+  background: var(--v2-surface, var(--bg));
+  border: 1px solid var(--v2-border, var(--border));
+  border-radius: var(--v2-control-radius, 10px);
+  font-variant-numeric: tabular-nums;
+}
+
+.program-import-week-types {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: var(--v2-space-3, 12px);
+}
+
+.program-import-week-types small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.program-import-edit {
+  margin-top: 10px;
+}
+
+.program-import-edit summary {
+  cursor: pointer;
+  min-height: var(--touch-target, 44px);
+  align-content: center;
+  font-weight: 600;
+}
+
+.program-import-edit > label {
+  margin-top: 10px;
+}
+
+.program-import-edit :is(input, select) {
+  width: 100%;
+  min-width: 0;
+}
+
+.program-import-cycle :is(input, select, button):focus-visible,
+.program-import-edit :is(input, select, summary):focus-visible {
+  outline: 3px solid var(--focus-ring, var(--accent-line));
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .program-import-cycle__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .program-import-table {
+    min-width: 0;
+    display: block;
+  }
+
+  .program-import-table thead {
+    display: none;
+  }
+
+  .program-import-table tbody {
+    display: grid;
+    gap: var(--v2-space-3, 12px);
+  }
+
+  .program-import-table tbody tr {
+    display: grid;
+    gap: 6px;
+    padding: var(--v2-space-3, 12px);
+    border-top: 1px solid var(--v2-border, var(--border));
+  }
+
+  .program-import-table th,
+  .program-import-table td {
+    display: block;
+    min-width: 0;
+    width: 100%;
+    padding: 4px 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .program-import-table .exercise-picker,
+  .program-import-table .exercise-picker > input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .program-import-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .program-import-cycle {
+    padding: var(--v2-space-3, 12px);
   }
 }
