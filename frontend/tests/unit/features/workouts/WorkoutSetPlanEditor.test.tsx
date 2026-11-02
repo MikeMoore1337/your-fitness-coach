@@ -54,7 +54,7 @@ it('показывает факты и применяет подтверждён
       onClose={onClose}
     />,
   );
-  expect(screen.getByText(/40 кг · 8 повторов · RIR 2/)).toBeVisible();
+  expect(screen.getByText(/40 кг · 8 повторов · повторов в запасе: 2/)).toBeVisible();
   await user.type(screen.getByLabelText('Плановый вес, кг'), '37,5');
   await user.type(screen.getByLabelText('План повторов'), '8');
   await user.click(screen.getByRole('button', { name: 'Проверить изменение' }));

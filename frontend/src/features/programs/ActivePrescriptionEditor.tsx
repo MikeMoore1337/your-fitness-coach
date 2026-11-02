@@ -172,7 +172,7 @@ export function ActivePrescriptionEditor({
               )}
               {editableEffort ? (
                 <label className="field">
-                  <span>RIR · подход {index + 1}</span>
+                  <span>Повторов в запасе · подход {index + 1}</span>
                   <input
                     value={row.effort}
                     placeholder="Не задан"
@@ -235,7 +235,7 @@ export function ActivePrescriptionEditor({
       )}
       {!plan && (
         <p className="field-error" role="alert">
-          Проверьте повторы, вес, RIR и отдых каждого подхода.
+          Проверьте повторы, вес, запас повторов и отдых каждого подхода.
         </p>
       )}
     </div>

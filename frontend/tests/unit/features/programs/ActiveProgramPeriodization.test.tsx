@@ -700,10 +700,12 @@ describe('Изменение назначенной периодизации', (
     await user.selectOptions(screen.getByRole('combobox', { name: 'Упражнение' }), '1:3');
     await user.click(screen.getByRole('button', { name: 'Настроить предписание подходов' }));
     await user.type(screen.getByRole('textbox', { name: 'Вес, кг · подход 1' }), '40');
-    await user.type(screen.getByRole('textbox', { name: 'RIR · подход 1' }), '2');
+    await user.type(screen.getByRole('textbox', { name: 'Повторов в запасе · подход 1' }), '2');
     await user.click(screen.getByRole('button', { name: 'Добавить подход' }));
     await user.click(screen.getByRole('button', { name: 'Проверить изменения' }));
-    expect(screen.getByText(/Подход 1 · 8–10 повторов · 40 кг · RIR 2/)).toBeVisible();
+    expect(
+      screen.getByText(/Подход 1 · 8–10 повторов · 40 кг · повторов в запасе: 2/),
+    ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Применить изменения' }));
     expect(apiMock).toHaveBeenCalledWith(
       '/api/v1/programs/assigned/9/exercises',

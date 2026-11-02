@@ -110,7 +110,7 @@ export function WorkoutSetPlanEditor({
                   <strong>Подход {item.set_number} · выполнен</strong>
                   <p>
                     {actualWeight ?? '—'} кг · {actualReps ?? '—'} повторов
-                    {actualRir ? ` · RIR ${actualRir}` : ''}
+                    {actualRir ? ` · повторов в запасе: ${actualRir}` : ''}
                   </p>
                 </div>
               );

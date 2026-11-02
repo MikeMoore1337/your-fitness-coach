@@ -156,7 +156,9 @@ function describeSegment(segment: ApiSchemas['PrescriptionSegment']): string {
       ? 'усилие не задано'
       : effort.kind === 'failure'
         ? 'до отказа'
-        : `${effort.kind.toUpperCase()} ${effort.value}`;
+        : effort.kind === 'rir'
+          ? `повторов в запасе: ${effort.value}`
+          : `RPE ${effort.value}`;
   return `Подход ${segment.position} · ${reps} · ${loadText} · ${effortText} · отдых ${segment.rest_after_seconds} сек.`;
 }
 
