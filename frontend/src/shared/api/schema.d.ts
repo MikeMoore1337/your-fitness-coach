@@ -15161,6 +15161,27 @@ export interface components {
              */
             offset: number;
         };
+        /**
+         * ProgramCycleImpactPreviewRequest
+         * @description Read-only impact view; unlike a week-type mutation it may cover all future weeks.
+         */
+        ProgramCycleImpactPreviewRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
+            /** From Week */
+            from_week?: number | null;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
         /** ProgramCycleRevisionRequest */
         ProgramCycleRevisionRequest: {
             /** Expected Revision Number */
@@ -23308,7 +23329,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProgramWeekTypeRevisionRequest"];
+                "application/json": components["schemas"]["ProgramCycleImpactPreviewRequest"];
             };
         };
         responses: {

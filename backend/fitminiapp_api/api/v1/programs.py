@@ -17,6 +17,7 @@ from fitminiapp_api.schemas.program import (
     ProgramCycleDisableRequest,
     ProgramCycleDurationPreviewRequest,
     ProgramCycleEnableRequest,
+    ProgramCycleImpactPreviewRequest,
     ProgramCycleRevisionRequest,
     ProgramLifecycleActionRequest,
     ProgramLifecycleMutationResponse,
@@ -919,7 +920,7 @@ def update_assigned_cycle(
 @router.post("/assigned/{program_id}/cycle/week-type/preview")
 def preview_assigned_week_type(
     program_id: int,
-    payload: ProgramWeekTypeRevisionRequest,
+    payload: ProgramCycleImpactPreviewRequest,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
