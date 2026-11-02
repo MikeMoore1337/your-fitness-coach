@@ -565,6 +565,7 @@ class UserWorkoutExercise(Base):
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
     source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_assignment_slot_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     source_weekly_prescription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)

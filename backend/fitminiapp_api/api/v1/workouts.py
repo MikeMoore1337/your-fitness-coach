@@ -543,6 +543,7 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 "superset_order": item.superset_order,
                 "prescription": item.prescription,
                 "source_template_exercise_id": item.source_template_exercise_id,
+                "source_assignment_slot_id": item.source_assignment_slot_id,
                 "source_weekly_prescription_id": item.source_weekly_prescription_id,
                 "group_id": item.group_id,
                 "group_kind": item.group_kind,
@@ -1501,6 +1502,12 @@ def update_workout_set(
     changes = payload.model_dump(exclude_unset=True)
     expected_version = changes.pop("expected_version", None)
     mutation_id = changes.pop("mutation_id", None)
+    if "planned_target" in changes or (
+        expected_version is not None
+        and set_row.plan_version is not None
+        and expected_version < set_row.plan_version
+    ):
+        db.refresh(workout_exercise)
     if changes.get("is_completed") == "sides-v1":
         changes["is_completed"] = changes.pop("side_is_completed")
     # Exact retries depend on the original request, not today's mutable set state.
@@ -1536,6 +1543,16 @@ def update_workout_set(
             expected_version=expected_version,
             mutation_id=mutation_id,
         )
+        if "planned_target" in changes:
+            record_audit_event(
+                db,
+                actor_user_id=current_user.id,
+                target_user_id=program.user_id,
+                action="workout.set_plan_updated",
+                resource_type="user_workout_set",
+                resource_id=set_row.id,
+                details={"workout_id": workout.id, "set_version": set_row.version},
+            )
     except WorkoutSetSyncError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 

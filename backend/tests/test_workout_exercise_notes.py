@@ -93,6 +93,23 @@ def _payload(data, mutation_id, **content):
     }
 
 
+def test_legacy_note_fingerprint_payload_is_unchanged_without_assignment_slot():
+    payload = ExerciseNoteWrite(
+        exercise_id=1,
+        source_template_exercise_id=5,
+        plan_revision_number=1,
+        week_number=1,
+        day_number=1,
+        expected_version=0,
+        mutation_id="legacy-mutation",
+        body="текст",
+        tags=[],
+    )
+    assert "source_assignment_slot_id" not in payload.model_dump(
+        mode="json", exclude={"mutation_id"}
+    )
+
+
 def test_note_history_uses_its_own_workout_and_preserves_set_history(client, case):
     old = _read(client, case, "old", "old_ex")
     response = client.put(

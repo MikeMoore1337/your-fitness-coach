@@ -17,6 +17,7 @@ from fitminiapp_api.models.program import (
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program import ExercisePrescriptionPlan
 from fitminiapp_api.services.exercise_catalog_metadata import exercise_catalog_metadata
+from fitminiapp_api.services.workout_metrics import exercise_slot_identity
 from fitminiapp_api.services.workout_sides import SIDE_MODES, serialize_sides, side_facts_present
 
 
@@ -53,7 +54,7 @@ def _topology(
         and {"unilateral", "alternating"}.intersection(metadata["execution_variant_tags"])
     ):
         return None
-    if exercise.source_template_exercise_id is None or exercise.prescription is None:
+    if exercise_slot_identity(exercise) is None or exercise.prescription is None:
         return None
     try:
         plan = ExercisePrescriptionPlan.model_validate(exercise.prescription)
@@ -123,7 +124,7 @@ def _matches_plan(exercise: UserWorkoutExercise, item: UserWorkoutSet) -> bool:
 def _group_peers(entries: dict, exercise: UserWorkoutExercise) -> set[tuple]:
     return {
         (
-            other.source_template_exercise_id,
+            exercise_slot_identity(other),
             other.exercise_id,
             other.group_order,
             other.superset_order,
@@ -199,6 +200,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
         cutoff_min = cutoff_max = now_in_timezone("UTC").replace(tzinfo=None)
     items = []
     for exercise, catalog, sets in exercises.get(workout_id, {}).values():
+        slot = exercise_slot_identity(exercise)
         matching_workouts = [
             workout
             for workout in workouts.values()
@@ -207,7 +209,8 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             and workout.day_number == current.day_number
             and any(
                 other.exercise_id == exercise.exercise_id
-                and other.source_template_exercise_id == exercise.source_template_exercise_id
+                and slot is not None
+                and exercise_slot_identity(other) == slot
                 for other, _, _ in exercises.get(workout.id, {}).values()
             )
         ]
@@ -225,7 +228,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
             [
                 entry
                 for entry in exercises.get(source.id, {}).values()
-                if entry[0].source_template_exercise_id == exercise.source_template_exercise_id
+                if slot is not None and exercise_slot_identity(entry[0]) == slot
             ]
             if source
             else []
@@ -233,7 +236,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
         current_slots = [
             entry
             for entry in exercises[workout_id].values()
-            if entry[0].source_template_exercise_id == exercise.source_template_exercise_id
+            if slot is not None and exercise_slot_identity(entry[0]) == slot
         ]
         source_sets: list[UserWorkoutSet] = []
         explicit_sides = any(item.execution_mode in SIDE_MODES for item in sets) or any(
@@ -312,6 +315,7 @@ def build_workout_set_history(db: Session, user: User, workout_id: int) -> dict:
                     "workout_exercise_id": exercise.id,
                     "exercise_id": exercise.exercise_id,
                     "source_template_exercise_id": exercise.source_template_exercise_id,
+                    "source_assignment_slot_id": exercise.source_assignment_slot_id,
                     "previous_today": previous,
                     "previous_workout": past,
                     "history_status": status,

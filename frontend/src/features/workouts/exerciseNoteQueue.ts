@@ -10,6 +10,7 @@ export type NoteIdentity = Pick<
   NoteResponse,
   | 'exercise_id'
   | 'source_template_exercise_id'
+  | 'source_assignment_slot_id'
   | 'plan_revision_number'
   | 'week_number'
   | 'day_number'
@@ -73,6 +74,7 @@ const draftTab = (() => {
 const IDENTITY_KEYS: Array<keyof NoteIdentity> = [
   'exercise_id',
   'source_template_exercise_id',
+  'source_assignment_slot_id',
   'plan_revision_number',
   'week_number',
   'day_number',
@@ -127,6 +129,9 @@ export function noteIdentity(
   return {
     exercise_id: exercise.exercise_id,
     source_template_exercise_id: exercise.source_template_exercise_id ?? null,
+    ...(exercise.source_assignment_slot_id
+      ? { source_assignment_slot_id: exercise.source_assignment_slot_id }
+      : {}),
     plan_revision_number: workout.plan_revision_number ?? null,
     week_number: workout.week_number,
     day_number: workout.day_number,
@@ -136,7 +141,7 @@ export function noteIdentity(
 }
 
 export function sameNoteIdentity(left: NoteIdentity, right: NoteIdentity): boolean {
-  return IDENTITY_KEYS.every((key) => left[key] === right[key]);
+  return IDENTITY_KEYS.every((key) => (left[key] ?? null) === (right[key] ?? null));
 }
 
 function validQueue(value: unknown, userId: number): value is NoteQueue {

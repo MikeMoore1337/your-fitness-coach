@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.nutrition import NutritionTargetResponse
 from fitminiapp_api.schemas.user import BodyPriorityPreference, TrainingPreferencesResponse
@@ -916,7 +916,7 @@ class CoachProgramExerciseCreate(BaseModel):
     skip_protected: bool = False
     effective_date: date | None = None
     exercise_id: int = Field(ge=1)
-    day_number: int | None = Field(default=None, ge=1, le=14)
+    day_number: int | None = Field(default=None, ge=1, le=2_147_483_647)
     prescribed_sets: int | None = Field(default=None, ge=1, le=10)
     prescribed_reps: str | None = Field(default=None, min_length=1, max_length=32)
     prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
@@ -929,10 +929,16 @@ class CoachProgramExerciseCreate(BaseModel):
     group_kind: PrescriptionGroupKind | None = None
     group_order: int | None = Field(default=None, ge=1, le=100)
     target_template_exercise_id: int | None = Field(default=None, ge=1)
+    target_assignment_slot_id: UUID4 | None = None
     reason: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
+        if (
+            self.target_template_exercise_id is not None
+            and self.target_assignment_slot_id is not None
+        ):
+            raise ValueError("Укажите только одну позицию упражнения")
         if self.skip_protected and (
             self.effective_scope != "future_program"
             or (
@@ -1167,9 +1173,77 @@ class ProgramCycleRevisionRequest(BaseModel):
     source_week_order: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
         default=None, min_length=1, max_length=20000
     )
+    remove_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    copy_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    new_day_weekday: int | None = Field(default=None, ge=0, le=6, strict=True)
+    new_day_title: str | None = Field(default=None, min_length=1, max_length=128)
+    swap_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    swap_with_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    occurrence_weeks: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
     week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
     repeat: bool | None = Field(default=None, strict=True)
     reason: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_day_change(self):
+        day_change = any(
+            value is not None
+            for value in (
+                self.remove_day_number,
+                self.copy_day_number,
+                self.swap_day_number,
+            )
+        )
+        if self.occurrence_weeks is not None and self.source_cycle_week is not None:
+            raise ValueError("Выберите отдельные недели или повторение исходной недели")
+        if (
+            self.occurrence_weeks is not None or self.source_cycle_week is not None
+        ) and not day_change:
+            raise ValueError("Область недель применяется только к изменению дней")
+        if (
+            self.occurrence_weeks is not None
+            and min(self.occurrence_weeks) != self.effective_from_week
+        ):
+            raise ValueError("Начало области должно совпадать с первой выбранной неделей")
+        if day_change and (
+            self.source_week_order is not None
+            or self.repeat is not None
+            or self.duration_weeks is not None
+            or "week_types" in self.model_fields_set
+        ):
+            raise ValueError("Изменение дней нужно проверять отдельно от изменения цикла")
+        if (self.swap_day_number is None) != (self.swap_with_day_number is None):
+            raise ValueError("Укажите оба тренировочных дня")
+        if self.swap_day_number is not None and (
+            self.swap_day_number == self.swap_with_day_number
+            or self.remove_day_number is not None
+            or self.copy_day_number is not None
+            or self.source_week_order is not None
+            or self.repeat is not None
+            or self.duration_weeks is not None
+            or "week_types" in self.model_fields_set
+        ):
+            raise ValueError("Перестановку дней нужно проверять отдельно")
+        if self.copy_day_number is None:
+            if self.new_day_weekday is not None or self.new_day_title is not None:
+                raise ValueError("Укажите исходный день для копирования")
+        elif (
+            self.remove_day_number is not None
+            or self.new_day_weekday is None
+            or not self.new_day_title
+            or not self.new_day_title.strip()
+        ):
+            raise ValueError("Укажите название и день недели новой тренировки")
+        return self
+
+
+class ProgramCycleRevisionPreviewRequest(ProgramCycleRevisionRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    offset: int = Field(default=0, ge=0)
 
 
 class ProgramWeekTypeRevisionRequest(BaseModel):
@@ -1213,6 +1287,39 @@ class ProgramCycleImpactPreviewRequest(BaseModel):
             raise ValueError("Выберите недели или начало будущей области")
         if self.occurrence_weeks is not None and self.source_cycle_week is not None:
             raise ValueError("Нельзя совмещать отдельные недели и повторение")
+        return self
+
+
+class ProgramCycleStructureRequest(ProgramCycleImpactPreviewRequest):
+    operation: Literal["add_exercise", "remove_exercise", "move_earlier", "move_later"]
+    day_number: int = Field(ge=1, le=2_147_483_647, strict=True)
+    target_template_exercise_id: int | None = Field(default=None, ge=1, strict=True)
+    target_assignment_slot_id: UUID4 | None = None
+    assignment_slot_id: UUID4 | None = None
+    exercise: ProgramTemplateExerciseCreate | None = None
+
+    @model_validator(mode="after")
+    def validate_structure_operation(self):
+        if self.operation == "add_exercise":
+            if (
+                self.assignment_slot_id is None
+                or self.exercise is None
+                or self.target_template_exercise_id is not None
+                or self.target_assignment_slot_id is not None
+            ):
+                raise ValueError("Укажите новое упражнение и его позицию")
+            if (
+                self.exercise.weekly_prescriptions
+                or self.exercise.group_id is not None
+                or self.exercise.superset_group is not None
+            ):
+                raise ValueError("Новое упражнение нельзя добавлять в группу без её настройки")
+        elif (
+            (self.target_template_exercise_id is None) == (self.target_assignment_slot_id is None)
+            or self.assignment_slot_id is not None
+            or self.exercise is not None
+        ):
+            raise ValueError("Укажите одну исходную позицию упражнения")
         return self
 
 

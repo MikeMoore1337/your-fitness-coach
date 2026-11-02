@@ -18,7 +18,9 @@ from fitminiapp_api.schemas.program import (
     ProgramCycleDurationPreviewRequest,
     ProgramCycleEnableRequest,
     ProgramCycleImpactPreviewRequest,
+    ProgramCycleRevisionPreviewRequest,
     ProgramCycleRevisionRequest,
+    ProgramCycleStructureRequest,
     ProgramLifecycleActionRequest,
     ProgramLifecycleMutationResponse,
     ProgramLifecycleResponse,
@@ -92,6 +94,7 @@ from fitminiapp_api.services.program_versioning import (
     program_lifecycle_summary,
     repeat_training_block,
     revise_program_cycle,
+    revise_program_cycle_structure,
     revise_program_week_type,
     update_training_block,
     upsert_future_program_exercise,
@@ -933,6 +936,46 @@ def preview_assigned_week_type(
     try:
         return revise_program_week_type(db, current_user, program_id, payload, preview=True)
     except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/revision/preview")
+def preview_assigned_cycle_revision(
+    program_id: int,
+    payload: ProgramCycleRevisionPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/structure/preview")
+def preview_assigned_cycle_structure(
+    program_id: int,
+    payload: ProgramCycleStructureRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle_structure(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/structure")
+def update_assigned_cycle_structure(
+    program_id: int,
+    payload: ProgramCycleStructureRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle_structure(db, current_user, program_id, payload, preview=False)
+    except ProgramError as exc:
+        db.rollback()
         raise _assigned_program_error(exc) from exc
 
 
