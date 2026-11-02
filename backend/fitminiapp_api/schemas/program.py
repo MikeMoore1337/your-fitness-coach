@@ -935,7 +935,11 @@ class CoachProgramExerciseCreate(BaseModel):
     def validate_superset_pair(self):
         if self.skip_protected and (
             self.effective_scope != "future_program"
-            or (self.occurrence_weeks is None and self.source_cycle_week is None)
+            or (
+                self.occurrence_weeks is None
+                and self.source_cycle_week is None
+                and self.from_week is None
+            )
         ):
             raise ValueError("skip_protected requires an explicit future cycle scope")
         if self.effective_scope == "next_workout" and self.effective_date is not None:
@@ -1186,8 +1190,6 @@ class ProgramWeekTypeRevisionRequest(BaseModel):
             raise ValueError("Выберите недели или начало повторения")
         if self.occurrence_weeks is not None and self.source_cycle_week is not None:
             raise ValueError("Нельзя совмещать отдельные недели и повторение")
-        if self.from_week is not None and self.source_cycle_week is None:
-            raise ValueError("Укажите исходную неделю цикла")
         return self
 
 

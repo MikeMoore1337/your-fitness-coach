@@ -1710,8 +1710,19 @@ def revise_program_week_type(
         if source_week is not None and source_week > cycle["length_weeks"]:
             raise ProgramError("Некорректный номер исходной недели цикла")
         if source_week is None:
-            # Impact-only projection: the edit contract already supports every future week.
-            # Do not truncate at an intervening cycle revision: resolve each week's phase.
+            # A source-free boundary selects every future occurrence, including
+            # subsequent cycle configurations. Reject disabled periodization
+            # before recording an override that would partially apply.
+            if not preview:
+                boundaries = {first} | {
+                    config["effective_from_week"]
+                    for config in _cycle_configurations(db, program, revisions=revisions)
+                    if first < config["effective_from_week"] <= program.duration_weeks
+                }
+                for selected_boundary in sorted(boundaries):
+                    active = _cycle_plan_at(db, program, selected_boundary, revisions=revisions)
+                    if active is None or active[0].get("periodization_disabled"):
+                        raise ProgramError("В выбранной области периодизация отключена")
             end = program.duration_weeks
             total = end - first + 1
             page = list(range(first + payload.offset, min(first + payload.offset + 50, end + 1)))

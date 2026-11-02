@@ -44,7 +44,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _assigned_cycle_with_completed_facts(client):
+def _assigned_cycle_with_completed_facts(client, *, cycle_length_weeks=1):
     auth = client.post("/api/v1/auth/dev-login", json={"telegram_user_id": 916190})
     assert auth.status_code == 200, auth.text
     headers = {"Authorization": f"Bearer {auth.json()['access_token']}"}
@@ -58,7 +58,7 @@ def _assigned_cycle_with_completed_facts(client):
             "goal": "strength",
             "level": "beginner",
             "assign_after_create": False,
-            "week_cycle": {"length_weeks": 1, "repeat": True},
+            "week_cycle": {"length_weeks": cycle_length_weeks, "repeat": True},
             "days": [
                 {
                     "title": "Day",
@@ -240,8 +240,17 @@ def test_concurrent_cycle_materialization_creates_one_occurrence(client):
 
 
 @pytest.mark.parametrize("read_case", ["schedule", "hydrate"])
-def test_parallel_cycle_http_reads_do_not_exhaust_a_small_pool(client, monkeypatch, read_case):
-    facts = _assigned_cycle_with_completed_facts(client)
+@pytest.mark.parametrize("cycle_length_weeks", [1, 3])
+def test_parallel_cycle_http_reads_do_not_exhaust_a_small_pool(
+    client, monkeypatch, read_case, cycle_length_weeks
+):
+    facts = _assigned_cycle_with_completed_facts(client, cycle_length_weeks=cycle_length_weeks)
+    with get_session_context() as db:
+        assert db.get(UserProgram, facts["program_id"]).duration_weeks == 16
+        rows = db.query(UserWorkout).filter_by(user_program_id=facts["program_id"]).all()
+        for row in rows:
+            assert row.source_cycle_week == (row.week_number - 1) % cycle_length_weeks + 1
+            assert row.cycle_iteration == (row.week_number - 1) // cycle_length_weeks + 1
     if read_case == "hydrate":
         with get_session_context() as db:
             completed = db.get(UserWorkout, facts["workout_id"])
