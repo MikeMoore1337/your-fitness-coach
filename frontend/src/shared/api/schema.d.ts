@@ -12642,6 +12642,8 @@ export interface components {
             version: number;
             /** Preview Signature */
             preview_signature: string;
+            /** Completion Confirmed */
+            completion_confirmed?: boolean | null;
         };
         /** HistoryImportDraftSummary */
         HistoryImportDraftSummary: {

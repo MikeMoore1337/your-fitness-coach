@@ -105,6 +105,94 @@ afterEach(() => {
 });
 
 describe('WorkoutHistoryImport', () => {
+  it('lets the user exclude and restore one matched FitNotes set', async () => {
+    const first = resolved.rows[0]!;
+    let current = {
+      ...resolved,
+      provider: 'fitnotes',
+      rows: [first, { ...first, line: 4, set_number: 2 }],
+    };
+    const resolutions: Array<{ excluded_lines: number[] }> = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/workout-history-imports' && (init?.method ?? 'GET') === 'GET')
+        return Response.json([]);
+      if (path === '/api/v1/workout-history-imports' && init?.method === 'POST')
+        return Response.json(current, { status: 201 });
+      if (path.endsWith('/resolve')) {
+        const payload = JSON.parse(String(init?.body)) as { excluded_lines: number[] };
+        resolutions.push(payload);
+        current = {
+          ...current,
+          version: current.version + 1,
+          rows: current.rows.map((item) => ({
+            ...item,
+            excluded: payload.excluded_lines.includes(item.line),
+          })),
+        };
+        return Response.json(current);
+      }
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderImport();
+    await userEvent.selectOptions(await screen.findByLabelText('Источник'), 'fitnotes');
+    fireEvent.change(screen.getByLabelText('Выбрать CSV-файл'), {
+      target: { files: [new File(['fixture'], 'fitnotes.csv')] },
+    });
+    expect(await screen.findByText(/В файле FitNotes нет отметок выполнения/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Исключить строку 4' }));
+    await screen.findByRole('button', { name: 'Вернуть строку' });
+    expect(resolutions[0]?.excluded_lines).toEqual([4]);
+    expect(screen.getByRole('button', { name: 'Исключить строку 3' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Вернуть строку' }));
+    await screen.findByRole('button', { name: 'Исключить строку 4' });
+    expect(resolutions[1]?.excluded_lines).toEqual([]);
+  });
+
+  it('requires renewed confirmation that FitNotes sets were completed', async () => {
+    let body: Record<string, unknown> | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/workout-history-imports' && (init?.method ?? 'GET') === 'GET')
+        return Response.json([]);
+      if (path === '/api/v1/workout-history-imports' && init?.method === 'POST')
+        return Response.json({ ...resolved, provider: 'fitnotes' }, { status: 201 });
+      if (path.endsWith('/confirm')) {
+        body = JSON.parse(String(init?.body));
+        return Response.json({
+          ...resolved,
+          status: 'confirmed',
+          result: { workout_ids: [99], workout_count: 1, set_count: 1 },
+        });
+      }
+      throw new Error(`unexpected request ${path}`);
+    });
+    renderImport();
+    await userEvent.selectOptions(await screen.findByLabelText('Источник'), 'fitnotes');
+    fireEvent.change(screen.getByLabelText('Выбрать CSV-файл'), {
+      target: { files: [new File(['fixture'], 'fitnotes.csv')] },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Продолжить' }));
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Подтверждаю, что выбранные подходы выполнены',
+    });
+    const save = screen.getByRole('button', { name: 'Сохранить историю' });
+    expect(save).toBeDisabled();
+    await userEvent.click(checkbox);
+    expect(save).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Вернуться к просмотру' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Продолжить' }));
+    expect(
+      screen.getByRole('checkbox', { name: 'Подтверждаю, что выбранные подходы выполнены' }),
+    ).not.toBeChecked();
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Подтверждаю, что выбранные подходы выполнены' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Сохранить историю' }));
+    await screen.findByText('История дополнена');
+    expect(body).toMatchObject({ completion_confirmed: true, version: 2 });
+  });
+
   it('sends the chosen source and explicit Strong weight unit', async () => {
     let uploadBody: FormData | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {

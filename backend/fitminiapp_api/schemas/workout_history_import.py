@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 
 class HistoryImportIssue(BaseModel):
@@ -176,3 +176,4 @@ class HistoryImportConfirm(BaseModel):
 
     version: int = Field(ge=1)
     preview_signature: str = Field(pattern=r"^[0-9a-f]{64}$")
+    completion_confirmed: StrictBool | None = None

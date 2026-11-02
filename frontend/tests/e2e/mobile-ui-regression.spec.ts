@@ -1086,7 +1086,9 @@ for (const theme of ['dark', 'light'] as const) {
       mimeType: 'text/csv',
       buffer: Buffer.from('Date,Exercise\n2025-10-12,Example', 'utf8'),
     });
-    await expect(page.getByText(/В FitNotes нет времени и типа подхода/)).toBeVisible();
+    await expect(page.getByText(/В файле FitNotes нет отметок выполнения/)).toBeVisible();
+    await expect(page.getByText(/Время и тип подхода тоже не указаны/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Исключить строку 3' })).toBeVisible();
     await expect(page.getByLabel('Тип подхода, если знаете')).toHaveValue('');
     await expectNoHorizontalOverflow(page);
     expect(mock.uploads()).toBe(1);
