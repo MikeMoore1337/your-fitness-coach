@@ -181,6 +181,36 @@ def test_coach_permissions_and_owner_are_preserved(client, calendar):
     assert _state(client, other)["mode"] == "calendar"
 
 
+def test_settings_and_extension_conflicts_return_current_state(client, calendar):
+    from test_program_week_cycle import _auth
+
+    headers, program_id, _, _ = assigned_cycle(client, k=1, n=2, days=3)
+    _enable(client, headers, program_id)
+    state = _state(client, headers)
+    url = f"/api/v1/programs/assigned/{program_id}/session-rotation"
+    stale_settings = {
+        "mode": "rotation",
+        "expected_revision_number": state["revision_number"] - 1,
+        "first_day_number": 1,
+    }
+    preview = client.post(f"{url}/preview", headers=headers, json=stale_settings)
+    assert preview.status_code == 409
+    assert preview.json()["detail"]["current"]["cursor"] == state["cursor"]
+    calendar[0] += timedelta(days=15)
+    expired = _state(client, headers)
+    extension = {
+        "expected_revision_number": expired["revision_number"],
+        "expected_cursor": "0" * 64,
+        "duration_weeks": 4,
+        "mutation_id": str(uuid4()),
+    }
+    conflict = client.post(f"{url}/extend", headers=headers, json=extension)
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["current"]["cursor"] == expired["cursor"]
+    stranger = _auth(client, 916202)
+    assert client.post(f"{url}/extend", headers=stranger, json=extension).status_code == 404
+
+
 def test_expired_coach_program_requires_coach_extension(client, calendar):
     from test_program_week_cycle import _auth
 

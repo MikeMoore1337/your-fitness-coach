@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_coach, require_user
@@ -932,6 +933,34 @@ def get_session_rotation_settings(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
+def _rotation_program_error(
+    db: Session,
+    actor: User,
+    program_id: int,
+    exc: ProgramError | session_rotation.SessionRotationError,
+) -> HTTPException:
+    error = (
+        _assigned_program_error(exc)
+        if isinstance(exc, ProgramError)
+        else HTTPException(status_code=exc.status_code, detail=exc.detail)
+    )
+    if error.status_code != 409:
+        return error
+    try:
+        program, _ = session_rotation.get_program_for_actor(db, actor, program_id)
+        current = (
+            session_rotation._state(db, program, session_rotation._owner(db, program))
+            if program.schedule_mode == "rotation"
+            else session_rotation.settings(db, actor, program_id)
+        )
+    except ProgramError, session_rotation.SessionRotationError:
+        return error
+    return HTTPException(
+        status_code=409,
+        detail={"message": error.detail, "current": jsonable_encoder(current)},
+    )
+
+
 @router.post(
     "/assigned/{program_id}/session-rotation/preview",
     response_model=SessionRotationSettingsResponse,
@@ -944,10 +973,9 @@ def preview_session_rotation_settings(
 ):
     try:
         return session_rotation.preview_settings(db, current_user, program_id, payload)
-    except ProgramError as exc:
-        raise _assigned_program_error(exc) from exc
-    except session_rotation.SessionRotationError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except (ProgramError, session_rotation.SessionRotationError) as exc:
+        db.rollback()
+        raise _rotation_program_error(db, current_user, program_id, exc) from exc
 
 
 @router.post(
@@ -967,12 +995,9 @@ def apply_session_rotation_settings(
         return session_rotation.apply_settings(
             db, current_user, program_id, request, payload.preview_token
         )
-    except ProgramError as exc:
+    except (ProgramError, session_rotation.SessionRotationError) as exc:
         db.rollback()
-        raise _assigned_program_error(exc) from exc
-    except session_rotation.SessionRotationError as exc:
-        db.rollback()
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _rotation_program_error(db, current_user, program_id, exc) from exc
 
 
 @router.post("/assigned/{program_id}/session-rotation/extend")
@@ -984,12 +1009,9 @@ def extend_session_rotation_program(
 ):
     try:
         return session_rotation.extend_program(db, current_user, program_id, payload)
-    except ProgramError as exc:
+    except (ProgramError, session_rotation.SessionRotationError) as exc:
         db.rollback()
-        raise _assigned_program_error(exc) from exc
-    except session_rotation.SessionRotationError as exc:
-        db.rollback()
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+        raise _rotation_program_error(db, current_user, program_id, exc) from exc
 
 
 @router.patch("/assigned/{program_id}/cycle")

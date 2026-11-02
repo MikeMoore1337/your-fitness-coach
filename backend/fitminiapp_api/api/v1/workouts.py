@@ -699,7 +699,9 @@ def start_session_rotation(
         raise _rotation_action_error(db, current_user, exc) from exc
     except ProgramError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise _rotation_action_error(
+            db, current_user, session_rotation.SessionRotationError(str(exc))
+        ) from exc
 
 
 @router.get("/session-rotation/plan", response_model=SessionRotationPlanResponse)
@@ -731,7 +733,9 @@ def skip_session_rotation(
         raise _rotation_action_error(db, current_user, exc) from exc
     except ProgramError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise _rotation_action_error(
+            db, current_user, session_rotation.SessionRotationError(str(exc))
+        ) from exc
 
 
 @router.post("/session-rotation/{action}", response_model=SessionRotationStateResponse)
