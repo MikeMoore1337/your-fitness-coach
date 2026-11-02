@@ -1,0 +1,41 @@
+{
+  "checked": 360,
+  "expected": 360,
+  "captured": 144,
+  "engines": [
+    "chromium",
+    "webkit"
+  ],
+  "themes": [
+    "dark",
+    "light"
+  ],
+  "widths": [
+    320,
+    360,
+    393,
+    430,
+    1440
+  ],
+  "scenes": [
+    "settings",
+    "rotation",
+    "preview",
+    "ready",
+    "partial",
+    "cancel",
+    "cancelled",
+    "skip",
+    "skipped",
+    "gap",
+    "period",
+    "coach",
+    "edit",
+    "other",
+    "empty",
+    "error",
+    "offline",
+    "conflict"
+  ],
+  "failures": []
+}
