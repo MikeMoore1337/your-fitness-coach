@@ -1,6 +1,6 @@
 # Issue #1204 — AFTER: тренировки по очереди
 
-Работающее приложение из [коммита 5513fc32](https://github.com/MikeMoore1337/your-fitness-coach/commit/5513fc329d4d48e2fa40ec365316bede3cd50995), PR [#1380](https://github.com/MikeMoore1337/your-fitness-coach/pull/1380). [Принятый прототип и контракт](https://github.com/MikeMoore1337/your-fitness-coach/blob/64c329b37f52051bc186a0698e5bb7b5cd1115f2/docs/ux/issue-1204-session-rotation/README.md).
+Снимки работающего приложения сделаны на [коммите 5513fc32](https://github.com/MikeMoore1337/your-fitness-coach/commit/5513fc329d4d48e2fa40ec365316bede3cd50995). В [финальном коммите 14b9017e](https://github.com/MikeMoore1337/your-fitness-coach/commit/14b9017e29002ea1601321b47c382e755bf24ce1) изменены только три тестовые фикстуры; код приложения и миграции не менялись. PR [#1380](https://github.com/MikeMoore1337/your-fitness-coach/pull/1380). [Принятый прототип и контракт](https://github.com/MikeMoore1337/your-fitness-coach/blob/64c329b37f52051bc186a0698e5bb7b5cd1115f2/docs/ux/issue-1204-session-rotation/README.md).
 
 Все данные вымышленные. Первые 184 снимка получены в локальном Web-интерфейсе с работающими API и отдельной PostgreSQL: 23 состояния, Chromium и WebKit, тёмная и светлая темы, viewport 393×900 и 1440×900. Снимки показывают всю страницу; закреплённая нижняя панель находится в позиции viewport.
 
