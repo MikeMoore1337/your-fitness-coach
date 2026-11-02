@@ -2007,7 +2007,9 @@ def test_xlsx_matrix_source_headers_four_to_six_use_source_positions_one_to_thre
         (3, "heavy", "I2"),
     ]
     assert "source_week_numbers_normalized" in {issue["code"] for issue in preview["issues"]}
-    assert preview["summary"]["blocking_issue_count"] == 0
+    # The source intentionally has no title/goal/level; preview remains editable
+    # until the user supplies those fields in an explicit resolve step.
+    assert preview["summary"]["blocking_issue_count"] > 0
     resolved = client.post(
         f"/api/v1/programs/imports/{preview['id']}/resolve",
         headers=headers,
@@ -2022,6 +2024,7 @@ def test_xlsx_matrix_source_headers_four_to_six_use_source_positions_one_to_thre
         },
     )
     assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["summary"]["blocking_issue_count"] == 0
     confirmed = client.post(
         f"/api/v1/programs/imports/{preview['id']}/confirm",
         headers=headers,
