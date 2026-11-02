@@ -417,6 +417,7 @@ test('rotation remains available in simulated standalone PWA', async ({ page }, 
     for (const theme of ['dark', 'light'] as const) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await page.waitForTimeout(400);
       await page.screenshot({
         path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-25-pwa.png`,
         fullPage: true,
