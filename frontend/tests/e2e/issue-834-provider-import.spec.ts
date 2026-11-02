@@ -94,6 +94,10 @@ for (const theme of ['dark', 'light'] as const) {
       await expect(page.getByText(/После подтверждения данные появятся в истории/)).toBeVisible();
       await screenshot834(page, info, theme, viewport.width, '05-fitnotes-confirm');
       expect(mock.confirmations()).toBe(0);
+      await expect(page.getByRole('button', { name: 'Сохранить историю' })).toBeDisabled();
+      await page
+        .getByRole('checkbox', { name: 'Подтверждаю, что выбранные подходы выполнены' })
+        .check();
       await page.getByRole('button', { name: 'Сохранить историю' }).click();
       await expect(page.getByText('История дополнена')).toBeVisible();
       expect(mock.confirmations()).toBe(1);

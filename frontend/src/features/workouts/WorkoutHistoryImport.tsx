@@ -187,6 +187,7 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [completionConfirmed, setCompletionConfirmed] = useState(false);
   const [page, setPage] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -382,16 +383,28 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
         setStage('match');
       } else setStage('conflicts');
     } else if (unresolvedDuplicates) setStage('conflicts');
-    else setStage('confirm');
+    else {
+      setCompletionConfirmed(false);
+      setStage('confirm');
+    }
   };
   const confirm = async () => {
-    if (!preview?.preview_signature || !canConfirm) return;
+    if (
+      !preview?.preview_signature ||
+      !canConfirm ||
+      (preview.provider === 'fitnotes' && !completionConfirmed)
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
       const result = await api<WorkoutHistoryImportPreview>(`${IMPORT_URL}/${preview.id}/confirm`, {
         method: 'POST',
-        body: { version: preview.version, preview_signature: preview.preview_signature },
+        body: {
+          version: preview.version,
+          preview_signature: preview.preview_signature,
+          ...(preview.provider === 'fitnotes' ? { completion_confirmed: completionConfirmed } : {}),
+        },
         timeoutMs: 30_000,
       });
       setPreview(result);
@@ -1035,8 +1048,28 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
               ? 'После подтверждения данные появятся в истории. Подходы без типа не попадут в рабочие показатели и рекорды.'
               : 'После подтверждения эти данные появятся в истории и статистике.'}
           </p>
+          {preview.provider === 'fitnotes' && (
+            <div className="history-import__completion">
+              <p>
+                В файле нет отметок выполнения. Исключите невыполненные подходы перед сохранением.
+              </p>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={completionConfirmed}
+                  onChange={(event) => setCompletionConfirmed(event.target.checked)}
+                />
+                <span>Подтверждаю, что выбранные подходы выполнены</span>
+              </label>
+            </div>
+          )}
           <div className="history-import__actions">
-            <Button disabled={busy || !canConfirm} onClick={() => void confirm()}>
+            <Button
+              disabled={
+                busy || !canConfirm || (preview.provider === 'fitnotes' && !completionConfirmed)
+              }
+              onClick={() => void confirm()}
+            >
               Сохранить историю
             </Button>
             <Button variant="secondary" onClick={() => setStage('preview')}>

@@ -144,6 +144,7 @@ def test_fitnotes_groups_by_date_and_leaves_time_and_set_type_unknown():
     assert rows[0].source["workout_ref"] == rows[1].source["workout_ref"]
     assert rows[0].source["completed_at"] == ""
     assert rows[0].source["set_kind"] == ""
+    assert rows[0].source["status"] == rows[0].source["set_status"] == ""
     assert [item.set_number for item in rows] == [1, 2]
 
 
@@ -346,10 +347,34 @@ def test_fitnotes_explicit_set_kind_changes_statistics_without_claiming_it_came_
     preview = resolved.json()
     assert preview["rows"][0]["source"]["set_kind"] == ""
     assert preview["rows"][0]["manual_set_kind"] == "working"
+    assert preview["parser_version"] == "1.1"
+    assert preview["rows"][0]["source"]["status"] == ""
+    assert preview["rows"][0]["source"]["set_status"] == ""
+    confirm_payload = {
+        "version": preview["version"],
+        "preview_signature": preview["preview_signature"],
+    }
+    denied = client.post(
+        f"/api/v1/workout-history-imports/{preview['id']}/confirm",
+        headers=headers,
+        json=confirm_payload,
+    )
+    assert denied.status_code == 409
+    assert denied.json()["detail"]["code"] == "completion_confirmation_required"
+    assert (
+        client.get("/api/v1/workouts/history/summary", headers=headers).json()["workouts_completed"]
+        == 0
+    )
+    invalid = client.post(
+        f"/api/v1/workout-history-imports/{preview['id']}/confirm",
+        headers=headers,
+        json=confirm_payload | {"completion_confirmed": "true"},
+    )
+    assert invalid.status_code == 422
     confirmed = client.post(
         f"/api/v1/workout-history-imports/{preview['id']}/confirm",
         headers=headers,
-        json={"version": preview["version"], "preview_signature": preview["preview_signature"]},
+        json=confirm_payload | {"completion_confirmed": True},
     )
     assert confirmed.status_code == 200, confirmed.text
     assert client.get("/api/v1/workouts/history/summary", headers=headers).json() == {
@@ -360,12 +385,55 @@ def test_fitnotes_explicit_set_kind_changes_statistics_without_claiming_it_came_
     with get_session_context() as db:
         provenance = db.get(ImportedWorkout, confirmed.json()["result"]["workout_ids"][0])
         assert provenance.source_data["sets"][0]["user_set_kind"] == "working"
+        assert provenance.source_data["completion_confirmation"] == "user"
 
 
 def test_hevy_unsupported_duration_is_visible_and_blocks_the_row():
     (parsed,) = hevy.parse(csv_file(HEVY, [hevy_row(duration_seconds="75")]))
     assert any(issue.field == "duration_seconds" for issue in parsed.issues)
     assert parsed.provider_fields["duration_seconds"] == "75"
+
+
+def test_existing_fitnotes_draft_requires_completion_confirmation(client):
+    from copy import deepcopy
+
+    from fitminiapp_api.models.workout_history_import import WorkoutHistoryImportDraft
+
+    headers = _auth(client, 834_105)
+    response = client.post(
+        "/api/v1/workout-history-imports",
+        headers=headers,
+        data={"provider": "fitnotes"},
+        files={
+            "file": (
+                "history.csv",
+                csv_file(FITNOTES, [fitnotes_row(Exercise="barbell bench press")]),
+                "text/csv",
+            )
+        },
+    )
+    assert response.status_code == 201
+    draft_id = response.json()["id"]
+    with get_session_context() as db:
+        draft = db.get(WorkoutHistoryImportDraft, draft_id)
+        payload = deepcopy(draft.draft_json)
+        payload["rows"][0]["source"]["status"] = "completed"
+        payload["rows"][0]["source"]["set_status"] = "completed"
+        draft.draft_json = payload
+        draft.parser_version = "1.0"
+    preview = client.get(f"/api/v1/workout-history-imports/{draft_id}", headers=headers).json()
+    payload = {"version": preview["version"], "preview_signature": preview["preview_signature"]}
+    denied = client.post(
+        f"/api/v1/workout-history-imports/{draft_id}/confirm", headers=headers, json=payload
+    )
+    assert denied.status_code == 409
+    assert denied.json()["detail"]["code"] == "completion_confirmation_required"
+    confirmed = client.post(
+        f"/api/v1/workout-history-imports/{draft_id}/confirm",
+        headers=headers,
+        json=payload | {"completion_confirmed": True},
+    )
+    assert confirmed.status_code == 200
 
 
 @pytest.mark.parametrize("adapter", [hevy.parse, strong.parse, fitnotes.parse])
@@ -429,10 +497,15 @@ def test_provider_preview_commit_and_overlapping_export(
     assert preview["rows"][0]["blocking_issues"] == []
     assert preview["rows"][0]["completed_at_utc"] is None
     assert preview["rows"][0]["provider_fields"]
+    confirm_payload = {
+        "version": preview["version"],
+        "preview_signature": preview["preview_signature"],
+        "completion_confirmed": provider == "fitnotes",
+    }
     confirmed = client.post(
         f"/api/v1/workout-history-imports/{preview['id']}/confirm",
         headers=headers,
-        json={"version": preview["version"], "preview_signature": preview["preview_signature"]},
+        json=confirm_payload,
     )
     assert confirmed.status_code == 200, confirmed.text
     workout_id = confirmed.json()["result"]["workout_ids"][0]
@@ -460,11 +533,35 @@ def test_provider_preview_commit_and_overlapping_export(
         candidate["kind"] == "source" and candidate["workout_id"] == workout_id
         for candidate in candidates
     )
+    same = upload([source]).json()
+    source_ref = same["duplicates"][0]["workout_ref"]
+    resolved = client.post(
+        f"/api/v1/workout-history-imports/{same['id']}/resolve",
+        headers=headers,
+        json={"version": same["version"], "duplicate_choices": {source_ref: "keep"}},
+    )
+    assert resolved.status_code == 200, resolved.text
+    same = resolved.json()
+    denied = client.post(
+        f"/api/v1/workout-history-imports/{same['id']}/confirm",
+        headers=headers,
+        json={
+            "version": same["version"],
+            "preview_signature": same["preview_signature"],
+            "completion_confirmed": provider == "fitnotes",
+        },
+    )
+    assert denied.status_code == 409
+    assert denied.json()["detail"]["code"] == "duplicate_exact"
+    assert (
+        client.get("/api/v1/workouts/history/summary", headers=headers).json()["workouts_completed"]
+        == 1
+    )
     assert (
         client.post(
             f"/api/v1/workout-history-imports/{preview['id']}/confirm",
             headers=headers,
-            json={"version": preview["version"], "preview_signature": preview["preview_signature"]},
+            json=confirm_payload,
         ).json()
         == confirmed.json()
     )

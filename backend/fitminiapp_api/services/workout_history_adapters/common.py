@@ -148,9 +148,11 @@ def row(
     fields: dict[str, str],
     source: dict[str, str],
     issues: list[ImportIssue],
+    *,
+    completion_unknown: bool = False,
 ) -> ImportRow:
     normalized = dict.fromkeys(CSV_COLUMNS_V2, "") | source
-    parsed = _parse_row(line, normalized, "3")
+    parsed = _parse_row(line, normalized, "3", completion_unknown=completion_unknown)
     return replace(parsed, issues=parsed.issues + tuple(issues), provider_fields=fields)
 
 

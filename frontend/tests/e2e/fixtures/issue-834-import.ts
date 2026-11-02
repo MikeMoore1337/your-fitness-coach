@@ -111,6 +111,9 @@ export async function installIssue834ImportApi(page: Page, provider: ImportProvi
       return route.fulfill({ json: preview });
     }
     if (pathname.endsWith('/confirm') && method === 'POST') {
+      if (provider === 'fitnotes' && request.postDataJSON().completion_confirmed !== true) {
+        return route.fulfill({ status: 409, json: { detail: 'Подтвердите выполнение' } });
+      }
       confirmations += 1;
       return route.fulfill({
         json: {
