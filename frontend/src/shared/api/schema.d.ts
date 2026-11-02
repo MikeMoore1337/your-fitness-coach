@@ -1488,6 +1488,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/assigned/{program_id}/session-rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Rotation Settings */
+        get: operations["get_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/session-rotation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Session Rotation Settings */
+        post: operations["preview_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/session-rotation/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Session Rotation Settings */
+        post: operations["apply_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/session-rotation/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extend Session Rotation Program */
+        post: operations["extend_session_rotation_program_api_v1_programs_assigned__program_id__session_rotation_extend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/assigned/{program_id}/cycle": {
         parameters: {
             query?: never;
@@ -2975,6 +3043,91 @@ export interface paths {
         get: operations["get_my_workout_comments_api_v1_workouts__workout_id__comments_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Rotation State */
+        get: operations["get_session_rotation_state_api_v1_workouts_session_rotation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Session Rotation */
+        post: operations["start_session_rotation_api_v1_workouts_session_rotation_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Rotation Plan */
+        get: operations["get_session_rotation_plan_api_v1_workouts_session_rotation_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip Session Rotation */
+        post: operations["skip_session_rotation_api_v1_workouts_session_rotation_skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transition Session Rotation */
+        post: operations["transition_session_rotation_api_v1_workouts_session_rotation__action__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16034,6 +16187,16 @@ export interface components {
             start_date: string;
             /** Duration Weeks */
             duration_weeks: number;
+            /**
+             * Schedule Mode
+             * @default calendar
+             * @enum {string}
+             */
+            schedule_mode: "calendar" | "rotation";
+            /** Rotation Current Title */
+            rotation_current_title?: string | null;
+            /** Rotation Status */
+            rotation_status?: string | null;
             /** Current Revision Number */
             current_revision_number: number;
             /** Current Week Number */
@@ -17813,6 +17976,234 @@ export interface components {
              * @enum {string}
              */
             unit: "g" | "ml";
+        };
+        /** SessionRotationActionRequest */
+        SessionRotationActionRequest: {
+            /** Expected Cursor */
+            expected_cursor: string;
+            /** Expected Day Number */
+            expected_day_number: number;
+            /** Mutation Id */
+            mutation_id: string;
+            /** Plan Week Number */
+            plan_week_number?: number | null;
+            /**
+             * Out Of Order
+             * @default false
+             */
+            out_of_order: boolean;
+        };
+        /** SessionRotationApplyRequest */
+        SessionRotationApplyRequest: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** First Day Number */
+            first_day_number?: number | null;
+            /** Resume Calendar Week */
+            resume_calendar_week?: number | null;
+            /** Resume Calendar Day */
+            resume_calendar_day?: number | null;
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** SessionRotationCalendarOption */
+        SessionRotationCalendarOption: {
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Title */
+            title: string;
+        };
+        /** SessionRotationDay */
+        SessionRotationDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Workout Id */
+            workout_id?: number | null;
+            /** Status */
+            status?: string | null;
+            /**
+             * From Template
+             * @default false
+             */
+            from_template: boolean;
+            /** Exercise Count */
+            exercise_count?: number | null;
+            /** Set Count */
+            set_count?: number | null;
+            /** Default Plan Week */
+            default_plan_week?: number | null;
+        };
+        /** SessionRotationExtendRequest */
+        SessionRotationExtendRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Expected Cursor */
+            expected_cursor: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Mutation Id */
+            mutation_id: string;
+        };
+        /** SessionRotationPlanExercise */
+        SessionRotationPlanExercise: {
+            /** Title */
+            title: string;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+        };
+        /** SessionRotationPlanResponse */
+        SessionRotationPlanResponse: {
+            /** Title */
+            title: string;
+            /** Week Number */
+            week_number: number;
+            /** Exercises */
+            exercises: components["schemas"]["SessionRotationPlanExercise"][];
+        };
+        /** SessionRotationReminder */
+        SessionRotationReminder: {
+            /** Workout Id */
+            workout_id: number;
+            /** Title */
+            title: string;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Status */
+            status: string;
+        };
+        /** SessionRotationSettingsRequest */
+        SessionRotationSettingsRequest: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** First Day Number */
+            first_day_number?: number | null;
+            /** Resume Calendar Week */
+            resume_calendar_week?: number | null;
+            /** Resume Calendar Day */
+            resume_calendar_day?: number | null;
+        };
+        /** SessionRotationSettingsResponse */
+        SessionRotationSettingsResponse: {
+            /** Program Id */
+            program_id: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /** Revision Number */
+            revision_number: number;
+            /** Days */
+            days: components["schemas"]["SessionRotationDay"][];
+            /** First Day Number */
+            first_day_number?: number | null;
+            /**
+             * Future Reminders
+             * @default 0
+             */
+            future_reminders: number;
+            /** Reminders */
+            reminders?: components["schemas"]["SessionRotationReminder"][];
+            /** Calendar Options */
+            calendar_options?: components["schemas"]["SessionRotationCalendarOption"][];
+            calendar_resume?: components["schemas"]["SessionRotationCalendarOption"] | null;
+            /** Template Plans */
+            template_plans?: components["schemas"]["SessionRotationSupplementPlan"][];
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** SessionRotationStateResponse */
+        SessionRotationStateResponse: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disabled" | "ready" | "in_progress" | "cancelled" | "expired" | "review_required" | "empty";
+            /** Program Id */
+            program_id?: number | null;
+            /** Revision Number */
+            revision_number?: number | null;
+            /** Cursor */
+            cursor?: string | null;
+            current?: components["schemas"]["SessionRotationDay"] | null;
+            next?: components["schemas"]["SessionRotationDay"] | null;
+            /** Days */
+            days?: components["schemas"]["SessionRotationDay"][];
+            /** Program End Date */
+            program_end_date?: string | null;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
+            /** Default Plan Week */
+            default_plan_week?: number | null;
+            /** Days Since Last Completion */
+            days_since_last_completion?: number | null;
+            /** Min Extension Weeks */
+            min_extension_weeks?: number | null;
+            /**
+             * Can Extend
+             * @default true
+             */
+            can_extend: boolean;
+            /** Undo Skip Workout Id */
+            undo_skip_workout_id?: number | null;
+        };
+        /** SessionRotationSupplementExercise */
+        SessionRotationSupplementExercise: {
+            /** Title */
+            title: string;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+        };
+        /** SessionRotationSupplementPlan */
+        SessionRotationSupplementPlan: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Week Number */
+            week_number: number;
+            /** Exercises */
+            exercises: components["schemas"]["SessionRotationSupplementExercise"][];
+        };
+        /** SessionRotationTransitionRequest */
+        SessionRotationTransitionRequest: {
+            /** Expected Cursor */
+            expected_cursor: string;
+            /** Workout Id */
+            workout_id: number;
+            /** Mutation Id */
+            mutation_id: string;
         };
         /** SideProgressionGuidance */
         SideProgressionGuidance: {
@@ -23444,6 +23835,142 @@ export interface operations {
             };
         };
     };
+    get_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extend_session_rotation_program_api_v1_programs_assigned__program_id__session_rotation_extend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationExtendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_assigned_cycle_api_v1_programs_assigned__program_id__cycle_patch: {
         parameters: {
             query?: never;
@@ -26564,6 +27091,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutCommentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_rotation_state_api_v1_workouts_session_rotation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationStateResponse"];
+                };
+            };
+        };
+    };
+    start_session_rotation_api_v1_workouts_session_rotation_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutTodayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_rotation_plan_api_v1_workouts_session_rotation_plan_get: {
+        parameters: {
+            query: {
+                day_number: number;
+                week_number: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationPlanResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_session_rotation_api_v1_workouts_session_rotation_skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationStateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transition_session_rotation_api_v1_workouts_session_rotation__action__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: "cancel" | "restore" | "undo-skip";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationStateResponse"];
                 };
             };
             /** @description Validation Error */

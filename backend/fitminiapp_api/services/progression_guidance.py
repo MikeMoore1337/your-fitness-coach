@@ -8,6 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Literal
 
+from sqlalchemy import or_, true
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import today_for_user
@@ -1901,7 +1902,13 @@ def list_assigned_program_progression_proposals(
         .filter(
             UserWorkout.user_program_id == program.id,
             UserWorkout.status.in_({"planned", "in_progress"}),
-            UserWorkout.scheduled_date >= today_for_user(actor),
+            UserWorkout.rotation_epoch == program.rotation_epoch
+            if program.schedule_mode == "rotation"
+            else true(),
+            or_(
+                UserWorkout.status == "in_progress",
+                UserWorkout.scheduled_date >= today_for_user(actor),
+            ),
         )
         .order_by(
             (UserWorkout.status == "in_progress").desc(),

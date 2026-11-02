@@ -1845,21 +1845,65 @@ def list_coach_assigned_programs(db: Session, coach: User) -> list[dict]:
         .all()
     )
 
+    from fitminiapp_api.services.schedule_modes import (
+        calendar_active_on,
+        calendar_segments,
+        mode_changes,
+    )
+
+    changes_by_program = mode_changes(db, {program.id for program, _client, _name in rows})
     result: list[dict] = []
     for program, client, private_name in rows:
-        workouts = list(program.workouts)
-        is_cycle = any(row.source_cycle_week is not None for row in workouts)
+        changes = changes_by_program.get(program.id, [])
+        workouts = [
+            workout
+            for workout in program.workouts
+            if workout.status != "planned"
+            or (
+                program.schedule_mode == "calendar"
+                and calendar_active_on(changes, workout.scheduled_date)
+            )
+        ]
+        is_cycle = any(row.source_cycle_week is not None for row in program.workouts)
         today = today_for_user(client)
         if is_cycle and program.is_active and program.status in {"active", "scheduled"}:
             from fitminiapp_api.services.program_versioning import materialize_cycle_read_window
 
             if materialize_cycle_read_window(db, [program.id], today, today + timedelta(days=27)):
                 db.expire(program, ["workouts"])
-                workouts = list(program.workouts)
+                workouts = [
+                    workout
+                    for workout in program.workouts
+                    if workout.status != "planned"
+                    or (
+                        program.schedule_mode == "calendar"
+                        and calendar_active_on(changes, workout.scheduled_date)
+                    )
+                ]
         completed = sum(workout.status == "completed" for workout in workouts)
         planned = sum(workout.status == "planned" for workout in workouts)
         total = len(workouts)
-        if is_cycle:
+        if is_cycle and changes:
+            from fitminiapp_api.services.program_versioning import cycle_workout_count
+
+            end = program.start_date + timedelta(days=program.duration_weeks * 7 - 1)
+            segments = calendar_segments(changes, program.start_date, end)
+            total = sum(
+                cycle_workout_count(db, program, start=start, end=stop) for start, stop in segments
+            )
+            total += sum(
+                row.rotation_epoch is not None and row.status != "cancelled" for row in workouts
+            )
+            if program.schedule_mode == "calendar" and program.status in {
+                "active",
+                "scheduled",
+                "paused",
+            }:
+                planned += sum(
+                    cycle_workout_count(db, program, start=start, end=stop, missing_only=True)
+                    for start, stop in segments
+                )
+        elif is_cycle:
             from fitminiapp_api.services.program_versioning import cycle_workout_count
 
             total = cycle_workout_count(db, program)
@@ -1869,8 +1913,10 @@ def list_coach_assigned_programs(db: Session, coach: User) -> list[dict]:
             workout.scheduled_date
             for workout in workouts
             if program.is_active
+            and program.schedule_mode == "calendar"
             and workout.status in {"planned", "in_progress"}
             and workout.scheduled_date >= today
+            and (workout.status != "planned" or calendar_active_on(changes, workout.scheduled_date))
         ]
         template = program.template
         result.append(

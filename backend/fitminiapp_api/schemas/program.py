@@ -791,6 +791,9 @@ class ProgramLifecycleResponse(BaseModel):
     is_active: bool
     start_date: date
     duration_weeks: int
+    schedule_mode: Literal["calendar", "rotation"] = "calendar"
+    rotation_current_title: str | None = None
+    rotation_status: str | None = None
     current_revision_number: int
     current_week_number: int | None = None
     current_block: ProgramLifecycleBlockSummary | None = None
@@ -1003,6 +1006,87 @@ class AssignmentScheduleRequest(BaseModel):
         if len(set(weekdays)) != len(weekdays):
             raise ValueError("schedule_weekdays must be unique")
         return self
+
+
+class SessionRotationDay(BaseModel):
+    day_number: int
+    title: str
+    workout_id: int | None = None
+    status: str | None = None
+    from_template: bool = False
+    exercise_count: int | None = None
+    set_count: int | None = None
+    default_plan_week: int | None = None
+
+
+class SessionRotationSettingsRequest(BaseModel):
+    mode: Literal["calendar", "rotation"]
+    expected_revision_number: int = Field(ge=0)
+    first_day_number: int | None = Field(default=None, ge=1)
+    resume_calendar_week: int | None = Field(default=None, ge=1)
+    resume_calendar_day: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_first_day(self):
+        if (self.mode == "rotation") != (self.first_day_number is not None):
+            raise ValueError("Выберите первую тренировку для режима по очереди")
+        if (self.resume_calendar_week is None) != (self.resume_calendar_day is None):
+            raise ValueError("Выберите тренировку для возвращения к расписанию")
+        if self.mode == "rotation" and self.resume_calendar_week is not None:
+            raise ValueError("Выбор календарной тренировки доступен только для расписания")
+        return self
+
+
+class SessionRotationApplyRequest(SessionRotationSettingsRequest):
+    preview_token: str = Field(min_length=64, max_length=64)
+
+
+class SessionRotationExtendRequest(BaseModel):
+    expected_revision_number: int = Field(ge=0)
+    expected_cursor: str = Field(min_length=64, max_length=64)
+    duration_weeks: int = Field(ge=1, strict=True)
+    mutation_id: str = Field(min_length=16, max_length=64)
+
+
+class SessionRotationReminder(BaseModel):
+    workout_id: int
+    title: str
+    scheduled_date: date
+    status: str
+
+
+class SessionRotationCalendarOption(BaseModel):
+    week_number: int
+    day_number: int
+    scheduled_date: date
+    title: str
+
+
+class SessionRotationSupplementExercise(BaseModel):
+    title: str
+    prescribed_sets: int | None = None
+    prescribed_reps: str | None = None
+
+
+class SessionRotationSupplementPlan(BaseModel):
+    day_number: int
+    title: str
+    week_number: int
+    exercises: list[SessionRotationSupplementExercise]
+
+
+class SessionRotationSettingsResponse(BaseModel):
+    program_id: int
+    mode: Literal["calendar", "rotation"]
+    revision_number: int
+    days: list[SessionRotationDay]
+    first_day_number: int | None = None
+    future_reminders: int = 0
+    reminders: list[SessionRotationReminder] = Field(default_factory=list)
+    calendar_options: list[SessionRotationCalendarOption] = Field(default_factory=list)
+    calendar_resume: SessionRotationCalendarOption | None = None
+    template_plans: list[SessionRotationSupplementPlan] = Field(default_factory=list)
+    preview_token: str | None = None
 
 
 class AssignTemplateSelfRequest(AssignmentScheduleRequest):

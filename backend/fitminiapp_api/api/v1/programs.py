@@ -31,6 +31,10 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateCreateResponse,
     ProgramTemplateResponse,
     ProgramWeekTypeRevisionRequest,
+    SessionRotationApplyRequest,
+    SessionRotationExtendRequest,
+    SessionRotationSettingsRequest,
+    SessionRotationSettingsResponse,
     TemplateExerciseReplacementRequest,
     TrainingBlockActionRequest,
     TrainingBlockAdvanceResponse,
@@ -52,6 +56,7 @@ from fitminiapp_api.schemas.workout import (
     ProgressionProposalReviewRequest,
     ProgressionProposalReviewResponse,
 )
+from fitminiapp_api.services import session_rotation
 from fitminiapp_api.services.exercise_catalog import (
     _effective_exercise_id,
     _source_exercise_slug,
@@ -909,6 +914,82 @@ def repeat_assigned_program_block(
         "duration_weeks": duration_weeks,
         "current_revision_number": revision_number,
     }
+
+
+@router.get(
+    "/assigned/{program_id}/session-rotation", response_model=SessionRotationSettingsResponse
+)
+def get_session_rotation_settings(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return session_rotation.settings(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    except session_rotation.SessionRotationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/assigned/{program_id}/session-rotation/preview",
+    response_model=SessionRotationSettingsResponse,
+)
+def preview_session_rotation_settings(
+    program_id: int,
+    payload: SessionRotationSettingsRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return session_rotation.preview_settings(db, current_user, program_id, payload)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    except session_rotation.SessionRotationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/assigned/{program_id}/session-rotation/apply",
+    response_model=SessionRotationSettingsResponse,
+)
+def apply_session_rotation_settings(
+    program_id: int,
+    payload: SessionRotationApplyRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        request = SessionRotationSettingsRequest.model_validate(
+            payload.model_dump(exclude={"preview_token"})
+        )
+        return session_rotation.apply_settings(
+            db, current_user, program_id, request, payload.preview_token
+        )
+    except ProgramError as exc:
+        db.rollback()
+        raise _assigned_program_error(exc) from exc
+    except session_rotation.SessionRotationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post("/assigned/{program_id}/session-rotation/extend")
+def extend_session_rotation_program(
+    program_id: int,
+    payload: SessionRotationExtendRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return session_rotation.extend_program(db, current_user, program_id, payload)
+    except ProgramError as exc:
+        db.rollback()
+        raise _assigned_program_error(exc) from exc
+    except session_rotation.SessionRotationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.patch("/assigned/{program_id}/cycle")

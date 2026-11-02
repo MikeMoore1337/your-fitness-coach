@@ -174,6 +174,71 @@ test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on on
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(false);
 });
 
+test('rotation respects Telegram safe areas and the keyboard', async ({
+  tma,
+  tmaPage,
+}, testInfo) => {
+  await installPlatformApi(tmaPage, { workoutStatus: 'none' });
+  await tmaPage.route('**/api/v1/workouts/session-rotation', async (route) => {
+    const days = [
+      { day_number: 1, title: 'Грудь и трицепс', from_template: false },
+      { day_number: 2, title: 'Спина и бицепс', from_template: false },
+    ];
+    await route.fulfill({
+      json: {
+        mode: 'rotation',
+        status: 'ready',
+        program_id: 7,
+        revision_number: 2,
+        cursor: 'a'.repeat(64),
+        duration_weeks: 8,
+        current: days[0],
+        next: days[1],
+        days,
+      },
+    });
+  });
+  await tmaPage.goto('/app');
+  await expect(tmaPage.getByRole('heading', { name: 'Грудь и трицепс' })).toBeVisible();
+  await tma.setSafeArea({ top: 28, right: 2, bottom: 20, left: 2 });
+  await tma.setContentSafeArea({ top: 44, right: 0, bottom: 16, left: 0 });
+  await expect(tmaPage.locator('html')).toHaveCSS('--yfc-tg-safe-bottom', '20px');
+  for (const width of [320, 360, 393, 430]) {
+    await tmaPage.setViewportSize({ width, height: 844 });
+    await tma.setViewport(844, 844);
+    await expectNoHorizontalOverflow(tmaPage);
+    await expectNoOverlap(
+      tmaPage.getByRole('button', { name: 'Начать тренировку' }),
+      tmaPage.locator('#appBottomNav'),
+    );
+  }
+  if (process.env.YFC_CAPTURE_1204 === '1') {
+    await tmaPage.setViewportSize({ width: 393, height: 900 });
+    await tma.setViewport(900, 900);
+    for (const theme of ['dark', 'light'] as const) {
+      await tma.setTheme(theme);
+      await tmaPage.screenshot({
+        path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-23-tma.png`,
+        fullPage: true,
+      });
+    }
+  }
+  const week = tmaPage.getByLabel('Неделя программы');
+  await week.focus();
+  await expect(week).toBeFocused();
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+  await expect(tmaPage.locator('#appBottomNav')).toBeHidden();
+  if (process.env.YFC_CAPTURE_1204 === '1') {
+    for (const theme of ['dark', 'light'] as const) {
+      await tma.setTheme(theme);
+      await tmaPage.screenshot({
+        path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-24-tma-keyboard.png`,
+        fullPage: true,
+      });
+    }
+  }
+});
+
 test('progress report starts native PDF download and keeps BackButton contract', async ({
   tma,
   tmaPage,

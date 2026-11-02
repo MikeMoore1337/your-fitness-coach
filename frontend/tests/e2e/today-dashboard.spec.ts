@@ -117,6 +117,9 @@ async function mockDashboard(page: Page, state: DashboardState = {}) {
         },
       });
     }
+    if (path.endsWith('/workouts/session-rotation')) {
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
+    }
     if (path.endsWith('/workouts/today')) {
       if (workoutStatus === 'completed' || workoutStatus === 'none') {
         return route.fulfill({
@@ -320,6 +323,107 @@ async function openDashboard(page: Page) {
   await page.getByRole('button', { name: 'Клиент' }).click();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
 }
+
+test('rotation confirms a skip and restores the previous place in the queue', async ({ page }) => {
+  await mockDashboard(page, { workout: 'none' });
+  const days = [
+    { day_number: 1, title: 'Грудь и трицепс', from_template: false },
+    { day_number: 2, title: 'Спина и бицепс', from_template: false },
+  ];
+  let skipped = false;
+  await page.route('**/api/v1/workouts/session-rotation**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = route.request().method() === 'POST' ? route.request().postDataJSON() : null;
+    if (path.endsWith('/skip')) {
+      expect(body).toMatchObject({ expected_cursor: 'a'.repeat(64), expected_day_number: 1 });
+      skipped = true;
+    }
+    if (path.endsWith('/undo-skip')) {
+      expect(body).toMatchObject({ expected_cursor: 'b'.repeat(64), workout_id: 15 });
+      skipped = false;
+    }
+    await route.fulfill({
+      json: {
+        mode: 'rotation',
+        status: 'ready',
+        program_id: 7,
+        revision_number: 2,
+        cursor: (skipped ? 'b' : 'a').repeat(64),
+        duration_weeks: 8,
+        default_plan_week: 1,
+        current: days[skipped ? 1 : 0],
+        next: days[skipped ? 0 : 1],
+        days,
+        undo_skip_workout_id: skipped ? 15 : null,
+      },
+    });
+  });
+  await openDashboard(page);
+  await expect(page.getByRole('heading', { name: 'Грудь и трицепс' })).toBeVisible();
+  await page.getByRole('button', { name: 'Пропустить тренировку' }).click();
+  const confirmation = page.getByRole('dialog');
+  await expect(confirmation).toContainText('Спина и бицепс');
+  await confirmation.getByRole('button', { name: 'Пропустить' }).click();
+  await expect(page.getByRole('heading', { name: 'Спина и бицепс' })).toBeVisible();
+  await page.getByRole('button', { name: 'Вернуть пропущенную тренировку' }).click();
+  await expect(page.getByRole('heading', { name: 'Грудь и трицепс' })).toBeVisible();
+
+  for (const width of [320, 360, 393, 430, 1440]) {
+    await page.setViewportSize({ width, height: 852 });
+    for (const theme of ['dark', 'light'] as const) {
+      await page.evaluate((value) => localStorage.setItem('app-theme', value), theme);
+      await page.reload();
+      await expect(page.getByRole('heading', { name: 'Грудь и трицепс' })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    }
+  }
+});
+
+test('rotation remains available in simulated standalone PWA', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.addInitScript(() => {
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query) => {
+      const result = original(query);
+      if (query === '(display-mode: standalone)')
+        Object.defineProperty(result, 'matches', { value: true });
+      return result;
+    };
+  });
+  await mockDashboard(page, { workout: 'none' });
+  await page.route('**/api/v1/workouts/session-rotation', async (route) => {
+    const day = { day_number: 1, title: 'Грудь и трицепс', from_template: false };
+    await route.fulfill({
+      json: {
+        mode: 'rotation',
+        status: 'ready',
+        program_id: 7,
+        revision_number: 2,
+        cursor: 'a'.repeat(64),
+        duration_weeks: 8,
+        default_plan_week: 1,
+        current: day,
+        next: day,
+        days: [day],
+      },
+    });
+  });
+  await openDashboard(page);
+  expect(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches)).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Грудь и трицепс' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeEnabled();
+  await expectNoHorizontalOverflow(page);
+  if (process.env.YFC_CAPTURE_1204 === '1') {
+    for (const theme of ['dark', 'light'] as const) {
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await page.screenshot({
+        path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-25-pwa.png`,
+        fullPage: true,
+      });
+    }
+  }
+});
 
 test('Today Cardio keeps a uniform frame and validation guard after the top rail removal', async ({
   page,

@@ -12,6 +12,7 @@ import type {
   WorkoutComment,
   WorkoutRecoveryState,
   WorkoutScheduleItem,
+  ApiSchemas,
 } from '../../shared/api/types';
 import { calendarWeek, dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
@@ -26,6 +27,7 @@ import {
 import { WorkoutAdaptation } from '../workouts/WorkoutAdaptation';
 import { WorkoutRecovery } from '../workouts/WorkoutRecovery';
 import { TodayWorkout } from '../workouts/TodayWorkout';
+import { SessionRotationToday } from './SessionRotationToday';
 import { PreviousWorkoutNote } from '../workouts/PreviousWorkoutNote';
 import { ExerciseNoteRecovery } from '../workouts/ExerciseNoteRecovery';
 import { Badge, Button, SemanticCard, Skeleton } from '../../shared/ui/common';
@@ -1048,6 +1050,15 @@ export function TodayDashboard({
     queryFn: () => api<WorkoutRecoveryState>('/api/v1/workouts/recovery'),
     enabled: Boolean(user),
   });
+  const rotation = useQuery({
+    queryKey: ['workout', 'session-rotation'],
+    queryFn: () =>
+      api<ApiSchemas['SessionRotationStateResponse']>('/api/v1/workouts/session-rotation', {
+        cache: 'no-store',
+      }),
+    enabled: Boolean(user?.has_active_program),
+    retry: false,
+  });
   const cardioWeek = useQuery({
     queryKey: queryKeys.cardio.range(weekStart, weekEnd),
     queryFn: () =>
@@ -1406,6 +1417,41 @@ export function TodayDashboard({
                   <p>Выберите другой день или откройте программу тренировок.</p>
                 </div>
               )
+            ) : rotation.isLoading ? (
+              <div className="today-inline-state" role="status">
+                Проверяем порядок тренировок…
+              </div>
+            ) : rotation.data?.mode === 'rotation' ? (
+              <SessionRotationToday
+                state={rotation.data}
+                refreshing={rotation.isFetching}
+                pendingLocalChanges={hasPendingLocalChanges}
+                onStarted={(startedWorkout) => {
+                  queryClient.setQueryData(['workout', 'today'], startedWorkout);
+                  setDetailsOpen(true);
+                }}
+                onResume={() => {
+                  if (visibleWorkout?.id === rotation.data?.current?.workout_id) {
+                    setDetailsOpen(true);
+                    return;
+                  }
+                  void workout.refetch().then((result) => {
+                    if (result.data?.id === rotation.data?.current?.workout_id)
+                      setDetailsOpen(true);
+                  });
+                }}
+              />
+            ) : rotation.isError && visibleWorkout?.status !== 'in_progress' ? (
+              <div className="today-inline-state" role="alert">
+                <strong id="today-workout-title">Не удалось проверить порядок тренировок</strong>
+                <button
+                  className="today-text-link"
+                  type="button"
+                  onClick={() => void rotation.refetch()}
+                >
+                  Повторить
+                </button>
+              </div>
             ) : workout.isLoading ||
               priorityContextLoading ||
               (noTodayWorkout && progress.isLoading && user?.has_active_program) ? (

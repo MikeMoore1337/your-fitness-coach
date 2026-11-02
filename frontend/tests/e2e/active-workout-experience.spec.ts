@@ -841,6 +841,9 @@ async function mockActiveWorkout(
         },
       });
     }
+    if (path.endsWith('/workouts/session-rotation')) {
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
+    }
     if (path.endsWith('/workouts/today')) {
       if (finished) {
         return route.fulfill({ status: 404, json: { detail: 'На сегодня тренировка завершена' } });

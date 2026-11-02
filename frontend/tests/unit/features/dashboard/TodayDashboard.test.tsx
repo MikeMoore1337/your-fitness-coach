@@ -52,7 +52,11 @@ vi.mock('../../../../src/shared/api/client', () => {
       this.name = 'ApiError';
     }
   }
-  return { api: apiMock, ApiError: MockApiError };
+  return {
+    api: apiMock,
+    ApiError: MockApiError,
+    getUserFacingErrorMessage: (error: Error) => error.message,
+  };
 });
 
 vi.mock('../../../../src/app/AuthProvider', () => ({
@@ -336,6 +340,9 @@ function auxiliaryResponse(
     comments?: Array<Record<string, unknown>>;
   } = {},
 ) {
+  if (path === '/api/v1/workouts/session-rotation') {
+    return Promise.resolve({ mode: 'calendar', status: 'disabled', days: [] });
+  }
   if (path === '/api/v1/workouts/week') return Promise.resolve(options.week ?? []);
   if (path.startsWith('/api/v1/workouts/cardio?')) return Promise.resolve(options.cardio ?? []);
   if (path.startsWith('/api/v1/nutrition/hydration')) {

@@ -132,11 +132,26 @@ def is_recoverable_missed_workout(
     *,
     program: UserProgram | None = None,
     authoritative_workout_ids: set[int] | None = None,
+    mode_history: list[tuple[date, str]] | None = None,
 ) -> bool:
     program = program or workout.user_program
-    if program is None or not program.is_active or program.status not in {"scheduled", "active"}:
+    if (
+        program is None
+        or program.schedule_mode == "rotation"
+        or not program.is_active
+        or program.status not in {"scheduled", "active"}
+    ):
         return False
     if workout.status != "planned" or workout.scheduled_date >= _recovery_today(user):
+        return False
+    from fitminiapp_api.services.schedule_modes import calendar_active_on, mode_changes
+
+    history = (
+        mode_history
+        if mode_history is not None
+        else mode_changes(db, {program.id}).get(program.id, [])
+    )
+    if not calendar_active_on(history, workout.scheduled_date):
         return False
     if authoritative_workout_ids is not None and workout.id not in authoritative_workout_ids:
         return False
@@ -155,6 +170,9 @@ def recoverable_missed_workouts(
         return []
     today = _recovery_today(user)
     authoritative_workout_ids = _current_revision_workout_ids(db, program)
+    from fitminiapp_api.services.schedule_modes import mode_changes
+
+    mode_history = mode_changes(db, {program.id}).get(program.id, [])
     rows = (
         db.query(UserWorkout)
         .filter(
@@ -174,6 +192,7 @@ def recoverable_missed_workouts(
                 row,
                 program=program,
                 authoritative_workout_ids=authoritative_workout_ids,
+                mode_history=mode_history,
             )
         ),
         key=_workout_order_key,
@@ -265,8 +284,13 @@ def _workouts_for_recovery(
         .all()
     )
     missed_ids = {row.id for row in recoverable_missed_workouts(db, current_user, program)}
+    from fitminiapp_api.services.schedule_modes import calendar_active_on, mode_changes
+
+    mode_history = mode_changes(db, {program.id}).get(program.id, [])
     items: list[dict] = []
     for row in rows:
+        if row.status == "planned" and not calendar_active_on(mode_history, row.scheduled_date):
+            continue
         if row.id == workout_id:
             if action == "skip":
                 continue
@@ -313,6 +337,15 @@ def recovery_state(db: Session, current_user: User) -> dict:
             }
         return {
             "status": "no_active_program",
+            "missed_workouts": [],
+            "next_workout": None,
+            "paused_program_id": None,
+            "paused_program_title": None,
+        }
+
+    if program.schedule_mode == "rotation":
+        return {
+            "status": "clear",
             "missed_workouts": [],
             "next_workout": None,
             "paused_program_id": None,
@@ -373,6 +406,8 @@ def _validate_request(
     program = workout.user_program
     if program is None or program.user_id != current_user.id:
         raise WorkoutRecoveryError("Тренировка не найдена", status_code=404)
+    if program.schedule_mode == "rotation":
+        raise WorkoutRecoveryError("Используйте действия очереди тренировок")
     if not program.is_active or program.status not in {"scheduled", "active"}:
         raise WorkoutRecoveryError("Программа сейчас неактивна")
     authoritative_workout_ids = _current_revision_workout_ids(db, program)
