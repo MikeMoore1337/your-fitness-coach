@@ -2006,9 +2006,7 @@ def test_xlsx_matrix_source_headers_four_to_six_use_source_positions_one_to_thre
         (2, "medium", "F2"),
         (3, "heavy", "I2"),
     ]
-    assert "source_week_numbers_normalized" in {
-        issue["code"] for issue in preview["issues"]
-    }
+    assert "source_week_numbers_normalized" in {issue["code"] for issue in preview["issues"]}
     assert preview["summary"]["blocking_issue_count"] == 0
     resolved = client.post(
         f"/api/v1/programs/imports/{preview['id']}/resolve",
@@ -2032,9 +2030,7 @@ def test_xlsx_matrix_source_headers_four_to_six_use_source_positions_one_to_thre
     assert confirmed.status_code == 200, confirmed.text
     template = confirmed.json()["template"]
     assert template["default_duration_weeks"] == 16
-    assert template["program_metadata"]["week_cycle"]["week_types"] == [
-        "light", "medium", "heavy"
-    ]
+    assert template["program_metadata"]["week_cycle"]["week_types"] == ["light", "medium", "heavy"]
 
 
 def test_xlsx_cycle_conflicts_manual_ambiguities_and_owner_gate(client):
