@@ -73,6 +73,7 @@ def _weekly_matrix_xlsx(
     weeks: int = 12,
     week_type_text: tuple[str, ...] | None = None,
     merge_week_header: bool = False,
+    first_week_label: int = 1,
 ) -> bytes:
     day_header_rows = (2, 7, 12, 17)
     day_names = (
@@ -92,7 +93,7 @@ def _weekly_matrix_xlsx(
     for week_number in range(1, weeks + 1):
         block_start = 1 + (week_number - 1) * 3
         source_order = (1, 2, 3, 4) if week_number == 1 else (1, 3, 2, 4)
-        label = f"Неделя {week_number}"
+        label = f"Неделя {first_week_label + week_number - 1}"
         if week_type_text is not None:
             label += f" - {week_type_text[week_number - 1]}"
         add_cell(2, block_start + 2, label)
@@ -1976,6 +1977,58 @@ def test_xlsx_matrix_preview_is_independent_of_fill_color(client):
             )
         )
     assert normalized[0] == normalized[1] == normalized[2]
+
+
+def test_xlsx_matrix_source_headers_four_to_six_use_source_positions_one_to_three(client):
+    headers = _auth(client, 931179)
+    upload = _upload(
+        client,
+        headers,
+        "weeks-4-to-6.xlsx",
+        _weekly_matrix_xlsx(
+            weeks=3,
+            first_week_label=4,
+            week_type_text=("Лёгкая", "Средняя", "Тяжёлая"),
+        ),
+    )
+    assert upload.status_code == 201, upload.text
+    preview = upload.json()
+    assert preview["layout_version"] == "weekly-matrix-v1"
+    assert preview["duration_weeks"] == 3
+    assert preview["week_types"] == [None, None, None]
+    assert {row["week_number"] for row in preview["rows"]} == {1, 2, 3}
+    assert [(item["week_number"], item["week_type"], item["source_cell"]) for item in preview["week_type_candidates"]] == [
+        (1, "light", "C2"),
+        (2, "medium", "F2"),
+        (3, "heavy", "I2"),
+    ]
+    assert "source_week_numbers_normalized" in {issue["code"] for issue in preview["issues"]}
+    assert preview["summary"]["blocking_issue_count"] == 0
+    resolved = client.post(
+        f"/api/v1/programs/imports/{preview['id']}/resolve",
+        headers=headers,
+        json={
+            "expected_draft_version": preview["draft_version"],
+            "title": "Цикл из исходных недель 4-6",
+            "goal": "maintenance",
+            "level": "intermediate",
+            "assignment_duration_weeks": 16,
+            "repeat": True,
+            "week_types": ["light", "medium", "heavy"],
+        },
+    )
+    assert resolved.status_code == 200, resolved.text
+    confirmed = client.post(
+        f"/api/v1/programs/imports/{preview['id']}/confirm",
+        headers=headers,
+        json={"expected_draft_version": resolved.json()["draft_version"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    template = confirmed.json()["template"]
+    assert template["default_duration_weeks"] == 16
+    assert template["program_metadata"]["week_cycle"]["week_types"] == [
+        "light", "medium", "heavy"
+    ]
 
 
 def test_xlsx_cycle_conflicts_manual_ambiguities_and_owner_gate(client):
