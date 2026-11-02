@@ -876,12 +876,20 @@ def test_cycle_impact_preview_supports_all_future_weeks_and_rejects_stale_revisi
     )
     assert repeating.status_code == 200, repeating.text
     assert [row["week_number"] for row in repeating.json()["weeks"][:3]] == [8, 11, 14]
+    mutation_endpoint = f"/api/v1/programs/assigned/{program_id}/cycle/week-type"
     invalid_write = client.post(
-        f"/api/v1/programs/assigned/{program_id}/cycle/week-type",
+        mutation_endpoint,
+        headers=headers,
+        json={"expected_revision_number": expected_revision, "week_type": "heavy"},
+    )
+    assert invalid_write.status_code == 422, invalid_write.text
+    all_future_write = client.post(
+        mutation_endpoint,
         headers=headers,
         json={**page_request, "week_type": "heavy"},
     )
-    assert invalid_write.status_code == 422, invalid_write.text
+    assert all_future_write.status_code == 200, all_future_write.text
+    assert all_future_write.json()["current_revision_number"] == expected_revision + 1
     stale = client.post(
         endpoint, headers=headers, json={**page_request, "expected_revision_number": 0}
     )
