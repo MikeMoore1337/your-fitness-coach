@@ -2622,11 +2622,7 @@ def _expand_extracted_rows(
             components = [source_name]
         is_compound = len(components) == 2
         raw_reps = source.values.get("prescribed_reps")
-        component_reps = (
-            raw_reps.split("/")
-            if is_compound and isinstance(raw_reps, str)
-            else []
-        )
+        component_reps = raw_reps.split("/") if is_compound and isinstance(raw_reps, str) else []
         # A two-part AMRAP/number target belongs to the two exercise names,
         # not to two of the four sets. Purely numeric lists remain unchanged.
         split_component_reps = (
