@@ -1805,7 +1805,9 @@ def _normalized_header_key(value: str) -> str:
 
 def _normalize_repetitions(value: str) -> str:
     normalized = _text(value)
-    normalized = re.sub(r"\b(?:макс(?:имум)?|max)\b", "MAX", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(
+        r"\b(?:макс(?:имум)?|[mм][aа][xх])\b", "MAX", normalized, flags=re.IGNORECASE
+    )
     normalized = re.sub(r"\s*(?:×|x|х)\s*", "/", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"\s*/\s*", "/", normalized)
     normalized = re.sub(r"\s+", " ", normalized)
@@ -2282,6 +2284,8 @@ def _week_type_candidates(table: _Table, source_weeks: int) -> list[dict[str, ob
 
 
 def _planned_rep_targets(reps: str, sets: int) -> list[dict[str, object]] | None:
+    if reps in {"MAX", "AMRAP"}:
+        return [{"kind": "amrap"} for _ in range(sets)]
     if _EXACT_REP_LIST_PATTERN.fullmatch(reps):
         numbers = [int(value) for value in reps.split("/")]
         if len(numbers) not in {1, sets} or any(not 1 <= value <= 1000 for value in numbers):
@@ -2617,6 +2621,22 @@ def _expand_extracted_rows(
         if len(components) > 2:
             components = [source_name]
         is_compound = len(components) == 2
+        raw_reps = source.values.get("prescribed_reps")
+        component_reps = (
+            raw_reps.split("/")
+            if is_compound and isinstance(raw_reps, str)
+            else []
+        )
+        # A two-part MAX/number target belongs to the two exercise names,
+        # not to two of the four sets. Purely numeric lists remain unchanged.
+        split_component_reps = (
+            len(component_reps) == 2
+            and "MAX" in component_reps
+            and all(
+                item == "MAX" or (item.isascii() and item.isdecimal() and 1 <= int(item) <= 1000)
+                for item in component_reps
+            )
+        )
         if is_compound:
             saw_compound = True
             key = (source.week_number or 1, int(source.values.get("day_number", "1")))
@@ -2629,6 +2649,8 @@ def _expand_extracted_rows(
             saw_qualifier = saw_qualifier or match_name != component
             values = dict(source.values)
             values["exercise_name"] = component
+            if split_component_reps:
+                values["prescribed_reps"] = component_reps[component_index - 1]
             existing_notes = _optional_text(values.get("notes"))
             qualifier = (
                 component[len(match_name) :].strip() if component.startswith(match_name) else ""
