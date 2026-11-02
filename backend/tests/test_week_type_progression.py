@@ -1333,6 +1333,62 @@ def test_cycle_revision_respects_coach_relationship_and_athlete_isolation(client
     outsider = _auth(client, 918999)
     assert client.post(path + "/preview", headers=athletes[0], json=change).status_code == 200
     assert client.post(path + "/preview", headers=outsider, json=change).status_code in (403, 404)
+    program_path = f"/api/v1/programs/assigned/{assigned.json()['user_program_id']}"
+    slot = created.json()["template"]["days"][0]["exercises"][0]["id"]
+    attempts = [
+        ("post", path, change),
+        (
+            "patch",
+            program_path + "/cycle",
+            {
+                "expected_revision_number": 1,
+                "effective_from_week": 7,
+                "duration_weeks": 20,
+            },
+        ),
+        (
+            "post",
+            program_path + "/cycle/disable",
+            {
+                "expected_revision_number": 1,
+                "effective_from_week": 7,
+            },
+        ),
+        (
+            "post",
+            program_path + "/cycle/enable",
+            {
+                "expected_revision_number": 1,
+                "effective_from_week": 7,
+                "duration_weeks": 16,
+                "week_cycle": {"length_weeks": 3, "repeat": True},
+            },
+        ),
+        (
+            "post",
+            program_path + "/exercises",
+            {
+                "expected_revision_number": 1,
+                "effective_scope": "future_program",
+                "occurrence_weeks": [7],
+                "day_number": 1,
+                "target_template_exercise_id": slot,
+                "exercise_id": exercise["id"],
+                "prescribed_sets": 3,
+                "prescribed_reps": "12",
+                "rest_seconds": 90,
+            },
+        ),
+    ]
+    for method, url, body in attempts:
+        response = getattr(client, method)(url, headers=athletes[0], json=body)
+        assert response.status_code == 403, (url, response.text)
+    assert (
+        client.get(program_path + "/lifecycle", headers=athletes[0]).json()[
+            "current_revision_number"
+        ]
+        == 1
+    )
     assert client.post(path, headers=coach, json=change).status_code == 200
     with get_session_context() as db:
         link = db.query(CoachClient).filter_by(client_user_id=clients[0][0]).one()

@@ -21,7 +21,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutSet,
 )
-from fitminiapp_api.models.user import User
+from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.program import (
     CoachProgramExerciseCreate,
     ProgramCycleDisableRequest,
@@ -433,6 +433,73 @@ def test_two_scoped_edits_with_same_revision_have_one_winner(client):
             row.exercises[0].prescribed_sets
             == overrides[0].changed_fields["occurrence_override"]["exercise"]["prescribed_sets"]
         )
+    _assert_facts_unchanged(facts)
+
+
+@pytest.mark.parametrize("actor_kind", ["athlete", "coach"])
+def test_cycle_edit_fails_closed_during_coaching_transition(client, actor_kind):
+    facts = _assigned_cycle_with_completed_facts(client)
+    athlete_login = client.post("/api/v1/auth/dev-login", json={"telegram_user_id": 916190})
+    assert athlete_login.status_code == 200, athlete_login.text
+    coach_login = client.post(
+        "/api/v1/auth/dev-login", json={"telegram_user_id": 916191, "is_coach": True}
+    )
+    assert coach_login.status_code == 200, coach_login.text
+    with get_session_context() as db:
+        coach = db.query(User).filter_by(telegram_user_id=916191).one()
+        coach_id = coach.id
+        db.get(UserProgram, facts["program_id"]).assigned_by_user_id = coach_id
+        relation = CoachClient(
+            coach_user_id=coach_id,
+            client_user_id=facts["owner_id"],
+            status="ended" if actor_kind == "athlete" else "active",
+        )
+        db.add(relation)
+        db.flush()
+        relation_id = relation.id
+
+    token = (
+        athlete_login.json()["access_token"]
+        if actor_kind == "athlete"
+        else coach_login.json()["access_token"]
+    )
+
+    def edit():
+        return client.post(
+            f"/api/v1/programs/assigned/{facts['program_id']}/exercises",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "expected_revision_number": facts["version"],
+                "effective_scope": "future_program",
+                "occurrence_weeks": [10],
+                "day_number": 1,
+                "target_template_exercise_id": facts["slot_id"],
+                "exercise_id": facts["exercise_id"],
+                "prescribed_sets": 3,
+                "prescribed_reps": "12",
+                "rest_seconds": 90,
+            },
+        )
+
+    blocker = SessionLocal()
+    try:
+        if actor_kind == "athlete":
+            blocker.query(User).filter_by(id=facts["owner_id"]).with_for_update().one()
+        else:
+            blocker.query(CoachClient).filter_by(id=relation_id).with_for_update().one()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(edit)
+            try:
+                result = future.result(timeout=8)
+            finally:
+                blocker.rollback()
+        assert result.status_code == 409, result.text
+    finally:
+        blocker.close()
+    with get_session_context() as db:
+        assert db.get(UserProgram, facts["program_id"]).current_revision_number == facts["version"]
+    retried = edit()
+    assert retried.status_code == 200, retried.text
     _assert_facts_unchanged(facts)
 
 

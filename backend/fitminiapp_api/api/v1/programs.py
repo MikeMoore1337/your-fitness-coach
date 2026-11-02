@@ -125,6 +125,8 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
     detail = str(exc)
     if detail in {"Assigned program not found", "Training block not found"}:
         return HTTPException(status_code=404, detail=detail)
+    if detail == "Изменения программы согласуйте с тренером":
+        return HTTPException(status_code=403, detail=detail)
     if detail in {
         "Program revision conflict",
         "Progression proposal is stale",

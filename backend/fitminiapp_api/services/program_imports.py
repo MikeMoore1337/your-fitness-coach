@@ -5218,6 +5218,8 @@ def confirm_program_import(
     except ProgramError as exc:
         db.rollback()
         if target_program_id is not None:
+            if str(exc) == "Изменения программы согласуйте с тренером":
+                raise ProgramImportError("target_forbidden", str(exc), 403) from exc
             if str(exc) == "Assigned program not found":
                 raise ProgramImportError(
                     "target_unavailable", "Назначенная программа не найдена", 404

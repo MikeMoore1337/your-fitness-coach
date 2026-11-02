@@ -465,6 +465,37 @@ def test_cycle_import_revision_updates_logical_source_and_restart(client):
         assert all(row.exercises[0].prescribed_reps == "14" for row in new_program.workouts)
 
 
+def test_import_cannot_replace_an_active_coach_managed_cycle(client):
+    from test_program_import import _csv_payload, _upload, _valid_row
+
+    from fitminiapp_api.models.program_import import ProgramImport
+    from fitminiapp_api.models.user import CoachClient, User
+
+    headers, program_id, _, _ = assigned_cycle(client)
+    _auth(client, 916205, is_coach=True)
+    with get_session_context() as db:
+        coach = db.query(User).filter_by(telegram_user_id=916205).one()
+        program = db.get(UserProgram, program_id)
+        program.assigned_by_user_id = coach.id
+        db.add(CoachClient(coach_user_id=coach.id, client_user_id=program.user_id, status="active"))
+    uploaded = _upload(client, headers, "cycle.csv", _csv_payload([_valid_row()]))
+    assert uploaded.status_code == 201, uploaded.text
+    import_id = uploaded.json()["id"]
+    with get_session_context() as db:
+        templates_before = db.query(ProgramTemplate).count()
+        version_before = db.get(UserProgram, program_id).current_revision_number
+    result = client.post(
+        f"/api/v1/programs/imports/{import_id}/confirm",
+        headers=headers,
+        json={"target_program_id": program_id, "expected_revision_number": version_before},
+    )
+    assert result.status_code == 403, result.text
+    with get_session_context() as db:
+        assert db.get(UserProgram, program_id).current_revision_number == version_before
+        assert db.query(ProgramTemplate).count() == templates_before
+        assert db.get(ProgramImport, import_id).status == "pending"
+
+
 def test_reminders_extend_logical_schedule_without_future_sets(client, monkeypatch):
     from datetime import datetime, time
 

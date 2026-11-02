@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from itertools import pairwise
 
 from sqlalchemy import and_, inspect, or_
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, SessionTransactionOrigin, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
@@ -143,6 +144,30 @@ def get_program_for_actor(
     ):
         return program, role
     raise ProgramError("Assigned program not found")
+
+
+def _ensure_cycle_plan_editor(db: Session, program: UserProgram, actor: User) -> None:
+    coach_id = program.assigned_by_user_id
+    if coach_id is None or coach_id == program.user_id:
+        return
+    try:
+        if actor.id == program.user_id:
+            # Invitation acceptance locks the user before the program; do not wait in reverse order.
+            db.query(User.id).filter_by(id=program.user_id).with_for_update(nowait=True).one()
+        relation = db.query(CoachClient.id).filter_by(
+            coach_user_id=coach_id, client_user_id=program.user_id, status="active"
+        )
+        if actor.id != program.user_id:
+            relation = relation.with_for_update(nowait=True)
+        active_relation = relation.first() is not None
+    except OperationalError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "55P03":
+            raise ProgramError("Program revision conflict") from exc
+        raise
+    if actor.id == program.user_id and active_relation:
+        raise ProgramError("Изменения программы согласуйте с тренером")
+    if actor.id != program.user_id and not active_relation:
+        raise ProgramError("Assigned program not found")
 
 
 def list_program_import_targets(db: Session, actor: User) -> list[dict[str, object]]:
@@ -1027,6 +1052,7 @@ def revise_program_cycle(
     db: Session, actor: User, program_id: int, payload: ProgramCycleRevisionRequest
 ) -> int:
     program, _ = get_program_for_actor(db, actor, program_id, lock=True)
+    _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     owner = db.get(User, program.user_id)
@@ -1205,6 +1231,8 @@ def enable_program_cycle(
     db: Session, actor: User, program_id: int, payload: ProgramCycleEnableRequest, *, preview: bool
 ) -> dict:
     program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     boundary, duration = payload.effective_from_week, payload.duration_weeks
@@ -1506,6 +1534,8 @@ def disable_program_cycle(
     preview: bool,
 ) -> dict:
     program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     boundary = payload.effective_from_week
@@ -1681,6 +1711,8 @@ def revise_program_week_type(
     if not preview and isinstance(payload, ProgramCycleImpactPreviewRequest):
         raise ProgramError("Для изменения типа недели требуется явная область повторений")
     program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     revisions = (
@@ -2880,6 +2912,7 @@ def apply_imported_template_revision(
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, expected_revision_number)
     if _cycle_plan_at(db, program, program.duration_weeks) is not None:
+        _ensure_cycle_plan_editor(db, program, actor)
         return _import_cycle_revision(
             db,
             actor,
@@ -3635,6 +3668,7 @@ def upsert_future_program_exercise(
         raise ProgramError("Strength rest must be at least 15 seconds")
 
     if _cycle_plan_at(db, program, program.duration_weeks) is not None:
+        _ensure_cycle_plan_editor(db, program, actor)
         explicit = payload.occurrence_weeks
         if payload.effective_scope != "future_program" and any(
             value is not None for value in (explicit, payload.from_week, payload.source_cycle_week)
