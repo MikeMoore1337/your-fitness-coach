@@ -590,7 +590,11 @@ def edit_template(
         detail = str(exc)
         if detail == "Template not found":
             raise HTTPException(status_code=404, detail=detail)
-        if detail in {"No permission to edit template", "No permission to manage this user"}:
+        if detail in {
+            "No permission to edit template",
+            "No permission to manage this user",
+            "Изменения программы согласуйте с тренером",
+        }:
             raise HTTPException(status_code=403, detail=detail)
         if detail == "Program revision conflict":
             raise HTTPException(status_code=409, detail=detail)

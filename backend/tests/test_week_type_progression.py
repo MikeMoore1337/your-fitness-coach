@@ -1383,6 +1383,21 @@ def test_cycle_revision_respects_coach_relationship_and_athlete_isolation(client
     for method, url, body in attempts:
         response = getattr(client, method)(url, headers=athletes[0], json=body)
         assert response.status_code == 403, (url, response.text)
+    template_id = created.json()["template"]["id"]
+    template_path = f"/api/v1/programs/templates/{template_id}"
+    edited_template = client.patch(
+        template_path,
+        headers=athletes[0],
+        json={
+            **payload,
+            "title": "Несогласованное изменение",
+            "mode": "self",
+            "target_telegram_user_id": None,
+            "expected_revision_number": 1,
+        },
+    )
+    assert edited_template.status_code == 403, edited_template.text
+    assert client.get(template_path, headers=athletes[0]).json()["title"] == payload["title"]
     assert (
         client.get(program_path + "/lifecycle", headers=athletes[0]).json()[
             "current_revision_number"
