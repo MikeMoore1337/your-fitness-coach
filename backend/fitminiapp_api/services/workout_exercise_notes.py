@@ -231,7 +231,7 @@ def _previous(
         .order_by(UserWorkoutSet.set_number.desc(), UserWorkoutSet.id.desc())
         .first()
     )
-    load = (
+    load: dict[str, object] | None = (
         None
         if latest_set is None
         else {

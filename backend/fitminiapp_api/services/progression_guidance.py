@@ -1554,7 +1554,7 @@ def build_progression_guidance(
         side_mode = next(iter(target_modes)) if len(target_modes) == 1 else None
         if side_mode not in SIDE_MODES:
             side_mode = None
-        side_guidance = None
+        side_guidance: dict[str, object] | None = None
         side_actions: dict[str, str] = {}
         side_sessions: dict[str, list[SessionFacts]] = {}
         target_reps = (
