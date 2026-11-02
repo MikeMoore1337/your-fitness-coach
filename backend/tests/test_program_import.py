@@ -1573,6 +1573,68 @@ def test_inconsistent_ai_status_payload_fails_closed(client):
     assert draft["rows"][0].get("prescribed_sets") is None
 
 
+def test_xlsx_matrix_compound_max_and_fixed_reps_preserves_each_exercise(client):
+    headers = _auth(client, 931182)
+    original = _weekly_matrix_xlsx(weeks=1)
+    with zipfile.ZipFile(io.BytesIO(original)) as archive:
+        entries = {item.filename: archive.read(item.filename) for item in archive.infolist()}
+
+    sheet = entries["xl/worksheets/sheet1.xml"]
+    old = "Сгибание ног лежа\n3×9".encode()
+    assert old in sheet
+    entries["xl/worksheets/sheet1.xml"] = sheet.replace(
+        old,
+        "Скручивания на пресс + икры стоя\n4×МАХ / 15".encode(),
+        1,
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, content in entries.items():
+            archive.writestr(name, content)
+
+    response = _upload(client, headers, "compound-reps.xlsx", output.getvalue())
+    assert response.status_code == 201, response.text
+    preview = response.json()
+    paired = [row for row in preview["rows"] if row["source_range"] == "A18:C18"]
+    assert len(paired) == 2
+    assert [(row["prescribed_sets"], row["prescribed_reps"]) for row in paired] == [
+        (4, "MAX"),
+        (4, "15"),
+    ]
+    assert [row["superset_order"] for row in paired] == [1, 2]
+    assert len({row["superset_group"] for row in paired}) == 1
+    assert not [
+        issue
+        for row in paired
+        for issue in row["issues"]
+        if issue["code"] == "planned_reps_ambiguous"
+    ]
+
+    resolved = client.post(
+        f"/api/v1/programs/imports/{preview['id']}/resolve",
+        headers=headers,
+        json={
+            "title": "Программа с двумя целями повторов",
+            "goal": "maintenance",
+            "level": "intermediate",
+        },
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["summary"]["blocking_issue_count"] == 0, resolved.json()
+
+    confirmed = client.post(
+        f"/api/v1/programs/imports/{preview['id']}/confirm",
+        headers=headers,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    day_four = confirmed.json()["template"]["days"][3]
+    assert [(item["prescribed_sets"], item["prescribed_reps"]) for item in day_four["exercises"][:2]] == [
+        (4, "MAX"),
+        (4, "15"),
+    ]
+    assert [item["superset_order"] for item in day_four["exercises"][:2]] == [1, 2]
+
+
 def test_weekly_matrix_extracts_four_days_and_preserves_exercise_changes(client):
     headers = _auth(client, 931012)
     preview = _upload(
