@@ -1598,7 +1598,7 @@ def test_xlsx_matrix_compound_max_and_fixed_reps_preserves_each_exercise(client)
     paired = [row for row in preview["rows"] if row["source_range"] == "A18:C18"]
     assert len(paired) == 2
     assert [(row["prescribed_sets"], row["prescribed_reps"]) for row in paired] == [
-        (4, "MAX"),
+        (4, "AMRAP"),
         (4, "15"),
     ]
     assert [row["superset_order"] for row in paired] == [1, 2]
@@ -1629,7 +1629,7 @@ def test_xlsx_matrix_compound_max_and_fixed_reps_preserves_each_exercise(client)
     assert confirmed.status_code == 200, confirmed.text
     day_four = confirmed.json()["template"]["days"][3]
     assert [(item["prescribed_sets"], item["prescribed_reps"]) for item in day_four["exercises"][:2]] == [
-        (4, "MAX"),
+        (4, "AMRAP"),
         (4, "15"),
     ]
     assert [item["superset_order"] for item in day_four["exercises"][:2]] == [1, 2]
