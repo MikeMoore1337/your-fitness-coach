@@ -836,7 +836,7 @@ def create_session(
             title=plan["title"],
             status="planned",
             plan_materialized=False,
-            source_cycle_week=plan["source_cycle_week"],
+            rotation_source_cycle_week=plan["source_cycle_week"],
             cycle_iteration=plan["cycle_iteration"],
             plan_revision_number=program.current_revision_number,
             rotation_epoch=program.rotation_epoch,
@@ -850,7 +850,12 @@ def create_session(
     else:
         assert source is not None
         workout = _copy_scheduled_workout(
-            db, source, program_id=program.id, scheduled_date=today, week_number=week
+            db,
+            source,
+            program_id=program.id,
+            scheduled_date=today,
+            week_number=week,
+            rotation_epoch=program.rotation_epoch,
         )
         workout.rotation_epoch = program.rotation_epoch
         workout.rotation_role = "extra" if payload.out_of_order else "ordered"

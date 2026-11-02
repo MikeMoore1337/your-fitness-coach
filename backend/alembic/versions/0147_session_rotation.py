@@ -1,4 +1,4 @@
-"""Add opt-in session rotation without rewriting existing workout facts."""
+"""Expand opt-in rotation without changing calendar indexes or workout facts."""
 
 from collections.abc import Sequence
 
@@ -12,122 +12,157 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 online_rollout_phase = "expand"
 online_rollout_notes = (
-    "Add opt-in rotation lineage and replace the calendar-only occurrence index. "
+    "Nullable rotation lineage; NULL mode remains calendar. Existing calendar uniqueness is "
+    "retained. New partial indexes are built concurrently and checked before rollout. "
     "Enable rotation only after every application instance runs the new code."
 )
 
 
-def _index(name: str, columns: list[str], predicate: str, *, unique: bool = False) -> None:
-    postgres = op.get_bind().dialect.name == "postgresql"
-    op.create_index(
-        name,
-        "user_workouts",
-        columns,
-        unique=unique,
-        postgresql_where=sa.text(predicate),
-        sqlite_where=sa.text(predicate),
-        postgresql_concurrently=postgres,
-        if_not_exists=postgres,
-    )
-    if postgres:
-        definition = (
-            op.get_bind()
-            .execute(
-                sa.text(
-                    "SELECT indisvalid AND indisready AND indisunique = :unique "
-                    "AND indrelid = to_regclass('user_workouts') AS valid, "
-                    "ARRAY(SELECT a.attname::text FROM unnest(i.indkey) WITH ORDINALITY AS k(num, pos) "
-                    "JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.num "
-                    "ORDER BY k.pos) AS columns, pg_get_expr(indpred, indrelid) AS predicate "
-                    "FROM pg_index i WHERE indexrelid = to_regclass(:name)"
-                ),
-                {"name": name, "unique": unique},
-            )
-            .mappings()
-            .one_or_none()
-        )
-
-        def normalized(value: str) -> str:
-            return (
-                value.lower()
-                .replace("::character varying", "")
-                .replace("::text", "")
-                .replace('"', "")
-                .replace("(", "")
-                .replace(")", "")
-                .replace(" ", "")
-            )
-
-        if (
-            not definition
-            or not definition["valid"]
-            or definition["columns"] != columns
-            or not definition["predicate"]
-            or normalized(definition["predicate"]) != normalized(predicate)
-        ):
-            raise RuntimeError(f"Incomplete rotation index {name}; repair it before retrying")
-
-
 def upgrade() -> None:
-    postgres = op.get_bind().dialect.name == "postgresql"
-    optional = {"if_not_exists": True} if postgres else {}
-    op.add_column(
-        "user_programs",
-        sa.Column("schedule_mode", sa.String(16), nullable=False, server_default="calendar"),
-        **optional,
-    )
-    for name in ("rotation_epoch", "rotation_first_day", "rotation_accepted_revision"):
-        op.add_column("user_programs", sa.Column(name, sa.Integer(), nullable=True), **optional)
-    op.add_column(
-        "user_workouts", sa.Column("rotation_epoch", sa.Integer(), nullable=True), **optional
-    )
-    op.add_column(
-        "user_workouts", sa.Column("rotation_role", sa.String(16), nullable=True), **optional
-    )
-    for name in (
-        "rotation_mutation_id",
-        "rotation_request_hash",
-        "rotation_transition_id",
-        "rotation_transition_hash",
-    ):
-        op.add_column("user_workouts", sa.Column(name, sa.String(64), nullable=True), **optional)
-
-    def replace_indexes() -> None:
-        _index(
-            "uq_user_workouts_cycle_occurrence_calendar",
-            ["user_program_id", "week_number", "day_number"],
-            "source_cycle_week IS NOT NULL AND rotation_epoch IS NULL",
-            unique=True,
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.add_column(
+            "user_programs",
+            sa.Column("schedule_mode", sa.String(16), nullable=True),
+            if_not_exists=True,
         )
-        _index(
-            "uq_user_workouts_rotation_mutation",
-            ["user_program_id", "rotation_mutation_id"],
-            "rotation_mutation_id IS NOT NULL",
-            unique=True,
+        op.add_column(
+            "user_programs",
+            sa.Column("rotation_epoch", sa.Integer(), nullable=True),
+            if_not_exists=True,
         )
-        _index(
-            "uq_user_workouts_rotation_in_progress",
-            ["user_program_id"],
-            "rotation_epoch IS NOT NULL AND status = 'in_progress'",
-            unique=True,
+        op.add_column(
+            "user_programs",
+            sa.Column("rotation_first_day", sa.Integer(), nullable=True),
+            if_not_exists=True,
         )
-        _index(
-            "ix_user_workouts_rotation_epoch",
-            ["user_program_id", "rotation_epoch", "id"],
-            "rotation_epoch IS NOT NULL",
+        op.add_column(
+            "user_programs",
+            sa.Column("rotation_accepted_revision", sa.Integer(), nullable=True),
+            if_not_exists=True,
         )
-        op.drop_index(
-            "uq_user_workouts_cycle_occurrence",
-            table_name="user_workouts",
-            postgresql_concurrently=postgres,
-            if_exists=postgres,
+        op.add_column(
+            "user_workouts",
+            sa.Column("rotation_epoch", sa.Integer(), nullable=True),
+            if_not_exists=True,
         )
-
-    if postgres:
+        op.add_column(
+            "user_workouts",
+            sa.Column("rotation_source_cycle_week", sa.Integer(), nullable=True),
+            if_not_exists=True,
+        )
+        op.add_column(
+            "user_workouts",
+            sa.Column("rotation_role", sa.String(16), nullable=True),
+            if_not_exists=True,
+        )
+        op.add_column(
+            "user_workouts",
+            sa.Column("rotation_mutation_id", sa.String(64), nullable=True),
+            if_not_exists=True,
+        )
+        op.add_column(
+            "user_workouts",
+            sa.Column("rotation_request_hash", sa.String(64), nullable=True),
+            if_not_exists=True,
+        )
+        op.add_column(
+            "user_workouts",
+            sa.Column("rotation_transition_id", sa.String(64), nullable=True),
+            if_not_exists=True,
+        )
+        op.add_column(
+            "user_workouts",
+            sa.Column("rotation_transition_hash", sa.String(64), nullable=True),
+            if_not_exists=True,
+        )
         with op.get_context().autocommit_block():
-            replace_indexes()
+            op.create_index(
+                "uq_user_workouts_rotation_mutation",
+                "user_workouts",
+                ["user_program_id", "rotation_mutation_id"],
+                unique=True,
+                postgresql_where=sa.text("rotation_mutation_id IS NOT NULL"),
+                postgresql_concurrently=True,
+                if_not_exists=True,
+            )
+            valid_mutation = bind.execute(
+                sa.text(
+                    "SELECT indisvalid AND indisready AND indisunique "
+                    "AND indrelid = 'user_workouts'::regclass "
+                    "AND indnkeyatts = 2 AND indnatts = 2 "
+                    "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+                    "AND pg_get_indexdef(indexrelid, 2, true) = 'rotation_mutation_id' "
+                    "AND pg_get_expr(indpred, indrelid) = '(rotation_mutation_id IS NOT NULL)' "
+                    "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_mutation'::regclass"
+                )
+            ).scalar_one()
+            if not valid_mutation:
+                raise RuntimeError("Incomplete rotation mutation index; repair it before retrying")
+            op.create_index(
+                "uq_user_workouts_rotation_in_progress",
+                "user_workouts",
+                ["user_program_id"],
+                unique=True,
+                postgresql_where=sa.text("rotation_epoch IS NOT NULL AND status = 'in_progress'"),
+                postgresql_concurrently=True,
+                if_not_exists=True,
+            )
+            valid_active = bind.execute(
+                sa.text(
+                    "SELECT indisvalid AND indisready AND indisunique "
+                    "AND indrelid = 'user_workouts'::regclass "
+                    "AND indnkeyatts = 1 AND indnatts = 1 "
+                    "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+                    "AND pg_get_expr(indpred, indrelid) = "
+                    "'((rotation_epoch IS NOT NULL) AND ((status)::text = ''in_progress''::text))' "
+                    "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_in_progress'::regclass"
+                )
+            ).scalar_one()
+            if not valid_active:
+                raise RuntimeError("Incomplete active rotation index; repair it before retrying")
     else:
-        replace_indexes()
+        op.add_column("user_programs", sa.Column("schedule_mode", sa.String(16), nullable=True))
+        op.add_column("user_programs", sa.Column("rotation_epoch", sa.Integer(), nullable=True))
+        op.add_column("user_programs", sa.Column("rotation_first_day", sa.Integer(), nullable=True))
+        op.add_column(
+            "user_programs", sa.Column("rotation_accepted_revision", sa.Integer(), nullable=True)
+        )
+        op.add_column("user_workouts", sa.Column("rotation_epoch", sa.Integer(), nullable=True))
+        op.add_column(
+            "user_workouts", sa.Column("rotation_source_cycle_week", sa.Integer(), nullable=True)
+        )
+        op.add_column("user_workouts", sa.Column("rotation_role", sa.String(16), nullable=True))
+        op.add_column(
+            "user_workouts", sa.Column("rotation_mutation_id", sa.String(64), nullable=True)
+        )
+        op.add_column(
+            "user_workouts", sa.Column("rotation_request_hash", sa.String(64), nullable=True)
+        )
+        op.add_column(
+            "user_workouts", sa.Column("rotation_transition_id", sa.String(64), nullable=True)
+        )
+        op.add_column(
+            "user_workouts", sa.Column("rotation_transition_hash", sa.String(64), nullable=True)
+        )
+        op.create_index(
+            "uq_user_workouts_rotation_mutation",
+            "user_workouts",
+            ["user_program_id", "rotation_mutation_id"],
+            unique=True,
+            sqlite_where=sa.text("rotation_mutation_id IS NOT NULL"),
+            postgresql_concurrently=True,
+            if_not_exists=True,
+        )
+        op.create_index(
+            "uq_user_workouts_rotation_in_progress",
+            "user_workouts",
+            ["user_program_id"],
+            unique=True,
+            sqlite_where=sa.text("rotation_epoch IS NOT NULL AND status = 'in_progress'"),
+            postgresql_concurrently=True,
+            if_not_exists=True,
+        )
 
 
 def downgrade() -> None:
@@ -135,49 +170,44 @@ def downgrade() -> None:
     if (
         bind.execute(
             sa.text(
-                "SELECT 1 FROM user_programs WHERE schedule_mode <> 'calendar' "
-                "OR rotation_epoch IS NOT NULL OR rotation_first_day IS NOT NULL "
-                "OR rotation_accepted_revision IS NOT NULL LIMIT 1"
+                "SELECT 1 FROM user_programs WHERE (schedule_mode IS NOT NULL AND "
+                "schedule_mode <> 'calendar') OR rotation_epoch IS NOT NULL "
+                "OR rotation_first_day IS NOT NULL OR rotation_accepted_revision IS NOT NULL LIMIT 1"
             )
         ).first()
         or bind.execute(
             sa.text(
                 "SELECT 1 FROM user_workouts WHERE rotation_epoch IS NOT NULL "
-                "OR rotation_role IS NOT NULL OR rotation_mutation_id IS NOT NULL "
-                "OR rotation_request_hash IS NOT NULL OR rotation_transition_id IS NOT NULL "
-                "OR rotation_transition_hash IS NOT NULL LIMIT 1"
+                "OR rotation_source_cycle_week IS NOT NULL OR rotation_role IS NOT NULL "
+                "OR rotation_mutation_id IS NOT NULL OR rotation_request_hash IS NOT NULL "
+                "OR rotation_transition_id IS NOT NULL OR rotation_transition_hash IS NOT NULL LIMIT 1"
             )
         ).first()
     ):
         raise RuntimeError("Unsafe downgrade: session rotation data exists; use a forward fix")
     postgres = bind.dialect.name == "postgresql"
-
-    def restore_indexes() -> None:
-        _index(
-            "uq_user_workouts_cycle_occurrence",
-            ["user_program_id", "week_number", "day_number"],
-            "source_cycle_week IS NOT NULL",
-            unique=True,
-        )
-        for name in (
-            "uq_user_workouts_cycle_occurrence_calendar",
-            "uq_user_workouts_rotation_mutation",
-            "uq_user_workouts_rotation_in_progress",
-            "ix_user_workouts_rotation_epoch",
-        ):
-            op.drop_index(name, table_name="user_workouts", postgresql_concurrently=postgres)
-
     if postgres:
         with op.get_context().autocommit_block():
-            restore_indexes()
+            op.drop_index(
+                "uq_user_workouts_rotation_mutation",
+                table_name="user_workouts",
+                postgresql_concurrently=True,
+            )
+            op.drop_index(
+                "uq_user_workouts_rotation_in_progress",
+                table_name="user_workouts",
+                postgresql_concurrently=True,
+            )
     else:
-        restore_indexes()
+        op.drop_index("uq_user_workouts_rotation_mutation", table_name="user_workouts")
+        op.drop_index("uq_user_workouts_rotation_in_progress", table_name="user_workouts")
     for name in (
         "rotation_transition_hash",
         "rotation_transition_id",
         "rotation_request_hash",
         "rotation_mutation_id",
         "rotation_role",
+        "rotation_source_cycle_week",
         "rotation_epoch",
     ):
         op.drop_column("user_workouts", name)

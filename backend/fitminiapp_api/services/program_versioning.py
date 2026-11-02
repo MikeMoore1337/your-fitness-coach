@@ -1210,7 +1210,8 @@ def hydrate_cycle_read_workout(db: Session, workout: UserWorkout) -> bool:
             for key in (
                 "exercises",
                 "plan_materialized",
-                "source_cycle_week",
+                "_source_cycle_week",
+                "rotation_source_cycle_week",
                 "cycle_iteration",
                 "plan_revision_number",
             )
@@ -3206,6 +3207,7 @@ def _copy_scheduled_workout(
     program_id: int,
     scheduled_date: date,
     week_number: int,
+    rotation_epoch: int | None = None,
 ) -> UserWorkout:
     workout = UserWorkout(
         user_program_id=program_id,
@@ -3216,7 +3218,9 @@ def _copy_scheduled_workout(
         title=source.title,
         status="planned",
         plan_materialized=source.plan_materialized,
-        source_cycle_week=source.source_cycle_week,
+        source_cycle_week=source.source_cycle_week if rotation_epoch is None else None,
+        rotation_source_cycle_week=source.source_cycle_week if rotation_epoch is not None else None,
+        rotation_epoch=rotation_epoch,
         cycle_iteration=source.cycle_iteration,
         plan_revision_number=1 if source.source_cycle_week is not None else None,
     )

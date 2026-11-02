@@ -324,7 +324,29 @@ def _is_in_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST,
     return False
 
 
-def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict) -> bool:
+ROTATION_INDEX_VALIDATIONS = {
+    "uq_user_workouts_rotation_mutation": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'user_workouts'::regclass "
+        "AND indnkeyatts = 2 AND indnatts = 2 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+        "AND pg_get_indexdef(indexrelid, 2, true) = 'rotation_mutation_id' "
+        "AND pg_get_expr(indpred, indrelid) = '(rotation_mutation_id IS NOT NULL)' "
+        "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_mutation'::regclass"
+    ),
+    "uq_user_workouts_rotation_in_progress": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'user_workouts'::regclass "
+        "AND indnkeyatts = 1 AND indnatts = 1 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+        "AND pg_get_expr(indpred, indrelid) = "
+        "'((rotation_epoch IS NOT NULL) AND ((status)::text = ''in_progress''::text))' "
+        "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_in_progress'::regclass"
+    ),
+}
+
+
+def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict, path: Path) -> bool:
     if not (
         isinstance(call.func, ast.Attribute)
         and isinstance(call.func.value, ast.Name)
@@ -351,14 +373,19 @@ def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict) -> bool:
         r"'([a-z][a-z0-9_]*)'::regclass",
         sql,
     )
+    name = checked[1] if checked else None
+    if name is None and path.name == "0147_session_rotation.py":
+        name = next(
+            (key for key, value in ROTATION_INDEX_VALIDATIONS.items() if value == sql), None
+        )
     return bool(
-        checked
+        name
         and _is_in_postgresql_branch(call, links)
         and any(
             item.func.attr == "create_index"
             and item.args
             and isinstance(item.args[0], ast.Constant)
-            and item.args[0].value == checked[1]
+            and item.args[0].value == name
             for item in _op_calls(upgrade)
         )
     )
@@ -466,11 +493,11 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
         if phase == "constraint_swap" and _is_sqlite_foreign_key_guard(call, links):
             allowed = True
         if phase == "expand":
-            if _is_index_validation(call, upgrade, links) or (
+            if _is_index_validation(call, upgrade, links, path) or (
                 isinstance(function, ast.Attribute)
                 and function.attr == "scalar_one"
                 and isinstance(function.value, ast.Call)
-                and _is_index_validation(function.value, upgrade, links)
+                and _is_index_validation(function.value, upgrade, links, path)
             ):
                 allowed = True
             if (
@@ -1004,7 +1031,7 @@ def validate_added_migration(path: Path) -> None:
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "op"
         ):
-            if phase == "expand" and _is_index_validation(node, upgrade, links):
+            if phase == "expand" and _is_index_validation(node, upgrade, links, path):
                 continue
             raise OnlineMigrationError(
                 f"{path} uses SQL execution outside the verified op.execute online contract"

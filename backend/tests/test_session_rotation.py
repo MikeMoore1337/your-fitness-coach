@@ -124,7 +124,33 @@ def test_rotation_advances_only_after_completion_and_wraps(client, calendar, day
             == day_count
         )
         assert db.query(UserWorkoutSet).filter_by(actual_reps=8).count() == day_count
+        assert all(
+            workout._source_cycle_week is None
+            and workout.rotation_source_cycle_week == workout.source_cycle_week == 1
+            for workout in finished
+        )
         assert db.get(UserProgram, program_id).schedule_mode == "rotation"
+
+
+def test_legacy_null_mode_keeps_calendar_reads_and_queries(client, calendar):
+    from sqlalchemy import text
+
+    headers, program_id, _, _ = assigned_cycle(client, k=1, n=2, days=1)
+    with get_session_context() as db:
+        db.execute(
+            text("UPDATE user_programs SET schedule_mode = NULL WHERE id = :id"), {"id": program_id}
+        )
+        db.commit()
+    with get_session_context() as db:
+        program = (
+            db.query(UserProgram)
+            .filter(UserProgram.schedule_mode == "calendar")
+            .filter_by(id=program_id)
+            .one()
+        )
+        assert program.schedule_mode == "calendar"
+    assert _state(client, headers)["mode"] == "calendar"
+    assert client.get("/api/v1/workouts/today", headers=headers).status_code == 200
 
 
 def test_eight_day_program_wraps_without_a_weekly_cycle(client, calendar):

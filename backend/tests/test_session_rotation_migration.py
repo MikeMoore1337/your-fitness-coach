@@ -23,7 +23,7 @@ def _create_legacy_tables(connection):
     connection.exec_driver_sql("CREATE TABLE user_programs (id INTEGER PRIMARY KEY)")
     connection.exec_driver_sql(
         "CREATE TABLE user_workouts (id INTEGER PRIMARY KEY, user_program_id INTEGER, "
-        "week_number INTEGER, day_number INTEGER, source_cycle_week INTEGER, status TEXT)"
+        "week_number INTEGER, day_number INTEGER, source_cycle_week INTEGER, status VARCHAR(32))"
     )
     connection.exec_driver_sql(
         "CREATE UNIQUE INDEX uq_user_workouts_cycle_occurrence ON user_workouts "
@@ -34,8 +34,8 @@ def _create_legacy_tables(connection):
 
 
 def _assert_constraints_and_rollback_guard(connection, migration):
-    assert connection.exec_driver_sql("SELECT schedule_mode FROM user_programs").scalar_one() == (
-        "calendar"
+    assert (
+        connection.exec_driver_sql("SELECT schedule_mode FROM user_programs").scalar_one() is None
     )
     assert connection.exec_driver_sql(
         "SELECT status, source_cycle_week, rotation_epoch FROM user_workouts WHERE id=1"
@@ -47,9 +47,12 @@ def _assert_constraints_and_rollback_guard(connection, migration):
         )
     connection.exec_driver_sql(
         "INSERT INTO user_workouts (id,user_program_id,week_number,day_number,"
-        "source_cycle_week,status,rotation_epoch,rotation_role,rotation_mutation_id) "
-        "VALUES (3,1,1,1,1,'in_progress',2,'ordered','one')"
+        "source_cycle_week,rotation_source_cycle_week,status,rotation_epoch,rotation_role,rotation_mutation_id) "
+        "VALUES (3,1,1,1,NULL,1,'in_progress',2,'ordered','one')"
     )
+    assert connection.exec_driver_sql(
+        "SELECT source_cycle_week,rotation_source_cycle_week FROM user_workouts WHERE id=3"
+    ).one() == (None, 1)
     with pytest.raises(sa.exc.IntegrityError), connection.begin_nested():
         connection.exec_driver_sql(
             "INSERT INTO user_workouts (id,user_program_id,week_number,day_number,"
@@ -125,7 +128,7 @@ def test_rotation_migration_rejects_a_wrong_existing_postgres_index():
         _create_legacy_tables(connection)
         connection.exec_driver_sql("ALTER TABLE user_workouts ADD COLUMN rotation_epoch INTEGER")
         connection.exec_driver_sql(
-            "CREATE UNIQUE INDEX uq_user_workouts_cycle_occurrence_calendar "
+            "CREATE UNIQUE INDEX uq_user_workouts_rotation_mutation "
             "ON user_workouts (user_program_id) WHERE rotation_epoch IS NOT NULL"
         )
         connection.commit()
@@ -133,7 +136,7 @@ def test_rotation_migration_rejects_a_wrong_existing_postgres_index():
             migration = _migration()
             context = MigrationContext.configure(connection)
             with (
-                pytest.raises(RuntimeError, match="Incomplete rotation index"),
+                pytest.raises(RuntimeError, match="Incomplete rotation mutation index"),
                 context.begin_transaction(),
                 Operations.context(context),
             ):
