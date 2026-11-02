@@ -1247,8 +1247,13 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
               ? normalized / 12.92
               : ((normalized + 0.055) / 1.055) ** 2.4;
           };
-          const luminance = (values: number[]) =>
-            linear(values[0]) * 0.2126 + linear(values[1]) * 0.7152 + linear(values[2]) * 0.0722;
+          const luminance = (values: number[]) => {
+            const [red, green, blue] = values;
+            if (red === undefined || green === undefined || blue === undefined) {
+              throw new Error('Не удалось определить RGB для проверки контраста');
+            }
+            return linear(red) * 0.2126 + linear(green) * 0.7152 + linear(blue) * 0.0722;
+          };
           const foreground = rgb(getComputedStyle(element).color);
           let background = [255, 255, 255];
           let ancestor: Element | null = element;
