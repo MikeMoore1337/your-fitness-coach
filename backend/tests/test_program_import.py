@@ -1628,7 +1628,9 @@ def test_xlsx_matrix_compound_max_and_fixed_reps_preserves_each_exercise(client)
     )
     assert confirmed.status_code == 200, confirmed.text
     day_four = confirmed.json()["template"]["days"][3]
-    assert [(item["prescribed_sets"], item["prescribed_reps"]) for item in day_four["exercises"][:2]] == [
+    assert [
+        (item["prescribed_sets"], item["prescribed_reps"]) for item in day_four["exercises"][:2]
+    ] == [
         (4, "AMRAP"),
         (4, "15"),
     ]
