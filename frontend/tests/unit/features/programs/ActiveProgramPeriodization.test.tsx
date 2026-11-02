@@ -468,6 +468,37 @@ describe('Изменение назначенной периодизации', (
     expect(changed).toHaveBeenCalledWith(5);
   });
 
+  it('позволяет проверять длинный цикл с постраничной картой исходных недель', async () => {
+    const user = userEvent.setup();
+    apiMock.mockImplementation((path: string) => {
+      if (path.endsWith('/revision/preview'))
+        return Promise.resolve({
+          weeks: [{ ...week(7), new_source_cycle_week: 1 }],
+          total_weeks: 10,
+          offset: 0,
+        });
+      if (path.endsWith('/preview'))
+        return Promise.resolve({
+          weeks: [{ ...week(7), cycle_length: 101 }],
+          total_weeks: 1,
+          offset: 0,
+        });
+      throw new Error('Unexpected path');
+    });
+    setup();
+    await screen.findByText(/Неделя 7 · исходная 1 · проход 3/);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Что изменить' }), 'cycle');
+    expect(screen.getByRole('spinbutton', { name: 'Новая неделя 1' })).toHaveValue(1);
+    await user.click(screen.getByRole('button', { name: 'Следующие недели' }));
+    const eleventh = screen.getByRole('spinbutton', { name: 'Новая неделя 11' });
+    await user.clear(eleventh);
+    await user.type(eleventh, '101');
+    await user.click(screen.getByRole('button', { name: 'Проверить изменения' }));
+    const request = apiMock.mock.calls.find(([path]) => String(path).endsWith('/revision/preview'));
+    expect(request?.[1].body.source_week_order).toHaveLength(101);
+    expect(request?.[1].body.source_week_order[10]).toBe(101);
+  });
+
   it('показывает защищённую тренировку и применяет только проверенную ревизию', async () => {
     const user = userEvent.setup();
     const changed = setup();

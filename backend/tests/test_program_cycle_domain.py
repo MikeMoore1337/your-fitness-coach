@@ -107,6 +107,31 @@ def test_cycle_replacement_rejects_incompatible_exercise_metric(client):
     assert revision(program_id) == 1
 
 
+def test_long_101_week_cycle_revision_preview_is_paginated(client):
+    headers, program_id, _, _ = assigned_cycle(client, k=101, n=116)
+    endpoint = f"/api/v1/programs/assigned/{program_id}/cycle"
+    payload = {
+        "expected_revision_number": 1,
+        "effective_from_week": 5,
+        "source_week_order": list(range(1, 102)),
+    }
+    for offset, first, last in [(0, 5, 54), (50, 55, 104), (100, 105, 116)]:
+        response = client.post(
+            f"{endpoint}/revision/preview", headers=headers, json={**payload, "offset": offset}
+        )
+        assert response.status_code == 200, response.text
+        page = response.json()
+        assert page["total_weeks"] == 112
+        assert [page["weeks"][0]["week_number"], page["weeks"][-1]["week_number"]] == [first, last]
+    assert client.patch(endpoint, headers=headers, json=payload).status_code == 200
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        for week, source_week in [(5, 1), (105, 101), (106, 1), (116, 11)]:
+            row = program_versioning._cycle_workout_plans(db, program, week)[0]
+            assert row["source_cycle_week"] == source_week
+            assert row["exercises"][0]["prescribed_reps"] == str(source_week + 5)
+
+
 def test_cycle_replacement_validates_only_the_selected_occurrence(client):
     from copy import deepcopy
 
