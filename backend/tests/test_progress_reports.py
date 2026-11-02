@@ -55,8 +55,11 @@ def _user_id(telegram_user_id: int) -> int:
         return db.query(User.id).filter(User.telegram_user_id == telegram_user_id).scalar()
 
 
-def _seed_report_data(user_id: int, *, as_of: date | None = None) -> None:
+def _seed_report_data(
+    user_id: int, *, as_of: date | None = None, completed_on: date | None = None
+) -> None:
     today = as_of or today_msk()
+    workout_day = completed_on if completed_on is not None else today - timedelta(days=4)
     with get_session_context() as db:
         user = db.get(User, user_id)
         assert user is not None and user.profile is not None
@@ -75,12 +78,12 @@ def _seed_report_data(user_id: int, *, as_of: date | None = None) -> None:
         exercise_id = db.query(Exercise.id).order_by(Exercise.id).limit(1).scalar()
         completed = UserWorkout(
             user_program_id=program.id,
-            scheduled_date=today - timedelta(days=4),
+            scheduled_date=workout_day,
             day_number=1,
             week_number=4,
             title="Силовая тренировка",
             status="completed",
-            completed_at=datetime.combine(today - timedelta(days=4), datetime.min.time()),
+            completed_at=datetime.combine(workout_day, datetime.min.time()),
         )
         skipped = UserWorkout(
             user_program_id=program.id,
@@ -691,8 +694,15 @@ def test_progress_report_periods_share_one_inclusive_canonical_range(
     expected_days: int | None,
 ) -> None:
     headers = _auth(client, 67_500 + list(NutritionReportPeriod).index(period))
-    _seed_report_data(_user_id(67_500 + list(NutritionReportPeriod).index(period)))
     today = today_msk()
+    # In the first four days of a month, the default workout day (today - 4)
+    # belongs to the previous month. Seed one completed session within the
+    # requested calendar month without changing other report-period fixtures.
+    _seed_report_data(
+        _user_id(67_500 + list(NutritionReportPeriod).index(period)),
+        as_of=today,
+        completed_on=today if period == NutritionReportPeriod.CURRENT_MONTH else None,
+    )
     params: dict[str, str] = {"period": period.value}
     if period == NutritionReportPeriod.CUSTOM:
         params.update(
