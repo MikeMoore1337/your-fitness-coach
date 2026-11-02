@@ -1287,6 +1287,60 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
           caret: 'hide',
         });
       }
+      const desktop = await browser.newPage({
+        viewport: { width: 1440, height: 900 },
+        locale: 'ru-RU',
+        timezoneId: 'Europe/Moscow',
+      });
+      const desktopErrors: string[] = [];
+      desktop.on('pageerror', (reason) => desktopErrors.push(reason.message));
+      try {
+        await preparePage(desktop, theme, 'browser');
+        await desktop.setViewportSize({ width: 1440, height: 900 });
+        await desktop.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: [] }));
+        await desktop.route('**/api/v1/programs/imports/targets', (route) =>
+          route.fulfill({ json: [] }),
+        );
+        await desktop.route('**/api/v1/programs/imports', (route) =>
+          route.fulfill({ json: preview(false) }),
+        );
+        await desktop.route('**/api/v1/programs/imports/issue-872-matrix/resolve', (route) =>
+          route.fulfill({ json: preview(true) }),
+        );
+        await desktop.route('**/api/v1/programs/imports/issue-872-matrix/confirm', (route) =>
+          route.fulfill({ status: 409, json: { detail: 'Конфликт версии' } }),
+        );
+        await desktop.goto('/app?section=programs&view=manage&start=create');
+        await desktop.getByLabel('Загрузить документ программы').setInputFiles({
+          name: 'matrix-3-weeks.xlsx',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: Buffer.from('synthetic-e2e-upload'),
+        });
+        await expect(desktop.locator('.program-import-cycle')).toContainText('Исходных недель: 3');
+        await desktop.getByLabel('Всего недель программы').fill('16');
+        await desktop
+          .getByRole('checkbox', { name: 'Повторять исходные недели до конца срока' })
+          .check();
+        await expectNoHorizontalOverflow(desktop);
+        await desktop.locator('.program-import-preview').screenshot({
+          path: info.outputPath('issue-872-desktop-' + theme + '-1440.png'),
+          animations: 'disabled',
+          caret: 'hide',
+        });
+        await desktop.getByRole('button', { name: 'Принять текстовые подсказки' }).click();
+        await desktop.getByRole('button', { name: 'Применить исправления' }).click();
+        await desktop.getByRole('button', { name: 'Подтвердить и сохранить шаблон' }).click();
+        await expect(desktop.getByRole('alert')).toContainText('Черновик или программа изменились');
+        await desktop.locator('.program-import-card').screenshot({
+          path: info.outputPath('issue-872-desktop-' + theme + '-409.png'),
+          animations: 'disabled',
+          caret: 'hide',
+        });
+        expect(desktopErrors).toEqual([]);
+      } finally {
+        await desktop.close();
+      }
+
       await page.getByRole('button', { name: 'Применить исправления' }).click();
       await expect.poll(() => resolveBody).not.toBeNull();
       expect(resolveBody).toMatchObject({
@@ -1299,6 +1353,12 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
       await confirm.click();
       await expect(page.getByRole('alert')).toContainText('Черновик или программа изменились');
       await expect(page.locator('.program-import-preview')).toBeVisible();
+      await page.setViewportSize({ width: 393, height: 844 });
+      await page.locator('.program-import-card').screenshot({
+        path: info.outputPath('issue-872-' + theme + '-393-409.png'),
+        animations: 'disabled',
+        caret: 'hide',
+      });
       await confirm.click();
       await expect(page.locator('.program-import-preview')).toHaveCount(0);
       expect(confirmCount).toBe(2);
