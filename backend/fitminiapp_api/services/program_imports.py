@@ -2459,12 +2459,16 @@ def _extract_weekly_matrix_rows(
             if block_index + 1 < len(blocks)
             else max((cell.column for cell in table.grid), default=block_start) + 1
         )
-        auxiliary_column = next(column for column, number in labels if positions[number] == week_number)
+        auxiliary_column = next(
+            column for column, number in labels if positions[number] == week_number
+        )
         if auxiliary_column == block_start:
             auxiliary_column = min(block_start + 2, block_end - 1)
         day_headers = day_headers_by_week[week_number]
         source_day_orders[week_number] = [day for _, day in day_headers]
-        week_label_column = next(column for column, value in labels if positions[value] == week_number)
+        week_label_column = next(
+            column for column, value in labels if positions[value] == week_number
+        )
         for day_index, (day_header_row, _day_number) in enumerate(day_headers):
             end_row = day_headers[day_index + 1][0] if day_index + 1 < len(day_headers) else None
             canonical_day_number = canonical_day_numbers[day_index]
