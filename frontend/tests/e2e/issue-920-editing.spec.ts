@@ -157,6 +157,14 @@ for (const theme of ['dark', 'light'] as const) {
       await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
       await installPlatformApi(page, { browserSession: true, programHistory: 'many' });
       await installCycle(page);
+      await page.route('**/api/v1/programs/exercises', (route) =>
+        route.fulfill({
+          json: [
+            { id: 11, title: 'Присед со штангой', metric_type: 'strength' },
+            { id: 12, title: 'Присед с гантелями', metric_type: 'strength' },
+          ],
+        }),
+      );
       let saved: Record<string, unknown> | undefined;
       const base = {
         week_number: 3,
@@ -209,6 +217,7 @@ for (const theme of ['dark', 'light'] as const) {
                         ...exercise,
                         source_template_exercise_id: null,
                         source_assignment_slot_id: body.assignment_slot_id,
+                        exercise_id: 12,
                       },
                     ],
                   },
@@ -255,6 +264,7 @@ for (const theme of ['dark', 'light'] as const) {
       await panel.getByRole('button', { name: 'Вернуться', exact: true }).click();
       await panel.getByRole('combobox', { name: 'Что изменить' }).selectOption('exercise');
       await panel.getByRole('combobox', { name: 'Упражнение' }).selectOption('1:12');
+      await panel.getByRole('combobox', { name: 'Заменить на' }).selectOption('12');
       await capture('replacement');
       await panel.getByRole('button', { name: 'Настроить предписание подходов' }).click();
       await capture('prescription');
@@ -264,7 +274,7 @@ for (const theme of ['dark', 'light'] as const) {
       await capture('scope');
       await panel.getByRole('combobox', { name: 'Что изменить' }).selectOption('structure');
       await panel.getByRole('button', { name: 'Добавить упражнение' }).click();
-      await panel.getByRole('combobox', { name: 'Новое упражнение' }).selectOption('11');
+      await panel.getByRole('combobox', { name: 'Новое упражнение' }).selectOption('12');
       await capture('structure');
       await panel.getByRole('button', { name: 'Проверить изменения' }).click();
       await expect(panel.getByText(/Станет:/)).toBeVisible();
