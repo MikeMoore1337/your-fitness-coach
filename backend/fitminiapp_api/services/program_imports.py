@@ -2227,16 +2227,30 @@ def _week_type_candidates(table: _Table, source_weeks: int) -> list[dict[str, ob
     """Suggest week types only from explicit text, never XLSX styles."""
     by_coord = {(cell.row, cell.column): cell for cell in table.grid}
     followers = _merged_follower_cells(table)
-    result: dict[int, dict[str, object]] = {}
-    conflicts: set[int] = set()
+    by_header_row: dict[int, list[tuple[int, int]]] = defaultdict(list)
     for cell in table.grid:
         if (cell.row, cell.column) in followers:
             continue
         match = _WEEK_HEADER_PATTERN.fullmatch(cell.value)
+        if match is not None:
+            by_header_row[cell.row].append((cell.column, int(match.group(1))))
+    if not by_header_row:
+        return []
+    header_row, labels = max(by_header_row.items(), key=lambda item: (len(item[1]), -item[0]))
+    ordered_labels = sorted(labels)
+    if len(ordered_labels) != source_weeks:
+        return []
+    positions = {label: index for index, (_, label) in enumerate(ordered_labels, start=1)}
+    result: dict[int, dict[str, object]] = {}
+    conflicts: set[int] = set()
+    for cell in table.grid:
+        if cell.row != header_row or (cell.row, cell.column) in followers:
+            continue
+        match = _WEEK_HEADER_PATTERN.fullmatch(cell.value)
         if match is None:
             continue
-        week = int(match.group(1))
-        if not 1 <= week <= source_weeks:
+        week = positions.get(int(match.group(1)))
+        if week is None:
             continue
         label = _optional_text(match.group(2))
         source_cell = cell
@@ -2385,8 +2399,12 @@ def _extract_weekly_matrix_rows(
     header_row, labels = max(by_label_row.items(), key=lambda item: (len(item[1]), -item[0]))
     labels = sorted(labels)
     labels_by_week = sorted(labels, key=lambda item: item[1])
-    if [week for _, week in labels_by_week] != list(range(1, len(labels_by_week) + 1)):
+    first_label = labels_by_week[0][1]
+    if [week for _, week in labels_by_week] != list(
+        range(first_label, first_label + len(labels_by_week))
+    ):
         return None
+    positions = {label: index for index, (_, label) in enumerate(labels_by_week, start=1)}
     blocks: list[tuple[int, int]] = []
     for label_column, week_number in labels_by_week:
         starts = [
@@ -2399,7 +2417,7 @@ def _extract_weekly_matrix_rows(
             and int(match.group(1)) == 1
         ]
         block_start = max(starts, default=label_column)
-        blocks.append((week_number, block_start))
+        blocks.append((positions[week_number], block_start))
     block_starts = [start for _, start in blocks]
     if any(right <= left for left, right in pairwise(block_starts)):
         return None
@@ -2441,12 +2459,12 @@ def _extract_weekly_matrix_rows(
             if block_index + 1 < len(blocks)
             else max((cell.column for cell in table.grid), default=block_start) + 1
         )
-        auxiliary_column = next(column for column, number in labels if number == week_number)
+        auxiliary_column = next(column for column, number in labels if positions[number] == week_number)
         if auxiliary_column == block_start:
             auxiliary_column = min(block_start + 2, block_end - 1)
         day_headers = day_headers_by_week[week_number]
         source_day_orders[week_number] = [day for _, day in day_headers]
-        week_label_column = next(column for column, value in labels if value == week_number)
+        week_label_column = next(column for column, value in labels if positions[value] == week_number)
         for day_index, (day_header_row, _day_number) in enumerate(day_headers):
             end_row = day_headers[day_index + 1][0] if day_index + 1 < len(day_headers) else None
             canonical_day_number = canonical_day_numbers[day_index]
@@ -2516,6 +2534,15 @@ def _extract_weekly_matrix_rows(
     if not extracted:
         return None
     warnings: list[tuple[str, str, str]] = []
+    if first_label != 1:
+        warnings.append(
+            (
+                "source_week_numbers_normalized",
+                "warning",
+                "Нумерация недель в файле сохранена в координатах источника; "
+                "импортный цикл начинается с первой распознанной недели",
+            )
+        )
     if any(
         order != sorted(order) or order != canonical_day_numbers
         for order in source_day_orders.values()
