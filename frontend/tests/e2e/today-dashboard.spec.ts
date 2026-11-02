@@ -414,6 +414,10 @@ test('rotation remains available in simulated standalone PWA', async ({ page }, 
   await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeEnabled();
   await expectNoHorizontalOverflow(page);
   if (process.env.YFC_CAPTURE_1204 === '1') {
+    await page.addStyleTag({
+      content:
+        '*, *::before, *::after { transition: none !important; animation: none !important; }',
+    });
     for (const theme of ['dark', 'light'] as const) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
@@ -421,6 +425,7 @@ test('rotation remains available in simulated standalone PWA', async ({ page }, 
       await page.screenshot({
         path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-25-pwa.png`,
         fullPage: true,
+        animations: 'disabled',
       });
     }
   }

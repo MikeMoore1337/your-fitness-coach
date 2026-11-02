@@ -215,6 +215,10 @@ test('rotation respects Telegram safe areas and the keyboard', async ({
   if (process.env.YFC_CAPTURE_1204 === '1') {
     await tmaPage.setViewportSize({ width: 393, height: 900 });
     await tma.setViewport(900, 900);
+    await tmaPage.addStyleTag({
+      content:
+        '*, *::before, *::after { transition: none !important; animation: none !important; }',
+    });
     for (const theme of ['dark', 'light'] as const) {
       await tma.setTheme(theme);
       await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
@@ -222,6 +226,7 @@ test('rotation respects Telegram safe areas and the keyboard', async ({
       await tmaPage.screenshot({
         path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-23-tma.png`,
         fullPage: true,
+        animations: 'disabled',
       });
     }
   }
@@ -238,6 +243,7 @@ test('rotation respects Telegram safe areas and the keyboard', async ({
       await tmaPage.screenshot({
         path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-24-tma-keyboard.png`,
         fullPage: true,
+        animations: 'disabled',
       });
     }
   }
