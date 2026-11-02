@@ -143,6 +143,79 @@ def test_incompatible_history_does_not_propose_a_weight(client):
     )
 
 
+def test_added_assignment_slot_progresses_only_from_its_own_week_type(client):
+    headers, program_id = _cycle(client, ["heavy", "light", "medium"])
+    with get_session_context() as db:
+        first = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=1).one()
+        exercise_id = first.exercises[0].exercise_id
+    slot = "b714c414-58ee-4aad-a214-fd21d5ef2f32"
+    response = client.post(
+        f"/api/v1/programs/assigned/{program_id}/cycle/structure",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "operation": "add_exercise",
+            "day_number": 1,
+            "assignment_slot_id": slot,
+            "from_week": 1,
+            "exercise": {
+                "exercise_id": exercise_id,
+                "prescribed_sets": 2,
+                "prescribed_reps": "8-10",
+                "rest_seconds": 90,
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    workouts = _workouts(program_id, 7)
+    with get_session_context() as db:
+        for week in range(1, 7):
+            workout = db.get(UserWorkout, workouts[week])
+            workout.status = "completed"
+            workout.started_at = datetime.combine(workout.scheduled_date, time(10))
+            workout.completed_at = datetime.combine(workout.scheduled_date, time(11))
+            for exercise in workout.exercises:
+                for row in exercise.sets:
+                    row.is_completed = True
+                    row.actual_reps = 10
+                    row.actual_weight = (
+                        (40 if week in {1, 4} else 100)
+                        if exercise.source_assignment_slot_id == slot
+                        else 150
+                    )
+                    row.rir = "2"
+        db.flush()
+        target = db.get(UserWorkout, workouts[7])
+        exercise = next(item for item in target.exercises if item.source_assignment_slot_id == slot)
+        program = db.get(UserProgram, program_id)
+        from fitminiapp_api.models.program import ProgramRevision
+        from fitminiapp_api.services.progression_guidance import (
+            _matches_cycle_plan,
+            _selection_signature,
+        )
+
+        revisions = (
+            db.query(ProgramRevision)
+            .filter_by(user_program_id=program_id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+        for week in (1, 4):
+            old_workout = db.get(UserWorkout, workouts[week])
+            old = next(
+                item for item in old_workout.exercises if item.source_assignment_slot_id == slot
+            )
+            assert _matches_cycle_plan(db, program, revisions, old_workout, old)
+            assert _selection_signature(old) == _selection_signature(exercise)
+        result = build_progression_guidance(db, db.get(User, program.user_id), target)[exercise.id]
+        assert result["outcome"] == "consider_progressing", result
+        assert result["suggested_weight"] == 42.5
+        assert [row["workout_id"] for row in result["evidence"]["sessions"]] == [
+            workouts[4],
+            workouts[1],
+        ]
+
+
 def test_untyped_week_does_not_use_typed_history_in_a_mixed_cycle(client):
     _headers, program_id = _cycle(client, ["heavy", None, "heavy"])
     workouts = _workouts(program_id, 5)
@@ -846,6 +919,38 @@ def test_changed_history_cannot_drive_promotion(client, change):
     assert result["proposal"]["source_evidence_ids"] == []
 
 
+def test_live_set_plan_change_cannot_mix_incomparable_progression_history(client):
+    headers, program_id = _cycle(client, ["heavy", "light", "heavy"])
+    workouts = _workouts(program_id, 7)
+    _complete(workouts, [1, 2, 4, 5, 6], high_weight_weeks=[2, 5])
+    with get_session_context() as db:
+        workout = db.get(UserWorkout, workouts[3])
+        workout.status = "in_progress"
+        workout.started_at = datetime.combine(workout.scheduled_date, time(10))
+        item = workout.exercises[0].sets[1]
+        set_id, version = item.id, item.version
+    response = client.patch(
+        f"/api/v1/workouts/sets/{set_id}",
+        headers=headers,
+        json={
+            "expected_version": version,
+            "mutation_id": "920-progression-live-plan",
+            "planned_target": {"weight_kg": "37.50", "reps": 8, "confirmed": True},
+        },
+    )
+    assert response.status_code == 200, response.text
+    _complete(workouts, [3])
+    result = _guidance(program_id, workouts[7])
+    assert [row["workout_id"] for row in result["evidence"]["sessions"]] == [
+        workouts[6],
+        workouts[4],
+    ]
+    assert all(
+        all(f"workout:{workouts[week]}/" not in item for week in (2, 3, 5))
+        for item in result["proposal"]["source_evidence_ids"]
+    )
+
+
 def test_changed_rule_revision_does_not_reuse_old_facts(client):
     _headers, program_id = _cycle(client, ["heavy", "light", "heavy"])
     workouts = _workouts(program_id, 7)
@@ -1333,6 +1438,77 @@ def test_cycle_revision_respects_coach_relationship_and_athlete_isolation(client
     outsider = _auth(client, 918999)
     assert client.post(path + "/preview", headers=athletes[0], json=change).status_code == 200
     assert client.post(path + "/preview", headers=outsider, json=change).status_code in (403, 404)
+    program_path = f"/api/v1/programs/assigned/{assigned.json()['user_program_id']}"
+    slot = created.json()["template"]["days"][0]["exercises"][0]["id"]
+    attempts = [
+        ("post", path, change),
+        (
+            "patch",
+            program_path + "/cycle",
+            {
+                "expected_revision_number": 1,
+                "effective_from_week": 7,
+                "duration_weeks": 20,
+            },
+        ),
+        (
+            "post",
+            program_path + "/cycle/disable",
+            {
+                "expected_revision_number": 1,
+                "effective_from_week": 7,
+            },
+        ),
+        (
+            "post",
+            program_path + "/cycle/enable",
+            {
+                "expected_revision_number": 1,
+                "effective_from_week": 7,
+                "duration_weeks": 16,
+                "week_cycle": {"length_weeks": 3, "repeat": True},
+            },
+        ),
+        (
+            "post",
+            program_path + "/exercises",
+            {
+                "expected_revision_number": 1,
+                "effective_scope": "future_program",
+                "occurrence_weeks": [7],
+                "day_number": 1,
+                "target_template_exercise_id": slot,
+                "exercise_id": exercise["id"],
+                "prescribed_sets": 3,
+                "prescribed_reps": "12",
+                "rest_seconds": 90,
+            },
+        ),
+    ]
+    for method, url, body in attempts:
+        response = getattr(client, method)(url, headers=athletes[0], json=body)
+        assert response.status_code == 403, (url, response.text)
+    template_id = created.json()["template"]["id"]
+    template_path = f"/api/v1/programs/templates/{template_id}"
+    edited_template = client.patch(
+        template_path,
+        headers=athletes[0],
+        json={
+            **payload,
+            "title": "Несогласованное изменение",
+            "mode": "self",
+            "target_telegram_user_id": None,
+            "expected_revision_number": 1,
+        },
+    )
+    assert edited_template.status_code == 403, edited_template.text
+    assert client.get(template_path, headers=athletes[0]).json()["title"] == payload["title"]
+    assert (
+        client.get(program_path + "/lifecycle", headers=athletes[0]).json()[
+            "current_revision_number"
+        ]
+        == 1
+    )
     assert client.post(path, headers=coach, json=change).status_code == 200
     with get_session_context() as db:
         link = db.query(CoachClient).filter_by(client_user_id=clients[0][0]).one()

@@ -18,7 +18,9 @@ from fitminiapp_api.schemas.program import (
     ProgramCycleDurationPreviewRequest,
     ProgramCycleEnableRequest,
     ProgramCycleImpactPreviewRequest,
+    ProgramCycleRevisionPreviewRequest,
     ProgramCycleRevisionRequest,
+    ProgramCycleStructureRequest,
     ProgramLifecycleActionRequest,
     ProgramLifecycleMutationResponse,
     ProgramLifecycleResponse,
@@ -92,6 +94,7 @@ from fitminiapp_api.services.program_versioning import (
     program_lifecycle_summary,
     repeat_training_block,
     revise_program_cycle,
+    revise_program_cycle_structure,
     revise_program_week_type,
     update_training_block,
     upsert_future_program_exercise,
@@ -125,6 +128,8 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
     detail = str(exc)
     if detail in {"Assigned program not found", "Training block not found"}:
         return HTTPException(status_code=404, detail=detail)
+    if detail == "Изменения программы согласуйте с тренером":
+        return HTTPException(status_code=403, detail=detail)
     if detail in {
         "Program revision conflict",
         "Progression proposal is stale",
@@ -588,7 +593,11 @@ def edit_template(
         detail = str(exc)
         if detail == "Template not found":
             raise HTTPException(status_code=404, detail=detail)
-        if detail in {"No permission to edit template", "No permission to manage this user"}:
+        if detail in {
+            "No permission to edit template",
+            "No permission to manage this user",
+            "Изменения программы согласуйте с тренером",
+        }:
             raise HTTPException(status_code=403, detail=detail)
         if detail == "Program revision conflict":
             raise HTTPException(status_code=409, detail=detail)
@@ -927,6 +936,46 @@ def preview_assigned_week_type(
     try:
         return revise_program_week_type(db, current_user, program_id, payload, preview=True)
     except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/revision/preview")
+def preview_assigned_cycle_revision(
+    program_id: int,
+    payload: ProgramCycleRevisionPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/structure/preview")
+def preview_assigned_cycle_structure(
+    program_id: int,
+    payload: ProgramCycleStructureRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle_structure(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/structure")
+def update_assigned_cycle_structure(
+    program_id: int,
+    payload: ProgramCycleStructureRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle_structure(db, current_user, program_id, payload, preview=False)
+    except ProgramError as exc:
+        db.rollback()
         raise _assigned_program_error(exc) from exc
 
 

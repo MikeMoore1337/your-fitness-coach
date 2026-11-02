@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from itertools import pairwise
 
 from sqlalchemy import and_, inspect, or_
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, SessionTransactionOrigin, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
@@ -30,6 +31,7 @@ from fitminiapp_api.schemas.program import (
     ProgramCycleEnableRequest,
     ProgramCycleImpactPreviewRequest,
     ProgramCycleRevisionRequest,
+    ProgramCycleStructureRequest,
     ProgramLifecycleActionRequest,
     ProgramWeekTypeRevisionRequest,
     TrainingBlockActionRequest,
@@ -143,6 +145,30 @@ def get_program_for_actor(
     ):
         return program, role
     raise ProgramError("Assigned program not found")
+
+
+def _ensure_cycle_plan_editor(db: Session, program: UserProgram, actor: User) -> None:
+    coach_id = program.assigned_by_user_id
+    if coach_id is None or coach_id == program.user_id:
+        return
+    try:
+        if actor.id == program.user_id:
+            # Invitation acceptance locks the user before the program; do not wait in reverse order.
+            db.query(User.id).filter_by(id=program.user_id).with_for_update(nowait=True).one()
+        relation = db.query(CoachClient.id).filter_by(
+            coach_user_id=coach_id, client_user_id=program.user_id, status="active"
+        )
+        if actor.id != program.user_id:
+            relation = relation.with_for_update(nowait=True)
+        active_relation = relation.first() is not None
+    except OperationalError as exc:
+        if getattr(exc.orig, "sqlstate", None) == "55P03":
+            raise ProgramError("Program revision conflict") from exc
+        raise
+    if actor.id == program.user_id and active_relation:
+        raise ProgramError("Изменения программы согласуйте с тренером")
+    if actor.id != program.user_id and not active_relation:
+        raise ProgramError("Assigned program not found")
 
 
 def list_program_import_targets(db: Session, actor: User) -> list[dict[str, object]]:
@@ -310,6 +336,7 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
                         "superset_group": exercise.superset_group,
                         "superset_order": exercise.superset_order,
                         "source_template_exercise_id": exercise.source_template_exercise_id,
+                        "source_assignment_slot_id": exercise.source_assignment_slot_id,
                         "source_weekly_prescription_id": exercise.source_weekly_prescription_id,
                         "group_id": exercise.group_id,
                         "group_kind": exercise.group_kind,
@@ -422,9 +449,25 @@ def _cycle_plan_at(
             cycle, source, boundary = (
                 config["week_cycle"],
                 config["logical_cycle"],
-                config["effective_from_week"],
+                config.get("cycle_anchor_week", config["effective_from_week"]),
             )
     return (cycle, source, boundary) if cycle else None
+
+
+def _cycle_phase_end(
+    db: Session, program: UserProgram, first: int, boundary: int, revisions: list[ProgramRevision]
+) -> int:
+    for candidate in sorted(
+        {
+            config["effective_from_week"]
+            for config in _cycle_configurations(db, program, revisions=revisions)
+            if first < config["effective_from_week"] <= program.duration_weeks
+        }
+    ):
+        active = _cycle_plan_at(db, program, candidate, revisions=revisions)
+        if active is None or active[2] != boundary:
+            return candidate - 1
+    return program.duration_weeks
 
 
 def _override_matches(override: dict, week: int, source_week: int, boundary: int = 1) -> bool:
@@ -434,6 +477,21 @@ def _override_matches(override: dict, week: int, source_week: int, boundary: int
         return week in override["weeks"]
     return override["from_week"] <= week <= override.get("to_week", week) and (
         override.get("source_cycle_week") is None or override["source_cycle_week"] == source_week
+    )
+
+
+def _cycle_slot_matches(item: dict, override: dict) -> bool:
+    assignment_slot = override.get("source_assignment_slot_id")
+    if assignment_slot is not None:
+        return (
+            item.get("source_assignment_slot_id") == assignment_slot
+            and item.get("source_template_exercise_id") is None
+        )
+    template_slot = override.get("source_template_exercise_id")
+    return (
+        template_slot is not None
+        and item.get("source_template_exercise_id") == template_slot
+        and item.get("source_assignment_slot_id") is None
     )
 
 
@@ -488,15 +546,56 @@ def _cycle_workout_plans(
                 or effective_date < override.get("not_before_date", "")
             ):
                 continue
-            for item in result["exercises"]:
-                if (
-                    item.get("source_template_exercise_id")
-                    != override["source_template_exercise_id"]
+            if override.get("operation") == "add_exercise":
+                items = result["exercises"]
+                if len(items) < 20 and not any(
+                    item.get("source_assignment_slot_id") == override["source_assignment_slot_id"]
+                    for item in items
                 ):
+                    added = deepcopy(override["exercise"])
+                    added["sort_order"] = max((item["sort_order"] for item in items), default=0) + 1
+                    items.append(added)
+                continue
+            if override.get("operation") in {"remove_exercise", "move_earlier", "move_later"}:
+                items = result["exercises"]
+                index = next(
+                    (i for i, item in enumerate(items) if _cycle_slot_matches(item, override)),
+                    None,
+                )
+                if index is None:
+                    continue
+                target = items[index]
+                if any(target.get(key) is not None for key in ("group_id", "superset_group")):
+                    continue
+                if override["operation"] == "remove_exercise":
+                    if len(items) > 1:
+                        items.pop(index)
+                else:
+                    adjacent = index + (-1 if override["operation"] == "move_earlier" else 1)
+                    if 0 <= adjacent < len(items) and not any(
+                        items[adjacent].get(key) is not None
+                        for key in ("group_id", "superset_group")
+                    ):
+                        target["sort_order"], items[adjacent]["sort_order"] = (
+                            items[adjacent]["sort_order"],
+                            target["sort_order"],
+                        )
+                        items[index], items[adjacent] = items[adjacent], items[index]
+                continue
+            for item in result["exercises"]:
+                if not _cycle_slot_matches(item, override):
                     continue
                 item.update(override["exercise"])
                 item["sets"] = _cycle_plan_sets(item["prescription"])
         plans.append(result)
+    plans.sort(
+        key=lambda item: (
+            scheduled_dates.get(item["day_number"], date.fromisoformat(item["scheduled_date"]))
+            if scheduled_dates
+            else date.fromisoformat(item["scheduled_date"]),
+            item["day_number"],
+        )
+    )
     return plans
 
 
@@ -519,6 +618,7 @@ def _preview_cycle_exercises(plan: dict, frozen: UserWorkout | None) -> list[dic
     """Use persisted prescriptions for protected workouts, not a future plan projection."""
     fields = (
         "source_template_exercise_id",
+        "source_assignment_slot_id",
         "exercise_id",
         "prescribed_sets",
         "prescribed_reps",
@@ -527,6 +627,7 @@ def _preview_cycle_exercises(plan: dict, frozen: UserWorkout | None) -> list[dic
         "notes",
         "prescription",
         "metric_type",
+        "sort_order",
     )
     if frozen is None or frozen.plan_materialized is False:
         return [{key: item.get(key) for key in fields} for item in plan["exercises"]]
@@ -603,7 +704,13 @@ def cycle_workout_count(
     missing_only: bool = False,
 ) -> int:
     """Count the logical schedule without creating future workouts or iterating over N."""
-    configurations = _cycle_configurations(db, program)
+    revisions = (
+        db.query(ProgramRevision)
+        .filter_by(user_program_id=program.id)
+        .order_by(ProgramRevision.revision_number)
+        .all()
+    )
+    configurations = _cycle_configurations(db, program, revisions=revisions)
     boundaries = sorted(
         {1, program.duration_weeks + 1}
         | {
@@ -614,7 +721,7 @@ def cycle_workout_count(
     )
     total = 0
     for left, right in pairwise(boundaries):
-        resolved = _cycle_plan_at(db, program, left)
+        resolved = _cycle_plan_at(db, program, left, revisions=revisions)
         if resolved is None:
             if not missing_only:
                 total += sum(
@@ -653,6 +760,36 @@ def cycle_workout_count(
                     and row.day_number == plan["day_number"]
                     for row in program.workouts
                 )
+    if not missing_only:
+        source_days: dict[int, set[tuple[int, int]]] = {}
+        today = today_for_user(db.get(User, program.user_id))
+        for row in program.workouts:
+            if (
+                row.week_number is None
+                or (start and row.scheduled_date < start)
+                or (end and row.scheduled_date > end)
+            ):
+                continue
+            resolved = _cycle_plan_at(db, program, row.week_number, revisions=revisions)
+            if resolved is None:
+                continue
+            cycle, source, boundary = resolved
+            if id(source) not in source_days:
+                source_days[id(source)] = {
+                    (item["week_number"], item["day_number"]) for item in source
+                }
+            source_week = (row.week_number - boundary) % cycle["length_weeks"] + 1
+            present = (
+                row.week_number <= program.duration_weeks
+                and (cycle["repeat"] or row.week_number - boundary < cycle["length_weeks"])
+                and (source_week, row.day_number) in source_days[id(source)]
+            )
+            if not present and (
+                row.scheduled_date < today
+                or row.status in {"in_progress", "completed", "skipped"}
+                or _workout_has_recorded_data(row)
+            ):
+                total += 1
     return total
 
 
@@ -679,7 +816,12 @@ def _cycle_plan_sets(plan: dict) -> list[dict]:
 
 
 def _write_cycle_exercises(
-    db: Session, workout: UserWorkout, plan: dict, *, target_slot: int | None = None
+    db: Session,
+    workout: UserWorkout,
+    plan: dict,
+    *,
+    target_slot: int | None = None,
+    target_assignment_slot: str | None = None,
 ) -> None:
     if workout.user_program is None:
         raise ProgramError("Для тренировки нет данных плана")
@@ -689,10 +831,24 @@ def _write_cycle_exercises(
         or _workout_has_recorded_data(workout)
     ):
         raise ProgramError("Нельзя заменить начатую тренировку или записанные результаты")
+
+    def slot_key(template_slot: int | None, assignment_slot: str | None, order: int) -> tuple:
+        if template_slot is not None and assignment_slot is not None:
+            raise ProgramError("Позиция упражнения неоднозначна")
+        return (
+            ("template", template_slot)
+            if template_slot is not None
+            else (
+                ("assignment", assignment_slot)
+                if assignment_slot is not None
+                else ("manual", order)
+            )
+        )
+
     by_slot = {
-        ("template", item.source_template_exercise_id)
-        if item.source_template_exercise_id is not None
-        else ("manual", item.sort_order): item
+        slot_key(
+            item.source_template_exercise_id, item.source_assignment_slot_id, item.sort_order
+        ): item
         for item in workout.exercises
     }
     if len(by_slot) != len(workout.exercises):
@@ -701,10 +857,15 @@ def _write_cycle_exercises(
     for source in plan["exercises"]:
         if target_slot is not None and source["source_template_exercise_id"] != target_slot:
             continue
-        slot = (
-            ("template", source["source_template_exercise_id"])
-            if source["source_template_exercise_id"] is not None
-            else ("manual", source["sort_order"])
+        if (
+            target_assignment_slot is not None
+            and source.get("source_assignment_slot_id") != target_assignment_slot
+        ):
+            continue
+        slot = slot_key(
+            source["source_template_exercise_id"],
+            source.get("source_assignment_slot_id"),
+            source["sort_order"],
         )
         if slot in retained:
             raise ProgramError("Позиции упражнений в плане неоднозначны")
@@ -737,7 +898,7 @@ def _write_cycle_exercises(
         for item in old_sets.values():
             db.delete(item)
     for slot, exercise in by_slot.items():
-        if target_slot is None and slot not in retained:
+        if target_slot is None and target_assignment_slot is None and slot not in retained:
             db.delete(exercise)
     workout.plan_materialized = True
     workout.plan_revision_number = workout.user_program.current_revision_number
@@ -835,7 +996,13 @@ def hydrate_cycle_workout(db: Session, workout: UserWorkout) -> bool:
 
 
 def materialize_cycle_schedule(
-    db: Session, program: UserProgram, start: date, end: date, *, with_sets: bool = False
+    db: Session,
+    program: UserProgram,
+    start: date,
+    end: date,
+    *,
+    with_sets: bool = False,
+    day_numbers: set[int] | None = None,
 ) -> int:
     if (end - start).days > 92:
         raise ProgramError("Диапазон расписания не может быть больше 93 дней")
@@ -857,6 +1024,8 @@ def materialize_cycle_schedule(
     hydrated_sets = 0
     for week in range(first, last + 1):
         for plan in _cycle_workout_plans(db, program, week):
+            if day_numbers is not None and plan["day_number"] not in day_numbers:
+                continue
             key = (week, plan["day_number"])
             scheduled = date.fromisoformat(plan["scheduled_date"])
             newly_created = key not in existing and start <= scheduled <= end
@@ -1024,48 +1193,106 @@ def hydrate_cycle_read_workout(db: Session, workout: UserWorkout) -> bool:
 
 
 def revise_program_cycle(
-    db: Session, actor: User, program_id: int, payload: ProgramCycleRevisionRequest
-) -> int:
-    program, _ = get_program_for_actor(db, actor, program_id, lock=True)
+    db: Session,
+    actor: User,
+    program_id: int,
+    payload: ProgramCycleRevisionRequest,
+    *,
+    preview: bool = False,
+) -> int | dict:
+    program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     owner = db.get(User, program.user_id)
     boundary = payload.effective_from_week
-    if boundary > program.duration_weeks + 1 or program.start_date + timedelta(
-        weeks=boundary - 1
-    ) < today_for_user(owner):
+    today = today_for_user(owner)
+    current_week = max(1, (today - program.start_date).days // 7 + 1)
+    if boundary > program.duration_weeks + 1 or boundary < current_week:
         raise ProgramError("Выберите будущую неделю в пределах программы для изменения цикла")
-    previous = _cycle_plan_at(db, program, min(boundary, program.duration_weeks))
+    revisions = (
+        db.query(ProgramRevision)
+        .filter_by(user_program_id=program.id)
+        .order_by(ProgramRevision.revision_number)
+        .all()
+    )
+    previous = _cycle_plan_at(
+        db, program, min(boundary, program.duration_weeks), revisions=revisions
+    )
     if previous is None:
         raise ProgramError("У назначения нет сохранённого цикла")
     cycle, source, _old_boundary = previous
     duration = payload.duration_weeks or program.duration_weeks
     if duration < boundary - 1 or duration > (date.max - program.start_date).days // 7:
         raise ProgramError("Некорректная длительность программы")
+    selected_weeks = set(payload.occurrence_weeks or [])
+    if any(week > duration for week in selected_weeks):
+        raise ProgramError("Некорректный номер недели программы")
+    if payload.source_cycle_week is not None and payload.source_cycle_week > cycle["length_weeks"]:
+        raise ProgramError("Некорректный номер исходной недели цикла")
+    if not preview and boundary == current_week:
+        first_date = program.start_date + timedelta(weeks=boundary - 1)
+        if first_date < today:
+            materialize_cycle_schedule(
+                db, program, first_date, today - timedelta(days=1), with_sets=True
+            )
     affected = (
         db.query(UserWorkout)
         .filter(UserWorkout.user_program_id == program.id, UserWorkout.week_number >= boundary)
         .all()
     )
+
+    def protected(row: UserWorkout) -> bool:
+        return (
+            row.scheduled_date < today
+            or row.status in {"in_progress", "completed", "skipped"}
+            or _workout_has_recorded_data(row)
+        )
+
     if any(
-        row.status in {"in_progress", "completed", "skipped"} or _workout_has_recorded_data(row)
-        for row in affected
+        _required_plan_number(row.week_number) > duration and protected(row) for row in affected
     ):
         raise ProgramError(
-            "Изменение цикла не может затрагивать выполненные или начатые тренировки"
+            "Продолжительность не может исключать выполненные или начатые тренировки"
         )
     config: dict | None = None
+    phase_mappings: list[tuple[int, int, dict, list[int]]] = []
+    new_day_number: int | None = None
     if (
         payload.source_week_order is not None
         or payload.repeat is not None
+        or payload.remove_day_number is not None
+        or payload.copy_day_number is not None
+        or payload.swap_day_number is not None
         or "week_types" in payload.model_fields_set
     ):
-        order = payload.source_week_order or list(range(1, cycle["length_weeks"] + 1))
+        day_change = any(
+            value is not None
+            for value in (
+                payload.remove_day_number,
+                payload.copy_day_number,
+                payload.swap_day_number,
+            )
+        )
+        day_only = (
+            day_change
+            and payload.source_week_order is None
+            and payload.repeat is None
+            and "week_types" not in payload.model_fields_set
+        )
+        phase = (
+            (boundary - _old_boundary) % cycle["length_weeks"] if day_change and not day_only else 0
+        )
+        order = payload.source_week_order or [
+            (phase + index) % cycle["length_weeks"] + 1 for index in range(cycle["length_weeks"])
+        ]
         if any(week > cycle["length_weeks"] for week in order):
             raise ProgramError("Некорректное соответствие исходных недель")
-        by_week = {
-            week: [item for item in source if item["week_number"] == week] for week in set(order)
-        }
+        by_week: dict[int, list[dict]] = {week: [] for week in set(order)}
+        for item in source:
+            if item["week_number"] in by_week:
+                by_week[item["week_number"]].append(item)
         if (
             sum(
                 sum(
@@ -1081,6 +1308,10 @@ def revise_program_cycle(
         new_source = []
         for index, old_week in enumerate(order, 1):
             for original in by_week[old_week]:
+                if original["day_number"] == payload.remove_day_number and (
+                    payload.source_cycle_week is None or old_week == payload.source_cycle_week
+                ):
+                    continue
                 item = deepcopy(original)
                 item["week_number"] = index
                 item["scheduled_date"] = (
@@ -1088,6 +1319,93 @@ def revise_program_cycle(
                     + timedelta(weeks=index - old_week)
                 ).isoformat()
                 new_source.append(item)
+        if payload.remove_day_number is not None:
+            if not any(item["day_number"] == payload.remove_day_number for item in source):
+                raise ProgramError("В исходном цикле нет выбранного тренировочного дня")
+            if not new_source:
+                raise ProgramError("В программе должна оставаться хотя бы одна тренировка")
+        if payload.copy_day_number is not None:
+            assert payload.new_day_weekday is not None and payload.new_day_title is not None
+            if not any(item["day_number"] == payload.copy_day_number for item in source):
+                raise ProgramError("В исходном цикле нет выбранного тренировочного дня")
+            if any(
+                date.fromisoformat(item["scheduled_date"]).weekday() == payload.new_day_weekday
+                for item in source
+                if payload.source_cycle_week is None
+                or item["week_number"] == payload.source_cycle_week
+            ):
+                raise ProgramError("В этот день недели тренировка уже запланирована")
+            offset = (payload.new_day_weekday - program.start_date.weekday()) % 7
+            first_new_week = program.start_date + timedelta(weeks=boundary - 1)
+            if offset > (date.max - first_new_week).days:
+                raise ProgramError("Дата новой тренировки выходит за пределы календаря")
+            if first_new_week + timedelta(days=offset) < today:
+                raise ProgramError("Выберите будущий день недели или следующую неделю программы")
+            assignment = _cycle_assignment(db, program, revisions=revisions)
+            original_source = (
+                assignment.snapshot.get(
+                    "logical_cycle",
+                    assignment.changed_fields.get(
+                        "logical_cycle", assignment.snapshot.get("workouts", [])
+                    ),
+                )
+                if assignment
+                else []
+            )
+            used_days = {item["day_number"] for item in [*source, *original_source]}
+            used_days.update(row.day_number for row in program.workouts)
+            for previous_config in _cycle_configurations(db, program, revisions=revisions):
+                used_days.update(item["day_number"] for item in previous_config["logical_cycle"])
+            new_day_number = next(
+                (number for number in range(1, len(used_days) + 2) if number not in used_days), None
+            )
+            if new_day_number is None:
+                raise ProgramError("Не осталось свободной позиции тренировочного дня")
+            for index, old_week in enumerate(order, 1):
+                if payload.source_cycle_week is not None and old_week != payload.source_cycle_week:
+                    continue
+                for original in by_week[old_week]:
+                    if original["day_number"] != payload.copy_day_number:
+                        continue
+                    item = deepcopy(original)
+                    item.update(
+                        {
+                            "week_number": index,
+                            "day_number": new_day_number,
+                            "title": payload.new_day_title.strip(),
+                            "scheduled_date": (
+                                program.start_date + timedelta(weeks=index - 1, days=offset)
+                            ).isoformat(),
+                        }
+                    )
+                    new_source.append(item)
+            if (
+                sum(len(item["sets"]) for row in new_source for item in row["exercises"])
+                > MAX_GENERATED_SETS
+            ):
+                raise ProgramError("Размер плана превышает допустимый объём одной операции")
+        if payload.swap_day_number is not None:
+            if payload.swap_with_day_number is None:
+                raise ProgramError("Укажите оба тренировочных дня")
+            pair = {payload.swap_day_number, payload.swap_with_day_number}
+            days_by_week: dict[int, dict[int, dict]] = {}
+            for item in new_source:
+                if item["day_number"] in pair and (
+                    payload.source_cycle_week is None
+                    or item["week_number"] == payload.source_cycle_week
+                ):
+                    days_by_week.setdefault(item["week_number"], {})[item["day_number"]] = item
+            if not days_by_week:
+                raise ProgramError("В исходном цикле нет выбранных тренировочных дней")
+            for days in days_by_week.values():
+                if len(days) != 2:
+                    raise ProgramError("Оба дня должны присутствовать в каждой исходной неделе")
+                first = days[payload.swap_day_number]
+                second = days[payload.swap_with_day_number]
+                first["scheduled_date"], second["scheduled_date"] = (
+                    second["scheduled_date"],
+                    first["scheduled_date"],
+                )
         new_cycle = {
             **cycle,
             "length_weeks": len(order),
@@ -1102,15 +1420,458 @@ def revise_program_cycle(
         }
         if new_cycle["week_types"] is not None and len(new_cycle["week_types"]) != len(order):
             raise ProgramError("Укажите тип для каждой недели нового цикла")
-        if not new_cycle["repeat"] and duration - boundary + 1 > len(order):
+        anchor = _old_boundary if day_only else boundary
+        last_week = (
+            min(duration, _cycle_phase_end(db, program, boundary, _old_boundary, revisions))
+            if day_only
+            else duration
+        )
+        if not new_cycle["repeat"] and last_week - anchor + 1 > len(order):
             raise ProgramError("Длительность программы превышает длину цикла без повторения")
         config = {
             "effective_from_week": boundary,
             "week_cycle": new_cycle,
             "logical_cycle": new_source,
         }
+        if day_only:
+            config["cycle_anchor_week"] = anchor
+        phase_mappings.append((boundary, _old_boundary, cycle, order))
     elif not cycle["repeat"] and duration - _old_boundary + 1 > cycle["length_weeks"]:
         raise ProgramError("Длительность программы превышает длину цикла без повторения")
+
+    configs = [config] if config else []
+    preserve_future_phases = config is not None and day_only
+    horizon = (date.max - program.start_date).days // 7
+    if preserve_future_phases:
+        later_boundaries = sorted(
+            {
+                item["effective_from_week"]
+                for item in _cycle_configurations(db, program, revisions=revisions)
+                if boundary < item["effective_from_week"] <= horizon
+            }
+            | {
+                week
+                for chosen in selected_weeks
+                for week in (chosen, chosen + 1)
+                if boundary < week <= horizon
+            }
+        )
+        last_cycle, last_source = cycle, source
+        last_active = True
+        for next_boundary in later_boundaries:
+            future = _cycle_plan_at(db, program, next_boundary, revisions=revisions)
+            if future is None:
+                raise ProgramError("У назначения нет сохранённого цикла")
+            next_cycle, next_source, old_boundary = future
+            active = (not selected_weeks or next_boundary in selected_weeks) and (
+                payload.source_cycle_week is None or old_boundary == _old_boundary
+            )
+            if next_cycle is last_cycle and next_source is last_source and active == last_active:
+                continue
+            last_cycle, last_source, last_active = next_cycle, next_source, active
+            length = next_cycle["length_weeks"]
+            next_order = list(range(1, length + 1))
+            old_to_new = {old: new for new, old in enumerate(next_order, 1)}
+            transformed = []
+            for original in next_source:
+                selected_source = (
+                    payload.source_cycle_week is None
+                    or original["week_number"] == payload.source_cycle_week
+                )
+                if (
+                    active
+                    and selected_source
+                    and original["day_number"] == payload.remove_day_number
+                ):
+                    continue
+                index = old_to_new[original["week_number"]]
+                item = deepcopy(original)
+                item["week_number"] = index
+                item["scheduled_date"] = (
+                    date.fromisoformat(original["scheduled_date"])
+                    + timedelta(weeks=index - original["week_number"])
+                ).isoformat()
+                transformed.append(item)
+            if not transformed:
+                raise ProgramError("В программе должна оставаться хотя бы одна тренировка")
+            if active and new_day_number is not None:
+                if payload.new_day_weekday is None or payload.new_day_title is None:
+                    raise ProgramError("Укажите название и день недели новой тренировки")
+                copied_days = [
+                    item
+                    for item in transformed
+                    if item["day_number"] == payload.copy_day_number
+                    and (
+                        payload.source_cycle_week is None
+                        or item["week_number"] == payload.source_cycle_week
+                    )
+                ]
+                if copied_days and any(
+                    date.fromisoformat(item["scheduled_date"]).weekday() == payload.new_day_weekday
+                    for item in transformed
+                    if payload.source_cycle_week is None
+                    or item["week_number"] == payload.source_cycle_week
+                ):
+                    raise ProgramError("В этот день недели тренировка уже запланирована")
+                offset = (payload.new_day_weekday - program.start_date.weekday()) % 7
+                for original in copied_days:
+                    item = deepcopy(original)
+                    item.update(
+                        {
+                            "day_number": new_day_number,
+                            "title": payload.new_day_title.strip(),
+                            "scheduled_date": (
+                                program.start_date
+                                + timedelta(weeks=item["week_number"] - 1, days=offset)
+                            ).isoformat(),
+                        }
+                    )
+                    transformed.append(item)
+            if active and payload.swap_day_number is not None:
+                if payload.swap_with_day_number is None:
+                    raise ProgramError("Укажите оба тренировочных дня")
+                pair = {payload.swap_day_number, payload.swap_with_day_number}
+                days_by_week = {}
+                for item in transformed:
+                    if item["day_number"] in pair and (
+                        payload.source_cycle_week is None
+                        or item["week_number"] == payload.source_cycle_week
+                    ):
+                        days_by_week.setdefault(item["week_number"], {})[item["day_number"]] = item
+                for days in days_by_week.values():
+                    if len(days) != 2:
+                        raise ProgramError("Оба дня должны присутствовать в каждой исходной неделе")
+                    first, second = (
+                        days[payload.swap_day_number],
+                        days[payload.swap_with_day_number],
+                    )
+                    first["scheduled_date"], second["scheduled_date"] = (
+                        second["scheduled_date"],
+                        first["scheduled_date"],
+                    )
+            if (
+                sum(len(item["sets"]) for row in transformed for item in row["exercises"])
+                > MAX_GENERATED_SETS
+            ):
+                raise ProgramError("Размер плана превышает допустимый объём одной операции")
+            next_types = next_cycle.get("week_types")
+            configs.append(
+                {
+                    "effective_from_week": next_boundary,
+                    "cycle_anchor_week": old_boundary,
+                    "week_cycle": {
+                        **next_cycle,
+                        "week_types": [next_types[week - 1] for week in next_order]
+                        if next_types
+                        else None,
+                    },
+                    "logical_cycle": transformed,
+                }
+            )
+            phase_mappings.append((next_boundary, old_boundary, next_cycle, next_order))
+
+    if (
+        sum(
+            len(exercise["sets"])
+            for item in configs
+            for row in item["logical_cycle"]
+            for exercise in row["exercises"]
+        )
+        > MAX_GENERATED_SETS
+    ):
+        raise ProgramError("Размер плана превышает допустимый объём одной операции")
+
+    carried_overrides: list[dict] = []
+    if config:
+        overrides = _cycle_occurrence_overrides(db, program.id, revisions=revisions)
+        for item in configs:
+            item["week_cycle"]["baked_override_count"] = len(overrides)
+
+        def carry(item: dict) -> None:
+            carried_overrides.append(item)
+            if new_day_number is not None and item.get("day_number") == payload.copy_day_number:
+                carried_overrides.append({**item, "day_number": new_day_number})
+
+        for original_index, original in enumerate(overrides):
+            for phase_index, (start, old_boundary, phase_cycle, old_order) in enumerate(
+                phase_mappings
+            ):
+                if original_index < phase_cycle.get("baked_override_count", 0):
+                    continue
+                if original.get("source_cycle_boundary", old_boundary) != old_boundary:
+                    continue
+                end = (
+                    phase_mappings[phase_index + 1][0] - 1
+                    if phase_index + 1 < len(phase_mappings)
+                    else horizon
+                )
+                copied = deepcopy(original)
+                copied["source_cycle_boundary"] = old_boundary if preserve_future_phases else start
+                if "weeks" in copied:
+                    copied["weeks"] = [week for week in copied["weeks"] if start <= week <= end]
+                    if not copied["weeks"]:
+                        continue
+                else:
+                    copied["from_week"] = max(start, copied["from_week"])
+                    if phase_index + 1 < len(phase_mappings) or "to_week" in copied:
+                        copied["to_week"] = min(end, copied.get("to_week", end))
+                    if copied["from_week"] > copied.get("to_week", end):
+                        continue
+                old_source_week = copied.get("source_cycle_week")
+                if old_source_week is None:
+                    carry(copied)
+                else:
+                    for index, source_week in enumerate(old_order, 1):
+                        if source_week == old_source_week:
+                            carry({**copied, "source_cycle_week": index})
+            if len(carried_overrides) > MAX_GENERATED_SETS:
+                raise ProgramError("Размер плана превышает допустимый объём одной операции")
+    config_fields = (
+        {"inherited_cycle_configurations": configs}
+        if len(configs) > 1
+        else {"cycle_configuration": config}
+        if config
+        else {}
+    )
+    projected = (
+        [
+            *revisions,
+            ProgramRevision(
+                change_kind="plan_updated",
+                changed_fields={
+                    **config_fields,
+                    "inherited_occurrence_overrides": carried_overrides,
+                },
+            ),
+        ]
+        if config
+        else revisions
+    )
+    dates_by_week: dict[int, dict[int, date]] = {}
+    existing_by_week: dict[int, dict[int, UserWorkout]] = {}
+    for row in affected:
+        if row.week_number is None or row.day_number is None:
+            raise ProgramError("Для тренировки нет данных плана")
+        dates_by_week.setdefault(row.week_number, {})[row.day_number] = row.scheduled_date
+        existing_by_week.setdefault(row.week_number, {})[row.day_number] = row
+    indexed_sources: dict[int, dict[int, list[dict]]] = {}
+
+    def plans(week: int, source_revisions: list[ProgramRevision]) -> dict[int, dict]:
+        return {
+            item["day_number"]: item
+            for item in _cycle_workout_plans(
+                db,
+                program,
+                week,
+                revisions=source_revisions,
+                source_index=indexed_sources,
+                scheduled_dates=dates_by_week.get(week),
+            )
+        }
+
+    swap_days = {
+        day for day in (payload.swap_day_number, payload.swap_with_day_number) if day is not None
+    }
+    blocked_swap_weeks: set[int] = set()
+    if swap_days:
+        checked: dict[int, dict[int, dict]] = {}
+        projected_days: dict[int, dict[int, dict]] = {}
+        for row in affected:
+            if row.day_number is None or row.day_number not in swap_days:
+                continue
+            week = _required_plan_number(row.week_number)
+            if week not in checked:
+                checked[week] = plans(week, revisions)
+                projected_days[week] = plans(week, projected)
+            old = checked[week].get(row.day_number)
+            new = projected_days[week].get(row.day_number)
+            if (
+                old is not None
+                and new is not None
+                and old["scheduled_date"] == new["scheduled_date"]
+            ):
+                continue
+            if (
+                protected(row)
+                or row.status != "planned"
+                or old is None
+                or row.scheduled_date != date.fromisoformat(old["scheduled_date"])
+            ):
+                blocked_swap_weeks.add(week)
+        old_boundary_plans = plans(boundary, revisions)
+        new_boundary_plans = plans(boundary, projected)
+        if any(
+            old_boundary_plans.get(day)
+            and new_boundary_plans.get(day)
+            and old_boundary_plans[day]["scheduled_date"]
+            != new_boundary_plans[day]["scheduled_date"]
+            for day in swap_days
+        ) and any(
+            date.fromisoformat(item["scheduled_date"]) < today
+            for day in swap_days
+            for item in (old_boundary_plans.get(day), new_boundary_plans.get(day))
+            if item is not None
+        ):
+            blocked_swap_weeks.add(boundary)
+        if not preview:
+            for week in blocked_swap_weeks:
+                first_date = program.start_date + timedelta(weeks=week - 1)
+                end_date = first_date + timedelta(days=min(6, (date.max - first_date).days))
+                materialize_cycle_schedule(db, program, first_date, end_date, day_numbers=swap_days)
+            if blocked_swap_weeks:
+                affected = (
+                    db.query(UserWorkout)
+                    .filter(
+                        UserWorkout.user_program_id == program.id,
+                        UserWorkout.week_number >= boundary,
+                    )
+                    .all()
+                )
+                dates_by_week.clear()
+                existing_by_week.clear()
+                for row in affected:
+                    if row.week_number is None or row.day_number is None:
+                        raise ProgramError("Для тренировки нет данных плана")
+                    dates_by_week.setdefault(row.week_number, {})[row.day_number] = (
+                        row.scheduled_date
+                    )
+                    existing_by_week.setdefault(row.week_number, {})[row.day_number] = row
+
+    if not preview and selected_weeks and config is not None and day_only:
+        found = False
+        for week in sorted(selected_weeks):
+            before, after = plans(week, revisions), plans(week, projected)
+            for day in before.keys() | after.keys():
+                old, new = before.get(day), after.get(day)
+                selected_row = existing_by_week.get(week, {}).get(day)
+                if (
+                    selected_row is not None
+                    and (selected_row.status != "planned" or protected(selected_row))
+                ) or (day in swap_days and week in blocked_swap_weeks):
+                    continue
+                if old is None and new is not None:
+                    found = date.fromisoformat(new["scheduled_date"]) >= today
+                elif old is not None and new is None:
+                    found = (
+                        selected_row.scheduled_date
+                        if selected_row
+                        else date.fromisoformat(old["scheduled_date"])
+                    ) >= today
+                elif old is not None and new is not None and day in swap_days:
+                    found = old["scheduled_date"] != new["scheduled_date"]
+                if found:
+                    break
+            if found:
+                break
+        if not found:
+            raise ProgramError("В выбранных неделях нет доступных для изменения тренировок")
+
+    if preview:
+        offset = getattr(payload, "offset", 0)
+        total = max(0, max(program.duration_weeks, duration) - boundary + 1)
+        weeks = []
+        old_overrides = _cycle_occurrence_overrides(db, program.id, revisions=revisions)
+        new_overrides = _cycle_occurrence_overrides(db, program.id, revisions=projected)
+        for week in range(boundary + offset, min(boundary + offset + 50, boundary + total)):
+            before = plans(week, revisions) if week <= program.duration_weeks else {}
+            after = plans(week, projected) if week <= duration else {}
+            before_cycle = _cycle_plan_at(db, program, week, revisions=revisions)
+            after_cycle = _cycle_plan_at(db, program, week, revisions=projected)
+            workouts = []
+            for day in sorted(before.keys() | after.keys() | existing_by_week.get(week, {}).keys()):
+                preview_row = existing_by_week.get(week, {}).get(day)
+                previous_plan, next_plan = before.get(day), after.get(day)
+                template = next_plan or previous_plan
+                if preview_row is None:
+                    if template is None:
+                        continue
+                    scheduled = date.fromisoformat((previous_plan or template)["scheduled_date"])
+                    title = template["title"]
+                else:
+                    scheduled = preview_row.scheduled_date
+                    title = preview_row.title
+                old_type = (
+                    workout_cycle_week_type(db, preview_row, revisions)[0]
+                    if preview_row is not None and protected(preview_row)
+                    else _cycle_type_for_date(
+                        before_cycle[0],
+                        old_overrides,
+                        week,
+                        previous_plan["source_cycle_week"],
+                        before_cycle[2],
+                        scheduled,
+                    )
+                    if before_cycle and previous_plan
+                    else None
+                )
+                new_type = (
+                    old_type
+                    if preview_row is not None and protected(preview_row)
+                    else _cycle_type_for_date(
+                        after_cycle[0],
+                        new_overrides,
+                        week,
+                        next_plan["source_cycle_week"],
+                        after_cycle[2],
+                        scheduled,
+                    )
+                    if after_cycle and next_plan
+                    else None
+                )
+                workouts.append(
+                    {
+                        "id": preview_row.id if preview_row else None,
+                        "day_number": day,
+                        "title": title,
+                        "scheduled_date": scheduled.isoformat(),
+                        "status": preview_row.status if preview_row else "planned",
+                        "changeable": scheduled >= today
+                        and not (day in swap_days and week in blocked_swap_weeks)
+                        and (
+                            preview_row is None
+                            or (preview_row.status == "planned" and not protected(preview_row))
+                        ),
+                        "new_scheduled_date": (
+                            next_plan["scheduled_date"]
+                            if next_plan and day in swap_days and week not in blocked_swap_weeks
+                            else scheduled.isoformat()
+                        ),
+                        "removed": next_plan is None,
+                        "added": previous_plan is None and next_plan is not None,
+                        "week_type": old_type,
+                        "new_week_type": new_type,
+                        "exercises": _preview_cycle_exercises(
+                            previous_plan,
+                            preview_row if preview_row and protected(preview_row) else None,
+                        )
+                        if previous_plan
+                        else [],
+                        "new_exercises": _preview_cycle_exercises(next_plan, None)
+                        if next_plan
+                        else [],
+                    }
+                )
+            weeks.append(
+                {
+                    "week_number": week,
+                    "source_cycle_week": (week - before_cycle[2]) % before_cycle[0]["length_weeks"]
+                    + 1
+                    if before_cycle and before
+                    else None,
+                    "cycle_iteration": (week - before_cycle[2]) // before_cycle[0]["length_weeks"]
+                    + 1
+                    if before_cycle and before
+                    else None,
+                    "new_source_cycle_week": (week - after_cycle[2])
+                    % after_cycle[0]["length_weeks"]
+                    + 1
+                    if after_cycle and after
+                    else None,
+                    "workouts": workouts,
+                }
+            )
+        return {"weeks": weeks, "total_weeks": total, "offset": offset}
+
     cancelled_by_plan = {
         workout_id
         for event in db.query(ProgramRevision).filter_by(user_program_id=program.id)
@@ -1118,6 +1879,23 @@ def revise_program_cycle(
         for workout_id in event.changed_fields.get(key, [])
     }
     program.duration_weeks = duration
+    if (
+        config
+        and not selected_weeks
+        and payload.source_cycle_week is None
+        and (payload.remove_day_number is not None or new_day_number is not None)
+    ):
+        weekdays_by_day: dict[int, set[int]] = {}
+        for item in config["logical_cycle"]:
+            weekdays_by_day.setdefault(item["day_number"], set()).add(
+                date.fromisoformat(item["scheduled_date"]).weekday()
+            )
+        if all(len(values) == 1 for values in weekdays_by_day.values()):
+            weekdays = [next(iter(values)) for values in weekdays_by_day.values()]
+            if len(weekdays) == len(set(weekdays)):
+                program.schedule_weekdays = sorted(
+                    weekdays, key=lambda weekday: (weekday - program.start_date.weekday()) % 7
+                )
     revision = record_program_revision(
         db,
         program,
@@ -1131,8 +1909,18 @@ def revise_program_cycle(
                 for row in affected
                 if _required_plan_number(row.week_number) > duration and row.status == "planned"
             ],
+            "structure_cancelled_workout_ids": [
+                row.id
+                for row in affected
+                if config is not None
+                and row.status == "planned"
+                and not protected(row)
+                and _required_plan_number(row.week_number) <= duration
+                and row.day_number not in plans(_required_plan_number(row.week_number), projected)
+            ],
             "duration_weeks": duration,
-            **({"cycle_configuration": config} if config else {}),
+            **config_fields,
+            **({"inherited_occurrence_overrides": carried_overrides} if config else {}),
         },
     )
     db.flush()
@@ -1142,11 +1930,35 @@ def revise_program_cycle(
         .order_by(ProgramRevision.revision_number)
         .all()
     )
-    indexed_sources: dict[int, dict[int, list[dict]]] = {}
     revised_sets = 0
     for workout in affected:
         if workout.week_number is None or workout.day_number is None:
             raise ProgramError("Для тренировки нет данных плана")
+        if config is not None and day_only:
+            if selected_weeks and workout.week_number not in selected_weeks:
+                continue
+            if payload.source_cycle_week is not None:
+                old_plan = _cycle_plan_at(db, program, workout.week_number, revisions=revisions)
+                if (
+                    old_plan is None
+                    or old_plan[2] != _old_boundary
+                    or (workout.week_number - old_plan[2]) % old_plan[0]["length_weeks"] + 1
+                    != payload.source_cycle_week
+                ):
+                    continue
+            if new_day_number is not None:
+                continue
+            if (
+                payload.remove_day_number is not None
+                and workout.day_number != payload.remove_day_number
+            ):
+                continue
+            if swap_days and workout.day_number not in swap_days:
+                continue
+        if protected(workout) or (
+            workout.day_number in swap_days and workout.week_number in blocked_swap_weeks
+        ):
+            continue
         if workout.week_number > duration:
             workout.status = "cancelled"
             cancel_workout_reminder(db, workout.id)
@@ -1169,7 +1981,15 @@ def revise_program_cycle(
                 None,
             )
             if plan is None:
+                if workout.status == "planned":
+                    workout.status = "cancelled"
+                    cancel_workout_reminder(db, workout.id)
                 continue
+            if workout.day_number in swap_days:
+                new_date = date.fromisoformat(plan["scheduled_date"])
+                if new_date != workout.scheduled_date:
+                    workout.scheduled_date = new_date
+                    cancel_workout_reminder(db, workout.id)
             if config is None and workout.status == "planned":
                 if (workout.source_cycle_week, workout.cycle_iteration) == (
                     plan["source_cycle_week"],
@@ -1187,6 +2007,15 @@ def revise_program_cycle(
             workout.source_cycle_week = plan["source_cycle_week"]
             workout.cycle_iteration = plan["cycle_iteration"]
             workout.plan_revision_number = revision.revision_number
+    if new_day_number is not None:
+        first_date = max(today, program.start_date + timedelta(weeks=boundary - 1))
+        materialize_cycle_schedule(
+            db,
+            program,
+            first_date,
+            first_date + timedelta(days=min(27, (date.max - first_date).days)),
+            day_numbers={new_day_number},
+        )
     revision.snapshot = _build_program_snapshot(db, program)
     record_audit_event(
         db,
@@ -1205,6 +2034,8 @@ def enable_program_cycle(
     db: Session, actor: User, program_id: int, payload: ProgramCycleEnableRequest, *, preview: bool
 ) -> dict:
     program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     boundary, duration = payload.effective_from_week, payload.duration_weeks
@@ -1430,12 +2261,12 @@ def preview_cycle_duration(
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     boundary, duration = payload.effective_from_week, payload.duration_weeks
+    today = today_for_user(db.get(User, program.user_id))
     if (
         boundary > program.duration_weeks + 1
         or duration < boundary - 1
         or duration > (date.max - program.start_date).days // 7
-        or program.start_date + timedelta(weeks=boundary - 1)
-        < today_for_user(db.get(User, program.user_id))
+        or boundary < max(1, (today - program.start_date).days // 7 + 1)
     ):
         raise ProgramError("Выберите будущую неделю и допустимую длительность программы")
     revisions = (
@@ -1460,7 +2291,18 @@ def preview_cycle_duration(
         .filter(UserWorkout.user_program_id == program.id, UserWorkout.week_number >= boundary)
     }
     weeks = []
-    today = today_for_user(db.get(User, program.user_id))
+    if any(
+        _required_plan_number(row.week_number) > duration
+        and (
+            row.scheduled_date < today
+            or row.status in {"in_progress", "completed", "skipped"}
+            or _workout_has_recorded_data(row)
+        )
+        for row in existing.values()
+    ):
+        raise ProgramError(
+            "Продолжительность не может исключать выполненные или начатые тренировки"
+        )
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
     for week in range(first, last):
         workouts = []
@@ -1506,6 +2348,8 @@ def disable_program_cycle(
     preview: bool,
 ) -> dict:
     program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     boundary = payload.effective_from_week
@@ -1537,11 +2381,13 @@ def disable_program_cycle(
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
     existing_by_week: dict[int, list[UserWorkout]] = {}
     dates_by_week: dict[int, dict[int, date]] = {}
-    for row in existing:
-        if row.week_number is None or row.day_number is None:
+    for existing_row in existing:
+        if existing_row.week_number is None or existing_row.day_number is None:
             raise ProgramError("Для тренировки нет данных плана")
-        existing_by_week.setdefault(row.week_number, []).append(row)
-        dates_by_week.setdefault(row.week_number, {})[row.day_number] = row.scheduled_date
+        existing_by_week.setdefault(existing_row.week_number, []).append(existing_row)
+        dates_by_week.setdefault(existing_row.week_number, {})[existing_row.day_number] = (
+            existing_row.scheduled_date
+        )
     if preview:
         weeks = []
         for week in range(
@@ -1681,6 +2527,8 @@ def revise_program_week_type(
     if not preview and isinstance(payload, ProgramCycleImpactPreviewRequest):
         raise ProgramError("Для изменения типа недели требуется явная область повторений")
     program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     revisions = (
@@ -1728,14 +2576,7 @@ def revise_program_week_type(
             page = list(range(first + payload.offset, min(first + payload.offset + 50, end + 1)))
             scope = {"from_week": payload.from_week, "to_week": end}
         else:
-            end = min(
-                [program.duration_weeks]
-                + [
-                    config["effective_from_week"] - 1
-                    for config in _cycle_configurations(db, program, revisions=revisions)
-                    if config["effective_from_week"] > first
-                ]
-            )
+            end = _cycle_phase_end(db, program, first, boundary, revisions)
             if not cycle["repeat"]:
                 end = min(end, boundary + cycle["length_weeks"] - 1)
             first += (boundary + source_week - 1 - first) % cycle["length_weeks"]
@@ -1746,7 +2587,6 @@ def revise_program_week_type(
             ]
             scope = {
                 "from_week": payload.from_week,
-                "to_week": end,
                 "source_cycle_week": source_week,
                 "source_cycle_boundary": boundary,
             }
@@ -1760,10 +2600,12 @@ def revise_program_week_type(
     by_key = {(row.week_number, row.day_number): row for row in existing}
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
     dates_by_week: dict[int, dict[int, date]] = {}
-    for row in existing:
-        if row.week_number is None or row.day_number is None:
+    for existing_row in existing:
+        if existing_row.week_number is None or existing_row.day_number is None:
             raise ProgramError("Для тренировки нет данных плана")
-        dates_by_week.setdefault(row.week_number, {})[row.day_number] = row.scheduled_date
+        dates_by_week.setdefault(existing_row.week_number, {})[existing_row.day_number] = (
+            existing_row.scheduled_date
+        )
     if preview:
         result = []
         overrides = _cycle_occurrence_overrides(db, program.id, revisions=revisions)
@@ -1892,6 +2734,245 @@ def revise_program_week_type(
         actor_user_id=actor.id,
         target_user_id=program.user_id,
         action="program.week_type_revised",
+        resource_type="user_program",
+        resource_id=program.id,
+        details={"revision_number": revision.revision_number, "scope": scope},
+    )
+    db.commit()
+    return {"current_revision_number": revision.revision_number}
+
+
+def revise_program_cycle_structure(
+    db: Session,
+    actor: User,
+    program_id: int,
+    payload: ProgramCycleStructureRequest,
+    *,
+    preview: bool,
+) -> dict:
+    program, _ = get_program_for_actor(db, actor, program_id, lock=not preview)
+    if not preview:
+        _ensure_cycle_plan_editor(db, program, actor)
+    page = revise_program_week_type(
+        db,
+        actor,
+        program_id,
+        payload if preview else payload.model_copy(update={"offset": 0}),
+        preview=True,
+    )
+    revisions = (
+        db.query(ProgramRevision)
+        .filter_by(user_program_id=program.id)
+        .order_by(ProgramRevision.revision_number)
+        .all()
+    )
+    today = today_for_user(db.get(User, program.user_id))
+    scope: dict = {}
+    if payload.occurrence_weeks is not None:
+        scope = {"weeks": sorted(set(payload.occurrence_weeks))}
+    else:
+        if payload.from_week is None:
+            raise ProgramError("Выберите начало области изменений")
+        scope = {"from_week": payload.from_week, "to_week": program.duration_weeks}
+        if payload.source_cycle_week is not None:
+            resolved = _cycle_plan_at(db, program, payload.from_week, revisions=revisions)
+            if resolved is None:
+                raise ProgramError("У назначения нет сохранённого цикла")
+            _, _, boundary = resolved
+            scope.pop("to_week")
+            scope.update(
+                {
+                    "source_cycle_week": payload.source_cycle_week,
+                    "source_cycle_boundary": boundary,
+                }
+            )
+    assignment_slot = str(payload.assignment_slot_id) if payload.assignment_slot_id else None
+    target_assignment_slot = (
+        str(payload.target_assignment_slot_id) if payload.target_assignment_slot_id else None
+    )
+    override: dict = {
+        **scope,
+        "not_before_date": today.isoformat(),
+        "operation": payload.operation,
+        "day_number": payload.day_number,
+        "source_template_exercise_id": payload.target_template_exercise_id,
+        "source_assignment_slot_id": target_assignment_slot or assignment_slot,
+    }
+    if payload.operation == "add_exercise":
+        if any(
+            item.get("source_assignment_slot_id") == assignment_slot
+            for item in _cycle_occurrence_overrides(db, program.id, revisions=revisions)
+        ):
+            raise ProgramError("Позиция упражнения уже используется")
+        owner = db.get(User, program.user_id)
+        if owner is None:
+            raise ProgramError("Владелец программы не найден")
+        visible = {
+            _effective_exercise_id(item): item for item in _load_visible_exercise_rows(db, owner)
+        }
+        requested = payload.exercise
+        assert requested is not None and assignment_slot is not None
+        exercise = visible.get(requested.exercise_id)
+        if exercise is None:
+            raise ProgramError("Упражнение недоступно владельцу программы")
+        metric = exercise_metric_type(exercise)
+        plan, projection = ensure_plan(
+            requested.prescription,
+            metric_type=metric,
+            prescribed_sets=requested.prescribed_sets,
+            prescribed_reps=requested.prescribed_reps,
+            prescribed_duration_minutes=requested.prescribed_duration_minutes,
+            rest_seconds=requested.rest_seconds,
+        )
+        if metric == "strength" and projection.rest_seconds < 15:
+            raise ProgramError("Отдых силового упражнения должен быть не меньше 15 секунд")
+        prescription = plan.model_dump(mode="json")
+        override["exercise"] = {
+            "exercise_id": requested.exercise_id,
+            "metric_type": metric,
+            "source_template_exercise_id": None,
+            "source_assignment_slot_id": assignment_slot,
+            "source_weekly_prescription_id": None,
+            "sort_order": 1,
+            "prescribed_sets": projection.prescribed_sets,
+            "prescribed_reps": projection.prescribed_reps,
+            "prescribed_duration_minutes": projection.prescribed_duration_minutes,
+            "rest_seconds": projection.rest_seconds,
+            "notes": requested.notes,
+            "superset_group": None,
+            "superset_order": None,
+            "group_id": None,
+            "group_kind": None,
+            "group_order": None,
+            "prescription": prescription,
+            "sets": _cycle_plan_sets(prescription),
+        }
+    projected = [
+        *revisions,
+        ProgramRevision(
+            change_kind="plan_updated", changed_fields={"occurrence_override": override}
+        ),
+    ]
+    indexed_sources: dict[int, dict[int, list[dict]]] = {}
+    for week in page["weeks"]:
+        for workout in week["workouts"]:
+            workout["new_exercises"] = workout["exercises"]
+            workout["structure_changed"] = False
+            if workout["day_number"] != payload.day_number or not workout["changeable"]:
+                continue
+            plans = _cycle_workout_plans(
+                db,
+                program,
+                week["week_number"],
+                revisions=projected,
+                source_index=indexed_sources,
+                scheduled_dates={
+                    workout["day_number"]: date.fromisoformat(workout["scheduled_date"])
+                },
+            )
+            updated = next(
+                (item for item in plans if item["day_number"] == payload.day_number), None
+            )
+            if updated is not None:
+                workout["new_exercises"] = _preview_cycle_exercises(updated, None)
+                workout["structure_changed"] = workout["new_exercises"] != workout["exercises"]
+    if preview:
+        return page
+    found_change = any(
+        workout["structure_changed"] for week in page["weeks"] for workout in week["workouts"]
+    )
+    for offset in range(50, min(page["total_weeks"], MAX_GENERATED_SETS), 50):
+        if found_change:
+            break
+        remaining = revise_program_cycle_structure(
+            db, actor, program_id, payload.model_copy(update={"offset": offset}), preview=True
+        )
+        found_change = any(
+            workout["structure_changed"]
+            for week in remaining["weeks"]
+            for workout in week["workouts"]
+        )
+    if not found_change and page["total_weeks"] > MAX_GENERATED_SETS:
+        raise ProgramError("Выберите более короткую область для проверки состава")
+    if not found_change:
+        raise ProgramError("Для выбранных тренировок нет допустимого изменения состава")
+
+    revision = record_program_revision(
+        db,
+        program,
+        actor=actor,
+        change_kind="plan_updated",
+        changed_fields={"occurrence_override": override},
+    )
+    current_revisions = [*revisions, revision]
+    revised_sets = 0
+    for workout in db.query(UserWorkout).filter_by(
+        user_program_id=program.id, day_number=payload.day_number
+    ):
+        if (
+            workout.week_number is None
+            or workout.scheduled_date < today
+            or workout.status != "planned"
+            or _workout_has_recorded_data(workout)
+        ):
+            continue
+        config = _cycle_plan_at(db, program, workout.week_number, revisions=revisions)
+        if config is None:
+            continue
+        source_week = (workout.week_number - config[2]) % config[0]["length_weeks"] + 1
+        if not _override_matches(scope, workout.week_number, source_week, config[2]):
+            continue
+        dates = {payload.day_number: workout.scheduled_date}
+        before = next(
+            (
+                item
+                for item in _cycle_workout_plans(
+                    db,
+                    program,
+                    workout.week_number,
+                    revisions=revisions,
+                    source_index=indexed_sources,
+                    scheduled_dates=dates,
+                )
+                if item["day_number"] == workout.day_number
+            ),
+            None,
+        )
+        after = next(
+            (
+                item
+                for item in _cycle_workout_plans(
+                    db,
+                    program,
+                    workout.week_number,
+                    revisions=current_revisions,
+                    source_index=indexed_sources,
+                    scheduled_dates=dates,
+                )
+                if item["day_number"] == workout.day_number
+            ),
+            None,
+        )
+        if before is None or after is None or before["exercises"] == after["exercises"]:
+            continue
+        if workout.plan_materialized is not False and (
+            workout.source_cycle_week != before["source_cycle_week"]
+            or workout.cycle_iteration != before["cycle_iteration"]
+        ):
+            raise ProgramError("Откройте тренировку и обновите её план перед изменением состава")
+        if workout.plan_materialized is False:
+            workout.plan_revision_number = revision.revision_number
+        else:
+            count = sum(len(item["sets"]) for item in after["exercises"])
+            if revised_sets + count <= MAX_GENERATED_SETS:
+                _write_cycle_exercises(db, workout, after)
+                revised_sets += count
+    revision.snapshot = _build_program_snapshot(db, program)
+    record_audit_event(
+        db,
+        actor_user_id=actor.id,
+        target_user_id=program.user_id,
+        action="program.cycle_structure_revised",
         resource_type="user_program",
         resource_id=program.id,
         details={"revision_number": revision.revision_number, "scope": scope},
@@ -2082,6 +3163,7 @@ def _copy_scheduled_workout(
             workout_id=workout.id,
             exercise_id=source_exercise.exercise_id,
             source_template_exercise_id=source_exercise.source_template_exercise_id,
+            source_assignment_slot_id=source_exercise.source_assignment_slot_id,
             source_weekly_prescription_id=source_exercise.source_weekly_prescription_id,
             metric_type=source_exercise.metric_type,
             sort_order=source_exercise.sort_order,
@@ -2880,6 +3962,7 @@ def apply_imported_template_revision(
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, expected_revision_number)
     if _cycle_plan_at(db, program, program.duration_weeks) is not None:
+        _ensure_cycle_plan_editor(db, program, actor)
         return _import_cycle_revision(
             db,
             actor,
@@ -3635,6 +4718,7 @@ def upsert_future_program_exercise(
         raise ProgramError("Strength rest must be at least 15 seconds")
 
     if _cycle_plan_at(db, program, program.duration_weeks) is not None:
+        _ensure_cycle_plan_editor(db, program, actor)
         explicit = payload.occurrence_weeks
         if payload.effective_scope != "future_program" and any(
             value is not None for value in (explicit, payload.from_week, payload.source_cycle_week)
@@ -3666,29 +4750,54 @@ def upsert_future_program_exercise(
             and payload.source_cycle_week > cycle["length_weeks"]
         ):
             raise ProgramError("Некорректный номер исходной недели цикла")
+        assignment_slot = (
+            str(payload.target_assignment_slot_id) if payload.target_assignment_slot_id else None
+        )
+        candidate_source = (
+            _cycle_workout_plans(db, program, target_week) if assignment_slot else source
+        )
         candidates = [
             (row["day_number"], item)
-            for row in source
+            for row in candidate_source
             for item in row["exercises"]
             if (payload.day_number is None or row["day_number"] == payload.day_number)
             and (
                 (
-                    payload.target_template_exercise_id is not None
+                    assignment_slot is not None
+                    and item.get("source_assignment_slot_id") == assignment_slot
+                    and item.get("source_template_exercise_id") is None
+                )
+                or (
+                    assignment_slot is None
+                    and payload.target_template_exercise_id is not None
                     and item.get("source_template_exercise_id")
                     == payload.target_template_exercise_id
                 )
                 or (
-                    payload.target_template_exercise_id is None
+                    assignment_slot is None
+                    and payload.target_template_exercise_id is None
                     and item["exercise_id"] == payload.exercise_id
                 )
             )
         ]
-        identities = {(day, item["source_template_exercise_id"]) for day, item in candidates}
+        identities = {
+            (
+                day,
+                item.get("source_assignment_slot_id")
+                if assignment_slot
+                else item["source_template_exercise_id"],
+            )
+            for day, item in candidates
+        }
         if len(identities) != 1:
             raise ProgramError("Укажите тренировочный день и исходную позицию упражнения")
         selected_day, selected_slot = next(iter(identities))
         if selected_slot is None:
             raise ProgramError("У исходного упражнения нет устойчивой позиции")
+        slot_selector = {
+            "source_template_exercise_id": None if assignment_slot else selected_slot,
+            "source_assignment_slot_id": assignment_slot,
+        }
         if any(
             payload.model_dump()[key] is not None
             for key in ("group_id", "group_kind", "group_order", "superset_group", "superset_order")
@@ -3764,6 +4873,58 @@ def upsert_future_program_exercise(
                 first_week, (block.start_date - program.start_date).days // 7 + 1
             )
             scope["to_week"] = (block.end_date - program.start_date).days // 7 + 1
+        if payload.target_template_exercise_id is not None or assignment_slot is not None:
+            revisions = (
+                db.query(ProgramRevision)
+                .filter_by(user_program_id=program.id)
+                .order_by(ProgramRevision.revision_number)
+                .all()
+            )
+            expected_metric = exercise_metric_type(exercise)
+            if "weeks" in scope:
+                affected_items = [
+                    item
+                    for week in scope["weeks"]
+                    for row in _cycle_workout_plans(db, program, week, revisions=revisions)
+                    if row["day_number"] == selected_day
+                    for item in row["exercises"]
+                    if _cycle_slot_matches(item, slot_selector)
+                ]
+            else:
+                boundaries = {scope["from_week"]} | {
+                    config["effective_from_week"]
+                    for config in _cycle_configurations(db, program, revisions=revisions)
+                    if scope["from_week"]
+                    < config["effective_from_week"]
+                    <= scope.get("to_week", program.duration_weeks)
+                }
+                sources = [
+                    resolved
+                    for boundary in boundaries
+                    if (resolved := _cycle_plan_at(db, program, boundary, revisions=revisions))
+                    and (payload.source_cycle_week is None or resolved[2] == cycle_boundary)
+                ]
+                affected_items = [
+                    item
+                    for _, source_rows, _ in sources
+                    for row in source_rows
+                    if row["day_number"] == selected_day
+                    and (
+                        payload.source_cycle_week is None
+                        or row["week_number"] == payload.source_cycle_week
+                    )
+                    for item in row["exercises"]
+                    if _cycle_slot_matches(item, slot_selector)
+                ]
+                affected_items.extend(
+                    override["exercise"]
+                    for override in _cycle_occurrence_overrides(db, program.id, revisions=revisions)
+                    if override.get("day_number") == selected_day
+                    and _cycle_slot_matches(override, slot_selector)
+                    and "exercise" in override
+                )
+            if any(item.get("metric_type") != expected_metric for item in affected_items):
+                raise ProgramError("Замена должна сохранять тип упражнения")
         existing = []
         for row in db.query(UserWorkout).filter_by(
             user_program_id=program.id, day_number=selected_day
@@ -3808,7 +4969,7 @@ def upsert_future_program_exercise(
         override: dict = {
             **scope,
             "day_number": selected_day,
-            "source_template_exercise_id": selected_slot,
+            **slot_selector,
             "exercise": {
                 "exercise_id": payload.exercise_id,
                 "metric_type": exercise_metric_type(exercise),
@@ -3862,7 +5023,7 @@ def upsert_future_program_exercise(
                 (
                     item
                     for item in effective["exercises"]
-                    if item.get("source_template_exercise_id") == selected_slot
+                    if _cycle_slot_matches(item, slot_selector)
                 ),
                 None,
             )
@@ -3873,7 +5034,13 @@ def upsert_future_program_exercise(
                 workout.plan_materialized is not False
                 and revised_sets + count <= MAX_GENERATED_SETS
             ):
-                _write_cycle_exercises(db, workout, effective, target_slot=selected_slot)
+                _write_cycle_exercises(
+                    db,
+                    workout,
+                    effective,
+                    target_slot=selected_slot if assignment_slot is None else None,
+                    target_assignment_slot=assignment_slot,
+                )
                 revised_sets += count
                 updated_count += 1
             elif workout.plan_materialized is False:
@@ -3892,6 +5059,8 @@ def upsert_future_program_exercise(
         db.commit()
         return updated_count, revision.revision_number
 
+    if payload.target_assignment_slot_id is not None:
+        raise ProgramError("У назначения нет сохранённого цикла")
     if payload.skip_protected or any(
         value is not None
         for value in (payload.occurrence_weeks, payload.from_week, payload.source_cycle_week)

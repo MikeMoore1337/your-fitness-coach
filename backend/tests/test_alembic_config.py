@@ -121,7 +121,11 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
     assert auth_families is not None
     assert relocated_marker is not None
     assert auth_families.down_revision == legacy_support.revision
-    assert revisions.get_heads() == ["0145_history_provider_provenance"]
+    assert revisions.get_heads() == ["0146_assignment_exercise_slots"]
+    assert (
+        revisions.get_revision("0146_assignment_exercise_slots").down_revision
+        == "0145_history_provider_provenance"
+    )
     assert (
         revisions.get_revision("0145_history_provider_provenance").down_revision
         == "0144_workout_side_metadata_ck"

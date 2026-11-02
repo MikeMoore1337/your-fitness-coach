@@ -1,0 +1,73 @@
+.workout-plan-editor {
+  width: min(100%, 784px);
+  margin: 12px auto 28px;
+  padding: 0 12px;
+}
+
+.workout-plan-editor__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 20px;
+}
+
+.workout-plan-editor__header h2 {
+  margin: 0;
+  font: 700 1.0625rem/1.35 var(--font-body, sans-serif);
+}
+
+.workout-plan-editor__back {
+  min-height: 44px;
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--text);
+}
+
+.workout-plan-editor__panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--v2-border, var(--border));
+  border-radius: 20px;
+  background: var(--v2-surface, var(--surface));
+}
+
+.workout-plan-editor__panel h3,
+.workout-plan-editor__panel p {
+  margin: 0;
+}
+
+.workout-plan-editor__item,
+.workout-plan-editor__warning {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--v2-border, var(--border));
+  border-radius: 14px;
+}
+
+.workout-plan-editor__item p {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.workout-plan-editor__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.workout-plan-editor__warning {
+  border-color: var(--v2-warning);
+  background: var(--v2-warning-surface);
+}
+
+.workout-plan-editor__warning strong {
+  color: var(--v2-warning);
+}
+
+.workout-plan-editor__panel > .ui-button--secondary {
+  justify-self: start;
+}

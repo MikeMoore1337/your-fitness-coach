@@ -718,6 +718,7 @@ def _serialize_workout(
                         "superset_group",
                         "superset_order",
                         "source_template_exercise_id",
+                        "source_assignment_slot_id",
                         "source_weekly_prescription_id",
                         "group_id",
                         "group_kind",

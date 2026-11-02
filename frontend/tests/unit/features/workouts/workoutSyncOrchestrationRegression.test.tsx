@@ -188,4 +188,137 @@ describe('QA: delayed GET and idempotency conflict', () => {
     expect(requests[1]?.expected_version).toBe(2);
     expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0);
   });
+
+  it('retains an offline result after a plan change until explicit review', async () => {
+    const client = makeClient();
+    const requests: Array<{ mutation_id: string; expected_version: number }> = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+      const payload = JSON.parse(String(options?.body)) as {
+        mutation_id: string;
+        expected_version: number;
+      };
+      requests.push(payload);
+      if (requests.length === 1) {
+        return new Response(
+          JSON.stringify({
+            detail: {
+              code: 'workout_set_plan_conflict',
+              message: 'План подхода изменился',
+              current: {
+                ...saved,
+                actual_reps: null,
+                actual_weight: null,
+                is_completed: false,
+                version: 2,
+              },
+            },
+          }),
+          { status: 409 },
+        );
+      }
+      return new Response(JSON.stringify({ ...saved, version: 3 }), { status: 200 });
+    });
+    const { result } = renderHook(() => useActiveWorkoutQueue(7, workout), {
+      wrapper: makeWrapper(client),
+    });
+    await act(async () => {
+      expect(await result.current.enqueue(201, 1, complete, true)).toBe(false);
+    });
+    expect(result.current.syncState).toBe('conflict');
+    expect(result.current.planConflict?.local).toMatchObject(complete);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values).toMatchObject(complete);
+    await act(async () => {
+      expect(await result.current.resolvePlanConflict()).toBe(true);
+    });
+    await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0));
+    expect(requests[1]).toEqual({ ...requests[0], expected_version: 2 });
+  });
+
+  it('does not change a set plan while an offline result is awaiting sync', async () => {
+    const client = makeClient();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const { result } = renderHook(() => useActiveWorkoutQueue(7, workout), {
+      wrapper: makeWrapper(client),
+    });
+    await act(async () => {
+      expect(await result.current.enqueue(201, 1, complete, true)).toBe(true);
+    });
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    await act(async () => {
+      await expect(
+        result.current.changePlannedTarget(201, 1, '920-plan-target-mutation-id', {
+          weight_kg: 37.5,
+          reps: 8,
+          confirmed: true,
+        }),
+      ).rejects.toThrow('Сначала синхронизируйте');
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values).toMatchObject(complete);
+  });
+
+  it('does not overwrite a set already completed in another tab', async () => {
+    const client = makeClient();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ detail: { code: 'workout_set_plan_conflict', current: saved } }),
+          { status: 409 },
+        ),
+      );
+    const { result } = renderHook(() => useActiveWorkoutQueue(7, workout), {
+      wrapper: makeWrapper(client),
+    });
+    await act(async () => {
+      await result.current.enqueue(201, 1, complete, true);
+    });
+    await act(async () => {
+      expect(await result.current.resolvePlanConflict()).toBe(false);
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values).toMatchObject(complete);
+  });
+
+  it('keeps the result if another tab completes the set after plan review', async () => {
+    const client = makeClient();
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            detail: {
+              code: 'workout_set_plan_conflict',
+              current: { ...saved, is_completed: false, version: 2 },
+            },
+          }),
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            detail: {
+              code: 'workout_set_version_conflict',
+              current: { ...saved, version: 3 },
+            },
+          }),
+          { status: 409 },
+        ),
+      );
+    const { result } = renderHook(() => useActiveWorkoutQueue(7, workout), {
+      wrapper: makeWrapper(client),
+    });
+    await act(async () => {
+      await result.current.enqueue(201, 1, complete, true);
+    });
+    await act(async () => {
+      await result.current.resolvePlanConflict();
+    });
+    await waitFor(() => expect(result.current.planConflict?.server.is_completed).toBe(true));
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values).toMatchObject(complete);
+  });
 });

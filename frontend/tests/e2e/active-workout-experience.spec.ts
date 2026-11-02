@@ -8750,6 +8750,7 @@ for (const theme of ['light', 'dark'] as const) {
     const past = row.getByRole('button', { name: 'Подставить из прошлой тренировки' });
     const help = row.getByText('Что такое RIR?', { exact: true });
     const note = row.locator('.exercise-execution-note > summary');
+    const editPlan = row.getByRole('button', { name: 'Изменить план подхода' });
     const helpers = row.getByText('Разминка и блины', { exact: true });
     const advanced = row.getByText('Дополнительно', { exact: true });
     await expect(prefill).toBeVisible();
@@ -8848,7 +8849,7 @@ for (const theme of ['light', 'dark'] as const) {
     await capture('prefill-collapsed');
 
     await done.focus();
-    for (const next of [prefill, help, note, helpers, advanced]) {
+    for (const next of [prefill, help, note, editPlan, helpers, advanced]) {
       await page.keyboard.press('Tab');
       await expect(next).toBeFocused();
     }
@@ -8997,6 +8998,7 @@ test('Issue #1293 disables prefill without a previous result', async ({ page }) 
   for (const next of [
     row.getByText('Что такое RIR?', { exact: true }),
     row.locator('.exercise-execution-note > summary'),
+    row.getByRole('button', { name: 'Изменить план подхода' }),
     row.getByText('Разминка и блины', { exact: true }),
     row.getByText('Дополнительно', { exact: true }),
   ]) {

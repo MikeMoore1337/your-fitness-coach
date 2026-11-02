@@ -611,3 +611,77 @@ test('предпросмотр будущих повторов предупре�
   await expect(panel.getByRole('combobox', { name: 'Новый тип недели' })).toHaveValue('light');
   await expectNoHorizontalOverflow(page);
 });
+
+test('#920 две вкладки отклоняют устаревшую ревизию и повторяют после обновления', async ({
+  page,
+  context,
+}) => {
+  let revision = 4;
+  const attempts: { revision: number; weekType: string; weeks: number[] }[] = [];
+  const setup = async (tab: Page, weekType: 'light' | 'medium') => {
+    await installPlatformApi(tab, { browserSession: true, programHistory: 'many' });
+    await installCycleApi(tab);
+    await tab.route('**/api/v1/programs/assigned/77/lifecycle', (route) =>
+      route.fulfill({
+        json: {
+          program_id: 77,
+          status: 'active',
+          is_active: true,
+          duration_weeks: 10,
+          current_revision_number: revision,
+          current_week_number: 3,
+          current_block: null,
+          next_block: null,
+          next_workout: null,
+          next_deload: null,
+          restarted_from_program_id: null,
+        },
+      }),
+    );
+    await tab.route('**/api/v1/programs/assigned/77/cycle/week-type', (route) => {
+      const body = route.request().postDataJSON();
+      attempts.push({
+        revision: body.expected_revision_number,
+        weekType: body.week_type,
+        weeks: body.occurrence_weeks,
+      });
+      if (body.expected_revision_number !== revision)
+        return route.fulfill({ status: 409, json: { detail: 'Program revision conflict' } });
+      revision += 1;
+      return route.fulfill({ json: { current_revision_number: revision } });
+    });
+    await tab.goto('/app?section=programs&view=manage&panel=operations');
+    await tab.getByText('Периодизация и будущие недели').click();
+    const panel = tab.getByRole('region', { name: 'Периодизация назначения' });
+    await expect(panel.getByText(/Неделя 3 · исходная 1/)).toBeVisible();
+    await panel.getByRole('combobox', { name: 'Новый тип недели' }).selectOption(weekType);
+    await panel.getByRole('button', { name: 'Проверить изменения' }).click();
+    return panel;
+  };
+  const first = await setup(page, 'light');
+  const other = await context.newPage();
+  const second = await setup(other, 'medium');
+
+  const firstRefresh = page.waitForResponse((response) =>
+    response.url().endsWith('/programs/assigned/77/lifecycle'),
+  );
+  await first.getByRole('button', { name: 'Применить изменения' }).click();
+  await firstRefresh;
+  await expect.poll(() => revision).toBe(5);
+  await second.getByRole('button', { name: 'Применить изменения' }).click();
+  await expect(second.getByRole('alert')).toContainText('План уже изменился');
+  await second.getByRole('button', { name: 'Обновить план' }).click();
+  await expect(second.getByRole('combobox', { name: 'Новый тип недели' })).toHaveValue('medium');
+  await second.getByRole('button', { name: 'Проверить изменения' }).click();
+  const secondRefresh = other.waitForResponse((response) =>
+    response.url().endsWith('/programs/assigned/77/lifecycle'),
+  );
+  await second.getByRole('button', { name: 'Применить изменения' }).click();
+  await secondRefresh;
+  await expect.poll(() => revision).toBe(6);
+  expect(attempts).toEqual([
+    { revision: 4, weekType: 'light', weeks: [3] },
+    { revision: 4, weekType: 'medium', weeks: [3] },
+    { revision: 5, weekType: 'medium', weeks: [3] },
+  ]);
+});

@@ -21,7 +21,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutSet,
 )
-from fitminiapp_api.models.user import User
+from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.program import (
     CoachProgramExerciseCreate,
     ProgramCycleDisableRequest,
@@ -433,6 +433,213 @@ def test_two_scoped_edits_with_same_revision_have_one_winner(client):
             row.exercises[0].prescribed_sets
             == overrides[0].changed_fields["occurrence_override"]["exercise"]["prescribed_sets"]
         )
+    _assert_facts_unchanged(facts)
+
+
+def test_concurrent_live_set_targets_preserve_both_plans(client):
+    from test_program_cycle_domain import assigned_cycle
+
+    headers, program_id, _, _ = assigned_cycle(client)
+    with get_session_context() as db:
+        workout = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=1).one()
+        workout_id = workout.id
+    started = client.post(f"/api/v1/workouts/{workout_id}/start", headers=headers)
+    assert started.status_code == 200, started.text
+    sets = started.json()["exercises"][0]["sets"]
+    barrier = Barrier(2)
+
+    def change(index):
+        barrier.wait(timeout=10)
+        return client.patch(
+            f"/api/v1/workouts/sets/{sets[index]['id']}",
+            headers=headers,
+            json={
+                "expected_version": sets[index]["version"],
+                "mutation_id": f"920-concurrent-live-target-{index}",
+                "planned_target": {"weight_kg": 30 + index, "reps": 8 + index, "confirmed": True},
+            },
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(change, (0, 1)))
+    assert [response.status_code for response in responses] == [200, 200]
+    with get_session_context() as db:
+        workout = db.get(UserWorkout, workout_id)
+        exercise = workout.exercises[0]
+        assert [
+            segment["load_target"]["value"] for segment in exercise.prescription["segments"]
+        ] == [30, 31]
+        assert [
+            segment["rep_target"]["value"] for segment in exercise.prescription["segments"]
+        ] == [8, 9]
+        assert all(
+            item.actual_weight is None and item.actual_reps is None for item in exercise.sets
+        )
+
+
+def test_concurrent_completion_and_live_plan_have_one_winner(client):
+    from test_program_cycle_domain import assigned_cycle
+
+    headers, program_id, _, _ = assigned_cycle(client)
+    with get_session_context() as db:
+        workout = db.query(UserWorkout).filter_by(user_program_id=program_id, week_number=1).one()
+        workout_id = workout.id
+    started = client.post(f"/api/v1/workouts/{workout_id}/start", headers=headers).json()
+    item = started["exercises"][0]["sets"][0]
+    path = f"/api/v1/workouts/sets/{item['id']}"
+    fact = {
+        "expected_version": item["version"],
+        "mutation_id": "920-concurrent-completed-fact",
+        "actual_weight": 42.5,
+        "actual_reps": 8,
+        "rir": "2",
+        "is_completed": True,
+    }
+    planned = {
+        "expected_version": item["version"],
+        "mutation_id": "920-concurrent-planned-target",
+        "planned_target": {"weight_kg": 37.5, "reps": 9, "confirmed": True},
+    }
+    barrier = Barrier(2)
+
+    def send(body):
+        barrier.wait(timeout=10)
+        return client.patch(path, headers=headers, json=body)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        logged, changed = list(executor.map(send, (fact, planned)))
+    assert sorted([logged.status_code, changed.status_code]) == [200, 409]
+    if changed.status_code == 200:
+        assert logged.json()["detail"]["code"] == "workout_set_plan_conflict"
+        logged = client.patch(
+            path, headers=headers, json={**fact, "expected_version": changed.json()["version"]}
+        )
+        assert logged.status_code == 200, logged.text
+    with get_session_context() as db:
+        workout = db.get(UserWorkout, workout_id)
+        recorded = workout.exercises[0].sets[0]
+        assert (
+            recorded.id,
+            recorded.actual_weight,
+            recorded.actual_reps,
+            recorded.rir,
+            recorded.is_completed,
+        ) == (item["id"], 42.5, 8, "2", True)
+
+
+def test_start_and_swap_days_serialize_without_changing_started_workout(client):
+    from test_program_cycle_domain import assigned_cycle
+
+    headers, program_id, _, _ = assigned_cycle(client, k=3, n=16, days=2)
+    with get_session_context() as db:
+        first = (
+            db.query(UserWorkout)
+            .filter_by(user_program_id=program_id, week_number=1, day_number=1)
+            .one()
+        )
+        second = (
+            db.query(UserWorkout)
+            .filter_by(user_program_id=program_id, week_number=1, day_number=2)
+            .one()
+        )
+        first_id, first_date, second_date = first.id, first.scheduled_date, second.scheduled_date
+        set_ids = [item.id for item in first.exercises[0].sets]
+    barrier = Barrier(2)
+
+    def run(operation):
+        barrier.wait(timeout=10)
+        if operation == "start":
+            return client.post(f"/api/v1/workouts/{first_id}/start", headers=headers)
+        return client.patch(
+            f"/api/v1/programs/assigned/{program_id}/cycle",
+            headers=headers,
+            json={
+                "expected_revision_number": 1,
+                "effective_from_week": 1,
+                "swap_day_number": 1,
+                "swap_with_day_number": 2,
+            },
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        start, swap = list(executor.map(run, ("start", "swap")))
+    assert swap.status_code == 200, swap.text
+    assert start.status_code in {200, 409}, start.text
+    with get_session_context() as db:
+        workout = db.get(UserWorkout, first_id)
+        assert [item.id for item in workout.exercises[0].sets] == set_ids
+        if start.status_code == 200:
+            assert workout.status == "in_progress"
+            assert workout.scheduled_date == first_date
+        else:
+            assert workout.status == "planned"
+            assert workout.scheduled_date == second_date
+
+
+@pytest.mark.parametrize("actor_kind", ["athlete", "coach"])
+def test_cycle_edit_fails_closed_during_coaching_transition(client, actor_kind):
+    facts = _assigned_cycle_with_completed_facts(client)
+    athlete_login = client.post("/api/v1/auth/dev-login", json={"telegram_user_id": 916190})
+    assert athlete_login.status_code == 200, athlete_login.text
+    coach_login = client.post(
+        "/api/v1/auth/dev-login", json={"telegram_user_id": 916191, "is_coach": True}
+    )
+    assert coach_login.status_code == 200, coach_login.text
+    with get_session_context() as db:
+        coach = db.query(User).filter_by(telegram_user_id=916191).one()
+        coach_id = coach.id
+        db.get(UserProgram, facts["program_id"]).assigned_by_user_id = coach_id
+        relation = CoachClient(
+            coach_user_id=coach_id,
+            client_user_id=facts["owner_id"],
+            status="ended" if actor_kind == "athlete" else "active",
+        )
+        db.add(relation)
+        db.flush()
+        relation_id = relation.id
+
+    token = (
+        athlete_login.json()["access_token"]
+        if actor_kind == "athlete"
+        else coach_login.json()["access_token"]
+    )
+
+    def edit():
+        return client.post(
+            f"/api/v1/programs/assigned/{facts['program_id']}/exercises",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "expected_revision_number": facts["version"],
+                "effective_scope": "future_program",
+                "occurrence_weeks": [10],
+                "day_number": 1,
+                "target_template_exercise_id": facts["slot_id"],
+                "exercise_id": facts["exercise_id"],
+                "prescribed_sets": 3,
+                "prescribed_reps": "12",
+                "rest_seconds": 90,
+            },
+        )
+
+    blocker = SessionLocal()
+    try:
+        if actor_kind == "athlete":
+            blocker.query(User).filter_by(id=facts["owner_id"]).with_for_update().one()
+        else:
+            blocker.query(CoachClient).filter_by(id=relation_id).with_for_update().one()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(edit)
+            try:
+                result = future.result(timeout=8)
+            finally:
+                blocker.rollback()
+        assert result.status_code == 409, result.text
+    finally:
+        blocker.close()
+    with get_session_context() as db:
+        assert db.get(UserProgram, facts["program_id"]).current_revision_number == facts["version"]
+    retried = edit()
+    assert retried.status_code == 200, retried.text
     _assert_facts_unchanged(facts)
 
 

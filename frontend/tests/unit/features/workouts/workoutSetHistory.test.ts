@@ -78,6 +78,23 @@ function pending(
 }
 
 describe('per-set history bindings', () => {
+  it('matches assignment slots only when the stable identity agrees', () => {
+    const slot = 'b714c414-58ee-4aad-a214-fd21d5ef2f30';
+    const added = {
+      ...exercise,
+      source_template_exercise_id: null,
+      source_assignment_slot_id: slot,
+    };
+    const result = history();
+    result.sets[0]!.source_template_exercise_id = null;
+    result.sets[0]!.source_assignment_slot_id = slot;
+    expect(boundSetHistory(result, 42, added, added.sets[2]!)?.history_status).toBe('matched');
+    result.sets[0]!.source_assignment_slot_id = 'b714c414-58ee-4aad-a214-fd21d5ef2f31';
+    expect(boundSetHistory(result, 42, added, added.sets[2]!)).toBeUndefined();
+    result.sets[0]!.source_assignment_slot_id = null;
+    expect(boundSetHistory(result, 42, added, added.sets[2]!)).toBeUndefined();
+  });
+
   it('accepts explicit asymmetric or partial side facts without scalar values', () => {
     const result = history();
     const past = result.sets[0]!.previous_workout!;

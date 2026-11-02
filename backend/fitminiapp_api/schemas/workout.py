@@ -192,6 +192,21 @@ class WorkoutSetCreate(BaseModel):
     is_completed: bool = True
 
 
+class WorkoutSetPlannedTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    weight_kg: Decimal = Field(ge=0, max_digits=10, decimal_places=2, allow_inf_nan=False)
+    reps: int = Field(ge=1, le=1_000, strict=True)
+    confirmed: bool = Field(strict=True)
+
+    @field_validator("confirmed")
+    @classmethod
+    def require_confirmation(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Подтвердите изменение плана подхода")
+        return value
+
+
 class WorkoutSetUpdate(BaseModel):
     actual_reps: int | None = Field(default=None, ge=0)
     actual_weight: Decimal | None = Field(
@@ -212,6 +227,7 @@ class WorkoutSetUpdate(BaseModel):
     first_side: WorkoutSide | None = None
     sides: WorkoutSideFacts | None = None
     confirm_mode_change: bool = False
+    planned_target: WorkoutSetPlannedTarget | None = None
     expected_version: int | None = Field(default=None, ge=1)
     mutation_id: str | None = Field(default=None, min_length=16, max_length=64)
 
@@ -219,6 +235,11 @@ class WorkoutSetUpdate(BaseModel):
     def validate_offline_sync_fields(self):
         if (self.expected_version is None) != (self.mutation_id is None):
             raise ValueError("expected_version и mutation_id должны передаваться вместе")
+        if "planned_target" in self.model_fields_set:
+            if self.planned_target is None or self.expected_version is None:
+                raise ValueError("Для изменения плана нужны подтверждение и версия подхода")
+            if self.model_fields_set - {"planned_target", "expected_version", "mutation_id"}:
+                raise ValueError("План подхода нельзя изменять вместе с результатами")
         uses_side_contract = (
             self.execution_mode in {"per_side", "alternating"} or self.confirm_mode_change
         )
@@ -285,6 +306,7 @@ class WorkoutSetHistoryItem(BaseModel):
     workout_exercise_id: int
     exercise_id: int
     source_template_exercise_id: int | None
+    source_assignment_slot_id: str | None = None
     previous_today: WorkoutSetResult | None = None
     previous_workout: WorkoutSetPastResult | None = None
     history_status: Literal[
@@ -463,6 +485,7 @@ class WorkoutExerciseItem(BaseModel):
     superset_order: int | None = None
     prescription: ExercisePrescriptionPlan | None = None
     source_template_exercise_id: int | None = None
+    source_assignment_slot_id: str | None = None
     source_weekly_prescription_id: int | None = None
     group_id: int | None = None
     group_kind: PrescriptionGroupKind | None = None

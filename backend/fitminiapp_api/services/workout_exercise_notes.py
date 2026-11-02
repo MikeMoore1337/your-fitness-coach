@@ -48,6 +48,11 @@ def _identity(workout: UserWorkout, exercise: UserWorkoutExercise) -> dict:
     return {
         "exercise_id": exercise.exercise_id,
         "source_template_exercise_id": exercise.source_template_exercise_id,
+        **(
+            {"source_assignment_slot_id": exercise.source_assignment_slot_id}
+            if exercise.source_assignment_slot_id is not None
+            else {}
+        ),
         "plan_revision_number": workout.plan_revision_number,
         "week_number": workout.week_number,
         "day_number": workout.day_number,
@@ -127,9 +132,14 @@ def _previous(
     workout: UserWorkout,
     exercise: UserWorkoutExercise,
 ) -> dict | None:
-    slot = exercise.source_template_exercise_id
-    if slot is None or workout.plan_materialized is False:
+    template_slot = exercise.source_template_exercise_id
+    assignment_slot = exercise.source_assignment_slot_id
+    if (template_slot is None) == (assignment_slot is None) or workout.plan_materialized is False:
         return None
+    slot_filter = {
+        "source_template_exercise_id": template_slot,
+        "source_assignment_slot_id": assignment_slot,
+    }
     if (
         workout.status == "planned"
         and workout.source_cycle_week is not None
@@ -137,9 +147,7 @@ def _previous(
     ):
         return None
     current_slot_count = (
-        db.query(UserWorkoutExercise.id)
-        .filter_by(workout_id=workout.id, source_template_exercise_id=slot)
-        .count()
+        db.query(UserWorkoutExercise.id).filter_by(workout_id=workout.id, **slot_filter).count()
     )
     if current_slot_count != 1:
         return None
@@ -170,9 +178,27 @@ def _previous(
             UserWorkout.status == "completed",
             UserWorkout.day_number == workout.day_number,
             WorkoutExerciseNote.exercise_id == exercise.exercise_id,
-            WorkoutExerciseNote.source_template_exercise_id == slot,
+            (
+                WorkoutExerciseNote.source_template_exercise_id == template_slot
+                if template_slot is not None
+                else WorkoutExerciseNote.source_assignment_slot_id == assignment_slot
+            ),
+            (
+                WorkoutExerciseNote.source_assignment_slot_id.is_(None)
+                if template_slot is not None
+                else WorkoutExerciseNote.source_template_exercise_id.is_(None)
+            ),
             UserWorkoutExercise.exercise_id == exercise.exercise_id,
-            UserWorkoutExercise.source_template_exercise_id == slot,
+            (
+                UserWorkoutExercise.source_template_exercise_id == template_slot
+                if template_slot is not None
+                else UserWorkoutExercise.source_assignment_slot_id == assignment_slot
+            ),
+            (
+                UserWorkoutExercise.source_assignment_slot_id.is_(None)
+                if template_slot is not None
+                else UserWorkoutExercise.source_template_exercise_id.is_(None)
+            ),
         )
         .all()
     )
@@ -212,9 +238,7 @@ def _previous(
         if source.plan_materialized is False:
             return None
         source_count = (
-            db.query(UserWorkoutExercise.id)
-            .filter_by(workout_id=source.id, source_template_exercise_id=slot)
-            .count()
+            db.query(UserWorkoutExercise.id).filter_by(workout_id=source.id, **slot_filter).count()
         )
         if source_count != 1:
             return None
@@ -514,6 +538,7 @@ def write_exercise_note(
             exercise_id=exercise.exercise_id,
             context_key=_context_key(workout, exercise),
             source_template_exercise_id=exercise.source_template_exercise_id,
+            source_assignment_slot_id=exercise.source_assignment_slot_id,
             plan_revision_number=workout.plan_revision_number,
             week_type=_week_type(db, program, workout),
             body=None,

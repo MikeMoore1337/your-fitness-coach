@@ -35,6 +35,7 @@ from fitminiapp_api.services.program_versioning import (
     workout_cycle_week_type,
 )
 from fitminiapp_api.services.workout_metrics import (
+    exercise_slot_identity,
     validate_workout_set_changes,
     workout_exercise_metric_type,
 )
@@ -674,6 +675,7 @@ def _snapshot_matches_target(
             if isinstance(item, dict)
             and item.get("exercise_id") == exercise.exercise_id
             and item.get("source_template_exercise_id") == exercise.source_template_exercise_id
+            and item.get("source_assignment_slot_id") == exercise.source_assignment_slot_id
             and item.get("sort_order") == exercise.sort_order
         ),
         None,
@@ -745,7 +747,7 @@ def _matches_cycle_plan(
         if (
             workout.plan_revision_number is None
             or workout.week_number is None
-            or exercise.source_template_exercise_id is None
+            or exercise_slot_identity(exercise) is None
         ):
             return False
         available = [
@@ -759,6 +761,7 @@ def _matches_cycle_plan(
             item
             for item in matching_plans[0]["exercises"]
             if item.get("source_template_exercise_id") == exercise.source_template_exercise_id
+            and item.get("source_assignment_slot_id") == exercise.source_assignment_slot_id
             and item.get("sort_order") == exercise.sort_order
             and item.get("exercise_id") == exercise.exercise_id
         ]
@@ -1619,7 +1622,7 @@ def build_progression_guidance(
                 if typed_context and (
                     item.workout.day_number != workout.day_number
                     or item.sort_order != current.sort_order
-                    or item.source_template_exercise_id != current.source_template_exercise_id
+                    or exercise_slot_identity(item) != exercise_slot_identity(current)
                 ):
                     continue
                 if item.workout.completed_at is None:
@@ -1680,7 +1683,7 @@ def build_progression_guidance(
                     != revision_number
                 ):
                     continue
-                if item.source_template_exercise_id != current.source_template_exercise_id:
+                if exercise_slot_identity(item) != exercise_slot_identity(current):
                     continue
                 if _selection_signature(item) != _selection_signature(current):
                     if typed_context:

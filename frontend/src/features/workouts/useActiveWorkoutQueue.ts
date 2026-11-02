@@ -29,6 +29,7 @@ interface ConflictDetail {
   code?: unknown;
   message?: unknown;
   current?: unknown;
+  current_plan?: unknown;
 }
 
 interface SideConflict {
@@ -36,6 +37,15 @@ interface SideConflict {
   mutationIds: string[];
   local: ActiveWorkoutSetValues;
   server: WorkoutStatus;
+}
+
+interface PlanConflict {
+  setId: number;
+  mutationIds: string[];
+  local: ActiveWorkoutSetValues;
+  server: WorkoutStatus;
+  plan: unknown;
+  planChanged: boolean;
 }
 
 function hasSideMode(mode: WorkoutStatus['execution_mode']): boolean {
@@ -112,6 +122,8 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const [message, setMessage] = useState<string | null>(null);
   const [sideConflict, setSideConflict] = useState<SideConflict | null>(null);
   const sideConflictRef = useRef<SideConflict | null>(null);
+  const [planConflict, setPlanConflict] = useState<PlanConflict | null>(null);
+  const planConflictRef = useRef<PlanConflict | null>(null);
   const inFlightId = useRef<string | null>(null);
   const flushPromise = useRef<Promise<boolean> | null>(null);
   const enqueuePromise = useRef<Promise<void> | null>(null);
@@ -184,7 +196,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   }, [persistSnapshotWithLock]);
 
   const runQueue = useCallback(async (): Promise<boolean> => {
-    if (sideConflictRef.current) return false;
+    if (sideConflictRef.current || planConflictRef.current) return false;
     if (!userId || !workoutId || !navigator.onLine) {
       setSyncState('offline');
       setMessage(
@@ -245,6 +257,37 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
         if (reason instanceof ApiError && reason.status === 409) {
           const detail = conflictDetail(reason);
           const current = detail?.current;
+          if (
+            validWorkoutStatus(current) &&
+            (detail?.code === 'workout_set_plan_conflict' ||
+              (detail?.code === 'workout_set_version_conflict' &&
+                current.is_completed &&
+                !hasSideMode(pending.values.execution_mode) &&
+                !hasSideMode(current.execution_mode)))
+          ) {
+            await updateCachedSet(queryClient, current);
+            const fresh = readFresh();
+            const local = latestMutationForSet(fresh, pending.set_id) ?? pending;
+            const conflict = {
+              setId: pending.set_id,
+              mutationIds: fresh.queue
+                .filter((item) => item.set_id === pending.set_id)
+                .map((item) => item.mutation_id),
+              local: local.values,
+              server: current,
+              plan: detail.current_plan,
+              planChanged: detail.code === 'workout_set_plan_conflict',
+            };
+            planConflictRef.current = conflict;
+            setPlanConflict(conflict);
+            setSyncState('conflict');
+            setMessage(
+              conflict.planChanged
+                ? 'План подхода изменился. Проверьте план и сохранённый результат.'
+                : 'Подход уже выполнен в другой вкладке. Локальный результат сохранён.',
+            );
+            return false;
+          }
           if (
             [
               'workout_set_version_conflict',
@@ -408,6 +451,41 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     [flushNow, lockName, persist, readFresh, userId, workoutId],
   );
 
+  const changePlannedTarget = useCallback(
+    async (
+      setId: number,
+      expectedVersion: number,
+      mutationId: string,
+      target: { weight_kg: number; reps: number; confirmed: true },
+    ) => {
+      if (!userId || !workoutId || !lockName || !navigator.onLine)
+        throw new Error('Дождитесь подключения и синхронизации тренировки.');
+      if (enqueuePromise.current) await enqueuePromise.current;
+      await crossContextCoordinator.run(lockName, async () => {
+        const fresh = readFresh();
+        if (
+          !navigator.onLine ||
+          fresh.queue.length > 0 ||
+          sideConflictRef.current ||
+          planConflictRef.current ||
+          !persist(fresh, true)
+        )
+          throw new Error('Сначала синхронизируйте сохранённые результаты тренировки.');
+        const saved = await api<WorkoutStatus>(`/api/v1/workouts/sets/${setId}`, {
+          method: 'PATCH',
+          body: {
+            expected_version: expectedVersion,
+            mutation_id: mutationId,
+            planned_target: target,
+          },
+        });
+        await updateCachedSet(queryClient, saved);
+      });
+      await queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true });
+    },
+    [lockName, persist, queryClient, readFresh, userId, workoutId],
+  );
+
   const clear = useCallback(async () => {
     if (!userId || !workoutId || !lockName) return;
     await crossContextCoordinator.run(lockName, () => {
@@ -431,6 +509,8 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       setMessage(null);
       sideConflictRef.current = null;
       setSideConflict(null);
+      planConflictRef.current = null;
+      setPlanConflict(null);
     });
   }, [lockName, readFresh, userId, workoutId]);
 
@@ -483,6 +563,59 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     },
     [flushNow, lockName, persist, readFresh, userId, workoutId],
   );
+
+  const resolvePlanConflict = useCallback(async () => {
+    const conflict = planConflictRef.current;
+    if (!conflict || !lockName) return false;
+    if (
+      conflict.server.is_completed ||
+      Object.values(conflict.server.sides ?? {}).some((side) => side?.is_completed)
+    ) {
+      setMessage(
+        'Подход уже выполнен в другой вкладке. Локальный результат сохранён для проверки.',
+      );
+      return false;
+    }
+    const resolved = await crossContextCoordinator.run(lockName, () => {
+      const fresh = readFresh();
+      const mutations = fresh.queue.filter((item) => item.set_id === conflict.setId);
+      if (mutations.map((item) => item.mutation_id).join(',') !== conflict.mutationIds.join(',')) {
+        const latest = mutations.at(-1);
+        if (latest) {
+          const updated = {
+            ...conflict,
+            local: latest.values,
+            mutationIds: mutations.map((item) => item.mutation_id),
+          };
+          planConflictRef.current = updated;
+          setPlanConflict(updated);
+        }
+        setMessage('Локальная версия изменилась. Проверьте её ещё раз.');
+        return false;
+      }
+      const first = mutations[0];
+      if (!first) return false;
+      const next = {
+        ...fresh,
+        queue: fresh.queue.map((item) =>
+          item.mutation_id === first.mutation_id
+            ? { ...item, expected_version: conflict.server.version }
+            : item,
+        ),
+      };
+      if (!persist(next, true)) {
+        setMessage('Не удалось сохранить выбор на устройстве. Результат сохранён в памяти.');
+        return false;
+      }
+      planConflictRef.current = null;
+      setPlanConflict(null);
+      setSyncState('pending');
+      setMessage(null);
+      return true;
+    });
+    if (resolved) void flushNow();
+    return resolved;
+  }, [flushNow, lockName, persist, readFresh]);
 
   useEffect(() => {
     if (
@@ -555,6 +688,9 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     message,
     sideConflict,
     resolveSideConflict,
+    planConflict,
+    resolvePlanConflict,
+    changePlannedTarget,
     enqueue,
     flushNow,
     clear,
