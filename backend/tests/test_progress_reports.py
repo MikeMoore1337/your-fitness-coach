@@ -56,10 +56,15 @@ def _user_id(telegram_user_id: int) -> int:
 
 
 def _seed_report_data(
-    user_id: int, *, as_of: date | None = None, completed_on: date | None = None
+    user_id: int, *, as_of: date | None = None, align_month: bool = False
 ) -> None:
     today = as_of or today_msk()
-    workout_day = completed_on if completed_on is not None else today - timedelta(days=4)
+    completed_day = today - timedelta(days=4)
+    diary_day = today - timedelta(days=1)
+    if align_month:
+        month_start = today.replace(day=1)
+        completed_day = max(completed_day, month_start)
+        diary_day = max(diary_day, month_start)
     with get_session_context() as db:
         user = db.get(User, user_id)
         assert user is not None and user.profile is not None
@@ -78,12 +83,12 @@ def _seed_report_data(
         exercise_id = db.query(Exercise.id).order_by(Exercise.id).limit(1).scalar()
         completed = UserWorkout(
             user_program_id=program.id,
-            scheduled_date=workout_day,
+            scheduled_date=completed_day,
             day_number=1,
             week_number=4,
             title="Силовая тренировка",
             status="completed",
-            completed_at=datetime.combine(workout_day, datetime.min.time()),
+            completed_at=datetime.combine(completed_day, datetime.min.time()),
         )
         skipped = UserWorkout(
             user_program_id=program.id,
@@ -141,7 +146,7 @@ def _seed_report_data(
                 ),
                 FoodDiaryEntry(
                     user_id=user_id,
-                    diary_date=today - timedelta(days=1),
+                    diary_date=diary_day,
                     meal_type="dinner",
                     amount=Decimal("1000"),
                     amount_unit="g",
@@ -154,14 +159,14 @@ def _seed_report_data(
                 ),
                 FoodDiaryDayStatus(
                     user_id=user_id,
-                    diary_date=today - timedelta(days=1),
+                    diary_date=diary_day,
                     status="complete",
                 ),
                 WeeklyCheckIn(
                     user_id=user_id,
                     week_start=today - timedelta(days=6),
                     week_end=today,
-                    submitted_on=today - timedelta(days=1),
+                    submitted_on=diary_day,
                     timezone="Europe/Moscow",
                     status="completed",
                     summary_version="weekly-check-in-summary-v1",
@@ -694,15 +699,11 @@ def test_progress_report_periods_share_one_inclusive_canonical_range(
     expected_days: int | None,
 ) -> None:
     headers = _auth(client, 67_500 + list(NutritionReportPeriod).index(period))
-    today = today_msk()
-    # In the first four days of a month, the default workout day (today - 4)
-    # belongs to the previous month. Seed one completed session within the
-    # requested calendar month without changing other report-period fixtures.
     _seed_report_data(
         _user_id(67_500 + list(NutritionReportPeriod).index(period)),
-        as_of=today,
-        completed_on=today if period == NutritionReportPeriod.CURRENT_MONTH else None,
+        align_month=period == NutritionReportPeriod.CURRENT_MONTH,
     )
+    today = today_msk()
     params: dict[str, str] = {"period": period.value}
     if period == NutritionReportPeriod.CUSTOM:
         params.update(
@@ -754,7 +755,10 @@ def test_progress_report_pdf_keeps_api_numbers_and_excludes_screen_controls(
 ) -> None:
     telegram_user_id = 67_700 + list(NutritionReportPeriod).index(period)
     headers = _auth(client, telegram_user_id)
-    _seed_report_data(_user_id(telegram_user_id))
+    _seed_report_data(
+        _user_id(telegram_user_id),
+        align_month=period == NutritionReportPeriod.CURRENT_MONTH,
+    )
     today = today_msk()
     params: dict[str, str] = {"period": period.value}
     if period == NutritionReportPeriod.CUSTOM:
