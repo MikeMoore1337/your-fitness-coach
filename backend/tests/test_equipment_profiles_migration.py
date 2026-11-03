@@ -1,5 +1,7 @@
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -54,23 +56,81 @@ def sqlite_connection():
         engine.dispose()
 
 
-def test_sqlite_downgrade_refuses_even_when_all_new_columns_are_empty(sqlite_connection):
+def test_sqlite_downgrade_removes_empty_columns(sqlite_connection):
     connection = sqlite_connection
     connection.exec_driver_sql("CREATE TABLE user_profiles (id INTEGER PRIMARY KEY)")
     migration = _migration(connection)
     migration.upgrade()
     connection.exec_driver_sql("INSERT INTO user_profiles (id) VALUES (1)")
 
-    with pytest.raises(RuntimeError, match="requires PostgreSQL"):
-        migration.downgrade()
+    migration.downgrade()
 
     assert connection.exec_driver_sql("SELECT id FROM user_profiles").scalar_one() == 1
     assert {column["name"] for column in sa.inspect(connection).get_columns("user_profiles")} == {
-        "id",
-        "equipment_profiles",
-        "active_equipment_profile_id",
-        "equipment_profiles_revision",
+        "id"
     }
+
+
+def test_sqlite_downgrade_locks_out_writer_after_check(tmp_path):
+    engine = sa.create_engine(
+        f"sqlite:///{(tmp_path / 'equipment.db').as_posix()}", connect_args={"timeout": 0.2}
+    )
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql("CREATE TABLE user_profiles (id INTEGER PRIMARY KEY)")
+            _migration(connection).upgrade()
+            connection.exec_driver_sql("INSERT INTO user_profiles (id) VALUES (1)")
+
+        def writer():
+            try:
+                with engine.begin() as connection:
+                    connection.exec_driver_sql(
+                        "UPDATE user_profiles SET equipment_profiles_revision=1 WHERE id=1"
+                    )
+                return "committed"
+            except sa.exc.OperationalError:
+                return "blocked"
+
+        outcomes = []
+        with ThreadPoolExecutor(max_workers=1) as executor, engine.begin() as connection:
+            migration = _migration(connection)
+            drop_column = migration.op.drop_column
+
+            def interleaved_drop(*args, **kwargs):
+                if not outcomes:
+                    outcomes.append(executor.submit(writer).result(timeout=5))
+                return drop_column(*args, **kwargs)
+
+            migration.op.drop_column = interleaved_drop
+            migration.downgrade()
+
+        assert outcomes == ["blocked"]
+    finally:
+        engine.dispose()
+
+
+def test_sqlite_downgrade_refuses_autocommit():
+    engine = sa.create_engine("sqlite:///:memory:", isolation_level="AUTOCOMMIT")
+    try:
+        with engine.connect() as connection:
+            connection.exec_driver_sql("CREATE TABLE user_profiles (id INTEGER PRIMARY KEY)")
+            migration = _migration(connection)
+            migration.upgrade()
+            connection.exec_driver_sql("INSERT INTO user_profiles (id) VALUES (1)")
+            with pytest.raises(RuntimeError, match="requires a transaction"):
+                migration.downgrade()
+            assert "equipment_profiles" in {
+                column["name"] for column in sa.inspect(connection).get_columns("user_profiles")
+            }
+    finally:
+        engine.dispose()
+
+
+def test_downgrade_refuses_an_unsupported_database(sqlite_connection):
+    migration = _migration(sqlite_connection)
+    migration.op.get_bind = lambda: SimpleNamespace(dialect=SimpleNamespace(name="unknown"))
+    with pytest.raises(RuntimeError, match="locking is unsupported"):
+        migration.downgrade()
 
 
 @pytest.fixture
