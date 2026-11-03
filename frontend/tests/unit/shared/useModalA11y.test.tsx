@@ -16,6 +16,16 @@ function Modal({ name, onClose }: { name: string; onClose: () => void }) {
   );
 }
 
+function ParentModal() {
+  const ref = useModalA11y<HTMLDivElement>(true, () => undefined, '[data-initial]');
+  return (
+    <div ref={ref} role="dialog" aria-label="Родительское окно" tabIndex={-1}>
+      <button data-initial>Первое действие</button>
+      <button>Открыть подтверждение</button>
+    </div>
+  );
+}
+
 describe('useDocumentScrollLock', () => {
   afterEach(() => {
     cleanup();
@@ -74,5 +84,71 @@ describe('useDocumentScrollLock', () => {
     expect(document.body.style.position).toBe('fixed');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(parentClose).toHaveBeenCalledOnce();
+  });
+
+  it('does not let a delayed parent frame steal focus from a nested dialog', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const view = render(<ParentModal />);
+    screen.getByRole('button', { name: 'Открыть подтверждение' }).focus();
+    view.rerender(
+      <>
+        <ParentModal />
+        <Modal name="Подтверждение" onClose={() => undefined} />
+      </>,
+    );
+    const child = screen.getByRole('button', { name: 'Подтверждение' });
+    child.focus();
+
+    frames[0]!(0);
+
+    expect(child).toHaveFocus();
+  });
+
+  it('moves focus to the preferred control when a dialog first opens', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const view = render(<button>Внешнее действие</button>);
+    screen.getByRole('button', { name: 'Внешнее действие' }).focus();
+    view.rerender(
+      <>
+        <button>Внешнее действие</button>
+        <ParentModal />
+      </>,
+    );
+
+    frames[0]!(0);
+
+    expect(screen.getByRole('button', { name: 'Первое действие' })).toHaveFocus();
+  });
+
+  it('keeps the restored trigger when the initial parent frame runs late', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const view = render(<ParentModal />);
+    const trigger = screen.getByRole('button', { name: 'Открыть подтверждение' });
+    trigger.focus();
+    view.rerender(
+      <>
+        <ParentModal />
+        <Modal name="Подтверждение" onClose={() => undefined} />
+      </>,
+    );
+    screen.getByRole('button', { name: 'Подтверждение' }).focus();
+    view.rerender(<ParentModal />);
+    expect(trigger).toHaveFocus();
+
+    frames[0]!(0);
+
+    expect(trigger).toHaveFocus();
   });
 });
