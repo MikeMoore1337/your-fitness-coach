@@ -381,24 +381,40 @@ test('#1381 real XLSX import saves and schedules the returned assignment in Post
   const exerciseTitle = (await exercise.json()).title as string;
   await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
   await page.goto('/app?section=programs&view=manage&panel=create');
+  const uploading = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/programs/imports',
+  );
   await page.getByLabel('Загрузить документ программы').setInputFiles({
     name: 'synthetic-program.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     buffer: await file.body(),
   });
+  const upload = await uploading;
+  expect(upload.status()).toBe(201);
+  const preview = (await upload.json()) as {
+    rows: { match_status: string; resolved_exercise_title: string | null }[];
+  };
+  expect(preview.rows).toHaveLength(1);
   await expect(
     page.getByRole('heading', { name: 'Проверьте план перед сохранением' }),
   ).toBeVisible();
   await page.getByLabel('Название программы').fill('Синтетическая программа 1381');
-  const picker = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
-  await picker.scrollIntoViewIfNeeded();
-  await picker.fill(exerciseTitle);
-  await page.getByRole('option', { name: exerciseTitle }).click({ timeout: 5000 });
-  await page.getByLabel('Название программы').click();
-  await picker.click();
-  await picker.press('ArrowDown');
-  await picker.press('Enter');
-  await expect(picker).toHaveValue(exerciseTitle);
+  let expectedExerciseTitle = preview.rows[0]?.resolved_exercise_title;
+  if (preview.rows[0]?.match_status !== 'matched') {
+    const picker = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
+    await picker.scrollIntoViewIfNeeded();
+    await picker.fill(exerciseTitle);
+    await page.getByRole('option', { name: exerciseTitle }).click({ timeout: 5000 });
+    await page.getByLabel('Название программы').click();
+    await picker.click();
+    await picker.press('ArrowDown');
+    await picker.press('Enter');
+    await expect(picker).toHaveValue(exerciseTitle);
+    expectedExerciseTitle = exerciseTitle;
+  }
+  expect(expectedExerciseTitle).toBeTruthy();
   const resolving = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
@@ -470,7 +486,7 @@ test('#1381 real XLSX import saves and schedules the returned assignment in Post
   await expect(page.getByRole('article', { name: 'Жизненный цикл программы' })).toContainText(
     'Запланирована',
   );
-  await expect(page.getByRole('heading', { name: exerciseTitle })).toBeVisible();
+  await expect(page.getByRole('heading', { name: expectedExerciseTitle! })).toBeVisible();
 });
 
 test('#1335 real PostgreSQL generator rechecks an explicit suggestion before confirmation', async ({

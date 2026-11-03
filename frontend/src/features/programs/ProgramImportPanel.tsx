@@ -39,6 +39,7 @@ type ImportResult = {
   assignedId?: number;
   scheduled?: boolean;
   startDate?: string;
+  notCurrent?: boolean;
   reason?: string;
   message?: string;
 };
@@ -659,10 +660,7 @@ export function ProgramImportPanel({
       assignedId: assigned.user_program_id,
       scheduled: assigned.status === 'scheduled',
       startDate: assigned.start_date,
-      reason:
-        assigned.status !== 'scheduled' && assigned.status !== 'active'
-          ? 'past_assignment'
-          : undefined,
+      notCurrent: assigned.status !== 'scheduled' && assigned.status !== 'active',
     });
     updateRecovery({ id, intent: 'assign' });
     void Promise.allSettled([
@@ -926,7 +924,7 @@ export function ProgramImportPanel({
             {result.kind === 'saved'
               ? 'Шаблон сохранён'
               : result.kind === 'assigned'
-                ? result.reason === 'past_assignment'
+                ? result.notCurrent
                   ? 'Назначение было создано'
                   : result.scheduled
                     ? 'Программа запланирована'
@@ -953,7 +951,7 @@ export function ProgramImportPanel({
               {result.kind === 'saved'
                 ? 'Программа доступна в личной библиотеке. Текущий план не изменился.'
                 : result.kind === 'assigned'
-                  ? result.reason === 'past_assignment'
+                  ? result.notCurrent
                     ? 'Назначение уже не является текущим. Проверьте программу в плане.'
                     : `${result.startDate ? `Начало: ${formatStartDate(result.startDate)}. ` : ''}${result.scheduled ? 'До этой даты программа будет запланирована.' : 'Тренировки доступны в разделе «План».'}`
                   : result.kind === 'partial'

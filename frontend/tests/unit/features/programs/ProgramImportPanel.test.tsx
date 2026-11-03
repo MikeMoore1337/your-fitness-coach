@@ -912,4 +912,37 @@ describe('личный импорт и назначение', () => {
     expect(assignRequests).toHaveLength(2);
     expect(assignRequests[1]).toEqual(assignRequests[0]);
   });
+
+  it('не называет архивное назначение активным при восстановлении', async () => {
+    sessionStorage.setItem(
+      'program-import-confirmation-v1',
+      JSON.stringify({ id: 'import-1', intent: 'assign' }),
+    );
+    vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === '/api/v1/programs/imports/import-1')
+        return new Response(
+          JSON.stringify({
+            ...ready,
+            status: 'confirmed',
+            confirmed_template_id: 501,
+            self_assigned_program_id: 804,
+          }),
+          { status: 200 },
+        );
+      if (path === '/api/v1/programs/templates/501')
+        return new Response(JSON.stringify(template), { status: 200 });
+      if (path === '/api/v1/programs/assigned/804/lifecycle')
+        return new Response(JSON.stringify({ status: 'archived', start_date: '2026-11-03' }), {
+          status: 200,
+        });
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    renderPersonal();
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить результат' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Назначение было создано' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Программа назначена' })).not.toBeInTheDocument();
+  });
 });
