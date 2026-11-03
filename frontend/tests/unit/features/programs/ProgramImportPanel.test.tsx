@@ -890,6 +890,28 @@ describe('личный импорт и назначение', () => {
     expect(assignRequests).toHaveLength(2);
   });
 
+  it('показывает ошибку проверки текущей программы и сохраняет предпросмотр', async () => {
+    const original = vi.mocked(globalThis.fetch).getMockImplementation();
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      if (String(input) === '/api/v1/programs/templates/mine') throw new TypeError('offline');
+      return original!(input, init);
+    });
+    renderPersonal();
+    await uploadReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и назначить' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Моя программа' })).getByRole('button', {
+        name: 'Сохранить и назначить',
+      }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Нет соединения с сервером');
+    expect(screen.queryByRole('dialog', { name: 'Моя программа' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Проверьте план перед сохранением' }),
+    ).toBeInTheDocument();
+    expect(confirmCount).toBe(0);
+  });
+
   it('после потери ответа и перезагрузки повторяет точный запрос без повторного сохранения', async () => {
     assignmentBehavior = 'network';
     renderPersonal();

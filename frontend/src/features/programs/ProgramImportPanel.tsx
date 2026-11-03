@@ -760,6 +760,7 @@ export function ProgramImportPanel({
         void queryClient.invalidateQueries({ queryKey: ['templates'] });
       } else {
         if (assignmentRequest) updateRecovery(null);
+        setAssignmentOpen(false);
         setError(reason instanceof Error ? reason.message : 'Не удалось проверить программу.');
       }
     } finally {
