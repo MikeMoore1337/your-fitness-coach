@@ -155,6 +155,7 @@ for (const surface of ['pwa', 'telegram'] as const) {
     if (surface === 'telegram') {
       await page.evaluate(() => {
         sessionStorage.setItem('audit_force_offline', '1');
+        sessionStorage.removeItem('fit_authenticated_user_id');
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
       });
       await other.evaluate(() =>

@@ -104,8 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const userIdRef = useRef<number | null>(null);
 
-  const clearCurrentUserData = useCallback(() => {
-    clearSensitiveUserScopedStorage();
+  const clearCurrentUserData = useCallback((preserveActiveWorkoutForUserId?: number) => {
+    clearSensitiveUserScopedStorage(preserveActiveWorkoutForUserId);
     userIdRef.current = null;
   }, []);
 
@@ -203,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const initData = telegram?.initData?.trim();
       if (!initData) throw new Error('Telegram не передал данные авторизации');
       await revokeWebPushSubscription().catch(() => undefined);
+      const previousToken = getAccessToken();
       const token = await api<{ access_token: string }>('/api/v1/auth/telegram/init', {
         method: 'POST',
         body: { init_data: initData },
@@ -212,9 +213,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { Authorization: `Bearer ${token.access_token}` },
         retryAuth: false,
       });
+      if (!Number.isSafeInteger(current.id) || current.id <= 0)
+        throw new Error('Не удалось подтвердить аккаунт Telegram');
       const previousUserId =
         userIdRef.current ?? Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
-      if (!previousUserId || previousUserId !== current.id) {
+      if (!previousUserId) {
+        let verifiedPreviousId: number | undefined;
+        if (previousToken) {
+          try {
+            const previous = await api<User>('/api/v1/me', {
+              headers: { Authorization: `Bearer ${previousToken}` },
+              retryAuth: false,
+            });
+            verifiedPreviousId = previous.id;
+          } catch {
+            // An unverified previous session must not retain private data.
+          }
+        }
+        clearCurrentUserData(verifiedPreviousId === current.id ? current.id : undefined);
+        setUser(null);
+        queryClient.clear();
+      } else if (previousUserId !== current.id) {
         clearCurrentUserData();
         setUser(null);
         queryClient.clear();

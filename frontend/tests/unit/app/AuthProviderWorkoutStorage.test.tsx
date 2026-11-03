@@ -223,6 +223,62 @@ describe('AuthProvider active workout cleanup', () => {
     expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
   });
 
+  it('сохраняет очередь только проверенного аккаунта, если вкладка потеряла его ID', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    saveActiveWorkoutSnapshot(8, { ...activeWorkout, id: 43 });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+    expect(loadCurrentActiveWorkoutSnapshot(8)).toBeUndefined();
+  });
+
+  it('не сохраняет очередь без подтверждения предыдущего токена', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    saveActiveWorkoutQueue(
+      enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      }),
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return new Response(authorization === 'Bearer initial-token' ? '{}' : '{"id":7}', {
+          status: authorization === 'Bearer initial-token' ? 401 : 200,
+        });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
   it('сохраняет подтверждённую offline-сессию при сетевой ошибке Telegram-входа', async () => {
     vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
     sessionStorage.setItem('fit_authenticated_user_id', '7');
