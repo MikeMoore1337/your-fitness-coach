@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -65,6 +66,7 @@ import { WorkoutRecovery } from './WorkoutRecovery';
 import { WorkoutSetPlanEditor } from './WorkoutSetPlanEditor';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
+import { ActiveWorkoutSyncContext } from './ActiveWorkoutSync';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { formatCalendarDate } from '../../shared/dateTime';
@@ -3174,7 +3176,12 @@ export function TodayWorkout({
     refetchOnReconnect: false,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
-  const activeSync = useActiveWorkoutQueue(user?.id, workout.data);
+  const sharedSync = useContext(ActiveWorkoutSyncContext);
+  const localSync = useActiveWorkoutQueue(
+    sharedSync ? undefined : user?.id,
+    sharedSync ? undefined : workout.data,
+  );
+  const activeSync = sharedSync ?? localSync;
   const online = useOnlineStatus();
   const historyEnabled = Boolean(
     user?.id &&

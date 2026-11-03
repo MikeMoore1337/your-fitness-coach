@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   USER_SCOPED_PERSISTENT_STORAGE_REGISTRY,
+  activeWorkoutPointerStorageKey,
+  activeWorkoutQueueStorageKey,
+  activeWorkoutRestStorageKey,
   clearSensitiveUserScopedStorage,
 } from '../../../src/shared/userScopedStorage';
 
@@ -33,5 +36,25 @@ describe('user-scoped browser storage registry', () => {
     expect(localStorage.getItem('app-theme')).toBe('dark');
     expect(localStorage.getItem('landing-theme')).toBe('light');
     expect(localStorage.getItem('fit_telegram_link_prompt_dismissed_7')).toBe('true');
+  });
+
+  it("retains only the verified user's scoped workout when explicitly requested", () => {
+    const kept = [
+      `${activeWorkoutQueueStorageKey(7, 42)}:v3`,
+      activeWorkoutPointerStorageKey(7),
+      activeWorkoutRestStorageKey(7, 42),
+    ];
+    const removed = [
+      `${activeWorkoutQueueStorageKey(70, 42)}:v3`,
+      activeWorkoutPointerStorageKey(8),
+      'fit_workout_pending_201',
+      'fit_profile_draft_7',
+    ];
+    for (const key of [...kept, ...removed]) localStorage.setItem(key, 'synthetic');
+
+    clearSensitiveUserScopedStorage(7);
+
+    for (const key of kept) expect(localStorage.getItem(key)).toBe('synthetic');
+    for (const key of removed) expect(localStorage.getItem(key)).toBeNull();
   });
 });

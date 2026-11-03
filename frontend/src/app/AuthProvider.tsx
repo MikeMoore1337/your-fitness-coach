@@ -104,20 +104,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const userIdRef = useRef<number | null>(null);
 
-  const clearCurrentUserData = useCallback(() => {
-    clearSensitiveUserScopedStorage();
+  const clearCurrentUserData = useCallback((preserveActiveWorkoutForUserId?: number) => {
+    clearSensitiveUserScopedStorage(preserveActiveWorkoutForUserId);
     userIdRef.current = null;
   }, []);
 
-  const acceptAuthenticatedUser = useCallback((current: User) => {
-    const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
-    const previousUserId =
-      userIdRef.current ?? (Number.isInteger(storedUserId) ? storedUserId : null);
-    if (previousUserId && previousUserId !== current.id) clearSensitiveUserScopedStorage();
-    sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, String(current.id));
-    userIdRef.current = current.id;
-    setUser(current);
-  }, []);
+  const acceptAuthenticatedUser = useCallback(
+    (current: User) => {
+      const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+      const previousUserId =
+        userIdRef.current ?? (Number.isInteger(storedUserId) ? storedUserId : null);
+      if (previousUserId && previousUserId !== current.id) {
+        clearSensitiveUserScopedStorage();
+        queryClient.clear();
+      }
+      sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, String(current.id));
+      userIdRef.current = current.id;
+      setUser(current);
+    },
+    [queryClient],
+  );
 
   const reloadUser = useCallback(async (): Promise<User | null> => {
     try {
@@ -197,19 +203,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const initData = telegram?.initData?.trim();
       if (!initData) throw new Error('Telegram не передал данные авторизации');
       await revokeWebPushSubscription().catch(() => undefined);
+      const previousToken = getAccessToken();
       const token = await api<{ access_token: string }>('/api/v1/auth/telegram/init', {
         method: 'POST',
         body: { init_data: initData },
         retryAuth: false,
       });
-      clearCurrentUserData();
-      setUser(null);
+      const current = await api<User>('/api/v1/me', {
+        headers: { Authorization: `Bearer ${token.access_token}` },
+        retryAuth: false,
+      });
+      if (!Number.isSafeInteger(current.id) || current.id <= 0)
+        throw new Error('Не удалось подтвердить аккаунт Telegram');
+      const previousUserId =
+        userIdRef.current ?? Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+      if (!previousUserId) {
+        let verifiedPreviousId: number | undefined;
+        if (previousToken) {
+          try {
+            const previous = await api<User>('/api/v1/me', {
+              headers: { Authorization: `Bearer ${previousToken}` },
+              retryAuth: false,
+            });
+            verifiedPreviousId = previous.id;
+          } catch {
+            // An unverified previous session must not retain private data.
+          }
+        }
+        clearCurrentUserData(verifiedPreviousId === current.id ? current.id : undefined);
+        setUser(null);
+        queryClient.clear();
+      } else if (previousUserId !== current.id) {
+        clearCurrentUserData();
+        setUser(null);
+        queryClient.clear();
+      }
       setError(null);
-      queryClient.clear();
       setAccessToken(token.access_token);
-      await reloadUser();
+      acceptAuthenticatedUser(current);
     },
-    [clearCurrentUserData, queryClient, reloadUser],
+    [acceptAuthenticatedUser, clearCurrentUserData, queryClient],
   );
 
   const devLogin = useCallback(
@@ -330,18 +363,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const tg = window.Telegram?.WebApp;
         if (tg?.initData?.trim()) {
-          await revokeWebPushSubscription().catch(() => undefined);
-          clearCurrentUserData();
-          clearAccessToken();
-          setUser(null);
-          queryClient.clear();
           try {
             await telegramLogin(tg);
           } catch (reason) {
             if (!cancelled) {
-              setError(
-                reason instanceof Error ? reason.message : 'Не удалось войти через Telegram',
-              );
+              const cached =
+                reason instanceof ApiError && reason.status === 0
+                  ? await offlineWorkoutUser()
+                  : null;
+              if (cached) {
+                userIdRef.current = cached.id;
+                setUser(cached);
+                setError(null);
+              } else {
+                clearAccessToken();
+                clearCurrentUserData();
+                setUser(null);
+                queryClient.clear();
+                setError(
+                  reason instanceof Error ? reason.message : 'Не удалось войти через Telegram',
+                );
+              }
             }
           }
           return;

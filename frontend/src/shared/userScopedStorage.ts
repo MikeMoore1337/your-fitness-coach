@@ -145,12 +145,25 @@ export function programDraftStorageKey(
   return `fit_program_${field}_${scope}`;
 }
 
-export function clearSensitiveUserScopedStorage(): void {
+export function clearSensitiveUserScopedStorage(preserveActiveWorkoutForUserId?: number): void {
+  const preserveId =
+    Number.isSafeInteger(preserveActiveWorkoutForUserId) &&
+    Number(preserveActiveWorkoutForUserId) > 0
+      ? preserveActiveWorkoutForUserId
+      : undefined;
+  const preservedPrefixes = preserveId
+    ? [
+        `${ACTIVE_WORKOUT_STORAGE_PREFIXES.queue}user_${preserveId}_workout_`,
+        `${ACTIVE_WORKOUT_STORAGE_PREFIXES.rest}user_${preserveId}_workout_`,
+      ]
+    : [];
   try {
     const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
     for (const key of keys) {
       if (
         key &&
+        key !== (preserveId ? activeWorkoutPointerStorageKey(preserveId) : null) &&
+        !preservedPrefixes.some((prefix) => key.startsWith(prefix)) &&
         (SENSITIVE_LOCAL_STORAGE_EXACT_KEYS.some((candidate) => candidate === key) ||
           sensitiveLocalStoragePrefixes.some((prefix) => key.startsWith(prefix)))
       ) {

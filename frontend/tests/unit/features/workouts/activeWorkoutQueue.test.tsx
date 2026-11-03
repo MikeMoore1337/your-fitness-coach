@@ -20,6 +20,10 @@ import {
   saveActiveWorkoutSnapshot,
 } from '../../../../src/features/workouts/activeWorkoutQueue';
 import { useActiveWorkoutQueue } from '../../../../src/features/workouts/useActiveWorkoutQueue';
+import {
+  ActiveWorkoutSyncNotice,
+  ActiveWorkoutSyncProvider,
+} from '../../../../src/features/workouts/ActiveWorkoutSync';
 import { createCrossContextCoordinator } from '../../../../src/shared/browser/crossContextLock';
 import { activeWorkoutPointerStorageKey } from '../../../../src/shared/userScopedStorage';
 
@@ -181,6 +185,171 @@ describe('active workout durable queue', () => {
     cleanup();
     vi.restoreAllMocks();
     setOnline(true);
+  });
+
+  it('синхронизирует сохранённый подход после offline-перезагрузки без открытия тренировки', async () => {
+    saveActiveWorkoutSnapshot(7, workout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 201,
+          set_number: 1,
+          actual_reps: 8,
+          actual_weight: 40,
+          is_completed: true,
+          version: 2,
+        }),
+        { status: 200 },
+      ),
+    );
+    const renderApp = () =>
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <ActiveWorkoutSyncProvider userId={7} enabled>
+            <ActiveWorkoutSyncNotice />
+            <p>Другой раздел приложения</p>
+          </ActiveWorkoutSyncProvider>
+        </QueryClientProvider>,
+      );
+    const first = renderApp();
+    expect(screen.getByRole('status')).toHaveTextContent('ожидают синхронизации');
+    first.unmount();
+    renderApp();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    setOnline(true);
+    act(() => window.dispatchEvent(new Event('online')));
+    await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0]![1]!.body as string)).toMatchObject({
+      mutation_id: queued.queue[0]!.mutation_id,
+      actual_reps: 8,
+      actual_weight: 40,
+      is_completed: true,
+    });
+    act(() => window.dispatchEvent(new Event('online')));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('сохраняет конфликтующую очередь и показывает сообщение вне тренировки', async () => {
+    saveActiveWorkoutSnapshot(7, workout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          detail: {
+            code: 'workout_set_version_conflict',
+            current: { id: 201, version: 2, is_completed: true },
+          },
+        }),
+        { status: 409 },
+      ),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ActiveWorkoutSyncProvider userId={7} enabled>
+          <ActiveWorkoutSyncNotice />
+        </ActiveWorkoutSyncProvider>
+      </QueryClientProvider>,
+    );
+    setOnline(true);
+    act(() => window.dispatchEvent(new Event('online')));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Локальный результат сохранён'),
+    );
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+    act(() => window.dispatchEvent(new Event('online')));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('не отправляет очередь другого пользователя', async () => {
+    saveActiveWorkoutSnapshot(7, workout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ActiveWorkoutSyncProvider userId={8} enabled>
+          <ActiveWorkoutSyncNotice />
+        </ActiveWorkoutSyncProvider>
+      </QueryClientProvider>,
+    );
+    setOnline(true);
+    act(() => window.dispatchEvent(new Event('online')));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+  });
+
+  it('два экземпляра синхронизации не отправляют один сохранённый подход дважды', async () => {
+    saveActiveWorkoutSnapshot(7, workout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: 201,
+            set_number: 1,
+            actual_reps: 8,
+            actual_weight: 40,
+            is_completed: true,
+            version: 2,
+          }),
+          { status: 200 },
+        ),
+    );
+    render(
+      <>
+        <QueryClientProvider client={new QueryClient()}>
+          <ActiveWorkoutSyncProvider userId={7} enabled>
+            <p>Первая вкладка</p>
+          </ActiveWorkoutSyncProvider>
+        </QueryClientProvider>
+        <QueryClientProvider client={new QueryClient()}>
+          <ActiveWorkoutSyncProvider userId={7} enabled>
+            <p>Вторая вкладка</p>
+          </ActiveWorkoutSyncProvider>
+        </QueryClientProvider>
+      </>,
+    );
+    setOnline(true);
+    act(() => window.dispatchEvent(new Event('online')));
+    await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0]![1]!.body as string).mutation_id).toBe(
+      queued.queue[0]!.mutation_id,
+    );
   });
 
   it('использует подтверждённую версию своего предыдущего сохранения для следующего ввода', async () => {

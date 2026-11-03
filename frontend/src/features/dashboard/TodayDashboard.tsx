@@ -27,6 +27,7 @@ import {
 import { WorkoutAdaptation } from '../workouts/WorkoutAdaptation';
 import { WorkoutRecovery } from '../workouts/WorkoutRecovery';
 import { TodayWorkout } from '../workouts/TodayWorkout';
+import { ActiveWorkoutSyncNotice } from '../workouts/ActiveWorkoutSync';
 import { SessionRotationToday } from './SessionRotationToday';
 import { PreviousWorkoutNote } from '../workouts/PreviousWorkoutNote';
 import { ExerciseNoteRecovery } from '../workouts/ExerciseNoteRecovery';
@@ -1358,6 +1359,7 @@ export function TodayDashboard({
 
   return (
     <div className="today-dashboard today-dashboard--design-v2">
+      <ActiveWorkoutSyncNotice />
       {user && capabilities.canMutatePrograms && <ExerciseNoteRecovery userId={user.id} />}
       <header className="today-dashboard__header">
         <p className="today-dashboard__date">{heading.title.replace(/^Сегодня · /, '')}</p>

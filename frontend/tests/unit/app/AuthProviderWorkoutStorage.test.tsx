@@ -7,7 +7,10 @@ import { clearAccessToken, setAccessToken } from '../../../src/shared/api/client
 import type { Workout } from '../../../src/shared/api/types';
 import {
   activeWorkoutQueueKey,
+  enqueueWorkoutMutation,
+  loadActiveWorkoutQueue,
   loadCurrentActiveWorkoutSnapshot,
+  saveActiveWorkoutQueue,
   saveActiveWorkoutSnapshot,
 } from '../../../src/features/workouts/activeWorkoutQueue';
 
@@ -36,11 +39,12 @@ const activeWorkout: Workout = {
 };
 
 function Harness() {
-  const { user, logout, devLogin } = useAuth();
+  const { user, logout, devLogin, reloadUser } = useAuth();
   return (
     <div>
       <span data-testid="user-id">{user?.id ?? 'none'}</span>
       <button onClick={() => void logout()}>Выйти</button>
+      <button onClick={() => void reloadUser()}>Обновить профиль</button>
       <button
         onClick={() =>
           void devLogin({
@@ -56,10 +60,11 @@ function Harness() {
   );
 }
 
-function renderProvider() {
-  const queryClient = new QueryClient({
+function renderProvider(
+  queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
+  }),
+) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -80,6 +85,7 @@ describe('AuthProvider active workout cleanup', () => {
     cleanup();
     clearAccessToken();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('очищает локальную тренировку при logout', async () => {
@@ -144,6 +150,28 @@ describe('AuthProvider active workout cleanup', () => {
     expect(localStorage.getItem('app-theme')).toBe('light');
   });
 
+  it('очищает кэш тренировки при смене пользователя во время обновления сессии', async () => {
+    let meCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        meCalls += 1;
+        return new Response(JSON.stringify({ id: meCalls === 1 ? 7 : 8 }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderProvider(queryClient);
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    queryClient.setQueryData(['workout', 'today'], activeWorkout);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Обновить профиль' }));
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+    expect(queryClient.getQueryData(['workout', 'today'])).toBeUndefined();
+  });
+
   it('восстанавливает offline-shell после refresh только для подтверждённой auth-сессии', async () => {
     saveActiveWorkoutSnapshot(7, activeWorkout);
     const firstFetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -162,6 +190,156 @@ describe('AuthProvider active workout cleanup', () => {
 
     await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
     expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it('сохраняет offline-очередь при повторном подтверждении того же Telegram-аккаунта', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    let validatedToken: string | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) {
+        validatedToken = (init?.headers as Record<string, string>).Authorization;
+        return new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(validatedToken).toBe('Bearer new-token');
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+    expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it('сохраняет очередь только проверенного аккаунта, если вкладка потеряла его ID', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    saveActiveWorkoutSnapshot(8, { ...activeWorkout, id: 43 });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+    expect(loadCurrentActiveWorkoutSnapshot(8)).toBeUndefined();
+  });
+
+  it('не сохраняет очередь без подтверждения предыдущего токена', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    saveActiveWorkoutQueue(
+      enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      }),
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return new Response(authorization === 'Bearer initial-token' ? '{}' : '{"id":7}', {
+          status: authorization === 'Bearer initial-token' ? 401 : 200,
+        });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('сохраняет подтверждённую offline-сессию при сетевой ошибке Telegram-входа', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input).endsWith('/public/config')) return new Response('{}', { status: 200 });
+      throw new TypeError('Failed to fetch');
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+  });
+
+  it('очищает локальную тренировку, если Telegram подтвердил другой аккаунт', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    saveActiveWorkoutQueue(
+      enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      }),
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":8}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual([]);
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('очищает локальную тренировку при отклонённой Telegram-сессии', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input).endsWith('/public/config')) return new Response('{}', { status: 200 });
+      return new Response('{}', { status: 401 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined());
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
   });
 
   it('не открывает private snapshot без access token', async () => {
