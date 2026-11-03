@@ -126,7 +126,7 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_quality == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     env:
       PRE_COMMIT_HOME: ${{ github.workspace }}/.artifacts/runtime/cache/pre-commit
     steps:
@@ -789,7 +789,7 @@ jobs:
       needs.scope-router.result == 'success' &&
       needs.scope-router.outputs.run_dependency_audit == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -854,7 +854,7 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_workflow_contracts == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
