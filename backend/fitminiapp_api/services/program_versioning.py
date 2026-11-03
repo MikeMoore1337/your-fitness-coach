@@ -305,6 +305,9 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
             "start_date": loaded.start_date.isoformat(),
             "duration_weeks": loaded.duration_weeks,
             "schedule_weekdays": list(loaded.schedule_weekdays),
+            "schedule_mode": loaded.schedule_mode,
+            "rotation_epoch": loaded.rotation_epoch,
+            "rotation_first_day": loaded.rotation_first_day,
             "status": loaded.status,
             "is_active": loaded.is_active,
             "current_revision_number": loaded.current_revision_number,
@@ -321,6 +324,8 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
                 "cycle_iteration": workout.cycle_iteration,
                 "plan_revision_number": workout.plan_revision_number,
                 "plan_materialized": workout.plan_materialized,
+                "rotation_epoch": workout.rotation_epoch,
+                "rotation_role": workout.rotation_role,
                 "title": workout.title,
                 "status": workout.status,
                 "exercises": [
@@ -728,6 +733,7 @@ def cycle_workout_count(
                     left <= _required_plan_number(row.week_number) < right
                     and (start is None or row.scheduled_date >= start)
                     and (end is None or row.scheduled_date <= end)
+                    and row.rotation_epoch is None
                     for row in program.workouts
                 )
             continue
@@ -758,6 +764,7 @@ def cycle_workout_count(
                     first <= _required_plan_number(row.week_number) <= last
                     and (_required_plan_number(row.week_number) - first) % length == 0
                     and row.day_number == plan["day_number"]
+                    and row.rotation_epoch is None
                     for row in program.workouts
                 )
     if not missing_only:
@@ -766,6 +773,7 @@ def cycle_workout_count(
         for row in program.workouts:
             if (
                 row.week_number is None
+                or row.rotation_epoch is not None
                 or (start and row.scheduled_date < start)
                 or (end and row.scheduled_date > end)
             ):
@@ -1016,9 +1024,14 @@ def materialize_cycle_schedule(
     existing = {
         (row.week_number, row.day_number): row
         for row in db.query(UserWorkout).filter(
-            UserWorkout.user_program_id == program.id, UserWorkout.week_number.between(first, last)
+            UserWorkout.user_program_id == program.id,
+            UserWorkout.rotation_epoch.is_(None),
+            UserWorkout.week_number.between(first, last),
         )
     }
+    from fitminiapp_api.services.schedule_modes import calendar_active_on, mode_changes
+
+    mode_history = mode_changes(db, {program.id}).get(program.id, [])
     workout: UserWorkout | None
     created = 0
     hydrated_sets = 0
@@ -1028,7 +1041,11 @@ def materialize_cycle_schedule(
                 continue
             key = (week, plan["day_number"])
             scheduled = date.fromisoformat(plan["scheduled_date"])
-            newly_created = key not in existing and start <= scheduled <= end
+            newly_created = (
+                key not in existing
+                and start <= scheduled <= end
+                and calendar_active_on(mode_history, scheduled)
+            )
             if newly_created:
                 workout = UserWorkout(
                     user_program=program,
@@ -1068,7 +1085,17 @@ def materialize_next_cycle_window(
     if _cycle_plan_at(db, program, program.duration_weeks) is None:
         return 0
     if through_date is None:
-        rows = db.query(UserWorkout).filter_by(user_program_id=program.id).all()
+        from fitminiapp_api.services.schedule_modes import calendar_active_on, mode_changes
+
+        mode_history = mode_changes(db, {program.id}).get(program.id, [])
+        rows = (
+            db.query(UserWorkout).filter_by(user_program_id=program.id, rotation_epoch=None).all()
+        )
+        rows = [
+            row
+            for row in rows
+            if row.status != "planned" or calendar_active_on(mode_history, row.scheduled_date)
+        ]
         if any(row.status not in {"completed", "skipped", "cancelled"} for row in rows):
             return 0
         existing = {(row.week_number, row.day_number) for row in rows}
@@ -1078,6 +1105,7 @@ def materialize_next_cycle_window(
                 for week in range(1, program.duration_weeks + 1)
                 if any(
                     (week, item["day_number"]) not in existing
+                    and calendar_active_on(mode_history, date.fromisoformat(item["scheduled_date"]))
                     for item in _cycle_workout_plans(db, program, week)
                 )
             ),
@@ -1106,6 +1134,7 @@ def materialize_cycle_read_window(
                 UserProgram.id.in_(program_ids),
                 UserProgram.is_active.is_(True),
                 UserProgram.status.in_({"active", "scheduled"}),
+                UserProgram.schedule_mode == "calendar",
             )
             .order_by(UserProgram.id)
             .all()
@@ -1181,7 +1210,8 @@ def hydrate_cycle_read_workout(db: Session, workout: UserWorkout) -> bool:
             for key in (
                 "exercises",
                 "plan_materialized",
-                "source_cycle_week",
+                "_source_cycle_week",
+                "rotation_source_cycle_week",
                 "cycle_iteration",
                 "plan_revision_number",
             )
@@ -1226,6 +1256,7 @@ def revise_program_cycle(
     duration = payload.duration_weeks or program.duration_weeks
     if duration < boundary - 1 or duration > (date.max - program.start_date).days // 7:
         raise ProgramError("Некорректная длительность программы")
+    _ensure_rotation_history_within_duration(db, program, duration)
     selected_weeks = set(payload.occurrence_weeks or [])
     if any(week > duration for week in selected_weeks):
         raise ProgramError("Некорректный номер недели программы")
@@ -1256,6 +1287,7 @@ def revise_program_cycle(
         raise ProgramError(
             "Продолжительность не может исключать выполненные или начатые тренировки"
         )
+    affected = [row for row in affected if row.rotation_epoch is None]
     config: dict | None = None
     phase_mappings: list[tuple[int, int, dict, list[int]]] = []
     new_day_number: int | None = None
@@ -1723,6 +1755,7 @@ def revise_program_cycle(
                     db.query(UserWorkout)
                     .filter(
                         UserWorkout.user_program_id == program.id,
+                        UserWorkout.rotation_epoch.is_(None),
                         UserWorkout.week_number >= boundary,
                     )
                     .all()
@@ -2039,6 +2072,7 @@ def enable_program_cycle(
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     boundary, duration = payload.effective_from_week, payload.duration_weeks
+    _ensure_rotation_history_within_duration(db, program, duration)
     today = today_for_user(db.get(User, program.user_id))
     if (
         boundary > program.duration_weeks
@@ -2073,7 +2107,8 @@ def enable_program_cycle(
     legacy: dict[int, list[dict]] = {}
     indexed_sources: dict[int, dict[int, list[dict]]] = {}
     for workout in snapshot["workouts"]:
-        legacy.setdefault(workout["week_number"], []).append(workout)
+        if workout.get("rotation_epoch") is None:
+            legacy.setdefault(workout["week_number"], []).append(workout)
 
     def originals(week: int) -> list[dict]:
         if current is not None:
@@ -2133,7 +2168,11 @@ def enable_program_cycle(
     existing = (
         db.query(UserWorkout)
         .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
-        .filter(UserWorkout.user_program_id == program.id, UserWorkout.week_number >= boundary)
+        .filter(
+            UserWorkout.user_program_id == program.id,
+            UserWorkout.rotation_epoch.is_(None),
+            UserWorkout.week_number >= boundary,
+        )
         .all()
     )
     by_key = {(row.week_number, row.day_number): row for row in existing}
@@ -2261,6 +2300,7 @@ def preview_cycle_duration(
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, payload.expected_revision_number)
     boundary, duration = payload.effective_from_week, payload.duration_weeks
+    _ensure_rotation_history_within_duration(db, program, duration)
     today = today_for_user(db.get(User, program.user_id))
     if (
         boundary > program.duration_weeks + 1
@@ -2288,7 +2328,11 @@ def preview_cycle_duration(
         (row.week_number, row.day_number): row
         for row in db.query(UserWorkout)
         .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
-        .filter(UserWorkout.user_program_id == program.id, UserWorkout.week_number >= boundary)
+        .filter(
+            UserWorkout.user_program_id == program.id,
+            UserWorkout.rotation_epoch.is_(None),
+            UserWorkout.week_number >= boundary,
+        )
     }
     weeks = []
     if any(
@@ -2374,7 +2418,11 @@ def disable_program_cycle(
     existing = (
         db.query(UserWorkout)
         .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
-        .filter(UserWorkout.user_program_id == program.id, UserWorkout.week_number >= boundary)
+        .filter(
+            UserWorkout.user_program_id == program.id,
+            UserWorkout.rotation_epoch.is_(None),
+            UserWorkout.week_number >= boundary,
+        )
         .all()
     )
     by_key = {(row.week_number, row.day_number): row for row in existing}
@@ -2429,6 +2477,7 @@ def disable_program_cycle(
     snapshot_by_key = {
         (item["week_number"], item["day_number"]): item
         for item in _build_program_snapshot(db, program)["workouts"]
+        if item.get("rotation_epoch") is None
     }
     for week in range(boundary, program.duration_weeks + 1):
         week_plans = {
@@ -2594,7 +2643,7 @@ def revise_program_week_type(
     existing = (
         db.query(UserWorkout)
         .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
-        .filter_by(user_program_id=program.id)
+        .filter_by(user_program_id=program.id, rotation_epoch=None)
         .all()
     )
     by_key = {(row.week_number, row.day_number): row for row in existing}
@@ -2907,7 +2956,7 @@ def revise_program_cycle_structure(
     current_revisions = [*revisions, revision]
     revised_sets = 0
     for workout in db.query(UserWorkout).filter_by(
-        user_program_id=program.id, day_number=payload.day_number
+        user_program_id=program.id, day_number=payload.day_number, rotation_epoch=None
     ):
         if (
             workout.week_number is None
@@ -3065,7 +3114,11 @@ def program_lifecycle_summary(db: Session, actor: User, program_id: int) -> dict
     ):
         workouts = workouts_query.all()
     in_progress = next((workout for workout in workouts if workout.status == "in_progress"), None)
-    planned = [workout for workout in workouts if workout.status == "planned"]
+    planned = [
+        workout
+        for workout in workouts
+        if workout.status == "planned" and program.schedule_mode == "calendar"
+    ]
     next_workout = in_progress or next(
         (workout for workout in planned if workout.scheduled_date >= today),
         planned[0] if planned else None,
@@ -3106,12 +3159,24 @@ def program_lifecycle_summary(db: Session, actor: User, program_id: int) -> dict
         ),
         None,
     )
+    rotation_current_title = None
+    rotation_status = None
+    if program.schedule_mode == "rotation" and program.is_active:
+        from fitminiapp_api.services.session_rotation import _state
+
+        rotation = _state(db, program, owner)
+        current = rotation["current"]
+        rotation_current_title = current["title"] if current else None
+        rotation_status = rotation["status"]
     return {
         "program_id": program.id,
         "status": program.status,
         "is_active": program.is_active,
         "start_date": program.start_date,
         "duration_weeks": program.duration_weeks,
+        "schedule_mode": program.schedule_mode,
+        "rotation_current_title": rotation_current_title,
+        "rotation_status": rotation_status,
         "current_revision_number": program.current_revision_number,
         "current_week_number": current_week,
         "current_block": (
@@ -3142,6 +3207,7 @@ def _copy_scheduled_workout(
     program_id: int,
     scheduled_date: date,
     week_number: int,
+    rotation_epoch: int | None = None,
 ) -> UserWorkout:
     workout = UserWorkout(
         user_program_id=program_id,
@@ -3152,7 +3218,9 @@ def _copy_scheduled_workout(
         title=source.title,
         status="planned",
         plan_materialized=source.plan_materialized,
-        source_cycle_week=source.source_cycle_week,
+        source_cycle_week=source.source_cycle_week if rotation_epoch is None else None,
+        rotation_source_cycle_week=source.source_cycle_week if rotation_epoch is not None else None,
+        rotation_epoch=rotation_epoch,
         cycle_iteration=source.cycle_iteration,
         plan_revision_number=1 if source.source_cycle_week is not None else None,
     )
@@ -3287,7 +3355,7 @@ def apply_program_lifecycle_action(
         source_workouts = (
             db.query(UserWorkout)
             .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
-            .filter(UserWorkout.user_program_id == program.id)
+            .filter(UserWorkout.user_program_id == program.id, UserWorkout.rotation_epoch.is_(None))
             .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
             .all()
         )
@@ -3543,6 +3611,30 @@ def _validate_restart_source_owner(program: UserProgram, owner: User) -> None:
 def _ensure_program_mutable(program: UserProgram) -> None:
     if not program.is_active or program.status not in MUTABLE_PROGRAM_STATUSES:
         raise ProgramError("Assigned program is not editable")
+
+
+def _ensure_rotation_history_within_duration(
+    db: Session, program: UserProgram, duration: int
+) -> None:
+    if duration >= program.duration_weeks:
+        return
+    protected = (
+        db.query(UserWorkout.id)
+        .filter(
+            UserWorkout.user_program_id == program.id,
+            UserWorkout.rotation_epoch.is_not(None),
+            UserWorkout.week_number > duration,
+            or_(
+                UserWorkout.status.in_({"in_progress", "completed", "skipped"}),
+                UserWorkout.started_at.is_not(None),
+            ),
+        )
+        .first()
+    )
+    if protected:
+        raise ProgramError(
+            "Продолжительность не может исключать выполненные или начатые тренировки"
+        )
 
 
 def _workout_has_recorded_data(workout: UserWorkout) -> bool:
@@ -3877,6 +3969,7 @@ def _import_cycle_revision(
     cancelled_ids = []
     for workout in db.query(UserWorkout).filter(
         UserWorkout.user_program_id == program.id,
+        UserWorkout.rotation_epoch.is_(None),
         UserWorkout.week_number >= boundary,
         UserWorkout.week_number <= program.duration_weeks,
         or_(
@@ -4004,7 +4097,7 @@ def apply_imported_template_revision(
     days_by_number = {day.day_number: day for day in loaded_template.days}
     all_workouts = (
         db.query(UserWorkout)
-        .filter(UserWorkout.user_program_id == program.id)
+        .filter(UserWorkout.user_program_id == program.id, UserWorkout.rotation_epoch.is_(None))
         .order_by(UserWorkout.week_number, UserWorkout.day_number)
         .all()
     )
@@ -4510,7 +4603,9 @@ def repeat_training_block(
         overrides = _cycle_occurrence_overrides(db, program.id, revisions=revisions)
         rows = {
             (row.week_number, row.day_number): row
-            for row in db.query(UserWorkout).filter_by(user_program_id=program.id)
+            for row in db.query(UserWorkout).filter_by(
+                user_program_id=program.id, rotation_epoch=None
+            )
         }
         indexed_sources: dict[int, dict[int, list[dict]]] = {}
         for old_week in range(first_week, last_week + 1):
@@ -4610,6 +4705,7 @@ def repeat_training_block(
         .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
         .filter(
             UserWorkout.user_program_id == program.id,
+            UserWorkout.rotation_epoch.is_(None),
             UserWorkout.scheduled_date.between(source.start_date, source.end_date),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
@@ -4810,7 +4906,12 @@ def upsert_future_program_exercise(
         for week in weeks:
             existing_workout = (
                 db.query(UserWorkout)
-                .filter_by(user_program_id=program.id, week_number=week, day_number=selected_day)
+                .filter_by(
+                    user_program_id=program.id,
+                    week_number=week,
+                    day_number=selected_day,
+                    rotation_epoch=None,
+                )
                 .first()
             )
             selected_plan = next(
@@ -4927,7 +5028,7 @@ def upsert_future_program_exercise(
                 raise ProgramError("Замена должна сохранять тип упражнения")
         existing = []
         for row in db.query(UserWorkout).filter_by(
-            user_program_id=program.id, day_number=selected_day
+            user_program_id=program.id, day_number=selected_day, rotation_epoch=None
         ):
             if row.scheduled_date.isoformat() < scope.get("not_before_date", ""):
                 continue

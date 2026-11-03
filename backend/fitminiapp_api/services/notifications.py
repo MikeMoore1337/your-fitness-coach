@@ -483,22 +483,30 @@ def sync_workout_reminders(db: Session) -> int:
     min_today = min(now_for_user_naive(user).date() for _, user, _ in rows)
     from fitminiapp_api.services.program_versioning import materialize_cycle_schedule
 
-    for program in (
+    programs = (
         db.query(UserProgram)
         .filter(
             UserProgram.user_id.in_(user_ids),
             UserProgram.is_active.is_(True),
-            UserProgram.id.in_(
-                db.query(UserWorkout.user_program_id).filter(
-                    UserWorkout.source_cycle_week.is_not(None)
-                )
-            ),
+            UserProgram.schedule_mode == "calendar",
             UserProgram.status.in_({"scheduled", "active"}),
         )
         .order_by(UserProgram.id)
-    ):
+        .with_for_update()
+        .all()
+    )
+    cycle_program_ids = {
+        row[0]
+        for row in db.query(UserWorkout.user_program_id)
+        .filter(
+            UserWorkout.user_program_id.in_([program.id for program in programs]),
+            UserWorkout.source_cycle_week.is_not(None),
+        )
+        .distinct()
+    }
+    for program in programs:
         setting, owner, _timezone = settings_by_user[program.user_id]
-        if setting.workout_reminders_enabled:
+        if setting.workout_reminders_enabled and program.id in cycle_program_ids:
             local_today = now_for_user_naive(owner).date()
             materialize_cycle_schedule(db, program, local_today, local_today + timedelta(days=7))
 
@@ -508,6 +516,7 @@ def sync_workout_reminders(db: Session) -> int:
         .filter(
             UserProgram.user_id.in_(user_ids),
             UserProgram.is_active.is_(True),
+            UserProgram.schedule_mode == "calendar",
             UserWorkout.status == "planned",
             UserWorkout.scheduled_date >= min_today,
         )
@@ -515,7 +524,14 @@ def sync_workout_reminders(db: Session) -> int:
     )
     scheduled_workouts: list[tuple[UserWorkout, User, str | None, datetime]] = []
     active_keys: set[str] = set()
+    from fitminiapp_api.services.schedule_modes import calendar_active_on, mode_changes
+
+    changes_by_program = mode_changes(db, {program.id for program in programs})
     for workout, user_id in workouts:
+        if not calendar_active_on(
+            changes_by_program.get(workout.user_program_id or -1, []), workout.scheduled_date
+        ):
+            continue
         setting, user, timezone = settings_by_user[user_id]
         if not setting.workout_reminders_enabled:
             continue

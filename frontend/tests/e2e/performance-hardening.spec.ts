@@ -308,6 +308,7 @@ test('Today initial queries settle without duplicate fetches', async ({ page }) 
     '/api/v1/workouts/cardio',
     '/api/v1/workouts/progress/summary',
     '/api/v1/workouts/recovery',
+    '/api/v1/workouts/session-rotation',
     '/api/v1/workouts/today',
     '/api/v1/workouts/week',
   ];

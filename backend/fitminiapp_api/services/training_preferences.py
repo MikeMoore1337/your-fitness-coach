@@ -195,7 +195,11 @@ def build_training_preferences_conflict(db: Session, owner: User, profile: UserP
 
     reasons: list[str] = []
     preferred_weekdays = set(profile.preferred_training_weekdays or [])
-    if preferred_weekdays and not set(program.schedule_weekdays or []).issubset(preferred_weekdays):
+    if (
+        program.schedule_mode == "calendar"
+        and preferred_weekdays
+        and not set(program.schedule_weekdays or []).issubset(preferred_weekdays)
+    ):
         reasons.append("Расписание активной программы не совпадает с выбранными днями.")
 
     workouts = (

@@ -142,6 +142,7 @@ def _build_events(db: Session, coach: User) -> list[_WorkflowEvent]:
         .filter(
             UserProgram.user_id.in_(client_ids),
             UserWorkout.user_program_id.in_(active_program_id_set or [-1]),
+            UserProgram.schedule_mode == "calendar",
             UserWorkout.status.in_(("planned", "in_progress")),
             UserWorkout.scheduled_date
             >= min(context.local_today for context in contexts.values())

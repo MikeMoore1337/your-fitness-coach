@@ -1804,6 +1804,9 @@ export async function installPlatformApi(
         },
       });
     }
+    if (path.endsWith('/workouts/session-rotation')) {
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
+    }
     if (path.endsWith('/workouts/today')) {
       if (workoutStatus === 'none') {
         return route.fulfill({

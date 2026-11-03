@@ -115,6 +115,7 @@ def get_today_workout(db: Session, user: User) -> UserWorkout | None:
             UserProgram.user_id == user.id,
             UserProgram.is_active.is_(True),
             UserProgram.status.in_({"scheduled", "active"}),
+            UserProgram.schedule_mode == "calendar",
             UserWorkout.scheduled_date == recovery_today_for_user(user),
             UserWorkout.status.in_({"planned", "completed"}),
         )

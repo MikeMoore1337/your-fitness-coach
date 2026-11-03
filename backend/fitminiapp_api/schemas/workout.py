@@ -12,6 +12,7 @@ from fitminiapp_api.schemas.program import (
     ExercisePrescriptionPlan,
     PrescriptionGroupKind,
     PrescriptionRole,
+    SessionRotationDay,
 )
 from fitminiapp_api.schemas.workout_rest import RestSessionResponse
 
@@ -564,6 +565,52 @@ class WorkoutTodayResponse(BaseModel):
     completed_at: datetime | None = None
     exercises: list[WorkoutExerciseItem]
     completion_summary: WorkoutCompletionSummary | None = None
+
+
+class SessionRotationStateResponse(BaseModel):
+    mode: Literal["calendar", "rotation"]
+    status: Literal[
+        "disabled", "ready", "in_progress", "cancelled", "expired", "review_required", "empty"
+    ]
+    program_id: int | None = None
+    revision_number: int | None = None
+    cursor: str | None = None
+    current: SessionRotationDay | None = None
+    next: SessionRotationDay | None = None
+    days: list[SessionRotationDay] = Field(default_factory=list)
+    program_end_date: date | None = None
+    duration_weeks: int | None = None
+    default_plan_week: int | None = None
+    days_since_last_completion: int | None = None
+    min_extension_weeks: int | None = None
+    can_extend: bool = True
+    undo_skip_workout_id: int | None = None
+
+
+class SessionRotationActionRequest(BaseModel):
+    expected_cursor: str = Field(min_length=64, max_length=64)
+    expected_day_number: int = Field(ge=1)
+    mutation_id: str = Field(min_length=16, max_length=64)
+    plan_week_number: int | None = Field(default=None, ge=1)
+    out_of_order: bool = False
+
+
+class SessionRotationTransitionRequest(BaseModel):
+    expected_cursor: str = Field(min_length=64, max_length=64)
+    workout_id: int = Field(ge=1)
+    mutation_id: str = Field(min_length=16, max_length=64)
+
+
+class SessionRotationPlanExercise(BaseModel):
+    title: str
+    prescribed_sets: int | None = None
+    prescribed_reps: str | None = None
+
+
+class SessionRotationPlanResponse(BaseModel):
+    title: str
+    week_number: int
+    exercises: list[SessionRotationPlanExercise]
 
 
 class WorkoutAdaptationApplyResponse(BaseModel):
