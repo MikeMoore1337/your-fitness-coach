@@ -1955,6 +1955,8 @@ def assign_template_to_self(
     duration_weeks: int = 1,
     schedule_weekdays: list[int] | None = None,
     replace_active: bool = False,
+    *,
+    commit: bool = True,
 ) -> tuple[UserProgram, int]:
     template = (
         db.query(ProgramTemplate)
@@ -2003,8 +2005,9 @@ def assign_template_to_self(
         schedule_weekdays=schedule_weekdays,
         replace_active=replace_active,
     )
-    db.commit()
-    db.refresh(program)
+    if commit:
+        db.commit()
+        db.refresh(program)
     return program, created
 
 

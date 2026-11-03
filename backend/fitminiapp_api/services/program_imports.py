@@ -39,7 +39,11 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateDayCreate,
     ProgramTemplateExerciseCreate,
 )
-from fitminiapp_api.schemas.program_import import ProgramImportBlock, ProgramImportProvenance
+from fitminiapp_api.schemas.program_import import (
+    ProgramImportAssignmentRequest,
+    ProgramImportBlock,
+    ProgramImportProvenance,
+)
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.exercise_catalog import (
     _effective_exercise_id,
@@ -52,7 +56,7 @@ from fitminiapp_api.services.exercise_catalog_metadata import (
     exercise_catalog_metadata,
 )
 from fitminiapp_api.services.prescription_semantics import ensure_plan
-from fitminiapp_api.services.program_common import ProgramError
+from fitminiapp_api.services.program_common import ProgramError, assignment_error_status
 from fitminiapp_api.services.program_import_ai import (
     PROGRAM_IMPORT_AI_CONTRACT_VERSION,
     PROGRAM_IMPORT_AI_PROMPT_VERSION,
@@ -68,7 +72,7 @@ from fitminiapp_api.services.program_versioning import (
     apply_imported_template_revision,
     get_program_for_actor,
 )
-from fitminiapp_api.services.programs import create_template
+from fitminiapp_api.services.programs import assign_template_to_self, create_template
 from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
     normalize_exercise_prescription,
@@ -4492,6 +4496,8 @@ def serialize_import(import_row: ProgramImport) -> dict[str, object]:
     return {
         "id": import_row.id,
         "status": import_row.status,
+        "confirmed_template_id": import_row.confirmed_template_id,
+        "self_assigned_program_id": import_row.self_assigned_program_id,
         "source_format": _document_format(import_row),
         "schema_version": import_row.schema_version,
         "parser_version": import_row.parser_version,
@@ -5275,6 +5281,120 @@ def confirm_program_import(
         logger.exception("program_import_confirm_failed", extra={"import_id": import_id})
         raise ProgramImportError("confirm_failed", "Не удалось подтвердить импорт", 500) from exc
     return import_row, template, target_program, workouts_updated, revision_number
+
+
+def assign_confirmed_program_import(
+    db: Session,
+    current_user: User,
+    import_id: str,
+    payload: ProgramImportAssignmentRequest,
+) -> UserProgram:
+    import_row = get_program_import(db, current_user, import_id, for_update=True)
+    if import_row.status != "confirmed" or import_row.confirmed_program_id is not None:
+        raise ProgramImportError(
+            "import_not_assignable", "Сначала сохраните импорт как личный шаблон", 409
+        )
+
+    request_hash = hashlib.sha256(
+        json.dumps(payload.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if import_row.self_assigned_program_id is not None:
+        if import_row.self_assignment_request_hash != request_hash:
+            raise ProgramImportError(
+                "assignment_already_confirmed", "Импорт уже назначен с другими настройками", 409
+            )
+        program = (
+            db.query(UserProgram)
+            .filter_by(id=import_row.self_assigned_program_id, user_id=current_user.id)
+            .first()
+        )
+        if program is None:
+            raise ProgramImportError("assignment_missing", "Результат назначения недоступен", 409)
+        return program
+    if import_row.confirmed_template_id is None:
+        raise ProgramImportError("confirmed_template_missing", "Сохранённый шаблон недоступен", 409)
+
+    try:
+        db.query(User).filter(User.id == current_user.id).with_for_update().one()
+        active = (
+            db.query(UserProgram)
+            .filter(UserProgram.user_id == current_user.id, UserProgram.is_active.is_(True))
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
+        if (active.id if active is not None else None) != payload.expected_active_program_id or (
+            active is not None
+            and active.current_revision_number != payload.expected_active_revision_number
+        ):
+            raise ProgramImportError(
+                "active_program_conflict",
+                "Программа изменилась. Обновите данные и проверьте выбор",
+                409,
+            )
+        if active is not None and active.assigned_by_user_id not in (None, current_user.id):
+            raise ProgramImportError(
+                "trainer_owned_program", "Изменение программы согласуйте с тренером", 403
+            )
+        if (
+            db.query(UserProgram.id)
+            .filter_by(user_id=current_user.id, template_id=import_row.confirmed_template_id)
+            .first()
+            is not None
+        ):
+            raise ProgramImportError(
+                "template_already_assigned", "Этот шаблон уже назначался. Проверьте программу", 409
+            )
+        program, _ = assign_template_to_self(
+            db,
+            current_user,
+            import_row.confirmed_template_id,
+            start_date=payload.start_date,
+            duration_weeks=payload.duration_weeks,
+            schedule_weekdays=payload.schedule_weekdays,
+            replace_active=payload.replace_active,
+            commit=False,
+        )
+        import_row.self_assigned_program_id = program.id
+        import_row.self_assignment_request_hash = request_hash
+        import_row.updated_at = now_msk_naive()
+        record_audit_event(
+            db,
+            actor_user_id=current_user.id,
+            target_user_id=current_user.id,
+            action="program_import.assigned",
+            resource_type="program_import",
+            resource_id=import_row.id,
+            details={
+                "template_id": import_row.confirmed_template_id,
+                "assigned_program_id": program.id,
+            },
+        )
+        db.commit()
+        db.refresh(program)
+        return program
+    except ProgramImportError:
+        db.rollback()
+        raise
+    except ProgramError as exc:
+        db.rollback()
+        detail = str(exc)
+        status_code = assignment_error_status(detail)
+        if status_code == 400:
+            status_code = 404 if detail == "Template not found" else 403
+        if detail == "Cannot replace a program while a workout is in progress":
+            raise ProgramImportError(
+                "workout_in_progress", "Заменить программу во время тренировки нельзя", 409
+            ) from exc
+        message = (
+            detail
+            if any("а" <= character.lower() <= "я" for character in detail)
+            else "Не удалось назначить программу. Проверьте параметры и попробуйте снова"
+        )
+        raise ProgramImportError("assignment_failed", message, status_code) from exc
+    except Exception:
+        db.rollback()
+        raise
 
 
 def cancel_program_import(db: Session, current_user: User, import_id: str) -> None:

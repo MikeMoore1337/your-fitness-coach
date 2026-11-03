@@ -1896,6 +1896,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/imports/{import_id}/assign-to-me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Import To Me */
+        post: operations["assign_import_to_me_api_v1_programs_imports__import_id__assign_to_me_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/imports/{import_id}/cancel": {
         parameters: {
             query?: never;
@@ -15787,6 +15804,44 @@ export interface components {
              */
             applied: boolean;
         };
+        /** ProgramImportAssignmentRequest */
+        ProgramImportAssignmentRequest: {
+            /** Start Date */
+            start_date?: string | null;
+            /**
+             * Duration Weeks
+             * @default 1
+             */
+            duration_weeks: number;
+            /** Schedule Weekdays */
+            schedule_weekdays?: number[] | null;
+            /**
+             * Replace Active
+             * @default false
+             */
+            replace_active: boolean;
+            /** Expected Active Program Id */
+            expected_active_program_id: number | null;
+            /** Expected Active Revision Number */
+            expected_active_revision_number: number | null;
+        };
+        /** ProgramImportAssignmentResponse */
+        ProgramImportAssignmentResponse: {
+            /** User Program Id */
+            user_program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+        };
         /** ProgramImportBlock */
         ProgramImportBlock: {
             /** Block Number */
@@ -15926,6 +15981,10 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "confirmed" | "cancelled" | "expired";
+            /** Confirmed Template Id */
+            confirmed_template_id?: number | null;
+            /** Self Assigned Program Id */
+            self_assigned_program_id?: number | null;
             /**
              * Source Format
              * @enum {string}
@@ -24588,6 +24647,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgramImportConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_import_to_me_api_v1_programs_imports__import_id__assign_to_me_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramImportAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportAssignmentResponse"];
                 };
             };
             /** @description Validation Error */

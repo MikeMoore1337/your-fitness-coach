@@ -851,6 +851,19 @@ def test_import_can_create_one_revision_and_preserve_completed_workouts_and_bloc
     assert confirmed.json()["revision_number"] == 3
     assert confirmed.json()["workouts_updated"] == 1
 
+    self_assignment = client.post(
+        f"/api/v1/programs/imports/{import_id}/assign-to-me",
+        headers=headers,
+        json={
+            "duration_weeks": 1,
+            "replace_active": False,
+            "expected_active_program_id": None,
+            "expected_active_revision_number": None,
+        },
+    )
+    assert self_assignment.status_code == 409
+    assert self_assignment.json()["detail"]["code"] == "import_not_assignable"
+
     replay = client.post(
         f"/api/v1/programs/imports/{import_id}/confirm",
         headers=headers,

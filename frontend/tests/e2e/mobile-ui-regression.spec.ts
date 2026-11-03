@@ -1225,7 +1225,7 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
         if (confirmCount === 1) {
           await route.fulfill({ status: 409, json: { detail: 'Конфликт версии' } });
         } else {
-          await route.fulfill({ json: {} });
+          await route.fulfill({ json: { template: { id: 872, title: 'Программа' } } });
         }
       });
 
@@ -1285,7 +1285,7 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
       await page.getByRole('button', { name: 'Принять текстовые подсказки' }).click();
       await expect(page.locator('.program-import-week-map')).toContainText('Неделя 16');
       await expect(page.locator('.program-import-week-map')).toContainText('исходная 1');
-      const confirm = page.getByRole('button', { name: 'Подтвердить и сохранить шаблон' });
+      const confirm = page.getByRole('button', { name: 'Сохранить шаблон' });
       await expect(confirm).toBeDisabled();
 
       for (const width of [320, 360, 393, 430]) {
@@ -1339,7 +1339,7 @@ test('@critical #872 XLSX cycle preview keeps week types opt-in and handles 409'
         });
         await desktop.getByRole('button', { name: 'Принять текстовые подсказки' }).click();
         await desktop.getByRole('button', { name: 'Применить исправления' }).click();
-        await desktop.getByRole('button', { name: 'Подтвердить и сохранить шаблон' }).click();
+        await desktop.getByRole('button', { name: 'Сохранить шаблон' }).click();
         await expect(desktop.getByRole('alert')).toContainText('Черновик или программа изменились');
         await desktop.locator('.program-import-card').screenshot({
           path: info.outputPath('issue-872-desktop-' + theme + '-409.png'),
