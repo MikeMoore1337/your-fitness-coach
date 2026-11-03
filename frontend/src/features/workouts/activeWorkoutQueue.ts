@@ -13,6 +13,7 @@ import { getApiRuntime } from '../../shared/runtime/runtime';
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 
 export const ACTIVE_WORKOUT_QUEUE_VERSION = 3 as const;
+export const ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT = 'fit:active-workout-queue-changed';
 const LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION = 1 as const;
 const PREVIOUS_ACTIVE_WORKOUT_QUEUE_VERSION = 2 as const;
 const MAX_QUEUE_LENGTH = 256;
@@ -346,17 +347,17 @@ export function loadActiveWorkoutQueue(
       parsed.workout_id === workoutId &&
       Array.isArray(parsed.queue) &&
       parsed.queue.length <= MAX_QUEUE_LENGTH * 2 &&
-      snapshotValid &&
       parsed.queue.every(validMutation);
+    const safeParsed = snapshotValid ? parsed : { ...parsed, workout_snapshot: undefined };
     if (valid && isPrevious) {
       const migrated = {
-        ...parsed,
+        ...safeParsed,
         schema_version: ACTIVE_WORKOUT_QUEUE_VERSION,
       } as ActiveWorkoutQueue;
       saveActiveWorkoutQueue(migrated);
       return migrated;
     }
-    if (valid && !isLegacy) return mergePreviousQueue(parsed as ActiveWorkoutQueue, workout);
+    if (valid && !isLegacy) return mergePreviousQueue(safeParsed as ActiveWorkoutQueue, workout);
     if (valid && workout && validWorkoutSnapshot(workout, workoutId, true)) {
       const migrated = migrateLegacyQueue(parsed as StoredActiveWorkoutQueue, workout);
       saveActiveWorkoutQueue(migrated);
@@ -598,6 +599,18 @@ export function clearActiveWorkoutDataForUser(userId: number): void {
   }
 }
 
+export function discardActiveWorkoutDataAfterAuthChange(userId: number, workoutId: number): void {
+  try {
+    localStorage.removeItem(activeWorkoutQueueKey(userId, workoutId));
+    localStorage.removeItem(legacyActiveWorkoutQueueKey(userId, workoutId));
+    localStorage.removeItem(activeWorkoutRestKey(userId, workoutId));
+    const pointerKey = activeWorkoutPointerKey(userId);
+    if (localStorage.getItem(pointerKey) === String(workoutId)) localStorage.removeItem(pointerKey);
+  } catch {
+    // Storage is optional in restrictive webviews.
+  }
+}
+
 function readLegacySetValue(key: string): Record<string, unknown> | null {
   try {
     const raw = localStorage.getItem(key);
@@ -624,7 +637,7 @@ export function saveActiveWorkoutSnapshot(
   userId: number,
   workout: Workout,
 ): ActiveWorkoutQueue | undefined {
-  if (workout.status !== 'in_progress') return undefined;
+  if (!validWorkoutSnapshot(workout, workout.id, true)) return undefined;
   const pointerKey = activeWorkoutPointerKey(userId);
   try {
     const previousWorkoutId = Number(localStorage.getItem(pointerKey));

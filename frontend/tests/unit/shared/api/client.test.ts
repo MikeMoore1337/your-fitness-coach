@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  AUTH_LOGOUT_EVENT,
+  AUTH_SESSION_EXPIRED_EVENT,
   api,
+  apiFile,
   clearAccessToken,
   coordinateAccessTokenRefresh,
   getAccessToken,
   refreshAccessToken,
   setAccessToken,
+  switchAuthenticatedAccount,
 } from '../../../../src/shared/api/client';
 import { createCrossContextCoordinator } from '../../../../src/shared/browser/crossContextLock';
 
@@ -33,6 +37,173 @@ describe('api client', () => {
     await expect(api<{ ok: boolean }>('/api/v1/me')).resolves.toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(getAccessToken()).toBe('new');
+  });
+
+  it('does not restore a token when an in-flight refresh finishes after logout', async () => {
+    setAccessToken('old');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishRefresh = resolve;
+        }),
+    );
+    const refreshing = refreshAccessToken();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    clearAccessToken();
+    finishRefresh(new Response('{"access_token":"late"}', { status: 200 }));
+
+    await expect(refreshing).resolves.toBe(false);
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('does not retry a stale mutation under another account after a delayed refresh', async () => {
+    setAccessToken('old-account');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{"detail":"expired"}', { status: 401 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }));
+    const request = api('/api/v1/workouts/sets/201', { method: 'PATCH', body: { reps: 10 } });
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    switchAuthenticatedAccount(8);
+    setAccessToken('new-account');
+    finishRefresh(new Response('{"access_token":"late-old-account"}', { status: 200 }));
+
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(getAccessToken()).toBe('new-account');
+  });
+
+  it('does not retry a pending mutation after an explicit sign-in without a known previous ID', async () => {
+    setAccessToken('old-account');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{"detail":"expired"}', { status: 401 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }));
+    const request = api('/api/v1/workouts/sets/201', { method: 'PATCH', body: { reps: 10 } });
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    setAccessToken('new-account', 8);
+    finishRefresh(new Response('{"access_token":"late-old-account"}', { status: 200 }));
+
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(getAccessToken()).toBe('new-account');
+  });
+
+  it('does not retry a pending file request after a verified sign-in', async () => {
+    setAccessToken('old-account');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(new Response('private file', { status: 200 }));
+    const request = apiFile('/api/v1/account/export');
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    setAccessToken('new-account', 8);
+    finishRefresh(new Response('{"access_token":"late-old-account"}', { status: 200 }));
+
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('notices another tab verified a login before its token message arrives', async () => {
+    setAccessToken('old-account');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      );
+    const request = api('/api/v1/workouts/sets/201', { method: 'PATCH', body: { reps: 10 } });
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    localStorage.setItem('fit_auth_verified_login_v1', JSON.stringify({ id: 'login', userId: 8 }));
+    finishRefresh(new Response('{"access_token":"late-old-account"}', { status: 200 }));
+
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(getAccessToken()).toBe('old-account');
+  });
+
+  it('clears the verified account marker on explicit logout', () => {
+    setAccessToken('verified', 7);
+    expect(localStorage.getItem('fit_auth_verified_login_v1')).not.toBeNull();
+    clearAccessToken();
+    expect(localStorage.getItem('fit_auth_verified_login_v1')).toBeNull();
+  });
+
+  it('broadcasts verified sign-in using the existing access-token message type', () => {
+    const post =
+      typeof window.BroadcastChannel === 'function'
+        ? vi.spyOn(window.BroadcastChannel.prototype, 'postMessage')
+        : undefined;
+    const store = vi.spyOn(Storage.prototype, 'setItem');
+    setAccessToken('verified', 7);
+    const fallback = store.mock.calls.find(([key]) => key === 'fit_auth_session_event_v1');
+    const message = post?.mock.calls[0]?.[0] ?? JSON.parse(fallback![1]).message;
+    expect(message).toEqual({ type: 'access-token', token: 'verified', userId: 7 });
+  });
+
+  it('discards an in-flight file response after logout', async () => {
+    setAccessToken('old');
+    let finishRequest!: (response: Response) => void;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishRequest = resolve;
+        }),
+    );
+    const result = expect(apiFile('/api/v1/me/exports/1/download')).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    clearAccessToken();
+    finishRequest(new Response('private export', { status: 200 }));
+    await result;
+  });
+
+  it('discards an in-flight authenticated response after logout', async () => {
+    setAccessToken('old');
+    let finishRequest!: (response: Response) => void;
+    vi.spyOn(globalThis, 'fetch').mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finishRequest = resolve;
+        }),
+    );
+    const request = api('/api/v1/me');
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    clearAccessToken();
+    finishRequest(new Response('{"id":7}', { status: 200 }));
+
+    await result;
+    expect(getAccessToken()).toBeNull();
   });
 
   it('keeps a safe Russian business detail, status, and raw conflict body', async () => {
@@ -94,6 +265,10 @@ describe('api client', () => {
 
   it('preserves an expired 401 status and body while clearing the failed session', async () => {
     setAccessToken('expired-session');
+    const expired = vi.fn();
+    const logout = vi.fn();
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, expired);
+    window.addEventListener(AUTH_LOGOUT_EVENT, logout);
     const body = { detail: 'expired' };
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 401 }))
@@ -107,6 +282,10 @@ describe('api client', () => {
       body,
     });
     expect(getAccessToken()).toBeNull();
+    expect(expired).toHaveBeenCalledOnce();
+    expect(logout).not.toHaveBeenCalled();
+    window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, expired);
+    window.removeEventListener(AUTH_LOGOUT_EVENT, logout);
   });
 
   it('preserves a 403 status and raw body without clearing the session', async () => {
@@ -147,6 +326,25 @@ describe('api client', () => {
         configurable: true,
         value: originalLocks,
       });
+    }
+  });
+
+  it('does not reuse a different account token after waiting for the refresh lock', async () => {
+    setAccessToken('old-account');
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const request = vi.fn(async (_name: string, callback: () => Promise<boolean>) => {
+      switchAuthenticatedAccount(8);
+      setAccessToken('new-account');
+      return callback();
+    });
+    const originalLocks = navigator.locks;
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
+    try {
+      await expect(refreshAccessToken()).resolves.toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(getAccessToken()).toBe('new-account');
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: originalLocks });
     }
   });
 
