@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { useDocumentScrollLock, useModalA11y } from '../../../src/shared/ui/useModalA11y';
 
 function Lock({ open }: { open: boolean }) {
@@ -23,6 +24,38 @@ function ParentModal() {
       <button data-initial>Первое действие</button>
       <button>Открыть подтверждение</button>
     </div>
+  );
+}
+
+function AutoFocusedModal({ onClose }: { onClose: () => void }) {
+  const ref = useModalA11y<HTMLDivElement>(true, onClose);
+  return (
+    <div ref={ref} role="dialog" aria-label="Окно" tabIndex={-1}>
+      <input aria-label="Первый ввод" autoFocus />
+    </div>
+  );
+}
+
+function ModalWithUnfocusedTrigger({
+  autoFocus = false,
+  delayed = false,
+}: {
+  autoFocus?: boolean;
+  delayed?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => (delayed ? window.setTimeout(() => setOpen(true), 0) : setOpen(true))}>
+        <span>Открыть окно</span>
+      </button>
+      {open &&
+        (autoFocus ? (
+          <AutoFocusedModal onClose={() => setOpen(false)} />
+        ) : (
+          <Modal name="Окно" onClose={() => setOpen(false)} />
+        ))}
+    </>
   );
 }
 
@@ -84,6 +117,48 @@ describe('useDocumentScrollLock', () => {
     expect(document.body.style.position).toBe('fixed');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(parentClose).toHaveBeenCalledOnce();
+  });
+
+  it('restores the clicked trigger when the browser did not focus it', () => {
+    render(<ModalWithUnfocusedTrigger />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    expect(trigger).not.toHaveFocus();
+    fireEvent.click(screen.getByText('Открыть окно'));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger).toHaveFocus();
+  });
+
+  it('restores the clicked trigger when a dialog control is focused on mount', () => {
+    render(<ModalWithUnfocusedTrigger autoFocus />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    fireEvent.click(screen.getByText('Открыть окно'));
+    expect(screen.getByLabelText('Первый ввод')).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger).toHaveFocus();
+  });
+
+  it('keeps the trigger when the dialog opens asynchronously', async () => {
+    render(<ModalWithUnfocusedTrigger delayed />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    fireEvent.click(screen.getByText('Открыть окно'));
+    await screen.findByRole('dialog', { name: 'Окно' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger).toHaveFocus();
+  });
+
+  it('does not restore an unrelated click after keyboard interaction', () => {
+    const view = render(<button>Другое действие</button>);
+    const unrelated = screen.getByRole('button', { name: 'Другое действие' });
+    fireEvent.click(unrelated);
+    fireEvent.keyDown(document, { key: 'Tab' });
+    view.rerender(
+      <>
+        <button>Другое действие</button>
+        <Modal name="Окно" onClose={() => undefined} />
+      </>,
+    );
+    view.rerender(<button>Другое действие</button>);
+    expect(unrelated).not.toHaveFocus();
   });
 
   it('does not let a delayed parent frame steal focus from a nested dialog', () => {
