@@ -347,17 +347,17 @@ export function loadActiveWorkoutQueue(
       parsed.workout_id === workoutId &&
       Array.isArray(parsed.queue) &&
       parsed.queue.length <= MAX_QUEUE_LENGTH * 2 &&
-      snapshotValid &&
       parsed.queue.every(validMutation);
+    const safeParsed = snapshotValid ? parsed : { ...parsed, workout_snapshot: undefined };
     if (valid && isPrevious) {
       const migrated = {
-        ...parsed,
+        ...safeParsed,
         schema_version: ACTIVE_WORKOUT_QUEUE_VERSION,
       } as ActiveWorkoutQueue;
       saveActiveWorkoutQueue(migrated);
       return migrated;
     }
-    if (valid && !isLegacy) return mergePreviousQueue(parsed as ActiveWorkoutQueue, workout);
+    if (valid && !isLegacy) return mergePreviousQueue(safeParsed as ActiveWorkoutQueue, workout);
     if (valid && workout && validWorkoutSnapshot(workout, workoutId, true)) {
       const migrated = migrateLegacyQueue(parsed as StoredActiveWorkoutQueue, workout);
       saveActiveWorkoutQueue(migrated);
@@ -637,7 +637,7 @@ export function saveActiveWorkoutSnapshot(
   userId: number,
   workout: Workout,
 ): ActiveWorkoutQueue | undefined {
-  if (workout.status !== 'in_progress') return undefined;
+  if (!validWorkoutSnapshot(workout, workout.id, true)) return undefined;
   const pointerKey = activeWorkoutPointerKey(userId);
   try {
     const previousWorkoutId = Number(localStorage.getItem(pointerKey));

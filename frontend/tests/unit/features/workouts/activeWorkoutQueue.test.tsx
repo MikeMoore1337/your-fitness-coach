@@ -105,8 +105,8 @@ function setOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value });
 }
 
-function Harness() {
-  const sync = useActiveWorkoutQueue(7, workout);
+function Harness({ workoutData = workout }: { workoutData?: Workout }) {
+  const sync = useActiveWorkoutQueue(7, workoutData);
   const [accepted, setAccepted] = useState<boolean | null>(null);
   const pending = sync.pendingBySet.get(201);
   return (
@@ -134,13 +134,13 @@ function Harness() {
   );
 }
 
-function renderHarness() {
+function renderHarness(workoutData?: Workout) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <Harness />
+      <Harness workoutData={workoutData} />
     </QueryClientProvider>,
   );
 }
@@ -977,6 +977,63 @@ describe('active workout durable queue', () => {
     expect(restored.workout_snapshot?.id).toBe(42);
     expect(restored.workout_snapshot?.exercises[0]?.metric_type).toBe('cardio');
     expect(loadCurrentActiveWorkoutSnapshot(7)?.exercises[0]?.metric_type).toBe('cardio');
+  });
+
+  it.each([2, 3])(
+    'retains v%s pending mutations when their workout snapshot is invalid',
+    (version) => {
+      const pending = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      });
+      localStorage.setItem(
+        activeWorkoutQueueKey(7, 42),
+        JSON.stringify({ ...pending, schema_version: version, workout_snapshot: { id: 42 } }),
+      );
+
+      const restored = loadActiveWorkoutQueue(7, 42);
+
+      expect(restored.queue).toEqual(pending.queue);
+      expect(restored.workout_snapshot).toBeUndefined();
+      expect(JSON.parse(localStorage.getItem(activeWorkoutQueueKey(7, 42))!).queue).toEqual(
+        pending.queue,
+      );
+      clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+      expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending.queue);
+    },
+  );
+
+  it('does not overwrite pending changes with an invalid workout snapshot', () => {
+    const pending = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    expect(saveActiveWorkoutQueue({ ...pending, workout_snapshot: workout })).toBe(true);
+    const invalidWorkout = {
+      ...workout,
+      exercises: workout.exercises.map((exercise) => ({ ...exercise, metric_type: undefined })),
+    } as unknown as Workout;
+
+    expect(saveActiveWorkoutSnapshot(7, invalidWorkout)).toBeUndefined();
+    expect(loadActiveWorkoutQueue(7, 42)).toMatchObject({
+      queue: pending.queue,
+      workout_snapshot: { id: 42 },
+    });
+  });
+
+  it('keeps an offline mutation when the workout response cannot form a valid snapshot', async () => {
+    const invalidWorkout = {
+      ...workout,
+      exercises: workout.exercises.map((exercise) => ({ ...exercise, metric_type: undefined })),
+    } as unknown as Workout;
+    renderHarness(invalidWorkout);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
+
+    await waitFor(() => expect(screen.getByTestId('accepted')).toHaveTextContent('true'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
   });
 
   it('сохраняет обе стороны отдельно от очереди старой вкладки и переносит v2 без потерь', () => {
