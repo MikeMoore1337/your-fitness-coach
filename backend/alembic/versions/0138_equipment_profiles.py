@@ -30,10 +30,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.execute("SET LOCAL lock_timeout = '3s'")
-        op.execute("SET LOCAL statement_timeout = '30s'")
-        op.execute("LOCK TABLE user_profiles IN ACCESS EXCLUSIVE MODE")
+    if bind.dialect.name != "postgresql":
+        raise RuntimeError("Unsafe downgrade: equipment profile protection requires PostgreSQL")
+    op.execute("SET LOCAL lock_timeout = '3s'")
+    op.execute("SET LOCAL statement_timeout = '30s'")
+    op.execute("LOCK TABLE user_profiles IN ACCESS EXCLUSIVE MODE")
     if bind.execute(
         sa.text(
             "SELECT 1 FROM user_profiles WHERE equipment_profiles IS NOT NULL "

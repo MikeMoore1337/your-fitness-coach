@@ -54,15 +54,74 @@ def sqlite_connection():
         engine.dispose()
 
 
-def test_downgrade_preserves_rows_when_all_new_columns_are_empty(sqlite_connection):
+def test_sqlite_downgrade_refuses_even_when_all_new_columns_are_empty(sqlite_connection):
     connection = sqlite_connection
     connection.exec_driver_sql("CREATE TABLE user_profiles (id INTEGER PRIMARY KEY)")
     migration = _migration(connection)
     migration.upgrade()
     connection.exec_driver_sql("INSERT INTO user_profiles (id) VALUES (1)")
 
-    migration.downgrade()
+    with pytest.raises(RuntimeError, match="requires PostgreSQL"):
+        migration.downgrade()
 
+    assert connection.exec_driver_sql("SELECT id FROM user_profiles").scalar_one() == 1
+    assert {column["name"] for column in sa.inspect(connection).get_columns("user_profiles")} == {
+        "id",
+        "equipment_profiles",
+        "active_equipment_profile_id",
+        "equipment_profiles_revision",
+    }
+
+
+@pytest.fixture
+def postgres_migration():
+    from fitminiapp_api.db.session import engine
+
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL")
+    schema = f"equipment_downgrade_{uuid4().hex}"
+    with engine.connect() as connection:
+        try:
+            connection.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
+            connection.exec_driver_sql(f'SET search_path TO "{schema}"')
+            connection.exec_driver_sql("CREATE TABLE user_profiles (id INTEGER PRIMARY KEY)")
+            migration = _migration(connection)
+            migration.upgrade()
+            connection.commit()
+            yield connection, migration
+        finally:
+            connection.rollback()
+            connection.exec_driver_sql('SET search_path TO "public"')
+            connection.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+            connection.commit()
+
+
+@pytest.mark.parametrize(
+    ("column", "value_sql"),
+    [
+        ("equipment_profiles", '\'{"profiles":[{"name":"home"}]}\'::json'),
+        ("active_equipment_profile_id", "'synthetic-profile'"),
+        ("equipment_profiles_revision", "1"),
+    ],
+)
+def test_postgres_downgrade_preserves_each_populated_column(postgres_migration, column, value_sql):
+    connection, migration = postgres_migration
+    connection.exec_driver_sql(f"INSERT INTO user_profiles (id, {column}) VALUES (1, {value_sql})")
+    before = connection.exec_driver_sql(
+        f"SELECT {column} FROM user_profiles WHERE id=1"
+    ).scalar_one()
+    with pytest.raises(RuntimeError, match="equipment profile data exists"):
+        migration.downgrade()
+    assert (
+        connection.exec_driver_sql(f"SELECT {column} FROM user_profiles WHERE id=1").scalar_one()
+        == before
+    )
+
+
+def test_postgres_downgrade_removes_empty_columns(postgres_migration):
+    connection, migration = postgres_migration
+    connection.exec_driver_sql("INSERT INTO user_profiles (id) VALUES (1)")
+    migration.downgrade()
     assert connection.exec_driver_sql("SELECT id FROM user_profiles").scalar_one() == 1
     assert {column["name"] for column in sa.inspect(connection).get_columns("user_profiles")} == {
         "id"
