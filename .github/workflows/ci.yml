@@ -70,7 +70,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
+          sparse-checkout: |
+            scripts/ci_contract.py
+            scripts/scheduled_regression.py
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -94,6 +98,8 @@ jobs:
             test -n "$TARGET_REF"
           fi
           if [ "$EVENT_NAME" = pull_request ]; then
+            git cat-file -e "${BASE_SHA}^{commit}"
+            git cat-file -e "${HEAD_SHA}^{commit}"
             python scripts/ci_contract.py route \
               --event pull_request \
               --base-sha "$BASE_SHA" \
@@ -1355,6 +1361,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/ci_contract.py
+            scripts/scheduled_regression.py
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"

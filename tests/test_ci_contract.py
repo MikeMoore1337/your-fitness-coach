@@ -1,9 +1,81 @@
+import subprocess
 import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from scripts import ci_contract, local_checks
+
+
+def test_shallow_sparse_pr_router_matches_full_history_and_rejects_missing_parent(
+    tmp_path: Path,
+) -> None:
+    def git(directory: Path, *arguments: str) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(directory), *arguments],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        return result.stdout.strip()
+
+    source = tmp_path / "source"
+    source.mkdir()
+    git(source, "init", "-b", "main")
+    git(source, "config", "user.email", "ci-test@example.invalid")
+    git(source, "config", "user.name", "CI test")
+    (source / "scripts").mkdir()
+    (source / "scripts" / "ci_contract.py").write_text("# router\n", encoding="utf-8")
+    (source / "frontend").mkdir()
+    (source / "frontend" / "app.ts").write_text("before\n", encoding="utf-8")
+    git(source, "add", ".")
+    git(source, "commit", "-m", "base")
+    base = git(source, "rev-parse", "HEAD")
+    git(source, "checkout", "-b", "feature")
+    (source / "frontend" / "app.ts").write_text("after\n", encoding="utf-8")
+    (source / "backend").mkdir()
+    (source / "backend" / "api.py").write_text("changed\n", encoding="utf-8")
+    git(source, "add", ".")
+    git(source, "commit", "-m", "feature")
+    head = git(source, "rev-parse", "HEAD")
+    git(source, "checkout", "main")
+    git(source, "merge", "--no-ff", "feature", "-m", "merge")
+    merge = git(source, "rev-parse", "HEAD")
+
+    def checkout(depth: int) -> Path:
+        target = tmp_path / f"depth-{depth}"
+        target.mkdir()
+        git(target, "init")
+        git(target, "sparse-checkout", "init", "--no-cone")
+        git(target, "sparse-checkout", "set", "--no-cone", "/scripts/ci_contract.py")
+        git(target, "fetch", f"--depth={depth}", source.as_uri(), merge)
+        git(target, "checkout", "--detach", "FETCH_HEAD")
+        return target
+
+    shallow = checkout(2)
+    assert not (shallow / "frontend" / "app.ts").exists()
+    assert ci_contract.route_repository(
+        shallow, event="pull_request", base_sha=base, head_sha=head
+    ) == ci_contract.route_repository(source, event="pull_request", base_sha=base, head_sha=head)
+    with pytest.raises(ci_contract.CIContractError, match="Cannot calculate changed paths"):
+        ci_contract.route_repository(
+            checkout(1), event="pull_request", base_sha=base, head_sha=head
+        )
+
+
+def test_ci_router_and_aggregate_checkout_only_their_required_scripts() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    router = workflow.split("  scope-router:\n", 1)[1].split("  quality:\n", 1)[0]
+    aggregate = workflow.split("  checks:\n", 1)[1]
+    for job in (router, aggregate):
+        assert "scripts/ci_contract.py" in job
+        assert "scripts/scheduled_regression.py" in job
+        assert "sparse-checkout-cone-mode: false" in job
+    assert "fetch-depth: 2" in router
+    assert 'git cat-file -e "${BASE_SHA}^{commit}"' in router
+    assert 'git cat-file -e "${HEAD_SHA}^{commit}"' in router
+    assert "python scripts/ci_contract.py verify-results" in aggregate
 
 
 def test_ci_contract_is_valid_and_profiles_are_non_empty() -> None:
