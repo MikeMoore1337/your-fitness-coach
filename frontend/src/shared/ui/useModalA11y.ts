@@ -63,6 +63,27 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+let lastActivatedElement: HTMLElement | null = null;
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'click',
+    (event) => {
+      lastActivatedElement =
+        event.target instanceof Element
+          ? event.target.closest<HTMLElement>(focusableSelector)
+          : null;
+    },
+    true,
+  );
+  document.addEventListener(
+    'keydown',
+    () => {
+      lastActivatedElement = null;
+    },
+    true,
+  );
+}
+
 export function useModalA11y<T extends HTMLElement>(
   open: boolean,
   onClose: () => void,
@@ -80,8 +101,16 @@ export function useModalA11y<T extends HTMLElement>(
   useEffect(() => {
     if (!open) return;
     modalStack.push(panelRef);
+    const active = document.activeElement;
     const previousFocus =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !panelRef.current?.contains(active)
+        ? active
+        : lastActivatedElement?.isConnected
+          ? lastActivatedElement
+          : null;
+    lastActivatedElement = null;
     const frame = window.requestAnimationFrame(() => {
       const panel = panelRef.current;
       if (!panel || modalStack.at(-1) !== panelRef || panel.contains(document.activeElement))
