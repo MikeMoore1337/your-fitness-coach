@@ -7,7 +7,10 @@ import { clearAccessToken, setAccessToken } from '../../../src/shared/api/client
 import type { Workout } from '../../../src/shared/api/types';
 import {
   activeWorkoutQueueKey,
+  enqueueWorkoutMutation,
+  loadActiveWorkoutQueue,
   loadCurrentActiveWorkoutSnapshot,
+  saveActiveWorkoutQueue,
   saveActiveWorkoutSnapshot,
 } from '../../../src/features/workouts/activeWorkoutQueue';
 
@@ -82,6 +85,7 @@ describe('AuthProvider active workout cleanup', () => {
     cleanup();
     clearAccessToken();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('очищает локальную тренировку при logout', async () => {
@@ -186,6 +190,100 @@ describe('AuthProvider active workout cleanup', () => {
 
     await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
     expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it('сохраняет offline-очередь при повторном подтверждении того же Telegram-аккаунта', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    let validatedToken: string | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) {
+        validatedToken = (init?.headers as Record<string, string>).Authorization;
+        return new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(validatedToken).toBe('Bearer new-token');
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+    expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it('сохраняет подтверждённую offline-сессию при сетевой ошибке Telegram-входа', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    saveActiveWorkoutQueue(queued);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input).endsWith('/public/config')) return new Response('{}', { status: 200 });
+      throw new TypeError('Failed to fetch');
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(queued.queue);
+  });
+
+  it('очищает локальную тренировку, если Telegram подтвердил другой аккаунт', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    saveActiveWorkoutQueue(
+      enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      }),
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init'))
+        return new Response('{"access_token":"new-token"}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":8}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual([]);
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('очищает локальную тренировку при отклонённой Telegram-сессии', async () => {
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init-data' } });
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    saveActiveWorkoutSnapshot(7, activeWorkout);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input).endsWith('/public/config')) return new Response('{}', { status: 200 });
+      return new Response('{}', { status: 401 });
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined());
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
   });
 
   it('не открывает private snapshot без access token', async () => {

@@ -208,14 +208,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: { init_data: initData },
         retryAuth: false,
       });
-      clearCurrentUserData();
-      setUser(null);
+      const current = await api<User>('/api/v1/me', {
+        headers: { Authorization: `Bearer ${token.access_token}` },
+        retryAuth: false,
+      });
+      const previousUserId =
+        userIdRef.current ?? Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+      if (!previousUserId || previousUserId !== current.id) {
+        clearCurrentUserData();
+        setUser(null);
+        queryClient.clear();
+      }
       setError(null);
-      queryClient.clear();
       setAccessToken(token.access_token);
-      await reloadUser();
+      acceptAuthenticatedUser(current);
     },
-    [clearCurrentUserData, queryClient, reloadUser],
+    [acceptAuthenticatedUser, clearCurrentUserData, queryClient],
   );
 
   const devLogin = useCallback(
@@ -336,18 +344,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const tg = window.Telegram?.WebApp;
         if (tg?.initData?.trim()) {
-          await revokeWebPushSubscription().catch(() => undefined);
-          clearCurrentUserData();
-          clearAccessToken();
-          setUser(null);
-          queryClient.clear();
           try {
             await telegramLogin(tg);
           } catch (reason) {
             if (!cancelled) {
-              setError(
-                reason instanceof Error ? reason.message : 'Не удалось войти через Telegram',
-              );
+              const cached =
+                reason instanceof ApiError && reason.status === 0
+                  ? await offlineWorkoutUser()
+                  : null;
+              if (cached) {
+                userIdRef.current = cached.id;
+                setUser(cached);
+                setError(null);
+              } else {
+                clearAccessToken();
+                clearCurrentUserData();
+                setUser(null);
+                queryClient.clear();
+                setError(
+                  reason instanceof Error ? reason.message : 'Не удалось войти через Telegram',
+                );
+              }
             }
           }
           return;

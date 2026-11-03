@@ -434,7 +434,7 @@ export default function MiniAppPage({
       data-motion-surface={section === 'progress' ? 'progress' : undefined}
       onAnimationEnd={sectionMotion.onMotionAnimationEnd}
     >
-      <ActiveWorkoutSyncNotice />
+      {section !== 'today' && <ActiveWorkoutSyncNotice />}
       {showSectionHero && (
         <header className="card hero-card">
           <div>
