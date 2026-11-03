@@ -84,10 +84,12 @@ export function useModalA11y<T extends HTMLElement>(
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => {
       const panel = panelRef.current;
+      if (!panel || modalStack.at(-1) !== panelRef || panel.contains(document.activeElement))
+        return;
       const preferred = initialFocusSelector
-        ? panel?.querySelector<HTMLElement>(initialFocusSelector)
+        ? panel.querySelector<HTMLElement>(initialFocusSelector)
         : null;
-      const first = panel?.querySelector<HTMLElement>(focusableSelector);
+      const first = panel.querySelector<HTMLElement>(focusableSelector);
       (preferred ?? first ?? panel)?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
