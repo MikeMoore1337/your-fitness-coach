@@ -280,20 +280,18 @@ describe('active workout durable queue', () => {
     );
     const pending = loadActiveWorkoutQueue(7, 42).queue;
     expect(pending).toHaveLength(1);
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            id: 201,
-            actual_reps: 8,
-            actual_weight: 40,
-            is_completed: true,
-            version: 2,
-          }),
-          { status: 200 },
-        ),
-      );
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 201,
+          actual_reps: 8,
+          actual_weight: 40,
+          is_completed: true,
+          version: 2,
+        }),
+        { status: 200 },
+      ),
+    );
     await act(async () => {
       setOnline(true);
       window.dispatchEvent(new Event('online'));
