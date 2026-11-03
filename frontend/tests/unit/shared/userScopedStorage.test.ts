@@ -57,4 +57,51 @@ describe('user-scoped browser storage registry', () => {
     for (const key of kept) expect(localStorage.getItem(key)).toBe('synthetic');
     for (const key of removed) expect(localStorage.getItem(key)).toBeNull();
   });
+
+  it('retains only scoped workouts with pending mutations on session expiry', () => {
+    const key7 = `${activeWorkoutQueueStorageKey(7, 42)}:v3`;
+    const legacy7 = activeWorkoutQueueStorageKey(7, 42);
+    const key8 = `${activeWorkoutQueueStorageKey(8, 43)}:v3`;
+    const empty = `${activeWorkoutQueueStorageKey(7, 44)}:v3`;
+    localStorage.setItem(
+      key7,
+      JSON.stringify({
+        schema_version: 3,
+        user_id: 7,
+        workout_id: 42,
+        queue: [{ mutation_id: 'synthetic' }],
+      }),
+    );
+    localStorage.setItem(
+      legacy7,
+      JSON.stringify({ schema_version: 1, user_id: 7, workout_id: 42, queue: [] }),
+    );
+    localStorage.setItem(
+      key8,
+      JSON.stringify({
+        schema_version: 3,
+        user_id: 8,
+        workout_id: 43,
+        queue: [{ mutation_id: 'synthetic' }],
+      }),
+    );
+    localStorage.setItem(
+      empty,
+      JSON.stringify({ schema_version: 3, user_id: 7, workout_id: 44, queue: [] }),
+    );
+    localStorage.setItem(activeWorkoutPointerStorageKey(7), '42');
+    localStorage.setItem(activeWorkoutRestStorageKey(7, 42), 'private rest');
+    localStorage.setItem('fit_food_draft_7', 'private food');
+    sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '7');
+
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+
+    for (const key of [key7, legacy7, activeWorkoutPointerStorageKey(7)]) {
+      expect(localStorage.getItem(key)).not.toBeNull();
+    }
+    for (const key of [key8, empty, activeWorkoutRestStorageKey(7, 42), 'fit_food_draft_7']) {
+      expect(localStorage.getItem(key)).toBeNull();
+    }
+    expect(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)).toBeNull();
+  });
 });

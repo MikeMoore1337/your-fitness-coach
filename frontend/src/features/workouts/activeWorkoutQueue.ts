@@ -13,6 +13,7 @@ import { getApiRuntime } from '../../shared/runtime/runtime';
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 
 export const ACTIVE_WORKOUT_QUEUE_VERSION = 3 as const;
+export const ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT = 'fit:active-workout-queue-changed';
 const LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION = 1 as const;
 const PREVIOUS_ACTIVE_WORKOUT_QUEUE_VERSION = 2 as const;
 const MAX_QUEUE_LENGTH = 256;
@@ -593,6 +594,18 @@ export function clearActiveWorkoutDataForUser(userId: number): void {
       if (key && prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
     }
     localStorage.removeItem(activeWorkoutPointerKey(userId));
+  } catch {
+    // Storage is optional in restrictive webviews.
+  }
+}
+
+export function discardActiveWorkoutDataAfterAuthChange(userId: number, workoutId: number): void {
+  try {
+    localStorage.removeItem(activeWorkoutQueueKey(userId, workoutId));
+    localStorage.removeItem(legacyActiveWorkoutQueueKey(userId, workoutId));
+    localStorage.removeItem(activeWorkoutRestKey(userId, workoutId));
+    const pointerKey = activeWorkoutPointerKey(userId);
+    if (localStorage.getItem(pointerKey) === String(workoutId)) localStorage.removeItem(pointerKey);
   } catch {
     // Storage is optional in restrictive webviews.
   }

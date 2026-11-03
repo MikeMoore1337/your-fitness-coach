@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, getUserFacingErrorMessage } from '../../shared/api/client';
+import {
+  api,
+  ApiError,
+  authDiscardChanged,
+  authDiscardSnapshot,
+  getUserFacingErrorMessage,
+} from '../../shared/api/client';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
 import type { Workout, WorkoutStatus } from '../../shared/api/types';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../../shared/telegram/layout';
 import {
+  ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT,
   acknowledgeLegacyWorkoutMutation,
   acknowledgeWorkoutMutation,
   activeWorkoutLockName,
   activeWorkoutQueueKey,
   clearActiveWorkoutData,
+  discardActiveWorkoutDataAfterAuthChange,
   emptyActiveWorkoutQueue,
   enqueueWorkoutMutation,
   latestMutationForSet,
@@ -90,6 +98,10 @@ async function updateCachedSet(
 export function useActiveWorkoutQueue(userId: number | undefined, workout: Workout | undefined) {
   const queryClient = useQueryClient();
   const workoutId = workout?.id;
+  const discardSnapshot = useMemo(
+    () => ({ ...authDiscardSnapshot(), userId, workoutId }),
+    [userId, workoutId],
+  );
   const validSetIds = useMemo(
     () =>
       new Set(workout?.exercises.flatMap((exercise) => exercise.sets.map((set) => set.id)) ?? []),
@@ -103,7 +115,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   }>(() => ({
     key,
     data:
-      userId && workoutId
+      userId && workoutId && !authDiscardChanged(discardSnapshot)
         ? loadActiveWorkoutQueue(userId, workoutId, validSetIds, workout)
         : emptyActiveWorkoutQueue(0, 0),
   }));
@@ -112,10 +124,10 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const [durable, setDurable] = useState(true);
   const loadedState = useMemo(
     () =>
-      userId && workoutId
+      userId && workoutId && !authDiscardChanged(discardSnapshot)
         ? loadActiveWorkoutQueue(userId, workoutId, validSetIds, workout)
         : emptyActiveWorkoutQueue(0, 0),
-    [userId, validSetIds, workout, workoutId],
+    [discardSnapshot, userId, validSetIds, workout, workoutId],
   );
   const state = storedState.key === key ? storedState.data : loadedState;
   const [syncState, setSyncState] = useState<SyncState>('idle');
@@ -128,18 +140,31 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const flushPromise = useRef<Promise<boolean> | null>(null);
   const enqueuePromise = useRef<Promise<void> | null>(null);
 
-  const persist = useCallback((next: ActiveWorkoutQueue, requireDurable = false) => {
-    const durable = saveActiveWorkoutQueue(next);
-    storageAvailable.current = durable;
-    setDurable(durable);
-    if (requireDurable && !durable) return false;
-    memoryState.current = next;
-    setStoredState({ key: activeWorkoutQueueKey(next.user_id, next.workout_id), data: next });
-    return durable;
-  }, []);
+  const persist = useCallback(
+    (next: ActiveWorkoutQueue, requireDurable = false) => {
+      if (authDiscardChanged(discardSnapshot)) return false;
+      const durable = saveActiveWorkoutQueue(next);
+      if (authDiscardChanged(discardSnapshot)) {
+        discardActiveWorkoutDataAfterAuthChange(next.user_id, next.workout_id);
+        return false;
+      }
+      storageAvailable.current = durable;
+      setDurable(durable);
+      if (requireDurable && !durable) return false;
+      memoryState.current = next;
+      setStoredState({ key: activeWorkoutQueueKey(next.user_id, next.workout_id), data: next });
+      if (durable)
+        window.dispatchEvent(
+          new CustomEvent(ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT, { detail: next.user_id }),
+        );
+      return durable;
+    },
+    [discardSnapshot],
+  );
 
   const readFresh = useCallback(() => {
-    if (!userId || !workoutId) return emptyActiveWorkoutQueue(0, 0);
+    if (!userId || !workoutId || authDiscardChanged(discardSnapshot))
+      return emptyActiveWorkoutQueue(0, 0);
     if (!storageAvailable.current) {
       const current = memoryState.current;
       return current.user_id === userId && current.workout_id === workoutId
@@ -149,15 +174,25 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     const fresh = loadActiveWorkoutQueue(userId, workoutId, validSetIds, workout);
     memoryState.current = fresh;
     return fresh;
-  }, [userId, validSetIds, workout, workoutId]);
+  }, [discardSnapshot, userId, validSetIds, workout, workoutId]);
 
   const persistSnapshot = useCallback(() => {
-    if (!userId || !workout || workout.status !== 'in_progress') return;
+    if (
+      !userId ||
+      !workout ||
+      workout.status !== 'in_progress' ||
+      authDiscardChanged(discardSnapshot)
+    )
+      return;
     const next = saveActiveWorkoutSnapshot(userId, workout);
+    if (authDiscardChanged(discardSnapshot)) {
+      discardActiveWorkoutDataAfterAuthChange(userId, workout.id);
+      return;
+    }
     if (!next) return;
     memoryState.current = next;
     setStoredState({ key: activeWorkoutQueueKey(userId, workout.id), data: next });
-  }, [userId, workout]);
+  }, [discardSnapshot, userId, workout]);
 
   const persistSnapshotWithLock = useCallback(() => {
     if (!lockName) {
@@ -392,7 +427,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       immediate = false,
       onlyIfNoPending = false,
     ): Promise<boolean> => {
-      if (!userId || !workoutId || !lockName) return false;
+      if (!userId || !workoutId || !lockName || authDiscardChanged(discardSnapshot)) return false;
       let releaseEnqueue!: () => void;
       const currentEnqueue = new Promise<void>((resolve) => {
         releaseEnqueue = resolve;
@@ -404,7 +439,14 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
         setSyncState(navigator.onLine ? 'pending' : 'offline');
         try {
           const result = await crossContextCoordinator.run(lockName, () => {
-            const fresh = readFresh();
+            if (authDiscardChanged(discardSnapshot)) return { durable: false, skipped: true };
+            let fresh = readFresh();
+            if (!fresh.workout_snapshot && workout?.status === 'in_progress')
+              fresh = saveActiveWorkoutSnapshot(userId, workout) ?? fresh;
+            if (authDiscardChanged(discardSnapshot)) {
+              discardActiveWorkoutDataAfterAuthChange(userId, workoutId);
+              return { durable: false, skipped: true };
+            }
             if (onlyIfNoPending && latestMutationForSet(fresh, setId)) {
               return { durable: false, skipped: true };
             }
@@ -448,7 +490,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
         if (enqueuePromise.current === currentEnqueue) enqueuePromise.current = null;
       }
     },
-    [flushNow, lockName, persist, readFresh, userId, workoutId],
+    [discardSnapshot, flushNow, lockName, persist, readFresh, userId, workout, workoutId],
   );
 
   const changePlannedTarget = useCallback(

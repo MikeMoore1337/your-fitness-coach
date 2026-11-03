@@ -5,11 +5,27 @@ const ACCESS_TOKEN_KEY = 'fit_access_token';
 const AUTH_CHANNEL_NAME = 'fit_auth_session';
 const AUTH_STORAGE_EVENT_KEY = 'fit_auth_session_event_v1';
 const AUTH_GENERATION_KEY = 'fit_auth_session_generation_v1';
+const AUTH_DISCARD_GENERATION_KEY = 'fit_auth_discard_generation_v1';
 const AUTH_REFRESH_LOCK_NAME = 'fit-auth-refresh';
 export const AUTH_LOGOUT_EVENT = 'fit:auth-logout';
-const AUTH_TOKEN_RECEIVED_EVENT = 'fit:auth-token-received';
+export const AUTH_SESSION_EXPIRED_EVENT = 'fit:auth-session-expired';
+export const AUTH_ACCOUNT_SWITCH_EVENT = 'fit:auth-account-switch';
+export const AUTH_TOKEN_RECEIVED_EVENT = 'fit:auth-token-received';
 
-type AuthChannelMessage = { type: 'access-token'; token: string } | { type: 'logout' };
+type AuthChannelMessage =
+  | { type: 'access-token'; token: string }
+  | { type: 'logout' | 'session-expired' }
+  | { type: 'account-switch'; userId: number };
+
+let authRevision = 0;
+let authBoundaryRevision = 0;
+let authDiscardRevision = 0;
+
+function recordAuthChange(type: AuthChannelMessage['type']): void {
+  authRevision += 1;
+  if (type !== 'session-expired') authBoundaryRevision += 1;
+  if (type === 'logout' || type === 'account-switch') authDiscardRevision += 1;
+}
 
 const authChannel =
   typeof window !== 'undefined' && typeof window.BroadcastChannel === 'function'
@@ -18,11 +34,23 @@ const authChannel =
 
 function receiveAuthMessage(message: AuthChannelMessage): void {
   if (message.type === 'access-token' && typeof message.token === 'string') {
+    recordAuthChange(message.type);
     sessionStorage.setItem(ACCESS_TOKEN_KEY, message.token);
     window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
-  } else if (message.type === 'logout') {
+  } else if (message.type === 'logout' || message.type === 'session-expired') {
+    recordAuthChange(message.type);
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
+    window.dispatchEvent(
+      new Event(message.type === 'logout' ? AUTH_LOGOUT_EVENT : AUTH_SESSION_EXPIRED_EVENT),
+    );
+  } else if (
+    message.type === 'account-switch' &&
+    Number.isSafeInteger(message.userId) &&
+    message.userId > 0
+  ) {
+    recordAuthChange(message.type);
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: message.userId }));
   }
 }
 
@@ -35,7 +63,12 @@ window.addEventListener('storage', (event) => {
   if (event.key !== AUTH_STORAGE_EVENT_KEY || authChannel || !event.newValue) return;
   try {
     const envelope = JSON.parse(event.newValue) as { message?: AuthChannelMessage };
-    if (envelope.message?.type === 'logout' || envelope.message?.type === 'access-token') {
+    if (
+      envelope.message?.type === 'logout' ||
+      envelope.message?.type === 'session-expired' ||
+      envelope.message?.type === 'account-switch' ||
+      envelope.message?.type === 'access-token'
+    ) {
       receiveAuthMessage(envelope.message);
     }
   } catch {
@@ -68,13 +101,16 @@ function authGeneration(): string | null {
   }
 }
 
-function advanceAuthGeneration(): void {
+function advanceAuthGeneration(type: AuthChannelMessage['type']): void {
+  recordAuthChange(type);
   try {
     const id =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
     localStorage.setItem(AUTH_GENERATION_KEY, id);
+    if (type === 'logout' || type === 'account-switch')
+      localStorage.setItem(AUTH_DISCARD_GENERATION_KEY, id);
   } catch {
     // BroadcastChannel remains the primary transport when shared storage is unavailable.
   }
@@ -205,15 +241,44 @@ export function getAccessToken(): string | null {
 
 export function setAccessToken(token: string): void {
   sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-  advanceAuthGeneration();
+  advanceAuthGeneration('access-token');
   broadcastAuthMessage({ type: 'access-token', token });
 }
 
 export function clearAccessToken(): void {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  advanceAuthGeneration();
+  advanceAuthGeneration('logout');
   window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
   broadcastAuthMessage({ type: 'logout' });
+}
+
+export function expireAccessToken(): void {
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  advanceAuthGeneration('session-expired');
+  window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+  broadcastAuthMessage({ type: 'session-expired' });
+}
+
+export function switchAuthenticatedAccount(userId: number): void {
+  if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error('Invalid account ID');
+  advanceAuthGeneration('account-switch');
+  window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: userId }));
+  broadcastAuthMessage({ type: 'account-switch', userId });
+}
+
+export function authDiscardSnapshot() {
+  let generation: string | null = null;
+  try {
+    generation = localStorage.getItem(AUTH_DISCARD_GENERATION_KEY);
+  } catch {
+    // The in-memory revision still protects this tab when storage is unavailable.
+  }
+  return { generation, revision: authDiscardRevision };
+}
+
+export function authDiscardChanged(snapshot: ReturnType<typeof authDiscardSnapshot>): boolean {
+  const current = authDiscardSnapshot();
+  return snapshot.generation !== current.generation || snapshot.revision !== current.revision;
 }
 
 async function responseError(response: Response): Promise<ApiError> {
@@ -230,6 +295,8 @@ async function responseError(response: Response): Promise<ApiError> {
 let refreshPromise: Promise<boolean> | null = null;
 
 async function requestAccessTokenRefresh(tokenBeforeRequest: string | null): Promise<boolean> {
+  const session = authSessionSnapshot();
+  const discard = authDiscardSnapshot();
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 15_000);
   try {
@@ -240,22 +307,33 @@ async function requestAccessTokenRefresh(tokenBeforeRequest: string | null): Pro
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
+    if (authDiscardChanged(discard)) return false;
+    if (authSessionChanged(session)) {
+      const winnerToken = getAccessToken();
+      return Boolean(winnerToken && winnerToken !== tokenBeforeRequest);
+    }
     if (!response.ok) {
       const winnerToken = getAccessToken();
       if (winnerToken && winnerToken !== tokenBeforeRequest) return true;
-      if (response.status === 401 || response.status === 403) clearAccessToken();
+      if (response.status === 401 || response.status === 403) expireAccessToken();
       return false;
     }
     const data = (await response.json()) as { access_token?: unknown };
+    if (authDiscardChanged(discard)) return false;
+    if (authSessionChanged(session)) {
+      const winnerToken = getAccessToken();
+      return Boolean(winnerToken && winnerToken !== tokenBeforeRequest);
+    }
     if (typeof data.access_token !== 'string' || !data.access_token) {
       const winnerToken = getAccessToken();
       if (winnerToken && winnerToken !== tokenBeforeRequest) return true;
-      clearAccessToken();
+      expireAccessToken();
       return false;
     }
     setAccessToken(data.access_token);
     return true;
   } catch {
+    if (authDiscardChanged(discard)) return false;
     const winnerToken = getAccessToken();
     return Boolean(winnerToken && winnerToken !== tokenBeforeRequest);
   } finally {
@@ -268,12 +346,16 @@ export async function coordinateAccessTokenRefresh(
 ): Promise<boolean> {
   const tokenBeforeLock = getAccessToken();
   const generationBeforeLock = authGeneration();
+  const revisionBeforeLock = authRevision;
+  const discard = authDiscardSnapshot();
   try {
     return await coordinator.run(AUTH_REFRESH_LOCK_NAME, async () => {
+      if (authDiscardChanged(discard)) return false;
       const tokenAfterLock = getAccessToken();
       if (tokenAfterLock && tokenAfterLock !== tokenBeforeLock) return true;
-      if (authGeneration() !== generationBeforeLock) {
-        return waitForWinnerToken(tokenBeforeLock);
+      if (authGeneration() !== generationBeforeLock || authRevision !== revisionBeforeLock) {
+        const winner = await waitForWinnerToken(tokenBeforeLock);
+        return !authDiscardChanged(discard) && winner;
       }
       return requestAccessTokenRefresh(tokenAfterLock);
     });
@@ -300,14 +382,37 @@ export interface ApiOptions extends Omit<RequestInit, 'body'> {
   retryAuth?: boolean;
 }
 
+function authSessionSnapshot() {
+  return {
+    token: getAccessToken(),
+    generation: authGeneration(),
+    revision: authRevision,
+    boundaryRevision: authBoundaryRevision,
+  };
+}
+
+function authSessionChanged(session: ReturnType<typeof authSessionSnapshot>): boolean {
+  return (
+    session.token !== getAccessToken() ||
+    session.generation !== authGeneration() ||
+    session.revision !== authRevision
+  );
+}
+
+function assertCurrentAuthSession(session: ReturnType<typeof authSessionSnapshot>): void {
+  if (authSessionChanged(session)) throw new DOMException('Сессия изменилась', 'AbortError');
+}
+
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { body, timeoutMs = 15_000, retryAuth = true, headers, signal, ...init } = options;
+  const discard = authDiscardSnapshot();
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   const abortFromCaller = () => controller.abort(signal?.reason);
   if (signal?.aborted) abortFromCaller();
   else signal?.addEventListener('abort', abortFromCaller, { once: true });
-  const token = getAccessToken();
+  const session = authSessionSnapshot();
+  const token = session.token;
   const formData = typeof FormData !== 'undefined' && body instanceof FormData;
   const runtime = getApiRuntime();
   try {
@@ -351,16 +456,28 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
           }
         : {}),
     });
-    if (response.status === 401 && retryAuth && (await refreshAccessToken())) {
-      return api<T>(path, { ...options, retryAuth: false });
+    assertCurrentAuthSession(session);
+    if (response.status === 401 && retryAuth) {
+      const refreshed = await refreshAccessToken();
+      if (authDiscardChanged(discard)) throw new DOMException('Сессия изменилась', 'AbortError');
+      if (refreshed) return api<T>(path, { ...options, retryAuth: false });
+      if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
     }
-    if (!response.ok) throw await responseError(response);
+    if (!response.ok) {
+      const error = await responseError(response);
+      if (response.status !== 401 || !retryAuth) assertCurrentAuthSession(session);
+      else if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
+      throw error;
+    }
     if (response.status === 204) return undefined as T;
     const text = await response.text();
+    assertCurrentAuthSession(session);
     return (text ? JSON.parse(text) : null) as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      if (signal?.aborted) throw error;
+      if (signal?.aborted || authSessionChanged(session)) throw error;
       throw new ApiError('Сервер не ответил вовремя. Попробуйте снова.', 0);
     }
     if (error instanceof TypeError) {
@@ -388,25 +505,41 @@ export async function apiFile(
   path: string,
   { retryAuth = true }: { retryAuth?: boolean } = {},
 ): Promise<ApiFile> {
+  const discard = authDiscardSnapshot();
   if (getApiRuntime().kind === 'demo') {
     throw new ApiError('Скачивание файлов недоступно в демо-режиме.', 403);
   }
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 15_000);
-  const token = getAccessToken();
+  const session = authSessionSnapshot();
+  const token = session.token;
   try {
     const response = await fetch(path, {
       credentials: 'same-origin',
       signal: controller.signal,
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    if (response.status === 401 && retryAuth && (await refreshAccessToken())) {
-      return apiFile(path, { retryAuth: false });
+    assertCurrentAuthSession(session);
+    if (response.status === 401 && retryAuth) {
+      const refreshed = await refreshAccessToken();
+      if (authDiscardChanged(discard)) throw new DOMException('Сессия изменилась', 'AbortError');
+      if (refreshed) return apiFile(path, { retryAuth: false });
+      if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
     }
-    if (!response.ok) throw await responseError(response);
-    return { blob: await response.blob(), filename: responseFilename(response) };
+    if (!response.ok) {
+      const error = await responseError(response);
+      if (response.status !== 401 || !retryAuth) assertCurrentAuthSession(session);
+      else if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
+      throw error;
+    }
+    const blob = await response.blob();
+    assertCurrentAuthSession(session);
+    return { blob, filename: responseFilename(response) };
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
+      if (authSessionChanged(session)) throw error;
       throw new ApiError('Сервер не ответил вовремя. Попробуйте снова.', 0);
     }
     if (error instanceof TypeError) {

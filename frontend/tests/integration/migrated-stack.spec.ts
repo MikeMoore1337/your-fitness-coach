@@ -16,7 +16,7 @@ function syntheticTelegramInitData(userId: number): string {
   return new URLSearchParams({ ...fields, hash }).toString();
 }
 
-for (const surface of ['pwa', 'telegram'] as const) {
+for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
   test(`PostgreSQL offline ${surface} reload automatically replays a saved set once`, async ({
     page,
     request,
@@ -33,7 +33,7 @@ for (const surface of ['pwa', 'telegram'] as const) {
     });
     expect(login.status()).toBe(200);
     const token = (await login.json()).access_token as string;
-    const headers = { Authorization: `Bearer ${token}` };
+    let headers = { Authorization: `Bearer ${token}` };
     const catalog = await page.request.get('/api/v1/programs/exercises', { headers });
     expect(catalog.status()).toBe(200);
     const exercise = (await catalog.json()).find(
@@ -76,10 +76,16 @@ for (const surface of ['pwa', 'telegram'] as const) {
     const before = await page.request.get('/api/v1/workouts/today', { headers });
     expect(before.status()).toBe(200);
     const workoutId = (await before.json()).id as number;
-    await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+    await page.addInitScript(
+      ({ value, expiry }) => {
+        if (!expiry || sessionStorage.getItem('audit_skip_initial_token') !== '1')
+          sessionStorage.setItem('fit_access_token', value);
+      },
+      { value: token, expiry: surface === 'pwa-expiry' },
+    );
     if (surface === 'telegram') await installTelegramHarness(page, { initData });
     await page.goto('/app?section=today');
-    if (surface === 'pwa') {
+    if (surface !== 'telegram') {
       await page.waitForFunction(() => navigator.serviceWorker.ready.then(() => true));
       if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))))
         await page.reload();
@@ -88,7 +94,13 @@ for (const surface of ['pwa', 'telegram'] as const) {
         .toContain('/sw.js');
     }
     const other = await page.context().newPage();
-    await other.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+    await other.addInitScript(
+      ({ value, expiry }) => {
+        if (!expiry || sessionStorage.getItem('audit_skip_initial_token') !== '1')
+          sessionStorage.setItem('fit_access_token', value);
+      },
+      { value: token, expiry: surface === 'pwa-expiry' },
+    );
     if (surface === 'telegram') await installTelegramHarness(other, { initData });
     await other.goto('/app?section=profile');
     await expect(other.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
@@ -152,12 +164,13 @@ for (const surface of ['pwa', 'telegram'] as const) {
       const body = request.postDataJSON();
       if (body.is_completed === true) replayBodies.push(body);
     });
-    if (surface === 'telegram') {
+    if (surface === 'telegram' || surface === 'pwa-expiry') {
       await page.evaluate(() => {
         sessionStorage.setItem('audit_force_offline', '1');
-        sessionStorage.removeItem('fit_authenticated_user_id');
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
       });
+      if (surface === 'telegram')
+        await page.evaluate(() => sessionStorage.removeItem('fit_authenticated_user_id'));
       await other.evaluate(() =>
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: false }),
       );
@@ -167,6 +180,65 @@ for (const surface of ['pwa', 'telegram'] as const) {
       });
     }
     await page.context().setOffline(false);
+    if (surface === 'pwa-expiry') {
+      const pending = await page.evaluate(() => {
+        const key = Object.keys(localStorage).find(
+          (name) => name.startsWith('fit_active_workout_v1_user_') && name.endsWith(':v3'),
+        );
+        return key ? { key, value: localStorage.getItem(key) } : null;
+      });
+      expect(pending?.value).toBeTruthy();
+      expect(JSON.parse(pending!.value!).queue).toHaveLength(1);
+      await page.evaluate(() => sessionStorage.setItem('audit_skip_initial_token', '1'));
+      await other.evaluate(() => sessionStorage.setItem('audit_skip_initial_token', '1'));
+      const observer = await request.post('/api/v1/auth/dev-login', {
+        data: { telegram_user_id: telegramUserId, full_name: 'Синтетическая проверка' },
+      });
+      expect(observer.status()).toBe(200);
+      const revoked = await page.request.post('/api/v1/auth/logout', { headers, data: {} });
+      expect(revoked.status()).toBe(200);
+      headers = { Authorization: `Bearer ${(await observer.json()).access_token as string}` };
+      await page.reload();
+      await expect(page).toHaveURL(/\/login/);
+      await expect
+        .poll(() => other.evaluate(() => sessionStorage.getItem('fit_access_token')))
+        .toBeNull();
+      expect(await page.evaluate((key) => localStorage.getItem(key), pending!.key)).toBe(
+        pending!.value,
+      );
+      expect(
+        (await (await request.get('/api/v1/workouts/today', { headers })).json()).exercises[0]
+          .sets[0].is_completed,
+      ).toBe(false);
+      await page.reload();
+      await expect(page).toHaveURL(/\/login/);
+      expect(await page.evaluate((key) => localStorage.getItem(key), pending!.key)).toBe(
+        pending!.value,
+      );
+      await page.context().route('**/api/v1/auth/dev-login', (route) =>
+        route.continue({
+          postData: JSON.stringify({
+            telegram_user_id: telegramUserId,
+            full_name: 'Синтетическая проверка',
+          }),
+        }),
+      );
+      const authenticating = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          new URL(response.url()).pathname === '/api/v1/auth/dev-login',
+      );
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      expect((await authenticating).status()).toBe(200);
+      await expect(page).toHaveURL(/\/app/);
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Изменения тренировки сохранены' }),
+      ).toBeVisible();
+      expect(await page.evaluate((key) => localStorage.getItem(key), pending!.key)).toBe(
+        pending!.value,
+      );
+      await page.context().unroute('**/api/v1/auth/dev-login');
+    }
     if (surface === 'telegram') {
       const authenticating = page.waitForResponse(
         (response) =>
@@ -191,7 +263,7 @@ for (const surface of ['pwa', 'telegram'] as const) {
       Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
       window.dispatchEvent(new Event('online'));
     });
-    if (surface === 'telegram') {
+    if (surface === 'telegram' || surface === 'pwa-expiry') {
       await other.evaluate(() => {
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
         window.dispatchEvent(new Event('online'));

@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,7 +25,15 @@ import {
   ActiveWorkoutSyncProvider,
 } from '../../../../src/features/workouts/ActiveWorkoutSync';
 import { createCrossContextCoordinator } from '../../../../src/shared/browser/crossContextLock';
-import { activeWorkoutPointerStorageKey } from '../../../../src/shared/userScopedStorage';
+import {
+  clearAccessToken,
+  expireAccessToken,
+  switchAuthenticatedAccount,
+} from '../../../../src/shared/api/client';
+import {
+  activeWorkoutPointerStorageKey,
+  clearSensitiveUserScopedStorage,
+} from '../../../../src/shared/userScopedStorage';
 
 const workout: Workout = {
   id: 42,
@@ -179,6 +187,166 @@ describe('active workout durable queue', () => {
   beforeEach(() => {
     localStorage.clear();
     setOnline(false);
+  });
+
+  async function finishEnqueueAfterSessionChange(
+    endSession: () => void,
+    beforeRelease?: () => void,
+  ) {
+    let releaseLock!: () => void;
+    let waitingForLock!: () => void;
+    let finishLock!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      waitingForLock = resolve;
+    });
+    const finished = new Promise<void>((resolve) => {
+      finishLock = resolve;
+    });
+    let hold = false;
+    const originalLocks = navigator.locks;
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: async (_name: string, callback: () => Promise<unknown>) => {
+          if (hold) {
+            waitingForLock();
+            await gate;
+          }
+          const result = await callback();
+          if (hold) finishLock();
+          return result;
+        },
+      },
+    });
+    try {
+      const view = renderHarness();
+      await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42));
+      hold = true;
+      fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
+      await waiting;
+      endSession();
+      view.unmount();
+      beforeRelease?.();
+      await act(async () => {
+        releaseLock();
+        await finished;
+      });
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: originalLocks });
+    }
+  }
+
+  it('does not recreate a queued set after explicit logout while a storage lock is pending', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage();
+      clearAccessToken();
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('keeps a queued set and its snapshot when the session expires while a storage lock is pending', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+      expireAccessToken();
+    });
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
+    expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it('discovers a delayed queued set if the same account signs in before its storage lock opens', async () => {
+    await finishEnqueueAfterSessionChange(
+      () => {
+        clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+        expireAccessToken();
+      },
+      () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        render(
+          <QueryClientProvider client={queryClient}>
+            <ActiveWorkoutSyncProvider userId={7} enabled>
+              <ActiveWorkoutSyncNotice />
+            </ActiveWorkoutSyncProvider>
+          </QueryClientProvider>,
+        );
+      },
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('ожидают синхронизации'),
+    );
+    const pending = loadActiveWorkoutQueue(7, 42).queue;
+    expect(pending).toHaveLength(1);
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            id: 201,
+            actual_reps: 8,
+            actual_weight: 40,
+            is_completed: true,
+            version: 2,
+          }),
+          { status: 200 },
+        ),
+      );
+    await act(async () => {
+      setOnline(true);
+      window.dispatchEvent(new Event('online'));
+    });
+    await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      mutation_id: pending[0]?.mutation_id,
+      is_completed: true,
+    });
+  });
+
+  it('does not recreate a queued set after account switch while a storage lock is pending', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+      expireAccessToken();
+      switchAuthenticatedAccount(8);
+      clearSensitiveUserScopedStorage();
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it("notices another tab's discard generation before its logout message arrives", async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage();
+      localStorage.setItem('fit_auth_discard_generation_v1', 'other-tab-logout');
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('removes a write that races with logout between the guard and localStorage write', async () => {
+    renderHarness();
+    await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42));
+    const nativeSet = Storage.prototype.setItem;
+    let logoutInjected = false;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (this === localStorage && key === activeWorkoutQueueKey(7, 42) && !logoutInjected) {
+        logoutInjected = true;
+        clearSensitiveUserScopedStorage();
+        clearAccessToken();
+        nativeSet.call(this, activeWorkoutQueueKey(8, 43), 'new-account-data');
+      }
+      return nativeSet.call(this, key, value);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
+    await waitFor(() => expect(logoutInjected).toBe(true));
+    await waitFor(() => expect(screen.getByTestId('accepted')).toHaveTextContent('false'));
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+    expect(localStorage.getItem(activeWorkoutQueueKey(8, 43))).toBe('new-account-data');
   });
 
   afterEach(() => {
