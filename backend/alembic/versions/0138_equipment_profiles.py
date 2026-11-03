@@ -29,6 +29,19 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("SET LOCAL lock_timeout = '3s'")
+        op.execute("SET LOCAL statement_timeout = '30s'")
+        op.execute("LOCK TABLE user_profiles IN ACCESS EXCLUSIVE MODE")
+    if bind.execute(
+        sa.text(
+            "SELECT 1 FROM user_profiles WHERE equipment_profiles IS NOT NULL "
+            "OR active_equipment_profile_id IS NOT NULL "
+            "OR equipment_profiles_revision IS NOT NULL LIMIT 1"
+        )
+    ).first():
+        raise RuntimeError("Unsafe downgrade: equipment profile data exists; use forward-fix")
     op.drop_column("user_profiles", "equipment_profiles_revision")
     op.drop_column("user_profiles", "active_equipment_profile_id")
     op.drop_column("user_profiles", "equipment_profiles")

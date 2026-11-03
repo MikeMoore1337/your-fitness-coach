@@ -77,6 +77,12 @@ Rollback — owner-authorized `workflow_dispatch` operation `rollback` с ука
 Текущий release state выбирает предыдущую известную успешную revision, запускает существующий
 rollback helper и production smoke. Local controller state не требуется.
 
+Штатный откат приложения не выполняет Alembic downgrade и не восстанавливает базу.
+Downgrade миграции `0138` откажется удалять заполненные профили оборудования: сохраните
+схему и данные и подготовьте исправление вперёд. Если необходимо восстановление из копии,
+используйте [план восстановления](operations/v11-rec-01-off-host-backup-recovery.md):
+сначала проверьте копию и изменения после неё, затем получите отдельное разрешение владельца.
+
 Failed deploy не оставляет вечного local lock/owner: queued/running Actions завершает работу по
 native concurrency, а deployment evidence и health checks сообщают результат. Real deployment
 failure fail-closed; cleanup/archive failure — warning.
