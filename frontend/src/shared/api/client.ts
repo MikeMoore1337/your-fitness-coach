@@ -260,7 +260,8 @@ export function expireAccessToken(): void {
 }
 
 export function switchAuthenticatedAccount(userId: number): void {
-  if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error('Invalid account ID');
+  if (!Number.isSafeInteger(userId) || userId <= 0)
+    throw new Error('Некорректный идентификатор аккаунта');
   advanceAuthGeneration('account-switch');
   window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: userId }));
   broadcastAuthMessage({ type: 'account-switch', userId });
