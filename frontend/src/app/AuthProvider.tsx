@@ -109,15 +109,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userIdRef.current = null;
   }, []);
 
-  const acceptAuthenticatedUser = useCallback((current: User) => {
-    const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
-    const previousUserId =
-      userIdRef.current ?? (Number.isInteger(storedUserId) ? storedUserId : null);
-    if (previousUserId && previousUserId !== current.id) clearSensitiveUserScopedStorage();
-    sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, String(current.id));
-    userIdRef.current = current.id;
-    setUser(current);
-  }, []);
+  const acceptAuthenticatedUser = useCallback(
+    (current: User) => {
+      const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+      const previousUserId =
+        userIdRef.current ?? (Number.isInteger(storedUserId) ? storedUserId : null);
+      if (previousUserId && previousUserId !== current.id) {
+        clearSensitiveUserScopedStorage();
+        queryClient.clear();
+      }
+      sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, String(current.id));
+      userIdRef.current = current.id;
+      setUser(current);
+    },
+    [queryClient],
+  );
 
   const reloadUser = useCallback(async (): Promise<User | null> => {
     try {

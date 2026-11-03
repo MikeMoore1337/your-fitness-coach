@@ -36,11 +36,12 @@ const activeWorkout: Workout = {
 };
 
 function Harness() {
-  const { user, logout, devLogin } = useAuth();
+  const { user, logout, devLogin, reloadUser } = useAuth();
   return (
     <div>
       <span data-testid="user-id">{user?.id ?? 'none'}</span>
       <button onClick={() => void logout()}>Выйти</button>
+      <button onClick={() => void reloadUser()}>Обновить профиль</button>
       <button
         onClick={() =>
           void devLogin({
@@ -56,10 +57,11 @@ function Harness() {
   );
 }
 
-function renderProvider() {
-  const queryClient = new QueryClient({
+function renderProvider(
+  queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
+  }),
+) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -142,6 +144,28 @@ describe('AuthProvider active workout cleanup', () => {
     expect(localStorage.getItem('fit_program_days_user_7')).toBeNull();
     expect(localStorage.getItem('fit_notification_draft_7')).toBeNull();
     expect(localStorage.getItem('app-theme')).toBe('light');
+  });
+
+  it('очищает кэш тренировки при смене пользователя во время обновления сессии', async () => {
+    let meCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        meCalls += 1;
+        return new Response(JSON.stringify({ id: meCalls === 1 ? 7 : 8 }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderProvider(queryClient);
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    queryClient.setQueryData(['workout', 'today'], activeWorkout);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Обновить профиль' }));
+
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+    expect(queryClient.getQueryData(['workout', 'today'])).toBeUndefined();
   });
 
   it('восстанавливает offline-shell после refresh только для подтверждённой auth-сессии', async () => {

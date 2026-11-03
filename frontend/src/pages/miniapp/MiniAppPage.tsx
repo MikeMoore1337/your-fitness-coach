@@ -28,6 +28,10 @@ import '../../styles/semantic-cards.css';
 import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import { useExerciseNoteSync } from '../../features/workouts/useExerciseNoteSync';
+import {
+  ActiveWorkoutSyncNotice,
+  ActiveWorkoutSyncProvider,
+} from '../../features/workouts/ActiveWorkoutSync';
 
 const NotificationsPanel = lazy(() =>
   import('../../features/account/NotificationsPanel').then((module) => ({
@@ -430,6 +434,7 @@ export default function MiniAppPage({
       data-motion-surface={section === 'progress' ? 'progress' : undefined}
       onAnimationEnd={sectionMotion.onMotionAnimationEnd}
     >
+      <ActiveWorkoutSyncNotice />
       {showSectionHero && (
         <header className="card hero-card">
           <div>
@@ -688,11 +693,15 @@ export default function MiniAppPage({
       </section>
     </div>
   );
-  return renderShell ? (
-    <AppShell demo={demo} section={section}>
-      {content}
-    </AppShell>
-  ) : (
-    content
+  return (
+    <ActiveWorkoutSyncProvider userId={user?.id} enabled={runtime.kind === 'production'}>
+      {renderShell ? (
+        <AppShell demo={demo} section={section}>
+          {content}
+        </AppShell>
+      ) : (
+        content
+      )}
+    </ActiveWorkoutSyncProvider>
   );
 }

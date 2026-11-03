@@ -1,5 +1,181 @@
 import { expect, test } from '@playwright/test';
 
+test('PostgreSQL offline PWA reload automatically replays a saved set once', async ({
+  page,
+  request,
+}, info) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 393, height: 844 });
+  const login = await page.request.post('/api/v1/auth/dev-login', {
+    data: {
+      telegram_user_id: Date.now() * 10 + info.workerIndex,
+      full_name: 'Синтетическая проверка',
+    },
+  });
+  expect(login.status()).toBe(200);
+  const token = (await login.json()).access_token as string;
+  const headers = { Authorization: `Bearer ${token}` };
+  const catalog = await page.request.get('/api/v1/programs/exercises', { headers });
+  expect(catalog.status()).toBe(200);
+  const exercise = (await catalog.json()).find(
+    (item: { metric_type: string }) => item.metric_type === 'strength',
+  );
+  expect(exercise).toBeTruthy();
+  const created = await page.request.post('/api/v1/programs/templates', {
+    headers,
+    data: {
+      title: 'Синтетическая тренировка',
+      goal: 'strength',
+      level: 'beginner',
+      assign_after_create: false,
+      days: [
+        {
+          title: 'День',
+          exercises: [
+            {
+              exercise_id: exercise.id,
+              prescribed_sets: 1,
+              prescribed_reps: '8',
+              rest_seconds: 90,
+            },
+          ],
+        },
+      ],
+    },
+  });
+  expect(created.status()).toBe(200);
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date());
+  const weekday = (new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7;
+  const assigned = await page.request.post(
+    `/api/v1/programs/templates/${(await created.json()).template.id}/assign-to-me`,
+    {
+      headers,
+      data: { start_date: date, duration_weeks: 1, schedule_weekdays: [weekday] },
+    },
+  );
+  expect(assigned.status()).toBe(200);
+  const before = await page.request.get('/api/v1/workouts/today', { headers });
+  expect(before.status()).toBe(200);
+  const workoutId = (await before.json()).id as number;
+  await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+  await page.goto('/app?section=today');
+  await page.waitForFunction(() => navigator.serviceWorker.ready.then(() => true));
+  if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))))
+    await page.reload();
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? ''))
+    .toContain('/sw.js');
+  const starting = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === `/api/v1/workouts/${workoutId}/start`,
+  );
+  await page.getByRole('button', { name: 'Начать тренировку', exact: true }).first().click();
+  const started = await starting;
+  expect(started.status()).toBe(200);
+  const original = (await started.json()).exercises[0].sets[0];
+  const setId = original.id as number;
+  const other = await page.context().newPage();
+  await other.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+  await other.goto('/app?section=profile');
+  await expect(other.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
+  await page.context().setOffline(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await page
+    .getByLabel(/^Вес, .* подход 1$/)
+    .first()
+    .fill('42.5');
+  await page
+    .getByLabel(/^Повторы, .* подход 1$/)
+    .first()
+    .fill('8');
+  await page.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).first().click();
+  await page
+    .getByRole('button', { name: /^Завершить: .*подход 1$/ })
+    .first()
+    .click();
+  await expect(page.locator('.active-workout-sync')).toContainText(
+    'Изменения сохранены на этом устройстве',
+  );
+  const offlineServer = await request.get('/api/v1/workouts/today', { headers });
+  expect((await offlineServer.json()).exercises[0].sets[0]).toMatchObject({
+    id: setId,
+    is_completed: false,
+    version: original.version,
+  });
+  const navigation = await page.reload({ waitUntil: 'domcontentloaded' });
+  expect(navigation?.status()).toBe(200);
+  await expect(page.locator('#root')).not.toBeEmpty();
+  expect((await other.reload({ waitUntil: 'domcontentloaded' }))?.status()).toBe(200);
+  await expect(other.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
+  await expect(
+    other
+      .getByRole('status')
+      .filter({ hasText: /Изменения|Нет сети/ })
+      .first(),
+  ).toBeVisible();
+  const replayBodies: { mutation_id: string; is_completed: boolean }[] = [];
+  page.context().on('request', (request) => {
+    if (
+      request.method() !== 'PATCH' ||
+      new URL(request.url()).pathname !== `/api/v1/workouts/sets/${setId}`
+    )
+      return;
+    const body = request.postDataJSON();
+    if (body.is_completed === true) replayBodies.push(body);
+  });
+  await page.context().setOffline(false);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    window.dispatchEvent(new Event('online'));
+  });
+  await expect.poll(() => replayBodies.length).toBeGreaterThan(0);
+  await expect
+    .poll(async () => {
+      const current = await page.request.get('/api/v1/workouts/today', { headers });
+      return (await current.json()).exercises?.[0]?.sets?.[0]?.is_completed;
+    })
+    .toBe(true);
+  const saved = (await (await page.request.get('/api/v1/workouts/today', { headers })).json())
+    .exercises[0].sets[0];
+  expect(saved).toMatchObject({
+    id: setId,
+    actual_reps: 8,
+    rir: '2',
+    is_completed: true,
+    version: original.version + 1,
+  });
+  expect(Number(saved.actual_weight)).toBe(42.5);
+  const retry = await page.request.patch(`/api/v1/workouts/sets/${setId}`, {
+    headers,
+    data: replayBodies[0],
+  });
+  expect(retry.status()).toBe(200);
+  expect((await retry.json()).version).toBe(saved.version);
+  expect(new Set(replayBodies.map((body) => body.mutation_id)).size).toBe(1);
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'День' })).toContainText(
+    '1 из 1 подходов отмечено',
+  );
+  await page.getByRole('button', { name: 'Продолжить тренировку', exact: true }).click();
+  const finishing = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === `/api/v1/workouts/${workoutId}/finish`,
+  );
+  await page.getByRole('button', { name: 'Завершить тренировку', exact: true }).click();
+  expect((await finishing).status()).toBe(200);
+  const summary = await page.request.get('/api/v1/workouts/history/summary', { headers });
+  expect(await summary.json()).toMatchObject({
+    workouts_completed: 1,
+    completed_sets: 1,
+    volume_kg: 340,
+  });
+});
+
 const historyImports = [
   {
     label: 'hevy',
