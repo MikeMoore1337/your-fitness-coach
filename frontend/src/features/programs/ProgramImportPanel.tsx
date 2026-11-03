@@ -1,5 +1,5 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiFile, ApiError } from '../../shared/api/client';
 import type {
@@ -7,15 +7,83 @@ import type {
   ProgramImport,
   ProgramImportConfirmResponse,
   ProgramImportTarget,
+  ProgramTemplate,
 } from '../../shared/api/types';
+import { dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DisclosureIcon, Badge, Button, Card, Field, Input, Select } from '../../shared/ui/common';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { SearchableExercisePicker, type ExercisePickerExercise } from './SearchableExercisePicker';
+import {
+  assignmentPlanFromTemplate,
+  assignmentFirstDate,
+  ProgramAssignmentDialog,
+  type AssignmentSchedule,
+} from './ProgramAssignmentDialog';
 import './program-import.css';
 
 const PAGE_SIZE = 50;
 const WEEK_PAGE_SIZE = 8;
+const RECOVERY_KEY = 'program-import-confirmation-v1';
+type AssignmentRequest = AssignmentSchedule & {
+  replace_active: boolean;
+  expected_active_program_id: number | null;
+  expected_active_revision_number: number | null;
+};
+type Recovery = { id: string; intent: 'save' | 'assign'; assignment?: AssignmentRequest };
+type ImportResult = {
+  kind: 'saved' | 'assigned' | 'partial' | 'uncertain';
+  id: string;
+  title?: string;
+  template?: ProgramTemplate;
+  assignedId?: number;
+  scheduled?: boolean;
+  startDate?: string;
+  notCurrent?: boolean;
+  reason?: string;
+  message?: string;
+};
+
+function outcomeUnknown(error: unknown): boolean {
+  return (
+    !(error instanceof ApiError) ||
+    error.status === 0 ||
+    error.status >= 500 ||
+    error.status === 408 ||
+    error.status === 429
+  );
+}
+
+function assignmentFailureCode(error: unknown): string | undefined {
+  if (!(error instanceof ApiError) || !error.body || typeof error.body !== 'object')
+    return undefined;
+  const detail = (error.body as { detail?: unknown }).detail;
+  if (!detail || typeof detail !== 'object') return undefined;
+  const code = (detail as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function readRecovery(): Recovery | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(RECOVERY_KEY) ?? 'null') as Recovery | null;
+    return value &&
+      typeof value.id === 'string' &&
+      (value.intent === 'save' || value.intent === 'assign')
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberRecovery(value: Recovery | null): void {
+  try {
+    if (value) sessionStorage.setItem(RECOVERY_KEY, JSON.stringify(value));
+    else sessionStorage.removeItem(RECOVERY_KEY);
+  } catch {
+    // The current screen still supports recovery if storage is unavailable.
+  }
+}
 type WeekType = 'light' | 'medium' | 'heavy' | null;
 type MatrixImport = ProgramImport & {
   draft_version?: number | null;
@@ -269,6 +337,13 @@ function formatError(error: unknown): string {
   return 'Не удалось обработать файл. Попробуйте ещё раз.';
 }
 
+function formatStartDate(value: string): string {
+  return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' }).replace(
+    /\s*г\.$/,
+    '',
+  );
+}
+
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -286,8 +361,22 @@ function importLayoutLabel(layoutVersion: string | null | undefined): string {
   return layoutVersion ? (importLayoutLabels[layoutVersion] ?? 'табличный формат') : 'определяется';
 }
 
-export function ProgramImportPanel({ onImported }: { onImported?: () => void } = {}) {
-  const { toast } = useFeedback();
+export function ProgramImportPanel({
+  onImported,
+  allowSelfAssignment = false,
+  defaultStartDate = dateInputValue(new Date()),
+  onOpenTemplates,
+  onOpenProgram,
+  onOpenWorkout,
+}: {
+  onImported?: () => void;
+  allowSelfAssignment?: boolean;
+  defaultStartDate?: string;
+  onOpenTemplates?: () => void;
+  onOpenProgram?: (id: number) => void;
+  onOpenWorkout?: () => void;
+} = {}) {
+  const { toast, confirm: confirmAction } = useFeedback();
   const queryClient = useQueryClient();
   const [preview, setPreview] = useState<MatrixImport | null>(null);
   const [title, setTitle] = useState('');
@@ -308,6 +397,21 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recovery, setRecovery] = useState<Recovery | null>(() =>
+    allowSelfAssignment ? readRecovery() : null,
+  );
+  const [result, setResult] = useState<ImportResult | null>(() => {
+    const pending = allowSelfAssignment ? readRecovery() : null;
+    return pending ? { kind: 'uncertain', id: pending.id } : null;
+  });
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [confirmingReplacement, setConfirmingReplacement] = useState(false);
+  const requestLock = useRef(false);
+
+  const updateRecovery = (value: Recovery | null) => {
+    setRecovery(value);
+    rememberRecovery(value);
+  };
 
   const exercises = useQuery({
     queryKey: ['program-import', 'exercises'],
@@ -489,29 +593,47 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     )
       return;
     if (targetProgramId !== '' && !selectedTarget) return;
+    if (requestLock.current) return;
+    requestLock.current = true;
     setBusy(true);
     setError(null);
+    if (allowSelfAssignment && !selectedTarget) updateRecovery({ id: preview.id, intent: 'save' });
     try {
-      await api<ProgramImportConfirmResponse>(`/api/v1/programs/imports/${preview.id}/confirm`, {
-        method: 'POST',
-        body: {
-          target_program_id: selectedTarget?.program_id ?? null,
-          expected_revision_number: selectedTarget?.current_revision_number ?? null,
-          expected_draft_version: preview.draft_version ?? undefined,
+      const saved = await api<ProgramImportConfirmResponse>(
+        `/api/v1/programs/imports/${preview.id}/confirm`,
+        {
+          method: 'POST',
+          body: {
+            target_program_id: selectedTarget?.program_id ?? null,
+            expected_revision_number: selectedTarget?.current_revision_number ?? null,
+            expected_draft_version: preview.draft_version ?? undefined,
+          },
         },
-      });
-      setPreview(null);
-      await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      await queryClient.invalidateQueries({ queryKey: ['assigned-program'] });
-      await queryClient.invalidateQueries({ queryKey: ['program-import', 'targets'] });
-      onImported?.();
-      toast(
-        selectedTarget
-          ? 'Новая ревизия программы сохранена'
-          : 'Программа импортирована в личные шаблоны',
       );
+      setPreview(null);
+      if (allowSelfAssignment && !selectedTarget) {
+        setResult({ kind: 'saved', id: preview.id, title: saved.template.title });
+      }
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['templates'] }),
+        queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+        queryClient.invalidateQueries({ queryKey: ['program-import', 'targets'] }),
+      ]);
+      onImported?.();
+      if (!allowSelfAssignment || selectedTarget)
+        toast(
+          selectedTarget
+            ? 'Новая ревизия программы сохранена'
+            : 'Программа импортирована в личные шаблоны',
+        );
       trackProductEvent({ name: 'program_import_confirmed', surface: productEventSurface() });
     } catch (reason) {
+      if (allowSelfAssignment && !selectedTarget && outcomeUnknown(reason)) {
+        setResult({ kind: 'uncertain', id: preview.id });
+        setPreview(null);
+      } else if (allowSelfAssignment && !selectedTarget) {
+        updateRecovery(null);
+      }
       setError(
         reason instanceof ApiError && reason.status === 409
           ? 'Черновик или программа изменились. Проверьте актуальные данные и повторите подтверждение.'
@@ -519,6 +641,198 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
       );
       trackProductEvent({ name: 'program_import_failed', surface: productEventSurface() });
     } finally {
+      requestLock.current = false;
+      setBusy(false);
+    }
+  };
+
+  const finishAssignment = (
+    id: string,
+    template: ProgramTemplate,
+    assigned: { user_program_id: number; status: string; start_date: string },
+  ) => {
+    setPreview(null);
+    setAssignmentOpen(false);
+    setResult({
+      kind: 'assigned',
+      id,
+      title: template.title,
+      assignedId: assigned.user_program_id,
+      scheduled: assigned.status === 'scheduled',
+      startDate: assigned.start_date,
+      notCurrent: assigned.status !== 'scheduled' && assigned.status !== 'active',
+    });
+    updateRecovery({ id, intent: 'assign' });
+    void Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: ['templates'] }),
+      queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+      queryClient.invalidateQueries({ queryKey: ['workout'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    ]);
+    onImported?.();
+    trackProductEvent({ name: 'program_import_confirmed', surface: productEventSurface() });
+  };
+
+  const assign = async (schedule: AssignmentSchedule) => {
+    if (requestLock.current || (!preview && !result?.template)) return;
+    requestLock.current = true;
+    setBusy(true);
+    setError(null);
+    const importId = preview?.id ?? result!.id;
+    let savedTemplate = result?.template;
+    let assignmentRequest: AssignmentRequest | undefined;
+    try {
+      const templates = await api<ProgramTemplate[]>('/api/v1/programs/templates/mine');
+      const active = templates.find((item) => item.is_active_for_current_user);
+      if (
+        active &&
+        (active.assigned_program_id == null || active.current_revision_number == null)
+      ) {
+        throw new Error(
+          'Не удалось проверить текущую программу. Обновите данные и попробуйте снова.',
+        );
+      }
+      const newTitle = savedTemplate?.title ?? title;
+      const firstDate = assignmentFirstDate(schedule);
+      const assignmentDescription =
+        firstDate > defaultStartDate
+          ? `будет запланирована с ${formatStartDate(firstDate)}`
+          : 'будет назначена';
+      if (active) {
+        setConfirmingReplacement(true);
+        const approved = await confirmAction({
+          title: 'Заменить активную программу?',
+          message: `«${active.title}» будет сразу отправлена в архив. «${newTitle}» ${assignmentDescription}. Выполненные тренировки и история сохранятся.`,
+          confirmText: 'Заменить программу',
+          danger: true,
+        });
+        setConfirmingReplacement(false);
+        if (!approved) return;
+      }
+      assignmentRequest = {
+        ...schedule,
+        replace_active: Boolean(active),
+        expected_active_program_id: active?.assigned_program_id ?? null,
+        expected_active_revision_number: active?.current_revision_number ?? null,
+      };
+      updateRecovery({ id: importId, intent: 'assign', assignment: assignmentRequest });
+      if (!savedTemplate && preview) {
+        const saved = await api<ProgramImportConfirmResponse>(
+          `/api/v1/programs/imports/${importId}/confirm`,
+          {
+            method: 'POST',
+            body: {
+              target_program_id: null,
+              expected_revision_number: null,
+              expected_draft_version: preview.draft_version ?? undefined,
+            },
+          },
+        );
+        savedTemplate = saved.template;
+      }
+      if (!savedTemplate) throw new Error('Сохранённый шаблон недоступен.');
+      const assigned = await api<{ user_program_id: number; status: string; start_date: string }>(
+        `/api/v1/programs/imports/${importId}/assign-to-me`,
+        {
+          method: 'POST',
+          body: assignmentRequest,
+        },
+      );
+      finishAssignment(importId, savedTemplate, assigned);
+    } catch (reason) {
+      const uncertain = outcomeUnknown(reason);
+      if (assignmentRequest && uncertain) {
+        setPreview(null);
+        setAssignmentOpen(false);
+        setResult({ kind: 'uncertain', id: importId, title: savedTemplate?.title });
+      } else if (savedTemplate && assignmentRequest) {
+        updateRecovery({ id: importId, intent: 'assign' });
+        setPreview(null);
+        setAssignmentOpen(false);
+        setResult({
+          kind: 'partial',
+          id: importId,
+          title: savedTemplate.title,
+          template: savedTemplate,
+          reason: assignmentFailureCode(reason),
+          message: reason instanceof Error ? reason.message : 'Не удалось назначить программу.',
+        });
+        void queryClient.invalidateQueries({ queryKey: ['templates'] });
+      } else {
+        if (assignmentRequest) updateRecovery(null);
+        setAssignmentOpen(false);
+        setError(reason instanceof Error ? reason.message : 'Не удалось проверить программу.');
+      }
+    } finally {
+      requestLock.current = false;
+      setBusy(false);
+    }
+  };
+
+  const checkResult = async () => {
+    if (!recovery || requestLock.current) return;
+    requestLock.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const current = await api<MatrixImport>(`/api/v1/programs/imports/${recovery.id}`);
+      if (current.status === 'pending') {
+        applyPreview(current);
+        setResult(null);
+        updateRecovery(null);
+        return;
+      }
+      if (current.status !== 'confirmed' || current.confirmed_template_id == null) {
+        throw new Error('Результат импорта недоступен. Проверьте личные шаблоны.');
+      }
+      const template = await api<ProgramTemplate>(
+        `/api/v1/programs/templates/${current.confirmed_template_id}`,
+      );
+      if (current.self_assigned_program_id != null) {
+        const lifecycle = await api<{ status: string; start_date: string }>(
+          `/api/v1/programs/assigned/${current.self_assigned_program_id}/lifecycle`,
+        );
+        finishAssignment(current.id, template, {
+          user_program_id: current.self_assigned_program_id,
+          status: lifecycle.status,
+          start_date: lifecycle.start_date,
+        });
+      } else if (recovery.intent === 'assign' && recovery.assignment) {
+        try {
+          const assigned = await api<{
+            user_program_id: number;
+            status: string;
+            start_date: string;
+          }>(`/api/v1/programs/imports/${current.id}/assign-to-me`, {
+            method: 'POST',
+            body: recovery.assignment,
+          });
+          finishAssignment(current.id, template, assigned);
+        } catch (reason) {
+          if (outcomeUnknown(reason)) throw reason;
+          updateRecovery({ id: current.id, intent: 'assign' });
+          setResult({
+            kind: 'partial',
+            id: current.id,
+            title: template.title,
+            template,
+            reason: assignmentFailureCode(reason),
+            message: reason instanceof Error ? reason.message : undefined,
+          });
+        }
+      } else if (recovery.intent === 'assign') {
+        setResult({ kind: 'partial', id: current.id, title: template.title, template });
+      } else {
+        setResult({ kind: 'saved', id: current.id, title: template.title });
+      }
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Не удалось проверить результат. Попробуйте ещё раз.',
+      );
+    } finally {
+      requestLock.current = false;
       setBusy(false);
     }
   };
@@ -562,15 +876,159 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     return [...byId.values()].sort((left, right) => left.title.localeCompare(right.title, 'ru'));
   };
 
+  const previewDays =
+    preview?.rows.filter((row) => row.week_number == null || row.week_number === 1) ?? [];
+  const days = [
+    ...new Set(
+      previewDays.map((row) => row.day_number).filter((day): day is number => day != null),
+    ),
+  ]
+    .sort((left, right) => left - right)
+    .map((day) => ({
+      title: previewDays.find((row) => row.day_number === day)?.day_title || `День ${day}`,
+    }));
+  const assignmentPlan = result?.template
+    ? assignmentPlanFromTemplate(result.template)
+    : preview
+      ? {
+          title: title || 'Программа',
+          days,
+          frequency: days.length,
+          defaultDurationWeeks: preview.assignment_duration_weeks ?? preview.duration_weeks ?? 1,
+          cycle: isMatrix ? { length_weeks: sourceWeeks, repeat: Boolean(preview.repeat) } : null,
+        }
+      : null;
+  const confirmationDisabled =
+    busy ||
+    !preview ||
+    preview.summary.blocking_issue_count > 0 ||
+    hasPendingChanges ||
+    Boolean(invalidDuration) ||
+    (targetProgramId !== '' && (!selectedTarget || !targetMatchesImport(selectedTarget)));
+
   return (
     <Card
       className="program-import-card"
       collapsible={false}
       family="training"
-      title="Импорт программы"
-      description="Загрузите XLSX, CSV, TXT или DOCX с программой. YFC сначала детерминированно извлечёт данные, а программа появится только после проверки и подтверждения."
+      title={result ? undefined : 'Импорт программы'}
+      description={
+        result
+          ? undefined
+          : 'Загрузите XLSX, CSV, TXT или DOCX с программой. YFC сначала детерминированно извлечёт данные, а программа появится только после проверки и подтверждения.'
+      }
     >
-      {!preview ? (
+      {result ? (
+        <section className="program-import-outcome" role="status" aria-live="polite">
+          <span className="eyebrow">Результат импорта</span>
+          <h3>
+            {result.kind === 'saved'
+              ? 'Шаблон сохранён'
+              : result.kind === 'assigned'
+                ? result.notCurrent
+                  ? 'Назначение было создано'
+                  : result.scheduled
+                    ? 'Программа запланирована'
+                    : 'Программа назначена'
+                : result.kind === 'partial'
+                  ? result.reason === 'workout_in_progress'
+                    ? 'Сначала завершите тренировку'
+                    : result.reason === 'trainer_owned_program'
+                      ? 'Программа назначена тренером'
+                      : result.reason === 'active_program_conflict'
+                        ? 'Данные программы изменились'
+                        : 'Шаблон сохранён, назначение не выполнено'
+                  : recovery?.intent === 'save'
+                    ? 'Результат сохранения пока неизвестен'
+                    : 'Результат назначения пока неизвестен'}
+          </h3>
+          <div className="program-import-result">
+            {result.title && (
+              <p>
+                <strong>{result.title}</strong>
+              </p>
+            )}
+            <p>
+              {result.kind === 'saved'
+                ? 'Программа доступна в личной библиотеке. Текущий план не изменился.'
+                : result.kind === 'assigned'
+                  ? result.notCurrent
+                    ? 'Назначение уже не является текущим. Проверьте программу в плане.'
+                    : `${result.startDate ? `Начало: ${formatStartDate(result.startDate)}. ` : ''}${result.scheduled ? 'До этой даты программа будет запланирована.' : 'Тренировки доступны в разделе «План».'}`
+                  : result.kind === 'partial'
+                    ? `Шаблон сохранён. ${result.message || 'Повторите только назначение, загружать файл заново не нужно.'}`
+                    : recovery?.intent === 'save'
+                      ? 'Связь прервалась. Проверьте, сохранился ли шаблон.'
+                      : 'Связь прервалась. Проверьте результат; при необходимости мы безопасно повторим подтверждённое назначение.'}
+            </p>
+          </div>
+          <div className="program-import-actions">
+            {result.kind === 'uncertain' && (
+              <Button disabled={busy} type="button" onClick={() => void checkResult()}>
+                {busy ? 'Проверяем…' : 'Проверить результат'}
+              </Button>
+            )}
+            {result.kind === 'partial' &&
+              result.reason === 'workout_in_progress' &&
+              onOpenWorkout && (
+                <Button type="button" onClick={onOpenWorkout}>
+                  Открыть тренировку
+                </Button>
+              )}
+            {result.kind === 'partial' &&
+              result.template &&
+              result.reason !== 'trainer_owned_program' &&
+              result.reason !== 'workout_in_progress' && (
+                <Button disabled={busy} type="button" onClick={() => setAssignmentOpen(true)}>
+                  {result.reason === 'active_program_conflict'
+                    ? 'Обновить данные'
+                    : 'Повторить назначение'}
+                </Button>
+              )}
+            {result.kind === 'assigned' && result.assignedId != null && onOpenProgram && (
+              <Button
+                type="button"
+                onClick={() => {
+                  updateRecovery(null);
+                  onOpenProgram(result.assignedId!);
+                }}
+              >
+                Открыть программу
+              </Button>
+            )}
+            {(result.kind === 'saved' ||
+              result.kind === 'partial' ||
+              result.kind === 'uncertain') &&
+              onOpenTemplates && (
+                <Button
+                  type="button"
+                  variant={
+                    result.kind === 'saved' || result.reason === 'trainer_owned_program'
+                      ? undefined
+                      : 'secondary'
+                  }
+                  onClick={() => {
+                    if (result.kind !== 'uncertain') updateRecovery(null);
+                    onOpenTemplates();
+                  }}
+                >
+                  Открыть в моих шаблонах
+                </Button>
+              )}
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                updateRecovery(null);
+                setResult(null);
+                setError(null);
+              }}
+            >
+              Импортировать другую программу
+            </button>
+          </div>
+        </section>
+      ) : !preview ? (
         <div className="program-import-intro">
           <div className="program-import-intro__actions">
             <label className="program-import-upload">
@@ -620,19 +1078,37 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             </Badge>
           </div>
 
-          {!!preview.issues.length && (
-            <div className="program-import-issues" role="status">
-              <strong>Сначала проверьте найденные проблемы</strong>
-              <ul>
-                {preview.issues.map((issue, index) => (
-                  <li key={`${issue.code}-${issue.location}-${index}`}>
-                    <span>{issue.message}</span>
-                    {issue.location && <small>{issue.location}</small>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {(['blocking', 'warning'] as const).map((severity) => {
+            const issues = preview.issues.filter((issue) =>
+              severity === 'blocking'
+                ? preview.summary.blocking_issue_count > 0 && issue.severity === 'blocking'
+                : issue.severity === 'warning' ||
+                  (preview.summary.blocking_issue_count === 0 && issue.severity === 'blocking'),
+            );
+            return (
+              !!issues.length && (
+                <div
+                  key={severity}
+                  className={`program-import-issues${severity === 'warning' ? ' program-import-issues--warning' : ''}`}
+                  role="status"
+                >
+                  <strong>
+                    {severity === 'blocking'
+                      ? 'Сначала проверьте найденные проблемы'
+                      : 'Особенности импорта'}
+                  </strong>
+                  <ul>
+                    {issues.map((issue, index) => (
+                      <li key={`${issue.code}-${issue.location}-${index}`}>
+                        <span>{issue.message}</span>
+                        {issue.location && <small>{issue.location}</small>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            );
+          })}
 
           <div className="program-import-fields">
             <Field label="Название программы" labelFor="program-import-title">
@@ -1232,23 +1708,28 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               Применить исправления
             </Button>
             <Button
-              disabled={
-                busy ||
-                preview.summary.blocking_issue_count > 0 ||
-                hasPendingChanges ||
-                Boolean(invalidDuration) ||
-                (targetProgramId !== '' &&
-                  (!selectedTarget || !targetMatchesImport(selectedTarget)))
-              }
+              disabled={confirmationDisabled}
               type="button"
+              variant={allowSelfAssignment && !selectedTarget ? 'secondary' : undefined}
               onClick={() => void confirm()}
             >
               {busy
                 ? 'Сохраняем…'
                 : selectedTarget
                   ? 'Подтвердить и создать ревизию'
-                  : 'Подтвердить и сохранить шаблон'}
+                  : allowSelfAssignment
+                    ? 'Сохранить шаблон'
+                    : 'Подтвердить и сохранить шаблон'}
             </Button>
+            {allowSelfAssignment && targetProgramId === '' && (
+              <Button
+                disabled={confirmationDisabled || days.length === 0}
+                type="button"
+                onClick={() => setAssignmentOpen(true)}
+              >
+                Сохранить и назначить
+              </Button>
+            )}
           </div>
           {hasPendingChanges && (
             <p className="muted" role="status">
@@ -1266,6 +1747,18 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
         <p className="field-error program-import-error" role="alert">
           {error}
         </p>
+      )}
+      {assignmentOpen && assignmentPlan && (
+        <ProgramAssignmentDialog
+          plan={assignmentPlan}
+          defaultStartDate={defaultStartDate}
+          busy={busy}
+          concealed={confirmingReplacement}
+          submitLabel={result?.template ? 'Назначить программу' : 'Сохранить и назначить'}
+          backLabel={result?.template ? 'Вернуться к результату' : 'Вернуться к импорту'}
+          onClose={() => setAssignmentOpen(false)}
+          onSubmit={(schedule) => void assign(schedule)}
+        />
       )}
     </Card>
   );

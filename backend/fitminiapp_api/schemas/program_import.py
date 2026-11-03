@@ -6,8 +6,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.program import (
+    AssignTemplateSelfRequest,
     ExercisePrescriptionPlan,
     ProgramCoachingRule,
+    ProgramLifecycleStatus,
     ProgramTargetUserResponse,
     ProgramTemplateResponse,
 )
@@ -188,6 +190,8 @@ class ProgramImportWeekTypeCandidate(BaseModel):
 class ProgramImportResponse(BaseModel):
     id: str
     status: ImportStatus
+    confirmed_template_id: int | None = None
+    self_assigned_program_id: int | None = None
     source_format: ImportFormat
     schema_version: int
     parser_version: str
@@ -251,3 +255,27 @@ class ProgramImportConfirmResponse(BaseModel):
     workouts_created: int = 0
     workouts_updated: int = 0
     target_user: ProgramTargetUserResponse
+
+
+class ProgramImportAssignmentRequest(AssignTemplateSelfRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_active_program_id: int | None = Field(ge=1)
+    expected_active_revision_number: int | None = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_replacement(self):
+        if (self.expected_active_program_id is None) != (
+            self.expected_active_revision_number is None
+        ):
+            raise ValueError("Укажите программу и её версию вместе")
+        if self.replace_active != (self.expected_active_program_id is not None):
+            raise ValueError("Подтвердите замену указанной программы")
+        return self
+
+
+class ProgramImportAssignmentResponse(BaseModel):
+    user_program_id: int
+    status: ProgramLifecycleStatus
+    start_date: date
+    duration_weeks: int

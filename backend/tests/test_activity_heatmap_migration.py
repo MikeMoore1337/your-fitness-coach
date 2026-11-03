@@ -45,6 +45,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
     with engine.connect() as connection:
         for statement in (
             "CREATE TABLE program_templates (id INTEGER PRIMARY KEY, default_duration_weeks INTEGER)",
+            "CREATE TABLE program_imports (id VARCHAR(36) PRIMARY KEY, status VARCHAR(16) NOT NULL)",
             "CREATE TABLE program_template_exercise_weeks (id INTEGER PRIMARY KEY, week_number INTEGER CONSTRAINT ck_program_template_exercise_weeks_number CHECK (week_number >= 1 AND week_number <= 24))",
             "CREATE TABLE user_programs (id INTEGER PRIMARY KEY)",
             "CREATE TABLE user_workouts (id INTEGER PRIMARY KEY, user_program_id INTEGER NOT NULL, week_number INTEGER NOT NULL, day_number INTEGER NOT NULL, status TEXT, completed_at TEXT)",
@@ -53,6 +54,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
             "CREATE TABLE user_workout_sets (id INTEGER PRIMARY KEY, actual_weight NUMERIC, actual_reps INTEGER, is_completed BOOLEAN)",
             "CREATE TABLE user_profiles (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL)",
             "INSERT INTO program_templates VALUES (1, 16)",
+            "INSERT INTO program_imports VALUES ('existing-import', 'confirmed')",
             "INSERT INTO program_template_exercise_weeks VALUES (1, 1)",
             "INSERT INTO user_programs VALUES (1)",
             "INSERT INTO user_workouts VALUES (1, 1, 1, 1, 'completed', '2026-08-01 12:00:00')",
@@ -80,8 +82,11 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0147_session_rotation",)
+            ("0148_import_self_assignment",)
         ]
+        assert connection.exec_driver_sql(
+            "SELECT status, self_assigned_program_id, self_assignment_request_hash FROM program_imports"
+        ).one() == ("confirmed", None, None)
         assert (
             connection.exec_driver_sql("SELECT schedule_mode FROM user_programs").scalar_one()
             is None

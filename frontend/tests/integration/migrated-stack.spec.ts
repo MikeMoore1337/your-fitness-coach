@@ -250,7 +250,8 @@ for (const scenario of programImportViewports) {
     await devLogin.getByRole('button', { name: 'Клиент', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
 
-    const programTitle = `Импорт браузера ${scenario.name}`;
+    const suffix = Date.now();
+    const programTitle = `Импорт браузера ${scenario.name} ${suffix}`;
     const row = [
       '',
       '',
@@ -289,7 +290,7 @@ for (const scenario of programImportViewports) {
       new URL('/api/v1/programs/exercises', page.url()).toString(),
       {
         headers: { Authorization: `Bearer ${accessToken}` },
-        data: { title: `CI import strength ${scenario.name}`, metric_type: 'strength' },
+        data: { title: `CI import strength ${scenario.name} ${suffix}`, metric_type: 'strength' },
       },
     );
     expect(exerciseResponse.status()).toBe(201);
@@ -332,7 +333,7 @@ for (const scenario of programImportViewports) {
     );
     await page.getByRole('button', { name: 'Применить исправления' }).click();
     expect((await resolved).status()).toBe(200);
-    const confirm = page.getByRole('button', { name: 'Подтвердить и сохранить шаблон' });
+    const confirm = page.getByRole('button', { name: 'Сохранить шаблон' });
     await expect(confirm).toBeEnabled();
 
     if (scenario.width < 500) {
@@ -352,13 +353,141 @@ for (const scenario of programImportViewports) {
     const response = await confirmation;
     expect(response.status()).toBe(200);
     expect((await response.json()).template.title).toBe(programTitle);
-    await expect(page.getByText('Программа импортирована в личные шаблоны')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Шаблон сохранён' })).toBeVisible();
+    await page.getByRole('button', { name: 'Открыть в моих шаблонах' }).click();
 
-    await page.goto('/app?section=programs&view=manage&panel=library');
     await page.reload();
     await expect(page.getByText(programTitle, { exact: true })).toBeVisible();
   });
 }
+
+test('#1381 real XLSX import saves and schedules the returned assignment in PostgreSQL', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  const login = await page.request.post('/api/v1/auth/dev-login', {
+    data: { telegram_user_id: Date.now() * 10 + info.workerIndex, full_name: 'Проверка импорта' },
+  });
+  expect(login.status()).toBe(200);
+  const token = (await login.json()).access_token as string;
+  const headers = { Authorization: `Bearer ${token}` };
+  const file = await page.request.get('/api/v1/programs/imports/template.xlsx', { headers });
+  expect(file.status()).toBe(200);
+  const exercise = await page.request.post('/api/v1/programs/exercises', {
+    headers,
+    data: { title: `Синтетическое упражнение ${Date.now()}`, metric_type: 'strength' },
+  });
+  expect(exercise.status()).toBe(201);
+  const exerciseTitle = (await exercise.json()).title as string;
+  await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+  await page.goto('/app?section=programs&view=manage&panel=create');
+  const uploading = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/programs/imports',
+  );
+  await page.getByLabel('Загрузить документ программы').setInputFiles({
+    name: 'synthetic-program.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: await file.body(),
+  });
+  const upload = await uploading;
+  expect(upload.status()).toBe(201);
+  const preview = (await upload.json()) as {
+    rows: { match_status: string; resolved_exercise_title: string | null }[];
+  };
+  expect(preview.rows).toHaveLength(1);
+  await expect(
+    page.getByRole('heading', { name: 'Проверьте план перед сохранением' }),
+  ).toBeVisible();
+  await page.getByLabel('Название программы').fill('Синтетическая программа 1381');
+  let expectedExerciseTitle = preview.rows[0]?.resolved_exercise_title;
+  if (preview.rows[0]?.match_status !== 'matched') {
+    const picker = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
+    await picker.scrollIntoViewIfNeeded();
+    await picker.fill(exerciseTitle);
+    await page.getByRole('option', { name: exerciseTitle }).click({ timeout: 5000 });
+    await page.getByLabel('Название программы').click();
+    await picker.click();
+    await picker.press('ArrowDown');
+    await picker.press('Enter');
+    await expect(picker).toHaveValue(exerciseTitle);
+    expectedExerciseTitle = exerciseTitle;
+  }
+  expect(expectedExerciseTitle).toBeTruthy();
+  const resolving = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/resolve'),
+  );
+  await page.getByRole('button', { name: 'Применить исправления' }).click();
+  expect((await resolving).status()).toBe(200);
+  const openSchedule = page.getByRole('button', { name: 'Сохранить и назначить' });
+  await expect(openSchedule).toBeEnabled();
+  if (process.env.YFC_1381_EVIDENCE) {
+    await openSchedule.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath('real-xlsx-preview.png'),
+      animations: 'disabled',
+    });
+  }
+  await openSchedule.click();
+  const dialog = page.getByRole('dialog', { name: 'Синтетическая программа 1381' });
+  await expect(dialog).toBeVisible();
+  const panel = await dialog.locator('.assignment-modal').boundingBox();
+  expect(panel).not.toBeNull();
+  expect(panel!.y).toBeGreaterThanOrEqual(0);
+  expect(panel!.y + panel!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  const start = dialog.getByLabel('Начать не раньше');
+  const startDate = new Date(`${await start.inputValue()}T12:00:00Z`);
+  startDate.setUTCDate(startDate.getUTCDate() + 7);
+  await start.fill(startDate.toISOString().slice(0, 10));
+  await expect(dialog).toContainText('программа будет запланирована');
+  if (process.env.YFC_1381_EVIDENCE) {
+    await page.screenshot({
+      path: info.outputPath('real-xlsx-schedule.png'),
+      animations: 'disabled',
+    });
+  }
+  await page.keyboard.press('Tab');
+  await expect(dialog.locator(':focus')).toHaveCount(1);
+  const assignment = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/assign-to-me'),
+  );
+  await dialog.getByRole('button', { name: 'Сохранить и назначить' }).click();
+  const response = await assignment;
+  expect(response.status()).toBe(200);
+  const assigned = (await response.json()) as { user_program_id: number; status: string };
+  expect(assigned.status).toBe('scheduled');
+  await expect(page.getByRole('heading', { name: 'Программа запланирована' })).toBeVisible();
+  const outcomeButtonHeights = await page
+    .locator('.program-import-outcome button')
+    .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
+  expect(Math.min(...outcomeButtonHeights)).toBeGreaterThanOrEqual(44);
+  if (process.env.YFC_1381_EVIDENCE) {
+    await page.locator('.program-import-outcome').scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath('real-xlsx-scheduled.png'),
+      animations: 'disabled',
+    });
+  }
+  const templates = await page.request.get('/api/v1/programs/templates/mine', { headers });
+  expect((await templates.json()) as object[]).toContainEqual(
+    expect.objectContaining({
+      title: 'Синтетическая программа 1381',
+      assigned_program_id: assigned.user_program_id,
+      assigned_program_status: 'scheduled',
+    }),
+  );
+  await page.getByRole('button', { name: 'Открыть программу' }).click();
+  await expect(page).toHaveURL(new RegExp(`assigned_program_id=${assigned.user_program_id}`));
+  await expect(page.getByRole('article', { name: 'Жизненный цикл программы' })).toContainText(
+    'Запланирована',
+  );
+  await expect(page.getByRole('heading', { name: expectedExerciseTitle! })).toBeVisible();
+});
 
 test('#1335 real PostgreSQL generator rechecks an explicit suggestion before confirmation', async ({
   page,

@@ -129,6 +129,37 @@
   color: var(--text);
 }
 
+.program-import-issues--warning,
+.program-import-result {
+  padding: 12px 14px;
+  border: 1px solid var(--v2-border, var(--border));
+  border-radius: var(--v2-control-radius, 10px);
+  background: var(--v2-surface-muted, var(--bg-soft));
+  color: var(--text);
+}
+
+.program-import-outcome {
+  display: grid;
+  gap: 12px;
+}
+
+.program-import-outcome h3 {
+  margin: 0;
+}
+
+.program-import-outcome .text-button {
+  min-height: var(--touch-target, 44px);
+}
+
+.program-import-result h3,
+.program-import-result p {
+  margin: 0;
+}
+
+.program-import-result p + p {
+  margin-top: 6px;
+}
+
 .program-import-ai {
   padding: 12px 14px;
   border: 1px solid var(--accent-line);
