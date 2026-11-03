@@ -16,11 +16,19 @@ function syntheticTelegramInitData(userId: number): string {
   return new URLSearchParams({ ...fields, hash }).toString();
 }
 
-for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
-  test(`PostgreSQL offline ${surface} reload automatically replays a saved set once`, async ({
-    page,
-    request,
-  }, info) => {
+for (const surface of [
+  'pwa',
+  'pwa-expiry',
+  'pwa-expiry-switch',
+  'pwa-expiry-logout',
+  'telegram',
+] as const) {
+  const expiryCase = surface.startsWith('pwa-expiry');
+  const expected =
+    surface === 'pwa-expiry-switch' || surface === 'pwa-expiry-logout'
+      ? 'clears the saved set across tabs'
+      : 'automatically replays a saved set once';
+  test(`PostgreSQL offline ${surface} reload ${expected}`, async ({ page, request }, info) => {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 393, height: 844 });
     const telegramUserId = Date.now() * 10 + info.workerIndex;
@@ -81,7 +89,7 @@ for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
         if (!expiry || sessionStorage.getItem('audit_skip_initial_token') !== '1')
           sessionStorage.setItem('fit_access_token', value);
       },
-      { value: token, expiry: surface === 'pwa-expiry' },
+      { value: token, expiry: expiryCase },
     );
     if (surface === 'telegram') await installTelegramHarness(page, { initData });
     await page.goto('/app?section=today');
@@ -99,7 +107,7 @@ for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
         if (!expiry || sessionStorage.getItem('audit_skip_initial_token') !== '1')
           sessionStorage.setItem('fit_access_token', value);
       },
-      { value: token, expiry: surface === 'pwa-expiry' },
+      { value: token, expiry: expiryCase },
     );
     if (surface === 'telegram') await installTelegramHarness(other, { initData });
     await other.goto('/app?section=profile');
@@ -164,7 +172,7 @@ for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
       const body = request.postDataJSON();
       if (body.is_completed === true) replayBodies.push(body);
     });
-    if (surface === 'telegram' || surface === 'pwa-expiry') {
+    if (surface === 'telegram' || expiryCase) {
       await page.evaluate(() => {
         sessionStorage.setItem('audit_force_offline', '1');
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
@@ -180,7 +188,7 @@ for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
       });
     }
     await page.context().setOffline(false);
-    if (surface === 'pwa-expiry') {
+    if (expiryCase) {
       const pending = await page.evaluate(() => {
         const key = Object.keys(localStorage).find(
           (name) => name.startsWith('fit_active_workout_v1_user_') && name.endsWith(':v3'),
@@ -218,7 +226,8 @@ for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
       await page.context().route('**/api/v1/auth/dev-login', (route) =>
         route.continue({
           postData: JSON.stringify({
-            telegram_user_id: telegramUserId,
+            telegram_user_id:
+              surface === 'pwa-expiry-switch' ? telegramUserId + 1_000_000 : telegramUserId,
             full_name: 'Синтетическая проверка',
           }),
         }),
@@ -231,12 +240,48 @@ for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
       await page.getByRole('button', { name: 'Клиент', exact: true }).click();
       expect((await authenticating).status()).toBe(200);
       await expect(page).toHaveURL(/\/app/);
+      if (surface === 'pwa-expiry-switch') {
+        await expect
+          .poll(() => page.evaluate((key) => localStorage.getItem(key), pending!.key))
+          .toBeNull();
+        const newToken = await page.evaluate(() => sessionStorage.getItem('fit_access_token'));
+        expect(newToken).toBeTruthy();
+        await expect
+          .poll(() => other.evaluate(() => sessionStorage.getItem('fit_access_token')))
+          .toBe(newToken);
+        const newProfile = await page.request.get('/api/v1/me', {
+          headers: { Authorization: `Bearer ${newToken}` },
+        });
+        expect((await newProfile.json()).telegram_user_id).toBe(telegramUserId + 1_000_000);
+        const unchanged = (await (await request.get('/api/v1/workouts/today', { headers })).json())
+          .exercises[0].sets[0];
+        expect(unchanged).toMatchObject({
+          id: setId,
+          is_completed: false,
+          version: original.version,
+        });
+        expect(replayBodies).toHaveLength(0);
+        return;
+      }
       await expect(
         page.getByRole('status').filter({ hasText: 'Изменения тренировки сохранены' }),
       ).toBeVisible();
       expect(await page.evaluate((key) => localStorage.getItem(key), pending!.key)).toBe(
         pending!.value,
       );
+      if (surface === 'pwa-expiry-logout') {
+        const profile = page.getByRole('button', { name: 'Открыть профиль и настройки' });
+        await profile.focus();
+        await page.keyboard.press('Enter');
+        await page.getByRole('dialog').getByRole('button', { name: 'Выйти из аккаунта' }).click();
+        await expect(page).toHaveURL(/\/login/);
+        await expect
+          .poll(() => other.evaluate(() => sessionStorage.getItem('fit_access_token')))
+          .toBeNull();
+        expect(await page.evaluate((key) => localStorage.getItem(key), pending!.key)).toBeNull();
+        expect(replayBodies).toHaveLength(0);
+        return;
+      }
       await page.context().unroute('**/api/v1/auth/dev-login');
     }
     if (surface === 'telegram') {
@@ -263,7 +308,7 @@ for (const surface of ['pwa', 'pwa-expiry', 'telegram'] as const) {
       Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
       window.dispatchEvent(new Event('online'));
     });
-    if (surface === 'telegram' || surface === 'pwa-expiry') {
+    if (surface === 'telegram' || expiryCase) {
       await other.evaluate(() => {
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
         window.dispatchEvent(new Event('online'));
