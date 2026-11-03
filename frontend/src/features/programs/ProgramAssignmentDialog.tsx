@@ -144,7 +144,13 @@ export function ProgramAssignmentDialog({
             <span className="eyebrow">Расписание программы</span>
             <h2 id="assign-program-title">{plan.title}</h2>
           </div>
-          <button type="button" className="secondary" disabled={busy} onClick={onClose}>
+          <button
+            type="button"
+            className="secondary"
+            aria-label="Закрыть настройку расписания"
+            disabled={busy}
+            onClick={onClose}
+          >
             Закрыть
           </button>
         </div>
