@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { useDocumentScrollLock, useModalA11y } from '../../../src/shared/ui/useModalA11y';
 
 function Lock({ open }: { open: boolean }) {
@@ -36,12 +36,21 @@ function AutoFocusedModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function EscapeOnLayout() {
+  useLayoutEffect(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  }, []);
+  return null;
+}
+
 function ModalWithUnfocusedTrigger({
   autoFocus = false,
   delayed = false,
+  escapeOnLayout = false,
 }: {
   autoFocus?: boolean;
   delayed?: boolean;
+  escapeOnLayout?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -55,6 +64,7 @@ function ModalWithUnfocusedTrigger({
         ) : (
           <Modal name="Окно" onClose={() => setOpen(false)} />
         ))}
+      {open && escapeOnLayout && <EscapeOnLayout />}
     </>
   );
 }
@@ -144,6 +154,30 @@ describe('useDocumentScrollLock', () => {
     await screen.findByRole('dialog', { name: 'Окно' });
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(trigger).toHaveFocus();
+  });
+
+  it('handles Escape during the commit that opens an asynchronous dialog', async () => {
+    render(<ModalWithUnfocusedTrigger delayed escapeOnLayout />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    fireEvent.click(screen.getByText('Открыть окно'));
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole('dialog', { name: 'Окно' })).not.toBeInTheDocument();
+  });
+
+  it('uses the latest close callback during a layout-phase Escape', () => {
+    const previousClose = vi.fn();
+    const nextClose = vi.fn();
+    const view = render(<Modal name="Окно" onClose={previousClose} />);
+
+    view.rerender(
+      <>
+        <Modal name="Окно" onClose={nextClose} />
+        <EscapeOnLayout />
+      </>,
+    );
+
+    expect(nextClose).toHaveBeenCalledOnce();
+    expect(previousClose).not.toHaveBeenCalled();
   });
 
   it('does not restore an unrelated click after keyboard interaction', () => {
