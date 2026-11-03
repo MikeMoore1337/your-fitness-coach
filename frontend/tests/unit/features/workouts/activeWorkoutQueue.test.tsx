@@ -28,6 +28,7 @@ import { createCrossContextCoordinator } from '../../../../src/shared/browser/cr
 import {
   clearAccessToken,
   expireAccessToken,
+  setAccessToken,
   switchAuthenticatedAccount,
 } from '../../../../src/shared/api/client';
 import {
@@ -324,6 +325,28 @@ describe('active workout durable queue', () => {
     expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
   });
 
+  it('keeps a pending write when another tab verifies the same account', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      localStorage.setItem(
+        'fit_auth_verified_login_v1',
+        JSON.stringify({ id: 'login', userId: 7 }),
+      );
+    });
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
+  });
+
+  it('does not recreate a pending write after another tab verifies a different account', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage(8);
+      localStorage.setItem(
+        'fit_auth_verified_login_v1',
+        JSON.stringify({ id: 'login', userId: 8 }),
+      );
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
   it('removes a write that races with logout between the guard and localStorage write', async () => {
     renderHarness();
     await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42));
@@ -404,6 +427,58 @@ describe('active workout durable queue', () => {
       await Promise.resolve();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('automatically retries the same queued mutation after the same account signs in again', async () => {
+    setAccessToken('old-token', 7);
+    try {
+      saveActiveWorkoutSnapshot(7, workout);
+      const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      });
+      saveActiveWorkoutQueue(queued);
+      let finishFirst!: (response: Response) => void;
+      const saved = JSON.stringify({
+        id: 201,
+        set_number: 1,
+        actual_reps: 8,
+        actual_weight: 40,
+        is_completed: true,
+        version: 2,
+      });
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              finishFirst = resolve;
+            }),
+        )
+        .mockResolvedValueOnce(new Response(saved, { status: 200 }));
+      setOnline(true);
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <ActiveWorkoutSyncProvider userId={7} enabled>
+            <ActiveWorkoutSyncNotice />
+          </ActiveWorkoutSyncProvider>
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      act(() => setAccessToken('same-account-new-token', 7));
+      await act(async () => finishFirst(new Response(saved, { status: 200 })));
+
+      await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0), {
+        timeout: 5000,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)).mutation_id).toBe(
+        queued.queue[0]?.mutation_id,
+      );
+    } finally {
+      clearAccessToken();
+    }
   });
 
   it('сохраняет конфликтующую очередь и показывает сообщение вне тренировки', async () => {

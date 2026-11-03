@@ -6,25 +6,30 @@ const AUTH_CHANNEL_NAME = 'fit_auth_session';
 const AUTH_STORAGE_EVENT_KEY = 'fit_auth_session_event_v1';
 const AUTH_GENERATION_KEY = 'fit_auth_session_generation_v1';
 const AUTH_DISCARD_GENERATION_KEY = 'fit_auth_discard_generation_v1';
+const AUTH_VERIFIED_LOGIN_KEY = 'fit_auth_verified_login_v1';
 const AUTH_REFRESH_LOCK_NAME = 'fit-auth-refresh';
 export const AUTH_LOGOUT_EVENT = 'fit:auth-logout';
 export const AUTH_SESSION_EXPIRED_EVENT = 'fit:auth-session-expired';
 export const AUTH_ACCOUNT_SWITCH_EVENT = 'fit:auth-account-switch';
 export const AUTH_TOKEN_RECEIVED_EVENT = 'fit:auth-token-received';
+export const AUTH_VERIFIED_LOGIN_EVENT = 'fit:auth-verified-login';
 
 type AuthChannelMessage =
   | { type: 'access-token'; token: string }
+  | { type: 'verified-login'; token: string; userId: number }
   | { type: 'logout' | 'session-expired' }
   | { type: 'account-switch'; userId: number };
 
 let authRevision = 0;
 let authBoundaryRevision = 0;
 let authDiscardRevision = 0;
+let authLoginRevision = 0;
 
 function recordAuthChange(type: AuthChannelMessage['type']): void {
   authRevision += 1;
   if (type !== 'session-expired') authBoundaryRevision += 1;
   if (type === 'logout' || type === 'account-switch') authDiscardRevision += 1;
+  if (type === 'verified-login') authLoginRevision += 1;
 }
 
 const authChannel =
@@ -33,7 +38,17 @@ const authChannel =
     : null;
 
 function receiveAuthMessage(message: AuthChannelMessage): void {
-  if (message.type === 'access-token' && typeof message.token === 'string') {
+  if (
+    message.type === 'verified-login' &&
+    typeof message.token === 'string' &&
+    Number.isSafeInteger(message.userId) &&
+    message.userId > 0
+  ) {
+    recordAuthChange(message.type);
+    window.dispatchEvent(new CustomEvent(AUTH_VERIFIED_LOGIN_EVENT, { detail: message.userId }));
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, message.token);
+    window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
+  } else if (message.type === 'access-token' && typeof message.token === 'string') {
     recordAuthChange(message.type);
     sessionStorage.setItem(ACCESS_TOKEN_KEY, message.token);
     window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
@@ -67,6 +82,7 @@ window.addEventListener('storage', (event) => {
       envelope.message?.type === 'logout' ||
       envelope.message?.type === 'session-expired' ||
       envelope.message?.type === 'account-switch' ||
+      envelope.message?.type === 'verified-login' ||
       envelope.message?.type === 'access-token'
     ) {
       receiveAuthMessage(envelope.message);
@@ -101,7 +117,7 @@ function authGeneration(): string | null {
   }
 }
 
-function advanceAuthGeneration(type: AuthChannelMessage['type']): void {
+function advanceAuthGeneration(type: AuthChannelMessage['type'], userId?: number): void {
   recordAuthChange(type);
   try {
     const id =
@@ -109,8 +125,12 @@ function advanceAuthGeneration(type: AuthChannelMessage['type']): void {
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
     localStorage.setItem(AUTH_GENERATION_KEY, id);
-    if (type === 'logout' || type === 'account-switch')
+    if (type === 'logout' || type === 'account-switch') {
       localStorage.setItem(AUTH_DISCARD_GENERATION_KEY, id);
+      localStorage.removeItem(AUTH_VERIFIED_LOGIN_KEY);
+    }
+    if (type === 'verified-login')
+      localStorage.setItem(AUTH_VERIFIED_LOGIN_KEY, JSON.stringify({ id, userId }));
   } catch {
     // BroadcastChannel remains the primary transport when shared storage is unavailable.
   }
@@ -239,10 +259,19 @@ export function getAccessToken(): string | null {
   return sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-export function setAccessToken(token: string): void {
+export function setAccessToken(token: string, verifiedUserId?: number): void {
+  if (
+    verifiedUserId !== undefined &&
+    (!Number.isSafeInteger(verifiedUserId) || verifiedUserId <= 0)
+  )
+    throw new Error('Некорректный идентификатор аккаунта');
+  const message: AuthChannelMessage =
+    verifiedUserId === undefined
+      ? { type: 'access-token', token }
+      : { type: 'verified-login', token, userId: verifiedUserId };
   sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-  advanceAuthGeneration('access-token');
-  broadcastAuthMessage({ type: 'access-token', token });
+  advanceAuthGeneration(message.type, verifiedUserId);
+  broadcastAuthMessage(message);
 }
 
 export function clearAccessToken(): void {
@@ -267,6 +296,20 @@ export function switchAuthenticatedAccount(userId: number): void {
   broadcastAuthMessage({ type: 'account-switch', userId });
 }
 
+export function invalidateLocalAccount(userId: number): void {
+  recordAuthChange('account-switch');
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: userId }));
+}
+
+function verifiedLoginGeneration(): string | null {
+  try {
+    return localStorage.getItem(AUTH_VERIFIED_LOGIN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function authDiscardSnapshot() {
   let generation: string | null = null;
   try {
@@ -274,12 +317,23 @@ export function authDiscardSnapshot() {
   } catch {
     // The in-memory revision still protects this tab when storage is unavailable.
   }
-  return { generation, revision: authDiscardRevision };
+  return { generation, revision: authDiscardRevision, verifiedLogin: verifiedLoginGeneration() };
 }
 
-export function authDiscardChanged(snapshot: ReturnType<typeof authDiscardSnapshot>): boolean {
+export function authDiscardChanged(
+  snapshot: ReturnType<typeof authDiscardSnapshot> & { userId?: number },
+): boolean {
   const current = authDiscardSnapshot();
-  return snapshot.generation !== current.generation || snapshot.revision !== current.revision;
+  if (snapshot.generation !== current.generation || snapshot.revision !== current.revision)
+    return true;
+  if (snapshot.userId && snapshot.verifiedLogin !== current.verifiedLogin) {
+    try {
+      return JSON.parse(current.verifiedLogin ?? 'null')?.userId !== snapshot.userId;
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function responseError(response: Response): Promise<ApiError> {
@@ -389,14 +443,24 @@ function authSessionSnapshot() {
     generation: authGeneration(),
     revision: authRevision,
     boundaryRevision: authBoundaryRevision,
+    loginRevision: authLoginRevision,
+    verifiedLogin: verifiedLoginGeneration(),
   };
+}
+
+function authLoginChanged(session: ReturnType<typeof authSessionSnapshot>): boolean {
+  return (
+    session.loginRevision !== authLoginRevision ||
+    session.verifiedLogin !== verifiedLoginGeneration()
+  );
 }
 
 function authSessionChanged(session: ReturnType<typeof authSessionSnapshot>): boolean {
   return (
     session.token !== getAccessToken() ||
     session.generation !== authGeneration() ||
-    session.revision !== authRevision
+    session.revision !== authRevision ||
+    authLoginChanged(session)
   );
 }
 
@@ -460,7 +524,8 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     assertCurrentAuthSession(session);
     if (response.status === 401 && retryAuth) {
       const refreshed = await refreshAccessToken();
-      if (authDiscardChanged(discard)) throw new DOMException('Сессия изменилась', 'AbortError');
+      if (authDiscardChanged(discard) || authLoginChanged(session))
+        throw new DOMException('Сессия изменилась', 'AbortError');
       if (refreshed) return api<T>(path, { ...options, retryAuth: false });
       if (session.boundaryRevision !== authBoundaryRevision)
         throw new DOMException('Сессия изменилась', 'AbortError');
@@ -523,7 +588,8 @@ export async function apiFile(
     assertCurrentAuthSession(session);
     if (response.status === 401 && retryAuth) {
       const refreshed = await refreshAccessToken();
-      if (authDiscardChanged(discard)) throw new DOMException('Сессия изменилась', 'AbortError');
+      if (authDiscardChanged(discard) || authLoginChanged(session))
+        throw new DOMException('Сессия изменилась', 'AbortError');
       if (refreshed) return apiFile(path, { retryAuth: false });
       if (session.boundaryRevision !== authBoundaryRevision)
         throw new DOMException('Сессия изменилась', 'AbortError');

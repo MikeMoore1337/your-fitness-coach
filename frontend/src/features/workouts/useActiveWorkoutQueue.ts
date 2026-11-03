@@ -289,6 +289,15 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
         acknowledgeLegacyWorkoutMutation(userId, workoutId, pending.mutation_id);
         conflictAttempts = 0;
       } catch (reason) {
+        if (
+          reason instanceof DOMException &&
+          reason.name === 'AbortError' &&
+          !authDiscardChanged(discardSnapshot)
+        ) {
+          setSyncState('pending');
+          setMessage(null);
+          return false;
+        }
         if (reason instanceof ApiError && reason.status === 409) {
           const detail = conflictDetail(reason);
           const current = detail?.current;
@@ -398,7 +407,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     setSyncState('conflict');
     setMessage('Тренировка часто меняется в другой вкладке. Повторите синхронизацию.');
     return false;
-  }, [persist, queryClient, readFresh, userId, validSetIds, workoutId]);
+  }, [discardSnapshot, persist, queryClient, readFresh, userId, validSetIds, workoutId]);
 
   const flushNow = useCallback((): Promise<boolean> => {
     if (flushPromise.current) return flushPromise.current;

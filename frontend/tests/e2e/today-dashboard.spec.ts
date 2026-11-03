@@ -61,6 +61,7 @@ async function mockDashboard(page: Page, state: DashboardState = {}) {
       {
         id: 101,
         exercise_id: 11,
+        metric_type: 'strength',
         exercise_title: 'Приседания',
         sort_order: 1,
         prescribed_sets: 2,

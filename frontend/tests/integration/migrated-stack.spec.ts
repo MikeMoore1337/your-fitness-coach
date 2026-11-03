@@ -19,13 +19,16 @@ function syntheticTelegramInitData(userId: number): string {
 for (const surface of [
   'pwa',
   'pwa-expiry',
+  'pwa-expiry-same-unknown',
   'pwa-expiry-switch',
+  'pwa-expiry-switch-unknown',
   'pwa-expiry-logout',
   'telegram',
 ] as const) {
   const expiryCase = surface.startsWith('pwa-expiry');
+  const switchCase = surface.startsWith('pwa-expiry-switch');
   const expected =
-    surface === 'pwa-expiry-switch' || surface === 'pwa-expiry-logout'
+    switchCase || surface === 'pwa-expiry-logout'
       ? 'clears the saved set across tabs'
       : 'automatically replays a saved set once';
   test(`PostgreSQL offline ${surface} reload ${expected}`, async ({ page, request }, info) => {
@@ -223,11 +226,16 @@ for (const surface of [
       expect(await page.evaluate((key) => localStorage.getItem(key), pending!.key)).toBe(
         pending!.value,
       );
+      if (surface.endsWith('-unknown')) {
+        await page.evaluate(() => {
+          sessionStorage.removeItem('fit_authenticated_user_id');
+          localStorage.removeItem('fit_last_authenticated_user_id_v1');
+        });
+      }
       await page.context().route('**/api/v1/auth/dev-login', (route) =>
         route.continue({
           postData: JSON.stringify({
-            telegram_user_id:
-              surface === 'pwa-expiry-switch' ? telegramUserId + 1_000_000 : telegramUserId,
+            telegram_user_id: switchCase ? telegramUserId + 1_000_000 : telegramUserId,
             full_name: 'Синтетическая проверка',
           }),
         }),
@@ -240,7 +248,7 @@ for (const surface of [
       await page.getByRole('button', { name: 'Клиент', exact: true }).click();
       expect((await authenticating).status()).toBe(200);
       await expect(page).toHaveURL(/\/app/);
-      if (surface === 'pwa-expiry-switch') {
+      if (switchCase) {
         await expect
           .poll(() => page.evaluate((key) => localStorage.getItem(key), pending!.key))
           .toBeNull();

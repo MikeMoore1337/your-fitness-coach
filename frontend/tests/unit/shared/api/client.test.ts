@@ -82,6 +82,83 @@ describe('api client', () => {
     expect(getAccessToken()).toBe('new-account');
   });
 
+  it('does not retry a pending mutation after an explicit sign-in without a known previous ID', async () => {
+    setAccessToken('old-account');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{"detail":"expired"}', { status: 401 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }));
+    const request = api('/api/v1/workouts/sets/201', { method: 'PATCH', body: { reps: 10 } });
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    setAccessToken('new-account', 8);
+    finishRefresh(new Response('{"access_token":"late-old-account"}', { status: 200 }));
+
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(getAccessToken()).toBe('new-account');
+  });
+
+  it('does not retry a pending file request after a verified sign-in', async () => {
+    setAccessToken('old-account');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      )
+      .mockResolvedValueOnce(new Response('private file', { status: 200 }));
+    const request = apiFile('/api/v1/account/export');
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    setAccessToken('new-account', 8);
+    finishRefresh(new Response('{"access_token":"late-old-account"}', { status: 200 }));
+
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('notices another tab verified a login before its token message arrives', async () => {
+    setAccessToken('old-account');
+    let finishRefresh!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishRefresh = resolve;
+          }),
+      );
+    const request = api('/api/v1/workouts/sets/201', { method: 'PATCH', body: { reps: 10 } });
+    const result = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    localStorage.setItem('fit_auth_verified_login_v1', JSON.stringify({ id: 'login', userId: 8 }));
+    finishRefresh(new Response('{"access_token":"late-old-account"}', { status: 200 }));
+
+    await result;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(getAccessToken()).toBe('old-account');
+  });
+
+  it('clears the verified account marker on explicit logout', () => {
+    setAccessToken('verified', 7);
+    expect(localStorage.getItem('fit_auth_verified_login_v1')).not.toBeNull();
+    clearAccessToken();
+    expect(localStorage.getItem('fit_auth_verified_login_v1')).toBeNull();
+  });
+
   it('discards an in-flight file response after logout', async () => {
     setAccessToken('old');
     let finishRequest!: (response: Response) => void;

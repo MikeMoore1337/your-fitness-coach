@@ -298,6 +298,56 @@ describe('AuthProvider active workout cleanup', () => {
     expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
   });
 
+  it('очищает прежнего пользователя до подтверждения другого входа из вкладки без прежнего ID', async () => {
+    let finishNewUser!: (response: Response) => void;
+    const newUser = new Promise<Response>((resolve) => {
+      finishNewUser = resolve;
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return authorization === 'Bearer other-token'
+          ? newUser
+          : new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    localStorage.setItem('fit_auth_verified_login_v1', JSON.stringify({ id: 'login', userId: 8 }));
+
+    await act(async () => {
+      const message = { type: 'verified-login', token: 'other-token', userId: 8 };
+      if (typeof window.BroadcastChannel === 'function') {
+        const channel = new window.BroadcastChannel('fit_auth_session');
+        channel.postMessage(message);
+        channel.close();
+      } else {
+        window.dispatchEvent(
+          new StorageEvent('storage', {
+            key: 'fit_auth_session_event_v1',
+            newValue: JSON.stringify({ message }),
+          }),
+        );
+      }
+    });
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/me',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer other-token' }),
+        }),
+      ),
+    );
+    await act(async () => finishNewUser(new Response('{"id":8}', { status: 200 })));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+  });
+
   it('не возобновляет сессию и не восстанавливает очередь после явного выхода при позднем 401', async () => {
     let meCalls = 0;
     let refreshCalls = 0;

@@ -12,6 +12,7 @@ import {
   AUTH_LOGOUT_EVENT,
   AUTH_SESSION_EXPIRED_EVENT,
   AUTH_TOKEN_RECEIVED_EVENT,
+  AUTH_VERIFIED_LOGIN_EVENT,
   api,
   ApiError,
   authDiscardChanged,
@@ -19,6 +20,7 @@ import {
   clearAccessToken,
   expireAccessToken,
   getAccessToken,
+  invalidateLocalAccount,
   refreshAccessToken,
   setAccessToken,
   switchAuthenticatedAccount,
@@ -276,7 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         queryClient.clear();
       }
       setError(null);
-      setAccessToken(token.access_token);
+      setAccessToken(token.access_token, current.id);
       acceptAuthenticatedUser(current);
     },
     [acceptAuthenticatedUser, clearCurrentUserData, previousAuthenticatedUserId, queryClient],
@@ -301,7 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setError(null);
       queryClient.clear();
-      setAccessToken(token.access_token);
+      setAccessToken(token.access_token, current.id);
       acceptAuthenticatedUser(current);
     },
     [acceptAuthenticatedUser, clearCurrentUserData, previousAuthenticatedUserId, queryClient],
@@ -414,6 +416,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener(AUTH_ACCOUNT_SWITCH_EVENT, handleAccountSwitch);
     return () => window.removeEventListener(AUTH_ACCOUNT_SWITCH_EVENT, handleAccountSwitch);
   }, [clearCurrentUserData, queryClient]);
+
+  useEffect(() => {
+    const handleVerifiedLogin = (event: Event) => {
+      const nextUserId = (event as CustomEvent<number>).detail;
+      if (userIdRef.current && userIdRef.current !== nextUserId) invalidateLocalAccount(nextUserId);
+    };
+    window.addEventListener(AUTH_VERIFIED_LOGIN_EVENT, handleVerifiedLogin);
+    return () => window.removeEventListener(AUTH_VERIFIED_LOGIN_EVENT, handleVerifiedLogin);
+  }, []);
 
   useEffect(() => {
     const handleReceivedToken = () => {
