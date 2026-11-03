@@ -15,17 +15,17 @@ export const AUTH_TOKEN_RECEIVED_EVENT = 'fit:auth-token-received';
 export const AUTH_VERIFIED_LOGIN_EVENT = 'fit:auth-verified-login';
 
 type AuthChannelMessage =
-  | { type: 'access-token'; token: string }
-  | { type: 'verified-login'; token: string; userId: number }
+  | { type: 'access-token'; token: string; userId?: number }
   | { type: 'logout' | 'session-expired' }
   | { type: 'account-switch'; userId: number };
+type AuthChange = AuthChannelMessage['type'] | 'verified-login';
 
 let authRevision = 0;
 let authBoundaryRevision = 0;
 let authDiscardRevision = 0;
 let authLoginRevision = 0;
 
-function recordAuthChange(type: AuthChannelMessage['type']): void {
+function recordAuthChange(type: AuthChange): void {
   authRevision += 1;
   if (type !== 'session-expired') authBoundaryRevision += 1;
   if (type === 'logout' || type === 'account-switch') authDiscardRevision += 1;
@@ -38,18 +38,14 @@ const authChannel =
     : null;
 
 function receiveAuthMessage(message: AuthChannelMessage): void {
-  if (
-    message.type === 'verified-login' &&
-    typeof message.token === 'string' &&
-    Number.isSafeInteger(message.userId) &&
-    message.userId > 0
-  ) {
-    recordAuthChange(message.type);
-    window.dispatchEvent(new CustomEvent(AUTH_VERIFIED_LOGIN_EVENT, { detail: message.userId }));
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, message.token);
-    window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
-  } else if (message.type === 'access-token' && typeof message.token === 'string') {
-    recordAuthChange(message.type);
+  if (message.type === 'access-token' && typeof message.token === 'string') {
+    if (message.userId !== undefined) {
+      if (!Number.isSafeInteger(message.userId) || message.userId <= 0) return;
+      recordAuthChange('verified-login');
+      window.dispatchEvent(new CustomEvent(AUTH_VERIFIED_LOGIN_EVENT, { detail: message.userId }));
+    } else {
+      recordAuthChange(message.type);
+    }
     sessionStorage.setItem(ACCESS_TOKEN_KEY, message.token);
     window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
   } else if (message.type === 'logout' || message.type === 'session-expired') {
@@ -82,7 +78,6 @@ window.addEventListener('storage', (event) => {
       envelope.message?.type === 'logout' ||
       envelope.message?.type === 'session-expired' ||
       envelope.message?.type === 'account-switch' ||
-      envelope.message?.type === 'verified-login' ||
       envelope.message?.type === 'access-token'
     ) {
       receiveAuthMessage(envelope.message);
@@ -117,7 +112,7 @@ function authGeneration(): string | null {
   }
 }
 
-function advanceAuthGeneration(type: AuthChannelMessage['type'], userId?: number): void {
+function advanceAuthGeneration(type: AuthChange, userId?: number): void {
   recordAuthChange(type);
   try {
     const id =
@@ -268,9 +263,12 @@ export function setAccessToken(token: string, verifiedUserId?: number): void {
   const message: AuthChannelMessage =
     verifiedUserId === undefined
       ? { type: 'access-token', token }
-      : { type: 'verified-login', token, userId: verifiedUserId };
+      : { type: 'access-token', token, userId: verifiedUserId };
   sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-  advanceAuthGeneration(message.type, verifiedUserId);
+  advanceAuthGeneration(
+    verifiedUserId === undefined ? 'access-token' : 'verified-login',
+    verifiedUserId,
+  );
   broadcastAuthMessage(message);
 }
 

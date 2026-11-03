@@ -159,6 +159,18 @@ describe('api client', () => {
     expect(localStorage.getItem('fit_auth_verified_login_v1')).toBeNull();
   });
 
+  it('broadcasts verified sign-in using the existing access-token message type', () => {
+    const post =
+      typeof window.BroadcastChannel === 'function'
+        ? vi.spyOn(window.BroadcastChannel.prototype, 'postMessage')
+        : undefined;
+    const store = vi.spyOn(Storage.prototype, 'setItem');
+    setAccessToken('verified', 7);
+    const fallback = store.mock.calls.find(([key]) => key === 'fit_auth_session_event_v1');
+    const message = post?.mock.calls[0]?.[0] ?? JSON.parse(fallback![1]).message;
+    expect(message).toEqual({ type: 'access-token', token: 'verified', userId: 7 });
+  });
+
   it('discards an in-flight file response after logout', async () => {
     setAccessToken('old');
     let finishRequest!: (response: Response) => void;

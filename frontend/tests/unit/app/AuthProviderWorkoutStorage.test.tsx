@@ -320,7 +320,7 @@ describe('AuthProvider active workout cleanup', () => {
     localStorage.setItem('fit_auth_verified_login_v1', JSON.stringify({ id: 'login', userId: 8 }));
 
     await act(async () => {
-      const message = { type: 'verified-login', token: 'other-token', userId: 8 };
+      const message = { type: 'access-token', token: 'other-token', userId: 8 };
       if (typeof window.BroadcastChannel === 'function') {
         const channel = new window.BroadcastChannel('fit_auth_session');
         channel.postMessage(message);
