@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,7 +25,16 @@ import {
   ActiveWorkoutSyncProvider,
 } from '../../../../src/features/workouts/ActiveWorkoutSync';
 import { createCrossContextCoordinator } from '../../../../src/shared/browser/crossContextLock';
-import { activeWorkoutPointerStorageKey } from '../../../../src/shared/userScopedStorage';
+import {
+  clearAccessToken,
+  expireAccessToken,
+  setAccessToken,
+  switchAuthenticatedAccount,
+} from '../../../../src/shared/api/client';
+import {
+  activeWorkoutPointerStorageKey,
+  clearSensitiveUserScopedStorage,
+} from '../../../../src/shared/userScopedStorage';
 
 const workout: Workout = {
   id: 42,
@@ -97,8 +106,8 @@ function setOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value });
 }
 
-function Harness() {
-  const sync = useActiveWorkoutQueue(7, workout);
+function Harness({ workoutData = workout }: { workoutData?: Workout }) {
+  const sync = useActiveWorkoutQueue(7, workoutData);
   const [accepted, setAccepted] = useState<boolean | null>(null);
   const pending = sync.pendingBySet.get(201);
   return (
@@ -126,13 +135,13 @@ function Harness() {
   );
 }
 
-function renderHarness() {
+function renderHarness(workoutData?: Workout) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <Harness />
+      <Harness workoutData={workoutData} />
     </QueryClientProvider>,
   );
 }
@@ -179,6 +188,186 @@ describe('active workout durable queue', () => {
   beforeEach(() => {
     localStorage.clear();
     setOnline(false);
+  });
+
+  async function finishEnqueueAfterSessionChange(
+    endSession: () => void,
+    beforeRelease?: () => void,
+  ) {
+    let releaseLock!: () => void;
+    let waitingForLock!: () => void;
+    let finishLock!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const waiting = new Promise<void>((resolve) => {
+      waitingForLock = resolve;
+    });
+    const finished = new Promise<void>((resolve) => {
+      finishLock = resolve;
+    });
+    let hold = false;
+    const originalLocks = navigator.locks;
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: async (_name: string, callback: () => Promise<unknown>) => {
+          if (hold) {
+            waitingForLock();
+            await gate;
+          }
+          const result = await callback();
+          if (hold) finishLock();
+          return result;
+        },
+      },
+    });
+    try {
+      const view = renderHarness();
+      await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42));
+      hold = true;
+      fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
+      await waiting;
+      endSession();
+      view.unmount();
+      beforeRelease?.();
+      await act(async () => {
+        releaseLock();
+        await finished;
+      });
+    } finally {
+      Object.defineProperty(navigator, 'locks', { configurable: true, value: originalLocks });
+    }
+  }
+
+  it('does not recreate a queued set after explicit logout while a storage lock is pending', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage();
+      clearAccessToken();
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('keeps a queued set and its snapshot when the session expires while a storage lock is pending', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+      expireAccessToken();
+    });
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
+    expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it('discovers a delayed queued set if the same account signs in before its storage lock opens', async () => {
+    await finishEnqueueAfterSessionChange(
+      () => {
+        clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+        expireAccessToken();
+      },
+      () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        render(
+          <QueryClientProvider client={queryClient}>
+            <ActiveWorkoutSyncProvider userId={7} enabled>
+              <ActiveWorkoutSyncNotice />
+            </ActiveWorkoutSyncProvider>
+          </QueryClientProvider>,
+        );
+      },
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('ожидают синхронизации'),
+    );
+    const pending = loadActiveWorkoutQueue(7, 42).queue;
+    expect(pending).toHaveLength(1);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 201,
+          actual_reps: 8,
+          actual_weight: 40,
+          is_completed: true,
+          version: 2,
+        }),
+        { status: 200 },
+      ),
+    );
+    await act(async () => {
+      setOnline(true);
+      window.dispatchEvent(new Event('online'));
+    });
+    await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({
+      mutation_id: pending[0]?.mutation_id,
+      is_completed: true,
+    });
+  });
+
+  it('does not recreate a queued set after account switch while a storage lock is pending', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+      expireAccessToken();
+      switchAuthenticatedAccount(8);
+      clearSensitiveUserScopedStorage();
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it("notices another tab's discard generation before its logout message arrives", async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage();
+      localStorage.setItem('fit_auth_discard_generation_v1', 'other-tab-logout');
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('keeps a pending write when another tab verifies the same account', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      localStorage.setItem(
+        'fit_auth_verified_login_v1',
+        JSON.stringify({ id: 'login', userId: 7 }),
+      );
+    });
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
+  });
+
+  it('does not recreate a pending write after another tab verifies a different account', async () => {
+    await finishEnqueueAfterSessionChange(() => {
+      clearSensitiveUserScopedStorage(8);
+      localStorage.setItem(
+        'fit_auth_verified_login_v1',
+        JSON.stringify({ id: 'login', userId: 8 }),
+      );
+    });
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+  });
+
+  it('removes a write that races with logout between the guard and localStorage write', async () => {
+    renderHarness();
+    await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42));
+    const nativeSet = Storage.prototype.setItem;
+    let logoutInjected = false;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (this === localStorage && key === activeWorkoutQueueKey(7, 42) && !logoutInjected) {
+        logoutInjected = true;
+        clearSensitiveUserScopedStorage();
+        clearAccessToken();
+        nativeSet.call(this, activeWorkoutQueueKey(8, 43), 'new-account-data');
+      }
+      return nativeSet.call(this, key, value);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
+    await waitFor(() => expect(logoutInjected).toBe(true));
+    await waitFor(() => expect(screen.getByTestId('accepted')).toHaveTextContent('false'));
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    expect(loadCurrentActiveWorkoutSnapshot(7)).toBeUndefined();
+    expect(localStorage.getItem(activeWorkoutQueueKey(8, 43))).toBe('new-account-data');
   });
 
   afterEach(() => {
@@ -238,6 +427,58 @@ describe('active workout durable queue', () => {
       await Promise.resolve();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('automatically retries the same queued mutation after the same account signs in again', async () => {
+    setAccessToken('old-token', 7);
+    try {
+      saveActiveWorkoutSnapshot(7, workout);
+      const queued = enqueueWorkoutMutation(loadActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      });
+      saveActiveWorkoutQueue(queued);
+      let finishFirst!: (response: Response) => void;
+      const saved = JSON.stringify({
+        id: 201,
+        set_number: 1,
+        actual_reps: 8,
+        actual_weight: 40,
+        is_completed: true,
+        version: 2,
+      });
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              finishFirst = resolve;
+            }),
+        )
+        .mockResolvedValueOnce(new Response(saved, { status: 200 }));
+      setOnline(true);
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <ActiveWorkoutSyncProvider userId={7} enabled>
+            <ActiveWorkoutSyncNotice />
+          </ActiveWorkoutSyncProvider>
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      act(() => setAccessToken('same-account-new-token', 7));
+      await act(async () => finishFirst(new Response(saved, { status: 200 })));
+
+      await waitFor(() => expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0), {
+        timeout: 5000,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)).mutation_id).toBe(
+        queued.queue[0]?.mutation_id,
+      );
+    } finally {
+      clearAccessToken();
+    }
   });
 
   it('сохраняет конфликтующую очередь и показывает сообщение вне тренировки', async () => {
@@ -811,6 +1052,63 @@ describe('active workout durable queue', () => {
     expect(restored.workout_snapshot?.id).toBe(42);
     expect(restored.workout_snapshot?.exercises[0]?.metric_type).toBe('cardio');
     expect(loadCurrentActiveWorkoutSnapshot(7)?.exercises[0]?.metric_type).toBe('cardio');
+  });
+
+  it.each([2, 3])(
+    'retains v%s pending mutations when their workout snapshot is invalid',
+    (version) => {
+      const pending = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+        setId: 201,
+        serverVersion: 1,
+        values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+      });
+      localStorage.setItem(
+        activeWorkoutQueueKey(7, 42),
+        JSON.stringify({ ...pending, schema_version: version, workout_snapshot: { id: 42 } }),
+      );
+
+      const restored = loadActiveWorkoutQueue(7, 42);
+
+      expect(restored.queue).toEqual(pending.queue);
+      expect(restored.workout_snapshot).toBeUndefined();
+      expect(JSON.parse(localStorage.getItem(activeWorkoutQueueKey(7, 42))!).queue).toEqual(
+        pending.queue,
+      );
+      clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+      expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending.queue);
+    },
+  );
+
+  it('does not overwrite pending changes with an invalid workout snapshot', () => {
+    const pending = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: true },
+    });
+    expect(saveActiveWorkoutQueue({ ...pending, workout_snapshot: workout })).toBe(true);
+    const invalidWorkout = {
+      ...workout,
+      exercises: workout.exercises.map((exercise) => ({ ...exercise, metric_type: undefined })),
+    } as unknown as Workout;
+
+    expect(saveActiveWorkoutSnapshot(7, invalidWorkout)).toBeUndefined();
+    expect(loadActiveWorkoutQueue(7, 42)).toMatchObject({
+      queue: pending.queue,
+      workout_snapshot: { id: 42 },
+    });
+  });
+
+  it('keeps an offline mutation when the workout response cannot form a valid snapshot', async () => {
+    const invalidWorkout = {
+      ...workout,
+      exercises: workout.exercises.map((exercise) => ({ ...exercise, metric_type: undefined })),
+    } as unknown as Workout;
+    renderHarness(invalidWorkout);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
+
+    await waitFor(() => expect(screen.getByTestId('accepted')).toHaveTextContent('true'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
   });
 
   it('сохраняет обе стороны отдельно от очереди старой вкладки и переносит v2 без потерь', () => {

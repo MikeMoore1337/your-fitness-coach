@@ -1,8 +1,11 @@
-import { createContext, useContext, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { Workout } from '../../shared/api/types';
-import { loadCurrentActiveWorkoutSnapshot } from './activeWorkoutQueue';
+import {
+  ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT,
+  loadCurrentActiveWorkoutSnapshot,
+} from './activeWorkoutQueue';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
 
 export const ActiveWorkoutSyncContext = createContext<ReturnType<
@@ -18,6 +21,7 @@ export function ActiveWorkoutSyncProvider({
   enabled: boolean;
   children: ReactNode;
 }) {
+  const queryClient = useQueryClient();
   const workout = useQuery({
     queryKey: ['workout', 'today'],
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
@@ -29,6 +33,17 @@ export function ActiveWorkoutSyncProvider({
     enabled ? userId : undefined,
     enabled ? workout.data : undefined,
   );
+  useEffect(() => {
+    if (!enabled || !userId) return;
+    const onQueueChanged = (event: Event) => {
+      if ((event as CustomEvent<number>).detail !== userId) return;
+      if (queryClient.getQueryData(['workout', 'today'])) return;
+      const snapshot = loadCurrentActiveWorkoutSnapshot(userId);
+      if (snapshot) queryClient.setQueryData(['workout', 'today'], snapshot);
+    };
+    window.addEventListener(ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT, onQueueChanged);
+    return () => window.removeEventListener(ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT, onQueueChanged);
+  }, [enabled, queryClient, userId]);
   return (
     <ActiveWorkoutSyncContext.Provider value={enabled ? sync : null}>
       {children}

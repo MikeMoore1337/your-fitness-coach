@@ -614,6 +614,7 @@ export async function installPlatformApi(
       {
         id: 101,
         exercise_id: 11,
+        metric_type: 'strength',
         exercise_title: options.longExerciseName
           ? 'Приседания со штангой с контролируемой паузой в нижней точке'
           : 'Приседания',

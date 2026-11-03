@@ -8,13 +8,22 @@ import {
   useState,
 } from 'react';
 import {
+  AUTH_ACCOUNT_SWITCH_EVENT,
   AUTH_LOGOUT_EVENT,
+  AUTH_SESSION_EXPIRED_EVENT,
+  AUTH_TOKEN_RECEIVED_EVENT,
+  AUTH_VERIFIED_LOGIN_EVENT,
   api,
   ApiError,
+  authDiscardChanged,
+  authDiscardSnapshot,
   clearAccessToken,
+  expireAccessToken,
   getAccessToken,
+  invalidateLocalAccount,
   refreshAccessToken,
   setAccessToken,
+  switchAuthenticatedAccount,
 } from '../shared/api/client';
 import type { PublicConfig, User } from '../shared/api/types';
 import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../shared/sync';
@@ -23,6 +32,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   clearSensitiveUserScopedStorage,
+  lastAuthenticatedUserId,
+  rememberAuthenticatedUserId,
 } from '../shared/userScopedStorage';
 import { syncFirstTouchAttribution } from '../shared/analytics/attribution';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../shared/telegram/layout';
@@ -109,20 +120,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userIdRef.current = null;
   }, []);
 
+  const previousAuthenticatedUserId = useCallback(() => {
+    const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+    return (
+      userIdRef.current ??
+      (Number.isSafeInteger(storedUserId) && storedUserId > 0
+        ? storedUserId
+        : lastAuthenticatedUserId())
+    );
+  }, []);
+
+  const clearExpiredUserData = useCallback(() => {
+    const userId = previousAuthenticatedUserId();
+    if (userId) rememberAuthenticatedUserId(userId);
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId });
+    userIdRef.current = null;
+  }, [previousAuthenticatedUserId]);
+
   const acceptAuthenticatedUser = useCallback(
     (current: User) => {
-      const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
-      const previousUserId =
-        userIdRef.current ?? (Number.isInteger(storedUserId) ? storedUserId : null);
+      if (!Number.isSafeInteger(current.id) || current.id <= 0)
+        throw new Error('Не удалось подтвердить аккаунт');
+      const previousUserId = previousAuthenticatedUserId();
       if (previousUserId && previousUserId !== current.id) {
+        switchAuthenticatedAccount(current.id);
         clearSensitiveUserScopedStorage();
+        queryClient.clear();
+      } else if (!previousUserId) {
+        clearSensitiveUserScopedStorage(current.id);
         queryClient.clear();
       }
       sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, String(current.id));
+      rememberAuthenticatedUserId(current.id);
       userIdRef.current = current.id;
       setUser(current);
     },
-    [queryClient],
+    [previousAuthenticatedUserId, queryClient],
   );
 
   const reloadUser = useCallback(async (): Promise<User | null> => {
@@ -132,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       return current;
     } catch (reason) {
+      if (reason instanceof DOMException && reason.name === 'AbortError') return null;
       if (reason instanceof ApiError && reason.status === 0) {
         const cached = await offlineWorkoutUser();
         if (cached) {
@@ -142,8 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       if (reason instanceof ApiError && [401, 403].includes(reason.status)) {
-        clearAccessToken();
-        clearCurrentUserData();
+        expireAccessToken();
         setUser(null);
         setError(null);
         return null;
@@ -151,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(reason instanceof Error ? reason.message : 'Не удалось загрузить профиль');
       return null;
     }
-  }, [acceptAuthenticatedUser, clearCurrentUserData]);
+  }, [acceptAuthenticatedUser]);
 
   const syncUser = useCallback(async (): Promise<void> => {
     try {
@@ -161,11 +194,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (reason) {
       // A temporary connection error must not log the user out. An expired session should.
       if (reason instanceof ApiError && reason.status === 401) {
-        clearCurrentUserData();
+        expireAccessToken();
         setUser(null);
       }
     }
-  }, [acceptAuthenticatedUser, clearCurrentUserData]);
+  }, [acceptAuthenticatedUser]);
 
   const userId = user?.id;
   useEffect(() => {
@@ -215,8 +248,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       if (!Number.isSafeInteger(current.id) || current.id <= 0)
         throw new Error('Не удалось подтвердить аккаунт Telegram');
-      const previousUserId =
-        userIdRef.current ?? Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+      const previousUserId = previousAuthenticatedUserId();
       if (!previousUserId) {
         let verifiedPreviousId: number | undefined;
         if (previousToken) {
@@ -225,55 +257,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               headers: { Authorization: `Bearer ${previousToken}` },
               retryAuth: false,
             });
-            verifiedPreviousId = previous.id;
+            if (Number.isSafeInteger(previous.id) && previous.id > 0)
+              verifiedPreviousId = previous.id;
           } catch {
-            // An unverified previous session must not retain private data.
+            // The new server-confirmed identity still limits which queue can be restored.
           }
         }
-        clearCurrentUserData(verifiedPreviousId === current.id ? current.id : undefined);
+        if (verifiedPreviousId && verifiedPreviousId !== current.id) {
+          switchAuthenticatedAccount(current.id);
+          clearCurrentUserData();
+        } else {
+          clearCurrentUserData(current.id);
+        }
         setUser(null);
         queryClient.clear();
       } else if (previousUserId !== current.id) {
+        switchAuthenticatedAccount(current.id);
         clearCurrentUserData();
         setUser(null);
         queryClient.clear();
       }
       setError(null);
-      setAccessToken(token.access_token);
+      setAccessToken(token.access_token, current.id);
       acceptAuthenticatedUser(current);
     },
-    [acceptAuthenticatedUser, clearCurrentUserData, queryClient],
-  );
-
-  const devLogin = useCallback(
-    async (input: DevLoginInput) => {
-      await revokeWebPushSubscription().catch(() => undefined);
-      const token = await api<{ access_token: string }>('/api/v1/auth/dev-login', {
-        method: 'POST',
-        body: input,
-        retryAuth: false,
-      });
-      clearCurrentUserData();
-      setUser(null);
-      setError(null);
-      queryClient.clear();
-      setAccessToken(token.access_token);
-      await reloadUser();
-    },
-    [clearCurrentUserData, queryClient, reloadUser],
+    [acceptAuthenticatedUser, clearCurrentUserData, previousAuthenticatedUserId, queryClient],
   );
 
   const acceptToken = useCallback(
     async (token: { access_token: string }) => {
       await revokeWebPushSubscription().catch(() => undefined);
-      clearCurrentUserData();
+      const current = await api<User>('/api/v1/me', {
+        headers: { Authorization: `Bearer ${token.access_token}` },
+        retryAuth: false,
+      });
+      if (!Number.isSafeInteger(current.id) || current.id <= 0)
+        throw new Error('Не удалось подтвердить аккаунт');
+      const previousUserId = previousAuthenticatedUserId();
+      if (previousUserId && previousUserId !== current.id) {
+        switchAuthenticatedAccount(current.id);
+        clearCurrentUserData();
+      } else {
+        clearCurrentUserData(current.id);
+      }
       setUser(null);
       setError(null);
       queryClient.clear();
-      setAccessToken(token.access_token);
-      await reloadUser();
+      setAccessToken(token.access_token, current.id);
+      acceptAuthenticatedUser(current);
     },
-    [clearCurrentUserData, queryClient, reloadUser],
+    [acceptAuthenticatedUser, clearCurrentUserData, previousAuthenticatedUserId, queryClient],
+  );
+
+  const devLogin = useCallback(
+    async (input: DevLoginInput) => {
+      const token = await api<{ access_token: string }>('/api/v1/auth/dev-login', {
+        method: 'POST',
+        body: input,
+        retryAuth: false,
+      });
+      await acceptToken(token);
+    },
+    [acceptToken],
   );
 
   const emailLogin = useCallback(
@@ -352,14 +397,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearCurrentUserData, queryClient]);
 
   useEffect(() => {
+    const handleSessionExpired = () => {
+      clearExpiredUserData();
+      setUser(null);
+      queryClient.clear();
+    };
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [clearExpiredUserData, queryClient]);
+
+  useEffect(() => {
+    const handleAccountSwitch = (event: Event) => {
+      const userId = (event as CustomEvent<number>).detail;
+      clearCurrentUserData(userId);
+      setUser(null);
+      queryClient.clear();
+    };
+    window.addEventListener(AUTH_ACCOUNT_SWITCH_EVENT, handleAccountSwitch);
+    return () => window.removeEventListener(AUTH_ACCOUNT_SWITCH_EVENT, handleAccountSwitch);
+  }, [clearCurrentUserData, queryClient]);
+
+  useEffect(() => {
+    const handleVerifiedLogin = (event: Event) => {
+      const nextUserId = (event as CustomEvent<number>).detail;
+      if (userIdRef.current && userIdRef.current !== nextUserId) invalidateLocalAccount(nextUserId);
+    };
+    window.addEventListener(AUTH_VERIFIED_LOGIN_EVENT, handleVerifiedLogin);
+    return () => window.removeEventListener(AUTH_VERIFIED_LOGIN_EVENT, handleVerifiedLogin);
+  }, []);
+
+  useEffect(() => {
+    const handleReceivedToken = () => {
+      if (!userIdRef.current) void reloadUser();
+    };
+    window.addEventListener(AUTH_TOKEN_RECEIVED_EVENT, handleReceivedToken);
+    return () => window.removeEventListener(AUTH_TOKEN_RECEIVED_EVENT, handleReceivedToken);
+  }, [reloadUser]);
+
+  useEffect(() => {
     let cancelled = false;
+    const discard = authDiscardSnapshot();
     void (async () => {
       try {
-        const publicConfig = await api<PublicConfig>('/api/v1/public/config', {
-          retryAuth: false,
+        const loadConfig = () => api<PublicConfig>('/api/v1/public/config', { retryAuth: false });
+        const publicConfig = await loadConfig().catch((reason: unknown) => {
+          if (!cancelled && reason instanceof DOMException && reason.name === 'AbortError')
+            return loadConfig();
+          throw reason;
         });
         if (cancelled) return;
         setConfig(publicConfig);
+        if (authDiscardChanged(discard)) {
+          if (getAccessToken() && !userIdRef.current) await reloadUser();
+          return;
+        }
 
         const tg = window.Telegram?.WebApp;
         if (tg?.initData?.trim()) {
@@ -376,8 +467,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser(cached);
                 setError(null);
               } else {
-                clearAccessToken();
-                clearCurrentUserData();
+                expireAccessToken();
                 setUser(null);
                 queryClient.clear();
                 setError(
@@ -389,9 +479,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (getAccessToken()) {
+        const tokenBeforeReload = getAccessToken();
+        if (tokenBeforeReload) {
           const current = await reloadUser();
-          if (current || cancelled) return;
+          if (current || cancelled || getAccessToken() !== tokenBeforeReload) return;
         }
 
         // The access token deliberately lives only in sessionStorage. A page reload in a
@@ -402,6 +493,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (reason) {
         if (!cancelled) {
+          if (reason instanceof DOMException && reason.name === 'AbortError') {
+            if (getAccessToken() && !userIdRef.current) await reloadUser();
+            return;
+          }
           const cached =
             reason instanceof ApiError && reason.status === 0 ? await offlineWorkoutUser() : null;
           if (cached) {
