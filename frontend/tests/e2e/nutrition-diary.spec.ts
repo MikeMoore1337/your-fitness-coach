@@ -1868,7 +1868,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
         .poll(() => page.evaluate(() => document.documentElement.dataset.yfcKeyboard))
         .toBe('hidden');
       await page.screenshot({
-        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-search-closed.png`,
+        path: test.info().outputPath(`${project}-${current.label}-search-closed.png`),
       });
 
       await search.focus();
@@ -1883,7 +1883,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(420);
       await expect(page.locator('.nutrition-food-results')).toBeVisible();
       await page.screenshot({
-        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-rice-search.png`,
+        path: test.info().outputPath(`${project}-${current.label}-keyboard-open-rice-search.png`),
       });
 
       const riceGeometry = await page.evaluate(() => {
@@ -1971,7 +1971,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       expect(scrollProof.after).toBeGreaterThan(scrollProof.before);
       expect(scrollProof.pageScrollY).toBe(0);
       await page.screenshot({
-        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-rice-results.png`,
+        path: test.info().outputPath(`${project}-${current.label}-keyboard-open-rice-results.png`),
       });
       await page.evaluate(() => {
         const flow = document.querySelector<HTMLElement>('.nutrition-picker__search-flow');
@@ -1995,7 +1995,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       );
       await setViewportHeight(420);
       await page.screenshot({
-        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-potato-results.png`,
+        path: test.info().outputPath(`${project}-${current.label}-potato-results.png`),
       });
 
       await search.fill('неизвестный продукт');
@@ -2015,7 +2015,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       });
       expect(emptyGeometry.secondaryTop).toBeGreaterThanOrEqual(emptyGeometry.emptyBottom - 0.5);
       await page.screenshot({
-        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-empty.png`,
+        path: test.info().outputPath(`${project}-${current.label}-keyboard-open-empty.png`),
       });
 
       await setViewportHeight(current.height);
@@ -2091,7 +2091,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       });
       expect(pressedState.ratio).toBeGreaterThanOrEqual(4.5);
       await page.screenshot({
-        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-pressed.png`,
+        path: test.info().outputPath(`${project}-${current.label}-pressed.png`),
       });
       await page.mouse.up();
       await expect(
@@ -2103,7 +2103,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       await expect(page.getByRole('spinbutton', { name: 'Количество' })).toBeFocused();
       await expect(page.getByLabel('Единица')).toHaveValue('g');
       await page.screenshot({
-        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-selected.png`,
+        path: test.info().outputPath(`${project}-${current.label}-selected.png`),
       });
       await page.getByRole('button', { name: 'Выбрать другое' }).click();
       await page.getByRole('button', { name: 'Закрыть добавление' }).click();
@@ -2204,7 +2204,7 @@ test('variant B keeps the first result visible in mocked TMA with safe-area inse
   expect(geometry.factsText).toContain('130 ккал / 100 г');
 
   await page.screenshot({
-    path: '../docs/ux/final-issues-acceptance/evidence/946-948/after/tma-393-dark-keyboard-open-rice.png',
+    path: test.info().outputPath('tma-393-dark-keyboard-open-rice.png'),
   });
   await page.setViewportSize({ width: 393, height: 844 });
   await expect
