@@ -229,3 +229,28 @@ def test_postgres_downgrade_does_not_race_a_profile_update():
             connection.exec_driver_sql('SET search_path TO "public"')
             connection.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
             connection.commit()
+
+
+@pytest.mark.parametrize("isolation", ["REPEATABLE READ", "SERIALIZABLE"])
+def test_postgres_downgrade_rejects_stale_snapshot(postgres_migration, isolation):
+    from fitminiapp_api.db.session import engine
+
+    connection, migration = postgres_migration
+    schema = connection.exec_driver_sql("SELECT current_schema()").scalar_one()
+    connection.commit()
+    connection.exec_driver_sql(f"SET TRANSACTION ISOLATION LEVEL {isolation}")
+    connection.exec_driver_sql("SELECT count(*) FROM user_profiles").scalar_one()
+    with engine.begin() as writer:
+        writer.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
+        writer.exec_driver_sql(
+            "INSERT INTO user_profiles (id, equipment_profiles_revision) VALUES (1, 9)"
+        )
+    with pytest.raises(RuntimeError, match="READ COMMITTED"):
+        migration.downgrade()
+    connection.rollback()
+    assert (
+        connection.exec_driver_sql(
+            "SELECT equipment_profiles_revision FROM user_profiles WHERE id=1"
+        ).scalar_one()
+        == 9
+    )
