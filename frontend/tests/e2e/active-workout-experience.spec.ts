@@ -3861,7 +3861,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate(() => {
       const write = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key: string, value: string) {
-        if (key.startsWith('fit_active_workout_v1_'))
+        if (key.startsWith('fit_active_workout_queue_v4_'))
           throw new DOMException('Quota', 'QuotaExceededError');
         return write.call(this, key, value);
       };
@@ -3948,7 +3948,7 @@ test('P1 combined API and storage failure never claims durable completion', asyn
   await page.evaluate(() => {
     const write = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (key.startsWith('fit_active_workout_v1_'))
+      if (key.startsWith('fit_active_workout_queue_v4_'))
         throw new DOMException('Quota', 'QuotaExceededError');
       return write.call(this, key, value);
     };
