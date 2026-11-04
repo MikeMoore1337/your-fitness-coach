@@ -4691,7 +4691,7 @@ for (const [theme, width] of [
   });
 }
 
-for (const width of [320, 360, 393, 430]) {
+for (const width of [320, 360, 361, 375, 390, 393, 430]) {
   for (const theme of ['dark', 'light'] as const) {
     test(`#996 footer geometry ${theme} ${width}px`, async ({ page }) => {
       const dialog = await openIssue996Replacement(page, { width, theme });

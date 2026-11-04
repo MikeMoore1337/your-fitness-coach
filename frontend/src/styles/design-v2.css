@@ -3799,9 +3799,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 430px) {
   .workout-adaptation-dialog__choice-row .ui-button {
     padding-inline: 4px;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .workout-adaptation-dialog__choice-row .ui-button {
     font-size: 0.75rem;
   }
 }
