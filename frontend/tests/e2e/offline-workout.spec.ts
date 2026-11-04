@@ -161,7 +161,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
     .poll(() =>
       page.evaluate(() => {
         const key = Object.keys(localStorage).find((item) =>
-          item.startsWith('fit_active_workout_v1_user_7_workout_42'),
+          item.startsWith('fit_active_workout_queue_v4_user_7_workout_42'),
         );
         const queue = key ? JSON.parse(localStorage.getItem(key) || '{}').queue : [];
         const values = queue?.at(-1)?.values;
@@ -179,7 +179,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
     .poll(() =>
       page.evaluate(() => {
         const key = Object.keys(localStorage).find((item) =>
-          item.startsWith('fit_active_workout_v1_user_7_workout_42'),
+          item.startsWith('fit_active_workout_queue_v4_user_7_workout_42'),
         );
         const queue = key ? JSON.parse(localStorage.getItem(key) || '{}').queue : [];
         return queue?.at(-1)?.values?.is_completed ?? null;

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   api,
   ApiError,
+  authIdentityPending,
   authDiscardChanged,
   authDiscardSnapshot,
   getUserFacingErrorMessage,
@@ -231,6 +232,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   }, [persistSnapshotWithLock]);
 
   const runQueue = useCallback(async (): Promise<boolean> => {
+    if (authIdentityPending()) return false;
     if (sideConflictRef.current || planConflictRef.current) return false;
     if (!userId || !workoutId || !navigator.onLine) {
       setSyncState('offline');
@@ -245,6 +247,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     setMessage(null);
     let conflictAttempts = 0;
     while (conflictAttempts < 12) {
+      if (authIdentityPending()) return false;
       const fresh = readFresh();
       const pending = fresh.queue[0];
       if (!pending) {
@@ -360,9 +363,16 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
           }
           if (detail?.code === 'workout_set_version_conflict' && validWorkoutStatus(current)) {
             await updateCachedSet(queryClient, current);
-            persist(
-              resolveWorkoutVersionConflict(readFresh(), pending.mutation_id, current.version),
+            const resolved = resolveWorkoutVersionConflict(
+              readFresh(),
+              pending.mutation_id,
+              current.version,
             );
+            if (
+              persist(resolved) &&
+              !resolved.queue.some((item) => item.mutation_id === pending.mutation_id)
+            )
+              acknowledgeLegacyWorkoutMutation(userId, workoutId, pending.mutation_id);
             conflictAttempts += 1;
             continue;
           }
@@ -436,7 +446,14 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       immediate = false,
       onlyIfNoPending = false,
     ): Promise<boolean> => {
-      if (!userId || !workoutId || !lockName || authDiscardChanged(discardSnapshot)) return false;
+      if (
+        !userId ||
+        !workoutId ||
+        !lockName ||
+        authIdentityPending() ||
+        authDiscardChanged(discardSnapshot)
+      )
+        return false;
       let releaseEnqueue!: () => void;
       const currentEnqueue = new Promise<void>((resolve) => {
         releaseEnqueue = resolve;
@@ -466,6 +483,12 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
               inFlightMutationId: inFlightId.current,
             });
             const durable = persist(next, immediate && !navigator.onLine);
+            if (durable) {
+              for (const previous of fresh.queue) {
+                if (!next.queue.some((item) => item.mutation_id === previous.mutation_id))
+                  acknowledgeLegacyWorkoutMutation(userId, workoutId, previous.mutation_id);
+              }
+            }
             setMessage(
               durable
                 ? navigator.onLine
@@ -696,8 +719,8 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       await queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true });
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== key && event.key !== legacyActiveWorkoutQueueKey(userId!, workoutId!))
-        return;
+      const legacyKey = legacyActiveWorkoutQueueKey(userId!, workoutId!);
+      if (event.key !== key && event.key !== legacyKey && event.key !== `${legacyKey}:v3`) return;
       const fresh = readFresh();
       memoryState.current = fresh;
       setStoredState({ key, data: fresh });

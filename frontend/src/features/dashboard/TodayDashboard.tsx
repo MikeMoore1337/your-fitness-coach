@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
-import { ApiError, api } from '../../shared/api/client';
+import {
+  ApiError,
+  api,
+  authDiscardChanged,
+  authDiscardSnapshot,
+  requiresLegacyReauthentication,
+} from '../../shared/api/client';
 import type {
   CardioSession,
   FoodDiaryDay,
@@ -20,6 +26,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
 import {
   activeWorkoutLockName,
+  discardActiveWorkoutDataAfterAuthChange,
   loadActiveWorkoutQueue,
   loadCurrentActiveWorkoutSnapshot,
   saveActiveWorkoutSnapshot,
@@ -1084,15 +1091,22 @@ export function TodayDashboard({
     user && workout.data && loadActiveWorkoutQueue(user.id, workout.data.id).queue.length > 0,
   );
   const visibleWorkout = noTodayWorkout && !hasPendingLocalChanges ? undefined : workout.data;
+  const suspendDiscard = useMemo(
+    () => ({ ...authDiscardSnapshot(), userId: user?.id, workoutId: workout.data?.id }),
+    [user?.id, workout.data?.id],
+  );
 
   const persistSnapshotOnSuspend = useCallback(() => {
     if (!user || !workout.data || workout.data.status !== 'in_progress') return;
     void crossContextCoordinator
       .run(activeWorkoutLockName(user.id, workout.data.id), () => {
+        if (authDiscardChanged(suspendDiscard) || requiresLegacyReauthentication()) return;
         saveActiveWorkoutSnapshot(user.id, workout.data!);
+        if (authDiscardChanged(suspendDiscard))
+          discardActiveWorkoutDataAfterAuthChange(user.id, workout.data!.id);
       })
       .catch(() => undefined);
-  }, [user, workout.data]);
+  }, [suspendDiscard, user, workout.data]);
 
   useEffect(() => {
     const refreshOnReturn = () => {

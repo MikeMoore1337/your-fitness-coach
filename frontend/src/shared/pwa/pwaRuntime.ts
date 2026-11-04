@@ -87,7 +87,11 @@ export function hasActiveWorkoutData(): boolean {
       const key = localStorage.key(index);
       if (!key) continue;
       if (key.startsWith('fit_active_workout_rest_v1_user_')) return true;
-      if (!key.startsWith('fit_active_workout_v1_user_')) continue;
+      if (
+        !key.startsWith('fit_active_workout_v1_user_') &&
+        !key.startsWith('fit_active_workout_queue_v4_user_')
+      )
+        continue;
       const parsed = JSON.parse(localStorage.getItem(key) || '{}') as {
         queue?: unknown;
         workout_snapshot?: { status?: unknown };
