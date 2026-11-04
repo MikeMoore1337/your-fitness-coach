@@ -123,7 +123,14 @@ def test_dependency_automation_policy_is_manual_and_fail_closed() -> None:
     assert project["tool"]["uv"]["required-version"] == ">=0.11.32,<0.12"
     assert {"backend", "bot"} <= set(project["project"]["optional-dependencies"])
     dev = project["dependency-groups"]["dev"]
-    for package in ("pytest>=9.1", "mypy>=2.3", "ruff>=0.16.1", "pre-commit>=4.6"):
+    # pytest 9.2 emits an AnyIO deprecation warning as an error until the
+    # Starlette/AnyIO test integration is upgraded compatibly.
+    for package in (
+        "pytest>=9.1,<9.2",
+        "mypy>=2.4.1,<3",
+        "ruff>=0.17.3,<0.18",
+        "pre-commit>=4.7.0,<5",
+    ):
         assert package in dev
     for legacy in (
         root / "backend" / "requirements.in",
