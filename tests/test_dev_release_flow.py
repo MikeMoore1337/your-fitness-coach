@@ -1,5 +1,6 @@
 """Two-stage YFC release governance contracts."""
 
+import hashlib
 import json
 import os
 import shutil
@@ -16,7 +17,7 @@ UPDATE_SCRIPT = ROOT / "scripts/update_dev.ps1"
 
 
 @pytest.mark.parametrize(
-    "scenario", ["valid", "unsafe", "modified", "deleted", "renamed", "not_ancestor"]
+    "scenario", ["valid", "reviewed", "unsafe", "modified", "deleted", "renamed", "not_ancestor"]
 )
 def test_dev_migration_preflight_uses_immutable_target_without_child_git(
     tmp_path: Path, scenario: str
@@ -49,18 +50,37 @@ def test_dev_migration_preflight_uses_immutable_target_without_child_git(
         "def upgrade():\n"
         '    op.add_column("users", sa.Column("nickname", sa.String(), nullable=True))\n'
     )
-    if scenario in {"modified", "deleted", "renamed"}:
-        migration.write_text(valid, encoding="utf-8")
+    reviewed_old = valid + "\ndef downgrade():\n    pass\n"
+    reviewed_new = reviewed_old.replace("    pass\n", '    raise RuntimeError("guard")\n')
+    if scenario in {"modified", "deleted", "renamed", "reviewed"}:
+        migration.write_text(reviewed_old if scenario == "reviewed" else valid, encoding="utf-8")
     git("add", ".")
     git("commit", "--quiet", "-m", "installed version")
     source = git("rev-parse", "HEAD")
     if scenario == "not_ancestor":
         git("checkout", "--orphan", "unrelated")
     checker.write_bytes((ROOT / "scripts/check_online_migrations.py").read_bytes())
+    if scenario == "reviewed":
+        hashes = tuple(
+            hashlib.sha256(value.encode()).hexdigest() for value in (reviewed_old, reviewed_new)
+        )
+        source_text = checker.read_text(encoding="utf-8")
+        marker = "DEV_DOWNGRADE_TRANSITIONS = {"
+        assert source_text.count(marker) == 1
+        checker.write_text(
+            source_text.replace(
+                marker,
+                f'{marker}\n    "{migration.relative_to(repo).as_posix()}": {hashes!r},',
+                1,
+            ),
+            encoding="utf-8",
+        )
     if scenario == "deleted":
         migration.unlink()
     elif scenario == "renamed":
         migration.rename(migration.with_name("9998_renamed.py"))
+    elif scenario == "reviewed":
+        migration.write_text(reviewed_new, encoding="utf-8")
     else:
         migration.write_text(
             valid.replace("op.add_column", "op.drop_table")
@@ -113,13 +133,16 @@ def test_dev_migration_preflight_uses_immutable_target_without_child_git(
         text=True,
         timeout=60,
     )
-    if scenario == "valid":
+    if scenario in {"valid", "reviewed"}:
         assert result.returncode == 0, result.stdout + result.stderr
         assert "VALIDATED" in result.stdout
         manifest = next((tmp_path / "evidence").glob("*/manifest.json"))
         saved = json.loads(manifest.read_text(encoding="utf-8"))
         assert (saved["active_revision"], saved["target_revision"]) == (source, target)
-        assert saved["changes"] == [{"status": "A", "path": migration.relative_to(repo).as_posix()}]
+        expected_status = "A" if scenario == "valid" else "M"
+        assert saved["changes"] == [
+            {"status": expected_status, "path": migration.relative_to(repo).as_posix()}
+        ]
     else:
         assert result.returncode == 17, result.stdout + result.stderr
         assert "GATE_REJECTED=MIGRATION_REVIEW_REQUIRED" in result.stdout
@@ -127,6 +150,9 @@ def test_dev_migration_preflight_uses_immutable_target_without_child_git(
         log = next((tmp_path / "evidence").glob("*/validation.log")).read_text(encoding="utf-8-sig")
         if scenario == "valid":
             assert "Online migration gate passed: 1 added migration(s)" in log
+        elif scenario == "reviewed":
+            assert "DEV-only reviewed downgrade change:" in log
+            assert "Online migration gate passed: 0 added migration(s)" in log
         elif scenario == "unsafe":
             assert "Online migration gate failed:" in log and "drop_table" in log
         else:
@@ -139,6 +165,7 @@ def test_dev_migration_preflight_uses_immutable_target_without_child_git(
 def test_dev_push_runs_ci_but_cannot_start_production_deploy() -> None:
     ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     deploy = (ROOT / ".github/workflows/deploy.yml").read_text(encoding="utf-8")
+    assert "--dev-reviewed-source" not in deploy
 
     assert "branches: [master, dev]" in ci
     # Retargeting must rerun the target-branch promotion guard and exact diff.

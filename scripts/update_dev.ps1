@@ -485,9 +485,20 @@ function Test-MigrationCompatibility {
     } | ConvertTo-Json -Depth 4
     $manifestPath = Join-Path $validationRoot 'manifest.json'
     [System.IO.File]::WriteAllText($manifestPath, $manifest, [System.Text.UTF8Encoding]::new($false))
+    $validatorArguments = @($Source, $Target, '--manifest', $manifestPath)
+    if (@($manifestChanges | Where-Object { $_.status -eq 'M' }).Count -gt 0) {
+        $sourceArchive = Join-Path $validationRoot 'source.zip'
+        $sourceRoot = Join-Path $validationRoot 'source'
+        [void](Invoke-Git -Arguments @(
+            'archive', '--format=zip', '--output', $sourceArchive, $Source, '--',
+            'backend/alembic/versions'
+        ))
+        Expand-Archive -LiteralPath $sourceArchive -DestinationPath $sourceRoot
+        $validatorArguments += @('--dev-reviewed-source', $sourceRoot)
+    }
     Push-Location $validationRoot
     try {
-        & py -3.14 scripts/check_online_migrations.py $Source $Target --manifest $manifestPath *> (Join-Path $validationRoot 'validation.log')
+        & py -3.14 scripts/check_online_migrations.py @validatorArguments *> (Join-Path $validationRoot 'validation.log')
         $validatorExitCode = $LASTEXITCODE
     } finally {
         Pop-Location

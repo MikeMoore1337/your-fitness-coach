@@ -65,6 +65,27 @@ LEGACY_ONLINE_MIGRATION_SHA256 = {
     "backend/alembic/versions/0118_measurement_eligibility.py": "13d4c9d6693d352b9ceb5b69b3a8713e124c505f65ba774620a8d5a12b3cdea8",
 }
 
+# These exact DEV transitions change only reviewed downgrade guards. Production
+# retains the immutable-history rule and never supplies the DEV source archive.
+DEV_DOWNGRADE_TRANSITIONS = {
+    "backend/alembic/versions/0138_equipment_profiles.py": (
+        "f70abef0572a9599f189f89721d204104aad76accc7183015467fe5abfdc4df3",
+        "719485af759455829107b612c19d2eff8b194c5bc2aca453f2cc6d9eeb488d5a",
+    ),
+    "backend/alembic/versions/0139_workout_exercise_notes.py": (
+        "d53aa4cf9d303492094a6f9afa140fca490b2bc73b07fb9c307b8bc8b7d642c0",
+        "ba8312b58a34607d082b5aa1cbcb2438b65a537da214fc338e1773702b758284",
+    ),
+    "backend/alembic/versions/0147_session_rotation.py": (
+        "1415c2097c56da861fcd38a37ac7616cdd2701d45555656531a984c0b3a026ac",
+        "774187c89c60c4e78e3eec8eb53ff9af88310ffe26f020788feac8630267aa5e",
+    ),
+    "backend/alembic/versions/0148_program_import_self_assignment.py": (
+        "e3c6f4fbb1cd5ef02976b2274c52cfda1a93ce79ae5514219b1e4f33f7adccd3",
+        "4b0ab56d3b8ce2ceceb08e5fb833dd467400b147e5dfc452251c67bd3ff2050d",
+    ),
+}
+
 
 class OnlineMigrationError(RuntimeError):
     """The release cannot coexist with the currently active revision."""
@@ -1177,21 +1198,72 @@ def validate_added_migration(path: Path) -> None:
     _validate_upgrade_call_allowlist(path, upgrade, phase)
 
 
+def _reviewed_dev_downgrade(path: Path, source_root: Path) -> bool:
+    expected = DEV_DOWNGRADE_TRANSITIONS.get(path.as_posix())
+    if expected is None:
+        return False
+    try:
+        sources = [
+            (source_root / path).read_bytes().replace(b"\r\n", b"\n"),
+            path.read_bytes().replace(b"\r\n", b"\n"),
+        ]
+    except OSError:
+        return False
+    if tuple(hashlib.sha256(source).hexdigest() for source in sources) != expected:
+        return False
+    trees = [ast.parse(source.decode("utf-8")) for source in sources]
+    for tree in trees:
+        downgrades = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "downgrade"
+        ]
+        if len(downgrades) != 1:
+            return False
+        downgrades[0].body = [ast.Pass()]
+        if any(
+            isinstance(node, ast.Name)
+            and node.id in {"downgrade", "eval", "exec", "getattr", "globals", "locals"}
+            for node in ast.walk(tree)
+        ):
+            return False
+    return ast.dump(trees[0], include_attributes=False) == ast.dump(
+        trees[1], include_attributes=False
+    )
+
+
 def check_online_migrations(
-    active_revision: str, target_revision: str, *, manifest: Path | None = None
+    active_revision: str,
+    target_revision: str,
+    *,
+    manifest: Path | None = None,
+    dev_reviewed_source: Path | None = None,
 ) -> list[Path]:
+    if dev_reviewed_source is not None and manifest is None:
+        raise OnlineMigrationError("DEV migration review requires a revision-bound manifest")
     changes = (
         changed_migrations_from_manifest(active_revision, target_revision, manifest)
         if manifest is not None
         else changed_migrations(active_revision, target_revision)
     )
-    unsafe_history = [(status, path) for status, path in changes if status != "A"]
+    unsafe_history = []
+    for status, path in changes:
+        if status == "A":
+            continue
+        if (
+            status == "M"
+            and dev_reviewed_source
+            and _reviewed_dev_downgrade(path, dev_reviewed_source)
+        ):
+            print(f"DEV-only reviewed downgrade change: {path}")
+        else:
+            unsafe_history.append((status, path))
     if unsafe_history:
         details = ", ".join(f"{status}:{path}" for status, path in unsafe_history)
         raise OnlineMigrationError(
             "applied migration history is immutable during an online rollout: " + details
         )
-    added = [path for _status, path in changes]
+    added = [path for status, path in changes if status == "A"]
     for path in added:
         if not validate_legacy_migration_compatibility(path):
             validate_added_migration(path)
@@ -1203,6 +1275,7 @@ def main() -> int:
     parser.add_argument("active_revision", nargs="?")
     parser.add_argument("target_revision", nargs="?")
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--dev-reviewed-source", type=Path)
     parser.add_argument("--write-manifest", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -1210,7 +1283,7 @@ def main() -> int:
         if not args.active_revision or not args.target_revision:
             raise OnlineMigrationError("active and target revisions are required")
         if args.write_manifest:
-            if args.manifest is not None or args.output is None:
+            if args.manifest is not None or args.output is None or args.dev_reviewed_source:
                 raise OnlineMigrationError("--write-manifest requires only --output")
             changes = changed_migrations(args.active_revision, args.target_revision)
             args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -1234,7 +1307,10 @@ def main() -> int:
         if args.output is not None:
             raise OnlineMigrationError("--output is valid only with --write-manifest")
         migrations = check_online_migrations(
-            args.active_revision, args.target_revision, manifest=args.manifest
+            args.active_revision,
+            args.target_revision,
+            manifest=args.manifest,
+            dev_reviewed_source=args.dev_reviewed_source,
         )
     except (OSError, SyntaxError, subprocess.CalledProcessError, OnlineMigrationError) as exc:
         print(f"Online migration gate failed: {exc}")
