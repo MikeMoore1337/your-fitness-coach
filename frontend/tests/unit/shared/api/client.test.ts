@@ -159,6 +159,18 @@ describe('api client', () => {
     expect(localStorage.getItem('fit_auth_verified_login_v1')).toBeNull();
   });
 
+  it('marks a new explicit logout while keeping the legacy message type', () => {
+    const post =
+      typeof window.BroadcastChannel === 'function'
+        ? vi.spyOn(window.BroadcastChannel.prototype, 'postMessage')
+        : undefined;
+    const store = vi.spyOn(Storage.prototype, 'setItem');
+    clearAccessToken();
+    const fallback = store.mock.calls.find(([key]) => key === 'fit_auth_session_event_v1');
+    const message = post?.mock.calls[0]?.[0] ?? JSON.parse(fallback![1]).message;
+    expect(message).toEqual({ type: 'logout', reason: 'explicit-logout' });
+  });
+
   it('broadcasts verified sign-in using the existing access-token message type', () => {
     const post =
       typeof window.BroadcastChannel === 'function'
@@ -168,7 +180,8 @@ describe('api client', () => {
     setAccessToken('verified', 7);
     const fallback = store.mock.calls.find(([key]) => key === 'fit_auth_session_event_v1');
     const message = post?.mock.calls[0]?.[0] ?? JSON.parse(fallback![1]).message;
-    expect(message).toEqual({ type: 'access-token', token: 'verified', userId: 7 });
+    const { id: loginId } = JSON.parse(localStorage.getItem('fit_auth_verified_login_v1')!);
+    expect(message).toEqual({ type: 'access-token', token: 'verified', userId: 7, loginId });
   });
 
   it('discards an in-flight file response after logout', async () => {
@@ -389,6 +402,7 @@ describe('api client', () => {
 
   it('waits for delayed winner-token delivery after the fallback lock', async () => {
     setAccessToken('old');
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
     const holder = createCrossContextCoordinator({
       nativeLocks: null,
       ownerId: 'refresh-holder',
@@ -423,14 +437,24 @@ describe('api client', () => {
     window.setTimeout(() => {
       if (typeof window.BroadcastChannel === 'function') {
         const channel = new window.BroadcastChannel('fit_auth_session');
-        channel.postMessage({ type: 'access-token', token: 'winner' });
+        channel.postMessage({
+          type: 'access-token',
+          token: 'winner',
+          source: 'refresh',
+          refreshUserId: 7,
+        });
         channel.close();
       } else {
         window.dispatchEvent(
           new StorageEvent('storage', {
             key: 'fit_auth_session_event_v1',
             newValue: JSON.stringify({
-              message: { type: 'access-token', token: 'winner' },
+              message: {
+                type: 'access-token',
+                token: 'winner',
+                source: 'refresh',
+                refreshUserId: 7,
+              },
             }),
           }),
         );

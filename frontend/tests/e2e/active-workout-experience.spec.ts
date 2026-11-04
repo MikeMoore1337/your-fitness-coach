@@ -1453,7 +1453,7 @@ async function captureIssue1162State(page: Page, info: TestInfo, theme: string, 
 
 async function activeWorkoutQueueLength(page: Page) {
   return page.evaluate(() => {
-    const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
+    const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
     return stored ? ((JSON.parse(stored) as { queue?: unknown[] }).queue?.length ?? 0) : 0;
   });
 }
@@ -3417,7 +3417,9 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
             .getAttribute('data-workout-set-id'),
           timers: await page.getByRole('timer', { name: 'Отдых' }).count(),
           queue: await page.evaluate(() =>
-            JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
+            JSON.parse(
+              localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}',
+            ),
           ),
         },
         null,
@@ -3693,7 +3695,7 @@ for (const width of [320, 360, 393, 430]) {
       );
       expect(rests).toHaveLength(1);
       const queue = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
+        JSON.parse(localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}'),
       );
       expect(queue.queue).toEqual([]);
       await page.screenshot({ path: info.outputPath(`completion-after-${width}-${theme}.png`) });
@@ -6309,7 +6311,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
+        const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
         if (!stored) return -1;
         return (JSON.parse(stored) as { queue: unknown[] }).queue.length;
       }),

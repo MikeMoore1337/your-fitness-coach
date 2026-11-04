@@ -25,6 +25,7 @@ import {
   ActiveWorkoutSyncProvider,
 } from '../../../../src/features/workouts/ActiveWorkoutSync';
 import { createCrossContextCoordinator } from '../../../../src/shared/browser/crossContextLock';
+import { LEGACY_AUTH_CANARY_KEY } from '../../../../src/shared/auth/legacySessionKeys';
 import {
   clearAccessToken,
   expireAccessToken,
@@ -1168,6 +1169,52 @@ describe('active workout durable queue', () => {
     ]);
     expect(combined.queue[1]?.values.sides).toEqual(sideState.queue[0]?.values.sides);
     expect(JSON.parse(localStorage.getItem(oldKey)!).queue).toEqual([oldMutation]);
+  });
+
+  it('переносит очередь v3 и принимает изменения старой вкладки без повторной мутации', () => {
+    const previousKey = `${legacyActiveWorkoutQueueKey(7, 42)}:v3`;
+    const initial = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: false },
+      now: 1,
+    });
+    localStorage.setItem(previousKey, JSON.stringify({ ...initial, workout_snapshot: workout }));
+    localStorage.setItem(activeWorkoutPointerStorageKey(7), '42');
+    expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(initial.queue);
+
+    const later = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 202,
+      serverVersion: 1,
+      values: { actual_reps: 10, actual_weight: 30, is_completed: false },
+      now: 2,
+    });
+    localStorage.setItem(previousKey, JSON.stringify({ ...initial, queue: later.queue }));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual([...initial.queue, ...later.queue]);
+    acknowledgeLegacyWorkoutMutation(7, 42, later.queue[0]!.mutation_id);
+    expect(JSON.parse(localStorage.getItem(previousKey)!).queue).toEqual([]);
+    localStorage.removeItem(previousKey);
+    localStorage.removeItem(activeWorkoutPointerStorageKey(7));
+    expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(initial.queue);
+  });
+
+  it('не перезаписывает карантин после очистки маркера старой вкладкой', () => {
+    const initial = enqueueWorkoutMutation(emptyActiveWorkoutQueue(7, 42), {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 8, actual_weight: 40, is_completed: false },
+    });
+    expect(saveActiveWorkoutQueue(initial)).toBe(true);
+    localStorage.removeItem(LEGACY_AUTH_CANARY_KEY);
+    const replacement = enqueueWorkoutMutation(initial, {
+      setId: 201,
+      serverVersion: 1,
+      values: { actual_reps: 9, actual_weight: 40, is_completed: false },
+    });
+    expect(saveActiveWorkoutQueue(replacement)).toBe(false);
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(initial.queue);
   });
 
   it('не объединяет версии одного подхода из разных вкладок до разрешения конфликта', () => {

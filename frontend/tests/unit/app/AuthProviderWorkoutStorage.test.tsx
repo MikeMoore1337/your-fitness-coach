@@ -18,6 +18,7 @@ import {
   saveActiveWorkoutSnapshot,
 } from '../../../src/features/workouts/activeWorkoutQueue';
 import { lastAuthenticatedUserId } from '../../../src/shared/userScopedStorage';
+import { LEGACY_AUTH_CANARY_KEY } from '../../../src/shared/auth/legacySessionKeys';
 
 const activeWorkout: Workout = {
   id: 42,
@@ -100,6 +101,21 @@ function renderProvider(
   );
 }
 
+function sendOtherTabMessage(message: Record<string, unknown>) {
+  if (typeof window.BroadcastChannel === 'function') {
+    const channel = new window.BroadcastChannel('fit_auth_session');
+    channel.postMessage(message);
+    channel.close();
+  } else {
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'fit_auth_session_event_v1',
+        newValue: JSON.stringify({ message }),
+      }),
+    );
+  }
+}
+
 describe('AuthProvider active workout cleanup', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -163,6 +179,407 @@ describe('AuthProvider active workout cleanup', () => {
     });
     return verified;
   }
+
+  it('сохраняет очередь после неоднозначного сигнала старой вкладки до входа того же аккаунта', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/email/login'))
+        return new Response('{"access_token":"same-token"}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    const pending = pendingWorkout();
+    for (const key of Object.keys(localStorage)) {
+      if (
+        key.startsWith('fit_active_workout_v1_') ||
+        key.startsWith('fit_active_workout_current_v1_user_')
+      )
+        localStorage.removeItem(key);
+    }
+    await act(async () => sendOtherTabMessage({ type: 'logout' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Войти снова' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
+    expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it('очищает очередь при помеченном явном выходе другой новой вкладки', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'logout', reason: 'explicit-logout' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+  });
+
+  it.each([
+    { type: 'access-token', token: 'late-unverified-token' },
+    { type: 'access-token', token: 'late-verified-token', userId: 7 },
+  ])(
+    'не принимает запоздавший токен другой вкладки после явного выхода: $token',
+    async (message) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const path = String(input);
+        if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+        if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+        if (path.endsWith('/auth/logout')) return new Response(null, { status: 204 });
+        return new Response('{}', { status: 200 });
+      });
+      renderProvider();
+      await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+      pendingWorkout();
+      await userEvent.click(screen.getByRole('button', { name: 'Выйти' }));
+      await act(async () => sendOtherTabMessage(message));
+      expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+      expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+      expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    },
+  );
+
+  it('после неоднозначного выхода не восстанавливает сессию по cookie без повторного входа', async () => {
+    let refreshCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/refresh')) {
+        refreshCalls += 1;
+        return new Response('{"access_token":"cookie-token"}', { status: 200 });
+      }
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    const first = renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'logout' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    first.unmount();
+    sessionStorage.clear();
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('auth-loading')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    expect(refreshCalls).toBe(0);
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
+  });
+
+  it('после legacy logout игнорирует старое подтверждение, но принимает новый подтверждённый вход', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    setAccessToken('verified-before-logout', 7);
+    const previousLoginId = JSON.parse(localStorage.getItem('fit_auth_verified_login_v1')!)
+      .id as string;
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    const pending = pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'logout' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    localStorage.setItem(
+      'fit_auth_verified_login_v1',
+      JSON.stringify({ id: 'new-login', userId: 7 }),
+    );
+    await act(async () =>
+      sendOtherTabMessage({
+        type: 'access-token',
+        token: 'stale-login',
+        userId: 7,
+        loginId: previousLoginId,
+      }),
+    );
+    await act(async () =>
+      sendOtherTabMessage({ type: 'access-token', token: 'legacy-login', userId: 7 }),
+    );
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    await act(async () =>
+      sendOtherTabMessage({
+        type: 'access-token',
+        token: 'new-login-token',
+        userId: 7,
+        loginId: 'new-login',
+      }),
+    );
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
+  });
+
+  it('принимает подтверждённый вход после запоздавшего события localStorage', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return new Response(JSON.stringify({ id: authorization === 'Bearer next-token' ? 8 : 7 }), {
+          status: 200,
+        });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'account-switch', userId: 8 }));
+    await act(async () =>
+      sendOtherTabMessage({
+        type: 'access-token',
+        token: 'next-token',
+        userId: 8,
+        loginId: 'next',
+      }),
+    );
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    const marker = JSON.stringify({ id: 'next', userId: 8 });
+    localStorage.setItem('fit_auth_verified_login_v1', marker);
+    await act(async () =>
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'fit_auth_verified_login_v1', newValue: marker }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+  });
+
+  it('не принимает отложенный вход после явного выхода', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (input) =>
+        new Response(String(input).endsWith('/me') ? '{"id":7}' : '{}', { status: 200 }),
+    );
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    await act(async () =>
+      sendOtherTabMessage({
+        type: 'access-token',
+        token: 'delayed-token',
+        userId: 7,
+        loginId: 'delayed',
+      }),
+    );
+    await act(async () => sendOtherTabMessage({ type: 'logout', reason: 'explicit-logout' }));
+    const marker = JSON.stringify({ id: 'delayed', userId: 7 });
+    localStorage.setItem('fit_auth_verified_login_v1', marker);
+    await act(async () =>
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: 'fit_auth_verified_login_v1', newValue: marker }),
+      ),
+    );
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+  });
+
+  it('требует вход после очистки старой вкладкой, даже если сообщение пропущено', async () => {
+    let refreshCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/refresh')) {
+        refreshCalls += 1;
+        return new Response('{"access_token":"cookie-token"}', { status: 200 });
+      }
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    const first = renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    first.unmount();
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('fit_active_workout_v1_')) localStorage.removeItem(key);
+    }
+    sessionStorage.clear();
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('auth-loading')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    expect(refreshCalls).toBe(0);
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
+  });
+
+  it('скрывает прежний аккаунт до проверки токена старой вкладки и удаляет его очередь при смене', async () => {
+    let finishNewUser!: (response: Response) => void;
+    const newUser = new Promise<Response>((resolve) => {
+      finishNewUser = resolve;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return authorization === 'Bearer other-token'
+          ? newUser
+          : new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'access-token', token: 'other-token' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(1);
+    await act(async () => finishNewUser(new Response('{"id":8}', { status: 200 })));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+  });
+
+  it('не возвращает аккаунт при запоздавшем подтверждении старого токена после выхода', async () => {
+    let finishUser!: (response: Response) => void;
+    const checkedUser = new Promise<Response>((resolve) => {
+      finishUser = resolve;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/logout')) return new Response(null, { status: 204 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return authorization === 'Bearer late-token'
+          ? checkedUser
+          : new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'access-token', token: 'late-token' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    await userEvent.click(screen.getByRole('button', { name: 'Выйти' }));
+    await act(async () => finishUser(new Response('{"id":7}', { status: 200 })));
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+  });
+
+  it('не принимает старый токен, если другая вкладка очистила маркер во время проверки', async () => {
+    let finishUser!: (response: Response) => void;
+    const checkedUser = new Promise<Response>((resolve) => {
+      finishUser = resolve;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return authorization === 'Bearer racing-token'
+          ? checkedUser
+          : new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    const pending = pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'access-token', token: 'racing-token' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    localStorage.removeItem(LEGACY_AUTH_CANARY_KEY);
+    await act(async () => finishUser(new Response('{"id":7}', { status: 200 })));
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
+  });
+
+  it('сохраняет другие черновики при проверке неподтверждённого токена того же аккаунта', async () => {
+    let finishUser!: (response: Response) => void;
+    const checkedUser = new Promise<Response>((resolve) => {
+      finishUser = resolve;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return authorization === 'Bearer refreshed-old-token'
+          ? checkedUser
+          : new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    const pending = pendingWorkout();
+    localStorage.setItem('fit_food_draft_7', 'synthetic draft');
+    await act(async () =>
+      sendOtherTabMessage({ type: 'access-token', token: 'refreshed-old-token' }),
+    );
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    expect(localStorage.getItem('fit_food_draft_7')).toBe('synthetic draft');
+    await act(async () => finishUser(new Response('{"id":7}', { status: 200 })));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(localStorage.getItem('fit_food_draft_7')).toBe('synthetic draft');
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
+  });
+
+  it('не очищает черновики при обновлении токена новой вкладкой', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    localStorage.setItem('fit_food_draft_7', 'synthetic draft');
+    await act(async () =>
+      sendOtherTabMessage({
+        type: 'access-token',
+        token: 'refreshed-token',
+        source: 'refresh',
+        refreshUserId: 7,
+      }),
+    );
+    expect(screen.getByTestId('user-id')).toHaveTextContent('7');
+    expect(localStorage.getItem('fit_food_draft_7')).toBe('synthetic draft');
+    expect(sessionStorage.getItem('fit_access_token')).toBe('refreshed-token');
+  });
+
+  it('проверяет refresh другой учётной записи прежде чем показывать её и очищать старую очередь', async () => {
+    let finishUser!: (response: Response) => void;
+    const checkedUser = new Promise<Response>((resolve) => {
+      finishUser = resolve;
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return authorization === 'Bearer other-refresh'
+          ? checkedUser
+          : new Response('{"id":7}', { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () =>
+      sendOtherTabMessage({
+        type: 'access-token',
+        token: 'other-refresh',
+        source: 'refresh',
+        refreshUserId: 8,
+      }),
+    );
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    await act(async () => finishUser(new Response('{"id":8}', { status: 200 })));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+    expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+  });
 
   it('loads public login options if the session changes while configuration is in flight', async () => {
     let finishConfig!: (response: Response) => void;
@@ -320,7 +737,7 @@ describe('AuthProvider active workout cleanup', () => {
     localStorage.setItem('fit_auth_verified_login_v1', JSON.stringify({ id: 'login', userId: 8 }));
 
     await act(async () => {
-      const message = { type: 'access-token', token: 'other-token', userId: 8 };
+      const message = { type: 'access-token', token: 'other-token', userId: 8, loginId: 'login' };
       if (typeof window.BroadcastChannel === 'function') {
         const channel = new window.BroadcastChannel('fit_auth_session');
         channel.postMessage(message);
@@ -521,6 +938,7 @@ describe('AuthProvider active workout cleanup', () => {
     renderProvider();
     await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
 
+    const remove = vi.spyOn(Storage.prototype, 'removeItem');
     await userEvent.click(screen.getByRole('button', { name: 'Сменить аккаунт' }));
 
     await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
@@ -529,6 +947,7 @@ describe('AuthProvider active workout cleanup', () => {
     expect(localStorage.getItem('fit_program_days_user_7')).toBeNull();
     expect(localStorage.getItem('fit_notification_draft_7')).toBeNull();
     expect(localStorage.getItem('app-theme')).toBe('light');
+    expect(remove).not.toHaveBeenCalledWith(LEGACY_AUTH_CANARY_KEY);
   });
 
   it('очищает кэш тренировки при смене пользователя во время обновления сессии', async () => {

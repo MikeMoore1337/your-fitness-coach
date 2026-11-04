@@ -96,6 +96,12 @@ describe('PWA runtime state', () => {
     expect(hasActiveWorkoutData()).toBe(true);
 
     localStorage.removeItem('fit_active_workout_v1_user_7_workout_42');
+    localStorage.setItem(
+      'fit_active_workout_queue_v4_user_7_workout_42',
+      JSON.stringify({ queue: [{ mutation_id: 'pending' }] }),
+    );
+    expect(hasActiveWorkoutData()).toBe(true);
+    localStorage.removeItem('fit_active_workout_queue_v4_user_7_workout_42');
     localStorage.setItem('fit_active_workout_v1_user_7_workout_42', '{malformed');
     expect(hasActiveWorkoutData()).toBe(true);
   });

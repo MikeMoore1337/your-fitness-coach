@@ -2,6 +2,9 @@ import { createHmac } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { installTelegramHarness } from '../e2e/fixtures/mobile-tma';
 
+// WebKit service workers intercept requests before Playwright can hold the response.
+const testWithoutServiceWorker = test.extend({ serviceWorkers: 'block' });
+
 function syntheticTelegramInitData(userId: number): string {
   const fields = {
     auth_date: String(Math.floor(Date.now() / 1000)),
@@ -23,15 +26,21 @@ for (const surface of [
   'pwa-expiry-switch',
   'pwa-expiry-switch-unknown',
   'pwa-expiry-logout',
+  'pwa-legacy-expiry',
+  'pwa-close-inflight',
   'telegram',
 ] as const) {
-  const expiryCase = surface.startsWith('pwa-expiry');
+  const legacyCase = surface === 'pwa-legacy-expiry';
+  const closeCase = surface === 'pwa-close-inflight';
+  const expiryCase = surface.startsWith('pwa-expiry') || legacyCase;
   const switchCase = surface.startsWith('pwa-expiry-switch');
   const expected =
     switchCase || surface === 'pwa-expiry-logout'
       ? 'clears the saved set across tabs'
       : 'automatically replays a saved set once';
-  test(`PostgreSQL offline ${surface} reload ${expected}`, async ({ page, request }, info) => {
+  const scenarioTest = closeCase ? testWithoutServiceWorker : test;
+  const title = `PostgreSQL offline ${surface} reload ${expected}`;
+  scenarioTest(title, async ({ page, request }, info) => {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 393, height: 844 });
     const telegramUserId = Date.now() * 10 + info.workerIndex;
@@ -96,7 +105,7 @@ for (const surface of [
     );
     if (surface === 'telegram') await installTelegramHarness(page, { initData });
     await page.goto('/app?section=today');
-    if (surface !== 'telegram') {
+    if (surface !== 'telegram' && !closeCase) {
       await page.waitForFunction(() => navigator.serviceWorker.ready.then(() => true));
       if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))))
         await page.reload();
@@ -152,6 +161,82 @@ for (const surface of [
       is_completed: false,
       version: original.version,
     });
+    if (closeCase) {
+      const pending = await page.evaluate(() => {
+        const key = Object.keys(localStorage).find((name) =>
+          name.startsWith('fit_active_workout_queue_v4_user_'),
+        );
+        return key ? { key, value: localStorage.getItem(key) } : null;
+      });
+      expect(pending?.value).toBeTruthy();
+      const queued = JSON.parse(pending!.value!).queue as { mutation_id: string }[];
+      expect(queued).toHaveLength(1);
+      await other.close();
+      let releaseResponse!: () => void;
+      const responseGate = new Promise<void>((resolve) => {
+        releaseResponse = resolve;
+      });
+      let sentBody: { mutation_id: string } | undefined;
+      let responseStatus = 0;
+      await page.route('**/api/v1/workouts/sets/**', async (route) => {
+        if (route.request().method() !== 'PATCH') return route.continue();
+        sentBody = route.request().postDataJSON();
+        const response = await route.fetch();
+        responseStatus = response.status();
+        await responseGate;
+        await route.fulfill({ response }).catch(() => undefined);
+      });
+      const context = page.context();
+      await context.setOffline(false);
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+        window.dispatchEvent(new Event('online'));
+      });
+      await expect.poll(() => responseStatus).toBe(200);
+      expect(sentBody?.mutation_id).toBe(queued[0]!.mutation_id);
+      await page.close();
+      releaseResponse();
+      const resumed = await context.newPage();
+      await resumed.goto('/app?section=today');
+      await expect(
+        resumed.getByRole('button', { name: 'Продолжить тренировку', exact: true }),
+      ).toBeVisible();
+      await expect
+        .poll(() =>
+          resumed.evaluate((key) => {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw).queue.length : 0;
+          }, pending!.key),
+        )
+        .toBe(0);
+      const resumedToken = await resumed.evaluate(() => sessionStorage.getItem('fit_access_token'));
+      expect(resumedToken).toBeTruthy();
+      const resumedHeaders = { Authorization: `Bearer ${resumedToken}` };
+      await expect
+        .poll(async () => {
+          const response = await request.get('/api/v1/workouts/today', {
+            headers: resumedHeaders,
+          });
+          return (await response.json()).exercises?.[0]?.sets?.[0]?.is_completed;
+        })
+        .toBe(true);
+      const saved = (
+        await (await request.get('/api/v1/workouts/today', { headers: resumedHeaders })).json()
+      ).exercises[0].sets[0];
+      expect(saved).toMatchObject({
+        id: setId,
+        actual_reps: 8,
+        is_completed: true,
+        version: original.version + 1,
+      });
+      const retry = await request.patch(`/api/v1/workouts/sets/${setId}`, {
+        headers: resumedHeaders,
+        data: sentBody,
+      });
+      expect(retry.status()).toBe(200);
+      expect((await retry.json()).version).toBe(saved.version);
+      return;
+    }
     if (surface === 'pwa') {
       const navigation = await page.reload({ waitUntil: 'domcontentloaded' });
       expect(navigation?.status()).toBe(200);
@@ -193,8 +278,8 @@ for (const surface of [
     await page.context().setOffline(false);
     if (expiryCase) {
       const pending = await page.evaluate(() => {
-        const key = Object.keys(localStorage).find(
-          (name) => name.startsWith('fit_active_workout_v1_user_') && name.endsWith(':v3'),
+        const key = Object.keys(localStorage).find((name) =>
+          name.startsWith('fit_active_workout_queue_v4_user_'),
         );
         return key ? { key, value: localStorage.getItem(key) } : null;
       });
@@ -209,6 +294,20 @@ for (const surface of [
       const revoked = await page.request.post('/api/v1/auth/logout', { headers, data: {} });
       expect(revoked.status()).toBe(200);
       headers = { Authorization: `Bearer ${(await observer.json()).access_token as string}` };
+      if (legacyCase) {
+        await other.evaluate(() => {
+          for (const key of Object.keys(localStorage)) {
+            if (key.startsWith('fit_active_workout_v1_')) localStorage.removeItem(key);
+          }
+          sessionStorage.removeItem('fit_access_token');
+          const channel = new BroadcastChannel('fit_auth_session');
+          channel.postMessage({ type: 'logout' });
+          channel.close();
+        });
+        await expect
+          .poll(() => page.evaluate(() => sessionStorage.getItem('fit_access_token')))
+          .toBeNull();
+      }
       await page.reload();
       await expect(page).toHaveURL(/\/login/);
       await expect

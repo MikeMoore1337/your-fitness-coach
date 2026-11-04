@@ -12,16 +12,20 @@ import {
   AUTH_LOGOUT_EVENT,
   AUTH_SESSION_EXPIRED_EVENT,
   AUTH_TOKEN_RECEIVED_EVENT,
+  AUTH_UNVERIFIED_TOKEN_EVENT,
   AUTH_VERIFIED_LOGIN_EVENT,
+  acceptLegacyAccessToken,
   api,
   ApiError,
   authDiscardChanged,
   authDiscardSnapshot,
   clearAccessToken,
+  establishLegacyAuthGuard,
   expireAccessToken,
   getAccessToken,
   invalidateLocalAccount,
   refreshAccessToken,
+  requiresLegacyReauthentication,
   setAccessToken,
   switchAuthenticatedAccount,
 } from '../shared/api/client';
@@ -141,6 +145,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (current: User) => {
       if (!Number.isSafeInteger(current.id) || current.id <= 0)
         throw new Error('Не удалось подтвердить аккаунт');
+      if (requiresLegacyReauthentication()) {
+        expireAccessToken();
+        throw new DOMException('Сессия изменилась', 'AbortError');
+      }
       const previousUserId = previousAuthenticatedUserId();
       if (previousUserId && previousUserId !== current.id) {
         switchAuthenticatedAccount(current.id);
@@ -152,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, String(current.id));
       rememberAuthenticatedUserId(current.id);
+      establishLegacyAuthGuard();
       userIdRef.current = current.id;
       setUser(current);
     },
@@ -379,8 +388,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       retryAuth: false,
       timeoutMs: 3_000,
     }).catch(() => undefined);
-    clearCurrentUserData();
     clearAccessToken();
+    clearCurrentUserData();
     setUser(null);
     queryClient.clear();
     await Promise.all([serverLogout, revoke]);
@@ -427,6 +436,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const handleUnverifiedToken = (event: Event) => {
+      const token = (event as CustomEvent<string>).detail;
+      const previousUserId = previousAuthenticatedUserId();
+      if (previousUserId) rememberAuthenticatedUserId(previousUserId);
+      sessionStorage.removeItem(AUTHENTICATED_USER_ID_STORAGE_KEY);
+      userIdRef.current = null;
+      setUser(null);
+      queryClient.clear();
+      void (async () => {
+        try {
+          const current = await api<User>('/api/v1/me', {
+            headers: { Authorization: `Bearer ${token}` },
+            retryAuth: false,
+          });
+          if (!Number.isSafeInteger(current.id) || current.id <= 0)
+            throw new Error('Не удалось подтвердить аккаунт');
+          if (!acceptLegacyAccessToken(token)) return;
+          acceptAuthenticatedUser(current);
+          setError(null);
+        } catch (reason) {
+          if (!(reason instanceof DOMException && reason.name === 'AbortError'))
+            setError(reason instanceof Error ? reason.message : 'Не удалось подтвердить аккаунт');
+        }
+      })();
+    };
+    window.addEventListener(AUTH_UNVERIFIED_TOKEN_EVENT, handleUnverifiedToken);
+    return () => window.removeEventListener(AUTH_UNVERIFIED_TOKEN_EVENT, handleUnverifiedToken);
+  }, [acceptAuthenticatedUser, previousAuthenticatedUserId, queryClient]);
+
+  useEffect(() => {
     const handleReceivedToken = () => {
       if (!userIdRef.current) void reloadUser();
     };
@@ -449,6 +488,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setConfig(publicConfig);
         if (authDiscardChanged(discard)) {
           if (getAccessToken() && !userIdRef.current) await reloadUser();
+          return;
+        }
+
+        if (requiresLegacyReauthentication()) {
+          expireAccessToken();
           return;
         }
 

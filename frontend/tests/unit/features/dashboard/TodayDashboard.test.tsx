@@ -12,6 +12,9 @@ import type {
 } from '../../../../src/shared/api/types';
 import { calendarWeek, dateInputValue } from '../../../../src/shared/dateTime';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
+import { crossContextCoordinator } from '../../../../src/shared/browser/crossContextLock';
+import { activeWorkoutQueueKey } from '../../../../src/features/workouts/activeWorkoutQueue';
+import { clearSensitiveUserScopedStorage } from '../../../../src/shared/userScopedStorage';
 import {
   formatNutritionDateLabel,
   formatTodayHeading,
@@ -20,6 +23,7 @@ import {
 
 const apiMock = vi.hoisted(() => vi.fn());
 const navigateMock = vi.hoisted(() => vi.fn());
+const discardRevision = vi.hoisted(() => ({ value: 0 }));
 const authState = vi.hoisted(() => ({
   user: {
     id: 7,
@@ -56,6 +60,14 @@ vi.mock('../../../../src/shared/api/client', () => {
     api: apiMock,
     ApiError: MockApiError,
     getUserFacingErrorMessage: (error: Error) => error.message,
+    authDiscardSnapshot: () => ({
+      generation: null,
+      revision: discardRevision.value,
+      verifiedLogin: null,
+    }),
+    authDiscardChanged: (snapshot: { revision: number }) =>
+      snapshot.revision !== discardRevision.value,
+    requiresLegacyReauthentication: () => false,
   };
 });
 
@@ -408,10 +420,60 @@ function useAvailableData({
 describe('TodayDashboard', () => {
   beforeEach(() => {
     apiMock.mockReset();
+    discardRevision.value = 0;
     authState.user.has_active_program = true;
     authState.user.profile.level = 'beginner';
     authState.user.profile.height_cm = 168;
     authState.user.profile.workouts_per_week = 3;
+  });
+
+  it('не возвращает snapshot после выхода, пока pagehide ожидал блокировку', async () => {
+    localStorage.clear();
+    useAvailableData();
+    const original = apiMock.getMockImplementation()!;
+    apiMock.mockImplementation((path: string, ...args: unknown[]) =>
+      path === '/api/v1/workouts/today'
+        ? Promise.resolve({
+            ...plannedWorkout,
+            status: 'in_progress',
+            exercises: plannedWorkout.exercises.map((exercise) => ({
+              ...exercise,
+              metric_type: 'strength',
+            })),
+          })
+        : original(path, ...args),
+    );
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let finished!: () => void;
+    const completed = new Promise<void>((resolve) => {
+      finished = resolve;
+    });
+    const lock = vi
+      .spyOn(crossContextCoordinator, 'run')
+      .mockImplementation(async (_name, task) => {
+        await gate;
+        try {
+          return await task();
+        } finally {
+          finished();
+        }
+      });
+    try {
+      renderDashboard();
+      await screen.findByRole('button', { name: 'Продолжить тренировку' });
+      fireEvent(window, new Event('pagehide'));
+      await waitFor(() => expect(lock).toHaveBeenCalled());
+      discardRevision.value += 1;
+      clearSensitiveUserScopedStorage();
+      release();
+      await completed;
+      expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    } finally {
+      lock.mockRestore();
+    }
   });
 
   afterEach(() => {
