@@ -49,7 +49,7 @@ for (const width of [360, 390, 768, 1440]) {
 
 for (const width of [390, 1440]) {
   for (const theme of ['light', 'dark'] as const) {
-    test(`native input Icon resources retain editing and search clear ${width} ${theme}`, async ({
+    test(`input icons retain editing and accessible search clear ${width} ${theme}`, async ({
       page,
     }, testInfo) => {
       await page.setViewportSize({ width, height: 900 });
@@ -83,10 +83,23 @@ for (const width of [390, 1440]) {
       const initialCount = await rows.count();
       await search.fill('Жим');
       await expect(search).toHaveValue('Жим');
-      const box = await search.boundingBox();
-      if (!box) throw new Error('Missing visible search control geometry');
-      await search.click({ position: { x: box.width - 22, y: box.height / 2 } });
+      const clear = page.getByRole('button', { name: 'Очистить поиск', exact: true });
+      await expect(clear).toBeVisible();
+      const box = await clear.boundingBox();
+      if (!box) throw new Error('Missing visible search clear control geometry');
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      await clear.click();
       await expect(search).toHaveValue('');
+      await expect(search).toBeFocused();
+      await expect(rows).toHaveCount(initialCount);
+      await search.fill('Жим');
+      await page.keyboard.press('Tab');
+      await expect(clear).toBeFocused();
+      await expect(clear).toHaveCSS('outline-style', 'solid');
+      await page.keyboard.press('Enter');
+      await expect(search).toHaveValue('');
+      await expect(search).toBeFocused();
       await expect(rows).toHaveCount(initialCount);
 
       await page.goto('/nutrition');
