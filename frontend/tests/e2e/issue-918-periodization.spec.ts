@@ -600,6 +600,7 @@ test('повторное открытие настроек с клавиатур
   const builder = page.locator('#program-builder');
   const trigger = builder.locator('.program-builder-settings > summary');
   for (let index = 0; index < 5; index += 1) {
+    await scrollIntoStablePosition(trigger);
     if (index % 2) {
       await trigger.focus();
       await trigger.press('Enter');
