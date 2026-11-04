@@ -18,9 +18,20 @@ try {
         throw 'compose.dev.yml не найден. Переключитесь на ветку YFC с поддержкой DEV.'
     }
 
+    function Invoke-DevDocker {
+        param([string[]]$Arguments)
+        # Windows PowerShell can treat redirected native stderr as a terminating error.
+        $ErrorActionPreference = 'Continue'
+        $global:LASTEXITCODE = $null
+        & docker @Arguments
+        if ($null -eq $LASTEXITCODE) {
+            throw 'Docker CLI не удалось запустить.'
+        }
+    }
+
     function Invoke-DevCompose {
         param([string[]]$Arguments)
-        & docker compose --env-file .env.dev -f compose.dev.yml @Arguments
+        Invoke-DevDocker -Arguments (@('compose', '--env-file', '.env.dev', '-f', 'compose.dev.yml') + $Arguments)
         if ($LASTEXITCODE -ne 0) {
             throw "Ошибка Docker Compose ($LASTEXITCODE)."
         }
@@ -46,7 +57,7 @@ try {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw 'Docker CLI отсутствует. Установите и запустите Docker Desktop с WSL2.'
     }
-    & docker info --format '{{.ServerVersion}}' *> $null
+    Invoke-DevDocker -Arguments @('info', '--format', '{{.ServerVersion}}') *> $null
     if ($LASTEXITCODE -ne 0) {
         throw 'Docker Engine недоступен. Запустите Docker Desktop и дождитесь Ready.'
     }

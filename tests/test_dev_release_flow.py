@@ -17,6 +17,73 @@ UPDATE_SCRIPT = ROOT / "scripts/update_dev.ps1"
 
 
 @pytest.mark.parametrize(
+    ("info_exit", "compose_failure", "expected"),
+    [(0, "none", 0), (1, "none", 17), (0, "config", 17), (0, "up", 17)],
+)
+def test_dev_launcher_handles_native_stderr_and_preserves_failures(
+    tmp_path: Path, info_exit: int, compose_failure: str, expected: int
+) -> None:
+    powershell = shutil.which("powershell.exe")
+    if os.name != "nt" or powershell is None:
+        pytest.skip("Windows PowerShell 5 is required for native stderr behavior")
+
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    launcher = scripts / "dev.ps1"
+    launcher.write_bytes((ROOT / "scripts/dev.ps1").read_bytes())
+    (tmp_path / ".env.dev").touch()
+    (tmp_path / "compose.dev.yml").touch()
+    mock_bin = tmp_path / "bin"
+    mock_bin.mkdir()
+    (mock_bin / "docker.cmd").write_text(
+        "@echo off\r\n"
+        "echo synthetic diagnostic 1>&2\r\n"
+        'if /I "%~1"=="info" exit /b %MOCK_INFO_EXIT%\r\n'
+        'if /I "%~1"=="compose" if /I "%~6"=="%MOCK_COMPOSE_FAILURE%" exit /b 1\r\n'
+        'if /I "%~1"=="compose" exit /b 0\r\n'
+        "exit /b 99\r\n",
+        encoding="ascii",
+    )
+    env = {
+        **os.environ,
+        "PATH": str(mock_bin) + os.pathsep + os.environ["PATH"],
+        "MOCK_REPO_ROOT": str(tmp_path),
+        "MOCK_UPDATE_SCRIPT": str(UPDATE_SCRIPT),
+        "MOCK_INFO_EXIT": str(info_exit),
+        "MOCK_COMPOSE_FAILURE": compose_failure,
+    }
+    result = subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$ErrorActionPreference='Stop'; "
+            "$tokens=$null; $errors=$null; "
+            "$ast=[System.Management.Automation.Language.Parser]::ParseFile("
+            "$env:MOCK_UPDATE_SCRIPT,[ref]$tokens,[ref]$errors); "
+            "if ($errors.Count) { exit 19 }; "
+            "$fn=$ast.Find({param($node) "
+            "$node -is [System.Management.Automation.Language.FunctionDefinitionAst] "
+            "-and $node.Name -eq 'Invoke-DevStart'},$true); "
+            "if ($null -eq $fn) { exit 19 }; "
+            ". ([scriptblock]::Create($fn.Extent.Text)); "
+            "$script:RepoRoot=$env:MOCK_REPO_ROOT; "
+            "function Stop-Update { param($Code,$Summary) throw $Code }; "
+            "function Invoke-WebRequest { param($Uri,$TimeoutSec,[switch]$UseBasicParsing) "
+            "[pscustomobject]@{StatusCode=200} }; "
+            "try { Invoke-DevStart; exit 0 } "
+            "catch { exit 17 }",
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == expected, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
     "scenario", ["valid", "reviewed", "unsafe", "modified", "deleted", "renamed", "not_ancestor"]
 )
 def test_dev_migration_preflight_uses_immutable_target_without_child_git(
