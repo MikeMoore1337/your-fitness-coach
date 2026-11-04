@@ -122,9 +122,13 @@ test('редактор сохраняет разные исходные неде
   await preview.getByRole('button', { name: 'Следующие недели' }).click();
   await expect(preview.getByText(/Неделя 16 · исходная 1 · проход 6/)).toBeVisible();
   await builder.getByRole('button', { name: 'Сохранить настройки' }).click();
-  await builder.getByRole('spinbutton', { name: 'Исходная неделя' }).fill('2');
+  const sourceWeek = builder.getByRole('spinbutton', { name: 'Исходная неделя' });
+  const addExercise = builder.getByRole('button', { name: 'Добавить упражнение', exact: true });
+  await sourceWeek.fill('2');
+  await expect(addExercise).toBeDisabled();
   await builder.getByRole('spinbutton', { name: 'Рабочие подходы' }).fill('5');
-  await builder.getByRole('spinbutton', { name: 'Исходная неделя' }).fill('1');
+  await sourceWeek.fill('1');
+  await expect(addExercise).toBeEnabled();
   await expect(builder.getByRole('spinbutton', { name: 'Рабочие подходы' })).toHaveValue('3');
   await builder.getByRole('button', { name: 'Проверить и назначить' }).click();
   await builder.getByRole('button', { name: 'Создать и назначить' }).click();
