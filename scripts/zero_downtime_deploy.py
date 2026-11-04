@@ -1897,12 +1897,20 @@ def _config(args: argparse.Namespace) -> DeployConfig:
     polling_value = _deployment_setting("BOT_POLLING_ENABLED", "true").strip().lower()
     if polling_value not in {"1", "true", "yes", "on", "0", "false", "no", "off"}:
         raise DeploymentError("BOT_POLLING_ENABLED must be a boolean value")
+    if getattr(args, "command", None) == "rollback":
+        backend_image = _deployment_setting("BACKEND_IMAGE", "").strip()
+        bot_image = _deployment_setting("BOT_IMAGE", "").strip()
+        if not backend_image or not bot_image:
+            raise DeploymentError("rollback requires BACKEND_IMAGE and BOT_IMAGE")
+    else:
+        backend_image = os.environ["BACKEND_IMAGE"]
+        bot_image = os.environ["BOT_IMAGE"]
     return DeployConfig(
         target_revision=args.target_revision,
         base_url=args.base_url,
         public_base_url=args.public_base_url,
-        backend_image=os.environ["BACKEND_IMAGE"],
-        bot_image=os.environ["BOT_IMAGE"],
+        backend_image=backend_image,
+        bot_image=bot_image,
         root=root,
         state_root=Path(
             os.environ.get(

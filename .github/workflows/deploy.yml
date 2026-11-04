@@ -947,9 +947,10 @@ jobs:
              test \"\$(tr -d '\\r\\n' < \"\$marker\")\" = '$ACTIVE_REVISION'
              test -L '$PROD_PATH/current'
              cd '$PROD_PATH/current'
-             set -a
-             . '$PROD_PATH/.env'
-             set +a
-             test -n \"\${BACKEND_IMAGE:-}\" -a -n \"\${BOT_IMAGE:-}\"
+             test -f '$PROD_PATH/.env'
+             test -f .env
+             cmp -s '$PROD_PATH/.env' .env || { echo 'Production environment files differ; refusing rollback' >&2; exit 1; }
+             export COMPOSE_PROJECT_NAME=fit-mini-app
+             unset BACKEND_IMAGE BOT_IMAGE
              DEPLOY_STATE_ROOT='$PROD_PATH/.artifacts/operations/deployments' \
              python3 scripts/zero_downtime_deploy.py rollback '$ACTIVE_REVISION' '$PROD_URL' '$PROD_PUBLIC_URL'"

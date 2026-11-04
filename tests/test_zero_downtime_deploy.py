@@ -250,6 +250,51 @@ def test_config_can_keep_rollout_state_outside_immutable_release(
     assert config.state_root == state_root.resolve()
 
 
+def test_rollback_config_reads_compose_values_without_executing_shell(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("BACKEND_IMAGE", raising=False)
+    monkeypatch.delenv("BOT_IMAGE", raising=False)
+    marker = tmp_path / "executed"
+    (tmp_path / ".env").write_text(
+        "BACKEND_IMAGE='registry/backend@sha256:" + "1" * 64 + "'\n"
+        'BOT_IMAGE="registry/bot@sha256:' + "2" * 64 + '"\n'
+        f"IGNORED=$(touch {marker})\n",
+        encoding="utf-8",
+    )
+    args = SimpleNamespace(
+        command="rollback",
+        target_revision=NEW_SHA,
+        base_url="https://app.example.test",
+        public_base_url="https://example.test",
+    )
+
+    config = deploy._config(args)
+
+    assert config.backend_image == "registry/backend@sha256:" + "1" * 64
+    assert config.bot_image == "registry/bot@sha256:" + "2" * 64
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("missing", ["BACKEND_IMAGE", "BOT_IMAGE"])
+def test_rollback_config_rejects_missing_image(tmp_path: Path, monkeypatch, missing: str) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("BACKEND_IMAGE", raising=False)
+    monkeypatch.delenv("BOT_IMAGE", raising=False)
+    present = "BOT_IMAGE" if missing == "BACKEND_IMAGE" else "BACKEND_IMAGE"
+    (tmp_path / ".env").write_text(f"{present}=registry/image:tag\n", encoding="utf-8")
+    args = SimpleNamespace(
+        command="rollback",
+        target_revision=NEW_SHA,
+        base_url="https://app.example.test",
+        public_base_url="https://example.test",
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="requires BACKEND_IMAGE and BOT_IMAGE"):
+        deploy._config(args)
+
+
 def test_public_smoke_uses_bounded_seo_timeout(tmp_path: Path, monkeypatch) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr(deploy, "_run", lambda command, **kwargs: commands.append(command))
