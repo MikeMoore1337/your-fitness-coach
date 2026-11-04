@@ -1454,7 +1454,7 @@ async function captureIssue1162State(page: Page, info: TestInfo, theme: string, 
 
 async function activeWorkoutQueueLength(page: Page) {
   return page.evaluate(() => {
-    const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
+    const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
     return stored ? ((JSON.parse(stored) as { queue?: unknown[] }).queue?.length ?? 0) : 0;
   });
 }
@@ -3418,7 +3418,9 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
             .getAttribute('data-workout-set-id'),
           timers: await page.getByRole('timer', { name: 'Отдых' }).count(),
           queue: await page.evaluate(() =>
-            JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
+            JSON.parse(
+              localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}',
+            ),
           ),
         },
         null,
@@ -3694,7 +3696,7 @@ for (const width of [320, 360, 393, 430]) {
       );
       expect(rests).toHaveLength(1);
       const queue = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
+        JSON.parse(localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}'),
       );
       expect(queue.queue).toEqual([]);
       await page.screenshot({ path: info.outputPath(`completion-after-${width}-${theme}.png`) });
@@ -3860,7 +3862,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate(() => {
       const write = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key: string, value: string) {
-        if (key.startsWith('fit_active_workout_v1_'))
+        if (key.startsWith('fit_active_workout_queue_v4_'))
           throw new DOMException('Quota', 'QuotaExceededError');
         return write.call(this, key, value);
       };
@@ -3947,7 +3949,7 @@ test('P1 combined API and storage failure never claims durable completion', asyn
   await page.evaluate(() => {
     const write = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (key.startsWith('fit_active_workout_v1_'))
+      if (key.startsWith('fit_active_workout_queue_v4_'))
         throw new DOMException('Quota', 'QuotaExceededError');
       return write.call(this, key, value);
     };
@@ -4692,7 +4694,7 @@ for (const [theme, width] of [
   });
 }
 
-for (const width of [320, 360, 393, 430]) {
+for (const width of [320, 360, 361, 375, 390, 393, 430]) {
   for (const theme of ['dark', 'light'] as const) {
     test(`#996 footer geometry ${theme} ${width}px`, async ({ page }) => {
       const dialog = await openIssue996Replacement(page, { width, theme });
@@ -6310,7 +6312,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
+        const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
         if (!stored) return -1;
         return (JSON.parse(stored) as { queue: unknown[] }).queue.length;
       }),

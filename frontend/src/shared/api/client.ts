@@ -1,5 +1,11 @@
 import { crossContextCoordinator, type CrossContextCoordinator } from '../browser/crossContextLock';
 import { getApiRuntime } from '../runtime/runtime';
+import {
+  AUTHENTICATED_USER_ID_STORAGE_KEY,
+  LEGACY_AUTH_CANARY_KEY,
+  LEGACY_AUTH_GUARD_KEY,
+  LEGACY_AUTH_REAUTH_KEY,
+} from '../auth/legacySessionKeys';
 
 const ACCESS_TOKEN_KEY = 'fit_access_token';
 const AUTH_CHANNEL_NAME = 'fit_auth_session';
@@ -13,17 +19,93 @@ export const AUTH_SESSION_EXPIRED_EVENT = 'fit:auth-session-expired';
 export const AUTH_ACCOUNT_SWITCH_EVENT = 'fit:auth-account-switch';
 export const AUTH_TOKEN_RECEIVED_EVENT = 'fit:auth-token-received';
 export const AUTH_VERIFIED_LOGIN_EVENT = 'fit:auth-verified-login';
+export const AUTH_UNVERIFIED_TOKEN_EVENT = 'fit:auth-unverified-token';
 
 type AuthChannelMessage =
-  | { type: 'access-token'; token: string; userId?: number }
-  | { type: 'logout' | 'session-expired' }
+  | {
+      type: 'access-token';
+      token: string;
+      userId?: number;
+      loginId?: string;
+      source?: 'refresh';
+      refreshUserId?: number;
+    }
+  | { type: 'logout'; cause?: 'explicit-logout' }
+  | { type: 'session-expired' }
   | { type: 'account-switch'; userId: number };
-type AuthChange = AuthChannelMessage['type'] | 'verified-login';
+type AuthChange = AuthChannelMessage['type'] | 'verified-login' | 'legacy-logout';
 
 let authRevision = 0;
 let authBoundaryRevision = 0;
 let authDiscardRevision = 0;
 let authLoginRevision = 0;
+let legacyReauthRequired = false;
+let unverifiedTokenPending = false;
+const pendingVerifiedLogins = new Map<
+  string,
+  Extract<AuthChannelMessage, { type: 'access-token' }>
+>();
+
+export function authIdentityPending(): boolean {
+  return unverifiedTokenPending;
+}
+
+export function authBoundarySnapshot(): number {
+  return authBoundaryRevision;
+}
+
+export function acceptLegacyAccessToken(token: string): boolean {
+  if (!unverifiedTokenPending || requiresLegacyReauthentication()) return false;
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+  unverifiedTokenPending = false;
+  recordAuthChange('verified-login');
+  return true;
+}
+
+export function requiresLegacyReauthentication(): boolean {
+  try {
+    return (
+      legacyReauthRequired ||
+      localStorage.getItem(LEGACY_AUTH_REAUTH_KEY) !== null ||
+      (localStorage.getItem(LEGACY_AUTH_GUARD_KEY) === '1' &&
+        localStorage.getItem(LEGACY_AUTH_CANARY_KEY) !== '1')
+    );
+  } catch {
+    return legacyReauthRequired;
+  }
+}
+
+export function establishLegacyAuthGuard(force = false): void {
+  try {
+    if (force || !localStorage.getItem(LEGACY_AUTH_GUARD_KEY)) {
+      localStorage.setItem(LEGACY_AUTH_CANARY_KEY, '1');
+      localStorage.setItem(LEGACY_AUTH_GUARD_KEY, '1');
+    }
+  } catch {
+    // Browser storage may be unavailable.
+  }
+}
+
+function setLegacyReauthentication(required: boolean): void {
+  legacyReauthRequired = false;
+  try {
+    if (required && localStorage.getItem(LEGACY_AUTH_REAUTH_KEY) === null) {
+      let previousId = '';
+      try {
+        const previous = JSON.parse(localStorage.getItem(AUTH_VERIFIED_LOGIN_KEY) ?? 'null') as {
+          id?: unknown;
+        } | null;
+        if (typeof previous?.id === 'string') previousId = previous.id;
+      } catch {
+        // An unreadable marker cannot establish a previous login.
+      }
+      localStorage.setItem(LEGACY_AUTH_REAUTH_KEY, `blocked:${previousId}`);
+    } else if (!required) localStorage.removeItem(LEGACY_AUTH_REAUTH_KEY);
+  } catch {
+    legacyReauthRequired = required;
+    // The in-memory marker still protects the current tab.
+  }
+}
 
 function recordAuthChange(type: AuthChange): void {
   authRevision += 1;
@@ -39,26 +121,71 @@ const authChannel =
 
 function receiveAuthMessage(message: AuthChannelMessage): void {
   if (message.type === 'access-token' && typeof message.token === 'string') {
-    if (message.userId !== undefined) {
+    if (message.userId !== undefined && message.loginId !== undefined) {
       if (!Number.isSafeInteger(message.userId) || message.userId <= 0) return;
+      if (typeof message.loginId !== 'string' || !message.loginId) return;
+      try {
+        const verified = JSON.parse(localStorage.getItem(AUTH_VERIFIED_LOGIN_KEY) ?? 'null') as {
+          id?: unknown;
+          userId?: unknown;
+        } | null;
+        if (verified?.id !== message.loginId || verified.userId !== message.userId) {
+          pendingVerifiedLogins.set(message.loginId, message);
+          if (pendingVerifiedLogins.size > 8)
+            pendingVerifiedLogins.delete(pendingVerifiedLogins.keys().next().value!);
+          return;
+        }
+        if (requiresLegacyReauthentication()) {
+          const blocked = localStorage.getItem(LEGACY_AUTH_REAUTH_KEY);
+          if (blocked === null) {
+            setLegacyReauthentication(true);
+            return;
+          }
+          if (blocked === `blocked:${verified.id}`) return;
+        }
+      } catch {
+        return;
+      }
+      pendingVerifiedLogins.clear();
+      setLegacyReauthentication(false);
+      establishLegacyAuthGuard(true);
+      unverifiedTokenPending = false;
       recordAuthChange('verified-login');
       window.dispatchEvent(new CustomEvent(AUTH_VERIFIED_LOGIN_EVENT, { detail: message.userId }));
     } else {
+      if (requiresLegacyReauthentication() || unverifiedTokenPending) return;
       recordAuthChange(message.type);
+      const localId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+      if (
+        message.userId !== undefined ||
+        message.source !== 'refresh' ||
+        !Number.isSafeInteger(message.refreshUserId) ||
+        message.refreshUserId !== localId ||
+        localId <= 0
+      ) {
+        unverifiedTokenPending = true;
+        sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+        window.dispatchEvent(
+          new CustomEvent(AUTH_UNVERIFIED_TOKEN_EVENT, { detail: message.token }),
+        );
+        return;
+      }
     }
     sessionStorage.setItem(ACCESS_TOKEN_KEY, message.token);
     window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
   } else if (message.type === 'logout' || message.type === 'session-expired') {
-    recordAuthChange(message.type);
+    pendingVerifiedLogins.clear();
+    const explicit = message.type === 'logout' && message.cause === 'explicit-logout';
+    if (message.type === 'logout') setLegacyReauthentication(true);
+    recordAuthChange(message.type === 'logout' && !explicit ? 'legacy-logout' : message.type);
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    window.dispatchEvent(
-      new Event(message.type === 'logout' ? AUTH_LOGOUT_EVENT : AUTH_SESSION_EXPIRED_EVENT),
-    );
+    window.dispatchEvent(new Event(explicit ? AUTH_LOGOUT_EVENT : AUTH_SESSION_EXPIRED_EVENT));
   } else if (
     message.type === 'account-switch' &&
     Number.isSafeInteger(message.userId) &&
     message.userId > 0
   ) {
+    pendingVerifiedLogins.clear();
     recordAuthChange(message.type);
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: message.userId }));
@@ -71,6 +198,29 @@ authChannel?.addEventListener('message', (event: MessageEvent<AuthChannelMessage
 });
 
 window.addEventListener('storage', (event) => {
+  if (event.key === AUTH_VERIFIED_LOGIN_KEY && event.newValue) {
+    try {
+      const marker = JSON.parse(event.newValue) as { id?: unknown };
+      if (typeof marker.id === 'string') {
+        const pending = pendingVerifiedLogins.get(marker.id);
+        if (pending) receiveAuthMessage(pending);
+      }
+    } catch {
+      // Ignore malformed markers.
+    }
+    return;
+  }
+  if (
+    event.key === LEGACY_AUTH_CANARY_KEY &&
+    event.newValue === null &&
+    requiresLegacyReauthentication()
+  ) {
+    setLegacyReauthentication(true);
+    recordAuthChange('legacy-logout');
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+    return;
+  }
   if (event.key !== AUTH_STORAGE_EVENT_KEY || authChannel || !event.newValue) return;
   try {
     const envelope = JSON.parse(event.newValue) as { message?: AuthChannelMessage };
@@ -112,7 +262,7 @@ function authGeneration(): string | null {
   }
 }
 
-function advanceAuthGeneration(type: AuthChange, userId?: number): void {
+function advanceAuthGeneration(type: AuthChange, userId?: number): string | undefined {
   recordAuthChange(type);
   try {
     const id =
@@ -126,6 +276,7 @@ function advanceAuthGeneration(type: AuthChange, userId?: number): void {
     }
     if (type === 'verified-login')
       localStorage.setItem(AUTH_VERIFIED_LOGIN_KEY, JSON.stringify({ id, userId }));
+    return id;
   } catch {
     // BroadcastChannel remains the primary transport when shared storage is unavailable.
   }
@@ -251,7 +402,9 @@ function migrateLegacyToken(): void {
 migrateLegacyToken();
 
 export function getAccessToken(): string | null {
-  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  return unverifiedTokenPending || requiresLegacyReauthentication()
+    ? null
+    : sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export function setAccessToken(token: string, verifiedUserId?: number): void {
@@ -260,26 +413,49 @@ export function setAccessToken(token: string, verifiedUserId?: number): void {
     (!Number.isSafeInteger(verifiedUserId) || verifiedUserId <= 0)
   )
     throw new Error('Некорректный идентификатор аккаунта');
-  const message: AuthChannelMessage =
-    verifiedUserId === undefined
-      ? { type: 'access-token', token }
-      : { type: 'access-token', token, userId: verifiedUserId };
+  const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
   sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-  advanceAuthGeneration(
+  const loginId = advanceAuthGeneration(
     verifiedUserId === undefined ? 'access-token' : 'verified-login',
     verifiedUserId,
   );
+  const message: AuthChannelMessage =
+    verifiedUserId === undefined
+      ? {
+          type: 'access-token',
+          token,
+          source: 'refresh',
+          ...(Number.isSafeInteger(storedUserId) && storedUserId > 0
+            ? { refreshUserId: storedUserId }
+            : {}),
+        }
+      : { type: 'access-token', token, userId: verifiedUserId, ...(loginId ? { loginId } : {}) };
+  if (verifiedUserId !== undefined) {
+    establishLegacyAuthGuard(true);
+    setLegacyReauthentication(false);
+    unverifiedTokenPending = false;
+  }
   broadcastAuthMessage(message);
 }
 
 export function clearAccessToken(): void {
+  pendingVerifiedLogins.clear();
+  setLegacyReauthentication(true);
+  unverifiedTokenPending = false;
+  try {
+    localStorage.removeItem(LEGACY_AUTH_GUARD_KEY);
+    localStorage.removeItem(LEGACY_AUTH_CANARY_KEY);
+  } catch {
+    // Storage may be unavailable.
+  }
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   advanceAuthGeneration('logout');
   window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
-  broadcastAuthMessage({ type: 'logout' });
+  broadcastAuthMessage({ type: 'logout', cause: 'explicit-logout' });
 }
 
 export function expireAccessToken(): void {
+  pendingVerifiedLogins.clear();
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   advanceAuthGeneration('session-expired');
   window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
@@ -289,6 +465,7 @@ export function expireAccessToken(): void {
 export function switchAuthenticatedAccount(userId: number): void {
   if (!Number.isSafeInteger(userId) || userId <= 0)
     throw new Error('Некорректный идентификатор аккаунта');
+  pendingVerifiedLogins.clear();
   advanceAuthGeneration('account-switch');
   window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: userId }));
   broadcastAuthMessage({ type: 'account-switch', userId });
@@ -397,13 +574,15 @@ async function requestAccessTokenRefresh(tokenBeforeRequest: string | null): Pro
 export async function coordinateAccessTokenRefresh(
   coordinator: CrossContextCoordinator = crossContextCoordinator,
 ): Promise<boolean> {
+  if (unverifiedTokenPending || requiresLegacyReauthentication()) return false;
   const tokenBeforeLock = getAccessToken();
   const generationBeforeLock = authGeneration();
   const revisionBeforeLock = authRevision;
   const discard = authDiscardSnapshot();
   try {
     return await coordinator.run(AUTH_REFRESH_LOCK_NAME, async () => {
-      if (authDiscardChanged(discard)) return false;
+      if (unverifiedTokenPending || requiresLegacyReauthentication() || authDiscardChanged(discard))
+        return false;
       const tokenAfterLock = getAccessToken();
       if (tokenAfterLock && tokenAfterLock !== tokenBeforeLock) return true;
       if (authGeneration() !== generationBeforeLock || authRevision !== revisionBeforeLock) {
