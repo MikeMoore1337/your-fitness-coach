@@ -238,6 +238,54 @@ def test_sqlite_waits_for_writer_then_refuses_data_loss(case, tmp_path):
         engine.dispose()
 
 
+def test_sqlite_blocks_new_writer_after_guard(case, tmp_path):
+    engine = sa.create_engine(
+        f"sqlite:///{(tmp_path / 'after-guard.db').as_posix()}", connect_args={"timeout": 0.2}
+    )
+    first_ddl = {
+        "0134_program_cycle_storage.py": "drop_index",
+        "0135_program_duration_unbounded.py": "batch_alter_table",
+        "0142_workout_history_import.py": "drop_table",
+        "0143_workout_set_sides.py": "drop_table",
+    }.get(case["file"], "drop_column")
+
+    class GuardReached(Exception):
+        pass
+
+    try:
+        with engine.begin() as connection:
+            _setup(connection, case)
+        with engine.connect() as reader:
+            migration = _migration(case, reader)
+            operations = migration.op
+
+            class StopBeforeDdl:
+                def __getattr__(self, name):
+                    original = getattr(operations, name)
+                    if name != first_ddl:
+                        return original
+
+                    def check_writer(*args, **kwargs):
+                        with (
+                            pytest.raises(sa.exc.OperationalError, match="locked"),
+                            engine.begin() as writer,
+                        ):
+                            writer.exec_driver_sql(case["writer"])
+                        raise GuardReached
+
+                    return check_writer
+
+            migration.op = StopBeforeDdl()
+            with pytest.raises(GuardReached):
+                migration.downgrade()
+            reader.rollback()
+        with engine.begin() as writer:
+            assert writer.exec_driver_sql(case["writer"]).rowcount == 1
+            _assert_written(writer, case)
+    finally:
+        engine.dispose()
+
+
 def test_sqlite_autocommit_fails_closed(case, tmp_path):
     engine = sa.create_engine(
         f"sqlite:///{(tmp_path / 'autocommit.db').as_posix()}", isolation_level="AUTOCOMMIT"
