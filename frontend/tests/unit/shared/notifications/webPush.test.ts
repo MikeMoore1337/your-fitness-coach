@@ -60,6 +60,25 @@ describe('web push runtime lifecycle', () => {
     },
   );
 
+  it('checks the subscription if notification permission changes during the push query', async () => {
+    const notification = { permission: 'default' };
+    vi.stubGlobal('Notification', notification);
+    const query = vi.fn(async () => {
+      notification.permission = 'granted';
+      return { state: 'prompt' };
+    });
+    const subscription = { endpoint: 'https://example.test/push' };
+    const getSubscription = vi.fn().mockResolvedValue(subscription);
+    Object.defineProperty(navigator, 'permissions', { configurable: true, value: { query } });
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription } }) },
+    });
+
+    await expect(getExistingWebPushSubscription()).resolves.toBe(subscription);
+    expect(getSubscription).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ['granted', null],
     ['default', 'granted'],
