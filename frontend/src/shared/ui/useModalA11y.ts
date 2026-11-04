@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import { useTelegramOverlayBackButton } from '../telegram/useTelegramOverlayBackButton';
 
 let openModalCount = 0;
@@ -94,11 +94,11 @@ export function useModalA11y<T extends HTMLElement>(
   useTelegramOverlayBackButton(open, () => closeRef.current());
   useDocumentScrollLock(open);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     closeRef.current = onClose;
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     modalStack.push(panelRef);
     const active = document.activeElement;
