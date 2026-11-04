@@ -2346,7 +2346,10 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   ).toBeVisible();
   await compactLunch.getByRole('button', { name: 'Обед' }).click();
   for (const action of await entry.locator('.nutrition-entry__actions button').all()) {
-    expect((await action.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    const height = (await action.boundingBox())?.height;
+    expect(height).toBeDefined();
+    // Normalize Firefox coordinate rounding without changing the 44px minimum.
+    expect(Math.round(height! * 16_384) / 16_384).toBeGreaterThanOrEqual(44);
   }
   await compactBreakfast.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-113A-round-5/nutrition-collapsible-meals-360.png',
