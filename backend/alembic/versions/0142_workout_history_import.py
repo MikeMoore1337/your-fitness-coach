@@ -87,7 +87,7 @@ def downgrade() -> None:
             "LOCK TABLE workout_history_import_drafts, imported_workouts IN ACCESS EXCLUSIVE MODE"
         )
     elif bind.dialect.name == "sqlite":
-        op.execute("UPDATE imported_workouts SET id = id WHERE 0")
+        op.execute("UPDATE imported_workouts SET workout_id = workout_id WHERE 0")
         if not getattr(bind.connection.driver_connection, "in_transaction", False):
             raise RuntimeError("Unsafe downgrade: history import locking requires a transaction")
     else:

@@ -31,7 +31,7 @@ def downgrade() -> None:
         op.execute("SET LOCAL statement_timeout = '30s'")
         op.execute("LOCK TABLE imported_workouts, user_workout_sets IN ACCESS EXCLUSIVE MODE")
     elif bind.dialect.name == "sqlite":
-        op.execute("UPDATE imported_workouts SET id = id WHERE 0")
+        op.execute("UPDATE imported_workouts SET workout_id = workout_id WHERE 0")
         if not getattr(bind.connection.driver_connection, "in_transaction", False):
             raise RuntimeError(
                 "Unsafe downgrade: provider provenance locking requires a transaction"

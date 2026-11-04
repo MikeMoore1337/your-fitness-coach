@@ -71,12 +71,12 @@ CASES = [
         "name": "0142-history",
         "file": "0142_workout_history_import.py",
         "setup": (
-            "CREATE TABLE imported_workouts (id integer primary key)",
+            "CREATE TABLE imported_workouts (workout_id integer primary key)",
             "CREATE TABLE workout_history_import_drafts (id integer primary key)",
         ),
-        "writer": "INSERT INTO imported_workouts (id) VALUES (1)",
+        "writer": "INSERT INTO imported_workouts (workout_id) VALUES (1)",
         "table": "imported_workouts",
-        "column": "id",
+        "column": "workout_id",
         "guard": "imported workout history or drafts",
     },
     {
@@ -96,11 +96,11 @@ CASES = [
         "name": "0145-provenance",
         "file": "0145_history_provider_provenance.py",
         "setup": (
-            "CREATE TABLE imported_workouts (id integer primary key, source_data text)",
+            "CREATE TABLE imported_workouts (workout_id integer primary key, source_data text)",
             "CREATE TABLE user_workout_sets (id integer primary key, set_kind_known boolean)",
-            "INSERT INTO imported_workouts (id) VALUES (1)",
+            "INSERT INTO imported_workouts (workout_id) VALUES (1)",
         ),
-        "writer": "UPDATE imported_workouts SET source_data='probe' WHERE id=1",
+        "writer": "UPDATE imported_workouts SET source_data='probe' WHERE workout_id=1",
         "table": "imported_workouts",
         "column": "source_data",
         "guard": "imported provider provenance",
@@ -141,6 +141,7 @@ CASES.extend(
             "name": "0142-history-draft",
             "writer": "INSERT INTO workout_history_import_drafts (id) VALUES (1)",
             "table": "workout_history_import_drafts",
+            "column": "id",
         },
         {
             **_BASE_CASES["0143-sides"],

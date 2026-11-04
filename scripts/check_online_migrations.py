@@ -94,7 +94,7 @@ DEV_DOWNGRADE_TRANSITIONS = {
     ),
     "backend/alembic/versions/0142_workout_history_import.py": (
         "83cd451557362201bf61339579cd5986c193687f41bad7cb7d9119d20de97351",
-        "0360a797994f51765692ed53207f9e2b43a918f07c3a0bce1ea71c900a3c3b5a",
+        "c39c63e04b8f4343cd6ed57f8df84920152d8dde9bb67eb1fed9c91ba49373f6",
     ),
     "backend/alembic/versions/0143_workout_set_sides.py": (
         "fe77022a71684b47220a31f2e26197a876a80ba0d7e68f5aa32c8882651e6ada",
@@ -102,7 +102,7 @@ DEV_DOWNGRADE_TRANSITIONS = {
     ),
     "backend/alembic/versions/0145_history_provider_provenance.py": (
         "d3e5699d44427bad686fb81ee0110f8650a4360e558675a456fc9a97a0683f6c",
-        "2d7bd04e57b9beb660b715e1fe1f68157b113ea9bea358b1b97cbfc997b6bbbe",
+        "5a120aa9bb4d3fffa234291dacffa09e6611315de5e547dd07e96c1141a63bd3",
     ),
     "backend/alembic/versions/0146_assignment_exercise_slots.py": (
         "045a53811c6ac88758055378e310ac1e4b297d00b2ae3c4cefb04ad5bd54159d",
