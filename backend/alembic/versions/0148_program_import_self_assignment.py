@@ -25,6 +25,16 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("SET LOCAL lock_timeout = '3s'")
+        op.execute("SET LOCAL statement_timeout = '30s'")
+        op.execute("LOCK TABLE program_imports IN ACCESS EXCLUSIVE MODE")
+    elif bind.dialect.name == "sqlite":
+        op.execute("UPDATE program_imports SET id = id WHERE 0")
+        if not getattr(bind.connection.driver_connection, "in_transaction", False):
+            raise RuntimeError("Unsafe downgrade: import assignment locking requires a transaction")
+    else:
+        raise RuntimeError("Unsafe downgrade: import assignment locking is unsupported")
     if bind.execute(
         sa.text(
             "SELECT 1 FROM program_imports WHERE self_assigned_program_id IS NOT NULL "

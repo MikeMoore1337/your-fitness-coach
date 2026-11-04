@@ -67,7 +67,24 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    if op.get_bind().execute(sa.text("SELECT 1 FROM workout_exercise_notes LIMIT 1")).first():
-        raise RuntimeError("Unsafe downgrade: exercise notes exist; use a forward fix")
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("SET LOCAL lock_timeout = '3s'")
+        op.execute("SET LOCAL statement_timeout = '30s'")
+        op.execute(
+            "LOCK TABLE workout_exercise_notes, workout_exercise_note_mutations "
+            "IN ACCESS EXCLUSIVE MODE"
+        )
+    elif bind.dialect.name == "sqlite":
+        op.execute("UPDATE workout_exercise_notes SET id = id WHERE 0")
+        if not getattr(bind.connection.driver_connection, "in_transaction", False):
+            raise RuntimeError("Unsafe downgrade: exercise note locking requires a transaction")
+    else:
+        raise RuntimeError("Unsafe downgrade: exercise note locking is unsupported")
+    if (
+        bind.execute(sa.text("SELECT 1 FROM workout_exercise_notes LIMIT 1")).first()
+        or bind.execute(sa.text("SELECT 1 FROM workout_exercise_note_mutations LIMIT 1")).first()
+    ):
+        raise RuntimeError("Unsafe downgrade: exercise notes or mutations exist; use a forward fix")
     op.drop_table("workout_exercise_note_mutations")
     op.drop_table("workout_exercise_notes")
