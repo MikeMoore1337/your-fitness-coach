@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { activeWorkoutRestStorageKey } from '../../src/shared/userScopedStorage';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 import {
   expectTouchTargets,
   installTelegramHarness,
@@ -7568,7 +7569,10 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await expect(current).toHaveAttribute('aria-current', 'step');
     await current.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
     await current.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
-    await current.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+    const rir = current.getByRole('button', { name: '2 — ещё примерно 2 повтора' });
+    await scrollIntoStablePosition(rir);
+    await rir.click();
+    await expect(rir).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
     await page.clock.setFixedTime(new Date('2026-10-10T12:00:02Z'));
     const writes: Array<{ method: string; path: string; completed: unknown }> = [];
