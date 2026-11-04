@@ -489,12 +489,27 @@ def test_deploy_runs_journald_before_compose_and_checks_app_logs_after_rollout()
     journald_call = "scripts/configure_production_log_retention.py --revision"
     ensure = deploy_script.index(journald_call)
     compose_validation = deploy_script.index("docker compose config --quiet")
-    rollout = deploy_script.index("python3 scripts/zero_downtime_deploy.py")
+    capacity_preflight = deploy_script.index(
+        'python3 scripts/zero_downtime_deploy.py "$capacity_command"'
+    )
+    rollout = deploy_script.index("python3 scripts/zero_downtime_deploy.py \\\n      deploy \\")
+    single_slot = deploy_script.index(
+        "python3 scripts/zero_downtime_deploy.py \\\n      single-slot \\"
+    )
     post_journald = deploy_script.index(journald_call, ensure + len(journald_call))
     post_check = deploy_script.index("--verify-application-logs")
     bot_smoke = deploy_script.index('echo "Checking the public Telegram bot profile"')
 
-    assert ensure < compose_validation < rollout < post_journald < post_check < bot_smoke
+    assert (
+        capacity_preflight
+        < ensure
+        < compose_validation
+        < rollout
+        < single_slot
+        < post_journald
+        < post_check
+        < bot_smoke
+    )
     assert (
         'scripts/configure_production_nutrition_label_scan.py .env "$NUTRITION_LABEL_SCAN_ROLLOUT_MARKER"'
         in deploy_script
