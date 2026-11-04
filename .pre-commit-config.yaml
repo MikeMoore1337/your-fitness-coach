@@ -27,7 +27,7 @@ repos:
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.1
+    rev: v0.17.3
     hooks:
       - id: ruff
         args: ["--fix", "--no-cache"]
@@ -43,7 +43,7 @@ repos:
         entry: python scripts/run_mypy.py
         language: python
         additional_dependencies:
-          - mypy==2.3.0
+          - mypy==2.4.1
         pass_filenames: false
         files: ^(backend/fitminiapp_api|scripts/run_mypy\.py|pyproject\.toml)
 
