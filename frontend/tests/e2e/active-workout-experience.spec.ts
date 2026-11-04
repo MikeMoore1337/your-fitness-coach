@@ -6002,9 +6002,11 @@ for (const width of [320, 360, 393, 430]) {
           const done = element
             .querySelector('[data-workout-field="done"]')!
             .getBoundingClientRect();
+          // Normalize Firefox coordinate rounding without changing the 12–16px bounds.
+          const normalize = (value: number) => Math.round(value * 16_384) / 16_384;
           return {
-            above: rir.top - Math.max(weight.bottom, reps.bottom),
-            below: done.top - rir.bottom,
+            above: normalize(rir.top - Math.max(weight.bottom, reps.bottom)),
+            below: normalize(done.top - rir.bottom),
           };
         });
         if (process.env.YFC_1272_CAPTURE_DIR) {

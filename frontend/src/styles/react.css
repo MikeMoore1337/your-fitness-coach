@@ -3785,7 +3785,22 @@ details:not([open]) > :not(summary) {
   min-height: 44px;
 }
 .exercise-catalog__search {
+  position: relative;
   max-width: 720px;
+}
+.exercise-catalog__search--has-clear input[type='search'] {
+  padding-inline-end: calc(var(--touch-target) + 8px);
+}
+.exercise-catalog__search--has-clear input[type='search']::-webkit-search-cancel-button {
+  display: none;
+}
+.exercise-catalog__search .exercise-catalog__search-clear {
+  position: absolute;
+  inset-inline-end: 4px;
+  bottom: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
 }
 .exercise-catalog__filters {
   display: grid;
