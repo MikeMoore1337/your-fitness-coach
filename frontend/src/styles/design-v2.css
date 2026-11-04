@@ -5088,6 +5088,17 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
     :where(button, a, input, select, textarea, summary):focus {
     scroll-margin-block: 16px 40%;
   }
+
+  @supports (-moz-appearance: none) {
+    /* Firefox otherwise counts the keyboard clearance twice during input focus. */
+    html[data-yfc-keyboard='visible']
+      .app-shell--design-v2
+      #appContent
+      .active-workout-set.is-current
+      input:focus {
+      scroll-margin-block-end: 0;
+    }
+  }
 }
 
 /* Core rollout: shared semantic scope for completed user surfaces (tasks 00-46). */
