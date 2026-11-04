@@ -6,6 +6,7 @@ import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platf
 import { expectSelectedChoice } from './fixtures/selected-state';
 import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
 import { installTelegramHarness } from './fixtures/mobile-tma';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -2725,7 +2726,10 @@ test('рекомендация кардио меняется с целью, а �
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
   await page.locator('#profile-personal > summary').click();
-  await page.getByText('Пульс и кардио-ориентиры').click();
+  const cardioSettings = page.getByText('Пульс и кардио-ориентиры');
+  await scrollIntoStablePosition(cardioSettings);
+  await cardioSettings.click();
+  await expect(page.getByLabel('Средний пульс в покое, уд/мин')).toBeVisible();
 
   await page.getByLabel('Дата рождения').fill('1992-08-12');
   await page.getByText('Средний пульс в покое, уд/мин').locator('..').locator('input').fill('75');
