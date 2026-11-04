@@ -36,6 +36,23 @@ function AutoFocusedModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function ModalWithDisclosure() {
+  const ref = useModalA11y<HTMLDivElement>(true, () => undefined);
+  return (
+    <div ref={ref} role="dialog" aria-label="Окно" tabIndex={-1}>
+      <button>До раздела</button>
+      <details>
+        <summary>Настройки дня</summary>
+        <p>Содержимое раздела</p>
+      </details>
+      <details>
+        <summary tabIndex={-1}>Пропустить раздел</summary>
+      </details>
+      <button>После раздела</button>
+    </div>
+  );
+}
+
 function EscapeOnLayout() {
   useLayoutEffect(() => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -235,6 +252,22 @@ describe('useDocumentScrollLock', () => {
     frames[0]!(0);
 
     expect(screen.getByRole('button', { name: 'Первое действие' })).toHaveFocus();
+  });
+
+  it('includes native disclosure summaries in the dialog tab order', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockReturnValue(document.body);
+    render(<ModalWithDisclosure />);
+    const before = screen.getByRole('button', { name: 'До раздела' });
+    const summary = screen.getByText('Настройки дня');
+    const after = screen.getByRole('button', { name: 'После раздела' });
+
+    before.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(summary).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(after).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(summary).toHaveFocus();
   });
 
   it('keeps the restored trigger when the initial parent frame runs late', () => {
