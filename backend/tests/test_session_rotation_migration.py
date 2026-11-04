@@ -304,6 +304,23 @@ def test_rotation_downgrade_refuses_sqlite_autocommit():
         engine.dispose()
 
 
+def test_rotation_downgrade_refuses_postgres_autocommit(rotation_downgrade):
+    _, connection, migration, schema = rotation_downgrade
+    if not schema:
+        pytest.skip("requires PostgreSQL")
+    connection.execution_options(isolation_level="AUTOCOMMIT")
+    migration.op = Operations(MigrationContext.configure(connection))
+    with pytest.raises(sa.exc.DBAPIError) as caught:
+        migration.downgrade()
+    assert getattr(caught.value.orig, "sqlstate", None) == "25P01"
+    connection.rollback()
+    indexes = {index["name"] for index in sa.inspect(connection).get_indexes("user_workouts")}
+    assert {
+        "uq_user_workouts_rotation_mutation",
+        "uq_user_workouts_rotation_in_progress",
+    } <= indexes
+
+
 def test_rotation_downgrade_refuses_unsupported_database():
     migration = _migration()
     migration.op = SimpleNamespace(
