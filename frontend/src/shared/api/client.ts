@@ -50,6 +50,10 @@ export function authIdentityPending(): boolean {
   return unverifiedTokenPending;
 }
 
+export function authBoundarySnapshot(): number {
+  return authBoundaryRevision;
+}
+
 export function acceptLegacyAccessToken(token: string): boolean {
   if (!unverifiedTokenPending || requiresLegacyReauthentication()) return false;
   sessionStorage.setItem(ACCESS_TOKEN_KEY, token);

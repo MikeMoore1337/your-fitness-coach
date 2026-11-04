@@ -166,6 +166,19 @@ for (const surface of [
     await expect(page.locator('.active-workout-sync')).toContainText(
       'Изменения сохранены на этом устройстве',
     );
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Object.keys(localStorage).some((key) => {
+            if (!key.startsWith('fit_active_workout_queue_v4_user_')) return false;
+            const stored = JSON.parse(localStorage.getItem(key) ?? 'null') as {
+              queue?: { values?: { is_completed?: boolean } }[];
+            } | null;
+            return stored?.queue?.some((item) => item.values?.is_completed === true) ?? false;
+          }),
+        ),
+      )
+      .toBe(true);
     const offlineServer = await request.get('/api/v1/workouts/today', { headers });
     expect((await offlineServer.json()).exercises[0].sets[0]).toMatchObject({
       id: setId,
@@ -342,13 +355,23 @@ for (const surface of [
           localStorage.removeItem('fit_last_authenticated_user_id_v1');
         });
       }
-      await page.context().route('**/api/v1/auth/dev-login', (route) =>
-        route.continue({
-          postData: JSON.stringify({
-            telegram_user_id: switchCase ? telegramUserId + 1_000_000 : telegramUserId,
-            full_name: 'Синтетическая проверка',
-          }),
-        }),
+      await page.evaluate(
+        (userId) => {
+          const originalFetch = window.fetch.bind(window);
+          window.fetch = (input, init) => {
+            if (input === '/api/v1/auth/dev-login' && init?.method === 'POST') {
+              return originalFetch(input, {
+                ...init,
+                body: JSON.stringify({
+                  telegram_user_id: userId,
+                  full_name: 'Синтетическая проверка',
+                }),
+              });
+            }
+            return originalFetch(input, init);
+          };
+        },
+        switchCase ? telegramUserId + 1_000_000 : telegramUserId,
       );
       const authenticating = page.waitForResponse(
         (response) =>
@@ -400,7 +423,6 @@ for (const surface of [
         expect(replayBodies).toHaveLength(0);
         return;
       }
-      await page.context().unroute('**/api/v1/auth/dev-login');
     }
     if (surface === 'telegram') {
       const authenticating = page.waitForResponse(

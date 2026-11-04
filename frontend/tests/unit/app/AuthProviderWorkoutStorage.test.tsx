@@ -45,7 +45,8 @@ const activeWorkout: Workout = {
 };
 
 function Harness() {
-  const { user, config, loading, logout, devLogin, emailLogin, reloadUser } = useAuth();
+  const { user, config, loading, logout, devLogin, emailLogin, telegramLogin, reloadUser } =
+    useAuth();
   return (
     <div>
       <span data-testid="user-id">{user?.id ?? 'none'}</span>
@@ -71,6 +72,9 @@ function Harness() {
         onClick={() => void emailLogin('invalid@example.test', 'test-password').catch(() => {})}
       >
         Проверить отклонённый вход
+      </button>
+      <button onClick={() => void telegramLogin({ initData: 'test' }).catch(() => {})}>
+        Войти через Telegram
       </button>
       <button
         onClick={() =>
@@ -207,6 +211,134 @@ describe('AuthProvider active workout cleanup', () => {
     await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
     expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
     expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42);
+  });
+
+  it.each(['Войти снова', 'Войти через Telegram'])(
+    'восстанавливает тот же аккаунт при зависшей push-подписке: %s',
+    async (loginButton) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const path = String(input);
+        if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+        if (path.endsWith('/auth/email/login'))
+          return new Response('{"access_token":"same-token"}', { status: 200 });
+        if (path.endsWith('/auth/telegram/init'))
+          return new Response('{"access_token":"same-token"}', { status: 200 });
+        if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+        return new Response('{}', { status: 200 });
+      });
+      renderProvider();
+      await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+      const pending = pendingWorkout();
+      await act(async () => sendOtherTabMessage({ type: 'logout' }));
+      await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+
+      vi.stubGlobal('Notification', { permission: 'granted' });
+      vi.stubGlobal('PushManager', class PushManager {});
+      const getSubscription = vi.fn(() => new Promise<PushSubscription | null>(() => {}));
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription } }) },
+      });
+      try {
+        await userEvent.click(screen.getByRole('button', { name: loginButton }));
+        await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+        expect(getSubscription).not.toHaveBeenCalled();
+        expect(loadActiveWorkoutQueue(7, 42).queue).toEqual(pending);
+      } finally {
+        Reflect.deleteProperty(navigator, 'serviceWorker');
+      }
+    },
+  );
+
+  it('при смене аккаунта сначала проверяет прежнюю push-подписку', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/email/login'))
+        return new Response('{"access_token":"other-token"}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return new Response(
+          JSON.stringify({ id: authorization === 'Bearer other-token' ? 8 : 7 }),
+          {
+            status: 200,
+          },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'logout' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+
+    vi.stubGlobal('Notification', { permission: 'granted' });
+    vi.stubGlobal('PushManager', class PushManager {});
+    let finishLookup!: (value: PushSubscription | null) => void;
+    const getSubscription = vi.fn(
+      () => new Promise<PushSubscription | null>((resolve) => (finishLookup = resolve)),
+    );
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription } }) },
+    });
+    try {
+      await userEvent.click(screen.getByRole('button', { name: 'Войти в другой аккаунт' }));
+      await waitFor(() => expect(getSubscription).toHaveBeenCalledOnce());
+      expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+      await act(async () => finishLookup(null));
+      await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('8'));
+      expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    } finally {
+      Reflect.deleteProperty(navigator, 'serviceWorker');
+    }
+  });
+
+  it('не завершает смену аккаунта после выхода во время проверки push-подписки', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/email/login'))
+        return new Response('{"access_token":"other-token"}', { status: 200 });
+      if (path.endsWith('/me')) {
+        const authorization = (init?.headers as Record<string, string>).Authorization;
+        return new Response(
+          JSON.stringify({ id: authorization === 'Bearer other-token' ? 8 : 7 }),
+          {
+            status: 200,
+          },
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    pendingWorkout();
+    await act(async () => sendOtherTabMessage({ type: 'logout' }));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+
+    vi.stubGlobal('Notification', { permission: 'granted' });
+    vi.stubGlobal('PushManager', class PushManager {});
+    let finishLookup!: (value: PushSubscription | null) => void;
+    const getSubscription = vi.fn(
+      () => new Promise<PushSubscription | null>((resolve) => (finishLookup = resolve)),
+    );
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription } }) },
+    });
+    try {
+      await userEvent.click(screen.getByRole('button', { name: 'Войти в другой аккаунт' }));
+      await waitFor(() => expect(getSubscription).toHaveBeenCalledOnce());
+      await act(async () => sendOtherTabMessage({ type: 'logout', cause: 'explicit-logout' }));
+      await act(async () => finishLookup(null));
+      expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+      expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+      expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
+    } finally {
+      Reflect.deleteProperty(navigator, 'serviceWorker');
+    }
   });
 
   it('очищает очередь при помеченном явном выходе другой новой вкладки', async () => {

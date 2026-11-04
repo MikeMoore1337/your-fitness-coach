@@ -17,6 +17,7 @@ import {
   acceptLegacyAccessToken,
   api,
   ApiError,
+  authBoundarySnapshot,
   authDiscardChanged,
   authDiscardSnapshot,
   clearAccessToken,
@@ -42,6 +43,14 @@ import {
 import { syncFirstTouchAttribution } from '../shared/analytics/attribution';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../shared/telegram/layout';
 import { revokeWebPushSubscription } from '../shared/notifications/webPush';
+
+async function revokePreviousAccountPush(): Promise<void> {
+  const boundary = authBoundarySnapshot();
+  const discard = authDiscardSnapshot();
+  await revokeWebPushSubscription().catch(() => undefined);
+  if (boundary !== authBoundarySnapshot() || authDiscardChanged(discard))
+    throw new DOMException('Сессия изменилась', 'AbortError');
+}
 
 async function offlineWorkoutUser(): Promise<User | null> {
   if (!getAccessToken()) return null;
@@ -244,7 +253,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (telegram: TelegramWebApp | null = window.Telegram?.WebApp ?? null) => {
       const initData = telegram?.initData?.trim();
       if (!initData) throw new Error('Telegram не передал данные авторизации');
-      await revokeWebPushSubscription().catch(() => undefined);
       const previousToken = getAccessToken();
       const token = await api<{ access_token: string }>('/api/v1/auth/telegram/init', {
         method: 'POST',
@@ -258,6 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!Number.isSafeInteger(current.id) || current.id <= 0)
         throw new Error('Не удалось подтвердить аккаунт Telegram');
       const previousUserId = previousAuthenticatedUserId();
+      if (previousUserId !== current.id) await revokePreviousAccountPush();
       if (!previousUserId) {
         let verifiedPreviousId: number | undefined;
         if (previousToken) {
@@ -295,7 +304,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const acceptToken = useCallback(
     async (token: { access_token: string }) => {
-      await revokeWebPushSubscription().catch(() => undefined);
       const current = await api<User>('/api/v1/me', {
         headers: { Authorization: `Bearer ${token.access_token}` },
         retryAuth: false,
@@ -303,6 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!Number.isSafeInteger(current.id) || current.id <= 0)
         throw new Error('Не удалось подтвердить аккаунт');
       const previousUserId = previousAuthenticatedUserId();
+      if (previousUserId !== current.id) await revokePreviousAccountPush();
       if (previousUserId && previousUserId !== current.id) {
         switchAuthenticatedAccount(current.id);
         clearCurrentUserData();
