@@ -17,6 +17,15 @@ def _migration(path: Path, body: str) -> Path:
     return path
 
 
+@pytest.mark.parametrize("path, hashes", online_migrations.DEV_DOWNGRADE_TRANSITIONS.items())
+def test_reviewed_dev_downgrade_target_matches_checked_in_source(
+    path: str, hashes: tuple[str, str]
+):
+    root = Path(__file__).resolve().parents[1]
+    source = (root / path).read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(source).hexdigest() == hashes[1]
+
+
 def test_reviewed_dev_downgrade_requires_exact_sources_and_unchanged_upgrade(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

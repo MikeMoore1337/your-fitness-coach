@@ -68,6 +68,18 @@ LEGACY_ONLINE_MIGRATION_SHA256 = {
 # These exact DEV transitions change only reviewed downgrade guards. Production
 # retains the immutable-history rule and never supplies the DEV source archive.
 DEV_DOWNGRADE_TRANSITIONS = {
+    "backend/alembic/versions/0134_workout_completed_at_utc.py": (
+        "b4c891fd9aedbefbecf2e51147a03a14174f3f0675c384a54935f74fe1bb2af4",
+        "821b3a4d340f86a8fe1f337e9bc2a7670f28469efe02fa789f9a82a2e84abf7d",
+    ),
+    "backend/alembic/versions/0134_program_cycle_storage.py": (
+        "06c4f101e60bd14884c7f5587b32184e1019ca03a6d92c62ba4df4a22e3e97b7",
+        "bde8abbf943b7104e95ca59018ab5674287eead1090a3d68cf016cfde5461fe9",
+    ),
+    "backend/alembic/versions/0135_program_duration_unbounded.py": (
+        "5525d6982929c0626dc4a932ab4ae00099ffaaf9d85e5e3abaa12a38d6b49666",
+        "2e2cb7dc1734ac0168cca6c2135cd1dcd8f2821cb9897f1ff4b62736eb8aa974",
+    ),
     "backend/alembic/versions/0138_equipment_profiles.py": (
         "f70abef0572a9599f189f89721d204104aad76accc7183015467fe5abfdc4df3",
         "719485af759455829107b612c19d2eff8b194c5bc2aca453f2cc6d9eeb488d5a",
@@ -75,6 +87,26 @@ DEV_DOWNGRADE_TRANSITIONS = {
     "backend/alembic/versions/0139_workout_exercise_notes.py": (
         "d53aa4cf9d303492094a6f9afa140fca490b2bc73b07fb9c307b8bc8b7d642c0",
         "ba8312b58a34607d082b5aa1cbcb2438b65a537da214fc338e1773702b758284",
+    ),
+    "backend/alembic/versions/0140_workout_start_utc.py": (
+        "5e496a915f91c94fcaa40711052bdd872076d86affe6a34860d839f6555c8e2d",
+        "a596b7ad92e61c75b17418cd83cf822bf3994861764a0695d66a77e4226b6c05",
+    ),
+    "backend/alembic/versions/0142_workout_history_import.py": (
+        "83cd451557362201bf61339579cd5986c193687f41bad7cb7d9119d20de97351",
+        "0360a797994f51765692ed53207f9e2b43a918f07c3a0bce1ea71c900a3c3b5a",
+    ),
+    "backend/alembic/versions/0143_workout_set_sides.py": (
+        "fe77022a71684b47220a31f2e26197a876a80ba0d7e68f5aa32c8882651e6ada",
+        "838561ad005469e5c39874e7078d99b9aa70f1ffa41d0d8818460f40625f1513",
+    ),
+    "backend/alembic/versions/0145_history_provider_provenance.py": (
+        "d3e5699d44427bad686fb81ee0110f8650a4360e558675a456fc9a97a0683f6c",
+        "2d7bd04e57b9beb660b715e1fe1f68157b113ea9bea358b1b97cbfc997b6bbbe",
+    ),
+    "backend/alembic/versions/0146_assignment_exercise_slots.py": (
+        "045a53811c6ac88758055378e310ac1e4b297d00b2ae3c4cefb04ad5bd54159d",
+        "dde58ebde2095ce38c5343bf175724751e366dd86016f57b899659de001beb1b",
     ),
     "backend/alembic/versions/0147_session_rotation.py": (
         "1415c2097c56da861fcd38a37ac7616cdd2701d45555656531a984c0b3a026ac",
