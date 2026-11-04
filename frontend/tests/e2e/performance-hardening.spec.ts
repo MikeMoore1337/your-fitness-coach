@@ -183,6 +183,7 @@ test('Landing and login keep public/auth initial work bounded in desktop and mob
         hasTouch: viewport.hasTouch,
         isMobile: viewport.isMobile,
         reducedMotion: 'reduce',
+        serviceWorkers: 'allow',
       });
       const page = await context.newPage();
       const consoleFailures = captureConsoleFailures(page);
@@ -254,6 +255,7 @@ test('Mobile Web and mocked TMA share one frontend resource graph', async ({ bro
       hasTouch: true,
       isMobile: true,
       reducedMotion: 'reduce',
+      serviceWorkers: 'allow',
     });
     const page = await context.newPage();
     const consoleFailures = captureConsoleFailures(page);
