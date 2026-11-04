@@ -26,6 +26,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
+        # A repeatable snapshot can predate the lock and hide committed writes.
+        if bind.execute(sa.text("SHOW transaction_isolation")).scalar_one() != "read committed":
+            raise RuntimeError("Unsafe downgrade: PostgreSQL READ COMMITTED isolation is required")
         op.execute("SET LOCAL lock_timeout = '3s'")
         op.execute("SET LOCAL statement_timeout = '30s'")
         op.execute("LOCK TABLE program_imports IN ACCESS EXCLUSIVE MODE")

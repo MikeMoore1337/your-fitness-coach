@@ -240,6 +240,73 @@ def test_downgrade_refuses_an_inflight_write(database, name):
 
 
 @pytest.mark.parametrize("name", ["notes", "imports"])
+@pytest.mark.parametrize("isolation", ["REPEATABLE READ", "SERIALIZABLE"])
+def test_postgres_downgrade_does_not_use_a_stale_snapshot(database, name, isolation):
+    engine, connection, schema = database
+    if not schema:
+        pytest.skip("requires PostgreSQL")
+    migration = _setup(connection, name)
+    connection.exec_driver_sql(f"SET TRANSACTION ISOLATION LEVEL {isolation}")
+    table = "workout_exercise_notes" if name == "notes" else "program_imports"
+    connection.exec_driver_sql(f"SELECT count(*) FROM {table}").scalar_one()
+    with engine.begin() as writer:
+        writer.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
+        _write(writer, name)
+
+    with pytest.raises(RuntimeError, match="READ COMMITTED"):
+        migration.downgrade()
+    connection.rollback()
+    if name == "notes":
+        assert (
+            connection.exec_driver_sql("SELECT body FROM workout_exercise_notes").scalar_one()
+            == "sentinel"
+        )
+    else:
+        assert (
+            connection.exec_driver_sql(
+                "SELECT self_assigned_program_id FROM program_imports"
+            ).scalar_one()
+            == 123
+        )
+
+
+@pytest.mark.parametrize("name", ["notes", "imports"])
+def test_sqlite_wal_downgrade_does_not_use_a_stale_snapshot(tmp_path, name):
+    engine = sa.create_engine(
+        f"sqlite:///{(tmp_path / 'wal.db').as_posix()}", connect_args={"timeout": 0.2}
+    )
+    try:
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql("PRAGMA journal_mode=WAL").scalar_one() == "wal"
+            connection.commit()
+            migration = _setup(connection, name)
+            connection.exec_driver_sql("BEGIN")
+            table = "workout_exercise_notes" if name == "notes" else "program_imports"
+            connection.exec_driver_sql(f"SELECT count(*) FROM {table}").scalar_one()
+            with engine.begin() as writer:
+                _write(writer, name)
+            with pytest.raises(sa.exc.OperationalError, match="database is locked"):
+                migration.downgrade()
+            connection.rollback()
+            if name == "notes":
+                assert (
+                    connection.exec_driver_sql(
+                        "SELECT body FROM workout_exercise_notes"
+                    ).scalar_one()
+                    == "sentinel"
+                )
+            else:
+                assert (
+                    connection.exec_driver_sql(
+                        "SELECT self_assigned_program_id FROM program_imports"
+                    ).scalar_one()
+                    == 123
+                )
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("name", ["notes", "imports"])
 def test_sqlite_downgrade_refuses_autocommit(name):
     engine = sa.create_engine("sqlite:///:memory:", isolation_level="AUTOCOMMIT")
     try:
