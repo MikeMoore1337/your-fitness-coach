@@ -17,7 +17,7 @@ FROM_RE = re.compile(r"^\s*FROM\s+(?:--[^\s]+\s+)*(?P<ref>[^\s]+)", re.MULTILINE
 
 APPLICATION_BASE_IMAGES = {
     "backend/Dockerfile": (
-        "node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f",
+        "node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85",
         "python:3.14-slim@sha256:930e1abba7c4e8f96ed93e8012c35d174d7732752731bbd5e8e757d7ec6f3966",
     ),
     "bot/Dockerfile": (
