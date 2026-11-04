@@ -28,6 +28,7 @@ def test_cross_browser_runner_isolates_results_ports_and_runs_all_browsers_after
 
     assert result == 1
     assert sorted(call["command"][-1] for call in calls) == ["chromium", "firefox", "webkit"]
+    ports: set[str] = set()
     for call in calls:
         browser = call["command"][-1]
         assert call["cwd"] == tmp_path / "frontend"
@@ -35,11 +36,13 @@ def test_cross_browser_runner_isolates_results_ports_and_runs_all_browsers_after
         environment = call["env"]
         assert environment["ALLURE_RESULTS_DIR"] == str(tmp_path / "results" / browser)
         assert environment["PLAYWRIGHT_OUTPUT_DIR"] == str(tmp_path / "playwright-output" / browser)
-        api_port, preview_port = run_cross_browser_regression.BROWSER_PORTS[browser]
-        assert environment["PW_API_PORT"] == api_port
-        assert environment["PW_PREVIEW_PORT"] == preview_port
+        api_port, preview_port = environment["PW_API_PORT"], environment["PW_PREVIEW_PORT"]
+        assert 0 < int(api_port) < 65536
+        assert 0 < int(preview_port) < 65536
+        ports.update((api_port, preview_port))
         assert "PW_EXTERNAL_SERVER" not in environment
         assert environment["PW_BASE_URL"] == f"http://127.0.0.1:{preview_port}"
+    assert len(ports) == 2 * len(calls)
 
 
 def test_cross_browser_runner_does_not_enable_allure_when_not_configured(

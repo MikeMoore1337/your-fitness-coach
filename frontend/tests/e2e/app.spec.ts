@@ -3772,9 +3772,10 @@ test('клиент собирает и проверяет личную прог�
 
 test('сенсорное поле даты сохраняет нативный пикер и показывает иконку календаря', async ({
   browser,
+  baseURL,
 }) => {
   const context = await browser.newContext({
-    baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
+    baseURL,
     viewport: { width: 390, height: 844 },
     hasTouch: true,
     isMobile: true,

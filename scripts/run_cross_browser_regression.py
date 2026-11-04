@@ -5,17 +5,13 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import subprocess
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 BROWSERS: tuple[str, ...] = ("chromium", "firefox", "webkit")
-BROWSER_PORTS: dict[str, tuple[str, str]] = {
-    "chromium": ("8001", "4174"),
-    "firefox": ("8002", "4175"),
-    "webkit": ("8003", "4176"),
-}
 DEFAULT_OUTPUT_DIR = Path(".artifacts/runtime/tests/playwright-cross-browser")
 
 
@@ -29,15 +25,29 @@ def _npm_command() -> str:
     return shutil.which(command) or command
 
 
+def _available_ports(count: int) -> list[str]:
+    sockets: list[socket.socket] = []
+    try:
+        for _ in range(count):
+            listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sockets.append(listener)
+            listener.bind(("127.0.0.1", 0))
+        return [str(listener.getsockname()[1]) for listener in sockets]
+    finally:
+        for listener in sockets:
+            listener.close()
+
+
 def _run_browser(
     browser: str,
     *,
     root: Path,
     base_environment: dict[str, str],
+    ports: tuple[str, str],
     runner: Callable[..., subprocess.CompletedProcess[str]],
 ) -> int:
     environment = dict(base_environment)
-    api_port, preview_port = BROWSER_PORTS[browser]
+    api_port, preview_port = ports
     environment.pop("PW_EXTERNAL_SERVER", None)
     environment["PW_API_PORT"] = api_port
     environment["PW_PREVIEW_PORT"] = preview_port
@@ -81,6 +91,7 @@ def run_cross_browser_regression(
         raise ValueError(f"unsupported browser(s): {', '.join(invalid)}")
     if not browsers:
         return 0
+    selected_ports = iter(_available_ports(len(browsers) * 2))
     with ThreadPoolExecutor(max_workers=len(browsers)) as executor:
         futures = [
             executor.submit(
@@ -88,6 +99,7 @@ def run_cross_browser_regression(
                 browser,
                 root=repository_root,
                 base_environment=base_environment,
+                ports=(next(selected_ports), next(selected_ports)),
                 runner=process_runner,
             )
             for browser in browsers
