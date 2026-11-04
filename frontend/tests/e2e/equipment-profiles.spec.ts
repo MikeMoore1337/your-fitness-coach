@@ -342,12 +342,53 @@ test.describe('PWA profile recovery', () => {
   test('keeps unsaved changes offline and saves them after reconnect', async ({
     page,
     context,
-  }) => {
-    const api = await setup(page, {
-      revision: 1,
-      active_profile_id: homeId,
-      profiles: [{ id: homeId, name: 'Дом', equipment_ids: ['dumbbell'] }],
-    });
+    request,
+  }, info) => {
+    let readState: () => Promise<State>;
+    if (process.env.PW_API_SERVER === 'true') {
+      // WebKit can bypass Playwright routes when a real service worker controls the page.
+      const login = await request.post('/api/v1/auth/dev-login', {
+        data: {
+          telegram_user_id: Date.now() * 10 + info.workerIndex,
+          full_name: 'Синтетический PWA-профиль',
+        },
+      });
+      expect(login.status()).toBe(200);
+      const token = (await login.json()).access_token as string;
+      const headers = { Authorization: `Bearer ${token}` };
+      const created = await request.put('/api/v1/me/equipment-profiles', {
+        headers,
+        data: {
+          revision: 0,
+          active_profile_id: null,
+          profiles: [{ name: 'Дом', equipment_ids: ['dumbbell'] }],
+        },
+      });
+      expect(created.status()).toBe(200);
+      const createdState = (await created.json()) as State;
+      const activated = await request.put('/api/v1/me/equipment-profiles', {
+        headers,
+        data: {
+          ...createdState,
+          active_profile_id: createdState.profiles[0]!.id,
+        },
+      });
+      expect(activated.status()).toBe(200);
+      await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+      readState = async () => {
+        const response = await request.get('/api/v1/me/equipment-profiles', { headers });
+        expect(response.status()).toBe(200);
+        return (await response.json()) as State;
+      };
+    } else {
+      const api = await setup(page, {
+        revision: 1,
+        active_profile_id: homeId,
+        profiles: [{ id: homeId, name: 'Дом', equipment_ids: ['dumbbell'] }],
+      });
+      readState = async () => api.state();
+    }
+    const before = await readState();
     await page.goto('/app?section=catalog&source=pwa');
     await page.waitForFunction(() => navigator.serviceWorker.ready.then(() => true));
     if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))))
@@ -363,9 +404,14 @@ test.describe('PWA profile recovery', () => {
     await page.getByLabel('Название профиля').fill('Дом после восстановления сети');
     await context.setOffline(true);
     await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeDisabled();
-    expect(api.state().revision).toBe(1);
+    expect((await readState()).revision).toBe(before.revision);
     await context.setOffline(false);
     await page.getByRole('button', { name: 'Сохранить', exact: true }).click();
-    await expect.poll(() => api.state().profiles[0]?.name).toBe('Дом после восстановления сети');
+    await expect
+      .poll(async () => {
+        const state = await readState();
+        return { revision: state.revision, name: state.profiles[0]?.name };
+      })
+      .toEqual({ revision: before.revision + 1, name: 'Дом после восстановления сети' });
   });
 });
