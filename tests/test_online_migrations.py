@@ -1,7 +1,9 @@
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
+from scripts import check_online_migrations as online_migrations
 from scripts.check_online_migrations import (
     OnlineMigrationError,
     changed_migrations_from_manifest,
@@ -13,6 +15,66 @@ from scripts.check_online_migrations import (
 def _migration(path: Path, body: str) -> Path:
     path.write_text(body, encoding="utf-8")
     return path
+
+
+def test_reviewed_dev_downgrade_requires_exact_sources_and_unchanged_upgrade(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    path = Path("backend/alembic/versions/0139_workout_exercise_notes.py")
+    previous_root = tmp_path / "previous"
+    path.parent.mkdir(parents=True)
+    (previous_root / path.parent).mkdir(parents=True)
+    old = 'revision = "x"\ndef upgrade():\n    pass\ndef downgrade():\n    pass\n'
+    new = old.replace(
+        "def downgrade():\n    pass", 'def downgrade():\n    raise RuntimeError("guard")'
+    )
+    (previous_root / path).write_text(old, encoding="utf-8")
+    path.write_text(new, encoding="utf-8")
+
+    def sha(value: str) -> str:
+        return hashlib.sha256(value.encode()).hexdigest()
+
+    monkeypatch.setitem(
+        online_migrations.DEV_DOWNGRADE_TRANSITIONS, path.as_posix(), (sha(old), sha(new))
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "active_revision": "old",
+                "target_revision": "new",
+                "changes": [{"status": "M", "path": path.as_posix()}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations("old", "new", manifest=manifest)
+    assert (
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
+        == []
+    )
+    (previous_root / path).write_text(old + "# altered\n", encoding="utf-8")
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
+    (previous_root / path).write_text(old, encoding="utf-8")
+    changed_upgrade = new.replace("def upgrade():\n    pass", "def upgrade():\n    dangerous()")
+    path.write_text(changed_upgrade, encoding="utf-8")
+    monkeypatch.setitem(
+        online_migrations.DEV_DOWNGRADE_TRANSITIONS,
+        path.as_posix(),
+        (sha(old), sha(changed_upgrade)),
+    )
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
 
 
 def test_production_migration_manifest_is_revision_bound(tmp_path: Path) -> None:
