@@ -247,6 +247,31 @@ def test_rotation_downgrade_blocks_writer_after_check(rotation_downgrade, table)
     assert outcomes == ["blocked"]
 
 
+@pytest.mark.parametrize("table", ["user_programs", "user_workouts"])
+def test_rotation_downgrade_refuses_inflight_writer(rotation_downgrade, table):
+    engine, connection, migration, schema = rotation_downgrade
+    with engine.connect() as writer:
+        if schema:
+            writer.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
+        writer.exec_driver_sql(f"UPDATE {table} SET rotation_epoch=4 WHERE id=1")
+        migration.op = Operations(MigrationContext.configure(connection))
+        with pytest.raises(sa.exc.OperationalError) as caught:
+            migration.downgrade()
+        if schema:
+            assert getattr(caught.value.orig, "sqlstate", None) == "55P03"
+        else:
+            assert "database is locked" in str(caught.value.orig)
+        connection.rollback()
+        writer.commit()
+    with pytest.raises(RuntimeError, match="rotation data exists"):
+        migration.downgrade()
+    connection.rollback()
+    assert (
+        connection.exec_driver_sql(f"SELECT rotation_epoch FROM {table} WHERE id=1").scalar_one()
+        == 4
+    )
+
+
 @pytest.mark.parametrize("isolation", ["REPEATABLE READ", "SERIALIZABLE"])
 def test_rotation_downgrade_refuses_a_stale_postgres_snapshot(rotation_downgrade, isolation):
     engine, connection, migration, schema = rotation_downgrade
