@@ -219,7 +219,7 @@ describe('AuthProvider active workout cleanup', () => {
     renderProvider();
     await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
     pendingWorkout();
-    await act(async () => sendOtherTabMessage({ type: 'logout', reason: 'explicit-logout' }));
+    await act(async () => sendOtherTabMessage({ type: 'logout', cause: 'explicit-logout' }));
     await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
     expect(localStorage.getItem(activeWorkoutQueueKey(7, 42))).toBeNull();
   });
@@ -369,7 +369,7 @@ describe('AuthProvider active workout cleanup', () => {
         loginId: 'delayed',
       }),
     );
-    await act(async () => sendOtherTabMessage({ type: 'logout', reason: 'explicit-logout' }));
+    await act(async () => sendOtherTabMessage({ type: 'logout', cause: 'explicit-logout' }));
     const marker = JSON.stringify({ id: 'delayed', userId: 7 });
     localStorage.setItem('fit_auth_verified_login_v1', marker);
     await act(async () =>

@@ -168,7 +168,7 @@ describe('api client', () => {
     clearAccessToken();
     const fallback = store.mock.calls.find(([key]) => key === 'fit_auth_session_event_v1');
     const message = post?.mock.calls[0]?.[0] ?? JSON.parse(fallback![1]).message;
-    expect(message).toEqual({ type: 'logout', reason: 'explicit-logout' });
+    expect(message).toEqual({ type: 'logout', cause: 'explicit-logout' });
   });
 
   it('broadcasts verified sign-in using the existing access-token message type', () => {

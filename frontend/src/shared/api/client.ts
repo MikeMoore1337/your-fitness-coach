@@ -30,7 +30,7 @@ type AuthChannelMessage =
       source?: 'refresh';
       refreshUserId?: number;
     }
-  | { type: 'logout'; reason?: 'explicit-logout' }
+  | { type: 'logout'; cause?: 'explicit-logout' }
   | { type: 'session-expired' }
   | { type: 'account-switch'; userId: number };
 type AuthChange = AuthChannelMessage['type'] | 'verified-login' | 'legacy-logout';
@@ -171,7 +171,7 @@ function receiveAuthMessage(message: AuthChannelMessage): void {
     window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
   } else if (message.type === 'logout' || message.type === 'session-expired') {
     pendingVerifiedLogins.clear();
-    const explicit = message.type === 'logout' && message.reason === 'explicit-logout';
+    const explicit = message.type === 'logout' && message.cause === 'explicit-logout';
     if (message.type === 'logout') setLegacyReauthentication(true);
     recordAuthChange(message.type === 'logout' && !explicit ? 'legacy-logout' : message.type);
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -447,7 +447,7 @@ export function clearAccessToken(): void {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   advanceAuthGeneration('logout');
   window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
-  broadcastAuthMessage({ type: 'logout', reason: 'explicit-logout' });
+  broadcastAuthMessage({ type: 'logout', cause: 'explicit-logout' });
 }
 
 export function expireAccessToken(): void {

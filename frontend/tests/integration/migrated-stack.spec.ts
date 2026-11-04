@@ -1,6 +1,17 @@
-import { createHmac } from 'node:crypto';
-import { expect, test } from '@playwright/test';
+import { createHash, createHmac } from 'node:crypto';
+import { expect, test as base } from '@playwright/test';
 import { installTelegramHarness } from '../e2e/fixtures/mobile-tma';
+
+const test = base.extend({
+  context: async ({ context }, runWithContext, info) => {
+    // Synthetic clients use separate loopback addresses without disabling rate limits.
+    const hash = createHash('sha256').update(`${info.project.name}/${info.testId}`).digest();
+    await context.setExtraHTTPHeaders({
+      'X-Forwarded-For': `127.${hash[0]}.${hash[1]}.${hash[2]}`,
+    });
+    await runWithContext(context);
+  },
+});
 
 // WebKit service workers intercept requests before Playwright can hold the response.
 const testWithoutServiceWorker = test.extend({ serviceWorkers: 'block' });
