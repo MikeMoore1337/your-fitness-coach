@@ -29,8 +29,21 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
+        # A repeatable snapshot can predate the lock and hide committed writes.
+        if bind.execute(sa.text("SHOW transaction_isolation")).scalar_one() != "read committed":
+            raise RuntimeError("Unsafe downgrade: PostgreSQL READ COMMITTED isolation is required")
         op.execute("SET LOCAL lock_timeout = '3s'")
         op.execute("SET LOCAL statement_timeout = '30s'")
+        op.execute(
+            "LOCK TABLE user_workout_exercises, workout_exercise_notes, program_revisions "
+            "IN ACCESS EXCLUSIVE MODE"
+        )
+    elif bind.dialect.name == "sqlite":
+        op.execute("UPDATE user_workout_exercises SET id = id WHERE 0")
+        if not getattr(bind.connection.driver_connection, "in_transaction", False):
+            raise RuntimeError("Unsafe downgrade: assignment slot locking requires a transaction")
+    else:
+        raise RuntimeError("Unsafe downgrade: assignment slot locking is unsupported")
     for table in ("user_workout_exercises", "workout_exercise_notes"):
         if bind.execute(
             sa.text(f"SELECT 1 FROM {table} WHERE source_assignment_slot_id IS NOT NULL LIMIT 1")

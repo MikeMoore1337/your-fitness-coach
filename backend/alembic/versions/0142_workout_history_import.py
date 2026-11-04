@@ -78,11 +78,20 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
+        # A repeatable snapshot can predate the lock and hide committed writes.
+        if bind.execute(sa.text("SHOW transaction_isolation")).scalar_one() != "read committed":
+            raise RuntimeError("Unsafe downgrade: PostgreSQL READ COMMITTED isolation is required")
         op.execute("SET LOCAL lock_timeout = '3s'")
         op.execute("SET LOCAL statement_timeout = '30s'")
         op.execute(
             "LOCK TABLE workout_history_import_drafts, imported_workouts IN ACCESS EXCLUSIVE MODE"
         )
+    elif bind.dialect.name == "sqlite":
+        op.execute("UPDATE imported_workouts SET workout_id = workout_id WHERE 0")
+        if not getattr(bind.connection.driver_connection, "in_transaction", False):
+            raise RuntimeError("Unsafe downgrade: history import locking requires a transaction")
+    else:
+        raise RuntimeError("Unsafe downgrade: history import locking is unsupported")
     if (
         bind.execute(sa.text("SELECT 1 FROM imported_workouts LIMIT 1")).first()
         or bind.execute(sa.text("SELECT 1 FROM workout_history_import_drafts LIMIT 1")).first()

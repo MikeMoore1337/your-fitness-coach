@@ -189,7 +189,10 @@ def test_manual_rollback_uses_native_actions_and_existing_production_safety() ->
     assert "options: [deploy, repair, verify, reconcile, rollback]" in deploy
     assert "rollback:" in deploy
     assert "owner-authorized rollback" in deploy
-    assert "python3 scripts/zero_downtime_deploy.py rollback" in deploy
+    assert (
+        r"os.execv(sys.executable,[sys.executable,\"scripts/zero_downtime_deploy.py\",\"rollback\",*sys.argv[1:]])"
+        in deploy
+    )
     assert "scripts/task_session.py" not in deploy
     assert "delivery owner" not in deploy
 
