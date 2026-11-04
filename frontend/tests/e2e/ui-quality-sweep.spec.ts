@@ -113,6 +113,7 @@ async function auditRoute(
 
 test('full UI quality sweep covers the production route/state matrix', async ({
   browser,
+  baseURL,
 }, testInfo) => {
   test.setTimeout(1_200_000);
   const records: SweepRecord[] = [];
@@ -124,7 +125,7 @@ test('full UI quality sweep covers the production route/state matrix', async ({
     for (const viewport of viewports) {
       for (const route of routes) {
         const context = await browser.newContext({
-          baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
+          baseURL,
           colorScheme: theme,
           locale: 'ru-RU',
           serviceWorkers: 'block',
