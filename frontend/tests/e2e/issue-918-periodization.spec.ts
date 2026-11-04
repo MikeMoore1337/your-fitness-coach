@@ -481,7 +481,17 @@ for (const mode of ['pwa', 'tma'] as const) {
         await expect(panel.getByRole('combobox', { name: 'Новый тип недели' })).toBeVisible();
         await panel.getByRole('combobox', { name: 'Новый тип недели' }).selectOption('light');
         await panel.getByRole('radio', { name: /Будущие повторы/ }).check();
-        await panel.getByRole('button', { name: 'Проверить изменения' }).click();
+        const preview = panel.getByRole('button', { name: 'Проверить изменения' });
+        await scrollIntoStablePosition(preview);
+        const [previewResponse] = await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              new URL(response.url()).pathname.endsWith('/cycle/week-type/preview'),
+          ),
+          preview.click(),
+        ]);
+        expect(previewResponse.ok()).toBe(true);
         await expect(panel.getByText('История сохранится')).toBeVisible();
         await panel.scrollIntoViewIfNeeded();
         if (process.env.YFC_CAPTURE_918)
