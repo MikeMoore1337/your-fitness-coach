@@ -35,7 +35,8 @@ export async function getExistingWebPushSubscription(): Promise<PushSubscription
         userVisibleOnly: true,
       } as PermissionDescriptor);
       // A revoked push permission deactivates its subscriptions.
-      if (permission.state === 'prompt') return null;
+      if (permission.state === 'prompt' && window.Notification.permission === 'default')
+        return null;
     } catch {
       // Browsers without push permission queries still need the normal subscription lookup.
     }
