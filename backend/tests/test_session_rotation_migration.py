@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -149,3 +151,138 @@ def test_rotation_migration_rejects_a_wrong_existing_postgres_index():
             connection.exec_driver_sql('SET search_path TO "public"')
             connection.exec_driver_sql(f'DROP SCHEMA "{schema}" CASCADE')
             connection.commit()
+
+
+@pytest.fixture(params=["sqlite", "postgresql"])
+def rotation_downgrade(request, tmp_path):
+    if request.param == "sqlite":
+        engine = sa.create_engine(
+            f"sqlite:///{(tmp_path / 'rotation-lock.db').as_posix()}",
+            connect_args={"timeout": 0.2},
+        )
+        schema = None
+    else:
+        from fitminiapp_api.db.session import engine
+
+        if engine.dialect.name != "postgresql":
+            pytest.skip("requires PostgreSQL")
+        schema = f"rotation_downgrade_{uuid4().hex}"
+    with engine.connect() as connection:
+        try:
+            if schema:
+                connection.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
+                connection.exec_driver_sql(f'SET search_path TO "{schema}"')
+            _create_legacy_tables(connection)
+            connection.commit()
+            migration = _migration()
+            context = MigrationContext.configure(connection)
+            with context.begin_transaction(), Operations.context(context):
+                migration.upgrade()
+            connection.commit()
+            yield engine, connection, migration, schema
+        finally:
+            connection.rollback()
+            if schema:
+                connection.exec_driver_sql('SET search_path TO "public"')
+                connection.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+                connection.commit()
+    if not schema:
+        engine.dispose()
+
+
+def test_postgres_downgrade_rollback_preserves_rotation_indexes(rotation_downgrade):
+    _, connection, migration, schema = rotation_downgrade
+    if not schema:
+        pytest.skip("requires PostgreSQL")
+    context = MigrationContext.configure(connection)
+    with pytest.raises(RuntimeError, match="later guard"), context.begin_transaction():
+        with Operations.context(context):
+            migration.downgrade()
+        raise RuntimeError("later guard")
+    names = {index["name"] for index in sa.inspect(connection).get_indexes("user_workouts")}
+    assert {
+        "uq_user_workouts_rotation_mutation",
+        "uq_user_workouts_rotation_in_progress",
+    } <= names
+    assert "rotation_epoch" in {
+        column["name"] for column in sa.inspect(connection).get_columns("user_workouts")
+    }
+
+
+@pytest.mark.parametrize("table", ["user_programs", "user_workouts"])
+def test_rotation_downgrade_blocks_writer_after_check(rotation_downgrade, table):
+    engine, connection, migration, schema = rotation_downgrade
+    context = MigrationContext.configure(connection)
+    operations = Operations(context)
+    migration.op = operations
+    drop_index = operations.drop_index
+    outcomes = []
+
+    def writer():
+        try:
+            with engine.begin() as other:
+                if schema:
+                    other.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
+                    other.exec_driver_sql("SET LOCAL lock_timeout = '200ms'")
+                other.exec_driver_sql(f"UPDATE {table} SET rotation_epoch=4 WHERE id=1")
+            return "committed"
+        except sa.exc.OperationalError as exc:
+            if schema:
+                assert getattr(exc.orig, "sqlstate", None) == "55P03"
+            else:
+                assert "database is locked" in str(exc.orig)
+            return "blocked"
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+
+        def interleaved_drop(*args, **kwargs):
+            if not outcomes:
+                outcomes.append(executor.submit(writer).result(timeout=5))
+                assert outcomes == ["blocked"]
+            return drop_index(*args, **kwargs)
+
+        operations.drop_index = interleaved_drop
+        with context.begin_transaction():
+            migration.downgrade()
+    assert outcomes == ["blocked"]
+
+
+@pytest.mark.parametrize("isolation", ["REPEATABLE READ", "SERIALIZABLE"])
+def test_rotation_downgrade_refuses_a_stale_postgres_snapshot(rotation_downgrade, isolation):
+    engine, connection, migration, schema = rotation_downgrade
+    if not schema:
+        pytest.skip("requires PostgreSQL")
+    context = MigrationContext.configure(connection)
+    with pytest.raises(RuntimeError, match="READ COMMITTED"), context.begin_transaction():
+        connection.exec_driver_sql(f"SET TRANSACTION ISOLATION LEVEL {isolation}")
+        connection.exec_driver_sql("SELECT count(*) FROM user_programs").scalar_one()
+        with engine.begin() as writer:
+            writer.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
+            writer.exec_driver_sql("UPDATE user_programs SET rotation_epoch=4 WHERE id=1")
+        with Operations.context(context):
+            migration.downgrade()
+    connection.rollback()
+    assert connection.exec_driver_sql("SELECT rotation_epoch FROM user_programs").scalar_one() == 4
+
+
+def test_rotation_downgrade_refuses_sqlite_autocommit():
+    engine = sa.create_engine("sqlite:///:memory:", isolation_level="AUTOCOMMIT")
+    try:
+        with engine.connect() as connection:
+            _create_legacy_tables(connection)
+            migration = _migration()
+            migration.op = Operations(MigrationContext.configure(connection))
+            migration.upgrade()
+            with pytest.raises(RuntimeError, match="requires a transaction"):
+                migration.downgrade()
+    finally:
+        engine.dispose()
+
+
+def test_rotation_downgrade_refuses_unsupported_database():
+    migration = _migration()
+    migration.op = SimpleNamespace(
+        get_bind=lambda: SimpleNamespace(dialect=SimpleNamespace(name="unknown"))
+    )
+    with pytest.raises(RuntimeError, match="locking is unsupported"):
+        migration.downgrade()

@@ -167,6 +167,19 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        # A repeatable snapshot can predate the lock and hide committed writes.
+        if bind.execute(sa.text("SHOW transaction_isolation")).scalar_one() != "read committed":
+            raise RuntimeError("Unsafe downgrade: PostgreSQL READ COMMITTED isolation is required")
+        op.execute("SET LOCAL lock_timeout = '3s'")
+        op.execute("SET LOCAL statement_timeout = '30s'")
+        op.execute("LOCK TABLE user_programs, user_workouts IN ACCESS EXCLUSIVE MODE")
+    elif bind.dialect.name == "sqlite":
+        op.execute("UPDATE user_programs SET id = id WHERE 0")
+        if not getattr(bind.connection.driver_connection, "in_transaction", False):
+            raise RuntimeError("Unsafe downgrade: session rotation locking requires a transaction")
+    else:
+        raise RuntimeError("Unsafe downgrade: session rotation locking is unsupported")
     if (
         bind.execute(
             sa.text(
@@ -185,22 +198,9 @@ def downgrade() -> None:
         ).first()
     ):
         raise RuntimeError("Unsafe downgrade: session rotation data exists; use a forward fix")
-    postgres = bind.dialect.name == "postgresql"
-    if postgres:
-        with op.get_context().autocommit_block():
-            op.drop_index(
-                "uq_user_workouts_rotation_mutation",
-                table_name="user_workouts",
-                postgresql_concurrently=True,
-            )
-            op.drop_index(
-                "uq_user_workouts_rotation_in_progress",
-                table_name="user_workouts",
-                postgresql_concurrently=True,
-            )
-    else:
-        op.drop_index("uq_user_workouts_rotation_mutation", table_name="user_workouts")
-        op.drop_index("uq_user_workouts_rotation_in_progress", table_name="user_workouts")
+    # Keep index removal in the same transaction as later downgrade guards.
+    op.drop_index("uq_user_workouts_rotation_mutation", table_name="user_workouts")
+    op.drop_index("uq_user_workouts_rotation_in_progress", table_name="user_workouts")
     for name in (
         "rotation_transition_hash",
         "rotation_transition_id",
