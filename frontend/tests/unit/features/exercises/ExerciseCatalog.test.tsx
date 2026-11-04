@@ -3,6 +3,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExerciseCatalog } from '../../../../src/features/exercises/ExerciseCatalog';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
+import { NavigationProvider } from '../../../../src/shared/navigation/router';
+
+vi.mock('../../../../src/features/equipment/equipmentProfileState', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../src/features/equipment/equipmentProfileState')
+  >()),
+  useEquipmentProfiles: () => ({
+    active: undefined,
+    query: {
+      data: { revision: 0, active_profile_id: null, profiles: [] },
+      isSuccess: true,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    },
+    save: { mutate: vi.fn(), error: null, isError: false, isPending: false },
+  }),
+}));
 
 const exercises = [
   {
@@ -53,9 +71,11 @@ function renderCatalog() {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <FeedbackProvider>
-        <ExerciseCatalog />
-      </FeedbackProvider>
+      <NavigationProvider>
+        <FeedbackProvider>
+          <ExerciseCatalog />
+        </FeedbackProvider>
+      </NavigationProvider>
     </QueryClientProvider>,
   );
 }
@@ -158,9 +178,11 @@ describe('ExerciseCatalog', () => {
     });
     render(
       <QueryClientProvider client={queryClient}>
-        <FeedbackProvider>
-          <ExerciseCatalog canAssign targetTelegramId={123} />
-        </FeedbackProvider>
+        <NavigationProvider>
+          <FeedbackProvider>
+            <ExerciseCatalog canAssign targetTelegramId={123} />
+          </FeedbackProvider>
+        </NavigationProvider>
       </QueryClientProvider>,
     );
 

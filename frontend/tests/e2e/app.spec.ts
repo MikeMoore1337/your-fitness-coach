@@ -6,6 +6,7 @@ import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platf
 import { expectSelectedChoice } from './fixtures/selected-state';
 import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
 import { installTelegramHarness } from './fixtures/mobile-tma';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -53,12 +54,14 @@ test.describe('универсальная геометрия предпросм�
             await page.route('**/api/v1/programs/templates/mine', (route) =>
               route.fulfill({ json: [template] }),
             );
-            await page.goto('/app?section=programs&view=manage');
+            await page.goto(
+              '/app?section=programs&view=manage' +
+                (template.is_active_for_current_user ? '' : '&start=templates'),
+            );
             if (surface !== 'telegram') await page.getByRole('button', { name: 'Клиент' }).click();
-            if (!template.is_active_for_current_user) await openCard(page, 'Программы и шаблоны');
             await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
             const trigger = template.is_active_for_current_user
-              ? page.getByRole('button', { name: 'Посмотреть план', exact: true })
+              ? page.getByRole('button', { name: 'Посмотреть состав', exact: true })
               : page.getByRole('button', {
                   name: `Посмотреть ${template.is_example ? 'шаблон' : 'программу'} «${template.title}»`,
                   exact: true,
@@ -499,6 +502,8 @@ async function mockApi(
         },
       });
     }
+    if (path.endsWith('/workouts/session-rotation'))
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
     if (path.endsWith('/workouts/today'))
       return route.fulfill({ status: 404, json: { detail: 'На сегодня тренировка не назначена' } });
     if (path.endsWith('/workouts/progress/summary'))
@@ -2489,7 +2494,11 @@ test('training preferences сохраняют Mobile Web/TMA композици�
     await expect(planManagementLink).toBeVisible();
     await planManagementLink.click();
     await expect(page).toHaveURL('/app?section=programs&view=manage');
-    await page.getByRole('button', { name: 'Подобрать другую' }).click();
+    await page
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Заменить программу/ })
+      .click();
+    await page.getByRole('button', { name: 'Подбор по параметрам' }).click();
     const wizard = page.getByRole('dialog', { name: 'Цель' });
     await expect(wizard).toBeVisible();
     await expect(wizard.getByText(/подставили достоверные ответы из профиля/i)).toBeVisible();
@@ -2717,7 +2726,10 @@ test('рекомендация кардио меняется с целью, а �
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
   await page.locator('#profile-personal > summary').click();
-  await page.getByText('Пульс и кардио-ориентиры').click();
+  const cardioSettings = page.getByText('Пульс и кардио-ориентиры');
+  await scrollIntoStablePosition(cardioSettings);
+  await cardioSettings.click();
+  await expect(page.getByLabel('Средний пульс в покое, уд/мин')).toBeVisible();
 
   await page.getByLabel('Дата рождения').fill('1992-08-12');
   await page.getByText('Средний пульс в покое, уд/мин').locator('..').locator('input').fill('75');
@@ -2960,11 +2972,19 @@ test('поля адаптируются к разным iPhone, а пример 
   await planManagementLink.click();
   await expect(page).toHaveURL('/app?section=programs&view=manage');
   await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Назначение и изменения/ })
+    .click();
   await page.getByText('Все этапы и изменения', { exact: true }).click();
   await expect(page.getByText('Тренировочные блоки ещё не настроены')).toBeVisible();
   await expect(page.getByText('Программа назначена')).toBeVisible();
   await page.getByText('Все этапы и изменения', { exact: true }).click();
-  await openCard(page, 'Программы и шаблоны');
+  await page.getByRole('button', { name: 'К центру управления' }).click();
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Программы и шаблоны/ })
+    .click();
   const example = page.getByRole('button', {
     name: 'Посмотреть шаблон «Программа на всё тело — 3 дня»',
   });
@@ -3148,7 +3168,8 @@ test('поля адаптируются к разным iPhone, а пример 
   await page.locator('.program-example-modal__close').click();
   await expect(previewDialog).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Посмотреть план' }).click();
+  await page.getByRole('button', { name: 'К центру управления' }).click();
+  await page.getByRole('button', { name: 'Посмотреть состав' }).click();
   await expect(previewDialog).toBeVisible();
   await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
   await expect(
@@ -3197,6 +3218,12 @@ test('поля адаптируются к разным iPhone, а пример 
   await page.locator('.program-example-modal__close').click();
   await expect(previewDialog).toHaveCount(0);
 
+  // #1326: the active program preview lives in overview; return to the library to launch this template.
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Программы и шаблоны/ })
+    .click();
+  await expect(sourceCard).toBeVisible();
   await sourceCard.getByRole('button', { name: 'Запустить' }).click();
   const assignmentDialog = page.locator('.assignment-modal');
   await expect(assignmentDialog).toBeVisible();
@@ -3260,6 +3287,154 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(page.locator('.exercise-lightbox')).toHaveCount(0);
 });
 
+for (const width of [360, 390, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#1335 проверенное предложение: ${width}px ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockApi(page);
+      const inputs = {
+        goal: 'strength',
+        experience: 'beginner',
+        days_per_week: 3,
+        preferred_session_duration_minutes: 60,
+        training_location: 'home',
+        available_equipment_ids: ['bodyweight', 'barbell', 'bench'],
+        priority_muscle_ids: [],
+        preferred_exercise_ids: [],
+        excluded_exercise_ids: [],
+      };
+      const source = {
+        template_id: 10,
+        slug: 'stronglifts-5x5',
+        title: 'StrongLifts 5x5',
+        goal: 'strength',
+        level: 'beginner',
+        split_type: 'full_body',
+        provenance_type: 'SOURCE_ADAPTATION',
+      };
+      const calls: Record<string, unknown>[] = [];
+      let confirmCalls = 0;
+      await page.route('**/api/v1/programs/generator/**', async (route) => {
+        if (route.request().url().endsWith('/confirm')) {
+          confirmCalls++;
+          return route.fulfill({ status: 400, json: { detail: 'Подтверждение не запрошено' } });
+        }
+        calls.push(route.request().postDataJSON());
+        if (calls.length === 1)
+          return route.fulfill({
+            json: {
+              status: 'no_compatible',
+              selection_policy_version: 'program_generator_v2',
+              input_fingerprint: 'initial',
+              message: 'Для программы «StrongLifts 5x5»: частота занятий отличается от выбранной.',
+              reason_codes: ['frequency_not_supported'],
+              suggestions: [
+                {
+                  source,
+                  inputs,
+                  changes: [
+                    'Цель: рекомпозиция → развитие силы.',
+                    'Занятий в неделю: 2 → 3.',
+                    'Понадобится дополнительно: штанга, скамья.',
+                  ],
+                },
+              ],
+            },
+          });
+        expect(calls[1]).toEqual(inputs);
+        return route.fulfill({
+          json: {
+            status: 'preview',
+            selection_policy_version: 'program_generator_v2',
+            input_fingerprint: 'rechecked',
+            draft_token: 'synthetic-checked-token',
+            message: 'Предпросмотр готов.',
+            source,
+            program: {
+              title: 'StrongLifts 5x5',
+              goal: 'strength',
+              level: 'beginner',
+              days_per_week: 3,
+              estimated_duration_minutes: 60,
+              days: [1, 2].map((day) => ({
+                day_number: day,
+                title: `Тренировка ${day}`,
+                estimated_duration_minutes: 60,
+                exercises: [
+                  {
+                    exercise_id: 1,
+                    source_exercise_id: 1,
+                    exercise_title: 'Приседание',
+                    metric_type: 'strength',
+                    prescribed_sets: 5,
+                    prescribed_reps: '5',
+                    rest_seconds: 150,
+                  },
+                ],
+              })),
+            },
+            fit_reasons: ['Три занятия в неделю с непрерывным чередованием.'],
+            tradeoffs: [],
+            adaptations: [],
+            suggestions: [],
+          },
+        });
+      });
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await openAppDestination(page, 'План');
+      await page.getByRole('link', { name: 'Управление программой', exact: true }).click();
+      await page
+        .getByRole('navigation', { name: 'Управление программой' })
+        .getByRole('button', { name: /Заменить программу/ })
+        .click();
+      await page.getByRole('button', { name: 'Подобрать программу', exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      await dialog.getByRole('radio', { name: /Рекомпозиция/ }).check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.getByRole('radio', { name: /Начинаю или возвращаюсь/ }).check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.locator('input[name="generator-frequency"][value="2"]').check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.getByRole('radio', { name: /60 минут/ }).check();
+      await dialog.getByRole('button', { name: 'Далее' }).click();
+      await dialog.getByRole('radio', { name: /Дома/ }).check();
+      await expect(dialog.getByText(/Инвентарь не отмечен/)).toBeVisible();
+      await dialog.getByRole('button', { name: 'Показать программу' }).click();
+      const apply = dialog.getByRole('button', { name: 'Применить предложенное изменение' });
+      await expect(apply).toBeVisible();
+      expect(calls).toHaveLength(1);
+      expect(confirmCalls).toBe(0);
+      await expect(dialog.getByText('Цель: рекомпозиция → развитие силы.')).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Подтвердить программу' })).toHaveCount(0);
+      const panel = dialog.locator('.program-wizard__panel');
+      expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+      await page.screenshot({ path: testInfo.outputPath(`suggestion-${width}-${theme}.png`) });
+      await apply.focus();
+      await page.keyboard.press('Enter');
+      await expect(dialog.getByText('3 занятий в неделю; 2 разных тренировок')).toBeVisible();
+      expect(calls).toHaveLength(2);
+      expect(confirmCalls).toBe(0);
+      await expect(panel).toBeFocused();
+      expect(await dialog.innerText()).not.toMatch(/source-backed|draft|lifecycle|\bpreview\b/);
+      await page.setViewportSize({ width, height: 600 });
+      const confirm = dialog.getByRole('button', { name: 'Подтвердить программу' });
+      await confirm.scrollIntoViewIfNeeded();
+      await expect(confirm).toBeInViewport();
+      expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+      await page.screenshot({ path: testInfo.outputPath(`preview-${width}-${theme}.png`) });
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+    });
+  }
+}
+
 test('детерминированный подбор проходит preview, no-compatible и explicit confirm', async ({
   page,
 }) => {
@@ -3276,9 +3451,9 @@ test('детерминированный подбор проходит preview, 
         return route.fulfill({
           json: {
             status: 'no_compatible',
-            selection_policy_version: 'program_generator_v1',
+            selection_policy_version: 'program_generator_v2',
             input_fingerprint: 'preview-no-compatible',
-            message: 'Не удалось подобрать программу под все выбранные ограничения.',
+            message: 'Для программы «Всё тело»: длительность несовместима с выбранным временем.',
             reason_codes: ['duration_incompatible', 'equipment_no_canonical_substitution'],
             fit_reasons: [],
             tradeoffs: [],
@@ -3291,7 +3466,7 @@ test('детерминированный подбор проходит preview, 
       return route.fulfill({
         json: {
           status: 'preview',
-          selection_policy_version: 'program_generator_v1',
+          selection_policy_version: 'program_generator_v2',
           input_fingerprint: 'preview-1',
           message:
             'Предпросмотр готов. Программа будет сохранена только после явного подтверждения.',
@@ -3307,6 +3482,7 @@ test('детерминированный подбор проходит preview, 
           },
           program: {
             title: 'Подобранная программа · Каноническая программа на всё тело',
+            days_per_week: 3,
             goal: 'recomposition',
             level: 'beginner',
             split_type: 'full_body',
@@ -3385,6 +3561,10 @@ test('детерминированный подбор проходит preview, 
   await planManagementLink.click();
   await expect(page).toHaveURL('/app?section=programs&view=manage');
 
+  await page
+    .getByRole('navigation', { name: 'Управление программой' })
+    .getByRole('button', { name: /Заменить программу/ })
+    .click();
   const launcher = page.getByRole('button', { name: 'Подобрать программу' });
   await launcher.click();
   const wizard = page.getByRole('dialog', { name: 'Цель' });
@@ -3439,7 +3619,7 @@ test('детерминированный подбор проходит preview, 
   await page.getByRole('button', { name: 'Далее' }).click();
   await page.getByRole('radio', { name: /Тренажёрный зал/ }).check();
   await page.getByRole('checkbox', { name: 'Гантели' }).check();
-  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Показать программу' }).click();
 
   const result = page.getByRole('dialog', { name: 'Предпросмотр программы' });
   await expect(result.getByRole('heading', { name: /Подобранная программа/ })).toBeVisible();
@@ -3465,9 +3645,9 @@ test('детерминированный подбор проходит preview, 
     path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-preview-desktop.png',
   });
 
-  await result.getByRole('button', { name: 'Изменить параметры' }).click();
+  await result.getByRole('button', { name: 'Изменить ответы' }).click();
   noCompatiblePreview = true;
-  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Показать программу' }).click();
   await expect(page.getByText('Совместимый вариант не найден')).toBeVisible();
   await expect(page.getByText(/длительность несовместима/i)).toBeVisible();
   await page.screenshot({
@@ -3475,8 +3655,8 @@ test('детерминированный подбор проходит preview, 
   });
 
   noCompatiblePreview = false;
-  await page.getByRole('button', { name: 'Изменить параметры' }).click();
-  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Изменить ответы' }).click();
+  await page.getByRole('button', { name: 'Показать программу' }).click();
   await page.getByRole('button', { name: 'Подтвердить программу' }).click();
   await expect(page.getByRole('heading', { name: 'Программа подтверждена' })).toBeVisible();
   expect(confirmPayload).toMatchObject({
@@ -3488,7 +3668,7 @@ test('детерминированный подбор проходит preview, 
   });
 });
 
-test('клиент собирает и переупорядочивает личную программу', async ({ page }) => {
+test('клиент собирает и проверяет личную программу перед назначением', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
@@ -3507,7 +3687,7 @@ test('клиент собирает и переупорядочивает лич
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'План');
-  await page.goto('/app?section=programs&view=manage');
+  await page.goto('/app?section=programs&view=manage&start=create');
 
   const builder = page.locator('#program-builder');
   await expect(builder.getByRole('heading', { name: 'Создать свою программу' })).toBeVisible();
@@ -3517,11 +3697,11 @@ test('клиент собирает и переупорядочивает лич
       .evaluateAll((elements) => elements.map((element) => element.id)),
   ).toEqual(['program-builder', 'program-library']);
   await expect(builder.getByLabel('Название', { exact: true })).toHaveValue('Моя программа');
-  await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 1');
+  await expect(builder.getByRole('textbox', { name: 'Название дня' })).toHaveValue('Тренировка 1');
   await expect(builder.getByText('Настройки программы', { exact: true })).toBeVisible();
   await expect(builder.getByRole('combobox', { name: 'Цель', exact: true })).toBeHidden();
   const settings = builder.locator('.program-builder-settings');
-  await settings.locator('summary').click();
+  await settings.locator(':scope > summary').click();
   const goal = builder.getByRole('combobox', { name: 'Цель', exact: true });
   await goal.selectOption('recomposition');
   await expect(goal).toHaveValue('recomposition');
@@ -3530,10 +3710,12 @@ test('клиент собирает и переупорядочивает лич
   await duration.fill('2');
   await expect(duration).toHaveValue('2');
   await duration.fill('1');
-  await settings.locator('summary').click();
+  await settings.locator(':scope > summary').click();
   await expect(goal).toBeHidden();
 
-  const exercisePicker = builder.getByRole('button', { name: 'Поиск упражнения' }).first();
+  await builder.locator('.copy-editor__exercise').first().click();
+  const parameters = page.getByRole('dialog', { name: 'Параметры упражнения' });
+  const exercisePicker = parameters.getByRole('button', { name: 'Поиск упражнения' });
   await exercisePicker.click();
   const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
   const exerciseSearch = pickerSheet.getByRole('searchbox', { name: 'Поиск упражнения' });
@@ -3556,39 +3738,22 @@ test('клиент собирает и переупорядочивает лич
   await expect(exercisePicker).toContainText('Тяга блока');
   await expect(builder.getByText('1 тренировка · 1 упр.', { exact: true })).toBeVisible();
 
-  await builder.getByRole('button', { name: 'Добавить упражнение' }).first().click();
-  const exercisePickers = builder.getByRole('button', { name: 'Поиск упражнения' });
-  await expect(exercisePickers.nth(0)).toContainText('Тяга блока');
-  await expect(exercisePickers.nth(1)).toContainText('Выбрать упражнение');
-  const moveExerciseDown = builder.getByRole('button', {
-    name: 'Переместить упражнение 1 ниже',
-  });
-  await moveExerciseDown.focus();
-  await moveExerciseDown.press('Enter');
-  const exerciseRows = builder.locator('.program-exercise-row');
-  await expect(exerciseRows.nth(0).getByRole('button', { name: 'Техника и детали' })).toHaveCount(
-    0,
-  );
-  await expect(exerciseRows.nth(1).getByRole('button', { name: 'Техника и детали' })).toBeVisible();
-  await expect(exercisePickers.nth(0)).toContainText('Выбрать упражнение');
-  await expect(exercisePickers.nth(1)).toContainText('Тяга блока');
-  await builder.getByRole('button', { name: 'Удалить упражнение 1 из дня 1' }).click();
-
-  await builder.getByRole('button', { name: 'Добавить день' }).click();
-  const moveDayUp = builder.getByRole('button', { name: 'Переместить день 2 выше' });
-  await moveDayUp.focus();
-  await moveDayUp.press('Enter');
-  await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 2');
-  await expect(builder.getByLabel('Название дня 2')).toHaveValue('Тренировка 1');
-  await builder.getByRole('button', { name: 'Удалить день 1' }).click();
-  await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 1');
+  await parameters.getByRole('button', { name: 'Закрыть параметры' }).click();
+  await expect(builder.locator('.copy-editor__exercise').first()).toContainText('Тяга блока');
+  await expect(
+    builder.locator('.copy-editor__current-day').getByRole('textbox', {
+      name: 'Название дня',
+    }),
+  ).toHaveValue('Тренировка 1');
 
   const createRequest = page.waitForRequest(
     (request) =>
       new URL(request.url()).pathname.endsWith('/programs/templates') &&
       request.method() === 'POST',
   );
-  await builder.getByRole('button', { name: 'Создать программу' }).click();
+  await builder.getByRole('button', { name: 'Проверить и назначить' }).click();
+  await expect(builder.getByRole('heading', { name: 'Проверка программы' })).toBeVisible();
+  await builder.getByRole('button', { name: 'Создать и назначить' }).click();
   const payload = (await createRequest).postDataJSON() as {
     title: string;
     goal: string;
@@ -3611,9 +3776,10 @@ test('клиент собирает и переупорядочивает лич
 
 test('сенсорное поле даты сохраняет нативный пикер и показывает иконку календаря', async ({
   browser,
+  baseURL,
 }) => {
   const context = await browser.newContext({
-    baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
+    baseURL,
     viewport: { width: 390, height: 844 },
     hasTouch: true,
     isMobile: true,

@@ -28,6 +28,19 @@ export function webPushPermission(): WebPushPermission {
 
 export async function getExistingWebPushSubscription(): Promise<PushSubscription | null> {
   if (!supportsWebPush()) return null;
+  if (window.Notification.permission === 'default' && navigator.permissions?.query) {
+    try {
+      const permission = await navigator.permissions.query({
+        name: 'push',
+        userVisibleOnly: true,
+      } as PermissionDescriptor);
+      // A revoked push permission deactivates its subscriptions.
+      if (permission.state === 'prompt' && window.Notification.permission === 'default')
+        return null;
+    } catch {
+      // Browsers without push permission queries still need the normal subscription lookup.
+    }
+  }
   const registration = await navigator.serviceWorker.getRegistration('/');
   return registration?.pushManager.getSubscription() ?? null;
 }

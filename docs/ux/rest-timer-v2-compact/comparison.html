@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ru">
+  <meta charset="utf-8" /><title>YFC #1338 — v2 Compact / AFTER</title
+  ><style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #f2f3f1;
+      color: #172017;
+      font:
+        14px Arial,
+        sans-serif;
+    }
+    section {
+      width: 850px;
+      padding: 20px;
+      background: #f2f3f1;
+    }
+    h1 {
+      font-size: 23px;
+      margin: 0 0 8px;
+    }
+    h2 {
+      font-size: 15px;
+      margin: 16px 0 7px;
+    }
+    p {
+      margin: 6px 0 12px;
+      line-height: 1.4;
+    }
+    .pair {
+      display: grid;
+      grid-template-columns: 393px 393px;
+      gap: 18px;
+    }
+    .crop {
+      overflow: hidden;
+      position: relative;
+      background: #d8ded6;
+    }
+    .crop img {
+      width: 100%;
+      display: block;
+      position: relative;
+    }
+    .reference img {
+      top: -112px;
+    }
+    .labels {
+      display: grid;
+      grid-template-columns: 393px 393px;
+      gap: 18px;
+      color: #4d594b;
+      margin: 8px 0;
+    }
+    .full img {
+      width: 393px;
+      display: block;
+    }
+    .desktop {
+      width: 1160px;
+    }
+    .desktop .pair {
+      grid-template-columns: 552px 552px;
+    }
+    .desktop img {
+      width: 552px;
+      display: block;
+    }
+  </style>
+  <body>
+    <section id="panels">
+      <h1>YFC #1338 · v2 Compact</h1>
+      <p>
+        Слева — утверждённый прототип. Справа — реальный интерфейс YFC, WebKit.
+        Вырезки панелей в CSS-масштабе 1:1; исходные PNG сохранены рядом.
+      </p>
+      <p>
+        Сохранены токены, матовый материал и радиусы приложения; запрещённая
+        односторонняя полоса 3 px не перенесена. Формат M:SS — действующий
+        формат YFC.
+      </p>
+      <div class="labels"><b>Эталон v2</b><b>AFTER · YFC</b></div>
+      <h2>Активный · Dark · 110 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 110px">
+          <img src="reference/yfc_timer_v2_active_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 110px">
+          <img src="after/webkit-dark-393-active.png" />
+        </div>
+      </div>
+      <h2>Активный · Light · 110 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 110px">
+          <img src="reference/yfc_timer_v2_active_light_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 110px">
+          <img src="after/webkit-light-393-active.png" />
+        </div>
+      </div>
+      <h2>Свёрнутый · 60 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 60px">
+          <img src="reference/yfc_timer_v2_collapsed_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 60px">
+          <img src="after/webkit-dark-393-collapsed-active.png" />
+        </div>
+      </div>
+      <h2>План истёк · 110 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 110px">
+          <img src="reference/yfc_timer_v2_expired_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 110px">
+          <img src="after/webkit-dark-393-expired.png" />
+        </div>
+      </div>
+      <h2>Завершённый · 66 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 66px">
+          <img src="reference/yfc_timer_v2_completed_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 66px">
+          <img src="after/webkit-dark-393-completed.png" />
+        </div>
+      </div>
+      <h2>Пропущенный · 66 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 66px">
+          <img src="reference/yfc_timer_v2_skipped_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 66px">
+          <img src="after/webkit-dark-393-skipped.png" />
+        </div>
+      </div>
+      <h2>Нет сети · 110 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 110px">
+          <img src="reference/yfc_timer_v2_offline_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 110px">
+          <img src="after/webkit-dark-393-offline.png" />
+        </div>
+      </div>
+      <h2>Ошибка · 110 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 110px">
+          <img src="reference/yfc_timer_v2_error_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 110px">
+          <img src="after/webkit-dark-393-error.png" />
+        </div>
+      </div>
+      <h2>Конфликт 409 · 110 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 110px">
+          <img src="reference/yfc_timer_v2_conflict_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 110px">
+          <img src="after/webkit-dark-393-conflict-409.png" />
+        </div>
+      </div>
+      <h2>Уточнение · 62 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 393px; height: 62px">
+          <img src="reference/yfc_timer_v2_recovery_dark_393.png" />
+        </div>
+        <div class="crop" style="width: 393px; height: 62px">
+          <img src="after/webkit-dark-393-review-required.png" />
+        </div>
+      </div>
+      <h2>Узкий экран · 320 px · высота 110 px</h2>
+      <div class="pair">
+        <div class="crop reference" style="width: 320px; height: 110px">
+          <img src="reference/yfc_timer_v2_active_dark_320.png" />
+        </div>
+        <div class="crop" style="width: 320px; height: 110px">
+          <img src="after/webkit-dark-320-active.png" />
+        </div>
+      </div>
+    </section>
+    <section id="recovery">
+      <h1>Уточнение факта · отдельный диалог</h1>
+      <p>
+        Эталон v2 / реальный YFC. Разная высота экрана и контекст тренировки;
+        используются существующие модальные компоненты, шрифты и фокус YFC.
+      </p>
+      <div class="pair full">
+        <img src="reference/yfc_timer_v2_recovery-sheet_dark_393.png" /><img
+          src="after/webkit-dark-393-recovery-dialog.png"
+        />
+      </div>
+    </section>
+    <section id="desktop" class="desktop">
+      <h1>Desktop · 1120 × 960 · Dark / Light</h1>
+      <p>
+        В каждой паре: эталон слева, реальный YFC справа. Панель максимум 640
+        CSS px; карточки и навигация приложения сохранены.
+      </p>
+      <h2>Dark</h2>
+      <div class="pair">
+        <img src="reference/yfc_timer_v2_active_dark_1120.png" /><img
+          src="after/webkit-dark-1120-active.png"
+        />
+      </div>
+      <h2>Light</h2>
+      <div class="pair">
+        <img src="reference/yfc_timer_v2_active_light_1120.png" /><img
+          src="after/webkit-light-1120-active.png"
+        />
+      </div>
+    </section>
+  </body>
+</html>

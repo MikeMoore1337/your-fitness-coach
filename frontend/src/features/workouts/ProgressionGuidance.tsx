@@ -4,6 +4,7 @@ import { productEventSurface, trackProductEvent } from '../../shared/analytics/p
 import { PublicWebLink } from '../../shared/navigation/PublicWebLink';
 import { Button, DisclosureIcon } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
+import { weekTypeGenitive, weekTypeLabels } from './weekTypes';
 
 type Guidance = NonNullable<Workout['exercises'][number]['progression_guidance']>;
 type Session = Guidance['evidence']['sessions'][number];
@@ -56,6 +57,22 @@ function sessionLabel(session: Session): string {
       ? 'нагрузка неполная'
       : `${formatNumber(session.load)} ${unitLabel(session.load_unit)}`;
   return `${date} · ${load} · ${reps}`;
+}
+
+function latestSessionLabel(session: Session): string {
+  if (session.load == null || session.reps_min == null || session.reps_max == null) {
+    return sessionLabel(session);
+  }
+  const date = new Date(`${session.scheduled_date}T12:00:00`).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+  });
+  const load = `${formatNumber(session.load)} ${unitLabel(session.load_unit)}`;
+  const reps =
+    session.reps_min === session.reps_max
+      ? String(session.reps_min)
+      : `${session.reps_min}–${session.reps_max}`;
+  return `${load} × ${reps} · ${date}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -189,12 +206,29 @@ export function ProgressionGuidance({
   guidance: Guidance;
   exerciseKey: number;
   applied?: boolean;
-  onApply?: () => void;
+  onApply?: () => void | Promise<unknown>;
   onDismiss: () => void;
 }) {
   const applyStarted = useRef(false);
   const exactSuggestion = guidance.proposal?.proposed_weight ?? guidance.suggested_weight;
   const explanation = ruleSummary(guidance);
+  const typed = guidance.ruleset_version === 'progression-guidance-v3';
+  const weekType = guidance.evidence.week_type;
+  const latestSession = guidance.evidence.sessions[0];
+  const reasons = guidance.proposal?.reason_codes ?? guidance.evidence.reason_keys;
+  const insufficientHistory = reasons.includes('insufficient_same_type_history');
+  const isIncreasing = guidance.outcome === 'consider_progressing';
+  const message =
+    typed && isIncreasing && exactSuggestion != null
+      ? `Можно рассмотреть увеличение до ${formatNumber(exactSuggestion)} ${unitLabel(guidance.load_unit)}`
+      : guidance.message;
+  const proposalVersions = (guidance.proposal?.target_set_updates ?? [])
+    .map((update) => `${update.set_id}:${update.set_version}`)
+    .join(',');
+
+  useEffect(() => {
+    applyStarted.current = false;
+  }, [guidance.proposal?.proposal_id, proposalVersions]);
 
   useEffect(() => {
     trackProductEvent(
@@ -203,15 +237,88 @@ export function ProgressionGuidance({
     );
   }, [exerciseKey]);
 
+  const apply = () => {
+    if (!onApply || applyStarted.current || applied) return;
+    applyStarted.current = true;
+    try {
+      const pending = onApply();
+      if (pending) {
+        void pending.catch(() => {
+          applyStarted.current = false;
+        });
+      }
+    } catch (error) {
+      applyStarted.current = false;
+      throw error;
+    }
+  };
+
+  if (guidance.side_guidance) {
+    const sides = guidance.side_guidance;
+    return (
+      <section aria-label="Рекомендации по сторонам" className="progression-guidance is-review">
+        <div className="progression-guidance__copy">
+          <span>Следующая нагрузка</span>
+          <strong>Прогрессия по сторонам</strong>
+          {(['left', 'right'] as const).map((key) => {
+            const result = sides[key];
+            return (
+              <div key={key}>
+                <strong>{key === 'left' ? 'Левая сторона' : 'Правая сторона'}</strong>
+                <p>
+                  {result.message}
+                  {result.suggested_weight == null
+                    ? ''
+                    : ` · ${formatNumber(result.suggested_weight)} ${unitLabel(result.load_unit)}`}
+                </p>
+                <p>{result.detail}</p>
+                <small>
+                  Сопоставимых тренировок: {result.evidence.comparable_session_count} из{' '}
+                  {result.evidence.required_session_count}
+                </small>
+              </div>
+            );
+          })}
+        </div>
+        <div className="progression-guidance__actions">
+          {guidance.proposal?.proposed_side_weights && onApply && (
+            <Button type="button" variant="secondary" disabled={applied} onClick={apply}>
+              {applied
+                ? 'Вес подставлен'
+                : `Применить: левая ${formatNumber(guidance.proposal.proposed_side_weights.left)} кг, правая ${formatNumber(guidance.proposal.proposed_side_weights.right)} кг`}
+            </Button>
+          )}
+          <Button type="button" variant="ghost" onClick={onDismiss}>
+            Оставить текущую нагрузку
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-label="Рекомендация по следующей нагрузке"
       className={`progression-guidance is-${guidance.outcome}`}
     >
       <div className="progression-guidance__copy">
-        <span>Следующая нагрузка</span>
-        <strong>{guidance.message}</strong>
+        <span>Следующая нагрузка{weekType ? ` · ${weekTypeLabels[weekType]} неделя` : ''}</span>
+        <strong>{message}</strong>
+        {typed && (
+          <p>
+            {latestSession
+              ? `Прошлая сопоставимая: ${latestSessionLabel(latestSession)}`
+              : insufficientHistory
+                ? 'Сопоставимых тренировок пока нет.'
+                : 'Сопоставимую историю для этой рекомендации не удалось подтвердить.'}
+          </p>
+        )}
         <p>{guidance.detail}</p>
+        {weekType && insufficientHistory && (
+          <p>
+            Для рекомендации нужны полные сопоставимые тренировки {weekTypeGenitive[weekType]} типа.
+          </p>
+        )}
         {explanation && <p className="progression-guidance__rule">Правило: {explanation}</p>}
       </div>
 
@@ -236,7 +343,7 @@ export function ProgressionGuidance({
             <ol className="progression-guidance__history" aria-label="Последние тренировки">
               {guidance.evidence.sessions.map((session) => (
                 <li key={session.workout_id}>
-                  <span>{sessionLabel(session)}</span>
+                  <span>{sessionLabel(session)} </span>
                   <small>
                     {session.working_set_count} раб. подх.
                     {session.rir_recorded_set_count > 0
@@ -255,6 +362,15 @@ export function ProgressionGuidance({
               Пока нет полных сопоставимых тренировок в этом контексте программы.
             </p>
           )}
+          {typed && (
+            <div className="progression-guidance__facts progression-guidance__provenance">
+              {guidance.proposal?.source_evidence_ids.length ? (
+                <span>Источники: {guidance.proposal.source_evidence_ids.join(' · ')}</span>
+              ) : null}
+              {reasons.length > 0 && <span>Причины: {reasons.join(' · ')}</span>}
+              <span>Версия правила: {guidance.ruleset_version}</span>
+            </div>
+          )}
           <PublicWebLink
             className="contextual-help__link progression-guidance__source"
             path="/knowledge/training/progressive-overload"
@@ -266,16 +382,7 @@ export function ProgressionGuidance({
 
       <div className="progression-guidance__actions">
         {exactSuggestion != null && onApply && (
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={applied}
-            onClick={() => {
-              if (applyStarted.current || applied) return;
-              applyStarted.current = true;
-              onApply();
-            }}
-          >
+          <Button type="button" variant="secondary" disabled={applied} onClick={apply}>
             {applied
               ? 'Вес подставлен'
               : `Применить ${formatNumber(exactSuggestion)} ${unitLabel(guidance.load_unit)}`}

@@ -339,7 +339,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       window.location.reload();
     };
     const markWaiting = (worker: ServiceWorker | null) => {
-      if (!worker || cancelled) return;
+      if (!worker || cancelled || worker === navigator.serviceWorker.controller) return;
       waitingWorkerRef.current = worker;
       if (navigator.serviceWorker.controller) {
         setUpdateAvailable(true);

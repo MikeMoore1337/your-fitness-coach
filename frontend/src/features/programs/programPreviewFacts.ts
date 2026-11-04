@@ -1,4 +1,4 @@
-import type { ProgramTemplate } from '../../shared/api/types';
+import type { ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { localizedEquipmentList } from '../../shared/equipmentLabels';
 
 export interface ProgramPreviewFact {
@@ -20,10 +20,53 @@ function metadata(template: ProgramTemplate): Record<string, unknown> {
     : {};
 }
 
+export function templateWeekCycle(
+  template: ProgramTemplate | null | undefined,
+): NonNullable<ProgramTemplateCreate['week_cycle']> | null {
+  if (!template) return null;
+  const value = metadata(template).week_cycle;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const cycle = value as Record<string, unknown>;
+  if (
+    cycle.schema_version !== 1 ||
+    !Number.isInteger(cycle.length_weeks) ||
+    (cycle.length_weeks as number) < 1 ||
+    typeof cycle.repeat !== 'boolean'
+  )
+    return null;
+  const types = cycle.week_types;
+  if (
+    types != null &&
+    (!Array.isArray(types) ||
+      types.length !== cycle.length_weeks ||
+      !types.every(
+        (item) => item === null || item === 'light' || item === 'medium' || item === 'heavy',
+      ))
+  )
+    return null;
+  return {
+    schema_version: 1,
+    length_weeks: cycle.length_weeks as number,
+    repeat: cycle.repeat,
+    week_types: types as NonNullable<ProgramTemplateCreate['week_cycle']>['week_types'],
+  };
+}
+
 function knownFrequency(value: unknown): string | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 7
     ? String(value) + ' в неделю'
     : null;
+}
+
+export function programWeeklySessions(template: ProgramTemplate): number {
+  if (metadata(template).week_cycle) return template.days.length;
+  const frequency = metadata(template).days_per_week;
+  return typeof frequency === 'number' &&
+    Number.isInteger(frequency) &&
+    frequency >= 1 &&
+    frequency <= 8
+    ? frequency
+    : template.days.length;
 }
 
 function knownScheduleFrequency(value: unknown): string | null {
@@ -74,11 +117,12 @@ export function programPreviewFacts(template: ProgramTemplate): ProgramPreviewFa
     ...weeks.filter((week) => Number.isInteger(week) && week >= 1),
   );
   const knownSourceWeeks =
-    maxExplicitWeek > 1
+    templateWeekCycle(template)?.length_weeks ??
+    (maxExplicitWeek > 1
       ? maxExplicitWeek
       : template.default_duration_weeks > 1
         ? template.default_duration_weeks
-        : null;
+        : null);
   const assignedWeeks =
     typeof template.assigned_program_duration_weeks === 'number' &&
     Number.isInteger(template.assigned_program_duration_weeks) &&

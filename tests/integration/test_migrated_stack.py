@@ -70,6 +70,61 @@ def test_migrated_postgres_serves_api_and_frontend() -> None:
         assert me.json()["telegram_user_id"] == 9_900_001
 
 
+def test_migrated_postgres_program_generator_uses_seed_without_preview_writes() -> None:
+    root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "backend"))
+    from fastapi.testclient import TestClient
+
+    from fitminiapp_api.db.session import get_session_context
+    from fitminiapp_api.main import app
+    from fitminiapp_api.models.program import ProgramTemplate, UserProgram, UserWorkout
+    from fitminiapp_api.services.seed import seed_demo_data
+
+    # This migrated test database has no application catalog until the fixture seeds it.
+    with get_session_context() as db:
+        seed_demo_data(db, include_demo_users=False)
+        assert db.query(ProgramTemplate).filter(ProgramTemplate.is_public.is_(True)).count() == 16
+        before = (
+            db.query(ProgramTemplate).count(),
+            db.query(UserProgram).count(),
+            db.query(UserWorkout).count(),
+        )
+    with TestClient(app) as client:
+        auth = client.post(
+            "/api/v1/auth/dev-login",
+            json={"telegram_user_id": 13_350_002, "full_name": "Проверка seed-каталога"},
+        )
+        assert auth.status_code == 200, auth.text
+        headers = {"Authorization": f"Bearer {auth.json()['access_token']}"}
+        payload = {
+            "goal": "recomposition",
+            "experience": "beginner",
+            "days_per_week": 2,
+            "preferred_session_duration_minutes": 60,
+            "training_location": "home",
+            "available_equipment_ids": ["bodyweight"],
+        }
+        response = client.post("/api/v1/programs/generator/preview", headers=headers, json=payload)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["status"] == "no_compatible"
+        assert body["draft_token"] is None
+        assert 1 <= len(body["suggestions"]) <= 3
+        for suggestion in body["suggestions"]:
+            checked = client.post(
+                "/api/v1/programs/generator/preview", headers=headers, json=suggestion["inputs"]
+            )
+            assert checked.status_code == 200, checked.text
+            assert checked.json()["status"] == "preview"
+            assert checked.json()["program"]["goal"] == suggestion["inputs"]["goal"]
+    with get_session_context() as db:
+        assert (
+            db.query(ProgramTemplate).count(),
+            db.query(UserProgram).count(),
+            db.query(UserWorkout).count(),
+        ) == before
+
+
 def test_migrated_postgres_account_deletion_removes_owner_nutrition_graph() -> None:
     database_url = os.environ.get("DATABASE_URL", "")
     assert database_url.startswith("postgresql+psycopg://"), (
@@ -491,8 +546,60 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
                 )
             ).scalar_one()
             assert "community_unverified" not in legacy_constraint
+            connection.commit()
 
-            command.upgrade(alembic_config, "head")
+            from sqlalchemy import event
+
+            migration_lock_id = 626517843
+            observed_concurrent_index = []
+
+            def check_migration_lock(_conn, _cursor, statement, _parameters, _context, _many):
+                if (
+                    "CONCURRENTLY" not in statement
+                    or "uq_user_workouts_cycle_occurrence" not in statement
+                ):
+                    return
+                with maintenance_engine.connect().execution_options(
+                    isolation_level="AUTOCOMMIT"
+                ) as observer:
+                    acquired = observer.execute(
+                        text("SELECT pg_try_advisory_lock(:key)"), {"key": migration_lock_id}
+                    ).scalar_one()
+                    if acquired:
+                        observer.execute(
+                            text("SELECT pg_advisory_unlock(:key)"), {"key": migration_lock_id}
+                        )
+                    assert acquired is False, "autocommit released the migrator serialization lock"
+                    observed_concurrent_index.append(True)
+
+            event.listen(connection, "before_cursor_execute", check_migration_lock)
+            try:
+                command.upgrade(alembic_config, "head")
+            finally:
+                event.remove(connection, "before_cursor_execute", check_migration_lock)
+            assert observed_concurrent_index == [True]
+            assert (
+                connection.execute(
+                    text(
+                        "SELECT indisvalid FROM pg_index WHERE indexrelid = "
+                        "'uq_user_workouts_cycle_occurrence'::regclass"
+                    )
+                ).scalar_one()
+                is True
+            )
+            connection.commit()
+            with maintenance_engine.connect().execution_options(
+                isolation_level="AUTOCOMMIT"
+            ) as observer:
+                assert (
+                    observer.execute(
+                        text("SELECT pg_try_advisory_lock(:key)"), {"key": migration_lock_id}
+                    ).scalar_one()
+                    is True
+                )
+                observer.execute(
+                    text("SELECT pg_advisory_unlock(:key)"), {"key": migration_lock_id}
+                )
             corrected_constraint, validated = connection.execute(
                 text(
                     "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "

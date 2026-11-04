@@ -304,6 +304,7 @@ async function mockFirstRunApi(
             completed_set_count: 0,
             recorded_set_count: 0,
             missing_set_count: 0,
+            mixed_side_set_count: 0,
             distribution: [],
           },
           primary_muscle_exposure: [],
@@ -502,8 +503,8 @@ test('brand-new Web user sees the profile prerequisite as the Today primary acti
   await page.getByRole('link', { name: 'Выбрать готовую программу' }).click();
   await expect(page).toHaveURL('/app?section=programs&start=templates');
   const library = page.locator('#program-library');
-  await expect(library).toHaveAttribute('open', '');
-  await expect(library.locator(':scope > summary')).toBeFocused();
+  await expect(library).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Программы и шаблоны', level: 1 })).toBeFocused();
   await expect(page.getByText('Программ пока нет')).toBeVisible();
 });
 

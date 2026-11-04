@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from fitminiapp_api.schemas.program import ProgramWeekCycle
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 
 ShareType = Literal["progress", "program"]
@@ -42,7 +43,7 @@ class PublicShareProgressSnapshot(BaseModel):
 
 
 class PublicShareProgramWeeklyPrescription(BaseModel):
-    week_number: int = Field(ge=1, le=24)
+    week_number: int = Field(ge=1)
     prescribed_sets: int = Field(ge=1, le=10)
     prescribed_reps: str = Field(min_length=1, max_length=32)
     prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
@@ -56,7 +57,7 @@ class PublicShareProgramExercise(BaseModel):
     prescribed_reps: str = Field(min_length=1, max_length=32)
     prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
     rest_seconds: int = Field(ge=0, le=600)
-    weekly_prescriptions: list[PublicShareProgramWeeklyPrescription] = Field(max_length=24)
+    weekly_prescriptions: list[PublicShareProgramWeeklyPrescription] = Field(max_length=500)
 
 
 class PublicShareProgramDay(BaseModel):
@@ -70,7 +71,8 @@ class PublicShareProgramSnapshot(BaseModel):
     title: str = Field(min_length=1, max_length=128)
     goal: str = Field(min_length=1, max_length=32)
     level: str = Field(min_length=1, max_length=32)
-    duration_weeks: int = Field(ge=1, le=24)
+    week_cycle: ProgramWeekCycle | None = None
+    duration_weeks: int = Field(ge=1)
     days: list[PublicShareProgramDay] = Field(min_length=1, max_length=8)
 
 

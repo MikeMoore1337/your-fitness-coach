@@ -6,6 +6,30 @@ import { WorkoutAdaptation } from '../../../../src/features/workouts/WorkoutAdap
 import type { Workout } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 
+const profileFixture = vi.hoisted(() => ({
+  active: null as null | { id: string; name: string; equipment_ids: string[] },
+}));
+vi.mock('../../../../src/features/equipment/equipmentProfileState', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../src/features/equipment/equipmentProfileState')
+  >()),
+  useEquipmentProfiles: () => ({
+    active: profileFixture.active ?? undefined,
+    query: {
+      data: {
+        revision: 0,
+        active_profile_id: profileFixture.active?.id ?? null,
+        profiles: profileFixture.active ? [profileFixture.active] : [],
+      },
+      isSuccess: true,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    },
+    save: { mutate: vi.fn(), error: null, isError: false, isPending: false },
+  }),
+}));
+
 const workout: Workout = {
   id: 42,
   scheduled_date: '2030-01-10',
@@ -107,6 +131,35 @@ describe('WorkoutAdaptation', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    profileFixture.active = null;
+  });
+
+  it('uses profile base equipment but keeps accessories out of the existing workout API', async () => {
+    profileFixture.active = {
+      id: 'home',
+      name: 'Дом',
+      equipment_ids: ['dumbbell', 'bench', 'rack', 'pullup_bar'],
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    const user = userEvent.setup();
+    renderAdaptation(false, {
+      initialTargetId: 101,
+      entryLabel: 'Заменить только в этой тренировке',
+    });
+    await user.click(screen.getByRole('button', { name: 'Заменить только в этой тренировке' }));
+    expect(screen.getByRole('checkbox', { name: 'Гантели' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Скамья' })).toBeChecked();
+    expect(screen.getByText(/Принадлежности из профиля/)).toHaveTextContent('Турник');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const request = String(
+      fetchMock.mock.calls.find(([url]) => String(url).includes('/alternatives?'))?.[0],
+    );
+    expect(request).toContain('available_equipment_ids=dumbbell');
+    expect(request).toContain('available_equipment_ids=bench');
+    expect(request).not.toContain('pullup_bar');
+    expect(request).not.toContain('rack');
   });
 
   it('показывает плоский diff и сохраняет выбор после отмены sheet', async () => {
@@ -341,6 +394,7 @@ describe('WorkoutAdaptation', () => {
             {
               exercise_id: 13,
               title: 'Жим гантелей лежа',
+              aliases: ['dumbbell bench press'],
               equipment_ids: ['dumbbell', 'bench'],
               media_thumbnail_url: '/static/exercise-guides/dumbbell-bench-press.jpg',
               media_thumbnail_sources: [],
@@ -390,10 +444,19 @@ describe('WorkoutAdaptation', () => {
 
     await user.click(screen.getByRole('button', { name: 'Все подходящие' }));
     const search = screen.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+    await user.type(search, 'dumbell bench press');
+    expect(screen.getByRole('radio', { name: /Жим гантелей лежа/ })).toBeInTheDocument();
+    await user.clear(search);
     await user.type(search, 'Смита');
     expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: /Жим в тренажере Смита/ }));
     await user.clear(search);
+    await user.type(search, 'жим гантелй');
+    expect(screen.getByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeChecked();
+    expect(screen.queryByRole('radio', { name: /Жим в тренажере Смита/ })).not.toBeInTheDocument();
+    await user.clear(search);
+    expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeChecked();
     await user.click(screen.getByRole('button', { name: 'Тренажёры' }));
     expect(screen.getByRole('radio', { name: /Жим в тренажере от груди/ })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();

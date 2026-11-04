@@ -64,7 +64,16 @@ const templateBase = {
   ],
 };
 
-function renderList(mode: 'full' | 'summary' = 'full') {
+function renderList(
+  mode: 'full' | 'summary' = 'full',
+  panel?: 'library' | 'operations' | 'replace' | 'create',
+) {
+  window.history.replaceState(
+    null,
+    '',
+    '/app?section=programs&view=manage' + (panel ? '&panel=' + panel : ''),
+  );
+  window.scrollTo = vi.fn();
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -212,7 +221,7 @@ describe('TemplatesList editing', () => {
   });
 
   it('opens a personal copy editor for a ready-made template', async () => {
-    renderList();
+    renderList('full', 'library');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Настроить копию' }));
 
@@ -220,7 +229,7 @@ describe('TemplatesList editing', () => {
   });
 
   it('keeps a stale preview out of the assignment flow', async () => {
-    renderList();
+    renderList('full', 'library');
 
     fireEvent.click(
       await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' }),
@@ -242,7 +251,7 @@ describe('TemplatesList editing', () => {
   });
 
   it('updates an owned template directly', async () => {
-    renderList();
+    renderList('full', 'library');
 
     const programCard = (
       await screen.findByRole('button', { name: 'Посмотреть программу «Моя программа»' })
@@ -251,6 +260,44 @@ describe('TemplatesList editing', () => {
     fireEvent.click(within(programCard!).getByRole('button', { name: 'Редактировать' }));
 
     expect(screen.getByText('update:Моя программа')).toBeInTheDocument();
+  });
+
+  it('shows a short overview and focused destinations instead of a long library', async () => {
+    renderList();
+    expect(await screen.findByRole('heading', { name: 'Центр управления' })).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Активная программа' });
+    expect(screen.getByRole('navigation', { name: 'Управление программой' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Программы и шаблоны/ }));
+    expect(
+      await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' }),
+    ).toBeInTheDocument();
+    expect(window.location.search).toContain('panel=library');
+    fireEvent.click(screen.getByRole('button', { name: 'К центру управления' }));
+    expect(screen.getByRole('navigation', { name: 'Управление программой' })).toBeInTheDocument();
+  });
+
+  it('keeps the trainer-assigned original read-only on overview', async () => {
+    activeProgramSource = 'trainer';
+    renderList();
+    expect(await screen.findByText(/Назначил тренер/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Редактировать шаблон' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Настроить свою копию' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Посмотреть состав' })).toBeInTheDocument();
+  });
+
+  it('opens replacement and creation as separate destinations', async () => {
+    renderList();
+    await screen.findByRole('heading', { name: 'Активная программа' });
+    fireEvent.click(screen.getByRole('button', { name: /Заменить программу/ }));
+    expect(screen.getByRole('button', { name: 'Подбор по параметрам' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Выбрать шаблон' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'К центру управления' }));
+    fireEvent.click(screen.getByRole('button', { name: /Создать или импортировать/ }));
+    expect(window.location.search).toContain('panel=create');
+    expect(screen.queryByRole('button', { name: 'Подбор по параметрам' })).not.toBeInTheDocument();
   });
 
   it('shows that the active program is already assigned', async () => {
@@ -416,7 +463,7 @@ describe('TemplatesList editing', () => {
   });
 
   it('shows ready-template actions in order without the owner deletion menu', async () => {
-    renderList();
+    renderList('full', 'library');
     const readyCard = (
       await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
     ).closest('article')!;
@@ -442,7 +489,7 @@ describe('TemplatesList editing', () => {
   });
 
   it('does not hide a ready template when confirmation is cancelled', async () => {
-    renderList();
+    renderList('full', 'library');
     const card = (
       await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
     ).closest('article')!;
@@ -462,7 +509,7 @@ describe('TemplatesList editing', () => {
   });
 
   it('hides only the selected ready template through its existing DELETE endpoint', async () => {
-    renderList();
+    renderList('full', 'library');
     const card = (
       await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
     ).closest('article')!;
@@ -502,7 +549,7 @@ describe('TemplatesList editing', () => {
       return originalFetch(input, init);
     });
 
-    renderList();
+    renderList('full', 'library');
     const card = (
       await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
     ).closest('article')!;
@@ -541,7 +588,7 @@ describe('TemplatesList editing', () => {
       return originalFetch(input, init);
     });
 
-    renderList();
+    renderList('full', 'library');
     const card = (
       await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' })
     ).closest('article')!;
@@ -566,7 +613,7 @@ describe('TemplatesList editing', () => {
   });
 
   it('keeps template deletion on the template endpoint', async () => {
-    renderList();
+    renderList('full', 'library');
     const card = (
       await screen.findByRole('button', { name: 'Посмотреть программу «Моя программа»' })
     ).closest('article');
@@ -602,21 +649,19 @@ describe('TemplatesList editing', () => {
     renderList();
 
     expect(await screen.findByRole('heading', { name: 'План ещё не выбран' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Создать свою программу' })).toHaveAttribute(
-      'href',
-      '#program-builder',
-    );
-    expect(screen.getByRole('link', { name: 'Программы и шаблоны' })).toHaveAttribute(
-      'href',
-      '#program-library',
-    );
-    expect(screen.queryByRole('button', { name: 'Подобрать программу' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Создать свою программу' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Подобрать программу' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Выбрать готовую' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Управление программой' }),
+    ).not.toBeInTheDocument();
   });
 
   it('previews a deterministic recommendation before explicit start', async () => {
     renderList();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Подобрать другую' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Заменить программу/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Подбор по параметрам' }));
     expect(screen.queryByRole('button', { name: 'Начать подбор' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
     fireEvent.click(screen.getByRole('button', { name: 'Далее' }));

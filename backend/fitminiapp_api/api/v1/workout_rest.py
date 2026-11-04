@@ -99,6 +99,7 @@ def _validate_source_set(set_row: UserWorkoutSet, exercise: UserWorkoutExercise)
         (set_row.set_kind or "working") != "working"
         or set_row.planned_role in ("warmup", "activation")
         or exercise.metric_type == "cardio"
+        or exercise.rest_seconds is None
         or exercise.rest_seconds <= 0
     ):
         raise HTTPException(status_code=422, detail="Отдых для этого подхода не предусмотрен")

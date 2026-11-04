@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.nutrition import NutritionTargetResponse
 from fitminiapp_api.schemas.user import BodyPriorityPreference, TrainingPreferencesResponse
@@ -364,10 +364,10 @@ class ProgramCoachingRule(BaseModel):
         "deload",
     ]
     scope: Literal["program", "block", "exercise"] = "program"
-    block_number: int | None = Field(default=None, ge=1, le=24)
+    block_number: int | None = Field(default=None, ge=1)
     exercise_id: int | None = Field(default=None, ge=1)
-    week_start: int | None = Field(default=None, ge=1, le=24)
-    week_end: int | None = Field(default=None, ge=1, le=24)
+    week_start: int | None = Field(default=None, ge=1)
+    week_end: int | None = Field(default=None, ge=1)
     rep_target: PrescriptionRepTarget | None = None
     load_target: PrescriptionLoadTarget | None = None
     effort_target: PrescriptionEffortTarget | None = None
@@ -439,6 +439,16 @@ class ProgramCoachingRule(BaseModel):
         return self
 
 
+class ProgramTemplateExerciseWeekResponse(BaseModel):
+    exercise_id: int = Field(ge=1)
+    week_number: int = Field(ge=1)
+    prescribed_sets: int = Field(ge=1, le=10)
+    prescribed_reps: str = Field(max_length=32)
+    prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
+    rest_seconds: int = Field(ge=0, le=600)
+    prescription: ExercisePrescriptionPlan | None = None
+
+
 class ProgramTemplateExerciseCreate(BaseModel):
     exercise_id: int = Field(ge=1)
     prescribed_sets: int | None = Field(default=None, ge=1, le=10)
@@ -452,6 +462,9 @@ class ProgramTemplateExerciseCreate(BaseModel):
     group_id: int | None = Field(default=None, ge=1)
     group_kind: PrescriptionGroupKind | None = None
     group_order: int | None = Field(default=None, ge=1, le=100)
+    weekly_prescriptions: list[ProgramTemplateExerciseWeekResponse] = Field(
+        default_factory=list, max_length=20000
+    )
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
@@ -508,6 +521,21 @@ class ProgramTemplateDayCreate(BaseModel):
         return self
 
 
+class ProgramWeekCycle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    length_weeks: int = Field(ge=1, strict=True)
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
+    repeat: bool = Field(strict=True)
+
+    @model_validator(mode="after")
+    def validate_week_types(self):
+        if self.week_types is not None and len(self.week_types) != self.length_weeks:
+            raise ValueError("week_types must contain one value per cycle week")
+        return self
+
+
 class ProgramTemplateCreate(BaseModel):
     title: str = Field(min_length=1, max_length=128)
     goal: ProgramRecommendationGoal
@@ -519,9 +547,10 @@ class ProgramTemplateCreate(BaseModel):
     expected_revision_number: int | None = Field(default=None, ge=0)
     assign_after_create: bool = True
     start_date: date | None = None
-    duration_weeks: int = Field(default=1, ge=1, le=24)
+    duration_weeks: int = Field(default=1, ge=1)
     schedule_weekdays: list[int] | None = Field(default=None, min_length=1, max_length=7)
     replace_active: bool = False
+    week_cycle: ProgramWeekCycle | None = None
 
     @model_validator(mode="after")
     def validate_assignment_schedule(self):
@@ -534,16 +563,6 @@ class ProgramTemplateCreate(BaseModel):
         if len(set(self.schedule_weekdays)) != len(self.schedule_weekdays):
             raise ValueError("schedule_weekdays must be unique")
         return self
-
-
-class ProgramTemplateExerciseWeekResponse(BaseModel):
-    exercise_id: int = Field(ge=1)
-    week_number: int = Field(ge=1, le=24)
-    prescribed_sets: int = Field(ge=1, le=10)
-    prescribed_reps: str = Field(max_length=32)
-    prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
-    rest_seconds: int = Field(ge=0, le=600)
-    prescription: ExercisePrescriptionPlan | None = None
 
 
 class ProgramTemplateExerciseResponse(BaseModel):
@@ -600,7 +619,7 @@ class ProgramTemplateResponse(BaseModel):
     assigned_program_updated: bool = False
     future_workouts_updated: int = Field(default=0, ge=0)
     assigned_program_revision_number: int | None = None
-    default_duration_weeks: int = Field(default=1, ge=1, le=24)
+    default_duration_weeks: int = Field(default=1, ge=1)
     provenance_type: ProgramProvenanceType = "CUSTOM"
     provenance: dict[str, object] | None = None
     program_metadata: dict[str, object] | None = None
@@ -772,6 +791,9 @@ class ProgramLifecycleResponse(BaseModel):
     is_active: bool
     start_date: date
     duration_weeks: int
+    schedule_mode: Literal["calendar", "rotation"] = "calendar"
+    rotation_current_title: str | None = None
+    rotation_status: str | None = None
     current_revision_number: int
     current_week_number: int | None = None
     current_block: ProgramLifecycleBlockSummary | None = None
@@ -889,9 +911,15 @@ class TrainingBlockMutationResponse(BaseModel):
 class CoachProgramExerciseCreate(BaseModel):
     expected_revision_number: int = Field(ge=0)
     effective_scope: Literal["next_workout", "current_block", "future_program"]
+    from_week: int | None = Field(default=None, ge=1, strict=True)
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    occurrence_weeks: list[Annotated[int, Field(strict=True, ge=1)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    skip_protected: bool = False
     effective_date: date | None = None
     exercise_id: int = Field(ge=1)
-    day_number: int | None = Field(default=None, ge=1, le=14)
+    day_number: int | None = Field(default=None, ge=1, le=2_147_483_647)
     prescribed_sets: int | None = Field(default=None, ge=1, le=10)
     prescribed_reps: str | None = Field(default=None, min_length=1, max_length=32)
     prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
@@ -904,10 +932,25 @@ class CoachProgramExerciseCreate(BaseModel):
     group_kind: PrescriptionGroupKind | None = None
     group_order: int | None = Field(default=None, ge=1, le=100)
     target_template_exercise_id: int | None = Field(default=None, ge=1)
+    target_assignment_slot_id: UUID4 | None = None
     reason: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
+        if (
+            self.target_template_exercise_id is not None
+            and self.target_assignment_slot_id is not None
+        ):
+            raise ValueError("Укажите только одну позицию упражнения")
+        if self.skip_protected and (
+            self.effective_scope != "future_program"
+            or (
+                self.occurrence_weeks is None
+                and self.source_cycle_week is None
+                and self.from_week is None
+            )
+        ):
+            raise ValueError("skip_protected requires an explicit future cycle scope")
         if self.effective_scope == "next_workout" and self.effective_date is not None:
             raise ValueError("effective_date cannot be combined with next_workout scope")
         if self.effective_scope == "current_block" and self.effective_date is not None:
@@ -949,7 +992,7 @@ class AssignTemplateRequest(BaseModel):
 
 class AssignmentScheduleRequest(BaseModel):
     start_date: date | None = None
-    duration_weeks: int = Field(default=1, ge=1, le=24)
+    duration_weeks: int = Field(default=1, ge=1)
     schedule_weekdays: list[int] | None = Field(default=None, min_length=1, max_length=7)
     replace_active: bool = False
 
@@ -963,6 +1006,87 @@ class AssignmentScheduleRequest(BaseModel):
         if len(set(weekdays)) != len(weekdays):
             raise ValueError("schedule_weekdays must be unique")
         return self
+
+
+class SessionRotationDay(BaseModel):
+    day_number: int
+    title: str
+    workout_id: int | None = None
+    status: str | None = None
+    from_template: bool = False
+    exercise_count: int | None = None
+    set_count: int | None = None
+    default_plan_week: int | None = None
+
+
+class SessionRotationSettingsRequest(BaseModel):
+    mode: Literal["calendar", "rotation"]
+    expected_revision_number: int = Field(ge=0)
+    first_day_number: int | None = Field(default=None, ge=1)
+    resume_calendar_week: int | None = Field(default=None, ge=1)
+    resume_calendar_day: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_first_day(self):
+        if (self.mode == "rotation") != (self.first_day_number is not None):
+            raise ValueError("Выберите первую тренировку для режима по очереди")
+        if (self.resume_calendar_week is None) != (self.resume_calendar_day is None):
+            raise ValueError("Выберите тренировку для возвращения к расписанию")
+        if self.mode == "rotation" and self.resume_calendar_week is not None:
+            raise ValueError("Выбор календарной тренировки доступен только для расписания")
+        return self
+
+
+class SessionRotationApplyRequest(SessionRotationSettingsRequest):
+    preview_token: str = Field(min_length=64, max_length=64)
+
+
+class SessionRotationExtendRequest(BaseModel):
+    expected_revision_number: int = Field(ge=0)
+    expected_cursor: str = Field(min_length=64, max_length=64)
+    duration_weeks: int = Field(ge=1, strict=True)
+    mutation_id: str = Field(min_length=16, max_length=64)
+
+
+class SessionRotationReminder(BaseModel):
+    workout_id: int
+    title: str
+    scheduled_date: date
+    status: str
+
+
+class SessionRotationCalendarOption(BaseModel):
+    week_number: int
+    day_number: int
+    scheduled_date: date
+    title: str
+
+
+class SessionRotationSupplementExercise(BaseModel):
+    title: str
+    prescribed_sets: int | None = None
+    prescribed_reps: str | None = None
+
+
+class SessionRotationSupplementPlan(BaseModel):
+    day_number: int
+    title: str
+    week_number: int
+    exercises: list[SessionRotationSupplementExercise]
+
+
+class SessionRotationSettingsResponse(BaseModel):
+    program_id: int
+    mode: Literal["calendar", "rotation"]
+    revision_number: int
+    days: list[SessionRotationDay]
+    first_day_number: int | None = None
+    future_reminders: int = 0
+    reminders: list[SessionRotationReminder] = Field(default_factory=list)
+    calendar_options: list[SessionRotationCalendarOption] = Field(default_factory=list)
+    calendar_resume: SessionRotationCalendarOption | None = None
+    template_plans: list[SessionRotationSupplementPlan] = Field(default_factory=list)
+    preview_token: str | None = None
 
 
 class AssignTemplateSelfRequest(AssignmentScheduleRequest):
@@ -1066,6 +1190,7 @@ class ExerciseCatalogItem(BaseModel):
     primary_muscle_ids: list[str]
     secondary_muscle_ids: list[str]
     equipment_ids: list[str]
+    required_equipment_ids: list[str] | None = None
     aliases: list[str] = Field(default_factory=list)
     movement_pattern: ExerciseMovementPattern | None = None
     machine_variant_tags: list[ExerciseMachineVariantTag] = Field(default_factory=list)
@@ -1123,3 +1248,187 @@ class ClientResponse(BaseModel):
     labels: list[str] = Field(default_factory=list, max_length=20)
     status: Literal["active", "pending"]
     operational_status: Literal["active", "paused", "archived"] = "active"
+
+
+class ProgramCycleRevisionRequest(BaseModel):
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    duration_weeks: int | None = Field(default=None, ge=1, strict=True)
+    source_week_order: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=20000
+    )
+    remove_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    copy_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    new_day_weekday: int | None = Field(default=None, ge=0, le=6, strict=True)
+    new_day_title: str | None = Field(default=None, min_length=1, max_length=128)
+    swap_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    swap_with_day_number: int | None = Field(default=None, ge=1, le=2_147_483_647, strict=True)
+    occurrence_weeks: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
+    repeat: bool | None = Field(default=None, strict=True)
+    reason: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_day_change(self):
+        day_change = any(
+            value is not None
+            for value in (
+                self.remove_day_number,
+                self.copy_day_number,
+                self.swap_day_number,
+            )
+        )
+        if self.occurrence_weeks is not None and self.source_cycle_week is not None:
+            raise ValueError("Выберите отдельные недели или повторение исходной недели")
+        if (
+            self.occurrence_weeks is not None or self.source_cycle_week is not None
+        ) and not day_change:
+            raise ValueError("Область недель применяется только к изменению дней")
+        if (
+            self.occurrence_weeks is not None
+            and min(self.occurrence_weeks) != self.effective_from_week
+        ):
+            raise ValueError("Начало области должно совпадать с первой выбранной неделей")
+        if day_change and (
+            self.source_week_order is not None
+            or self.repeat is not None
+            or self.duration_weeks is not None
+            or "week_types" in self.model_fields_set
+        ):
+            raise ValueError("Изменение дней нужно проверять отдельно от изменения цикла")
+        if (self.swap_day_number is None) != (self.swap_with_day_number is None):
+            raise ValueError("Укажите оба тренировочных дня")
+        if self.swap_day_number is not None and (
+            self.swap_day_number == self.swap_with_day_number
+            or self.remove_day_number is not None
+            or self.copy_day_number is not None
+            or self.source_week_order is not None
+            or self.repeat is not None
+            or self.duration_weeks is not None
+            or "week_types" in self.model_fields_set
+        ):
+            raise ValueError("Перестановку дней нужно проверять отдельно")
+        if self.copy_day_number is None:
+            if self.new_day_weekday is not None or self.new_day_title is not None:
+                raise ValueError("Укажите исходный день для копирования")
+        elif (
+            self.remove_day_number is not None
+            or self.new_day_weekday is None
+            or not self.new_day_title
+            or not self.new_day_title.strip()
+        ):
+            raise ValueError("Укажите название и день недели новой тренировки")
+        return self
+
+
+class ProgramCycleRevisionPreviewRequest(ProgramCycleRevisionRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    offset: int = Field(default=0, ge=0)
+
+
+class ProgramWeekTypeRevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    week_type: Literal["light", "medium", "heavy"] | None
+    occurrence_weeks: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    from_week: int | None = Field(default=None, ge=1, strict=True)
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if (self.occurrence_weeks is None) == (self.from_week is None):
+            raise ValueError("Выберите недели или начало повторения")
+        if self.occurrence_weeks is not None and self.source_cycle_week is not None:
+            raise ValueError("Нельзя совмещать отдельные недели и повторение")
+        return self
+
+
+class ProgramCycleImpactPreviewRequest(BaseModel):
+    """Read-only impact view; unlike a week-type mutation it may cover all future weeks."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    week_type: Literal["light", "medium", "heavy"] | None = None
+    occurrence_weeks: list[Annotated[int, Field(ge=1, strict=True)]] | None = Field(
+        default=None, min_length=1, max_length=100
+    )
+    from_week: int | None = Field(default=None, ge=1, strict=True)
+    source_cycle_week: int | None = Field(default=None, ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if (self.occurrence_weeks is None) == (self.from_week is None):
+            raise ValueError("Выберите недели или начало будущей области")
+        if self.occurrence_weeks is not None and self.source_cycle_week is not None:
+            raise ValueError("Нельзя совмещать отдельные недели и повторение")
+        return self
+
+
+class ProgramCycleStructureRequest(ProgramCycleImpactPreviewRequest):
+    operation: Literal["add_exercise", "remove_exercise", "move_earlier", "move_later"]
+    day_number: int = Field(ge=1, le=2_147_483_647, strict=True)
+    target_template_exercise_id: int | None = Field(default=None, ge=1, strict=True)
+    target_assignment_slot_id: UUID4 | None = None
+    assignment_slot_id: UUID4 | None = None
+    exercise: ProgramTemplateExerciseCreate | None = None
+
+    @model_validator(mode="after")
+    def validate_structure_operation(self):
+        if self.operation == "add_exercise":
+            if (
+                self.assignment_slot_id is None
+                or self.exercise is None
+                or self.target_template_exercise_id is not None
+                or self.target_assignment_slot_id is not None
+            ):
+                raise ValueError("Укажите новое упражнение и его позицию")
+            if (
+                self.exercise.weekly_prescriptions
+                or self.exercise.group_id is not None
+                or self.exercise.superset_group is not None
+            ):
+                raise ValueError("Новое упражнение нельзя добавлять в группу без её настройки")
+        elif (
+            (self.target_template_exercise_id is None) == (self.target_assignment_slot_id is None)
+            or self.assignment_slot_id is not None
+            or self.exercise is not None
+        ):
+            raise ValueError("Укажите одну исходную позицию упражнения")
+        return self
+
+
+class ProgramCycleDisableRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+
+class ProgramCycleDurationPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    duration_weeks: int = Field(ge=1, strict=True)
+    offset: int = Field(default=0, ge=0)
+
+
+class ProgramCycleEnableRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision_number: int = Field(ge=0)
+    effective_from_week: int = Field(ge=1, strict=True)
+    duration_weeks: int = Field(ge=1, strict=True)
+    week_cycle: ProgramWeekCycle
+    offset: int = Field(default=0, ge=0)

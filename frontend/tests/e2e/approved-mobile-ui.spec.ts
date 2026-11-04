@@ -361,14 +361,16 @@ test('approved B mobile picker preserves editor draft and supports keyboard sear
     programHistory: 'many',
     longExerciseName: true,
   });
-  await page.goto('/app?section=programs&view=manage&start=templates');
-  await expect(page.locator('.program-current-block h4')).toBeVisible();
+  await page.goto('/app?section=programs&view=manage');
+  await expect(page.getByRole('heading', { name: 'Центр управления' })).toBeVisible();
   await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
   const editor = page.locator('.program-editor-modal');
   const title = editor.getByLabel('Название', { exact: true });
   await title.fill('Мой сохранённый черновик');
   await editor.getByRole('button', { name: 'Добавить упражнение', exact: true }).click();
-  const picker = editor.getByRole('button', { name: 'Поиск упражнения', exact: true });
+  const picker = page
+    .getByRole('dialog', { name: 'Параметры упражнения' })
+    .getByRole('button', { name: 'Поиск упражнения', exact: true });
   await picker.click();
   const dialog = page.getByRole('dialog', { name: 'Выбор упражнения', exact: true });
   const search = dialog.getByRole('searchbox');

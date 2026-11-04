@@ -126,7 +126,11 @@ export function QuickAddSheet({
       // Modal cleanup runs before the background inert state is fully released.
       // Restore keyboard focus on the next frame, after the close commit.
       window.requestAnimationFrame(() => {
-        if (trigger?.isConnected && !trigger.closest('[inert]')) {
+        if (
+          trigger?.isConnected &&
+          !trigger.closest('[inert]') &&
+          (document.activeElement === document.body || document.activeElement === trigger)
+        ) {
           trigger.focus({ preventScroll: true });
         }
       });

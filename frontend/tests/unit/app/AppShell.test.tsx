@@ -1,4 +1,6 @@
+import { useContext } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QuickAddPlacementContext } from '../../../src/app/QuickAddPlacementContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../../../src/app/AppShell';
 import { PRODUCT_EVENT_NAME } from '../../../src/shared/analytics/productEvents';
@@ -221,6 +223,142 @@ describe('AppShell', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
+  });
+
+  it('places the existing quick-add action in the progress slot and returns focus after closing', async () => {
+    stubViewport(1280);
+    navigation.path = '/app';
+    function ProgressSlot() {
+      const setTarget = useContext(QuickAddPlacementContext);
+      return <div data-testid="progress-quick-add-slot" ref={setTarget ?? undefined} />;
+    }
+    render(
+      <AppShell section="progress">
+        <ProgressSlot />
+      </AppShell>,
+    );
+    const slot = screen.getByTestId('progress-quick-add-slot');
+    const add = within(slot).getByRole('button', { name: 'Быстро добавить' });
+    expect(screen.getAllByRole('button', { name: 'Быстро добавить' })).toHaveLength(1);
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Что добавить?' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(add).toHaveFocus());
+  });
+
+  it('keeps a focused quick-add trigger when the progress slot appears after loading', async () => {
+    stubViewport(1280);
+    navigation.path = '/app';
+    function ProgressSlot() {
+      const setTarget = useContext(QuickAddPlacementContext);
+      return <div data-testid="progress-quick-add-slot" ref={setTarget ?? undefined} />;
+    }
+    const view = render(<AppShell section="progress">Загрузка</AppShell>);
+    const add = screen.getByRole('button', { name: 'Быстро добавить' });
+    add.focus();
+    view.rerender(
+      <AppShell section="progress">
+        <ProgressSlot />
+      </AppShell>,
+    );
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('progress-quick-add-slot')).getByRole('button', {
+          name: 'Быстро добавить',
+        }),
+      ).toBe(add),
+    );
+    expect(add).toHaveFocus();
+  });
+
+  it('keeps focus when a loaded progress slot is removed', async () => {
+    stubViewport(1280);
+    navigation.path = '/app';
+    function ProgressSlot() {
+      const setTarget = useContext(QuickAddPlacementContext);
+      return <div data-testid="progress-quick-add-slot" ref={setTarget ?? undefined} />;
+    }
+    const view = render(
+      <AppShell section="progress">
+        <ProgressSlot />
+      </AppShell>,
+    );
+    const add = within(screen.getByTestId('progress-quick-add-slot')).getByRole('button', {
+      name: 'Быстро добавить',
+    });
+    add.focus();
+    view.rerender(<AppShell section="progress">Загрузка</AppShell>);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Быстро добавить' })).toBe(add));
+    expect(add).toHaveFocus();
+  });
+
+  it('returns focus when the progress slot appears while quick add is open', async () => {
+    stubViewport(1280);
+    navigation.path = '/app';
+    function ProgressSlot() {
+      const setTarget = useContext(QuickAddPlacementContext);
+      return <div data-testid="progress-quick-add-slot" ref={setTarget ?? undefined} />;
+    }
+    const view = render(<AppShell section="progress">Загрузка</AppShell>);
+    const add = screen.getByRole('button', { name: 'Быстро добавить' });
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Что добавить?' })).toBeInTheDocument();
+    view.rerender(
+      <AppShell section="progress">
+        <ProgressSlot />
+      </AppShell>,
+    );
+    expect(document.querySelector('[data-testid="quick-add-trigger"]')).toBe(add);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(add).toHaveFocus());
+  });
+
+  it('keeps quick add in the mobile dock on resize and restores the floating trigger outside progress', async () => {
+    const resize = stubViewport(1280);
+    navigation.path = '/app';
+    function ProgressSlot() {
+      const setTarget = useContext(QuickAddPlacementContext);
+      return <div data-testid="progress-quick-add-slot" ref={setTarget ?? undefined} />;
+    }
+    const view = render(
+      <AppShell section="progress">
+        <ProgressSlot />
+      </AppShell>,
+    );
+    expect(
+      within(screen.getByTestId('progress-quick-add-slot')).getByRole('button', {
+        name: 'Быстро добавить',
+      }),
+    ).toBeInTheDocument();
+    resize(390);
+    await waitFor(() =>
+      expect(
+        within(document.querySelector('.app-bottom-nav__primary') as HTMLElement).getByRole(
+          'button',
+          { name: 'Быстро добавить' },
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      within(screen.getByTestId('progress-quick-add-slot')).queryByRole('button', {
+        name: 'Быстро добавить',
+      }),
+    ).not.toBeInTheDocument();
+    resize(1280);
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('progress-quick-add-slot')).getByRole('button', {
+          name: 'Быстро добавить',
+        }),
+      ).toBeInTheDocument(),
+    );
+    view.rerender(<AppShell section="today">Сегодня</AppShell>);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Быстро добавить' })).toHaveClass(
+        'app-quick-add-trigger--floating',
+      ),
+    );
+    expect(screen.getAllByRole('button', { name: 'Быстро добавить' })).toHaveLength(1);
   });
 
   it('встраивает добавление пятым действием мобильного dock и возвращает на него фокус', () => {

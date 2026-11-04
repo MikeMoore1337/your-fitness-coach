@@ -322,7 +322,7 @@ test('Task 294 keeps Progress desktop hierarchy and Profile disclosures readable
     await openApp(page, 'profile');
     await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
     const profileSections = page.locator('.profile-settings > details.card-disclosure');
-    await expect(profileSections).toHaveCount(5);
+    await expect(profileSections).toHaveCount(6);
     const summaryHeights = await profileSections
       .locator(':scope > summary')
       .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
@@ -469,7 +469,7 @@ test('Task 294 keeps Profile disclosures and approved Progress navigation access
   await openApp(page, 'profile');
   await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
   const profileSections = page.locator('.profile-settings > details.card-disclosure');
-  await expect(profileSections).toHaveCount(5);
+  await expect(profileSections).toHaveCount(6);
   const profileSummary = profileSections.first().locator(':scope > summary');
   await profileSummary.focus();
   await expect(profileSummary).toBeFocused();

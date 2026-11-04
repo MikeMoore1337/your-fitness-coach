@@ -15,9 +15,9 @@ if (process.env.PW_API_SERVER === 'true') {
 }
 if (!process.env.PW_EXTERNAL_SERVER) {
   webServers.push({
-    command: `node ./node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${previewPort}`,
+    command: `node ./node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${previewPort} --strictPort`,
     url: `http://127.0.0.1:${previewPort}/app`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   });
 }
 

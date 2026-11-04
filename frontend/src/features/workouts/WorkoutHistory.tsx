@@ -8,6 +8,7 @@ import type {
 } from '../../shared/api/types';
 import {
   Badge,
+  Button,
   Card,
   DisclosureIcon,
   EmptyState,
@@ -21,6 +22,10 @@ import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
+import { WorkoutCopyButton } from './WorkoutCopyButton';
+import { ExerciseNoteHistory } from './ExerciseNoteHistory';
+import { WorkoutHistoryImport } from './WorkoutHistoryImport';
+import { formatWorkoutSides } from './workoutSideDisplay';
 
 interface RestHistoryEntry {
   id: number;
@@ -87,6 +92,7 @@ export function WorkoutHistory({
   onWorkoutSelect,
   readOnly = false,
   timeZone,
+  userId,
 }: {
   compact?: boolean;
   focusedWorkoutId?: number | null;
@@ -95,10 +101,12 @@ export function WorkoutHistory({
   onWorkoutSelect?: (workoutId: number, target: WorkoutNavigationTarget) => void;
   readOnly?: boolean;
   timeZone?: string | null;
+  userId?: number;
 }) {
   const queryClient = useQueryClient();
   const { confirm, toast } = useFeedback();
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const week = useQuery({
     queryKey: ['workout', 'week'],
     queryFn: () => api<WorkoutScheduleItem[]>('/api/v1/workouts/week'),
@@ -210,12 +218,24 @@ export function WorkoutHistory({
       )}
       <Card
         className="workout-history-card"
-        collapsible={!compact || Boolean(focusedWorkoutId)}
+        collapsible={!importOpen && (!compact || Boolean(focusedWorkoutId))}
         defaultOpen={Boolean(focusedWorkoutId)}
         key={focusedWorkoutId ?? 'history'}
-        title="История"
+        title={importOpen ? undefined : 'История'}
+        actions={
+          !importOpen && !readOnly ? (
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              Импортировать историю
+            </Button>
+          ) : undefined
+        }
       >
-        {history.isLoading || summary.isLoading ? (
+        {!importOpen && !readOnly && (
+          <p className="muted">Добавьте выполненные тренировки из подготовленного файла.</p>
+        )}
+        {importOpen ? (
+          <WorkoutHistoryImport onClose={() => setImportOpen(false)} />
+        ) : history.isLoading || summary.isLoading ? (
           <LoadingState />
         ) : history.error || summary.error ? (
           <ErrorState message={((history.error || summary.error) as Error).message} />
@@ -234,7 +254,11 @@ export function WorkoutHistory({
               </div>
               <div className="metric">
                 <span>Объём</span>
-                <strong>{Math.round(summary.data?.volume_kg ?? 0)} кг</strong>
+                <strong>
+                  {summary.data?.volume_incomplete
+                    ? 'Указан не полностью'
+                    : `${Math.round(summary.data?.volume_kg ?? 0)} кг`}
+                </strong>
               </div>
             </div>
             <div className="list-grid top-gap">
@@ -253,16 +277,29 @@ export function WorkoutHistory({
                     </p>
                     <div className="workout-history__exercises" aria-label="Выполненные упражнения">
                       {item.exercises.map((exercise) => (
-                        <button
-                          type="button"
-                          className="text-button"
-                          key={exercise.workout_exercise_id}
-                          onClick={() =>
-                            setGuide({ id: exercise.exercise_id, title: exercise.title })
-                          }
-                        >
-                          {exercise.title}
-                        </button>
+                        <div key={exercise.workout_exercise_id}>
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() =>
+                              setGuide({ id: exercise.exercise_id, title: exercise.title })
+                            }
+                          >
+                            {exercise.title}
+                          </button>
+                          {exercise.side_sets?.map((set) => (
+                            <p className="workout-history__side-set" key={set.set_number}>
+                              Подход {set.set_number}
+                              {set.is_completed ? '' : ' · не завершён'} ·{' '}
+                              {set.execution_mode === 'alternating' ? 'поочерёдно' : 'по сторонам'}
+                              {set.first_side
+                                ? ` · первая: ${set.first_side === 'left' ? 'левая' : 'правая'}`
+                                : ''}
+                              <br />
+                              {formatWorkoutSides(set.sides)}
+                            </p>
+                          ))}
+                        </div>
                       ))}
                     </div>
                     <RestHistory
@@ -271,13 +308,19 @@ export function WorkoutHistory({
                           .rest_sessions
                       }
                     />
+                    {!readOnly && userId && !item.is_imported && (
+                      <ExerciseNoteHistory key={userId} userId={userId} workoutId={item.id} />
+                    )}
                     {item.adaptations.map((adaptation) => (
                       <p className="workout-history__adaptation" key={adaptation.id}>
                         Изменено перед тренировкой: {adaptationReasonLabels[adaptation.reason]}
                       </p>
                     ))}
+                    {!readOnly && !item.is_imported && (
+                      <WorkoutCopyButton workoutId={item.id} workoutTitle={item.title} />
+                    )}
                     {(item.completion_feedback || item.completion_note) && (
-                      <div className="workout-completion-context">
+                      <div className={`workout-completion-context${readOnly ? '' : ' top-gap'}`}>
                         {item.completion_feedback && (
                           <strong>
                             Самооценка: {workoutCompletionFeedbackLabels[item.completion_feedback]}
@@ -287,20 +330,24 @@ export function WorkoutHistory({
                       </div>
                     )}
                   </div>
-                  <strong>{item.volume_kg} кг</strong>
-                  <WorkoutFeedbackDisclosure
-                    workoutId={item.id}
-                    workoutTitle={item.title}
-                    workoutDate={item.scheduled_date}
-                    exercises={item.exercises.map((exercise) => ({
-                      workoutExerciseId: exercise.workout_exercise_id,
-                      title: exercise.title,
-                    }))}
-                    viewer="client"
-                    focusedCommentId={focusedWorkoutId === item.id ? focusedCommentId : null}
-                    focusedExerciseId={focusedWorkoutId === item.id ? focusedExerciseId : null}
-                    defaultOpen={focusedWorkoutId === item.id && Boolean(focusedCommentId)}
-                  />
+                  <strong>
+                    {item.volume_incomplete ? 'Объём указан не полностью' : `${item.volume_kg} кг`}
+                  </strong>
+                  {!item.is_imported && (
+                    <WorkoutFeedbackDisclosure
+                      workoutId={item.id}
+                      workoutTitle={item.title}
+                      workoutDate={item.scheduled_date}
+                      exercises={item.exercises.map((exercise) => ({
+                        workoutExerciseId: exercise.workout_exercise_id,
+                        title: exercise.title,
+                      }))}
+                      viewer="client"
+                      focusedCommentId={focusedWorkoutId === item.id ? focusedCommentId : null}
+                      focusedExerciseId={focusedWorkoutId === item.id ? focusedExerciseId : null}
+                      defaultOpen={focusedWorkoutId === item.id && Boolean(focusedCommentId)}
+                    />
+                  )}
                 </article>
               ))}
             </div>

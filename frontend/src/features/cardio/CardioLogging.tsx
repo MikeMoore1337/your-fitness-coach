@@ -629,27 +629,29 @@ function SessionList({
                   Действия с записью
                   <DisclosureIcon />
                 </summary>
-                <Button onClick={() => setEditing(session)} type="button" variant="secondary">
-                  Изменить
-                </Button>
-                <Button
-                  disabled={remove.isPending}
-                  onClick={async () => {
-                    if (
-                      await confirm({
-                        title: 'Удалить кардио-запись?',
-                        message: `${activityLabels[session.activity_type]}, ${formatSessionDate(session.scheduled_at)}. Запись будет удалена безвозвратно.`,
-                        confirmText: 'Удалить',
-                      })
-                    ) {
-                      remove.mutate(session.id);
-                    }
-                  }}
-                  type="button"
-                  variant="danger"
-                >
-                  Удалить
-                </Button>
+                <div className="cardio-session-row__menu-actions">
+                  <Button onClick={() => setEditing(session)} type="button" variant="secondary">
+                    Изменить
+                  </Button>
+                  <Button
+                    disabled={remove.isPending}
+                    onClick={async () => {
+                      if (
+                        await confirm({
+                          title: 'Удалить кардио-запись?',
+                          message: `${activityLabels[session.activity_type]}, ${formatSessionDate(session.scheduled_at)}. Запись будет удалена безвозвратно.`,
+                          confirmText: 'Удалить',
+                        })
+                      ) {
+                        remove.mutate(session.id);
+                      }
+                    }}
+                    type="button"
+                    variant="danger"
+                  >
+                    Удалить
+                  </Button>
+                </div>
               </details>
             </div>
           </article>

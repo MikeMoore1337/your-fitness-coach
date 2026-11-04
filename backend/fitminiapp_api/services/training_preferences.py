@@ -159,12 +159,16 @@ def _editor_payload(db: Session, owner: User, editor_id: int | None) -> dict | N
 
 
 def _estimated_minutes(items: list[UserWorkoutExercise]) -> int:
-    seconds = sum(
-        item.prescribed_sets * ACTIVE_SECONDS_PER_SET
-        + max(item.prescribed_sets - 1, 0) * item.rest_seconds
-        + TRANSITION_SECONDS_PER_EXERCISE
-        for item in items
-    )
+    seconds = 0
+    for item in items:
+        sets, rest = item.prescribed_sets, item.rest_seconds
+        if sets is None or rest is None:
+            raise ValueError("Missing planned exercise parameters")
+        seconds += (
+            sets * ACTIVE_SECONDS_PER_SET
+            + max(sets - 1, 0) * rest
+            + TRANSITION_SECONDS_PER_EXERCISE
+        )
     return math.ceil(seconds / 60) if seconds else 0
 
 
@@ -191,7 +195,11 @@ def build_training_preferences_conflict(db: Session, owner: User, profile: UserP
 
     reasons: list[str] = []
     preferred_weekdays = set(profile.preferred_training_weekdays or [])
-    if preferred_weekdays and not set(program.schedule_weekdays or []).issubset(preferred_weekdays):
+    if (
+        program.schedule_mode == "calendar"
+        and preferred_weekdays
+        and not set(program.schedule_weekdays or []).issubset(preferred_weekdays)
+    ):
         reasons.append("Расписание активной программы не совпадает с выбранными днями.")
 
     workouts = (

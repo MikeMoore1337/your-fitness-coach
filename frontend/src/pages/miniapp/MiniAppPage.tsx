@@ -27,6 +27,11 @@ import '../../styles/pulse-concepts.css';
 import '../../styles/semantic-cards.css';
 import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { positiveIntegerParam } from '../../shared/navigation/routeParams';
+import { useExerciseNoteSync } from '../../features/workouts/useExerciseNoteSync';
+import {
+  ActiveWorkoutSyncNotice,
+  ActiveWorkoutSyncProvider,
+} from '../../features/workouts/ActiveWorkoutSync';
 
 const NotificationsPanel = lazy(() =>
   import('../../features/account/NotificationsPanel').then((module) => ({
@@ -64,6 +69,11 @@ const TrainerCapabilityCard = lazy(() =>
 const ProfileForm = lazy(() =>
   import('../../features/profile/ProfileForm').then((module) => ({
     default: module.ProfileForm,
+  })),
+);
+const EquipmentProfilesWorkspace = lazy(() =>
+  import('../../features/equipment/EquipmentProfiles').then((module) => ({
+    default: module.EquipmentProfilesWorkspace,
   })),
 );
 const ProgramBuilder = lazy(() =>
@@ -115,6 +125,16 @@ const sections: ReadonlyArray<AppSection> = [
   'nutrition',
   'profile',
 ];
+const sectionHero: Partial<Record<AppSection, { title: string; description: string }>> = {
+  profile: {
+    title: 'Профиль и настройки',
+    description: 'Личные данные, связи, уведомления и безопасность аккаунта.',
+  },
+  programs: {
+    title: 'План',
+    description: 'Активная программа, ближайшие тренировки и управление планом.',
+  },
+};
 
 const PROFILE_HASH_TARGETS = new Set([
   'profile-personal',
@@ -163,9 +183,9 @@ function requestedWellbeingDate(search: string): string | undefined {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
 }
 
-function requestedProgramStart(search: string): 'create' | 'templates' | null {
+function requestedProgramStart(search: string): 'create' | 'templates' | 'generator' | null {
   const value = new URLSearchParams(search).get('start');
-  return value === 'create' || value === 'templates' ? value : null;
+  return value === 'create' || value === 'templates' || value === 'generator' ? value : null;
 }
 
 function requestedProgramView(search: string): 'summary' | 'manage' {
@@ -244,6 +264,7 @@ export default function MiniAppPage({
 } = {}) {
   const { user, reloadUser } = useAuth();
   const runtime = useRuntime();
+  useExerciseNoteSync(user?.id, runtime.kind === 'production');
   const capabilities = useRuntimeCapabilities();
   const { hash, navigate, search } = useNavigation();
   const { toast } = useFeedback();
@@ -257,6 +278,10 @@ export default function MiniAppPage({
       : 'today';
   });
   const section = sectionOverride ?? requestedSection(search) ?? fallbackSection;
+  const equipmentProfilesView =
+    section === 'profile' &&
+    capabilities.canMutateProfile &&
+    new URLSearchParams(search).get('view') === 'equipment';
   const exerciseSlug = section === 'catalog' ? requestedExerciseSlug(search) : null;
   const aiCoachStatus = useAiCoachStatus(section === 'profile');
   const nutritionDate = requestedNutritionDate(search);
@@ -393,6 +418,13 @@ export default function MiniAppPage({
     return () => observer.disconnect();
   }, [hash, navigate, search, section]);
 
+  const showSectionHero =
+    !['today', 'progress', 'nutrition'].includes(section) && !equipmentProfilesView;
+  const showProfileSettings = section === 'profile' && !equipmentProfilesView;
+  const heroTitle =
+    sectionHero[section]?.title ?? (user?.profile?.full_name || user?.first_name || 'Мой фитнес');
+  const heroDescription =
+    sectionHero[section]?.description ?? 'Тренировки, питание и прогресс в одном месте.';
   const content = (
     <div
       className={`page-stack app-section app-section--${section} app-section--design-v2`}
@@ -402,24 +434,13 @@ export default function MiniAppPage({
       data-motion-surface={section === 'progress' ? 'progress' : undefined}
       onAnimationEnd={sectionMotion.onMotionAnimationEnd}
     >
-      {section !== 'today' && section !== 'progress' && section !== 'nutrition' && (
+      {section !== 'today' && <ActiveWorkoutSyncNotice />}
+      {showSectionHero && (
         <header className="card hero-card">
           <div>
             <span className="eyebrow">Your Fitness Coach</span>
-            <h1>
-              {section === 'profile'
-                ? 'Профиль и настройки'
-                : section === 'programs'
-                  ? 'План'
-                  : user?.profile?.full_name || user?.first_name || 'Мой фитнес'}
-            </h1>
-            <p className="muted">
-              {section === 'profile'
-                ? 'Личные данные, связи, уведомления и безопасность аккаунта.'
-                : section === 'programs'
-                  ? 'Активная программа, ближайшие тренировки и управление планом.'
-                  : 'Тренировки, питание и прогресс в одном месте.'}
-            </p>
+            <h1>{heroTitle}</h1>
+            <p className="muted">{heroDescription}</p>
           </div>
         </header>
       )}
@@ -496,6 +517,7 @@ export default function MiniAppPage({
                     ) : progressView === 'history' ? (
                       <WorkoutHistory
                         compact
+                        userId={user?.id}
                         readOnly={!capabilities.canMutateProgress}
                         timeZone={user?.profile?.timezone}
                         focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
@@ -524,15 +546,11 @@ export default function MiniAppPage({
                   )}
                   {programManagementOpen ? (
                     <TemplatesList
-                      key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
                       defaultLibraryOpen={programStart === 'templates'}
                       mode="full"
                       readOnly={!capabilities.canMutatePrograms}
                     >
-                      <ProgramBuilder
-                        key={programStart === 'create' ? 'create-start' : 'create-default'}
-                        defaultOpen={programStart === 'create'}
-                      />
+                      <ProgramBuilder defaultOpen={programStart === 'create'} />
                     </TemplatesList>
                   ) : (
                     <>
@@ -577,7 +595,12 @@ export default function MiniAppPage({
               onSaved={async () => void (await reloadUser())}
             />
           )}
-          {section === 'profile' && (
+          {equipmentProfilesView && (
+            <fieldset className="profile-settings-fieldset" disabled={runtime.kind === 'demo'}>
+              <EquipmentProfilesWorkspace />
+            </fieldset>
+          )}
+          {showProfileSettings && (
             <fieldset className="profile-settings-fieldset" disabled={runtime.kind === 'demo'}>
               <div className="profile-settings">
                 {runtime.kind === 'demo' && (
@@ -670,11 +693,15 @@ export default function MiniAppPage({
       </section>
     </div>
   );
-  return renderShell ? (
-    <AppShell demo={demo} section={section}>
-      {content}
-    </AppShell>
-  ) : (
-    content
+  return (
+    <ActiveWorkoutSyncProvider userId={user?.id} enabled={runtime.kind === 'production'}>
+      {renderShell ? (
+        <AppShell demo={demo} section={section}>
+          {content}
+        </AppShell>
+      ) : (
+        content
+      )}
+    </ActiveWorkoutSyncProvider>
   );
 }

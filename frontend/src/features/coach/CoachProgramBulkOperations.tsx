@@ -98,12 +98,16 @@ function proposalClass(candidate: ProposalCandidate): string {
   const { exercise, proposal } = candidate;
   return stableJson({
     exerciseId: exercise.exercise_id,
+    rulesetVersion: exercise.guidance.ruleset_version,
+    weekType: exercise.guidance.evidence.week_type ?? null,
     loadUnit: candidate.loadUnit,
     ruleKind: proposal.rule_kind,
     ruleSnapshot: proposal.rule_snapshot,
     action: proposal.proposed_action,
     currentWeight: proposal.current_weight,
     proposedWeight: proposal.proposed_weight,
+    sideExecutionMode: proposal.side_execution_mode,
+    proposedSideWeights: proposal.proposed_side_weights,
     deloadVolumePercent: proposal.deload_volume_percent,
     deloadIntensityPercent: proposal.deload_intensity_percent,
     reasonCodes: [...proposal.reason_codes].sort(),
@@ -112,12 +116,16 @@ function proposalClass(candidate: ProposalCandidate): string {
       plannedRole: item.planned_role,
       currentWeight: item.current_weight,
       proposedWeight: item.proposed_weight,
+      proposedSideWeights: item.proposed_side_weights,
       relativeToTop: item.relative_to_top,
     })),
   });
 }
 
 function proposalActionLabel(proposal: Proposal, unit: 'kg' | 'lb'): string {
+  if (proposal.proposed_action === 'set_load' && proposal.proposed_side_weights) {
+    return `левая ${proposal.proposed_side_weights.left}, правая ${proposal.proposed_side_weights.right} ${unit === 'kg' ? 'кг' : 'фунт'}`;
+  }
   if (proposal.proposed_action === 'set_load' && proposal.proposed_weight != null) {
     return `нагрузка ${proposal.proposed_weight} ${unit === 'kg' ? 'кг' : 'фунт'}`;
   }
@@ -951,10 +959,11 @@ export function CoachProgramBulkOperations({
                   <ul>
                     {group.map((candidate) => (
                       <li key={candidate.proposal.proposal_id}>
-                        {candidate.target.clientName} · {candidate.proposal.current_weight ?? '—'} →{' '}
-                        {candidate.proposal.proposed_weight ?? '—'}{' '}
-                        {candidate.loadUnit === 'kg' ? 'кг' : 'фунт'} · тренировка на{' '}
-                        {formatDate(candidate.scheduledDate)}
+                        {candidate.target.clientName} ·{' '}
+                        {candidate.proposal.proposed_side_weights
+                          ? proposalActionLabel(candidate.proposal, candidate.loadUnit)
+                          : `${candidate.proposal.current_weight ?? '—'} → ${candidate.proposal.proposed_weight ?? '—'} ${candidate.loadUnit === 'kg' ? 'кг' : 'фунт'}`}{' '}
+                        · тренировка на {formatDate(candidate.scheduledDate)}
                       </li>
                     ))}
                   </ul>

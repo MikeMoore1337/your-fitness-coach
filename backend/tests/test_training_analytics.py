@@ -364,6 +364,83 @@ def test_training_analytics_handles_empty_data_and_trainer_isolation(client) -> 
     assert revoked.status_code == 404
 
 
+def test_training_analytics_keeps_mixed_roles_and_distinct_sessions_factual(client) -> None:
+    headers = _auth(client, 27_301)
+    user_id = _user_id(27_301)
+    with get_session_context() as db:
+        bench = db.query(Exercise).filter(Exercise.slug == "bench-press").one()
+        pushdown = db.query(Exercise).filter(Exercise.slug == "rope-pushdown").one()
+        calf = db.query(Exercise).filter(Exercise.slug == "standing-calf-raise").one()
+        unmapped = Exercise(
+            slug="analytics-mixed-role-unmapped",
+            title="Упражнение без мышечных связей",
+            created_by_user_id=user_id,
+        )
+        db.add(unmapped)
+        db.flush()
+        program = _program(db, user_id)
+        workout = _add_exercise_session(
+            db, program, bench.id, days_ago=1, sets=[(10, 20, "2", True)] * 3
+        )
+        for sort_order, exercise in enumerate((pushdown, unmapped), start=2):
+            item = UserWorkoutExercise(
+                workout_id=workout.id,
+                exercise_id=exercise.id,
+                sort_order=sort_order,
+                prescribed_sets=2,
+                prescribed_reps="8-12",
+                rest_seconds=60,
+            )
+            db.add(item)
+            db.flush()
+            db.add_all(
+                UserWorkoutSet(
+                    workout_exercise_id=item.id,
+                    set_number=set_number,
+                    actual_reps=10,
+                    actual_weight=20,
+                    is_completed=True,
+                )
+                for set_number in (1, 2)
+            )
+        _add_exercise_session(db, program, calf.id, days_ago=10, sets=[(10, 20, "2", True)])
+
+    response = client.get(
+        "/api/v1/workouts/progress/training-analytics?period_days=7", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    workload = {item["muscle_id"]: item for item in payload["muscle_group_workload"]}
+    assert payload["completed_set_count"] == 7
+    assert payload["completed_sets_without_muscle_metadata"] == 2
+    assert payload["completed_workout_count"] == 1
+    assert payload["frequency_per_week"] == 1.0
+    assert (
+        sum(
+            item["current"]["completed_set_count"]
+            for item in workload.values()
+            if item["current"] is not None
+        )
+        > payload["completed_set_count"]
+    )
+    triceps = workload["triceps"]
+    assert triceps["current"] == {
+        "completed_set_count": 5,
+        "primary_completed_set_count": 2,
+        "secondary_completed_set_count": 3,
+        "completed_session_count": 1,
+        "frequency_per_week": 1.0,
+    }
+    assert triceps["previous"] is None
+    assert triceps["completed_set_count_change"] is None
+    assert triceps["frequency_per_week_change"] is None
+    assert triceps["trend"] == "no_comparable_data"
+    assert workload["calves"]["current"] is None
+    assert workload["calves"]["previous"]["completed_set_count"] == 1
+    assert workload["calves"]["completed_set_count_change"] is None
+    assert workload["calves"]["trend"] == "no_comparable_data"
+
+
 def test_training_analytics_bounds_long_history_with_constant_query_count(client) -> None:
     _auth(client, 27_201)
     user_id = _user_id(27_201)

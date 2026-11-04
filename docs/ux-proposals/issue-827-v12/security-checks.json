@@ -1,0 +1,195 @@
+{
+  "scope": "prototype URL parameters; no runtime changes",
+  "cases": [
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "7",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "30",
+      "expectedTotal": "48",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "90",
+      "expectedTotal": "60",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "NaN",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "Infinity",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "30.5",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "7<img src=x onerror=globalThis.injected=true>",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "days",
+      "value": "\" autofocus onfocus=globalThis.injected=true x=\"",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "group",
+      "value": "\"><img src=x onerror=globalThis.injected=true>",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "chromium",
+      "key": "state",
+      "value": "\"><svg onload=globalThis.injected=true>",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "7",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "30",
+      "expectedTotal": "48",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "90",
+      "expectedTotal": "60",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "NaN",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "Infinity",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "30.5",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "7<img src=x onerror=globalThis.injected=true>",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "days",
+      "value": "\" autofocus onfocus=globalThis.injected=true x=\"",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "group",
+      "value": "\"><img src=x onerror=globalThis.injected=true>",
+      "expectedTotal": "36",
+      "status": "PASS"
+    },
+    {
+      "browser": "webkit",
+      "key": "state",
+      "value": "\"><svg onload=globalThis.injected=true>",
+      "expectedTotal": "36",
+      "status": "PASS"
+    }
+  ],
+  "visualEquivalence": [
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 393,
+      "pngBytes": "IDENTICAL"
+    },
+    {
+      "browser": "chromium",
+      "theme": "dark",
+      "width": 1440,
+      "pngBytes": "IDENTICAL"
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 393,
+      "pngBytes": "IDENTICAL"
+    },
+    {
+      "browser": "chromium",
+      "theme": "light",
+      "width": 1440,
+      "pngBytes": "IDENTICAL"
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 393,
+      "pngBytes": "IDENTICAL"
+    },
+    {
+      "browser": "webkit",
+      "theme": "dark",
+      "width": 1440,
+      "pngBytes": "IDENTICAL"
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 393,
+      "pngBytes": "IDENTICAL"
+    },
+    {
+      "browser": "webkit",
+      "theme": "light",
+      "width": 1440,
+      "pngBytes": "IDENTICAL"
+    }
+  ]
+}

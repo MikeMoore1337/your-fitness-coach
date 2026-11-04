@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ru">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>#827 · Композиции</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #eee;
+      color: #171717;
+      font:
+        15px/1.45 system-ui,
+        sans-serif;
+      padding: 32px;
+    }
+    h1 {
+      font-size: 25px;
+      margin: 0 0 6px;
+    }
+    p {
+      margin: 0 0 22px;
+      color: #515151;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .concept {
+      min-width: 0;
+    }
+    h2 {
+      font-size: 21px;
+      margin: 0 0 6px;
+    }
+    .thesis {
+      height: 64px;
+    }
+    .wire {
+      border: 2px solid #333;
+      border-radius: 12px;
+      height: 650px;
+      background: white;
+      display: grid;
+      grid-template-columns: 45px 1fr;
+      overflow: hidden;
+    }
+    .side {
+      background: #ddd;
+      border-right: 1px solid #888;
+      padding: 12px 6px;
+      font-size: 10px;
+    }
+    .side i {
+      display: block;
+      height: 25px;
+      margin: 16px 0;
+      background: #b5b5b5;
+      border-radius: 4px;
+    }
+    .screen {
+      padding: 16px;
+      min-width: 0;
+    }
+    .header {
+      font-size: 21px;
+      font-weight: 800;
+      margin: 0 0 12px;
+    }
+    .period,
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      border: 1px solid #999;
+      padding: 8px;
+      margin-bottom: 10px;
+      font-size: 11px;
+      gap: 5px;
+    }
+    .sel {
+      background: #333;
+      color: white;
+      padding: 2px 6px;
+    }
+    .metrics {
+      display: flex;
+      gap: 20px;
+      border-block: 1px solid #aaa;
+      margin: 15px 0;
+      padding: 12px 0;
+    }
+    .metrics b {
+      font-size: 24px;
+    }
+    .metrics small {
+      display: block;
+      font-size: 10px;
+    }
+    .subtitle {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 20px 0 12px;
+    }
+    .list {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 12px;
+    }
+    .row {
+      padding: 9px 0;
+      border-bottom: 1px solid #aaa;
+      font-size: 12px;
+    }
+    .bar {
+      height: 6px;
+      background: #555;
+      margin: 6px 0;
+    }
+    .dash {
+      height: 6px;
+      background: repeating-linear-gradient(
+        90deg,
+        #888 0 4px,
+        transparent 4px 7px
+      );
+      width: 65%;
+    }
+    .detail {
+      border: 1px solid #777;
+      padding: 10px;
+      background: #f3f3f3;
+      font-size: 11px;
+    }
+    .detail h3 {
+      margin: 2px 0 18px;
+      font-size: 15px;
+    }
+    .note {
+      font-size: 10px;
+      margin-top: 16px;
+      color: #555;
+    }
+    .timeline {
+      display: grid;
+      grid-template-columns: 1fr 58px 58px;
+      font-size: 11px;
+      border-bottom: 1px solid #aaa;
+      padding: 10px 0;
+      gap: 6px;
+    }
+    .timeline b {
+      text-align: right;
+    }
+    .compare {
+      background: #ddd;
+      padding: 14px;
+      margin: 10px 0;
+      font-size: 12px;
+    }
+    .index {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 5px;
+      font-size: 11px;
+      margin: 15px 0;
+    }
+    .index span {
+      border: 1px solid #777;
+      padding: 7px;
+    }
+    .profile {
+      border: 1px solid #555;
+      padding: 18px;
+      margin: 18px 0;
+    }
+    .profile h3 {
+      font-size: 23px;
+      margin: 0 0 18px;
+    }
+    .roles {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+    .roles b {
+      display: block;
+      font-size: 28px;
+    }
+    .sources {
+      font-size: 12px;
+      border-top: 1px solid #888;
+      padding: 12px 0;
+    }
+    .signature {
+      font-size: 12px;
+      margin-top: 12px;
+      color: #444;
+    }
+    @media (max-width: 1000px) {
+      .board {
+        grid-template-columns: 1fr;
+      }
+      .thesis {
+        height: auto;
+      }
+      .wire {
+        max-width: 460px;
+      }
+    }
+  </style>
+  <h1>Мышечные группы · три композиционные гипотезы</h1>
+  <p>
+    Wireframe · одинаковый масштаб · синтетические числа · оболочка «Прогресса»
+    YFC
+  </p>
+  <div class="board"></div>
+  <script>
+    fetch("fixtures.json")
+      .then((r) => r.json())
+      .then(({ snapshots }) => {
+        const d = snapshots.populated["7"],
+          gs = d.muscle_group_workload.slice(0, 5),
+          g = d.muscle_group_workload.find((x) => x.muscle_id === "triceps"),
+          c = g.current,
+          p = g.previous;
+        const row = (x) =>
+          '<div class="row"><b>' +
+          x.muscle_name +
+          " · " +
+          x.current.completed_set_count +
+          '</b><div class="bar" style="width:' +
+          (x.current.primary_completed_set_count / 28) * 100 +
+          '%"></div><div class="dash" style="width:' +
+          (x.current.secondary_completed_set_count / 28) * 100 +
+          '%"></div></div>';
+        const common =
+          '<div class="header">Прогресс</div><div class="period"><span class="sel">7 дней</span><span>30 дней</span><span>90 дней</span><span>Свой</span></div><div class="nav">Обзор <b>Тренировки</b> Тело</div>';
+        const sources = g.contributing_exercises
+          .map(
+            (e) =>
+              '<div class="row">' +
+              e.exercise_title +
+              " · " +
+              e.completed_set_count +
+              "</div>",
+          )
+          .join("");
+        const designs = [
+          [
+            "A · Распределение",
+            "Сначала все группы. Строка раскрывает упражнения-источники.",
+            '<div class="metrics"><div><b>' +
+              d.completed_set_count +
+              "</b><small>подходов</small></div><div><b>" +
+              d.completed_workout_count +
+              '</b><small>тренировки</small></div></div><div class="subtitle">Участие мышц</div><div class="list"><div>' +
+              gs.map(row).join("") +
+              '</div><div class="detail"><h3>Трицепс</h3><b>' +
+              c.primary_completed_set_count +
+              " основных</b><p>" +
+              c.secondary_completed_set_count +
+              " вспомогательных</p>" +
+              sources +
+              "<p>Ранее " +
+              p.completed_set_count +
+              " · сейчас " +
+              c.completed_set_count +
+              '</p></div></div><div class="note">Подходы групп не складываются.<br>Две полосы — два вида участия.</div>',
+            "Период → общий факт → распределение → источник",
+          ],
+          [
+            "B · Сравнение периодов",
+            "Сначала изменения. Ведомость двух равных периодов.",
+            '<div class="compare"><b>3 тренировки</b> за период<br>Ранее 2 · частота 3 / неделю</div><div class="subtitle">Что изменилось</div><div class="timeline"><span>Группа / участие</span><b>Ранее</b><b>Сейчас</b></div>' +
+              gs
+                .slice(0, 3)
+                .map(
+                  (x) =>
+                    '<div class="timeline"><strong>' +
+                    x.muscle_name +
+                    "</strong><b>" +
+                    x.previous.completed_set_count +
+                    "</b><b>" +
+                    x.current.completed_set_count +
+                    "</b><span>Основное</span><b>" +
+                    x.previous.primary_completed_set_count +
+                    "</b><b>" +
+                    x.current.primary_completed_set_count +
+                    "</b><span>Вспомогательное</span><b>" +
+                    x.previous.secondary_completed_set_count +
+                    "</b><b>" +
+                    x.current.secondary_completed_set_count +
+                    "</b></div>",
+                )
+                .join("") +
+              '<div class="note">36 уникальных подходов сейчас.<br>Нет данных для сравнения ≠ ноль.</div>',
+            "Период → изменение частоты → ведомость ролей",
+          ],
+          [
+            "C · Профиль группы",
+            "Сначала выбор. Один большой профиль с контекстом участия.",
+            '<div class="index">' +
+              d.muscle_group_workload
+                .slice(0, 6)
+                .map(
+                  (x) =>
+                    "<span " +
+                    (x.muscle_id === "triceps" ? 'class="sel"' : "") +
+                    ">" +
+                    x.muscle_name +
+                    " " +
+                    x.current.completed_set_count +
+                    "</span>",
+                )
+                .join("") +
+              '</div><div class="profile"><h3>Трицепс</h3><div class="roles"><div><b>' +
+              c.primary_completed_set_count +
+              "</b>основных</div><div><b>" +
+              c.secondary_completed_set_count +
+              '</b>вспомогательных</div></div><div class="row">24 подхода · 3 тренировки</div><div class="row">Ранее 6 · изменение +18</div></div><div class="sources"><b>Упражнения-источники</b>' +
+              sources +
+              "</div>",
+            "Период → индекс → профиль → упражнения",
+          ],
+        ];
+        document.querySelector(".board").innerHTML = designs
+          .map(
+            ([title, thesis, content, signature]) =>
+              '<article class="concept"><h2>' +
+              title +
+              '</h2><p class="thesis">' +
+              thesis +
+              '</p><div class="wire"><aside class="side">YFC<i></i><i></i><i></i><i></i></aside><div class="screen">' +
+              common +
+              content +
+              '</div></div><p class="signature">' +
+              signature +
+              "</p></article>",
+          )
+          .join("");
+        document.body.dataset.ready = "true";
+      });
+  </script>
+</html>

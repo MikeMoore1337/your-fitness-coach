@@ -59,27 +59,31 @@ def test_sqlite_migration_history_replays_to_head(tmp_path: Path, monkeypatch) -
     script = ScriptDirectory.from_config(alembic_config)
     expected_revision = script.get_current_head()
     previous_revision = script.get_revision(expected_revision).down_revision
-    assert isinstance(previous_revision, str)
+    previous_revisions = (
+        {previous_revision} if isinstance(previous_revision, str) else set(previous_revision or ())
+    )
+    assert previous_revisions
 
     command.upgrade(alembic_config, "head")
 
-    def current_revision() -> str:
+    def current_revisions() -> set[str]:
         engine = create_engine(database_url)
         try:
             with engine.connect() as connection:
-                return connection.execute(
-                    text("SELECT version_num FROM alembic_version")
-                ).scalar_one()
+                return set(
+                    connection.execute(text("SELECT version_num FROM alembic_version")).scalars()
+                )
         finally:
             engine.dispose()
 
-    assert current_revision() == expected_revision
+    assert current_revisions() == {expected_revision}
 
-    command.downgrade(alembic_config, previous_revision)
-    assert current_revision() == previous_revision
+    for previous in sorted(previous_revisions):
+        command.downgrade(alembic_config, previous)
+        assert current_revisions() == previous_revisions
 
-    command.upgrade(alembic_config, "head")
-    assert current_revision() == expected_revision
+        command.upgrade(alembic_config, "head")
+        assert current_revisions() == {expected_revision}
 
 
 def test_sqlite_stage7_upgrade_from_0092_preserves_expand_contract(

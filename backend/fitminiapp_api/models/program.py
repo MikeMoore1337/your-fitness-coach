@@ -20,6 +20,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fitminiapp_api.core.timezone import now_msk_naive
@@ -36,7 +37,7 @@ class ProgramTemplate(Base):
             name="ck_program_templates_split_type",
         ),
         CheckConstraint(
-            "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
+            "default_duration_weeks >= 1",
             name="ck_program_templates_default_duration_weeks",
         ),
     )
@@ -66,6 +67,16 @@ class ProgramTemplate(Base):
     @property
     def effective_duration_weeks(self) -> int:
         return self.default_duration_weeks or 1
+
+    @property
+    def sessions_per_week(self) -> int:
+        metadata = self.program_metadata or {}
+        if metadata.get("week_cycle"):
+            return len(self.days)
+        frequency = metadata.get("days_per_week")
+        if type(frequency) is int and 1 <= frequency <= 8:
+            return frequency
+        return len(self.days)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -170,7 +181,7 @@ class ProgramTemplateExerciseWeekPrescription(Base):
             name="uq_program_template_exercise_week",
         ),
         CheckConstraint(
-            "week_number >= 1 AND week_number <= 24",
+            "week_number >= 1",
             name="ck_program_template_exercise_weeks_number",
         ),
         CheckConstraint(
@@ -249,6 +260,26 @@ class UserProgram(Base):
     schedule_weekdays: Mapped[list[int]] = mapped_column(
         JSON, nullable=False, default=list, server_default="[]"
     )
+    _schedule_mode: Mapped[str | None] = mapped_column(
+        "schedule_mode", String(16), nullable=True, default="calendar"
+    )
+    rotation_epoch: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_first_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_accepted_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    @hybrid_property
+    def schedule_mode(self) -> str:
+        return self._schedule_mode or "calendar"
+
+    @schedule_mode.inplace.setter
+    def _set_schedule_mode(self, value: str) -> None:
+        self._schedule_mode = value
+
+    @schedule_mode.inplace.expression
+    @classmethod
+    def _schedule_mode_expression(cls):
+        return func.coalesce(cls._schedule_mode, "calendar")
+
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="active", server_default="active"
     )
@@ -421,6 +452,30 @@ class UserWorkout(Base):
             "scheduled_date",
             "status",
         ),
+        Index(
+            "uq_user_workouts_cycle_occurrence",
+            "user_program_id",
+            "week_number",
+            "day_number",
+            unique=True,
+            postgresql_where=text("source_cycle_week IS NOT NULL"),
+            sqlite_where=text("source_cycle_week IS NOT NULL"),
+        ),
+        Index(
+            "uq_user_workouts_rotation_mutation",
+            "user_program_id",
+            "rotation_mutation_id",
+            unique=True,
+            postgresql_where=text("rotation_mutation_id IS NOT NULL"),
+            sqlite_where=text("rotation_mutation_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_user_workouts_rotation_in_progress",
+            "user_program_id",
+            unique=True,
+            postgresql_where=text("rotation_epoch IS NOT NULL AND status = 'in_progress'"),
+            sqlite_where=text("rotation_epoch IS NOT NULL AND status = 'in_progress'"),
+        ),
         CheckConstraint(
             "completion_feedback IS NULL OR completion_feedback IN "
             "('easier_than_expected', 'as_expected', 'harder_than_expected')",
@@ -430,23 +485,69 @@ class UserWorkout(Base):
             "completion_note IS NULL OR length(completion_note) <= 500",
             name="ck_user_workouts_completion_note_length",
         ),
+        CheckConstraint(
+            "(history_imported IS TRUE AND user_program_id IS NULL AND day_number IS NULL "
+            "AND week_number IS NULL AND status = 'completed') OR "
+            "(history_imported IS NOT TRUE AND user_program_id IS NOT NULL "
+            "AND day_number IS NOT NULL AND week_number IS NOT NULL)",
+            name="ck_user_workouts_plan_presence",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_program_id: Mapped[int] = mapped_column(ForeignKey("user_programs.id"), index=True)
+    user_program_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_programs.id"), index=True, nullable=True
+    )
+    history_imported: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     scheduled_date: Mapped[date] = mapped_column(Date, index=True)
     scheduled_time: Mapped[time | None] = mapped_column(Time, nullable=True)
-    day_number: Mapped[int] = mapped_column(Integer)
-    week_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    day_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    week_number: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=1, server_default="1"
+    )
+    plan_materialized: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=True)
+    _source_cycle_week: Mapped[int | None] = mapped_column(
+        "source_cycle_week", Integer, nullable=True
+    )
+    rotation_source_cycle_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cycle_iteration: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    plan_revision_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_epoch: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    rotation_mutation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rotation_request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rotation_transition_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rotation_transition_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    @hybrid_property
+    def source_cycle_week(self) -> int | None:
+        return self.rotation_source_cycle_week or self._source_cycle_week
+
+    @source_cycle_week.inplace.setter
+    def _set_source_cycle_week(self, value: int | None) -> None:
+        if self.rotation_epoch is None:
+            self._source_cycle_week = value
+        else:
+            self.rotation_source_cycle_week = value
+
+    @source_cycle_week.inplace.expression
+    @classmethod
+    def _source_cycle_week_expression(cls):
+        return func.coalesce(cls.rotation_source_cycle_week, cls._source_cycle_week)
+
     title: Mapped[str] = mapped_column(String(128))
     status: Mapped[str] = mapped_column(String(32), default="planned")
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at_utc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at_utc: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completion_feedback: Mapped[str | None] = mapped_column(String(24), nullable=True)
     completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     completion_feedback_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    user_program: Mapped[UserProgram] = relationship("UserProgram", back_populates="workouts")
+    user_program: Mapped[UserProgram | None] = relationship(
+        "UserProgram", back_populates="workouts"
+    )
     exercises: Mapped[list[UserWorkoutExercise]] = relationship(
         "UserWorkoutExercise",
         back_populates="workout",
@@ -512,19 +613,28 @@ class UserWorkoutExercise(Base):
             "superset_group >= 1 AND superset_order IN (1, 2))",
             name="ck_user_workout_exercises_superset",
         ),
+        CheckConstraint(
+            "(history_imported IS TRUE AND prescribed_sets IS NULL AND prescribed_reps IS NULL "
+            "AND rest_seconds IS NULL) OR (history_imported IS NOT TRUE "
+            "AND prescribed_sets IS NOT NULL AND prescribed_reps IS NOT NULL "
+            "AND rest_seconds IS NOT NULL)",
+            name="ck_user_workout_exercises_plan_presence",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    history_imported: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
     source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_assignment_slot_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     source_weekly_prescription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
-    prescribed_sets: Mapped[int] = mapped_column(Integer)
-    prescribed_reps: Mapped[str] = mapped_column(String(32))
+    prescribed_sets: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescribed_reps: Mapped[str | None] = mapped_column(String(32), nullable=True)
     prescribed_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
+    rest_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True, default=90)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -560,6 +670,11 @@ class UserWorkoutSet(Base):
             name="ck_user_workout_sets_kind",
         ),
         CheckConstraint("version >= 1", name="ck_user_workout_sets_version_positive"),
+        CheckConstraint(
+            "(execution_mode IS NULL OR execution_mode IN ('bilateral', 'per_side', 'alternating')) "
+            "AND (first_side IS NULL OR first_side IN ('left', 'right'))",
+            name="ck_user_workout_sets_side_metadata",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -569,12 +684,15 @@ class UserWorkoutSet(Base):
     set_number: Mapped[int] = mapped_column(Integer)
     actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
     actual_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    execution_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    first_side: Mapped[str | None] = mapped_column(String(5), nullable=True)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     distance_km: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
     average_heart_rate_bpm: Mapped[int | None] = mapped_column(Integer, nullable=True)
     heart_rate_zone: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
     set_kind: Mapped[str | None] = mapped_column(String(16), nullable=True, default="working")
+    set_kind_known: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     planned_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
     planned_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -583,9 +701,49 @@ class UserWorkoutSet(Base):
     planned_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    plan_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     workout_exercise: Mapped[UserWorkoutExercise] = relationship(
         "UserWorkoutExercise", back_populates="sets"
+    )
+    side_results: Mapped[list[UserWorkoutSetSide]] = relationship(
+        "UserWorkoutSetSide",
+        back_populates="workout_set",
+        cascade="all, delete-orphan",
+        order_by="UserWorkoutSetSide.side",
+    )
+
+
+class UserWorkoutSetSide(Base):
+    __tablename__ = "user_workout_set_sides"
+    __table_args__ = (
+        UniqueConstraint("workout_set_id", "side", name="uq_user_workout_set_sides_set_side"),
+        CheckConstraint("side IN ('left', 'right')", name="ck_user_workout_set_sides_side"),
+        CheckConstraint(
+            "actual_reps IS NULL OR actual_reps >= 0", name="ck_user_workout_set_sides_reps"
+        ),
+        CheckConstraint(
+            "actual_weight IS NULL OR actual_weight >= 0", name="ck_user_workout_set_sides_weight"
+        ),
+        CheckConstraint(
+            "rir IS NULL OR rir IN ('0', '1', '2', '3', '4+')",
+            name="ck_user_workout_set_sides_rir",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workout_set_id: Mapped[int] = mapped_column(
+        ForeignKey("user_workout_sets.id", ondelete="CASCADE"), nullable=False
+    )
+    side: Mapped[str] = mapped_column(String(5), nullable=False)
+    actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actual_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    is_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    workout_set: Mapped[UserWorkoutSet] = relationship(
+        "UserWorkoutSet", back_populates="side_results"
     )
 
 

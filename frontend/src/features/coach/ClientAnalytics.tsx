@@ -23,6 +23,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { WorkoutFeedbackDisclosure } from '../workouts/WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from '../workouts/WorkoutCompletionSummary';
 import { MuscleWorkloadList } from '../workouts/MuscleWorkload';
+import { formatWorkoutSides } from '../workouts/workoutSideDisplay';
 
 function formatDate(value: string): string {
   return new Date(`${value}T12:00:00`).toLocaleDateString('ru-RU', {
@@ -174,7 +175,11 @@ export function ClientAnalytics({
                 </div>
                 <div className="metric">
                   <span>Объём</span>
-                  <strong>{Math.round(checkIn.summary.progression.training_volume_kg)} кг</strong>
+                  <strong>
+                    {checkIn.summary.progression.training_volume_kg == null
+                      ? 'Указан не полностью'
+                      : `${Math.round(checkIn.summary.progression.training_volume_kg)} кг`}
+                  </strong>
                 </div>
                 <div className="metric">
                   <span>Новые результаты</span>
@@ -305,7 +310,10 @@ export function ClientAnalytics({
                       {formatDate(workout.scheduled_date)}
                       {workout.scheduled_time
                         ? ` в ${workout.scheduled_time.slice(0, 5)}`
-                        : ''} · {workout.completed_sets} подх. · {Math.round(workout.volume_kg)} кг
+                        : ''} · {workout.completed_sets} подх. ·{' '}
+                      {workout.volume_incomplete
+                        ? 'объём указан не полностью'
+                        : `${Math.round(workout.volume_kg)} кг`}
                     </small>
                   </span>
                   <Badge>{workoutStatusLabel(workout.status)}</Badge>
@@ -334,9 +342,24 @@ export function ClientAnalytics({
                           {exercise.notes && <span className="muted">{exercise.notes}</span>}
                           <span className="muted">
                             {exercise.sets
-                              .filter((set) => set.is_completed)
-                              .map(
-                                (set) => `${set.actual_weight ?? 0} кг × ${set.actual_reps ?? 0}`,
+                              .filter(
+                                (set) =>
+                                  set.is_completed ||
+                                  (set.sides &&
+                                    [set.sides.left, set.sides.right].some(
+                                      (side) =>
+                                        side &&
+                                        (side.is_completed ||
+                                          side.actual_reps != null ||
+                                          side.actual_weight != null ||
+                                          side.rir != null ||
+                                          side.reached_failure != null),
+                                    )),
+                              )
+                              .map((set) =>
+                                set.sides
+                                  ? formatWorkoutSides(set.sides)
+                                  : `${set.actual_weight == null ? 'вес не указан' : `${set.actual_weight} кг`} × ${set.actual_reps == null ? 'повторы не указаны' : set.actual_reps}`,
                               )
                               .join(' · ') || 'Нет выполненных подходов'}
                           </span>

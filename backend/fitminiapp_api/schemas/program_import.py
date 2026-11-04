@@ -6,8 +6,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.program import (
+    AssignTemplateSelfRequest,
     ExercisePrescriptionPlan,
     ProgramCoachingRule,
+    ProgramLifecycleStatus,
     ProgramTargetUserResponse,
     ProgramTemplateResponse,
 )
@@ -72,10 +74,10 @@ class ProgramImportProvenance(BaseModel):
 
 
 class ProgramImportBlock(BaseModel):
-    block_number: int = Field(ge=1, le=24)
+    block_number: int = Field(ge=1)
     title: str = Field(min_length=1, max_length=128)
-    week_start: int = Field(ge=1, le=24)
-    week_end: int = Field(ge=1, le=24)
+    week_start: int = Field(ge=1)
+    week_end: int = Field(ge=1)
     is_deload: bool = False
 
     @model_validator(mode="after")
@@ -89,7 +91,7 @@ class ProgramImportTarget(BaseModel):
     program_id: int = Field(ge=1)
     title: str = Field(min_length=1, max_length=128)
     owner_name: str | None = Field(default=None, max_length=128)
-    duration_weeks: int = Field(ge=1, le=24)
+    duration_weeks: int = Field(ge=1)
     current_revision_number: int = Field(ge=0)
     status: Literal["scheduled", "active"]
     day_numbers: list[int] = Field(min_length=1, max_length=8)
@@ -118,7 +120,7 @@ class ProgramImportRow(BaseModel):
     source_sheet: str | None = Field(default=None, max_length=31)
     source_range: str | None = Field(default=None, max_length=64)
     source_cells: dict[str, str] = Field(default_factory=dict, max_length=24)
-    week_number: int | None = Field(default=None, ge=1, le=24)
+    week_number: int | None = Field(default=None, ge=1)
     day_number: int | None = Field(default=None, ge=1, le=8)
     day_title: str | None = Field(default=None, max_length=128)
     exercise_name: str | None = Field(default=None, max_length=512)
@@ -131,10 +133,11 @@ class ProgramImportRow(BaseModel):
     rest_seconds: int | None = Field(default=None, ge=0, le=600)
     notes: str | None = Field(default=None, max_length=2_000)
     source_auxiliary: str | None = Field(default=None, max_length=512)
+    manual_planned_loads: str | None = Field(default=None, max_length=256)
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
     prescription: ExercisePrescriptionPlan | None = None
-    block_number: int | None = Field(default=None, ge=1, le=24)
+    block_number: int | None = Field(default=None, ge=1)
     block_title: str | None = Field(default=None, max_length=128)
     block_is_deload: bool = False
     coaching_rule: ProgramCoachingRule | None = None
@@ -176,14 +179,29 @@ class ProgramImportAiInfo(BaseModel):
     fallback: Literal["deterministic_manual"] = "deterministic_manual"
 
 
+class ProgramImportWeekTypeCandidate(BaseModel):
+    week_number: int = Field(ge=1)
+    week_type: Literal["light", "medium", "heavy"]
+    source_text: str = Field(min_length=1, max_length=128)
+    source_sheet: str | None = Field(default=None, max_length=31)
+    source_cell: str = Field(min_length=1, max_length=32)
+
+
 class ProgramImportResponse(BaseModel):
     id: str
     status: ImportStatus
+    confirmed_template_id: int | None = None
+    self_assigned_program_id: int | None = None
     source_format: ImportFormat
     schema_version: int
     parser_version: str
     layout_version: str | None = None
-    duration_weeks: int | None = Field(default=None, ge=1, le=24)
+    duration_weeks: int | None = Field(default=None, ge=1)
+    draft_version: int | None = Field(default=None, ge=1)
+    assignment_duration_weeks: int | None = Field(default=None, ge=1)
+    repeat: bool | None = None
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
+    week_type_candidates: list[ProgramImportWeekTypeCandidate] = Field(default_factory=list)
     expires_at: datetime
     program_title: str | None = None
     goal: ImportGoal | None = None
@@ -200,9 +218,16 @@ class ProgramImportResponse(BaseModel):
 class ProgramImportRowResolution(BaseModel):
     row_number: int = Field(ge=3)
     exercise_id: int | None = Field(default=None, ge=1)
+    prescribed_sets: int | None = Field(default=None, ge=1, le=10)
+    prescribed_reps: str | None = Field(default=None, min_length=1, max_length=32)
+    planned_loads: str | None = Field(default=None, max_length=256)
 
 
 class ProgramImportResolveRequest(BaseModel):
+    expected_draft_version: int | None = Field(default=None, ge=1)
+    assignment_duration_weeks: int | None = Field(default=None, ge=1)
+    repeat: bool | None = None
+    week_types: list[Literal["light", "medium", "heavy"] | None] | None = None
     title: str | None = Field(default=None, min_length=1, max_length=128)
     goal: ImportGoal | None = None
     level: ImportLevel | None = None
@@ -211,6 +236,7 @@ class ProgramImportResolveRequest(BaseModel):
 
 
 class ProgramImportConfirmRequest(BaseModel):
+    expected_draft_version: int | None = Field(default=None, ge=1)
     target_program_id: int | None = Field(default=None, ge=1)
     expected_revision_number: int | None = Field(default=None, ge=0)
 
@@ -229,3 +255,27 @@ class ProgramImportConfirmResponse(BaseModel):
     workouts_created: int = 0
     workouts_updated: int = 0
     target_user: ProgramTargetUserResponse
+
+
+class ProgramImportAssignmentRequest(AssignTemplateSelfRequest):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_active_program_id: int | None = Field(ge=1)
+    expected_active_revision_number: int | None = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_replacement(self):
+        if (self.expected_active_program_id is None) != (
+            self.expected_active_revision_number is None
+        ):
+            raise ValueError("Укажите программу и её версию вместе")
+        if self.replace_active != (self.expected_active_program_id is not None):
+            raise ValueError("Подтвердите замену указанной программы")
+        return self
+
+
+class ProgramImportAssignmentResponse(BaseModel):
+    user_program_id: int
+    status: ProgramLifecycleStatus
+    start_date: date
+    duration_weeks: int

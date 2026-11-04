@@ -174,6 +174,81 @@ test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on on
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(false);
 });
 
+test('rotation respects Telegram safe areas and the keyboard', async ({
+  tma,
+  tmaPage,
+}, testInfo) => {
+  await installPlatformApi(tmaPage, { workoutStatus: 'none' });
+  await tmaPage.route('**/api/v1/workouts/session-rotation', async (route) => {
+    const days = [
+      { day_number: 1, title: 'Грудь и трицепс', from_template: false },
+      { day_number: 2, title: 'Спина и бицепс', from_template: false },
+    ];
+    await route.fulfill({
+      json: {
+        mode: 'rotation',
+        status: 'ready',
+        program_id: 7,
+        revision_number: 2,
+        cursor: 'a'.repeat(64),
+        duration_weeks: 8,
+        current: days[0],
+        next: days[1],
+        days,
+      },
+    });
+  });
+  await tmaPage.goto('/app');
+  await expect(tmaPage.getByRole('heading', { name: 'Грудь и трицепс' })).toBeVisible();
+  await tma.setSafeArea({ top: 28, right: 2, bottom: 20, left: 2 });
+  await tma.setContentSafeArea({ top: 44, right: 0, bottom: 16, left: 0 });
+  await expect(tmaPage.locator('html')).toHaveCSS('--yfc-tg-safe-bottom', '20px');
+  for (const width of [320, 360, 393, 430]) {
+    await tmaPage.setViewportSize({ width, height: 844 });
+    await tma.setViewport(844, 844);
+    await expectNoHorizontalOverflow(tmaPage);
+    await expectNoOverlap(
+      tmaPage.getByRole('button', { name: 'Начать тренировку' }),
+      tmaPage.locator('#appBottomNav'),
+    );
+  }
+  if (process.env.YFC_CAPTURE_1204 === '1') {
+    await tmaPage.setViewportSize({ width: 393, height: 900 });
+    await tma.setViewport(900, 900);
+    await tmaPage.addStyleTag({
+      content:
+        '*, *::before, *::after { transition: none !important; animation: none !important; }',
+    });
+    for (const theme of ['dark', 'light'] as const) {
+      await tma.setTheme(theme);
+      await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await tmaPage.waitForTimeout(400);
+      await tmaPage.screenshot({
+        path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-23-tma.png`,
+        fullPage: true,
+        animations: 'disabled',
+      });
+    }
+  }
+  const week = tmaPage.getByLabel('Неделя программы');
+  await week.focus();
+  await expect(week).toBeFocused();
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+  await expect(tmaPage.locator('#appBottomNav')).toBeHidden();
+  if (process.env.YFC_CAPTURE_1204 === '1') {
+    for (const theme of ['dark', 'light'] as const) {
+      await tma.setTheme(theme);
+      await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await tmaPage.waitForTimeout(400);
+      await tmaPage.screenshot({
+        path: `../.artifacts/tasks/1204/evidence/after-matrix/${testInfo.project.name}-${theme}-393-24-tma-keyboard.png`,
+        fullPage: true,
+        animations: 'disabled',
+      });
+    }
+  }
+});
+
 test('progress report starts native PDF download and keeps BackButton contract', async ({
   tma,
   tmaPage,
@@ -441,6 +516,17 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
     await expectNoHorizontalOverflow(tmaPage);
+    const editAction = finalTmaRow.getByRole('button', { name: 'Изменить' });
+    const deleteAction = finalTmaRow.getByRole('button', { name: 'Удалить' });
+    await expect(editAction).toBeVisible();
+    await expect(deleteAction).toBeVisible();
+    const editBounds = await editAction.boundingBox();
+    const deleteBounds = await deleteAction.boundingBox();
+    expect(editBounds).not.toBeNull();
+    expect(deleteBounds).not.toBeNull();
+    expect(deleteBounds!.y - (editBounds!.y + editBounds!.height)).toBeGreaterThanOrEqual(11);
+    expect(editBounds!.height).toBeGreaterThanOrEqual(44);
+    expect(deleteBounds!.height).toBeGreaterThanOrEqual(44);
     await expectTouchTargets(
       tmaCardio.locator(
         '.cardio-session-row__actions > summary:visible, .cardio-session-row__actions .ui-button:visible',
@@ -563,8 +649,8 @@ test('program history keeps current block, readable revisions and workout return
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs&view=manage'),
-    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage&panel=operations'),
+    mobilePage.goto('/app?section=programs&view=manage&panel=operations'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -631,7 +717,9 @@ test('program history keeps current block, readable revisions and workout return
   await expect(tmaPage.getByText(/доступен только для просмотра/)).toBeVisible();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=programs&program_history=77&program_revision=4');
+  await expect(tmaPage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=4',
+  );
   await expect(tmaPage.locator('.program-history__disclosure')).toHaveJSProperty('open', true);
   await expect(tmaPage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
   await expect(tmaPage.locator('#program-revision-77-4 > summary')).toBeFocused();
@@ -644,7 +732,9 @@ test('program history keeps current block, readable revisions and workout return
   await expect(tmaPage.getByText('3 подх. · 8–10 повт. · отдых 90 сек.')).toBeVisible();
   await expect(tmaPage.getByText('4 подх. · 6–8 повт. · отдых 120 сек.')).not.toBeAttached();
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=programs&program_history=77&program_revision=3');
+  await expect(tmaPage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=3',
+  );
   await expect(tmaPage.locator('#program-revision-77-3')).toHaveJSProperty('open', true);
 
   await mobilePage
@@ -653,7 +743,9 @@ test('program history keeps current block, readable revisions and workout return
     .click();
   await expect(mobilePage.getByText('4 подх. · 6–8 повт. · отдых 120 сек.')).toBeVisible();
   await mobilePage.getByRole('link', { name: 'К истории программы' }).click();
-  await expect(mobilePage).toHaveURL('/app?section=programs&program_history=77&program_revision=4');
+  await expect(mobilePage).toHaveURL(
+    '/app?section=programs&view=manage&panel=operations&program_history=77&program_revision=4',
+  );
   await expect(mobilePage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
 });
 
@@ -670,8 +762,8 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
   });
   await installPlatformApi(tmaPage, { programHistory: 'many', aiAdaptation: 'available' });
   await Promise.all([
-    mobilePage.goto('/app?section=programs&view=manage'),
-    tmaPage.goto('/app?section=programs&view=manage'),
+    mobilePage.goto('/app?section=programs&view=manage&panel=operations'),
+    tmaPage.goto('/app?section=programs&view=manage&panel=operations'),
   ]);
   await tma.setTheme('dark');
 
@@ -777,7 +869,7 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
     programHistory: 'many',
     aiAdaptation: 'available',
   });
-  await desktopReviewPage.goto('/app?section=programs&view=manage');
+  await desktopReviewPage.goto('/app?section=programs&view=manage&panel=operations');
   const desktopReview = desktopReviewPage.getByTestId('ai-adaptation');
   await desktopReview.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
   const desktopGenerate = desktopReviewPage.waitForRequest(
@@ -808,7 +900,7 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
     }
   });
   await installPlatformApi(desktop, { browserSession: true, programHistory: 'many' });
-  await desktop.goto('/app?section=programs&view=manage');
+  await desktop.goto('/app?section=programs&view=manage&panel=operations');
   const desktopAdaptation = desktop.getByTestId('ai-adaptation');
   await expect(desktopAdaptation).toHaveCount(0);
   await expect(desktop.getByText('Текущий тренировочный блок')).toBeVisible();
@@ -826,7 +918,7 @@ test('program history renders empty, one-block and full lifecycle states honestl
   for (const state of ['empty', 'one', 'many'] as const) {
     const page = await browser.newPage({ viewport: MOBILE_CONTEXTS.baseline });
     await installPlatformApi(page, { browserSession: true, programHistory: state });
-    await page.goto('/app?section=programs&view=manage');
+    await page.goto('/app?section=programs&view=manage&panel=operations');
     const history = page.locator('.program-history');
 
     if (state === 'empty') {
@@ -866,18 +958,20 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs&view=manage'),
-    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage&start=create'),
+    mobilePage.goto('/app?section=programs&view=manage&start=create'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
     const builder = page.locator('#program-builder');
     await expect(builder.getByRole('heading', { name: 'Создать свою программу' })).toBeVisible();
     await expect(builder.getByLabel('Название', { exact: true })).toHaveValue('Моя программа');
-    await expect(builder.getByLabel('Название дня 1')).toHaveValue('Тренировка 1');
+    await expect(builder.getByRole('textbox', { name: 'Название дня' })).toHaveValue(
+      'Тренировка 1',
+    );
     await expect(builder.getByRole('combobox', { name: 'Цель', exact: true })).toBeHidden();
     await expect(builder.getByRole('button', { name: 'Добавить упражнение' })).toBeVisible();
-    await expect(builder.getByRole('button', { name: 'Создать программу' })).toBeVisible();
+    await expect(builder.getByRole('button', { name: 'Проверить и назначить' })).toBeVisible();
     expect(
       await page
         .locator('#program-builder, #program-library')
@@ -906,10 +1000,10 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
     path: '../.artifacts/screenshots/task-118/mobile-web-390x844-light.png',
     fullPage: true,
   });
+  await mobilePage.locator('#program-builder .copy-editor__exercise').first().click();
   await mobilePage
-    .locator('#program-builder')
+    .getByRole('dialog', { name: 'Параметры упражнения' })
     .getByRole('button', { name: 'Поиск упражнения' })
-    .first()
     .click();
   const mobileSearch = mobilePage
     .getByRole('dialog', { name: 'Выбор упражнения' })
@@ -997,9 +1091,8 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       browserSession: !current.telegram,
       programHistory: 'many',
     });
-    await page.goto('/app?section=programs&view=manage');
-    const program = page.locator('.program-active');
-    const history = program.locator('.program-history');
+    await page.goto('/app?section=programs&view=manage&panel=operations');
+    const history = page.locator('.program-manage-destination .program-history');
     await expect(history.getByText('Текущий тренировочный блок')).toBeVisible();
     await waitForVisualStability(page);
     if (current.screenshot) {
@@ -1074,9 +1167,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       const radius = rootStyle.getPropertyValue('--radius-action').trim();
       const currentBlock = element.querySelector<HTMLElement>('.program-current-block');
       const action = element.querySelector<HTMLElement>('.program-block-actions .ui-button');
-      const editAction = element
-        .closest('.program-active')
-        ?.querySelector<HTMLElement>('.program-active__edit-action');
+      const editAction = document.querySelector<HTMLElement>('.program-active__edit-action');
       const disclosure = element.querySelector<HTMLElement>('.disclosure-icon');
       const disclosureRect = disclosure?.getBoundingClientRect();
       return {
@@ -1094,8 +1185,10 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     });
     expect(brandContract.boundaryShadow).toContain(brandContract.lime);
     expect(brandContract.actionRadius).toBe(brandContract.radius);
-    expect(brandContract.editActionBackground).toBe(brandContract.lime);
-    expect(brandContract.editActionColor).toBe(brandContract.onLime);
+    // #1326: editing is now a neutral secondary action; the lime primary action previews the plan.
+    expect(brandContract.editActionBackground).not.toBeNull();
+    expect(brandContract.editActionBackground).not.toBe(brandContract.lime);
+    expect(brandContract.editActionColor).not.toBeNull();
     expect(brandContract.disclosure).toEqual({ width: 28, height: 28 });
 
     if (current.screenshot) {
@@ -1114,7 +1207,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       await page.locator('#appBottomNav').evaluate((element) => {
         element.style.visibility = '';
       });
-      await program.screenshot({
+      await history.screenshot({
         path: `../.artifacts/screenshots/task-59/${current.surface}-${current.viewport.width}x${current.viewport.height}-${current.theme}-history.png`,
       });
       await history
@@ -2138,7 +2231,8 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   await expect(
     tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
   ).toBeVisible();
-  expect((await tma.state()).haptics.notifications).toContain('success');
+  // The offline-draft alert can already be visible before completion is accepted.
+  await expect.poll(async () => (await tma.state()).haptics.notifications).toContain('success');
 
   api.setOffline(false);
   await setNetworkOffline(tmaPage, false);

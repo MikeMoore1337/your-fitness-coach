@@ -81,7 +81,11 @@ def _references_belong_to_user(
             .filter(UserWorkout.id == workout_id)
             .first()
         )
-        if workout is None or workout.user_program.user_id != user.id:
+        if (
+            workout is None
+            or workout.user_program is None
+            or workout.user_program.user_id != user.id
+        ):
             return False
         if program_id is not None and workout.user_program_id != program_id:
             return False

@@ -9,7 +9,7 @@ from math import floor
 from typing import Literal, cast
 
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import (
     get_user_timezone_name,
@@ -35,6 +35,7 @@ from fitminiapp_api.models.user import (
     UserProfile,
     UserProfilePriorityMuscle,
 )
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.services.data_quality import (
     build_anthropometry_signal,
     build_body_metric_signal,
@@ -49,6 +50,8 @@ from fitminiapp_api.services.period_bounds import (
     resolve_progress_bounds,
 )
 from fitminiapp_api.services.profile import serialize_body_priority
+from fitminiapp_api.services.workout_ownership import workout_owner_id
+from fitminiapp_api.services.workout_sides import SIDE_MODES, sql_completed_set_volume
 from fitminiapp_api.services.workouts import working_volume_set_filter
 
 FORMULA_VERSION = "adherence-v1"
@@ -441,28 +444,88 @@ def build_progress_summaries(
     workout_rows = (
         db.query(
             UserProgram.user_id,
+            UserProgram.id.label("program_id"),
+            and_(
+                UserProgram.status.in_({"active", "scheduled", "paused"}),
+                UserProgram.workouts.any(UserWorkout.source_cycle_week.is_not(None)),
+            ).label("is_cycle"),
             UserWorkout.id,
             UserWorkout.scheduled_date,
             UserWorkout.scheduled_time,
             UserWorkout.title,
             UserWorkout.status,
+            UserWorkout.rotation_epoch,
         )
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
-        .filter(
-            _user_date_filter(
-                user_ids,
-                start_by_user,
-                today_by_user,
-                UserProgram.user_id,
-                UserWorkout.scheduled_date,
-            )
+        .select_from(UserProgram)
+        .outerjoin(
+            UserWorkout,
+            and_(
+                UserProgram.id == UserWorkout.user_program_id,
+                _user_date_filter(
+                    user_ids,
+                    start_by_user,
+                    today_by_user,
+                    UserProgram.user_id,
+                    UserWorkout.scheduled_date,
+                ),
+            ),
         )
+        .filter(UserProgram.user_id.in_(user_ids))
         .order_by(UserProgram.user_id, UserWorkout.scheduled_date, UserWorkout.id)
         .all()
     )
+    from fitminiapp_api.services.schedule_modes import (
+        calendar_active_on,
+        calendar_segments,
+        mode_changes,
+    )
+
+    changes_by_program = mode_changes(db, {row.program_id for row in workout_rows})
     workouts_by_user: dict[int, list] = defaultdict(list)
     for workout_row in workout_rows:
-        workouts_by_user[workout_row.user_id].append(workout_row)
+        if workout_row.id is not None and not (
+            workout_row.rotation_epoch is None
+            and workout_row.status == "planned"
+            and not calendar_active_on(
+                changes_by_program.get(workout_row.program_id, []), workout_row.scheduled_date
+            )
+        ):
+            workouts_by_user[workout_row.user_id].append(workout_row)
+    cycle_program_ids = {row.program_id for row in workout_rows if row.is_cycle}
+
+    cycle_programs = (
+        db.query(UserProgram)
+        .options(selectinload(UserProgram.workouts))
+        .filter(
+            UserProgram.id.in_(cycle_program_ids),
+        )
+        .order_by(UserProgram.id)
+        .all()
+        if cycle_program_ids
+        else []
+    )
+    missing_workouts_by_user: dict[int, int] = defaultdict(int)
+    if cycle_programs:
+        from fitminiapp_api.services.program_versioning import (
+            cycle_workout_count,
+            materialize_cycle_read_window,
+        )
+
+        for program in cycle_programs:
+            current_day = actual_today_by_user[program.user_id]
+            if program.is_active and program.status in {"active", "scheduled"}:
+                materialize_cycle_read_window(
+                    db, [program.id], current_day, current_day + timedelta(days=27)
+                )
+                db.expire(program, ["workouts"])
+            for segment_start, segment_end in calendar_segments(
+                changes_by_program.get(program.id, []),
+                start_by_user[program.user_id],
+                min(today_by_user[program.user_id], current_day - timedelta(days=1)),
+            ):
+                missing_workouts_by_user[program.user_id] += cycle_workout_count(
+                    db, program, start=segment_start, end=segment_end, missing_only=True
+                )
 
     cardio_rows = (
         db.query(CardioSession)
@@ -493,7 +556,16 @@ def build_progress_summaries(
     for cardio_row in cardio_rows:
         cardio_by_user[cardio_row.user_id].append(cardio_row)
 
-    next_candidates = (
+    rotation_dates = []
+    for program_id, changes in changes_by_program.items():
+        for index, (start, mode) in enumerate(changes):
+            if mode != "rotation":
+                continue
+            conditions = [UserProgram.id == program_id, UserWorkout.scheduled_date >= start]
+            if index + 1 < len(changes):
+                conditions.append(UserWorkout.scheduled_date < changes[index + 1][0])
+            rotation_dates.append(and_(*conditions))
+    next_candidates_query = (
         db.query(
             UserProgram.user_id.label("user_id"),
             UserWorkout.id.label("id"),
@@ -515,6 +587,8 @@ def build_progress_summaries(
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .filter(
             UserWorkout.status.in_({"planned", "in_progress"}),
+            UserProgram.is_active.is_(True),
+            UserProgram.schedule_mode == "calendar",
             or_(
                 *(
                     and_(
@@ -525,20 +599,23 @@ def build_progress_summaries(
                 )
             ),
         )
-        .subquery()
     )
+    if rotation_dates:
+        next_candidates_query = next_candidates_query.filter(~or_(*rotation_dates))
+    next_candidates = next_candidates_query.subquery()
     next_rows = db.query(next_candidates).filter(next_candidates.c.row_number == 1).all()
     next_by_user = {row.user_id: row for row in next_rows}
 
     last_completed_rows = (
         db.query(
-            UserProgram.user_id,
+            workout_owner_id().label("user_id"),
             func.max(UserWorkout.completed_at).label("completed_at"),
             func.max(UserWorkout.scheduled_date).label("scheduled_on"),
         )
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
-        .filter(UserProgram.user_id.in_(user_ids), UserWorkout.status == "completed")
-        .group_by(UserProgram.user_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
+        .filter(workout_owner_id().in_(user_ids), UserWorkout.status == "completed")
+        .group_by(workout_owner_id())
         .all()
     )
     last_completed_by_user = {
@@ -724,13 +801,17 @@ def build_progress_summaries(
 
     set_rows = (
         db.query(
-            UserProgram.user_id,
+            workout_owner_id().label("user_id"),
             UserWorkoutExercise.exercise_id,
             UserWorkout.scheduled_date,
             UserWorkoutSet.actual_weight,
             UserWorkoutSet.actual_reps,
+            UserWorkoutSet.execution_mode,
+            sql_completed_set_volume().label("set_volume"),
         )
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
@@ -741,7 +822,7 @@ def build_progress_summaries(
                 user_ids,
                 start_by_user,
                 today_by_user,
-                UserProgram.user_id,
+                workout_owner_id(),
                 UserWorkout.scheduled_date,
             ),
         )
@@ -749,7 +830,14 @@ def build_progress_summaries(
     )
     period_best: dict[tuple[int, int], tuple[float, float]] = {}
     volume_by_user: dict[int, float] = defaultdict(float)
+    incomplete_volume_by_user: dict[int, bool] = defaultdict(bool)
     for set_row in set_rows:
+        if set_row.execution_mode in SIDE_MODES:
+            if set_row.set_volume is None:
+                incomplete_volume_by_user[set_row.user_id] = True
+            else:
+                volume_by_user[set_row.user_id] += float(set_row.set_volume)
+            continue
         weight = float(set_row.actual_weight or 0)
         volume = weight * float(set_row.actual_reps or 0)
         volume_by_user[set_row.user_id] += volume
@@ -759,14 +847,16 @@ def build_progress_summaries(
 
     previous_best_rows = (
         db.query(
-            UserProgram.user_id,
+            workout_owner_id().label("user_id"),
             UserWorkoutExercise.exercise_id,
             func.max(UserWorkoutSet.actual_weight).label("max_weight"),
             func.max(UserWorkoutSet.actual_weight * UserWorkoutSet.actual_reps).label(
                 "max_set_volume"
             ),
         )
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
@@ -776,14 +866,14 @@ def build_progress_summaries(
             or_(
                 *(
                     and_(
-                        UserProgram.user_id == user_id,
+                        workout_owner_id() == user_id,
                         UserWorkout.scheduled_date < start_by_user[user_id],
                     )
                     for user_id in user_ids
                 )
             ),
         )
-        .group_by(UserProgram.user_id, UserWorkoutExercise.exercise_id)
+        .group_by(workout_owner_id(), UserWorkoutExercise.exercise_id)
         .all()
     )
     previous_best = {
@@ -810,14 +900,15 @@ def build_progress_summaries(
         evaluated_workouts = [
             row
             for row in workouts
-            if row.scheduled_date < actual_today_by_user[user.id]
+            if (row.rotation_epoch is None and row.scheduled_date < actual_today_by_user[user.id])
             or row.status in {"completed", "skipped"}
         ]
         completed_workouts = [row for row in evaluated_workouts if row.status == "completed"]
         skipped_workouts = [row for row in evaluated_workouts if row.status == "skipped"]
+        evaluated_count = len(evaluated_workouts) + missing_workouts_by_user[user.id]
         workout_adherence = calculate_adherence_component(
             achieved=len(completed_workouts),
-            evaluated=len(evaluated_workouts),
+            evaluated=evaluated_count,
             weight=ADHERENCE_WEIGHTS["workouts"],
             unavailable_status="not_applicable",
             unavailable_reason="no_evaluable_planned_workouts",
@@ -992,11 +1083,14 @@ def build_progress_summaries(
             "period_start": start_by_user[user.id],
             "period_end": current_day,
             "training": {
-                "planned_workouts": len(evaluated_workouts),
-                "completed_workouts": len(completed_workouts),
+                "planned_workouts": evaluated_count,
+                "completed_workouts": training_counts_by_user[user.id].completed_workout_count,
                 "skipped_workouts": len(skipped_workouts),
-                "frequency_per_week": round(len(completed_workouts) * 7 / period_days, 2),
+                "frequency_per_week": round(
+                    training_counts_by_user[user.id].completed_workout_count * 7 / period_days, 2
+                ),
                 "volume_kg": round(volume_by_user[user.id], 2),
+                "volume_incomplete": incomplete_volume_by_user[user.id] or None,
                 "new_personal_records": new_records_by_user[user.id],
                 "last_completed_workout_on": last_completed_by_user.get(user.id),
                 "next_workout": next_workout,

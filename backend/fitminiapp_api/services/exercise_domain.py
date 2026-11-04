@@ -61,6 +61,9 @@ EQUIPMENT_TAXONOMY = (
     ("kettlebell", "Гиря"),
     ("cardio", "Кардиооборудование"),
     ("other", "Другое"),
+    ("rack", "Стойка / силовая рама"),
+    ("pullup_bar", "Турник"),
+    ("dip_bars", "Брусья"),
 )
 
 EQUIPMENT_IDENTIFIER_BY_LEGACY_VALUE = {

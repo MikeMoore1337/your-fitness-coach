@@ -1,0 +1,34 @@
+name: Harness2 Windows contract (offline)
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - scripts/harness2_dev.ps1
+      - tests/test_harness2_upstream.py
+      - docs/development/harness2-upstream.md
+      - .github/workflows/harness2-windows-contract.yml
+  push:
+    branches: [dev]
+    paths:
+      - scripts/harness2_dev.ps1
+      - tests/test_harness2_upstream.py
+      - docs/development/harness2-upstream.md
+      - .github/workflows/harness2-windows-contract.yml
+
+permissions:
+  contents: read
+
+jobs:
+  windows-powershell-offline:
+    name: Windows PowerShell 5.1 + 7 mocked integration
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Test safe Toolkit delegation without WSL or models
+        shell: pwsh
+        run: python -m unittest discover -s tests -p test_harness2_upstream.py -v

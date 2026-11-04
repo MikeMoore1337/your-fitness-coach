@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { activeWorkoutRestStorageKey } from '../../src/shared/userScopedStorage';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 import {
   expectTouchTargets,
   installTelegramHarness,
@@ -51,6 +52,471 @@ const ISSUE_996_AFTER_DIR = resolve(
   process.env.YFC_ISSUE_996_AFTER_DIR ??
     resolve(process.cwd(), '..', '.artifacts', 'tasks', '996', 'evidence', 'after'),
 );
+const ISSUE_832_AFTER_DIR = resolve(
+  process.env.YFC_832_CAPTURE_DIR ??
+    resolve(process.cwd(), '..', '.artifacts', 'tasks', '832', 'evidence', 'after'),
+);
+
+test('#832 раздельные стороны сохраняются одним подходом', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    true,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+  await page.getByLabel('По сторонам', { exact: true }).click();
+  await expect.poll(() => server.readSet(201).execution_mode).toBe('per_side');
+  await expect(page.getByLabel('По сторонам', { exact: true })).toBeChecked();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await expect(row.getByText('Одинаково на обе стороны')).toBeVisible();
+  await row.getByLabel(/^Вес, на сторону/).fill('18');
+  await row.getByLabel(/^Повторы, на сторону/).fill('10');
+  await row.getByRole('button', { name: 'Указать раздельно' }).click();
+  await expect(row.getByLabel(/^Вес, Правая/)).toHaveValue('18');
+  await row.getByLabel(/^Вес, Правая/).fill('16');
+  await row.getByLabel(/^Повторы, Правая/).fill('8');
+  await row.getByRole('button', { name: /^Левая: 2 —/ }).click();
+  await row.getByRole('button', { name: /^Правая: 0 —/ }).click();
+  await row.getByLabel('До отказа · Правая').check();
+  await row
+    .getByRole('region', { name: 'Левая сторона' })
+    .getByRole('button', { name: 'Отметить выполненной' })
+    .click();
+  await expect(row.getByRole('button', { name: 'Завершить подход' })).toBeDisabled();
+  await expect.poll(() => server.readSet(201).sides?.left?.is_completed).toBe(true);
+  await expect.poll(() => server.readSet(201).sides?.right?.is_completed).toBe(false);
+  await row
+    .getByRole('region', { name: 'Правая сторона' })
+    .getByRole('button', { name: 'Отметить выполненной' })
+    .click();
+  await row.getByRole('button', { name: 'Завершить подход' }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  expect(server.readSet(201).sides).toMatchObject({
+    left: { actual_weight: 18, actual_reps: 10, rir: '2', is_completed: true },
+    right: {
+      actual_weight: 16,
+      actual_reps: 8,
+      rir: '0',
+      reached_failure: true,
+      is_completed: true,
+    },
+  });
+  expect(
+    server.patches
+      .filter((patch) => patch.setId === 201)
+      .every((patch) => patch.body.is_completed === 'sides-v1'),
+  ).toBe(true);
+});
+
+async function capture832(page: Page, browser: string, theme: string, state: string) {
+  const widths = browser === 'chromium' ? [320, 360, 393, 430, 1440] : [393];
+  const directory = ISSUE_832_AFTER_DIR;
+  const row = page.locator('[data-workout-set-id="201"]');
+  const expectedValues =
+    state === 'same' || state === 'alternating'
+      ? ([
+          [/^Вес, на сторону/, state === 'same' ? '18' : '12'],
+          [/^Повторы, на сторону/, '10'],
+        ] as const)
+      : state === 'asymmetric' || state === 'partial'
+        ? ([
+            [/^Вес, Левая/, '18'],
+            [/^Повторы, Левая/, '10'],
+            [/^Вес, Правая/, '16'],
+            [/^Повторы, Правая/, '8'],
+          ] as const)
+        : state === 'offline' || state === 'error' || state === 'conflict'
+          ? ([
+              [/^Вес, Левая/, '18'],
+              [/^Повторы, Левая/, '10'],
+              [/^Вес, Правая/, ''],
+              [/^Повторы, Правая/, ''],
+            ] as const)
+          : [];
+  const assertValues = async () => {
+    for (const [label, value] of expectedValues) {
+      expect(await row.getByLabel(label).inputValue(), `${state} ${String(label)}`).toBe(value);
+    }
+  };
+  if (process.env.CAPTURE_832_AFTER === '1') await mkdir(directory, { recursive: true });
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+    await assertValues();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+      `${browser} ${theme} ${state} ${width}px overflow`,
+    ).toBeLessThanOrEqual(1);
+    if (state === 'asymmetric' || state === 'partial') {
+      const buttons = page.locator(
+        '[data-workout-set-id="201"] .active-workout-sides__side[aria-label] > button',
+      );
+      await expectTouchTargets(buttons);
+      expect(
+        await buttons.evaluateAll((items) =>
+          items.every((item) => item.scrollWidth <= item.clientWidth + 1),
+        ),
+      ).toBe(true);
+    }
+    if (process.env.CAPTURE_832_AFTER === '1') {
+      await page.screenshot({
+        path: resolve(directory, `${browser}-${theme}-${width}-${state}.png`),
+        fullPage: true,
+        animations: 'disabled',
+      });
+      await assertValues();
+      if (
+        width === 393 ||
+        (width !== 1440 && ['same', 'asymmetric', 'partial', 'conflict'].includes(state))
+      ) {
+        await page.locator('[data-workout-set-id="201"]').scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: resolve(directory, `${browser}-${theme}-${width}-${state}-viewport.png`),
+          animations: 'disabled',
+        });
+        await assertValues();
+      }
+    }
+  }
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#832 AFTER состояния и размеры ${theme}`, async ({ page, browserName }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+      true,
+    );
+    await mockSetHistory(page, server, true);
+    await mockRestSessions(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const row = page.locator('[data-workout-set-id="201"]');
+    await capture832(page, browserName, theme, 'bilateral');
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('По сторонам', { exact: true }).click();
+    await expect.poll(() => server.readSet(201).execution_mode).toBe('per_side');
+    await expect(row.getByText('Одинаково на обе стороны')).toBeVisible();
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    await expect(row.locator('.active-workout-set__history')).toContainText('Левая: 18 кг × 9', {
+      timeout: 15000,
+    });
+    await page.getByRole('button', { name: 'Что делать сейчас?' }).click();
+    await expect(page.getByText('Прогрессия по сторонам')).toBeVisible();
+    await capture832(page, browserName, theme, 'history-progression');
+    await row.getByLabel(/^Вес, на сторону/).fill('18');
+    await row.getByLabel(/^Повторы, на сторону/).fill('10');
+    await capture832(page, browserName, theme, 'same');
+    await row.getByRole('button', { name: 'Указать раздельно' }).click();
+    await row.getByLabel(/^Вес, Правая/).fill('16');
+    await row.getByLabel(/^Повторы, Правая/).fill('8');
+    await row.getByRole('button', { name: /^Левая: 2 —/ }).click();
+    await row.getByRole('button', { name: /^Правая: 0 —/ }).click();
+    await row.getByLabel('До отказа · Правая').check();
+    await capture832(page, browserName, theme, 'asymmetric');
+    await row
+      .getByRole('region', { name: 'Левая сторона' })
+      .getByRole('button', { name: 'Отметить выполненной' })
+      .click();
+    await expect.poll(() => server.readSet(201).sides?.left?.is_completed).toBe(true);
+    await expect(row.getByRole('button', { name: 'Завершить подход' })).toBeDisabled();
+    await capture832(page, browserName, theme, 'partial');
+    await row
+      .getByRole('region', { name: 'Правая сторона' })
+      .getByRole('button', { name: 'Отметить выполненной' })
+      .click();
+    await row.getByRole('button', { name: 'Завершить подход' }).click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    await capture832(page, browserName, theme, 'completed');
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+    await expect(
+      page.locator('[data-workout-set-id="202"] .active-workout-set__history'),
+    ).toContainText('Левая: 18 кг × 10');
+    await expect(
+      page.locator('[data-workout-set-id="202"] .active-workout-set__history'),
+    ).toContainText('Правая: 16 кг × 8');
+    const next = page.locator('[data-workout-set-id="202"]');
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 500 });
+      await next.getByLabel(/^Вес, на сторону/).focus();
+      await expect(next.getByLabel(/^Вес, на сторону/)).toBeFocused();
+      await expect
+        .poll(() =>
+          next.getByLabel(/^Вес, на сторону/).evaluate((field) => {
+            const rect = field.getBoundingClientRect();
+            const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+            return rect.bottom <= innerHeight && (!timer || rect.top >= timer.bottom);
+          }),
+        )
+        .toBe(true);
+      if (process.env.CAPTURE_832_AFTER === '1') {
+        const directory = ISSUE_832_AFTER_DIR;
+        await page.screenshot({
+          path: resolve(directory, `${browserName}-${theme}-${width}-keyboard-viewport-model.png`),
+          animations: 'disabled',
+        });
+      }
+    }
+  });
+
+  test(`#832 offline, ошибка и конфликт версий ${theme}`, async ({ page, browserName }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+    );
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('По сторонам', { exact: true }).click();
+    await expect.poll(() => server.readSet(203).execution_mode).toBe('per_side');
+    const row = page.locator('[data-workout-set-id="201"]');
+    await row.getByRole('button', { name: 'Указать раздельно' }).click();
+    await setNetworkOffline(page, true);
+    await row.getByLabel(/^Вес, Левая/).fill('18');
+    await row.getByLabel(/^Повторы, Левая/).fill('10');
+    await row
+      .getByRole('region', { name: 'Левая сторона' })
+      .getByRole('button', { name: 'Отметить выполненной' })
+      .click();
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBeGreaterThan(0);
+    await expect(page.locator('.active-workout-sync')).toContainText('Сохранено на устройстве');
+    await capture832(page, browserName, theme, 'offline');
+    server.failSetPatch(true);
+    await setNetworkOffline(page, false);
+    await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+    await capture832(page, browserName, theme, 'error');
+    const remote = server.readSet(201);
+    Object.assign(remote, {
+      version: remote.version + 1,
+      execution_mode: 'per_side',
+      sides: {
+        left: { actual_weight: 22, actual_reps: 7, is_completed: true },
+        right: { actual_weight: 15, actual_reps: 8, is_completed: false },
+      },
+    });
+    server.failSetPatch(false);
+    await page.locator('.active-workout-sync').getByRole('button', { name: 'Повторить' }).click();
+    const conflict = page.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' });
+    await expect(conflict).toBeVisible();
+    await expect(conflict).toContainText('18 кг × 10');
+    await expect(conflict).toContainText('22 кг × 7');
+    await capture832(page, browserName, theme, 'conflict');
+    await conflict.getByRole('button', { name: 'Оставить эту версию' }).click();
+    await expect.poll(() => server.readSet(201).sides?.left?.actual_weight).toBe(18);
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    expect(server.readSet(201).sides?.right).toBeNull();
+  });
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#832 чередование сохраняет первую сторону и общие значения ${theme}`, async ({
+    page,
+    browserName,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+    );
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('Поочерёдно', { exact: true }).click();
+    await expect.poll(() => server.readSet(201).execution_mode).toBe('alternating');
+    const row = page.locator('[data-workout-set-id="201"]');
+    await row.getByLabel('Первая сторона').selectOption('right');
+    await row.getByLabel(/^Вес, на сторону/).fill('12');
+    await row.getByLabel(/^Повторы, на сторону/).fill('10');
+    await capture832(page, browserName, theme, 'alternating');
+    await row.getByRole('button', { name: 'Завершить подход' }).click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    expect(server.readSet(201).first_side).toBe('right');
+    expect(server.readSet(201).sides).toMatchObject({
+      left: { actual_weight: 12, actual_reps: 10, is_completed: true },
+      right: { actual_weight: 12, actual_reps: 10, is_completed: true },
+    });
+  });
+}
+
+for (const surface of ['pwa', 'telegram'] as const) {
+  test(`#832 история сторон в ${surface}`, async ({ page, browserName }) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    if (surface === 'telegram') {
+      await installTelegramHarness(page, {
+        platform: 'ios',
+        colorScheme: 'dark',
+        safeAreaInset: { top: 20, right: 0, bottom: 16, left: 0 },
+        contentSafeAreaInset: { top: 8, right: 0, bottom: 0, left: 0 },
+      });
+    } else {
+      await page.addInitScript(() => {
+        const nativeMatchMedia = window.matchMedia.bind(window);
+        window.matchMedia = (query) => {
+          const result = nativeMatchMedia(query);
+          if (query === '(display-mode: standalone)')
+            Object.defineProperty(result, 'matches', { value: true });
+          return result;
+        };
+        Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+      });
+    }
+    const server = await mockActiveWorkout(
+      page,
+      false,
+      'approved_animated',
+      false,
+      null,
+      false,
+      null,
+      true,
+    );
+    await mockSetHistory(page, server, true);
+    await page.goto(surface === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
+    if (surface === 'telegram')
+      await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+    else await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const row = page.locator('[data-workout-set-id="201"]');
+    await expect(row.locator('.active-workout-set__history')).toContainText('Левая: 18 кг × 9');
+    await expect(
+      row.getByRole('button', { name: 'Подставить из прошлой тренировки' }),
+    ).toBeDisabled();
+    await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+    await page.getByLabel('По сторонам', { exact: true }).click();
+    await expect.poll(() => server.readSet(203).execution_mode).toBe('per_side');
+    const prefill = row.getByRole('button', { name: 'Подставить из прошлой тренировки' });
+    await expect(prefill).toBeEnabled();
+    await prefill.click();
+    await expect(row.getByLabel(/^Вес, Левая/)).toHaveValue('18');
+    await expect(row.getByLabel(/^Повторы, Левая/)).toHaveValue('9');
+    await expect(row.getByLabel(/^Вес, Правая/)).toHaveValue('16');
+    await expect(row.getByLabel(/^Повторы, Правая/)).toHaveValue('8');
+    if (process.env.CAPTURE_832_AFTER === '1') {
+      const directory = ISSUE_832_AFTER_DIR;
+      await mkdir(directory, { recursive: true });
+      await row.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: resolve(directory, `${browserName}-${surface}-393-prefill.png`),
+        animations: 'disabled',
+      });
+    }
+  });
+}
+
+test('#832 две вкладки сохраняют разные подходы без потери сторон', async ({ page, context }) => {
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    true,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page.getByRole('button', { name: /Выполнение упражнения: обычное/ }).click();
+  await page.getByLabel('По сторонам', { exact: true }).click();
+  await expect.poll(() => server.readSet(203).execution_mode).toBe('per_side');
+  const other = await context.newPage();
+  await mockActiveWorkout(
+    other,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    true,
+    false,
+    server.sets,
+  );
+  const token = await page.evaluate(() => sessionStorage.getItem('fit_access_token'));
+  expect(token).toBeTruthy();
+  await other.addInitScript((value) => sessionStorage.setItem('fit_access_token', value!), token);
+  await other.goto('/app');
+  await other.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  const second = other.locator('[data-workout-set-id="202"]');
+  await page.bringToFront();
+  await first.getByLabel(/^Вес, на сторону/).fill('18');
+  await first.getByLabel(/^Повторы, на сторону/).fill('10');
+  await first.getByRole('button', { name: 'Завершить подход' }).click();
+  await other.bringToFront();
+  await second.getByLabel(/^Вес, на сторону/).fill('16');
+  await second.getByLabel(/^Повторы, на сторону/).fill('8');
+  await second.getByRole('button', { name: 'Завершить подход' }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect
+    .poll(
+      async () =>
+        server.readSet(202).is_completed ||
+        (await page
+          .getByRole('alert')
+          .filter({ hasText: 'Сравнить версии подхода' })
+          .isVisible()) ||
+        (await other.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' }).isVisible()),
+    )
+    .toBe(true);
+  if (!server.readSet(202).is_completed) {
+    const firstConflict = page.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' });
+    const conflict = (await firstConflict.isVisible())
+      ? firstConflict
+      : other.getByRole('alert').filter({ hasText: 'Сравнить версии подхода' });
+    await expect(conflict).toContainText('16 кг × 8');
+    await conflict.getByRole('button', { name: 'Оставить эту версию' }).click();
+  }
+  await expect.poll(() => server.readSet(202).is_completed).toBe(true);
+  expect(server.readSet(201).sides?.left?.actual_weight).toBe(18);
+  expect(server.readSet(201).sides?.right?.actual_reps).toBe(10);
+  expect(server.readSet(202).sides?.left?.actual_weight).toBe(16);
+  expect(server.readSet(202).sides?.right?.actual_reps).toBe(8);
+  await other.close();
+});
 
 const captureLandingProductProofs =
   (
@@ -77,6 +543,9 @@ type SetState = {
   reached_failure: boolean | null;
   is_completed: boolean;
   version: number;
+  execution_mode?: 'bilateral' | 'per_side' | 'alternating' | null;
+  first_side?: 'left' | 'right' | null;
+  sides?: { left: SideState | null; right: SideState | null } | null;
   planned_role?:
     | 'warmup'
     | 'working'
@@ -99,6 +568,14 @@ type SetState = {
     | null;
 };
 
+type SideState = {
+  actual_reps?: number | null;
+  actual_weight?: number | null;
+  rir?: '0' | '1' | '2' | '3' | '4+' | null;
+  reached_failure?: boolean | null;
+  is_completed: boolean;
+};
+
 async function mockActiveWorkout(
   page: Page,
   mixed = false,
@@ -107,6 +584,9 @@ async function mockActiveWorkout(
   setupMemoryBody: string | null = null,
   longWorkout = false,
   exerciseTitleOverride: string | null = null,
+  supportsSides = false,
+  exampleSideGuidance = false,
+  sharedSets?: Map<number, SetState>,
 ) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
@@ -142,67 +622,73 @@ async function mockActiveWorkout(
   const cardioCompleted = new Promise<void>((resolve) => {
     resolveCardioCompleted = resolve;
   });
-  const sets = new Map<number, SetState>([
-    [
-      201,
-      {
-        actual_reps: targetStarted ? 1 : null,
-        actual_weight: null,
-        rir: null,
-        set_kind: 'working',
-        reached_failure: null,
-        is_completed: false,
-        version: 1,
-        planned_role: 'top',
-      },
-    ],
-    [
-      202,
-      {
-        actual_reps: null,
-        actual_weight: null,
-        rir: null,
-        set_kind: 'working',
-        reached_failure: null,
-        is_completed: false,
-        version: 1,
-        planned_role: 'backoff',
-      },
-    ],
-    [
-      203,
-      {
-        actual_reps: null,
-        actual_weight: null,
-        rir: null,
-        set_kind: 'working',
-        reached_failure: null,
-        is_completed: false,
-        version: 1,
-        planned_role: 'backoff',
-      },
-    ],
-    ...(mixed
-      ? ([
-          [
-            204,
-            {
-              actual_reps: null,
-              actual_weight: null,
-              duration_minutes: null,
-              distance_km: null,
-              average_heart_rate_bpm: null,
-              heart_rate_zone: null,
-              rir: null,
-              set_kind: null,
-              reached_failure: null,
-              is_completed: false,
-              version: 1,
-            },
-          ],
-        ] as Array<[number, SetState]>)
-      : []),
-  ]);
+  const sets =
+    sharedSets ??
+    new Map<number, SetState>([
+      [
+        201,
+        {
+          actual_reps: targetStarted ? 1 : null,
+          actual_weight: null,
+          rir: null,
+          set_kind: 'working',
+          reached_failure: null,
+          is_completed: false,
+          version: 1,
+          planned_role: 'top',
+        },
+      ],
+      [
+        202,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          rir: null,
+          set_kind: 'working',
+          reached_failure: null,
+          is_completed: false,
+          version: 1,
+          planned_role: 'backoff',
+        },
+      ],
+      [
+        203,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          rir: null,
+          set_kind: 'working',
+          reached_failure: null,
+          is_completed: false,
+          version: 1,
+          planned_role: 'backoff',
+        },
+      ],
+      ...(mixed
+        ? ([
+            [
+              204,
+              {
+                actual_reps: null,
+                actual_weight: null,
+                duration_minutes: null,
+                distance_km: null,
+                average_heart_rate_bpm: null,
+                heart_rate_zone: null,
+                rir: null,
+                set_kind: null,
+                reached_failure: null,
+                is_completed: false,
+                version: 1,
+              },
+            ],
+          ] as Array<[number, SetState]>)
+        : []),
+    ]);
+  if (supportsSides && !sharedSets) {
+    for (const set of sets.values())
+      Object.assign(set, { execution_mode: null, first_side: null, sides: null });
+  }
   const workout = () => ({
     id: 42,
     scheduled_date: today,
@@ -224,12 +710,48 @@ async function mockActiveWorkout(
         prescribed_sets: 3,
         prescribed_reps: '8–10',
         rest_seconds: 90,
+        source_template_exercise_id: 71,
         notes: 'Сохраняйте устойчивое положение корпуса.',
         setup_memory: setupMemory,
         has_guide: true,
         media_state: mediaState,
         media_thumbnail_url: mediaState === 'approved_animated' ? mediaThumbnailUrl : null,
         media_animation_url: mediaState === 'approved_animated' ? mediaAnimationUrl : null,
+        ...(exampleSideGuidance && sets.get(201)?.execution_mode === 'per_side'
+          ? {
+              progression_guidance: {
+                outcome: 'review',
+                message: 'Рекомендации по сторонам',
+                detail: '',
+                suggested_weight: null,
+                load_unit: 'kg',
+                proposal: null,
+                evidence: {
+                  comparable_session_count: 2,
+                  required_session_count: 2,
+                  sessions: [],
+                  reason_keys: [],
+                },
+                side_guidance: {
+                  execution_mode: 'per_side',
+                  left: {
+                    message: 'Можно рассмотреть увеличение',
+                    detail: 'Повторы достигнуты.',
+                    suggested_weight: 20.5,
+                    load_unit: 'kg',
+                    evidence: { comparable_session_count: 2, required_session_count: 2 },
+                  },
+                  right: {
+                    message: 'Пока оставьте текущую нагрузку',
+                    detail: 'Отмечен отказ.',
+                    suggested_weight: null,
+                    load_unit: 'kg',
+                    evidence: { comparable_session_count: 2, required_session_count: 2 },
+                  },
+                },
+              },
+            }
+          : {}),
         sets: [...sets]
           .filter(([id]) => id !== 204)
           .sort(([leftId, leftState], [rightId, rightState]) => {
@@ -319,6 +841,9 @@ async function mockActiveWorkout(
           trainer: null,
         },
       });
+    }
+    if (path.endsWith('/workouts/session-rotation')) {
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
     }
     if (path.endsWith('/workouts/today')) {
       if (finished) {
@@ -725,7 +1250,9 @@ async function mockActiveWorkout(
     const setMatch = path.match(/\/workouts\/sets\/(\d+)$/);
     if (setMatch) {
       const setId = Number(setMatch[1]);
-      const body = request.postDataJSON() as Partial<SetState> & {
+      const body = request.postDataJSON() as Omit<Partial<SetState>, 'is_completed'> & {
+        is_completed?: boolean | 'sides-v1';
+        side_is_completed?: boolean;
         expected_version: number;
         mutation_id: string;
       };
@@ -767,7 +1294,17 @@ async function mockActiveWorkout(
         rir: body.rir ?? null,
         set_kind: body.set_kind ?? null,
         reached_failure: body.reached_failure ?? null,
-        is_completed: body.is_completed ?? false,
+        is_completed:
+          body.is_completed === 'sides-v1'
+            ? (body.side_is_completed ?? false)
+            : (body.is_completed ?? false),
+        ...(supportsSides
+          ? {
+              execution_mode: body.execution_mode ?? null,
+              first_side: body.first_side ?? null,
+              sides: body.sides ?? null,
+            }
+          : {}),
         version: current.version + 1,
       };
       sets.set(setId, next);
@@ -799,8 +1336,18 @@ async function mockActiveWorkout(
   );
 
   return {
+    sets,
     patches,
+    readWorkout: workout,
     readSet: (setId: number) => sets.get(setId)!,
+    addFourthSet() {
+      sets.set(301, {
+        ...sets.get(203)!,
+        actual_reps: null,
+        actual_weight: null,
+        is_completed: false,
+      });
+    },
     setRole(setId: number, role: SetState['planned_role']) {
       sets.get(setId)!.planned_role = role;
     },
@@ -831,6 +1378,66 @@ async function mockActiveWorkout(
   };
 }
 
+async function mockSetHistory(
+  page: Page,
+  server: Awaited<ReturnType<typeof mockActiveWorkout>>,
+  sideHistory = false,
+) {
+  let hasHistory = true;
+  let requests = 0;
+  await page.route('**/api/v1/workouts/42/set-history', async (route) => {
+    requests += 1;
+    const exercise = server.readWorkout().exercises[0]!;
+    return route.fulfill({
+      json: {
+        workout_id: 42,
+        user_program_id: 4,
+        program_revision_number: 2,
+        sets: exercise.sets.map((set) => ({
+          set_id: set.id,
+          set_number: set.set_number,
+          set_version: set.version,
+          workout_exercise_id: exercise.id,
+          exercise_id: exercise.exercise_id,
+          source_template_exercise_id: 71,
+          previous_today: null,
+          history_status: hasHistory ? 'matched' : 'no_matching_set',
+          previous_workout: hasHistory
+            ? {
+                set_id: set.id + 1000,
+                set_number: set.set_number,
+                set_version: 1,
+                workout_id: 41,
+                workout_exercise_id: 100,
+                completed_at: '2026-10-23T12:00:00',
+                performed_on: '2026-10-23',
+                actual_weight: [160, 180, 200, 190][set.set_number - 1],
+                actual_reps: 8,
+                ...(sideHistory
+                  ? {
+                      actual_weight: null,
+                      actual_reps: null,
+                      execution_mode: 'per_side',
+                      sides: {
+                        left: { actual_weight: 18, actual_reps: 9, rir: '2', is_completed: true },
+                        right: { actual_weight: 16, actual_reps: 8, rir: '1', is_completed: true },
+                      },
+                    }
+                  : {}),
+              }
+            : null,
+        })),
+      },
+    });
+  });
+  return {
+    withoutHistory() {
+      hasHistory = false;
+    },
+    requests: () => requests,
+  };
+}
+
 function completedActions(row: Locator) {
   return row.locator('.active-workout-set__completed-actions');
 }
@@ -847,14 +1454,14 @@ async function captureIssue1162State(page: Page, info: TestInfo, theme: string, 
 
 async function activeWorkoutQueueLength(page: Page) {
   return page.evaluate(() => {
-    const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42');
+    const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
     return stored ? ((JSON.parse(stored) as { queue?: unknown[] }).queue?.length ?? 0) : 0;
   });
 }
 
-test.describe('#1097 rest clock typography and responsive layout', () => {
+test.describe('#1097 rest clock typography and v2 compact layout', () => {
   for (const theme of ['dark', 'light'] as const) {
-    test(`planned and measured clocks share size and fit the top row in ${theme}`, async ({
+    test(`planned and measured clocks preserve hierarchy and fit the top row in ${theme}`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 393, height: 844 });
@@ -873,7 +1480,7 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
       const panel = page.locator('.active-workout-rest');
       await expect(panel.locator('.active-workout-rest__actual-value')).toBeVisible();
       await expect(panel.locator('.active-workout-rest__actual-value span')).toHaveText('ФАКТ');
-      await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
 
       for (const width of [320, 360, 393, 430, 1440]) {
         await page.setViewportSize({ width, height: 844 });
@@ -882,7 +1489,7 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
           const actual = element.querySelector<HTMLElement>(
             '.active-workout-rest__actual-value strong',
           )!;
-          const next = element.querySelector<HTMLElement>('.active-workout-rest__next')!;
+          const status = element.querySelector<HTMLElement>('.active-workout-rest__status')!;
           const actualBlock = element.querySelector<HTMLElement>('.active-workout-rest__actual')!;
           const stop = element.querySelector<HTMLElement>('.active-workout-rest__stop')!;
           const original = actual.textContent;
@@ -891,13 +1498,25 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
           const timerSize = getComputedStyle(planned).fontSize;
           const actualSize = getComputedStyle(actual).fontSize;
           const actualFits = actual.scrollWidth <= actual.clientWidth + 1;
+          const plannedText = document.createRange();
+          plannedText.selectNodeContents(planned);
+          const plannedRight = plannedText.getBoundingClientRect().right;
+          const originalPlanned = planned.textContent;
+          // Exercise the maximum prescribed ten-minute rest at narrow widths.
+          planned.textContent = '10:00';
+          plannedText.selectNodeContents(planned);
+          const tenMinuteRight = plannedText.getBoundingClientRect().right;
+          const tenMinuteActualLeft = actualBlock.getBoundingClientRect().left;
+          planned.textContent = originalPlanned;
           const geometry = {
             timerSize,
             actualSize,
             actualFits,
-            plannedRight: planned.getBoundingClientRect().right,
-            nextLeft: next.getBoundingClientRect().left,
-            nextRight: next.getBoundingClientRect().right,
+            plannedLeft: planned.getBoundingClientRect().left,
+            plannedRight,
+            tenMinuteRight,
+            tenMinuteActualLeft,
+            statusLeft: status.getBoundingClientRect().left,
             actualLeft: actualBlock.getBoundingClientRect().left,
             actualRight: actualBlock.getBoundingClientRect().right,
             stopRight: stop.getBoundingClientRect().right,
@@ -907,22 +1526,39 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
               document.documentElement.scrollWidth - document.documentElement.clientWidth,
             actions: Array.from(
               element.querySelectorAll<HTMLElement>('.active-workout-rest__actions button'),
-            ).map((button) => button.getBoundingClientRect().width),
+            ).map((button) => {
+              const box = button.getBoundingClientRect();
+              return { left: box.left, width: box.width };
+            }),
           };
           actual.textContent = original;
           return geometry;
         });
-        expect(result.actualSize, `${width}px ${theme}: matching clock type scale`).toBe(
-          result.timerSize,
-        );
+        expect(
+          parseFloat(result.timerSize),
+          `${width}px ${theme}: planned clock hierarchy`,
+        ).toBeGreaterThanOrEqual(parseFloat(result.actualSize));
         expect(result.actualFits, `${width}px ${theme}: full hour format visible`).toBe(true);
-        expect(result.plannedRight).toBeLessThanOrEqual(result.nextLeft + 1);
-        expect(result.nextRight).toBeLessThanOrEqual(result.actualLeft + 1);
+        expect(
+          result.actualLeft - result.plannedRight,
+          `${width}px ${theme}: clock separation`,
+        ).toBeGreaterThanOrEqual(15);
+        expect(
+          result.tenMinuteActualLeft - result.tenMinuteRight,
+          `${width}px ${theme}: ten-minute rest`,
+        ).toBeGreaterThanOrEqual(4);
+        expect(result.actualRight).toBeLessThanOrEqual(result.statusLeft + 1);
         expect(result.stopRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.documentOverflow).toBeLessThanOrEqual(1);
         expect(result.actions).toHaveLength(4);
-        expect(result.actions.every((buttonWidth) => buttonWidth >= 44)).toBe(true);
+        expect(result.actions.every((button) => button.width >= 44)).toBe(true);
+        expect(Math.abs(result.plannedLeft - result.actions[0]!.left)).toBeLessThanOrEqual(1);
+        expect(Math.abs(result.actualLeft - result.actions[1]!.left)).toBeLessThanOrEqual(2);
+        // Compare rendered pixels, not platform-specific fractional font metrics.
+        expect(
+          Math.round(Math.abs(result.tenMinuteActualLeft - result.actions[1]!.left)),
+        ).toBeLessThanOrEqual(8);
         await panel.screenshot({
           path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
           animations: 'disabled',
@@ -1379,7 +2015,7 @@ async function verifyIssue1099RestSwipe(page: Page, info: TestInfo, surface: 'br
         },
       ),
     ),
-  ).toEqual([true, true, true, true, true]);
+  ).toEqual([true, true, true, true, true, true]);
   expect(await reps.inputValue()).toBe('12');
   expect(server.readSet(202).is_completed).toBe(false);
   expect(server.patches).toHaveLength(patchCountBeforeGesture);
@@ -2477,7 +3113,7 @@ for (const width of [320, 360, 393, 430]) {
       for (const phase of ['running', 'collapsed']) {
         if (phase === 'collapsed') {
           await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
-          await expect(panel.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+          await expect(panel.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
         }
         const samples = await probe();
         const tops = samples.map((sample) => sample.top);
@@ -2782,7 +3418,9 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
             .getAttribute('data-workout-set-id'),
           timers: await page.getByRole('timer', { name: 'Отдых' }).count(),
           queue: await page.evaluate(() =>
-            JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42') ?? '{}'),
+            JSON.parse(
+              localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}',
+            ),
           ),
         },
         null,
@@ -3058,7 +3696,7 @@ for (const width of [320, 360, 393, 430]) {
       );
       expect(rests).toHaveLength(1);
       const queue = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42') ?? '{}'),
+        JSON.parse(localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}'),
       );
       expect(queue.queue).toEqual([]);
       await page.screenshot({ path: info.outputPath(`completion-after-${width}-${theme}.png`) });
@@ -3201,7 +3839,7 @@ test('P1 lock and resume completion starts the measured rest panel', async ({ pa
   ]);
   await expect.poll(() => server.readSet(201).is_completed).toBe(true);
   await expect(page.locator('.active-workout-rest__actual-value strong')).toHaveText('0:00');
-  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
 });
 
 for (const theme of ['dark', 'light'] as const) {
@@ -3224,7 +3862,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate(() => {
       const write = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key: string, value: string) {
-        if (key.startsWith('fit_active_workout_v1_'))
+        if (key.startsWith('fit_active_workout_queue_v4_'))
           throw new DOMException('Quota', 'QuotaExceededError');
         return write.call(this, key, value);
       };
@@ -3311,7 +3949,7 @@ test('P1 combined API and storage failure never claims durable completion', asyn
   await page.evaluate(() => {
     const write = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (key.startsWith('fit_active_workout_v1_'))
+      if (key.startsWith('fit_active_workout_queue_v4_'))
         throw new DOMException('Quota', 'QuotaExceededError');
       return write.call(this, key, value);
     };
@@ -3680,6 +4318,51 @@ async function assertIssue996FooterGeometry(dialog: Locator, afterPreview = fals
   }
 }
 
+test('#1202 searches verified replacements without applying one', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await mockActiveWorkout(page);
+  await page.route('**/workouts/42/exercises/101/alternatives?*', (route) =>
+    route.fulfill({
+      json: [
+        {
+          exercise_id: 13,
+          title: 'Жим гантелей лёжа',
+          aliases: ['dumbbell bench press'],
+          equipment_ids: ['dumbbell', 'bench'],
+        },
+        { exercise_id: 14, title: 'Жим в тренажёре', aliases: [], equipment_ids: ['machine'] },
+        { exercise_id: 15, title: 'Отжимания', aliases: [], equipment_ids: ['bodyweight'] },
+        { exercise_id: 16, title: 'Жим Смита', aliases: [], equipment_ids: ['machine'] },
+      ],
+    }),
+  );
+  const writes: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/adaptations/'))
+      writes.push(request.url());
+  });
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('button', { name: 'Заменить только в этой тренировке', exact: true })
+    .first()
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Заменить только в этой тренировке' });
+  await dialog.getByRole('checkbox', { name: 'Гантели' }).check();
+  await dialog.getByRole('checkbox', { name: 'Скамья' }).check();
+  await dialog.getByRole('button', { name: 'Все подходящие' }).click();
+  const search = dialog.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+  await search.focus();
+  await search.fill('dumbell bench press');
+  await expect(dialog.getByRole('radio', { name: /Жим гантелей лёжа/ })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: /Жим Смита/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
+  expect(writes).toEqual([]);
+});
+
 test('V9-01 replaces only an untouched active exercise and survives refresh', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockActiveWorkout(page);
@@ -4011,7 +4694,7 @@ for (const [theme, width] of [
   });
 }
 
-for (const width of [320, 360, 393, 430]) {
+for (const width of [320, 360, 361, 375, 390, 393, 430]) {
   for (const theme of ['dark', 'light'] as const) {
     test(`#996 footer geometry ${theme} ${width}px`, async ({ page }) => {
       const dialog = await openIssue996Replacement(page, { width, theme });
@@ -4798,11 +5481,11 @@ test('active workout keeps one obvious next action through logging, timer and fi
   const secondSet = page.locator('[data-workout-set-id="202"]');
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
   await expect(secondSet.getByText('Облегчённый подход', { exact: true })).toBeVisible();
-  await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
+  await expect(secondSet.locator('.active-workout-set__history')).toContainText('40 кг × 8');
   await secondSet.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('35');
   await expect.poll(() => secondSetPatchBodies.length).toBeGreaterThan(0);
   const patchesBeforePrefill = secondSetPatchBodies.length;
-  await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
+  await secondSet.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }).click();
   await expect.poll(() => secondSetPatchBodies.length).toBe(patchesBeforePrefill);
   await expect(secondSet.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('35');
   await expect(
@@ -4812,12 +5495,10 @@ test('active workout keeps one obvious next action through logging, timer and fi
     secondSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }),
   ).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
-  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
-    'Далее: Жим штанги лёжа',
-  );
-  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
-    'Подход 2 из 3',
-  );
+  const restPanel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+  await expect(restPanel).not.toContainText('Жим штанги лёжа');
+  await expect(restPanel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
+  await expect(secondSet).toHaveAttribute('aria-current', 'step');
 
   await secondSet.getByText('Дополнительно').click();
   await secondSet.getByLabel('Вид подхода').selectOption('drop');
@@ -4832,8 +5513,9 @@ test('active workout keeps one obvious next action through logging, timer and fi
   const thirdSet = page.locator('[data-workout-set-id="203"]');
   await expect(thirdSet).toHaveAttribute('aria-current', 'step');
   await thirdSet.getByRole('button', { name: /^4\+ —/ }).click();
+  await thirdSet.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }).click();
   const thirdDone = thirdSet.getByRole('button', {
-    name: 'Подставить и завершить',
+    name: 'Завершить: Жим штанги лёжа, подход 3',
   });
   await thirdDone.evaluate((element) =>
     element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' }),
@@ -4919,16 +5601,16 @@ async function runIssue1164SpacingScenario(
 
   const secondSet = page.locator('[data-workout-set-id="202"]');
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
-  await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
+  await expect(secondSet.locator('.active-workout-set__history')).toContainText('40 кг × 8');
   await expect(secondSet.locator('.active-workout-set__context')).toContainText('8–10 повторений');
   await expect(secondSet.locator('.active-workout-set__context')).toContainText('Отдых 90 с');
-  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
   await captureState('02-rest-prefill-visible', secondSet, true);
 
   const measure = async () =>
     page.evaluate(() => {
       const row = document.querySelector<HTMLElement>('[data-workout-set-id="202"]');
-      const previous = row?.querySelector<HTMLElement>('.active-workout-set__previous');
+      const previous = row?.querySelector<HTMLElement>('.active-workout-set__history');
       const prefill = row?.querySelector<HTMLElement>('.active-workout-set__prefill-actions');
       const context = row?.querySelector<HTMLElement>('.active-workout-set__context');
       const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
@@ -4951,12 +5633,14 @@ async function runIssue1164SpacingScenario(
   expect(beforePrefill!.contextGap).toBeLessThanOrEqual(24);
   expect(beforePrefill!.prefillAfterControlsGap).toBeGreaterThanOrEqual(-1);
 
-  await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
-  await expect(secondSet.locator('.active-workout-set__prefill-actions')).toHaveClass(/is-hidden/);
+  await secondSet.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }).click();
+  await expect(
+    secondSet.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }),
+  ).toBeDisabled();
   const afterPrefill = await measure();
   expect(afterPrefill).not.toBeNull();
-  expect(afterPrefill!.prefillHeight).toBe(0);
-  expect(afterPrefill!.prefillVisibility).toBe('hidden');
+  expect(afterPrefill!.prefillHeight).toBe(beforePrefill!.prefillHeight);
+  expect(afterPrefill!.prefillVisibility).toBe('visible');
   expect(afterPrefill!.contextGap).toBeLessThanOrEqual(24);
   await captureState('03-rest-prefill-dismissed', secondSet, true);
 
@@ -4967,21 +5651,33 @@ async function runIssue1164SpacingScenario(
   await secondSet.getByText('Дополнительно', { exact: true }).click();
   await expect(secondSet.getByLabel('Вид подхода')).not.toBeVisible();
 
+  // #1318: keep the focus outline inside both inputs without shifting the label.
   const weight = secondSet.getByLabel(/Вес,/);
+  const repetitions = secondSet.getByRole('spinbutton', { name: /Повторы,/ });
+  for (const field of [weight, repetitions]) {
+    await field.focus();
+    await expect(field).toBeFocused();
+    await expect(field).toHaveCSS('outline-width', '3px');
+    await expect(field).toHaveCSS('outline-offset', '-4px');
+    const distance = await field.evaluate((input) => {
+      const caption = input.closest('label')!.querySelector('span')!;
+      return input.getBoundingClientRect().top - caption.getBoundingClientRect().bottom;
+    });
+    expect(distance).toBeGreaterThanOrEqual(0);
+  }
   await weight.focus();
-  await expect(weight).toBeFocused();
   await expectClearOfBottomDock(weight, `${theme} ${viewport.width}px weight`);
   await expectClearOfBottomDock(
     secondSet.getByRole('button', { name: /^Завершить:/ }),
     `${theme} ${viewport.width}px completion`,
   );
   const focusedPrefill = await measure();
-  expect(focusedPrefill?.prefillHeight).toBe(0);
-  expect(focusedPrefill?.prefillVisibility).toBe('hidden');
+  expect(focusedPrefill?.prefillHeight).toBe(beforePrefill!.prefillHeight);
+  expect(focusedPrefill?.prefillVisibility).toBe('visible');
   await weight.blur();
   await expect(weight).not.toBeFocused();
   const afterBlur = await measure();
-  expect(afterBlur?.prefillHeight).toBe(0);
+  expect(afterBlur?.prefillHeight).toBe(beforePrefill!.prefillHeight);
   if (capture) {
     await mkdir(directory, { recursive: true });
     await writeFile(
@@ -4998,12 +5694,12 @@ async function runIssue1164SpacingScenario(
     .toBe(true);
 
   await page.getByRole('button', { name: 'Свернуть таймер' }).click();
-  await expect(page.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
   expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
   await captureState('05-rest-collapsed', secondSet, true);
 
-  await page.getByRole('button', { name: 'Показать таймер' }).click();
-  await page.getByRole('button', { name: 'Завершить отдых' }).click();
+  await page.getByRole('button', { name: 'Развернуть таймер' }).click();
+  await page.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
   await expect(page.getByRole('button', { name: 'Скрыть' })).toBeVisible();
   expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
   await captureState('06-rest-completed', secondSet, true);
@@ -5306,9 +6002,11 @@ for (const width of [320, 360, 393, 430]) {
           const done = element
             .querySelector('[data-workout-field="done"]')!
             .getBoundingClientRect();
+          // Normalize Firefox coordinate rounding without changing the 12–16px bounds.
+          const normalize = (value: number) => Math.round(value * 16_384) / 16_384;
           return {
-            above: rir.top - Math.max(weight.bottom, reps.bottom),
-            below: done.top - rir.bottom,
+            above: normalize(rir.top - Math.max(weight.bottom, reps.bottom)),
+            below: normalize(done.top - rir.bottom),
           };
         });
         if (process.env.YFC_1272_CAPTURE_DIR) {
@@ -5593,7 +6291,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await pulse.click();
   await cardio.getByRole('spinbutton', { name: 'Средний пульс, уд/мин' }).fill('138');
   await cardio.getByRole('combobox', { name: 'Зона пульса' }).selectOption('3');
-  await expect(cardio.locator('details')).toHaveAttribute('open', '');
+  await expect(cardio.locator('.active-workout-set__advanced')).toHaveAttribute('open', '');
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-119/mobile-web-390x844-dark-mixed-workout.png',
@@ -5616,7 +6314,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42');
+        const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
         if (!stored) return -1;
         return (JSON.parse(stored) as { queue: unknown[] }).queue.length;
       }),
@@ -6089,6 +6787,32 @@ for (const issue1162Width of [320, 360, 393, 430]) {
       );
       expect(closedLayout.buttonsFit).toEqual([true, true]);
       expect(closedLayout.actions?.height).toBeLessThanOrEqual(52);
+
+      // #1320: completed RIR/failure can be corrected without reopening the set.
+      const writesBeforeMetadata = server.patches.length;
+      await first.locator('.active-workout-set__advanced > summary').click();
+      const completedRir = first.getByRole('button', { name: /^1 —/ });
+      const completedFailure = first.getByRole('checkbox', { name: 'Подход до отказа' });
+      await expect(completedRir).toBeEnabled();
+      await expect(completedFailure).toBeEnabled();
+      await completedRir.click();
+      await expect.poll(() => server.readSet(201).rir).toBe('1');
+      await completedRir.click();
+      await expect.poll(() => server.readSet(201).rir).toBeNull();
+      await first.getByRole('button', { name: /^2 —/ }).click();
+      await expect.poll(() => server.readSet(201).rir).toBe('2');
+      await completedFailure.check();
+      await expect.poll(() => server.readSet(201).reached_failure).toBe(true);
+      await completedFailure.uncheck();
+      await expect.poll(() => server.readSet(201).reached_failure).toBe(false);
+      await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+      const metadataWrites = server.patches.slice(writesBeforeMetadata);
+      expect(metadataWrites.length).toBeGreaterThanOrEqual(5);
+      expect(metadataWrites.every((patch) => patch.body.is_completed === true)).toBe(true);
+      expect(server.readSet(201).is_completed).toBe(true);
+      await expect(first.getByText('Выполнен', { exact: true })).toBeVisible();
+      await expect(current).toHaveAttribute('aria-current', 'step');
+      await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
 
       const actions = completedActions(first);
       await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
@@ -6722,7 +7446,7 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
-  await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
   await expect(panel).toContainText('ФАКТ');
   await expect(panel).not.toHaveClass(/is-compact/);
   await expect
@@ -6758,12 +7482,12 @@ test('rest timer reaches its final state from the deadline without user events',
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
   await expect(panel).toContainText('ФАКТ');
-  await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
-  await panel.getByRole('button', { name: 'Завершить отдых' }).click();
+  await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
   await expect(panel).toHaveClass(/is-compact/);
   await expect(panel).toContainText('Отдых завершён по отметке');
   await panel.getByRole('button', { name: 'Скрыть' }).click();
-  await expect(panel.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Новый отдых' })).toBeVisible();
 });
 
 test('policy C offers manual rest recovery after fifteen minutes away past the deadline', async ({
@@ -6780,7 +7504,7 @@ test('policy C offers manual rest recovery after fifteen minutes away past the d
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
   await expect(
-    page.locator('.active-workout-rest').getByRole('button', { name: 'Завершить отдых' }),
+    page.locator('.active-workout-rest').getByRole('button', { name: 'Стоп: завершить отдых' }),
   ).toBeVisible();
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
@@ -6794,13 +7518,12 @@ test('policy C offers manual rest recovery after fifteen minutes away past the d
     });
     document.dispatchEvent(new Event('visibilitychange'));
   });
+  await page.getByRole('button', { name: 'Уточнить', exact: true }).click();
   const review = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
   await expect(review).toBeVisible();
-  await expect(review).toContainText('Вы забыли завершить отдых?');
-  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
-  await review
-    .getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' })
-    .fill('2,5');
+  await expect(page.getByRole('dialog', { name: 'Сколько отдыхали?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toHaveCount(0);
+  await review.getByRole('textbox', { name: 'Фактическое время, минуты' }).fill('2,5');
   await review.getByRole('button', { name: 'Сохранить время' }).click();
   await expect(page.locator('.active-workout-rest')).toContainText(
     'Отдых сохранён по вашей отметке',
@@ -6835,7 +7558,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
         safeAreaInset: { top: 24, right: 0, bottom: 34, left: 0 },
       });
     }
-    await mockActiveWorkout(page);
+    const server = await mockActiveWorkout(page);
     await page.goto(telegram ? '/app?tgWebAppPlatform=ios' : '/app');
     if (!telegram) await page.getByRole('button', { name: 'Клиент', exact: true }).click();
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
@@ -6850,7 +7573,14 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await expect(current).toHaveAttribute('aria-current', 'step');
     await current.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
     await current.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
-    await current.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+    const rir = current.getByRole('button', { name: '2 — ещё примерно 2 повтора' });
+    await scrollIntoStablePosition(rir);
+    await rir.click();
+    await expect(rir).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .poll(() => server.readSet(202))
+      .toMatchObject({ actual_weight: 42.5, actual_reps: 9, rir: '2' });
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
     await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
     await page.clock.setFixedTime(new Date('2026-10-10T12:00:02Z'));
     const writes: Array<{ method: string; path: string; completed: unknown }> = [];
@@ -6993,6 +7723,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
           .getByRole('button', { name: '2 — ещё примерно 2 повтора' })
           .scrollIntoViewIfNeeded();
         await page.screenshot({ path: testInfo.outputPath(`selection-rir-${width}-${theme}.png`) });
+        await settleViewport(page);
 
         const nutritionLink = navigation.getByRole('link', { name: 'Питание', exact: true });
         const materialGeometry = await nutritionLink.evaluate((link) => {
@@ -7028,6 +7759,17 @@ test.describe('#914 rest timer pointer lifecycle', () => {
           body: JSON.stringify(materialGeometry),
           contentType: 'application/json',
         });
+        await settleViewport(page);
+        await expect
+          .poll(() =>
+            nutritionLink.evaluate((link) => {
+              const rect = link.getBoundingClientRect();
+              return link.contains(
+                document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+              );
+            }),
+          )
+          .toBe(true);
         await nutritionLink.tap();
         await expect(page).toHaveURL(/section=nutrition/);
         await expect(page.locator('.app-section--nutrition')).toBeVisible();
@@ -7256,7 +7998,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     // After rapid repeated taps, the terminal "Скрыть" action may already have
     // been hit at the former Skip coordinates. Both terminal states must retain
     // the explicit restart action without starting another interval.
-    const restart = context.panel.getByRole('button', { name: 'Начать отдых' });
+    const restart = context.panel.getByRole('button', { name: 'Новый отдых' });
     await expect(restart).toBeVisible();
     const dismiss = context.panel.getByRole('button', { name: 'Скрыть' });
     if (await dismiss.isVisible()) await dismiss.click();
@@ -7286,7 +8028,9 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     // already pressed Skip is an explicit user action, so it must be honored.
     await expect(context.panel).toHaveClass(/is-compact/);
     await expect(context.panel).toContainText('Отдых пропущен');
-    await expect(context.panel.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
+    await expect(context.panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toHaveCount(
+      0,
+    );
     await unchanged(page, context);
   });
 });
@@ -7343,7 +8087,7 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
   await page.screenshot({ path: `${packagePath}/mobile-light-rest.png`, fullPage: true });
 
   const secondSet = page.locator('[data-workout-set-id="202"]');
-  await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
+  await secondSet.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }).click();
   await page.screenshot({ path: `${packagePath}/mobile-light-prefilled-set.png`, fullPage: true });
   await secondSet.getByText('Дополнительно', { exact: true }).click();
   await secondSet.getByLabel('Вид подхода').selectOption('drop');
@@ -7401,13 +8145,16 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
   if (await skipRest.isVisible()) await skipRest.click();
   const remainingSecondSet = page.locator('[data-workout-set-id="202"]');
   await remainingSecondSet
-    .getByRole('button', { name: /Подставить и завершить|Завершить: Жим штанги лёжа, подход 2/ })
+    .getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' })
     .click();
   const remainingThirdSet = page.locator('[data-workout-set-id="203"]');
   const skipSecondRest = page.getByRole('button', { name: 'Пропустить' });
   if (await skipSecondRest.isVisible()) await skipSecondRest.click();
   await remainingThirdSet
-    .getByRole('button', { name: /Подставить и завершить|Завершить: Жим штанги лёжа, подход 3/ })
+    .getByRole('button', { name: 'Подставить предыдущий подход сегодня' })
+    .click();
+  await remainingThirdSet
+    .getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 3' })
     .click();
   await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
@@ -7433,7 +8180,7 @@ for (const theme of ['light', 'dark'] as const) {
       await set.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
       await set.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
       const rest = page.locator('.active-workout-rest');
-      await expect(rest.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await expect(rest.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
       await expect(rest).toContainText('ФАКТ');
       const folder = resolve(
         process.cwd(),
@@ -7463,9 +8210,10 @@ for (const theme of ['light', 'dark'] as const) {
         });
         document.dispatchEvent(new Event('visibilitychange'));
       });
-      const review = rest.getByRole('group', { name: 'Уточнение фактического отдыха' });
+      await rest.getByRole('button', { name: 'Уточнить', exact: true }).click();
+      const review = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
       await expect(review).toBeVisible();
-      await expect(review).toContainText('Вы забыли завершить отдых?');
+      await expect(page.getByRole('dialog', { name: 'Сколько отдыхали?' })).toBeVisible();
       await page.screenshot({
         path: resolve(folder, `after-${theme}-${width}-recovery.png`),
         animations: 'disabled',
@@ -7478,6 +8226,8 @@ async function mockRestSessions(page: Page) {
   const intervals: Record<number, Record<string, unknown>> = {};
   let nextId = 900;
   let restartRequests = 0;
+  let actionFailure: number | null = null;
+  let actionBarrier: Promise<void> | null = null;
   await page.route('**/api/v1/workouts/42/rest-sessions', async (route) => {
     const request = route.request();
     if (request.method() === 'GET') {
@@ -7504,6 +8254,14 @@ async function mockRestSessions(page: Page) {
     await route.fulfill({ json: intervals[id] });
   });
   await page.route('**/api/v1/workouts/rest-sessions/*/actions', async (route) => {
+    if (actionBarrier) await actionBarrier;
+    if (actionFailure) {
+      await route.fulfill({
+        status: actionFailure,
+        json: { detail: 'Controlled rest save failure' },
+      });
+      return;
+    }
     const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
     const interval = intervals[id];
     const payload = route.request().postDataJSON();
@@ -7556,7 +8314,23 @@ async function mockRestSessions(page: Page) {
     };
     await route.fulfill({ json: intervals[id] });
   });
-  return { intervals, restartCount: () => restartRequests };
+  return {
+    intervals,
+    restartCount: () => restartRequests,
+    failActions(status: number | null) {
+      actionFailure = status;
+    },
+    holdNextAction() {
+      let release!: () => void;
+      actionBarrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return () => {
+        actionBarrier = null;
+        release();
+      };
+    },
+  };
 }
 
 for (const theme1166 of ['dark', 'light'] as const) {
@@ -7594,20 +8368,380 @@ for (const theme1166 of ['dark', 'light'] as const) {
       await expect(page.getByRole('button', { name: 'Свернуть таймер' })).toBeVisible();
       await shot('01-running');
       await page.getByRole('button', { name: 'Свернуть таймер' }).click();
-      await expect(page.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
       await shot('02-hidden');
-      await page.getByRole('button', { name: 'Показать таймер' }).click();
+      await page.getByRole('button', { name: 'Развернуть таймер' }).click();
       await shot('03-reopened');
-      await page.getByRole('button', { name: 'Завершить отдых' }).click();
-      await expect(page.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+      await page.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
+      await expect(page.getByRole('button', { name: 'Новый отдых' })).toBeVisible();
       await shot('04-stopped');
-      await page.getByRole('button', { name: 'Начать отдых' }).click();
-      await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await page.getByRole('button', { name: 'Новый отдых' }).click();
+      await expect(page.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
       await shot('05-restarted');
       expect(server.readSet(201).is_completed).toBe(true);
     });
   }
 }
+for (const theme of ['light', 'dark'] as const) {
+  test(`Issue #1132 shows four corresponding sets and preserves the timer in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.slow();
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page);
+    server.addFourthSet();
+    await mockRestSessions(page);
+    Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, is_completed: true });
+    await mockSetHistory(page, server);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const second = page.locator('[data-workout-set-id="202"]');
+    await second.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('45');
+    await second.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('8');
+    await second.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }).click();
+    await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toBeVisible();
+    const third = page.locator('[data-workout-set-id="203"]');
+    await expect(third).toHaveAttribute('aria-current', 'step');
+    await expect(third.getByRole('group', { name: 'История подхода 3' })).toBeVisible();
+    for (const [id, value] of [
+      [201, 160],
+      [202, 180],
+      [203, 200],
+      [301, 190],
+    ]) {
+      await expect(
+        page.locator(`[data-workout-set-id="${id}"] .active-workout-set__history`),
+      ).toContainText(`${value} кг × 8`);
+    }
+    await expect(third.locator('.active-workout-set__history')).toContainText('45 кг × 8');
+    await expect(third.locator('.active-workout-set__history')).toContainText(
+      'тип недели может отличаться',
+    );
+    for (const width of [320, 360, 393, 430, 1440]) {
+      await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+      // The mobile-to-desktop layout can reflow after setViewportSize resolves.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      const layout = await third.evaluate((row) => {
+        const history = row.querySelector('.active-workout-set__history')!.getBoundingClientRect();
+        const controls = row
+          .querySelector('.active-workout-set__controls')!
+          .getBoundingClientRect();
+        const buttons = [
+          ...row.querySelectorAll<HTMLButtonElement>('.active-workout-set__prefill-actions button'),
+        ].map((button) => button.getBoundingClientRect());
+        return { history, controls, buttons, scrollWidth: document.documentElement.scrollWidth };
+      });
+      expect(layout.history.bottom).toBeLessThanOrEqual(layout.controls.top + 1);
+      expect(layout.buttons).toHaveLength(2);
+      expect(layout.buttons[0]!.bottom).toBeLessThanOrEqual(layout.buttons[1]!.top + 1);
+      expect(layout.buttons.every((button) => button.height >= 44)).toBe(true);
+      expect(layout.buttons.every((button) => button.height <= 60)).toBe(true);
+      expect(layout.scrollWidth).toBeLessThanOrEqual(width + 1);
+      for (const action of await third
+        .locator('.active-workout-set__prefill-actions button')
+        .all()) {
+        await action.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
+        expect(
+          await action.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            const hit = document.elementFromPoint(
+              box.left + box.width / 2,
+              box.top + box.height / 2,
+            );
+            return hit === element || element.contains(hit);
+          }),
+        ).toBe(true);
+      }
+      if (
+        (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') ||
+        (process.env.YFC_1132_WEBKIT_CAPTURE === '1' &&
+          info.project.name === 'webkit' &&
+          width === 393)
+      ) {
+        const directory = resolve(
+          process.cwd(),
+          '..',
+          'docs',
+          'ux-proposals',
+          'issue-1132-v12',
+          'after',
+        );
+        const prefix = info.project.name === 'webkit' ? 'webkit-' : '';
+        await mkdir(directory, { recursive: true });
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+        await page.screenshot({
+          path: resolve(directory, `${prefix}${theme}-${width}-four-sets.png`),
+          fullPage: true,
+          scale: 'css',
+          animations: 'disabled',
+        });
+        if (width === 393) {
+          await third.evaluate((element) => {
+            window.scrollBy({
+              top: element.getBoundingClientRect().top - 120,
+              behavior: 'instant',
+            });
+          });
+          await page.screenshot({
+            path: resolve(directory, `${prefix}${theme}-393-active-viewport.png`),
+            animations: 'disabled',
+          });
+        }
+      }
+    }
+    const past = third.getByRole('button', { name: 'Подставить из прошлой тренировки' });
+    await expect(past).toBeEnabled();
+    const today = third.getByRole('button', { name: 'Подставить предыдущий подход сегодня' });
+    await third.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 3' }).focus();
+    await page.keyboard.press('Tab');
+    await expect(today).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(past).toBeFocused();
+    await third.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+    await third.getByText('Дополнительно', { exact: true }).click();
+    await third.getByLabel('Подход до отказа').check();
+    await past.click();
+    await expect(third.getByLabel('Вес, Жим штанги лёжа, подход 3')).toHaveValue('200');
+    await expect(third.getByLabel('Повторы, Жим штанги лёжа, подход 3')).toHaveValue('8');
+    await expect.poll(() => server.readSet(203).actual_weight).toBe(200);
+    expect(server.readSet(203)).toMatchObject({
+      actual_reps: 8,
+      rir: '2',
+      reached_failure: true,
+      is_completed: false,
+    });
+  });
+
+  test(`Issue #1132 keeps empty history and the first set usable in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page);
+    const history = await mockSetHistory(page, server);
+    history.withoutHistory();
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const first = page.locator('[data-workout-set-id="201"]');
+    await expect(first.locator('.active-workout-set__history')).toContainText(
+      'Нет прошлого результата',
+    );
+    await expect(first.locator('.active-workout-set__history')).toContainText(
+      'Нет завершённого подхода',
+    );
+    await expect(
+      first.getByRole('button', { name: 'Подставить из прошлой тренировки' }),
+    ).toBeDisabled();
+    if (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') {
+      const directory = resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux-proposals',
+        'issue-1132-v12',
+        'after',
+      );
+      await mkdir(directory, { recursive: true });
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      await page.screenshot({
+        path: resolve(directory, `${theme}-393-no-history.png`),
+        fullPage: true,
+        animations: 'disabled',
+      });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      await page.screenshot({
+        path: resolve(directory, `${theme}-1440-no-history.png`),
+        fullPage: true,
+        animations: 'disabled',
+      });
+      await page.setViewportSize({ width: 393, height: 844 });
+    }
+    const input = first.getByLabel('Вес, Жим штанги лёжа, подход 1');
+    await input.focus();
+    await page.setViewportSize({ width: 393, height: 480 });
+    await input.evaluate((element) =>
+      element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+    );
+    await expect(input).toBeFocused();
+    expect(
+      await input.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return box.top >= 0 && box.bottom <= window.innerHeight && hit === element;
+      }),
+    ).toBe(true);
+    if (process.env.YFC_1132_KEYBOARD_CAPTURE === '1') {
+      const prefix = info.project.name === 'webkit' ? 'webkit-' : '';
+      await page.screenshot({
+        path: resolve(
+          process.cwd(),
+          '..',
+          'docs',
+          'ux-proposals',
+          'issue-1132-v12',
+          'after',
+          `${prefix}${theme}-393-keyboard-model.png`,
+        ),
+        animations: 'disabled',
+      });
+    }
+  });
+
+  test(`Issue #1132 allows the first set to use only its matching past result in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page);
+    await mockSetHistory(page, server);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const first = page.locator('[data-workout-set-id="201"]');
+    const past = first.getByRole('button', { name: 'Подставить из прошлой тренировки' });
+    await expect(past).toBeEnabled();
+    await expect(
+      first.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }),
+    ).toBeDisabled();
+    await expect(first.locator('.active-workout-set__history')).toContainText('160 кг × 8');
+    if (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') {
+      const directory = resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux-proposals',
+        'issue-1132-v12',
+        'after',
+      );
+      await mkdir(directory, { recursive: true });
+      await first.evaluate((element) =>
+        window.scrollBy({ top: element.getBoundingClientRect().top - 25, behavior: 'instant' }),
+      );
+      await page.screenshot({
+        path: resolve(directory, `${theme}-393-first-viewport.png`),
+        animations: 'disabled',
+      });
+    }
+    await past.click();
+    await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('160');
+    await expect.poll(() => server.readSet(201).actual_weight).toBe(160);
+    expect(server.readSet(201).is_completed).toBe(false);
+  });
+}
+
+test('Issue #1132 preserves history and explicit prefill in mocked Telegram Mini App', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await installTelegramHarness(page, {
+    platform: 'ios',
+    colorScheme: 'dark',
+    safeAreaInset: { top: 20, right: 0, bottom: 16, left: 0 },
+    contentSafeAreaInset: { top: 8, right: 0, bottom: 0, left: 0 },
+  });
+  const server = await mockActiveWorkout(page);
+  await mockSetHistory(page, server);
+  await page.goto('/app?tgWebAppPlatform=ios');
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  const past = first.getByRole('button', { name: 'Подставить из прошлой тренировки' });
+  await expect(past).toBeEnabled();
+  await expect(first.getByRole('group', { name: 'История подхода 1' })).toContainText('160 кг × 8');
+  if (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') {
+    const directory = resolve(
+      process.cwd(),
+      '..',
+      'docs',
+      'ux-proposals',
+      'issue-1132-v12',
+      'after',
+    );
+    await mkdir(directory, { recursive: true });
+    await first.evaluate((element) =>
+      window.scrollBy({ top: element.getBoundingClientRect().top - 10, behavior: 'instant' }),
+    );
+    await page.screenshot({
+      path: resolve(directory, 'tma-mocked-dark-393-first.png'),
+      animations: 'disabled',
+    });
+  }
+  await past.click();
+  await expect.poll(() => server.readSet(201).actual_weight).toBe(160);
+  expect(server.readSet(201)).toMatchObject({ actual_reps: 8, is_completed: false });
+});
+
+test('Issue #1132 hides stale history offline and reloads it after reconnect', async ({ page }) => {
+  const server = await mockActiveWorkout(page);
+  const history = await mockSetHistory(page, server);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  const button = first.getByRole('button', { name: 'Подставить из прошлой тренировки' });
+  await expect(button).toBeEnabled();
+  await expect(first.locator('.active-workout-set__history')).toContainText('160 кг × 8');
+  await setNetworkOffline(page, true);
+  await expect(first.locator('.active-workout-set__history')).toContainText(
+    'История недоступна без сети',
+  );
+  await expect(button).toBeDisabled();
+  history.withoutHistory();
+  const beforeReconnect = history.requests();
+  await setNetworkOffline(page, false);
+  await expect.poll(() => history.requests()).toBeGreaterThan(beforeReconnect);
+  await expect(first.locator('.active-workout-set__history')).toContainText(
+    'Нет прошлого результата',
+  );
+  await expect(button).toBeDisabled();
+  await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('');
+});
+
+test('Issue #1132 hides history during pending writes and reloads after a version conflict', async ({
+  page,
+}) => {
+  const server = await mockActiveWorkout(page);
+  await mockSetHistory(page, server);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  const history = first.locator('.active-workout-set__history');
+  const button = first.getByRole('button', { name: 'Подставить из прошлой тренировки' });
+  await expect(button).toBeEnabled();
+  const release = server.holdNextPatch();
+  server.readSet(201).version += 1;
+  const weight = first.getByLabel('Вес, Жим штанги лёжа, подход 1');
+  await weight.fill('35');
+  try {
+    await expect.poll(() => server.patches.length).toBeGreaterThan(0);
+    await expect(history).toContainText('Обновляем историю');
+    await expect(button).toBeDisabled();
+  } finally {
+    release();
+  }
+  await expect.poll(() => server.patches.some((patch) => patch.status === 409)).toBe(true);
+  await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+  await expect(button).toBeEnabled();
+  await expect(weight).toHaveValue('35');
+  await expect(first.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('');
+  expect(server.readSet(201).is_completed).toBe(false);
+});
+
 for (const theme of ['light', 'dark'] as const) {
   test(`Issue #1293 keeps active set order and helpers usable in ${theme}`, async ({
     page,
@@ -7627,17 +8761,20 @@ for (const theme of ['light', 'dark'] as const) {
     const weight = row.getByLabel('Вес, Жим штанги лёжа, подход 2');
     const reps = row.getByLabel('Повторы, Жим штанги лёжа, подход 2');
     const done = row.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' });
-    const prefill = row.getByRole('button', { name: 'Подставить предыдущий результат' });
-    const quick = row.getByRole('button', { name: 'Подставить и завершить' });
+    const prefill = row.getByRole('button', { name: 'Подставить предыдущий подход сегодня' });
+    const past = row.getByRole('button', { name: 'Подставить из прошлой тренировки' });
     const help = row.getByText('Что такое RIR?', { exact: true });
+    const note = row.locator('.exercise-execution-note > summary');
+    const editPlan = row.getByRole('button', { name: 'Изменить план подхода' });
     const helpers = row.getByText('Разминка и блины', { exact: true });
     const advanced = row.getByText('Дополнительно', { exact: true });
     await expect(prefill).toBeVisible();
-    await expect(quick).toBeVisible();
+    await expect(past).toBeVisible();
+    await expect(past).toBeDisabled();
 
     const order = await row.evaluate((element) => {
       const selectors = [
-        '.active-workout-set__previous',
+        '.active-workout-set__history',
         '.active-workout-set__context',
         '[data-workout-field="weight"]',
         '[data-workout-field="reps"]',
@@ -7646,6 +8783,7 @@ for (const theme of ['light', 'dark'] as const) {
         '.active-workout-set__prefill-actions button:first-child',
         '.active-workout-set__prefill-actions button:last-child',
         '.active-workout-set__contextual-help summary',
+        '.exercise-execution-note > summary',
         '.active-workout-set__helpers > summary',
         '.active-workout-set__advanced > summary',
       ];
@@ -7684,11 +8822,12 @@ for (const theme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: 844 });
       const geometry = await row.evaluate((element) => {
         const selectors = [
-          '.active-workout-set__previous',
+          '.active-workout-set__history',
           '.active-workout-set__context',
           '.active-workout-set__controls',
           '.active-workout-set__prefill-actions',
           '.active-workout-set__contextual-help',
+          '.exercise-execution-note',
           '.active-workout-set__helpers',
           '.active-workout-set__advanced',
         ];
@@ -7725,7 +8864,7 @@ for (const theme of ['light', 'dark'] as const) {
     await capture('prefill-collapsed');
 
     await done.focus();
-    for (const next of [prefill, quick, help, helpers, advanced]) {
+    for (const next of [prefill, help, note, editPlan, helpers, advanced]) {
       await page.keyboard.press('Tab');
       await expect(next).toBeFocused();
     }
@@ -7777,7 +8916,8 @@ for (const theme of ['light', 'dark'] as const) {
     await prefill.click();
     await expect(weight).toHaveValue('40');
     await expect(reps).toHaveValue('8');
-    await expect(row.locator('.active-workout-set__prefill-actions')).toBeHidden();
+    await expect(prefill).toBeDisabled();
+    await expect(past).toBeDisabled();
     const gap = await row.evaluate((element) => {
       const controls = element
         .querySelector('.active-workout-set__controls')!
@@ -7785,10 +8925,17 @@ for (const theme of ['light', 'dark'] as const) {
       const helpBox = element
         .querySelector('.active-workout-set__contextual-help')!
         .getBoundingClientRect();
-      return helpBox.top - controls.bottom;
+      const actions = element
+        .querySelector('.active-workout-set__prefill-actions')!
+        .getBoundingClientRect();
+      return {
+        afterControls: actions.top - controls.bottom,
+        beforeHelp: helpBox.top - actions.bottom,
+      };
     });
-    expect(gap).toBeGreaterThanOrEqual(0);
-    expect(gap).toBeLessThanOrEqual(24);
+    expect(gap.afterControls).toBeGreaterThanOrEqual(0);
+    expect(gap.beforeHelp).toBeGreaterThanOrEqual(0);
+    expect(gap.beforeHelp).toBeLessThanOrEqual(24);
     const selectedRir = row.getByRole('button', { name: '2 — ещё примерно 2 повтора' });
     await selectedRir.click();
     await expect.poll(() => server.readSet(202).rir).toBe('2');
@@ -7828,14 +8975,19 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('Issue #1293 has no prefill container without a previous result', async ({ page }) => {
+test('Issue #1293 disables prefill without a previous result', async ({ page }) => {
   await mockActiveWorkout(page);
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const row = page.locator('[data-workout-set-id="201"]');
   await expect(row).toHaveAttribute('aria-current', 'step');
-  await expect(row.locator('.active-workout-set__prefill-actions')).toHaveCount(0);
+  await expect(
+    row.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }),
+  ).toBeDisabled();
+  await expect(
+    row.getByRole('button', { name: 'Подставить из прошлой тренировки' }),
+  ).toBeDisabled();
   for (const width of [320, 360, 393, 430]) {
     await page.setViewportSize({ width, height: 844 });
     const spacing = await row.evaluate((element) => {
@@ -7858,13 +9010,19 @@ test('Issue #1293 has no prefill container without a previous result', async ({ 
   }
   const done = row.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' });
   await done.focus();
-  for (const label of ['Что такое RIR?', 'Разминка и блины', 'Дополнительно']) {
+  for (const next of [
+    row.getByText('Что такое RIR?', { exact: true }),
+    row.locator('.exercise-execution-note > summary'),
+    row.getByRole('button', { name: 'Изменить план подхода' }),
+    row.getByText('Разминка и блины', { exact: true }),
+    row.getByText('Дополнительно', { exact: true }),
+  ]) {
     await page.keyboard.press('Tab');
-    await expect(row.getByText(label, { exact: true })).toBeFocused();
+    await expect(next).toBeFocused();
   }
 });
 
-test('Issue #1293 keeps quick completion and optional RIR', async ({ page }) => {
+test('Issue #1293 keeps explicit completion and optional RIR', async ({ page }) => {
   const server = await mockActiveWorkout(page);
   Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, is_completed: true });
   await page.goto('/app');
@@ -7873,7 +9031,9 @@ test('Issue #1293 keeps quick completion and optional RIR', async ({ page }) => 
   const row = page.locator('[data-workout-set-id="202"]');
   await row.getByRole('button', { name: '4+ — осталось много сил' }).click();
   await expect.poll(() => server.readSet(202).rir).toBe('4+');
-  await row.getByRole('button', { name: 'Подставить и завершить' }).click();
+  await row.getByRole('button', { name: 'Подставить предыдущий подход сегодня' }).click();
+  expect(server.readSet(202).is_completed).toBe(false);
+  await row.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }).click();
   await expect.poll(() => server.readSet(202).is_completed).toBe(true);
   expect(server.readSet(202)).toMatchObject({ actual_weight: 40, actual_reps: 8, rir: '4+' });
 });
@@ -7911,7 +9071,7 @@ test.describe('#1292 compact rest panel', () => {
         await first.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
         await first.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
         const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
-        await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
         await expect.poll(() => Object.values(restApi.intervals).length).toBe(1);
         const current = page.locator('[data-workout-set-id="202"]');
         const weight = current.getByLabel('Вес, Жим штанги лёжа, подход 2');
@@ -7952,9 +9112,9 @@ test.describe('#1292 compact rest panel', () => {
         };
         await shot('running');
         await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
-        await expect(panel.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Развернуть таймер' })).toBeVisible();
         await shot('collapsed');
-        await panel.getByRole('button', { name: 'Показать таймер' }).click();
+        await panel.getByRole('button', { name: 'Развернуть таймер' }).click();
         await page.evaluate(() => {
           Object.defineProperty(document, 'visibilityState', {
             configurable: true,
@@ -7970,13 +9130,14 @@ test.describe('#1292 compact rest panel', () => {
           });
           document.dispatchEvent(new Event('visibilitychange'));
         });
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
         await page
           .getByRole('group', { name: 'Уточнение фактического отдыха' })
           .getByRole('button', { name: 'Не учитывать', exact: true })
           .click();
         const summary = panel.locator('.active-workout-rest__complete-summary');
         await expect(summary).toHaveText('Отдых не учитывается');
-        const restart = panel.getByRole('button', { name: 'Начать отдых' });
+        const restart = panel.getByRole('button', { name: 'Новый отдых' });
         const dismiss = panel.getByRole('button', { name: 'Скрыть' });
         await expect(restart).toHaveClass(/ui-button--primary/);
         await expect(dismiss).toHaveClass(/ui-button--secondary/);
@@ -8035,13 +9196,12 @@ test.describe('#1292 compact rest panel', () => {
         expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
         expect(geometry.textScrollWidth).toBeLessThanOrEqual(geometry.textClientWidth + 1);
         expect(geometry.textScrollHeight).toBeLessThanOrEqual(geometry.textClientHeight + 1);
-        if (width < 681)
-          expect(geometry.status.bottom).toBeLessThanOrEqual(geometry.buttons[0]!.top + 1);
-        else expect(geometry.status.right).toBeLessThanOrEqual(geometry.buttons[0]!.left);
+        expect(geometry.status.right).toBeLessThanOrEqual(geometry.buttons[0]!.left);
+        expect(geometry.panel.height).toBeLessThanOrEqual(66);
         expect(geometry.buttons[0]!.right).toBeLessThanOrEqual(geometry.buttons[1]!.left);
         if (width < 681) {
-          expect(geometry.buttons[0]!.left - geometry.panel.left).toBeCloseTo(13, 0);
-          expect(geometry.panel.right - geometry.buttons[1]!.right).toBeCloseTo(13, 0);
+          expect(geometry.status.left - geometry.panel.left).toBeCloseTo(11, 0);
+          expect(geometry.panel.right - geometry.buttons[1]!.right).toBeCloseTo(11, 0);
         }
         for (const button of geometry.buttons) {
           expect(button.width).toBeGreaterThanOrEqual(44);
@@ -8140,7 +9300,7 @@ test.describe('#1292 compact rest panel', () => {
         await shot('dismissed');
 
         await restart.dblclick();
-        await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
         await expect.poll(() => restApi.restartCount()).toBe(1);
         await expect.poll(async () => (await readRestJournal(page)).length).toBe(2);
         const records = await readRestJournal(page);
@@ -8206,7 +9366,7 @@ test.describe('#1292 compact rest panel', () => {
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
           'Отдых завершён',
         );
-        await expect(panel.getByRole('button', { name: 'Начать отдых' })).toHaveCount(0);
+        await expect(panel.getByRole('button', { name: 'Новый отдых' })).toHaveCount(0);
         const single = await panel.evaluate((element) => {
           const p = element.getBoundingClientRect();
           const summary = element.querySelector('.active-workout-rest__complete-summary')!;
@@ -8253,7 +9413,7 @@ test.describe('#1292 compact rest panel', () => {
         await page.clock.setFixedTime(new Date(start.getTime() + 100_000));
         await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
         await expect(panel.getByRole('timer', { name: 'Отдых' })).toHaveText('0:00');
-        await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+        await expect(panel.getByRole('button', { name: 'Стоп: завершить отдых' })).toBeVisible();
         await shot('expired-running');
         await page.evaluate(() => {
           Object.defineProperty(document, 'visibilityState', {
@@ -8270,10 +9430,9 @@ test.describe('#1292 compact rest panel', () => {
           });
           document.dispatchEvent(new Event('visibilitychange'));
         });
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
         const recovery = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
-        await recovery
-          .getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' })
-          .fill('2,5');
+        await recovery.getByRole('textbox', { name: 'Фактическое время, минуты' }).fill('2,5');
         await recovery.getByRole('button', { name: 'Сохранить время' }).click();
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
           'ФАКТ 2:30',
@@ -8284,7 +9443,7 @@ test.describe('#1292 compact rest panel', () => {
         expect(corrected).toMatchObject({ measured_seconds: 150, source: 'USER_CORRECTED' });
         await shot('corrected');
 
-        await panel.getByRole('button', { name: 'Начать отдых' }).click();
+        await panel.getByRole('button', { name: 'Новый отдых' }).click();
         await expect.poll(() => restApi.restartCount()).toBe(1);
         await panel.getByRole('button', { name: 'Пропустить' }).click();
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
@@ -8292,11 +9451,11 @@ test.describe('#1292 compact rest panel', () => {
         );
         await shot('skipped');
         await expect.poll(async () => (await readRestJournal(page))[1]?.pending.length).toBe(0);
-        await panel.getByRole('button', { name: 'Начать отдых' }).click();
+        await panel.getByRole('button', { name: 'Новый отдых' }).click();
         await expect.poll(() => restApi.restartCount()).toBe(2);
-        await panel.getByRole('button', { name: 'Завершить отдых' }).click();
+        await panel.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
         await expect(panel.locator('.active-workout-rest__complete-summary')).toContainText(
-          'Отдых завершён по отметке',
+          'Отдых завершён',
         );
         expect((await readRestJournal(page))[0]).toEqual(corrected);
         expect(await readRestJournal(page)).toHaveLength(3);
@@ -8401,5 +9560,361 @@ test.describe('#1292 compact rest panel', () => {
         await capture('tma-keyboard');
       });
     }
+  }
+});
+
+test.describe('#1338 v2 compact timer', () => {
+  test.use({ hasTouch: true });
+
+  for (const theme of ['dark', 'light'] as const) {
+    for (const width of [320, 360, 393, 430, 1120, 1440]) {
+      test('review states ' + theme + ' ' + width + 'px', async ({ page, browserName }, info) => {
+        const start = new Date('2026-10-10T12:00:00Z');
+        await page.setViewportSize({
+          width,
+          height: width === 1440 ? 1000 : width === 1120 ? 960 : 844,
+        });
+        await page.clock.install({ time: start });
+        await page.clock.setFixedTime(start);
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        const server = await mockActiveWorkout(page);
+        const restApi = await mockRestSessions(page);
+        Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, rir: '1' });
+        Object.assign(server.readSet(202), { actual_weight: 42.5, actual_reps: 9, rir: '2' });
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+        await expect(panel).toHaveCount(0);
+        expect(await readRestJournal(page)).toHaveLength(0);
+        await page
+          .locator('[data-workout-set-id="201"]')
+          .getByRole('button', { name: /^Завершить:/ })
+          .click();
+        await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+        await expect.poll(async () => (await readRestJournal(page))[0]?.server_id).toBe(900);
+        const previousSet = structuredClone(server.readSet(201));
+        const nextSet = structuredClone(server.readSet(202));
+        const neighbor = structuredClone(server.readSet(203));
+        const heights: Record<string, number> = {};
+        const capture = async (state: string, expectedHeight: number) => {
+          await expect
+            .poll(async () => (await panel.boundingBox())?.height, { message: state })
+            .toBeCloseTo(expectedHeight, 0);
+          const box = await panel.boundingBox();
+          expect(box).not.toBeNull();
+          await expect(panel).toBeInViewport();
+          if (expectedHeight === 110) expect(box!.height).toBeLessThanOrEqual(118);
+          heights[state] = box!.height;
+          const geometry = await panel.evaluate((element) => {
+            const p = element.getBoundingClientRect();
+            return {
+              overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              controls: Array.from(element.querySelectorAll('button'))
+                .filter((button) => button.getClientRects().length)
+                .map((button) => {
+                  const r = button.getBoundingClientRect();
+                  return {
+                    width: r.width,
+                    height: r.height,
+                    left: r.left - p.left,
+                    right: p.right - r.right,
+                  };
+                }),
+            };
+          });
+          expect(geometry.overflow).toBeLessThanOrEqual(1);
+          expect(geometry.controls.length).toBeGreaterThan(0);
+          for (const control of geometry.controls) {
+            expect(control.width).toBeGreaterThanOrEqual(44);
+            expect(control.height).toBeGreaterThanOrEqual(44);
+            expect(control.left).toBeGreaterThanOrEqual(-1);
+            expect(control.right).toBeGreaterThanOrEqual(-1);
+          }
+          if (state === 'completed' || state === 'skipped') {
+            await expect(panel.locator('.active-workout-rest__complete-mark')).toHaveCount(0);
+            const terminal = await panel.evaluate((element) => {
+              const copy = element.querySelector<HTMLElement>(
+                '.active-workout-rest__complete-copy',
+              )!;
+              const copyBox = copy.getBoundingClientRect();
+              const panelBox = element.getBoundingClientRect();
+              return {
+                copyOffset: (copyBox.top + copyBox.bottom - panelBox.top - panelBox.bottom) / 2,
+              };
+            });
+            if (state === 'skipped') {
+              expect(
+                Math.abs(terminal.copyOffset),
+                'skipped text vertical center',
+              ).toBeLessThanOrEqual(1);
+            }
+          }
+          expect(server.readSet(201)).toEqual(previousSet);
+          expect(server.readSet(202)).toEqual(nextSet);
+          expect(server.readSet(203)).toEqual(neighbor);
+          if (process.env.CAPTURE_1338_VISUALS === '1') {
+            const folder = resolve(
+              process.cwd(),
+              '..',
+              '.artifacts',
+              'tasks',
+              '1338',
+              'evidence',
+              'after',
+            );
+            await mkdir(folder, { recursive: true });
+            await page.screenshot({
+              path: resolve(folder, [browserName, theme, width, state].join('-') + '.png'),
+              animations: 'disabled',
+            });
+          }
+        };
+
+        await expect(panel.locator('.active-workout-rest__actions button')).toHaveCount(4);
+        await expect(panel.getByRole('timer')).toHaveText('1:30');
+        await capture('active', 110);
+        await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
+        await capture('collapsed-active', 60);
+        await panel.getByRole('button', { name: 'Развернуть таймер' }).click();
+        await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+        await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+        await expect(panel.getByRole('timer')).toHaveText('3:00');
+        await expect.poll(() => restApi.intervals[900]?.adjusted_seconds).toBe(180);
+
+        await page.clock.setFixedTime(new Date(start.getTime() + 200_000));
+        await page.clock.runFor(1100);
+        await expect(panel.getByRole('timer')).toHaveText('0:00');
+        await expect(panel.getByLabel('Время по отметке пользователя')).toHaveText('3:20');
+        await capture('expired', 110);
+        const intervalId = (await readRestJournal(page))[0]!.start_mutation_id;
+        await panel.getByRole('button', { name: 'Свернуть таймер' }).click();
+        await capture('collapsed', 60);
+        await page.clock.setFixedTime(new Date(start.getTime() + 210_000));
+        await page.clock.runFor(1100);
+        await expect(panel).toContainText('ФАКТ 3:30');
+        await panel.getByRole('button', { name: 'Развернуть таймер' }).click();
+        expect((await readRestJournal(page))[0]!.start_mutation_id).toBe(intervalId);
+        await expect(panel.getByLabel('Время по отметке пользователя')).toHaveText('3:30');
+        await panel.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
+        await expect.poll(() => restApi.intervals[900]?.measured_seconds).toBe(210);
+        await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+        await capture('completed', 66);
+        const completed = (await readRestJournal(page))[0];
+        await panel.getByRole('button', { name: 'Скрыть', exact: true }).click();
+        await expect(panel.locator('.active-workout-rest__complete-summary')).toHaveCount(0);
+        await expect
+          .poll(
+            async () => (await page.locator('.active-workout-rest-spacer').boundingBox())?.height,
+          )
+          .toBe(44);
+        await capture('dismissed', 44);
+        expect(await readRestJournal(page)).toEqual([completed]);
+
+        await panel.getByRole('button', { name: 'Новый отдых', exact: true }).dblclick();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect.poll(() => restApi.restartCount()).toBe(1);
+        expect((await readRestJournal(page))[0]).toEqual(completed);
+        await expect(panel.getByLabel('Время по отметке пользователя')).toHaveText('0:00');
+        await capture('restarted', 110);
+        await panel.getByRole('button', { name: 'Пропустить', exact: true }).click();
+        await expect.poll(() => restApi.intervals[901]?.status).toBe('skipped');
+        expect(restApi.intervals[901]!.measured_seconds).toBeNull();
+        await capture('skipped', 66);
+
+        await panel.getByRole('button', { name: 'Новый отдых', exact: true }).click();
+        await expect.poll(() => restApi.restartCount()).toBe(2);
+        await setDocumentVisibility(page, 'hidden');
+        await page.clock.setFixedTime(new Date(start.getTime() + 23 * 60_000));
+        await setDocumentVisibility(page, 'visible');
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await capture('review-required', 62);
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: 'Сколько отдыхали?', exact: true });
+        const input = dialog.getByRole('textbox', {
+          name: 'Фактическое время, минуты',
+        });
+        await expect(input).toBeFocused();
+        await capture('recovery-dialog', 62);
+        const unresolved = await readRestJournal(page);
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0);
+        expect(await readRestJournal(page)).toEqual(unresolved);
+        await capture('review-required', 62);
+        const reopen = panel.getByRole('button', { name: 'Уточнить', exact: true });
+        await reopen.click();
+        await expect(input).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(dialog.locator('.active-workout-rest-dialog__close')).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(input).toBeFocused();
+        await input.fill('-1');
+        await dialog.getByRole('button', { name: 'Сохранить время', exact: true }).click();
+        await expect(input).toHaveAttribute('aria-invalid', 'true');
+        expect(await readRestJournal(page)).toEqual(unresolved);
+        await input.fill('2,5');
+        await dialog.getByRole('button', { name: 'Сохранить время', exact: true }).click();
+        await expect(dialog).toHaveCount(0);
+        await expect.poll(() => restApi.intervals[902]?.measured_seconds).toBe(150);
+        expect(restApi.intervals[902]!.source).toBe('USER_CORRECTED');
+        await capture('corrected', 66);
+
+        await panel.getByRole('button', { name: 'Новый отдых', exact: true }).click();
+        await setDocumentVisibility(page, 'hidden');
+        await page.clock.setFixedTime(new Date(start.getTime() + 45 * 60_000));
+        await setDocumentVisibility(page, 'visible');
+        await panel.getByRole('button', { name: 'Уточнить', exact: true }).click();
+        await page
+          .getByRole('dialog', { name: 'Сколько отдыхали?', exact: true })
+          .getByRole('button', { name: 'Не учитывать', exact: true })
+          .click();
+        await expect.poll(() => restApi.intervals[903]?.status).toBe('skipped');
+        expect(restApi.intervals[903]!.measured_seconds).toBeNull();
+        await expect(panel.locator('.active-workout-rest__complete-summary')).toHaveText(
+          'Отдых не учитывается',
+        );
+        await capture('omitted', 66);
+        expect((await readRestJournal(page))[0]).toEqual(completed);
+
+        if (width === 320 && theme === 'dark') {
+          await panel.getByRole('button', { name: 'Новый отдых', exact: true }).click();
+          await page.evaluate(() => {
+            document.documentElement.style.fontSize = '200%';
+          });
+          const scaled = await panel.evaluate((element) => {
+            const p = element.getBoundingClientRect();
+            return Array.from(element.querySelectorAll('button'))
+              .filter((button) => button.getClientRects().length)
+              .map((button) => {
+                const r = button.getBoundingClientRect();
+                return (
+                  r.left >= p.left && r.right <= p.right && button.scrollWidth <= button.clientWidth
+                );
+              });
+          });
+          expect(scaled.length).toBeGreaterThanOrEqual(6);
+          expect(scaled.every(Boolean)).toBe(true);
+          if (process.env.CAPTURE_1338_VISUALS === '1') {
+            const folder = resolve(
+              process.cwd(),
+              '..',
+              '.artifacts',
+              'tasks',
+              '1338',
+              'evidence',
+              'after',
+            );
+            await page.screenshot({
+              path: resolve(folder, [browserName, theme, width, 'large-text'].join('-') + '.png'),
+              animations: 'disabled',
+            });
+          }
+        }
+        await writeFile(
+          info.outputPath('timer-heights.json'),
+          JSON.stringify({ browserName, theme, width, heights }, null, 2),
+        );
+      });
+    }
+
+    test('sync pending offline error and 409 ' + theme, async ({ page, browserName }, info) => {
+      await page.setViewportSize({ width: 393, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const server = await mockActiveWorkout(page);
+      const restApi = await mockRestSessions(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const first = page.locator('[data-workout-set-id="201"]');
+      await first.getByLabel(/^Вес,/).fill('40');
+      await first.getByLabel(/^Повторы,/).fill('8');
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(async () => (await readRestJournal(page))[0]?.server_id).toBe(900);
+      const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+      const before = structuredClone(server.readSet(202));
+      const capture = async (state: string) => {
+        expect((await panel.boundingBox())!.height).toBe(110);
+        expect(server.readSet(202)).toEqual(before);
+        expect(
+          await panel.evaluate((element) =>
+            Array.from(element.querySelectorAll('button, [role="timer"]')).every((control) => {
+              const r = control.getBoundingClientRect();
+              return control.contains(
+                document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2),
+              );
+            }),
+          ),
+          `${state}: clocks and actions are not covered by global notices`,
+        ).toBe(true);
+        if (process.env.CAPTURE_1338_VISUALS === '1') {
+          const folder = resolve(
+            process.cwd(),
+            '..',
+            '.artifacts',
+            'tasks',
+            '1338',
+            'evidence',
+            'after',
+          );
+          await mkdir(folder, { recursive: true });
+          await page.screenshot({
+            path: resolve(folder, [browserName, theme, 393, state].join('-') + '.png'),
+            animations: 'disabled',
+          });
+        }
+      };
+      const release = restApi.holdNextAction();
+      await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+      await expect(panel.locator('.active-workout-rest__status')).toContainText('Сохраняется…');
+      await capture('pending');
+      release();
+      await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+      await setNetworkOffline(page, true);
+      await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+      await expect(panel.locator('.active-workout-rest__status')).toContainText('Нет сети');
+      await expect(page.locator('.offline-status')).toBeHidden();
+      const offline = (await readRestJournal(page))[0]!;
+      expect(offline.pending).toHaveLength(1);
+      await capture('offline');
+      restApi.failActions(503);
+      await setNetworkOffline(page, false);
+      await expect(panel.locator('.active-workout-rest__status')).toContainText(
+        'Ошибка сохранения',
+      );
+      await capture('error');
+      const status = panel.getByRole('button', { name: /Состояние отдыха:/ });
+      await status.click();
+      const dialog = page.getByRole('dialog', { name: 'Сохранение отдыха' });
+      await expect(dialog.getByRole('alert')).toContainText('устройстве');
+      await page.keyboard.press('Escape');
+      await expect(status).toBeFocused();
+      restApi.failActions(409);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await expect(panel.locator('.active-workout-rest__status')).toContainText(
+        'Конфликт сохранения',
+      );
+      expect((await readRestJournal(page))[0]).toMatchObject({
+        start_mutation_id: offline.start_mutation_id,
+        deadline: offline.deadline,
+        pending: offline.pending,
+      });
+      await capture('conflict-409');
+      restApi.failActions(null);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+      await expect(panel.locator('.active-workout-rest__status')).toContainText('Отдых идёт');
+      expect(restApi.intervals[900]!.adjusted_seconds).toBe(180);
+      await capture('reconnected');
+      await writeFile(
+        info.outputPath('sync-verification.json'),
+        JSON.stringify(
+          { browserName, theme, pendingRetainedOn409: true, syncedAdjustedSeconds: 180 },
+          null,
+          2,
+        ),
+      );
+    });
   }
 });

@@ -21,6 +21,8 @@ from fitminiapp_api.models.program import (
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.workout import WorkoutAdaptationRequest
 from fitminiapp_api.services.audit import record_audit_event
+from fitminiapp_api.services.equipment_profiles import load_active_equipment_profile
+from fitminiapp_api.services.equipment_requirements import exercise_equipment_requirements
 from fitminiapp_api.services.exercise_catalog import (
     _source_exercise_slug,
     get_visible_exercise_display_map,
@@ -35,6 +37,7 @@ from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
     workout_exercise_metric_type,
 )
+from fitminiapp_api.services.workout_sides import side_facts_present
 
 RULESET_VERSION = "workout-adaptation-v2"
 ACTIVE_SECONDS_PER_SET = 45
@@ -219,7 +222,7 @@ def _validate_today_state(
             "Изменить состав можно только до начала тренировки",
             outcome="rejected_stale",
         )
-    if not workout.user_program.is_active:
+    if workout.user_program is None or not workout.user_program.is_active:
         raise WorkoutAdaptationError("Программа сейчас неактивна", outcome="rejected_stale")
 
 
@@ -242,6 +245,7 @@ def _alternative_candidates(
     visible: dict[int, Exercise] | None = None,
     pairs: list[ExerciseAlternative] | None = None,
     allow_catalog_fallback: bool = False,
+    active_profile: dict | None = None,
 ) -> list[AlternativeCandidate]:
     from fitminiapp_api.services.training_preferences import avoided_exercise_ids
 
@@ -276,7 +280,15 @@ def _alternative_candidates(
         if exercise_metric_type(exercise) != target_metric:
             continue
         equipment_ids = _equipment_ids(exercise)
-        if equipment_ids and not set(equipment_ids).issubset(available_equipment_ids):
+        if active_profile is not None:
+            required = exercise_equipment_requirements(exercise)
+            available = available_equipment_ids | (
+                set(active_profile["equipment_ids"]) & {"rack", "pullup_bar", "dip_bars"}
+            )
+            if required is None or not set(required).issubset(available):
+                continue
+            equipment_ids = tuple(sorted(set(equipment_ids) | set(required)))
+        elif equipment_ids and not set(equipment_ids).issubset(available_equipment_ids):
             continue
         if _effective_exercise_id(exercise) == target_id:
             continue
@@ -335,21 +347,25 @@ def list_compatible_alternatives(
     _ensure_replacement_unstarted(workout, target)
     used_ids = {_effective_exercise_id(item.exercise) for item in workout.exercises}
     alternatives = []
+    active_profile, _revision = load_active_equipment_profile(db, current_user.id)
     for candidate in _alternative_candidates(
         db,
         current_user,
         target,
         available_equipment_ids,
         allow_catalog_fallback=workout.status == "planned",
+        active_profile=active_profile,
     ):
         if _effective_exercise_id(candidate.exercise) in used_ids:
             continue
         source_slug = _source_exercise_slug(candidate.exercise)
+        metadata = exercise_catalog_metadata(source_slug)
         media = get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
         alternatives.append(
             {
                 "exercise_id": candidate.exercise.id,
                 "title": candidate.exercise.title,
+                "aliases": list(metadata["aliases"]) if metadata else [],
                 "equipment_ids": list(candidate.equipment_ids),
                 "score": candidate.score,
                 "reason_keys": list(candidate.reason_keys),
@@ -395,6 +411,7 @@ def _ensure_replacement_unstarted(workout: UserWorkout, target: UserWorkoutExerc
             or item.heart_rate_zone is not None
             or item.rir is not None
             or item.reached_failure is not None
+            or side_facts_present(item)
         )
 
     if any(has_execution_evidence(item) for item in target.sets):
@@ -447,21 +464,25 @@ def _replacement_changes(
     workout: UserWorkout,
     payload: WorkoutAdaptationRequest,
     visible: dict[int, Exercise],
+    active_profile: dict | None,
 ) -> list[dict]:
     available: set[str] = set(payload.available_equipment_ids or [])
+    if active_profile is not None:
+        available |= set(active_profile["equipment_ids"]) & {"rack", "pullup_bar", "dip_bars"}
+
+    def available_for(exercise: Exercise) -> bool | None:
+        if active_profile is not None:
+            required = exercise_equipment_requirements(exercise)
+            return None if required is None else set(required).issubset(available)
+        equipment = _equipment_ids(exercise)
+        return bool(equipment) and set(equipment).issubset(available)
+
     if payload.reason in {"unavailable_equipment", "replace_exercise"}:
         targets = [_find_workout_exercise(workout, payload.target_workout_exercise_id)]
-        if payload.reason == "unavailable_equipment":
-            current_equipment = _equipment_ids(targets[0].exercise)
-            if current_equipment and set(current_equipment).issubset(available):
-                targets = []
+        if payload.reason == "unavailable_equipment" and available_for(targets[0].exercise):
+            targets = []
     else:
-        targets = [
-            item
-            for item in workout.exercises
-            if not _equipment_ids(item.exercise)
-            or not set(_equipment_ids(item.exercise)).issubset(available)
-        ]
+        targets = [item for item in workout.exercises if available_for(item.exercise) is False]
     if not targets:
         return []
 
@@ -492,6 +513,7 @@ def _replacement_changes(
                 allow_catalog_fallback=(
                     payload.reason == "replace_exercise" and workout.status == "planned"
                 ),
+                active_profile=active_profile,
             )
             if _effective_exercise_id(candidate.exercise) not in used_ids
         ]
@@ -552,6 +574,11 @@ def build_adaptation_preview(
     )
     visible = get_visible_exercise_display_map(db, current_user)
     snapshot = _snapshot(db, workout, current_user, visible=visible)
+    active_profile = None
+    if payload.reason in {"unavailable_equipment", "replace_exercise", "different_environment"}:
+        active_profile, revision = load_active_equipment_profile(db, current_user.id)
+        if active_profile is not None:
+            snapshot["equipment_profile"] = {"id": active_profile["id"], "revision": revision}
     original_exercises = snapshot["exercises"]
     original_minutes = _estimated_minutes(original_exercises)
     if safety:
@@ -582,8 +609,19 @@ def build_adaptation_preview(
             payload.time_budget_minutes or 0,
         )
     else:
-        changes = _replacement_changes(db, current_user, workout, payload, visible)
+        changes = _replacement_changes(db, current_user, workout, payload, visible, active_profile)
         warnings = []
+        if (
+            active_profile is not None
+            and payload.reason == "different_environment"
+            and any(
+                exercise_equipment_requirements(item.exercise) is None for item in workout.exercises
+            )
+        ):
+            warnings.append(
+                "Для некоторых упражнений оборудование неизвестно. Они оставлены без изменений; "
+                "проверьте их самостоятельно."
+            )
 
     removed_ids = {
         change["workout_exercise_id"] for change in changes if change["kind"] == "removed"
@@ -661,6 +699,8 @@ def apply_adaptation(
             )
         return existing
 
+    if payload.reason in {"unavailable_equipment", "replace_exercise", "different_environment"}:
+        db.query(User).filter(User.id == current_user.id).with_for_update().one()
     preview = build_adaptation_preview(db, current_user, workout, payload)
     if preview["status"] != "preview" or not preview["changes"]:
         raise WorkoutAdaptationError(

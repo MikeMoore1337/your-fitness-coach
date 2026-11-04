@@ -138,6 +138,7 @@ def _program_snapshot_and_payload(
         raise PublicShareError("Программа недоступна для публикации", 404) from exc
     if template.owner_user_id != current_user.id:
         raise PublicShareError("Программа недоступна для публикации", 404)
+    cycle = (template.program_metadata or {}).get("week_cycle")
 
     days: list[dict] = []
     private_days: list[dict] = []
@@ -210,7 +211,10 @@ def _program_snapshot_and_payload(
             "title": template.title,
             "goal": template.goal,
             "level": template.level,
-            "duration_weeks": template.effective_duration_weeks,
+            "duration_weeks": max(template.effective_duration_weeks, cycle["length_weeks"])
+            if cycle
+            else template.effective_duration_weeks,
+            "week_cycle": cycle,
             "days": days,
         }
     ).model_dump(mode="json")
@@ -220,7 +224,10 @@ def _program_snapshot_and_payload(
         "level": template.level,
         "mode": "self",
         "assign_after_create": False,
-        "duration_weeks": template.effective_duration_weeks,
+        "duration_weeks": max(template.effective_duration_weeks, cycle["length_weeks"])
+        if cycle
+        else template.effective_duration_weeks,
+        "week_cycle": cycle,
         "days": [
             {
                 "title": day["title"],

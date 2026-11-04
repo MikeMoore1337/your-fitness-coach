@@ -2605,6 +2605,10 @@ body:has(.app-shell--design-v2) {
   font-size: 0.75rem;
 }
 
+.progression-guidance__provenance {
+  overflow-wrap: anywhere;
+}
+
 .active-workout--design-v2 .progression-guidance__history {
   display: grid;
   margin: 0;
@@ -2738,6 +2742,11 @@ body:has(.app-shell--design-v2) {
   text-align: center;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+/* #1318: draw the focus ring inside the input without moving the label or keyboard viewport. */
+.active-workout--design-v2 .is-current .active-workout-input input:focus-visible {
+  outline-offset: -4px;
 }
 
 .active-workout--design-v2 .active-workout-set__done {
@@ -3790,9 +3799,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 430px) {
   .workout-adaptation-dialog__choice-row .ui-button {
     padding-inline: 4px;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .workout-adaptation-dialog__choice-row .ui-button {
     font-size: 0.75rem;
   }
 }
@@ -5047,6 +5062,17 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
     scroll-margin-bottom: var(--yfc-mobile-dock-clearance);
   }
 
+  /* Keep the reuse actions and workout finish clear of the dock when centering the active set. */
+  html:not([data-yfc-keyboard='visible']):not([data-yfc-pwa-focus-placement='true'])
+    .app-shell--design-v2
+    #appContent
+    .active-workout-set.is-current:has(.active-workout-set__prefill-actions--history)
+    .active-workout-set__done {
+    scroll-margin-bottom: calc(
+      var(--yfc-mobile-dock-clearance) + clamp(0px, calc(100dvh - 640px), 160px)
+    );
+  }
+
   /* Keep the active workout's final controls in the scrollable safe area above the fixed dock. */
   .active-workout--design-v2 {
     padding-bottom: var(--yfc-mobile-dock-clearance);
@@ -5061,6 +5087,17 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
     #appContent
     :where(button, a, input, select, textarea, summary):focus {
     scroll-margin-block: 16px 40%;
+  }
+
+  @supports (-moz-appearance: none) {
+    /* Firefox otherwise counts the keyboard clearance twice during input focus. */
+    html[data-yfc-keyboard='visible']
+      .app-shell--design-v2
+      #appContent
+      .active-workout-set.is-current
+      input:focus {
+      scroll-margin-block-end: 0;
+    }
   }
 }
 
@@ -8050,6 +8087,13 @@ button.notification-row__main:focus-visible {
 
 .app-section--programs .progression-guidance__rule {
   font-weight: 600;
+}
+
+.app-section--programs .progression-guidance__facts {
+  display: grid;
+  gap: var(--v2-space-1);
+  color: var(--v2-text-secondary);
+  font-size: var(--font-size-caption);
 }
 
 .app-section--programs .progression-guidance__actions,

@@ -80,6 +80,7 @@ from fitminiapp_api.models.user import (
     UserProfilePriorityMuscle,
 )
 from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery, WeeklyDigestPreference
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.services.account_export import build_account_export
 from fitminiapp_api.services.programs import delete_template_cascade
 
@@ -96,13 +97,20 @@ def _new_anonymized_exercise_slug(db: Session) -> str:
             return candidate
 
 
-def _delete_user_programs(db: Session, user_program_ids: list[int]) -> None:
-    if not user_program_ids:
-        return
+def _delete_user_programs(db: Session, user_program_ids: list[int], user_id: int) -> None:
     workout_ids = [
         row.id
         for row in db.query(UserWorkout.id)
-        .filter(UserWorkout.user_program_id.in_(user_program_ids))
+        .filter(
+            or_(
+                UserWorkout.user_program_id.in_(user_program_ids),
+                UserWorkout.id.in_(
+                    db.query(ImportedWorkout.workout_id).filter(
+                        ImportedWorkout.owner_user_id == user_id
+                    )
+                ),
+            )
+        )
         .all()
     ]
     workout_exercise_ids = (
@@ -258,7 +266,7 @@ def delete_user_cascade(db: Session, user: User) -> None:
     own_program_ids = [
         row.id for row in db.query(UserProgram.id).filter(UserProgram.user_id == user.id).all()
     ]
-    _delete_user_programs(db, own_program_ids)
+    _delete_user_programs(db, own_program_ids, user.id)
     db.query(ProgramRevision).filter(ProgramRevision.changed_by_user_id == user.id).update(
         {ProgramRevision.changed_by_user_id: None},
         synchronize_session=False,

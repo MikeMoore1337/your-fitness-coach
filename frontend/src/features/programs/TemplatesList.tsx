@@ -18,17 +18,24 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { ProgramBuilder } from './ProgramBuilder';
 import { shouldSaveTemplateAsCopy } from './templateEditing';
-import { DateInput } from '../../shared/ui/PickerInput';
 import { ProgramRecommendation } from './ProgramRecommendation';
 import { LegacyProgramRecommendation } from './LegacyProgramRecommendation';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { AssignedProgramDetails } from './AssignedProgramDetails';
 import { ProgramImportPanel } from './ProgramImportPanel';
+import {
+  assignmentPlanFromTemplate,
+  ProgramAssignmentDialog,
+  type AssignmentSchedule,
+} from './ProgramAssignmentDialog';
 import { PublicProgramSharePanel } from './PublicProgramSharePanel';
-import { AppLink } from '../../shared/navigation/router';
+import { AppLink, useNavigation } from '../../shared/navigation/router';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
+import { Icon, type IconName } from '../../shared/ui/Icon';
 import { programPreviewFacts, previewSourceSignature } from './programPreviewFacts';
 import { exerciseCountLabel } from './programDefaults';
 import './programPreview.css';
+import './programControlCenter.css';
 
 const goalLabels: Record<string, string> = {
   muscle_gain: 'Набор мышечной массы',
@@ -42,27 +49,6 @@ const levelLabels: Record<string, string> = {
   intermediate: 'Средний уровень',
   advanced: 'Продвинутый уровень',
 };
-const weekdayLabels = [
-  'Понедельник',
-  'Вторник',
-  'Среда',
-  'Четверг',
-  'Пятница',
-  'Суббота',
-  'Воскресенье',
-];
-
-function weekdayFromDate(value: string): number {
-  const date = new Date(`${value}T12:00:00Z`);
-  return Number.isNaN(date.valueOf()) ? 0 : (date.getUTCDay() + 6) % 7;
-}
-
-function defaultWeekdays(template: ProgramTemplate, startDate: string): number[] {
-  if (template.days.length > 7) return [];
-  const firstWeekday = weekdayFromDate(startDate);
-  return template.days.map((_, index) => (firstWeekday + index) % 7);
-}
-
 function weeksLabel(value: number): string {
   const remainder = value % 10;
   const suffix =
@@ -109,6 +95,51 @@ function previewOwnership(item: ProgramTemplate, currentUserId?: number): string
     : 'Изменения исходного шаблона недоступны. Можно создать личную копию.';
 }
 
+type ManagePanel = 'overview' | 'operations' | 'replace' | 'library' | 'create';
+
+function panelFromSearch(search: string): ManagePanel {
+  const params = new URLSearchParams(search);
+  const value = params.get('panel');
+  if (value === 'operations' || value === 'replace' || value === 'library' || value === 'create')
+    return value;
+  if (params.get('start') === 'templates') return 'library';
+  if (params.get('start') === 'create') return 'create';
+  if (params.get('start') === 'generator') return 'replace';
+  return 'overview';
+}
+
+const manageActions: ReadonlyArray<{
+  panel: Exclude<ManagePanel, 'overview'>;
+  title: string;
+  description: string;
+  icon: IconName;
+}> = [
+  {
+    panel: 'operations',
+    title: 'Назначение и изменения',
+    description: 'Недели, этапы, история и версии',
+    icon: 'calendar',
+  },
+  {
+    panel: 'replace',
+    title: 'Заменить программу',
+    description: 'Подобрать или назначить другую',
+    icon: 'edit',
+  },
+  {
+    panel: 'library',
+    title: 'Программы и шаблоны',
+    description: 'Мои, готовые и скрытые примеры',
+    icon: 'nav-knowledge',
+  },
+  {
+    panel: 'create',
+    title: 'Создать или импортировать',
+    description: 'Конструктор и загрузка программы',
+    icon: 'plus',
+  },
+];
+
 export function TemplatesList({
   children,
   defaultLibraryOpen = false,
@@ -120,6 +151,38 @@ export function TemplatesList({
   mode?: 'full' | 'summary';
   readOnly?: boolean;
 }) {
+  const { search, navigate } = useNavigation();
+  const panel = mode === 'full' ? panelFromSearch(search) : 'overview';
+  const lastPanel = useRef<ManagePanel>('overview');
+  const positions = useRef<Partial<Record<ManagePanel, number>>>({});
+  const previousPanel = useRef(panel);
+  const openPanel = (next: ManagePanel) => {
+    if (mode !== 'full' || next === panel) return;
+    positions.current[panel] = window.scrollY;
+    if (next !== 'overview') lastPanel.current = next;
+    const params = new URLSearchParams(search);
+    params.set('section', 'programs');
+    params.set('view', 'manage');
+    params.delete('start');
+    params.delete('assigned_program_id');
+    if (next === 'overview') params.delete('panel');
+    else params.set('panel', next);
+    navigate('/app?' + params.toString());
+  };
+  useEffect(() => {
+    if (mode !== 'full' || previousPanel.current === panel) return;
+    previousPanel.current = panel;
+    const frame = window.requestAnimationFrame(() => {
+      if (panel === 'overview') {
+        document
+          .querySelector<HTMLElement>('[data-program-panel="' + lastPanel.current + '"]')
+          ?.focus({ preventScroll: true });
+      } else document.getElementById('program-manage-heading')?.focus({ preventScroll: true });
+      window.scrollTo({ top: positions.current[panel] ?? 0, behavior: 'instant' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, panel]);
+
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
   const queryClient = useQueryClient();
@@ -150,14 +213,13 @@ export function TemplatesList({
   const [saveAsCopy, setSaveAsCopy] = useState(false);
   const [assignmentTemplate, setAssignmentTemplate] = useState<ProgramTemplate | null>(null);
   const [recommendationOpen, setRecommendationOpen] = useState(false);
-  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [generatorOpen, setGeneratorOpen] = useState(
+    () => mode === 'full' && new URLSearchParams(search).get('start') === 'generator',
+  );
   const defaultStartDate = dateInputValue(
     new Date(),
     user?.profile?.timezone || detectedTimeZone(),
   );
-  const [assignmentStartDate, setAssignmentStartDate] = useState(defaultStartDate);
-  const [assignmentDuration, setAssignmentDuration] = useState(4);
-  const [assignmentWeekdays, setAssignmentWeekdays] = useState<number[]>([]);
   const examplePanelRef = useModalA11y<HTMLDivElement>(Boolean(selectedExample), () =>
     setSelectedExample(null),
   );
@@ -165,9 +227,6 @@ export function TemplatesList({
     selectedExample?.is_active_for_current_user === true &&
     selectedExample.assigned_by_user_id != null &&
     selectedExample.assigned_by_user_id !== user?.id;
-  const assignmentPanelRef = useModalA11y<HTMLDivElement>(Boolean(assignmentTemplate), () =>
-    setAssignmentTemplate(null),
-  );
   const templates = useQuery({
     queryKey: ['templates', 'mine'],
     queryFn: () => api<ProgramTemplate[]>('/api/v1/programs/templates/mine'),
@@ -226,14 +285,19 @@ export function TemplatesList({
   };
 
   const assignmentMutation = useMutation({
-    mutationFn: ({ templateId, replaceActive }: { templateId: number; replaceActive: boolean }) =>
+    mutationFn: ({
+      templateId,
+      replaceActive,
+      schedule,
+    }: {
+      templateId: number;
+      replaceActive: boolean;
+      schedule: AssignmentSchedule;
+    }) =>
       api(`/api/v1/programs/templates/${templateId}/assign-to-me`, {
         method: 'POST',
         body: {
-          start_date: assignmentStartDate,
-          duration_weeks: assignmentDuration,
-          schedule_weekdays:
-            assignmentTemplate && assignmentTemplate.days.length > 7 ? null : assignmentWeekdays,
+          ...schedule,
           replace_active: replaceActive,
         },
       }),
@@ -303,25 +367,7 @@ export function TemplatesList({
     },
   });
 
-  const assignmentOffsets = assignmentWeekdays.map(
-    (weekday) => (weekday - (assignmentWeekdays[0] ?? weekday) + 7) % 7,
-  );
-  const assignmentScheduleIsValid =
-    Boolean(assignmentTemplate) &&
-    ((assignmentTemplate?.days.length ?? 0) > 7
-      ? assignmentWeekdays.length === 0
-      : assignmentWeekdays.length === assignmentTemplate?.days.length &&
-        new Set(assignmentWeekdays).size === assignmentWeekdays.length &&
-        assignmentOffsets.every(
-          (offset, index) => index === 0 || offset > assignmentOffsets[index - 1]!,
-        ));
-
   const openAssignment = (template: ProgramTemplate) => {
-    setAssignmentStartDate(defaultStartDate);
-    setAssignmentDuration(
-      template.default_duration_weeks > 1 ? template.default_duration_weeks : 4,
-    );
-    setAssignmentWeekdays(defaultWeekdays(template, defaultStartDate));
     setAssignmentTemplate(template);
   };
 
@@ -356,6 +402,11 @@ export function TemplatesList({
   };
 
   const activeTemplate = templates.data?.find((item) => item.is_active_for_current_user) ?? null;
+  const operationParams = new URLSearchParams(search);
+  const operationId = positiveIntegerParam(operationParams, 'assigned_program_id');
+  const operationsTemplate = operationParams.has('assigned_program_id')
+    ? (templates.data?.find((item) => item.assigned_program_id === operationId) ?? null)
+    : activeTemplate;
   const deleteActiveProgram = async () => {
     const assignedProgramId = activeTemplate?.assigned_program_id;
     if (assignedProgramId == null || deleteAssignedMutation.isPending) return;
@@ -386,16 +437,22 @@ export function TemplatesList({
     ) ?? [];
 
   useEffect(() => {
-    if (mode !== 'full' || !defaultLibraryOpen || templates.isLoading) return;
+    if (mode !== 'full' || new URLSearchParams(search).get('start') !== 'generator') return;
+    const frame = window.requestAnimationFrame(() => setGeneratorOpen(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, search]);
+
+  useEffect(() => {
+    if (mode !== 'full' || !defaultLibraryOpen) return;
     const frame = window.requestAnimationFrame(() => {
-      const target = document.getElementById('program-library');
-      if (!(target instanceof HTMLDetailsElement)) return;
-      target.open = true;
-      target.scrollIntoView({ block: 'start' });
-      target.querySelector<HTMLElement>(':scope > summary')?.focus();
+      document.getElementById('program-manage-heading')?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [defaultLibraryOpen, mode, templates.isLoading]);
+  }, [defaultLibraryOpen, mode]);
+
+  const isManage = mode === 'full';
+  const isSummary = mode === 'summary';
+  const showingOverview = panel === 'overview';
 
   const renderTemplate = (item: ProgramTemplate) => (
     <article className="program-template-card" key={item.id}>
@@ -474,176 +531,276 @@ export function TemplatesList({
 
   return (
     <>
-      <section
-        className="program-active semantic-card semantic-card--action semantic-card--training"
-        data-card-variant="action"
-        data-semantic-family="training"
-        aria-labelledby="active-program-title"
+      {isManage && (
+        <header className="program-manage-intro">
+          <span className="eyebrow">План / Моя программа</span>
+          <h1 id="program-manage-heading" tabIndex={-1}>
+            {showingOverview
+              ? 'Центр управления'
+              : manageActions.find((item) => item.panel === panel)?.title}
+          </h1>
+          <p className="muted">Текущая программа, настройки и быстрые действия.</p>
+          {!showingOverview && (
+            <button
+              type="button"
+              className="secondary program-manage-back"
+              onClick={() => openPanel('overview')}
+            >
+              <Icon name="arrow-left" size={20} /> К центру управления
+            </button>
+          )}
+        </header>
+      )}
+      <div
+        className={isManage ? 'program-manage-layout' : undefined}
+        hidden={isManage && !showingOverview}
       >
-        {templates.isLoading ? (
-          <LoadingState label="Загружаем текущую программу…" />
-        ) : templates.error ? (
-          <ErrorState
-            message={(templates.error as Error).message}
-            retry={() => void templates.refetch()}
-          />
-        ) : activeTemplate ? (
-          <>
-            <div className="program-active__head">
-              <div>
-                <span className="eyebrow">Текущая программа</span>
-                <h2 id="active-program-title">{activeTemplate.title}</h2>
-                <p>{programMeta(activeTemplate)}</p>
-              </div>
-              <Badge tone="success">Активна</Badge>
-            </div>
-            {mode === 'summary' ? (
-              <div className="program-active__summary">
-                <span>Ближайшие тренировки и календарь — в разделе «План».</span>
-                {readOnly ? (
-                  <span className="muted">Управление доступно после входа.</span>
-                ) : (
-                  <AppLink className="button-link" to="/app?section=programs&view=manage">
-                    Управление программой
-                  </AppLink>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="program-active__source">
-                  <strong>{programKind(activeTemplate, user?.id)}</strong>
-                  {activeTemplate.assigned_by_user_id &&
-                  activeTemplate.assigned_by_user_id !== user?.id ? (
-                    <span>
-                      Назначил тренер
-                      {activeTemplate.assigned_by_full_name
-                        ? ` ${activeTemplate.assigned_by_full_name}`
-                        : ''}
-                    </span>
-                  ) : (
-                    <span>Вы можете посмотреть состав или изменить будущий шаблон.</span>
-                  )}
+        <section
+          className="program-active semantic-card semantic-card--action semantic-card--training"
+          data-card-variant="action"
+          data-semantic-family="training"
+          aria-labelledby="active-program-title"
+        >
+          {templates.isLoading ? (
+            <LoadingState label="Загружаем текущую программу…" />
+          ) : templates.error ? (
+            <ErrorState
+              message={(templates.error as Error).message}
+              retry={() => void templates.refetch()}
+            />
+          ) : activeTemplate ? (
+            <>
+              <div className="program-active__head">
+                <div>
+                  <span className="eyebrow">Текущая программа</span>
+                  <h2 id="active-program-title">{activeTemplate.title}</h2>
+                  <p>{programMeta(activeTemplate)}</p>
                 </div>
-                {activeTemplate.assigned_program_id &&
-                  activeTemplate.assigned_program_start_date &&
-                  activeTemplate.assigned_program_duration_weeks != null &&
-                  activeTemplate.current_revision_number != null && (
-                    <AssignedProgramDetails
-                      key={activeTemplate.assigned_program_id}
-                      programId={activeTemplate.assigned_program_id}
-                      currentRevisionNumber={activeTemplate.current_revision_number}
-                      startDate={activeTemplate.assigned_program_start_date}
-                      durationWeeks={activeTemplate.assigned_program_duration_weeks}
-                      showAiAdaptation
-                      workoutHistoryReturnPath="/app?section=programs"
-                    />
-                  )}
-                <div className="program-active__actions">
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={(event) => {
-                      event.currentTarget.focus();
-                      setPreviewStale(false);
-                      setSelectedExample(activeTemplate);
-                    }}
-                  >
-                    Посмотреть план
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => setRecommendationOpen(true)}
-                  >
-                    Подобрать другую
-                  </button>
-                  <button type="button" onClick={() => setGeneratorOpen(true)}>
-                    Подобрать программу
-                  </button>
-                  <button
-                    type="button"
-                    className="program-active__edit-action"
-                    onClick={() => {
-                      setSaveAsCopy(shouldSaveTemplateAsCopy(activeTemplate));
-                      setEditingTemplate(activeTemplate);
-                    }}
-                  >
-                    {shouldSaveTemplateAsCopy(activeTemplate)
-                      ? 'Настроить свою копию'
-                      : 'Редактировать шаблон'}
-                  </button>
-                </div>
-                {activeTemplate.owner_user_id === user?.id && (
-                  <PublicProgramSharePanel template={activeTemplate} />
-                )}
-                {activeTemplate.assigned_program_id != null && (
-                  <button
-                    type="button"
-                    className="btn-danger program-active__delete-action"
-                    disabled={deleteAssignedMutation.isPending}
-                    onClick={() => void deleteActiveProgram()}
-                  >
-                    Удалить программу
-                  </button>
-                )}
-              </>
-            )}
-          </>
-        ) : (
-          <div className="program-active__empty">
-            <span className="eyebrow">Текущая программа</span>
-            <h2 id="active-program-title">План ещё не выбран</h2>
-            <p>Создайте свою программу сразу или выберите готовый шаблон.</p>
-            <div className="program-active__actions">
-              {mode === 'summary' ? (
-                <>
+                <Badge tone="success">
+                  {activeTemplate.assigned_program_status === 'scheduled'
+                    ? 'Запланирована'
+                    : 'Активна'}
+                </Badge>
+              </div>
+              {isSummary ? (
+                <div className="program-active__summary">
+                  <span>Ближайшие тренировки и календарь — в разделе «План».</span>
                   {readOnly ? (
-                    <span className="muted">Создание и выбор программы доступны после входа.</span>
+                    <span className="muted">Управление доступно после входа.</span>
                   ) : (
-                    <>
-                      <AppLink
-                        className="button-link program-wizard__anchor"
-                        to="/app?section=programs&view=manage&start=create"
-                      >
-                        Создать свою программу
-                      </AppLink>
-                      <AppLink
-                        className="secondary program-wizard__anchor"
-                        to="/app?section=programs&view=manage&start=templates"
-                      >
-                        Программы и шаблоны
-                      </AppLink>
-                    </>
+                    <AppLink className="button-link" to="/app?section=programs&view=manage">
+                      Управление программой
+                    </AppLink>
                   )}
-                </>
+                </div>
               ) : (
                 <>
-                  <AppLink
-                    className="button-link program-wizard__anchor"
-                    to="/app?section=programs&view=manage&start=generator"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setGeneratorOpen(true);
-                    }}
-                  >
-                    Подобрать программу
-                  </AppLink>
-                  <a className="button-link program-wizard__anchor" href="#program-builder">
-                    Создать свою программу
-                  </a>
-                  <a className="secondary program-wizard__anchor" href="#program-library">
-                    Программы и шаблоны
-                  </a>
+                  <div className="program-active__source">
+                    <strong>{programKind(activeTemplate, user?.id)}</strong>
+                    {activeTemplate.assigned_by_user_id &&
+                    activeTemplate.assigned_by_user_id !== user?.id ? (
+                      <span>
+                        Назначил тренер
+                        {activeTemplate.assigned_by_full_name
+                          ? ` ${activeTemplate.assigned_by_full_name}`
+                          : ''}
+                      </span>
+                    ) : (
+                      <span>Вы можете посмотреть состав или изменить будущий шаблон.</span>
+                    )}
+                  </div>
+                  <div className="program-active__actions">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={(event) => {
+                        event.currentTarget.focus();
+                        setPreviewStale(false);
+                        setSelectedExample(activeTemplate);
+                      }}
+                    >
+                      Посмотреть состав
+                    </button>
+                    {!(
+                      activeTemplate.assigned_by_user_id &&
+                      activeTemplate.assigned_by_user_id !== user?.id
+                    ) && (
+                      <button
+                        type="button"
+                        className="program-active__edit-action"
+                        onClick={() => {
+                          setSaveAsCopy(shouldSaveTemplateAsCopy(activeTemplate));
+                          setEditingTemplate(activeTemplate);
+                        }}
+                      >
+                        {shouldSaveTemplateAsCopy(activeTemplate)
+                          ? 'Настроить свою копию'
+                          : 'Редактировать шаблон'}
+                      </button>
+                    )}
+                  </div>
+                  {activeTemplate.owner_user_id === user?.id && (
+                    <PublicProgramSharePanel template={activeTemplate} />
+                  )}
+                  {activeTemplate.assigned_program_id != null && (
+                    <button
+                      type="button"
+                      className="btn-danger program-active__delete-action"
+                      disabled={deleteAssignedMutation.isPending}
+                      onClick={() => void deleteActiveProgram()}
+                    >
+                      Удалить программу
+                    </button>
+                  )}
                 </>
               )}
+            </>
+          ) : (
+            <div className="program-active__empty">
+              <span className="eyebrow">Текущая программа</span>
+              <h2 id="active-program-title">План ещё не выбран</h2>
+              <p>Создайте свою программу сразу или выберите готовый шаблон.</p>
+              <div className="program-active__actions">
+                {isSummary ? (
+                  <>
+                    {readOnly ? (
+                      <span className="muted">
+                        Создание и выбор программы доступны после входа.
+                      </span>
+                    ) : (
+                      <>
+                        <AppLink
+                          className="button-link program-wizard__anchor"
+                          to="/app?section=programs&view=manage&start=create"
+                        >
+                          Создать свою программу
+                        </AppLink>
+                        <AppLink
+                          className="secondary program-wizard__anchor"
+                          to="/app?section=programs&view=manage&start=templates"
+                        >
+                          Программы и шаблоны
+                        </AppLink>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => openPanel('create')}>
+                      Создать свою программу
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        openPanel('replace');
+                        setGeneratorOpen(true);
+                      }}
+                    >
+                      Подобрать программу
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => openPanel('library')}
+                    >
+                      Выбрать готовую
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+        </section>
+        {isManage && activeTemplate && (
+          <nav className="program-manage-actions" aria-label="Управление программой">
+            <div className="program-manage-actions__head">
+              <h2>Управление</h2>
+              <span className="muted">4 действия</span>
+            </div>
+            {manageActions.map((action) => (
+              <button
+                type="button"
+                key={action.panel}
+                className="program-manage-actions__item"
+                data-program-panel={action.panel}
+                onClick={() => openPanel(action.panel)}
+              >
+                <span className="program-manage-actions__icon">
+                  <Icon name={action.icon} size={20} />
+                </span>
+                <span className="program-manage-actions__label">
+                  <strong>{action.title}</strong>
+                  <small>{action.description}</small>
+                </span>
+                <Icon name="chevron-right" size={20} />
+              </button>
+            ))}
+          </nav>
         )}
-      </section>
-      {mode === 'full' && (
+      </div>
+      {isManage && (
         <>
-          {children}
-          <ProgramImportPanel />
+          <section className="program-manage-destination" hidden={panel !== 'operations'}>
+            <h2>Назначение и изменения</h2>
+            {panel === 'operations' &&
+            operationsTemplate?.assigned_program_id &&
+            operationsTemplate.assigned_program_start_date &&
+            operationsTemplate.assigned_program_duration_weeks != null &&
+            operationsTemplate.current_revision_number != null ? (
+              <AssignedProgramDetails
+                key={operationsTemplate.assigned_program_id}
+                programId={operationsTemplate.assigned_program_id}
+                currentRevisionNumber={operationsTemplate.current_revision_number}
+                startDate={operationsTemplate.assigned_program_start_date}
+                durationWeeks={operationsTemplate.assigned_program_duration_weeks}
+                periodizationReadOnly={
+                  operationsTemplate.assigned_by_user_id != null &&
+                  operationsTemplate.assigned_by_user_id !== user?.id
+                }
+                showAiAdaptation
+                workoutHistoryReturnPath="/app?section=programs&view=manage&panel=operations"
+              />
+            ) : (
+              <p className="muted">Подробности назначения пока недоступны.</p>
+            )}
+          </section>
+          <section className="program-manage-destination" hidden={panel !== 'replace'}>
+            <h2>Заменить программу</h2>
+            <p className="muted">
+              Программа не изменится без явного подтверждения нового назначения.
+            </p>
+            <div className="program-manage-destination__actions">
+              <button type="button" onClick={() => setGeneratorOpen(true)}>
+                Подобрать программу
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setRecommendationOpen(true)}
+              >
+                Подбор по параметрам
+              </button>
+              <button type="button" className="secondary" onClick={() => openPanel('library')}>
+                Выбрать шаблон
+              </button>
+            </div>
+          </section>
+          <div className="program-manage-destination" hidden={panel !== 'create'}>
+            {children}
+            <ProgramImportPanel
+              allowSelfAssignment
+              defaultStartDate={defaultStartDate}
+              onImported={() => void refreshProgramState()}
+              onOpenTemplates={() => openPanel('library')}
+              onOpenProgram={(id) =>
+                navigate(
+                  `/app?section=programs&view=manage&panel=operations&assigned_program_id=${id}`,
+                )
+              }
+              onOpenWorkout={() => navigate('/app?section=today')}
+            />
+          </div>
           <LegacyProgramRecommendation
             open={recommendationOpen}
             onOpenChange={setRecommendationOpen}
@@ -653,78 +810,87 @@ export function TemplatesList({
           <ProgramRecommendation
             open={generatorOpen}
             onOpenChange={setGeneratorOpen}
+            onOpenPrograms={() => openPanel('library')}
             onConfirmed={refreshProgramState}
           />
-          <Card
-            defaultOpen={defaultLibraryOpen}
-            family="training"
-            id="program-library"
-            title="Программы и шаблоны"
-            description="Ваши заготовки и готовые варианты для быстрого запуска."
-          >
-            {templates.isLoading ? (
-              <LoadingState />
-            ) : templates.error ? (
-              <ErrorState message={(templates.error as Error).message} />
-            ) : !ownTemplates.length && !readyTemplates.length ? (
-              <EmptyState
-                title="Программ пока нет"
-                text="Создайте первую программу в конструкторе."
-              />
-            ) : (
-              <div className="program-library top-gap">
-                {!!ownTemplates.length && (
-                  <section className="program-library__group" aria-labelledby="own-programs-title">
-                    <div>
-                      <h3 id="own-programs-title">Мои программы</h3>
-                      <span>{ownTemplates.length}</span>
-                    </div>
-                    <div className="program-template-grid">{ownTemplates.map(renderTemplate)}</div>
-                  </section>
-                )}
-                {!!readyTemplates.length && (
-                  <section
-                    className="program-library__group"
-                    aria-labelledby="ready-programs-title"
-                  >
-                    <div>
-                      <h3 id="ready-programs-title">Готовые шаблоны</h3>
-                      <span>{readyTemplates.length}</span>
-                    </div>
-                    <div className="program-template-grid">
-                      {readyTemplates.map(renderTemplate)}
-                    </div>
-                  </section>
-                )}
-              </div>
-            )}
-            {!!hidden.data?.length && (
-              <details className="compact-disclosure top-gap">
-                <summary className="yfc-disclosure-summary">
-                  <span>Скрытые примеры программ ({hidden.data.length})</span>
-                  <DisclosureIcon />
-                </summary>
-                <div className="list-grid top-gap">
-                  {hidden.data.map((item) => (
-                    <article className="list-row" key={item.id}>
-                      <strong>{item.title}</strong>
-                      <button
-                        className="secondary"
-                        onClick={() =>
-                          mutation.mutate({
-                            path: `/api/v1/programs/templates/${item.id}/restore`,
-                            method: 'POST',
-                          })
-                        }
-                      >
-                        Восстановить
-                      </button>
-                    </article>
-                  ))}
+          <div className="program-manage-destination" hidden={panel !== 'library'}>
+            <Card
+              collapsible={false}
+              defaultOpen={defaultLibraryOpen}
+              family="training"
+              id="program-library"
+              title="Программы и шаблоны"
+              description="Ваши заготовки и готовые варианты для быстрого запуска."
+            >
+              {templates.isLoading ? (
+                <LoadingState />
+              ) : templates.error ? (
+                <ErrorState message={(templates.error as Error).message} />
+              ) : !ownTemplates.length && !readyTemplates.length ? (
+                <EmptyState
+                  title="Программ пока нет"
+                  text="Создайте первую программу в конструкторе."
+                />
+              ) : (
+                <div className="program-library top-gap">
+                  {!!ownTemplates.length && (
+                    <section
+                      className="program-library__group"
+                      aria-labelledby="own-programs-title"
+                    >
+                      <div>
+                        <h3 id="own-programs-title">Мои программы</h3>
+                        <span>{ownTemplates.length}</span>
+                      </div>
+                      <div className="program-template-grid">
+                        {ownTemplates.map(renderTemplate)}
+                      </div>
+                    </section>
+                  )}
+                  {!!readyTemplates.length && (
+                    <section
+                      className="program-library__group"
+                      aria-labelledby="ready-programs-title"
+                    >
+                      <div>
+                        <h3 id="ready-programs-title">Готовые шаблоны</h3>
+                        <span>{readyTemplates.length}</span>
+                      </div>
+                      <div className="program-template-grid">
+                        {readyTemplates.map(renderTemplate)}
+                      </div>
+                    </section>
+                  )}
                 </div>
-              </details>
-            )}
-          </Card>
+              )}
+              {!!hidden.data?.length && (
+                <details className="compact-disclosure top-gap">
+                  <summary className="yfc-disclosure-summary">
+                    <span>Скрытые примеры программ ({hidden.data.length})</span>
+                    <DisclosureIcon />
+                  </summary>
+                  <div className="list-grid top-gap">
+                    {hidden.data.map((item) => (
+                      <article className="list-row" key={item.id}>
+                        <strong>{item.title}</strong>
+                        <button
+                          className="secondary"
+                          onClick={() =>
+                            mutation.mutate({
+                              path: `/api/v1/programs/templates/${item.id}/restore`,
+                              method: 'POST',
+                            })
+                          }
+                        >
+                          Восстановить
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </Card>
+          </div>
         </>
       )}
       {selectedExample && (
@@ -913,7 +1079,9 @@ export function TemplatesList({
                       className="program-example-modal__primary-action"
                       disabled
                     >
-                      Уже запущена
+                      {selectedExample.assigned_program_status === 'scheduled'
+                        ? 'Уже запланирована'
+                        : 'Уже запущена'}
                     </button>
                   ) : (
                     <button
@@ -933,144 +1101,29 @@ export function TemplatesList({
         </div>
       )}
       {assignmentTemplate && (
-        <div
-          className="modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="assign-program-title"
-        >
-          <button
-            type="button"
-            className="modal__backdrop"
-            aria-label="Закрыть настройку расписания"
-            onClick={() => setAssignmentTemplate(null)}
-          />
-          <div
-            className="modal__panel card assignment-modal"
-            ref={assignmentPanelRef}
-            tabIndex={-1}
-          >
-            <div className="section-head">
-              <div>
-                <span className="eyebrow">Расписание программы</span>
-                <h2 id="assign-program-title">{assignmentTemplate.title}</h2>
-              </div>
-              <button
-                type="button"
-                className="secondary"
-                aria-label="Закрыть настройку расписания"
-                onClick={() => setAssignmentTemplate(null)}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <form
-              className="stack"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                const active = templates.data?.find(
-                  (template) => template.is_active_for_current_user,
-                );
-                let replaceActive = false;
-                if (
-                  active &&
-                  !(await confirm({
-                    title: 'Заменить активную программу?',
-                    message: `«${active.title}» будет отправлена в архив, а «${assignmentTemplate.title}» станет активной.`,
-                    confirmText: 'Заменить программу',
-                  }))
-                )
-                  return;
-                replaceActive = Boolean(active);
-                assignmentMutation.mutate({ templateId: assignmentTemplate.id, replaceActive });
-              }}
-            >
-              <div className="form-grid">
-                <label className="field">
-                  <span>Начать не раньше</span>
-                  <DateInput
-                    min={defaultStartDate}
-                    value={assignmentStartDate}
-                    onChange={(event) => {
-                      const nextStartDate = event.target.value;
-                      setAssignmentStartDate(nextStartDate);
-                      setAssignmentWeekdays(defaultWeekdays(assignmentTemplate, nextStartDate));
-                    }}
-                    required
-                  />
-                </label>
-                <label className="field">
-                  <span>Длительность, недель</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={
-                      assignmentTemplate.default_duration_weeks > 1
-                        ? assignmentTemplate.default_duration_weeks
-                        : 24
-                    }
-                    value={assignmentDuration}
-                    onChange={(event) => setAssignmentDuration(Number(event.target.value))}
-                    required
-                  />
-                </label>
-              </div>
-              {assignmentTemplate.default_duration_weeks > 1 && (
-                <p className="auth-notice">
-                  Для этого шаблона доступны назначения на{' '}
-                  {assignmentTemplate.default_duration_weeks} недель с сохранённой схемой
-                  повторений.
-                </p>
-              )}
-              {assignmentTemplate.days.length > 7 ? (
-                <p className="auth-notice">
-                  Восьмидневный цикл планируется последовательно: одна тренировка за другой, начиная
-                  с выбранной даты.
-                </p>
-              ) : (
-                <div className="form-grid">
-                  {assignmentTemplate.days.map((day, dayIndex) => (
-                    <label className="field" key={day.id}>
-                      <span>{day.title || `День ${dayIndex + 1}`}</span>
-                      <select
-                        value={assignmentWeekdays[dayIndex] ?? ''}
-                        onChange={(event) =>
-                          setAssignmentWeekdays(
-                            assignmentWeekdays.map((value, index) =>
-                              index === dayIndex ? Number(event.target.value) : value,
-                            ),
-                          )
-                        }
-                      >
-                        {weekdayLabels.map((label, weekday) => (
-                          <option value={weekday} key={label}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-              )}
-              {!assignmentScheduleIsValid && (
-                <p className="field-error" role="alert">
-                  Выберите разные дни недели в порядке тренировок. В одной неделе доступно до семи
-                  дней.
-                </p>
-              )}
-              <button
-                disabled={
-                  assignmentMutation.isPending ||
-                  !assignmentScheduleIsValid ||
-                  assignmentDuration < 1 ||
-                  assignmentDuration > 24
-                }
-              >
-                {assignmentMutation.isPending ? 'Назначаем…' : 'Назначить по расписанию'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <ProgramAssignmentDialog
+          plan={assignmentPlanFromTemplate(assignmentTemplate)}
+          defaultStartDate={defaultStartDate}
+          busy={assignmentMutation.isPending}
+          onClose={() => setAssignmentTemplate(null)}
+          onSubmit={async (schedule) => {
+            const active = templates.data?.find((template) => template.is_active_for_current_user);
+            if (
+              active &&
+              !(await confirm({
+                title: 'Заменить активную программу?',
+                message: `«${active.title}» будет сразу отправлена в архив. «${assignmentTemplate.title}» будет назначена. Выполненные тренировки и история сохранятся.`,
+                confirmText: 'Заменить программу',
+              }))
+            )
+              return;
+            assignmentMutation.mutate({
+              templateId: assignmentTemplate.id,
+              replaceActive: Boolean(active),
+              schedule,
+            });
+          }}
+        />
       )}
       {guide && (
         <ExerciseGuideDialog

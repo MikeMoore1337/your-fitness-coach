@@ -110,6 +110,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutExercise,
     UserWorkoutSet,
+    UserWorkoutSetSide,
     WorkoutAdaptation,
     WorkoutSetMutation,
 )
@@ -137,6 +138,11 @@ from fitminiapp_api.models.weekly_digest import (
     WeeklyDigestIssueItem,
     WeeklyDigestPreference,
 )
+from fitminiapp_api.models.workout_exercise_note import (
+    WorkoutExerciseNote,
+    WorkoutExerciseNoteMutation,
+)
+from fitminiapp_api.models.workout_history_import import ImportedWorkout, WorkoutHistoryImportDraft
 from fitminiapp_api.models.workout_rest import WorkoutRestAction, WorkoutRestSession
 
 __all__ = [
@@ -200,6 +206,7 @@ __all__ = [
     "HydrationEntry",
     "HydrationGoal",
     "HydrationPreset",
+    "ImportedWorkout",
     "LifecycleMilestone",
     "LocalCredential",
     "Muscle",
@@ -251,6 +258,7 @@ __all__ = [
     "UserWorkout",
     "UserWorkoutExercise",
     "UserWorkoutSet",
+    "UserWorkoutSetSide",
     "WebArticle",
     "WebArticleCandidate",
     "WebArticleRevision",
@@ -263,6 +271,9 @@ __all__ = [
     "WorkoutAdaptation",
     "WorkoutComment",
     "WorkoutCommentRevision",
+    "WorkoutExerciseNote",
+    "WorkoutExerciseNoteMutation",
+    "WorkoutHistoryImportDraft",
     "WorkoutRestAction",
     "WorkoutRestSession",
     "WorkoutSetMutation",

@@ -1,0 +1,466 @@
+{
+  "units": "CSS px",
+  "viewports": [320, 360, 393, 430, 1120, 1440],
+  "themes": ["dark", "light"],
+  "browsers": ["chromium", "webkit"],
+  "data": "controlled synthetic API fixtures in real YFC frontend",
+  "design_archive_sha256": "ff512791186f910917d271ac85684efcd699455df8a2372a96cf56b44753f84f",
+  "results": [
+    {
+      "browserName": "chromium",
+      "theme": "dark",
+      "width": 430,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "dark",
+      "width": 430,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "light",
+      "width": 1120,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "light",
+      "width": 1120,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "dark",
+      "width": 360,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "dark",
+      "width": 360,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "dark",
+      "width": 1440,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "dark",
+      "width": 1440,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "dark",
+      "width": 320,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "dark",
+      "width": 320,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "light",
+      "width": 1440,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "light",
+      "width": 1440,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "light",
+      "width": 320,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "light",
+      "width": 320,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "dark",
+      "width": 393,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "dark",
+      "width": 393,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "light",
+      "width": 393,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "light",
+      "width": 393,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "dark",
+      "width": 1120,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "dark",
+      "width": 1120,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "light",
+      "width": 360,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "light",
+      "width": 360,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "chromium",
+      "theme": "light",
+      "width": 430,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    },
+    {
+      "browserName": "webkit",
+      "theme": "light",
+      "width": 430,
+      "heights": {
+        "active": 110,
+        "collapsed-active": 60,
+        "expired": 110,
+        "collapsed": 60,
+        "completed": 66,
+        "dismissed": 44,
+        "restarted": 110,
+        "skipped": 66,
+        "review-required": 62,
+        "recovery-dialog": 62,
+        "corrected": 66,
+        "omitted": 66
+      }
+    }
+  ]
+}

@@ -4,6 +4,8 @@ export const equipmentLabels: Readonly<Record<string, string>> = {
   barbell: 'Штанга',
   bench: 'Скамья',
   rack: 'Стойка/силовая рама',
+  pullup_bar: 'Турник',
+  dip_bars: 'Брусья',
   cable: 'Тросовый блок',
   machine: 'Тренажёр',
   kettlebell: 'Гиря',

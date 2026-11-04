@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useLayoutEffect, useState } from 'react';
 import { useDocumentScrollLock, useModalA11y } from '../../../src/shared/ui/useModalA11y';
 
 function Lock({ open }: { open: boolean }) {
@@ -13,6 +14,75 @@ function Modal({ name, onClose }: { name: string; onClose: () => void }) {
     <div ref={ref} role="dialog" aria-label={name} tabIndex={-1}>
       <button>{name}</button>
     </div>
+  );
+}
+
+function ParentModal() {
+  const ref = useModalA11y<HTMLDivElement>(true, () => undefined, '[data-initial]');
+  return (
+    <div ref={ref} role="dialog" aria-label="Родительское окно" tabIndex={-1}>
+      <button data-initial>Первое действие</button>
+      <button>Открыть подтверждение</button>
+    </div>
+  );
+}
+
+function AutoFocusedModal({ onClose }: { onClose: () => void }) {
+  const ref = useModalA11y<HTMLDivElement>(true, onClose);
+  return (
+    <div ref={ref} role="dialog" aria-label="Окно" tabIndex={-1}>
+      <input aria-label="Первый ввод" autoFocus />
+    </div>
+  );
+}
+
+function ModalWithDisclosure() {
+  const ref = useModalA11y<HTMLDivElement>(true, () => undefined);
+  return (
+    <div ref={ref} role="dialog" aria-label="Окно" tabIndex={-1}>
+      <button>До раздела</button>
+      <details>
+        <summary>Настройки дня</summary>
+        <p>Содержимое раздела</p>
+      </details>
+      <details>
+        <summary tabIndex={-1}>Пропустить раздел</summary>
+      </details>
+      <button>После раздела</button>
+    </div>
+  );
+}
+
+function EscapeOnLayout() {
+  useLayoutEffect(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  }, []);
+  return null;
+}
+
+function ModalWithUnfocusedTrigger({
+  autoFocus = false,
+  delayed = false,
+  escapeOnLayout = false,
+}: {
+  autoFocus?: boolean;
+  delayed?: boolean;
+  escapeOnLayout?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => (delayed ? window.setTimeout(() => setOpen(true), 0) : setOpen(true))}>
+        <span>Открыть окно</span>
+      </button>
+      {open &&
+        (autoFocus ? (
+          <AutoFocusedModal onClose={() => setOpen(false)} />
+        ) : (
+          <Modal name="Окно" onClose={() => setOpen(false)} />
+        ))}
+      {open && escapeOnLayout && <EscapeOnLayout />}
+    </>
   );
 }
 
@@ -74,5 +144,153 @@ describe('useDocumentScrollLock', () => {
     expect(document.body.style.position).toBe('fixed');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(parentClose).toHaveBeenCalledOnce();
+  });
+
+  it('restores the clicked trigger when the browser did not focus it', () => {
+    render(<ModalWithUnfocusedTrigger />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    expect(trigger).not.toHaveFocus();
+    fireEvent.click(screen.getByText('Открыть окно'));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger).toHaveFocus();
+  });
+
+  it('restores the clicked trigger when a dialog control is focused on mount', () => {
+    render(<ModalWithUnfocusedTrigger autoFocus />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    fireEvent.click(screen.getByText('Открыть окно'));
+    expect(screen.getByLabelText('Первый ввод')).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger).toHaveFocus();
+  });
+
+  it('keeps the trigger when the dialog opens asynchronously', async () => {
+    render(<ModalWithUnfocusedTrigger delayed />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    fireEvent.click(screen.getByText('Открыть окно'));
+    await screen.findByRole('dialog', { name: 'Окно' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger).toHaveFocus();
+  });
+
+  it('handles Escape during the commit that opens an asynchronous dialog', async () => {
+    render(<ModalWithUnfocusedTrigger delayed escapeOnLayout />);
+    const trigger = screen.getByRole('button', { name: 'Открыть окно' });
+    fireEvent.click(screen.getByText('Открыть окно'));
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.queryByRole('dialog', { name: 'Окно' })).not.toBeInTheDocument();
+  });
+
+  it('uses the latest close callback during a layout-phase Escape', () => {
+    const previousClose = vi.fn();
+    const nextClose = vi.fn();
+    const view = render(<Modal name="Окно" onClose={previousClose} />);
+
+    view.rerender(
+      <>
+        <Modal name="Окно" onClose={nextClose} />
+        <EscapeOnLayout />
+      </>,
+    );
+
+    expect(nextClose).toHaveBeenCalledOnce();
+    expect(previousClose).not.toHaveBeenCalled();
+  });
+
+  it('does not restore an unrelated click after keyboard interaction', () => {
+    const view = render(<button>Другое действие</button>);
+    const unrelated = screen.getByRole('button', { name: 'Другое действие' });
+    fireEvent.click(unrelated);
+    fireEvent.keyDown(document, { key: 'Tab' });
+    view.rerender(
+      <>
+        <button>Другое действие</button>
+        <Modal name="Окно" onClose={() => undefined} />
+      </>,
+    );
+    view.rerender(<button>Другое действие</button>);
+    expect(unrelated).not.toHaveFocus();
+  });
+
+  it('does not let a delayed parent frame steal focus from a nested dialog', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const view = render(<ParentModal />);
+    screen.getByRole('button', { name: 'Открыть подтверждение' }).focus();
+    view.rerender(
+      <>
+        <ParentModal />
+        <Modal name="Подтверждение" onClose={() => undefined} />
+      </>,
+    );
+    const child = screen.getByRole('button', { name: 'Подтверждение' });
+    child.focus();
+
+    frames[0]!(0);
+
+    expect(child).toHaveFocus();
+  });
+
+  it('moves focus to the preferred control when a dialog first opens', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const view = render(<button>Внешнее действие</button>);
+    screen.getByRole('button', { name: 'Внешнее действие' }).focus();
+    view.rerender(
+      <>
+        <button>Внешнее действие</button>
+        <ParentModal />
+      </>,
+    );
+
+    frames[0]!(0);
+
+    expect(screen.getByRole('button', { name: 'Первое действие' })).toHaveFocus();
+  });
+
+  it('includes native disclosure summaries in the dialog tab order', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockReturnValue(document.body);
+    render(<ModalWithDisclosure />);
+    const before = screen.getByRole('button', { name: 'До раздела' });
+    const summary = screen.getByText('Настройки дня');
+    const after = screen.getByRole('button', { name: 'После раздела' });
+
+    before.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(summary).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(after).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(summary).toHaveFocus();
+  });
+
+  it('keeps the restored trigger when the initial parent frame runs late', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const view = render(<ParentModal />);
+    const trigger = screen.getByRole('button', { name: 'Открыть подтверждение' });
+    trigger.focus();
+    view.rerender(
+      <>
+        <ParentModal />
+        <Modal name="Подтверждение" onClose={() => undefined} />
+      </>,
+    );
+    screen.getByRole('button', { name: 'Подтверждение' }).focus();
+    view.rerender(<ParentModal />);
+    expect(trigger).toHaveFocus();
+
+    frames[0]!(0);
+
+    expect(trigger).toHaveFocus();
   });
 });

@@ -1,4 +1,4 @@
-MAX_PROGRAM_DURATION_WEEKS = 24
+MAX_GENERATED_SETS = 20_000
 
 
 class ProgramError(ValueError):
@@ -14,6 +14,9 @@ ASSIGNMENT_CONFLICT_ERRORS = {
 }
 
 ASSIGNMENT_VALIDATION_PREFIXES = (
+    "Длительность программы",
+    "Размер плана",
+    "В календарной неделе",
     "Program duration must",
     "A weekly program supports",
     "Program is too large",

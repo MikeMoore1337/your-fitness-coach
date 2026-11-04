@@ -1,9 +1,9 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { DisclosureIcon, Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
+import { DisclosureIcon, Card, LoadingState } from '../../shared/ui/common';
 import { orderExercisesForLevel } from './exerciseOrdering';
 import { buildStrengthPreset, resolveStrengthRule, type StrengthSplit } from './strengthPresets';
 import { usePersistentState } from '../../shared/storage';
@@ -15,16 +15,20 @@ import { ContextualHelp } from '../../shared/ui/ContextualHelp';
 import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
-import { SearchableExercisePicker } from './SearchableExercisePicker';
+import { ProgramDayEditor } from './ProgramDayEditor';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { ProgramSettingsPanel } from './ProgramSettingsPanel';
+import { ProgramPeriodization } from './ProgramPeriodization';
+import { ActiveProgramPeriodization } from './ActiveProgramPeriodization';
+import { templateWeekCycle } from './programPreviewFacts';
+import './ProgramBuilderFocus.css';
 import { DateInput } from '../../shared/ui/PickerInput';
-import { Icon } from '../../shared/ui/Icon';
 import {
   productEventSurface,
   trackCoreProductEvent,
   trackGrowthEvent,
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
-import { isPairedWithPrevious, moveItem, removeExercise, toggleSuperset } from './programDraft';
 import {
   SIMPLE_PROGRAM_DEFAULTS,
   simpleTrainingTitle,
@@ -32,6 +36,42 @@ import {
 } from './programDefaults';
 
 type Day = ProgramTemplateCreate['days'][number];
+type DraftExercise = Day['exercises'][number];
+type WeeklyPrescription = NonNullable<DraftExercise['weekly_prescriptions']>[number];
+
+function weekPrescription(exercise: DraftExercise, week: number): WeeklyPrescription {
+  return (
+    exercise.weekly_prescriptions?.find((item) => item.week_number === week) ?? {
+      exercise_id: exercise.exercise_id,
+      week_number: week,
+      prescribed_sets: exercise.prescribed_sets ?? 1,
+      prescribed_reps: exercise.prescribed_reps ?? '',
+      prescribed_duration_minutes: exercise.prescribed_duration_minutes,
+      rest_seconds: exercise.rest_seconds,
+      prescription: exercise.prescription,
+    }
+  );
+}
+
+function projectSourceWeek(days: Day[], week: number): Day[] {
+  return days.map((day) => ({
+    ...day,
+    exercises: day.exercises.map((exercise) => {
+      if (week === 1 && !exercise.weekly_prescriptions?.some((item) => item.week_number === 1))
+        return exercise;
+      const weekly = weekPrescription(exercise, week);
+      return {
+        ...exercise,
+        exercise_id: weekly.exercise_id,
+        prescribed_sets: weekly.prescribed_sets,
+        prescribed_reps: weekly.prescribed_reps,
+        prescribed_duration_minutes: weekly.prescribed_duration_minutes,
+        rest_seconds: weekly.rest_seconds,
+        prescription: weekly.prescription ?? exercise.prescription,
+      };
+    }),
+  }));
+}
 type ProgramTemplateAssignmentCreate = ProgramTemplateCreate & {
   start_date: string;
   duration_weeks: number;
@@ -92,6 +132,7 @@ export function ProgramBuilder({
   const sectionId = useId();
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
+  const { canMutateProfile } = useRuntimeCapabilities();
   const queryClient = useQueryClient();
   const draftScope = editingTemplate
     ? `template_${saveAsCopy ? 'copy_' : ''}${editingTemplate.id}`
@@ -127,6 +168,11 @@ export function ProgramBuilder({
         notes: exercise.notes,
         superset_group: exercise.superset_group,
         superset_order: exercise.superset_order,
+        prescription: exercise.prescription,
+        group_id: exercise.group_id,
+        group_kind: exercise.group_kind,
+        group_order: exercise.group_order,
+        weekly_prescriptions: exercise.weekly_prescriptions,
       })),
     })) ?? [blankDay(1)],
   );
@@ -145,8 +191,22 @@ export function ProgramBuilder({
   );
   const [durationWeeks, setDurationWeeks, clearDurationDraft] = usePersistentState<number>(
     programDraftStorageKey('duration', draftScope),
-    editingTemplate?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+    (editingTemplate?.is_active_for_current_user && !saveAsCopy
+      ? editingTemplate.assigned_program_duration_weeks
+      : null) ??
+      (templateWeekCycle(editingTemplate) ? editingTemplate?.default_duration_weeks : undefined) ??
+      SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
   );
+  const [weekCycle, setWeekCycle, clearWeekCycleDraft] = usePersistentState<NonNullable<
+    ProgramTemplateCreate['week_cycle']
+  > | null>(programDraftStorageKey('week-cycle', draftScope), templateWeekCycle(editingTemplate));
+  const [sourceWeek, setSourceWeek] = useState<number | ''>(1);
+  const sourceWeekValid =
+    typeof sourceWeek === 'number' &&
+    Number.isInteger(sourceWeek) &&
+    sourceWeek >= 1 &&
+    (!weekCycle || sourceWeek <= weekCycle.length_weeks);
+  const selectedSourceWeek = sourceWeekValid ? (sourceWeek as number) : 1;
   const [scheduleWeekdays, setScheduleWeekdays, clearScheduleDraft] = usePersistentState<number[]>(
     programDraftStorageKey('weekdays', draftScope),
     editingTemplate?.assigned_program_schedule_weekdays ?? [],
@@ -159,6 +219,8 @@ export function ProgramBuilder({
     editingTemplate.current_revision_number != null,
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const snapshot = JSON.stringify([
     title,
     goal,
@@ -167,12 +229,13 @@ export function ProgramBuilder({
     defaultRestSeconds,
     startDate,
     durationWeeks,
+    weekCycle,
     scheduleWeekdays,
   ]);
-  const originalSnapshot = useRef(snapshot);
+  const [originalSnapshot] = useState(snapshot);
   useEffect(() => {
-    onDirtyChange?.(snapshot !== originalSnapshot.current);
-  }, [onDirtyChange, snapshot]);
+    onDirtyChange?.(snapshot !== originalSnapshot);
+  }, [onDirtyChange, originalSnapshot, snapshot]);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [creationSuccess, setCreationSuccess] = useState<{ canStartToday: boolean } | null>(null);
   const exercises = useQuery({
@@ -216,6 +279,7 @@ export function ProgramBuilder({
           assign_after_create: !editingTemplate,
           start_date: startDate,
           duration_weeks: durationWeeks,
+          week_cycle: weekCycle,
           schedule_weekdays: scheduleWeekdaysForSave(days.length, effectiveScheduleWeekdays),
           expected_revision_number: activeProgramEdit
             ? editingTemplate?.current_revision_number
@@ -223,11 +287,25 @@ export function ProgramBuilder({
           replace_active: replaceActive,
           days: days.map((day) => ({
             ...day,
-            exercises: day.exercises.filter((item) => item.exercise_id > 0),
+            exercises: day.exercises
+              .filter((item) => item.exercise_id > 0)
+              .map((item) => ({
+                ...item,
+                weekly_prescriptions:
+                  weekCycle &&
+                  days.some((draftDay) =>
+                    draftDay.exercises.some((row) => (row.weekly_prescriptions?.length ?? 0) > 0),
+                  )
+                    ? Array.from({ length: weekCycle.length_weeks }, (_, index) =>
+                        weekPrescription(item, index + 1),
+                      )
+                    : item.weekly_prescriptions,
+              })),
           })),
         } satisfies ProgramTemplateAssignmentCreate,
       }),
     onSuccess: async (result) => {
+      setReviewOpen(false);
       if (!editingTemplate) {
         trackGrowthEvent('program_added');
         if (targetTelegramId) {
@@ -279,6 +357,7 @@ export function ProgramBuilder({
       clearDurationDraft(
         result?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
       );
+      clearWeekCycleDraft(templateWeekCycle(editingTemplate));
       clearScheduleDraft(result?.assigned_program_schedule_weekdays ?? []);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['templates'] }),
@@ -319,11 +398,140 @@ export function ProgramBuilder({
     },
   });
 
+  const totalExercises = days.reduce(
+    (count, day) => count + day.exercises.filter((item) => item.exercise_id > 0).length,
+    0,
+  );
+  const hasDetailedPrescriptions = days.some((day) =>
+    day.exercises.some((item) => item.prescription || (item.weekly_prescriptions?.length ?? 0) > 0),
+  );
+  const sourceSetCount = days.reduce(
+    (sum, day) =>
+      sum +
+      day.exercises
+        .filter((item) => item.exercise_id > 0)
+        .reduce(
+          (count, item) =>
+            count +
+            Math.max(
+              item.prescription?.segments.length ?? item.prescribed_sets ?? 1,
+              ...(item.weekly_prescriptions ?? []).map(
+                (weekly) => weekly.prescription?.segments.length ?? weekly.prescribed_sets,
+              ),
+            ),
+          0,
+        ),
+    0,
+  );
+  const sourceBudgetExceeded = Boolean(
+    weekCycle && weekCycle.length_weeks * sourceSetCount > 20000,
+  );
+  const hasExtraWeeks = Boolean(
+    weekCycle &&
+    days.some((day) =>
+      day.exercises.some((item) =>
+        item.weekly_prescriptions?.some((weekly) => weekly.week_number > weekCycle.length_weeks),
+      ),
+    ),
+  );
+  const reviewIssues: string[] = [];
+  if (!title.trim()) reviewIssues.push('Укажите название программы.');
+  if (
+    !Number.isSafeInteger(durationWeeks) ||
+    durationWeeks < 1 ||
+    (!weekCycle && durationWeeks > 24)
+  )
+    reviewIssues.push(
+      weekCycle ? 'Укажите длительность программы.' : 'Укажите длительность от 1 до 24 недель.',
+    );
+  if (
+    weekCycle &&
+    (!Number.isInteger(weekCycle.length_weeks) ||
+      weekCycle.length_weeks < 1 ||
+      weekCycle.length_weeks > 20000)
+  )
+    reviewIssues.push('Укажите допустимое количество исходных недель.');
+  if (weekCycle && !weekCycle.repeat && durationWeeks > weekCycle.length_weeks)
+    reviewIssues.push('Без повтора срок не может быть больше исходного цикла.');
+  if (weekCycle && hasExtraWeeks)
+    reviewIssues.push('Подтвердите удаление предписаний за пределами исходного цикла.');
+  if (weekCycle && !sourceWeekValid) reviewIssues.push('Укажите существующую исходную неделю.');
+  if (sourceBudgetExceeded) reviewIssues.push('Размер недельной схемы превышает допустимый объём.');
+  if (!scheduleIsValid) reviewIssues.push('Проверьте расписание тренировок.');
+  days.forEach((day, index) => {
+    if (!day.title.trim()) reviewIssues.push('День ' + (index + 1) + ': укажите название.');
+    if (!day.exercises.some((item) => item.exercise_id > 0))
+      reviewIssues.push('День ' + (index + 1) + ': добавьте хотя бы одно упражнение.');
+    day.exercises
+      .filter((item) => item.exercise_id > 0)
+      .forEach((item) => {
+        const cardio =
+          exercises.data?.find((exercise) => exercise.id === item.exercise_id)?.metric_type ===
+          'cardio';
+        if (
+          cardio &&
+          (!item.prescribed_duration_minutes ||
+            item.prescribed_duration_minutes < 1 ||
+            item.prescribed_duration_minutes > 600)
+        )
+          reviewIssues.push('День ' + (index + 1) + ': проверьте длительность.');
+        if (
+          !cardio &&
+          (!item.prescribed_sets ||
+            item.prescribed_sets < 1 ||
+            item.prescribed_sets > 10 ||
+            !item.prescribed_reps?.trim() ||
+            item.rest_seconds == null ||
+            item.rest_seconds < 15 ||
+            item.rest_seconds > 600)
+        )
+          reviewIssues.push('День ' + (index + 1) + ': проверьте подходы, повторы и отдых.');
+      });
+  });
+  const submitReviewedProgram = async () => {
+    if (mutation.isPending || reviewIssues.length || navigator.onLine === false) return;
+    let replaceActive = false;
+    if (!editingTemplate && user?.has_active_program) {
+      if (
+        !(await confirm({
+          title: 'Заменить активную программу?',
+          message:
+            'Текущая программа будет архивирована. Тренировку, которая уже идёт, заменить нельзя.',
+          confirmText: 'Создать и заменить',
+        }))
+      )
+        return;
+      replaceActive = true;
+    }
+    mutation.mutate({ replaceActive });
+  };
   const updateDay = (index: number, next: Day | ((current: Day) => Day)) =>
     setDays((currentDays) =>
-      currentDays.map((day, dayIndex) =>
-        dayIndex === index ? (typeof next === 'function' ? next(day) : next) : day,
-      ),
+      currentDays.map((day, dayIndex) => {
+        if (dayIndex !== index) return day;
+        const currentWeekDay = projectSourceWeek([day], selectedSourceWeek)[0]!;
+        const edited = typeof next === 'function' ? next(currentWeekDay) : next;
+        if (!weekCycle || selectedSourceWeek === 1) return edited;
+        return {
+          ...day,
+          exercises: day.exercises.map((exercise, exerciseIndex) => {
+            const replacement = edited.exercises[exerciseIndex]!;
+            const weekly = Array.from({ length: weekCycle.length_weeks }, (_, weekIndex) =>
+              weekPrescription(exercise, weekIndex + 1),
+            );
+            weekly[selectedSourceWeek - 1] = {
+              ...weekly[selectedSourceWeek - 1]!,
+              exercise_id: replacement.exercise_id,
+              prescribed_sets: replacement.prescribed_sets ?? 1,
+              prescribed_reps: replacement.prescribed_reps ?? '',
+              prescribed_duration_minutes: replacement.prescribed_duration_minutes,
+              rest_seconds: replacement.rest_seconds,
+              prescription: replacement.prescription,
+            };
+            return { ...exercise, weekly_prescriptions: weekly };
+          }),
+        };
+      }),
     );
   const rule = resolveStrengthRule(level, split);
   const [presetDays, setPresetDays] = useState<number>(rule.recommended);
@@ -372,26 +580,24 @@ export function ProgramBuilder({
 
   return (
     <Card
-      className="program-builder"
+      className={`program-builder${settingsOpen ? ' program-builder--settings-open' : ''}`}
       collapsible={false}
       id={!editingTemplate && !targetTelegramId ? 'program-builder' : undefined}
       title={
         editingTemplate
           ? saveAsCopy
-            ? 'Настроить личную копию'
-            : 'Редактировать программу'
+            ? 'Редактирование личной копии'
+            : 'Редактирование программы'
           : targetTelegramId
             ? `Новая программа для ${targetName || targetTelegramId}`
             : 'Создать свою программу'
       }
       description={
         editingTemplate
-          ? saveAsCopy
-            ? `Настройте личную копию «${editingTemplate.title}»`
-            : `Редактирование «${editingTemplate.title}»`
+          ? undefined
           : targetTelegramId
             ? `Назначение для ${targetName || targetTelegramId}`
-            : 'Название уже заполнено — добавьте упражнение и сохраните.'
+            : undefined
       }
     >
       {exercises.isLoading ? (
@@ -420,625 +626,404 @@ export function ProgramBuilder({
         </section>
       ) : (
         <form
-          className="stack top-gap"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            let replaceActive = false;
-            if (
-              !editingTemplate &&
-              user?.has_active_program &&
-              !(await confirm({
-                title: 'Заменить активную программу?',
-                message:
-                  'Новая программа станет активной, а текущая будет отправлена в архив. Тренировку, которая уже идёт, заменить нельзя.',
-                confirmText: 'Создать и заменить',
-              }))
-            )
-              return;
-            replaceActive = Boolean(user?.has_active_program);
-            mutation.mutate({ replaceActive });
+          className={
+            editingTemplate ? 'stack top-gap program-builder--personal-editor' : 'stack top-gap'
+          }
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!settingsOpen) setReviewOpen(true);
           }}
         >
-          {saveAsCopy && (
-            <p className="auth-notice">
-              Исходный готовый шаблон останется без изменений. После сохранения появится личная
-              копия, в которой можно использовать свои упражнения.
-            </p>
-          )}
-          <section
-            className="program-builder-basics stack"
-            aria-labelledby={`${sectionId}-program-basics-title`}
-          >
-            <div>
-              <span className="eyebrow">Шаг 1</span>
-              <h3 id={`${sectionId}-program-basics-title`}>Основа программы</h3>
-            </div>
-            <div className="form-grid">
-              <label className="field">
-                <span>Название</span>
-                <input
-                  value={title}
-                  maxLength={128}
-                  enterKeyHint="next"
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </label>
-            </div>
-          </section>
-          <div className="program-builder-days-heading">
-            <div>
-              <span className="eyebrow">Шаг 2</span>
-              <h3>Добавьте упражнения</h3>
-              <p>Первая тренировка уже создана. Выберите хотя бы одно упражнение.</p>
-            </div>
-            <Badge>{days.length} из 8</Badge>
-          </div>
-          {days.map((day, dayIndex) => (
-            <div className="program-day stack" key={dayIndex}>
-              <div className="program-day__head">
-                <span className="program-day__number">{dayIndex + 1}</span>
-                <input
-                  aria-label={`Название дня ${dayIndex + 1}`}
-                  value={day.title}
-                  maxLength={128}
-                  required
-                  onChange={(e) => updateDay(dayIndex, { ...day, title: e.target.value })}
-                />
-                <div className="program-order-controls" aria-label={`Порядок дня ${dayIndex + 1}`}>
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={`Переместить день ${dayIndex + 1} выше`}
-                    disabled={dayIndex === 0}
-                    onClick={() =>
-                      setDays((currentDays) => moveItem(currentDays, dayIndex, dayIndex - 1))
-                    }
-                  >
-                    <Icon name="move-up" size={20} />
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={`Переместить день ${dayIndex + 1} ниже`}
-                    disabled={dayIndex === days.length - 1}
-                    onClick={() =>
-                      setDays((currentDays) => moveItem(currentDays, dayIndex, dayIndex + 1))
-                    }
-                  >
-                    <Icon name="move-down" size={20} />
-                  </button>
-                  {days.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      aria-label={`Удалить день ${dayIndex + 1}`}
-                      onClick={() =>
-                        setDays((currentDays) =>
-                          currentDays.filter((_, index) => index !== dayIndex),
-                        )
-                      }
-                    >
-                      <TrashIcon />
-                    </button>
-                  )}
-                </div>
+          <div className="program-builder-primary stack" hidden={settingsOpen}>
+            {saveAsCopy && (
+              <p className="program-builder-copy-note">
+                Исходный шаблон не изменится. Изменения сохранятся в отдельной личной копии.
+              </p>
+            )}
+            <section
+              className="program-builder-basics stack"
+              aria-labelledby={`${sectionId}-program-basics-title`}
+            >
+              <div>
+                <span className="eyebrow">Шаг 1</span>
+                <h3 id={`${sectionId}-program-basics-title`}>Основа программы</h3>
               </div>
-              {day.exercises.map((item, exerciseIndex) => (
-                <div className="program-exercise-row" key={exerciseIndex}>
-                  <div className="field exercise-select">
-                    <span className="program-exercise-row__heading">
-                      <span>
-                        <span className="program-exercise-row__number">{exerciseIndex + 1}</span>
-                        <strong>Упражнение</strong>
-                      </span>
-                      <span
-                        className="program-exercise-row__actions"
-                        aria-label={`Действия с упражнением ${exerciseIndex + 1}`}
-                      >
-                        <button
-                          type="button"
-                          className="secondary"
-                          aria-label={`Переместить упражнение ${exerciseIndex + 1} выше`}
-                          disabled={exerciseIndex === 0}
-                          onClick={() =>
-                            updateDay(dayIndex, (currentDay) => ({
-                              ...currentDay,
-                              exercises: moveItem(
-                                currentDay.exercises,
-                                exerciseIndex,
-                                exerciseIndex - 1,
-                              ),
-                            }))
-                          }
-                        >
-                          <Icon name="move-up" size={20} />
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          aria-label={`Переместить упражнение ${exerciseIndex + 1} ниже`}
-                          disabled={exerciseIndex === day.exercises.length - 1}
-                          onClick={() =>
-                            updateDay(dayIndex, (currentDay) => ({
-                              ...currentDay,
-                              exercises: moveItem(
-                                currentDay.exercises,
-                                exerciseIndex,
-                                exerciseIndex + 1,
-                              ),
-                            }))
-                          }
-                        >
-                          <Icon name="move-down" size={20} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-danger"
-                          aria-label={`Удалить упражнение ${exerciseIndex + 1} из дня ${dayIndex + 1}`}
-                          onClick={() =>
-                            updateDay(dayIndex, (currentDay) =>
-                              removeExercise(currentDay, exerciseIndex),
-                            )
-                          }
-                        >
-                          <TrashIcon />
-                        </button>
-                      </span>
-                    </span>
-                    <SearchableExercisePicker
-                      mobileSheet
-                      exercises={orderedExercises}
-                      value={item.exercise_id}
-                      clearValue={0}
-                      onOpenGuide={(exercise) =>
-                        setGuide({ id: exercise.id, title: exercise.title })
-                      }
-                      onChange={(exerciseId) => {
-                        const nextExerciseId = typeof exerciseId === 'number' ? exerciseId : 0;
-                        const selected = exercises.data?.find(
-                          (exercise) => exercise.id === nextExerciseId,
-                        );
-                        updateDay(dayIndex, {
-                          ...day,
-                          exercises: day.exercises.map((row, index) => {
-                            if (index !== exerciseIndex) return row;
-                            if (selected?.metric_type === 'cardio') {
-                              return {
-                                ...row,
-                                exercise_id: nextExerciseId,
-                                prescribed_sets: null,
-                                prescribed_reps: null,
-                                prescribed_duration_minutes: row.prescribed_duration_minutes ?? 30,
-                                superset_group: null,
-                                superset_order: null,
-                              };
-                            }
-                            return {
-                              ...row,
-                              exercise_id: nextExerciseId,
-                              prescribed_sets: row.prescribed_sets ?? 3,
-                              prescribed_reps: row.prescribed_reps || '8-12',
-                              prescribed_duration_minutes: null,
-                            };
-                          }),
-                        });
-                      }}
-                    />
-                    {exercises.data?.some((exercise) => exercise.id === item.exercise_id) && (
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() => {
-                          const selected = exercises.data?.find(
-                            (exercise) => exercise.id === item.exercise_id,
-                          );
-                          if (selected) setGuide({ id: selected.id, title: selected.title });
-                        }}
-                      >
-                        {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                          ?.has_guide
-                          ? 'Техника и детали'
-                          : 'Подробнее об упражнении'}
-                      </button>
-                    )}
-                  </div>
-                  <div className="program-exercise-row__metrics">
-                    {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                      ?.metric_type === 'cardio' ? (
-                      <label className="field">
-                        <span>Плановая длительность, мин</span>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min="1"
-                          max="600"
-                          required
-                          value={item.prescribed_duration_minutes ?? ''}
-                          onChange={(event) =>
-                            updateDay(dayIndex, {
-                              ...day,
-                              exercises: day.exercises.map((row, index) =>
-                                index === exerciseIndex
-                                  ? {
-                                      ...row,
-                                      prescribed_duration_minutes: Number(event.target.value),
-                                    }
-                                  : row,
-                              ),
-                            })
-                          }
-                        />
-                      </label>
-                    ) : (
-                      (
-                        [
-                          ['prescribed_sets', 'Рабочие подходы'],
-                          ['prescribed_reps', 'Повторы'],
-                          ['rest_seconds', 'Отдых, сек'],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <label className="field" key={key}>
-                          <span>{label}</span>
-                          <input
-                            type={key === 'prescribed_reps' ? 'text' : 'number'}
-                            inputMode={key === 'prescribed_reps' ? undefined : 'numeric'}
-                            min={
-                              key === 'prescribed_sets'
-                                ? 1
-                                : key === 'rest_seconds'
-                                  ? 15
-                                  : undefined
-                            }
-                            max={
-                              key === 'prescribed_sets'
-                                ? 10
-                                : key === 'rest_seconds'
-                                  ? 600
-                                  : undefined
-                            }
-                            maxLength={key === 'prescribed_reps' ? 32 : undefined}
-                            required
-                            value={item[key] ?? ''}
-                            onChange={(e) =>
-                              updateDay(dayIndex, {
-                                ...day,
-                                exercises: day.exercises.map((row, index) =>
-                                  index === exerciseIndex
-                                    ? {
-                                        ...row,
-                                        [key]:
-                                          key === 'prescribed_reps'
-                                            ? e.target.value
-                                            : Number(e.target.value),
-                                      }
-                                    : row,
-                                ),
-                              })
-                            }
-                          />
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  <details className="program-exercise-advanced compact-disclosure">
-                    <summary className="yfc-disclosure-summary">
-                      <span>
-                        <strong>
-                          {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                            ?.metric_type === 'cardio'
-                            ? 'Заметка и замены'
-                            : 'Заметка, суперсет и замены'}
-                        </strong>
-                        <small>Необязательные настройки упражнения</small>
-                      </span>
-                      <DisclosureIcon />
-                    </summary>
-                    <div className="program-exercise-advanced__body">
-                      <label className="field exercise-notes">
-                        <span>Заметка к упражнению</span>
-                        <input
-                          maxLength={2000}
-                          value={item.notes ?? ''}
-                          placeholder="Например: выполнять медленно, без рывков"
-                          onChange={(event) =>
-                            updateDay(dayIndex, {
-                              ...day,
-                              exercises: day.exercises.map((row, index) =>
-                                index === exerciseIndex
-                                  ? { ...row, notes: event.target.value }
-                                  : row,
-                              ),
-                            })
-                          }
-                        />
-                      </label>
-                      {exerciseIndex > 0 &&
-                        exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                          ?.metric_type !== 'cardio' && (
-                          <label className="checkbox-row">
-                            <input
-                              type="checkbox"
-                              checked={isPairedWithPrevious(day, exerciseIndex)}
-                              onChange={(event) =>
-                                updateDay(
-                                  dayIndex,
-                                  toggleSuperset(day, exerciseIndex, event.target.checked),
-                                )
-                              }
-                            />
-                            <span>Суперсет — выполнить вместе с предыдущим упражнением подряд</span>
-                          </label>
-                        )}
-                      {(() => {
-                        const selected = exercises.data?.find(
-                          (exercise) => exercise.id === item.exercise_id,
-                        );
-                        const alternatives = (selected?.alternatives ?? [])
-                          .map((alternative) =>
-                            exercises.data?.find((exercise) => exercise.id === alternative.id),
+              <div className="form-grid">
+                <label className="field">
+                  <span>Название</span>
+                  <input
+                    value={title}
+                    maxLength={128}
+                    enterKeyHint="next"
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+            </section>
+            <div className="program-builder-days-heading">
+              <div>
+                <span className="eyebrow">Шаг 2</span>
+                <h3>Тренировочные дни</h3>
+              </div>
+            </div>
+            {weekCycle && !activeProgramEdit && weekCycle.length_weeks > 1 && (
+              <div className="program-builder-section stack">
+                <label className="field">
+                  <span>Исходная неделя</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    max={weekCycle.length_weeks}
+                    value={sourceWeek}
+                    onChange={(event) =>
+                      setSourceWeek(event.target.value === '' ? '' : Number(event.target.value))
+                    }
+                    disabled={sourceBudgetExceeded}
+                    required
+                  />
+                </label>
+                <p className="muted">
+                  Предписания относятся к выбранной исходной неделе. Состав дней меняется в первой
+                  неделе.
+                </p>
+              </div>
+            )}
+            <ProgramDayEditor
+              days={projectSourceWeek(
+                days,
+                weekCycle && !activeProgramEdit ? selectedSourceWeek : 1,
+              )}
+              setDays={setDays}
+              updateDay={updateDay}
+              exercises={orderedExercises}
+              equipmentFilterEnabled={!targetTelegramId && canMutateProfile}
+              defaultRestSeconds={defaultRestSeconds}
+              onOpenGuide={(exercise) => setGuide({ id: exercise.id, title: exercise.title })}
+              sourceWeek={weekCycle && !activeProgramEdit ? selectedSourceWeek : 1}
+            />
+          </div>
+          <ProgramSettingsPanel
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            valid={
+              scheduleIsValid &&
+              Number.isInteger(durationWeeks) &&
+              durationWeeks >= 1 &&
+              (weekCycle !== null || durationWeeks <= 24) &&
+              !hasExtraWeeks &&
+              !sourceBudgetExceeded &&
+              (!weekCycle ||
+                (Number.isInteger(weekCycle.length_weeks) &&
+                  weekCycle.length_weeks >= 1 &&
+                  weekCycle.length_weeks <= 20000 &&
+                  (weekCycle.repeat || durationWeeks <= weekCycle.length_weeks))) &&
+              Boolean(startDate) &&
+              defaultRestSeconds >= 15 &&
+              defaultRestSeconds <= 600
+            }
+          >
+            <section
+              className="program-builder-section stack"
+              aria-labelledby={`${sectionId}-program-profile-title`}
+            >
+              <h3 id={`${sectionId}-program-profile-title`}>Цель и уровень</h3>
+              <p className="muted">Для чего и какой уровень подготовки</p>
+              <div className="form-grid">
+                <label className="field">
+                  <span>Цель</span>
+                  <select
+                    value={goal}
+                    onChange={(event) =>
+                      setGoal(event.target.value as ProgramTemplateCreate['goal'])
+                    }
+                  >
+                    <option value="fat_loss">Похудение</option>
+                    <option value="muscle_gain">Набор</option>
+                    <option value="maintenance">Поддержание</option>
+                    <option value="recomposition">Рекомпозиция</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Уровень</span>
+                  <select
+                    value={level}
+                    onChange={(event) =>
+                      setLevel(event.target.value as ProgramTemplateCreate['level'])
+                    }
+                  >
+                    <option value="beginner">Начальный</option>
+                    <option value="intermediate">Средний</option>
+                    <option value="advanced">Продвинутый</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <section
+              className="program-builder-section stack"
+              aria-labelledby={`${sectionId}-program-schedule-title`}
+            >
+              <h3 id={`${sectionId}-program-schedule-title`}>Расписание</h3>
+              <p className="muted">
+                {activeProgramEdit
+                  ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
+                  : 'Когда начинать и как часто тренироваться.'}
+              </p>
+              <div className="form-grid">
+                <label className="field">
+                  <span>Начать не раньше</span>
+                  <DateInput
+                    disabled={activeProgramEdit}
+                    min={defaultStartDate}
+                    value={startDate}
+                    onChange={(event) => {
+                      setStartDate(event.target.value);
+                      setScheduleWeekdays(scheduleForDays(days.length, event.target.value));
+                    }}
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span>Длительность, недель</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    disabled={activeProgramEdit}
+                    min="1"
+                    max={weekCycle ? undefined : 24}
+                    value={durationWeeks}
+                    onChange={(event) => setDurationWeeks(Number(event.target.value))}
+                    required
+                  />
+                </label>
+              </div>
+              {usesSequentialCycle ? (
+                <ContextualHelp summary="Как устроен цикл?">
+                  <p>
+                    Восьмидневный цикл планируется последовательно и автоматически повторяется после
+                    восьмой тренировки.
+                  </p>
+                </ContextualHelp>
+              ) : (
+                <div className="form-grid">
+                  {days.map((day, dayIndex) => (
+                    <label className="field" key={`schedule-${dayIndex}`}>
+                      <span>{day.title || simpleTrainingTitle(dayIndex + 1)}</span>
+                      <select
+                        value={effectiveScheduleWeekdays[dayIndex] ?? ''}
+                        onChange={(event) =>
+                          setScheduleWeekdays(
+                            effectiveScheduleWeekdays.map((value, index) =>
+                              index === dayIndex ? Number(event.target.value) : value,
+                            ),
                           )
-                          .filter((exercise): exercise is Exercise => Boolean(exercise));
-                        return alternatives.length ? (
-                          <div className="program-exercise-alternatives">
-                            <strong>Проверенные замены</strong>
-                            <div className="toolbar wrap">
-                              {alternatives.map((alternative) => (
-                                <button
-                                  type="button"
-                                  className="text-button"
-                                  key={alternative.id}
-                                  onClick={() =>
-                                    updateDay(dayIndex, {
-                                      ...day,
-                                      exercises: day.exercises.map((row, index) =>
-                                        index === exerciseIndex
-                                          ? { ...row, exercise_id: alternative.id }
-                                          : row,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  Заменить на «{alternative.title}»
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <small className="muted">Проверенных замен пока нет.</small>
-                        );
-                      })()}
-                      {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
-                        ?.metric_type !== 'cardio' && (
-                        <small className="muted">
-                          Разминочные и дроп-сеты отмечаются отдельно во время тренировки.
-                        </small>
-                      )}
-                    </div>
-                  </details>
+                        }
+                      >
+                        {weekdayLabels.map((label, weekday) => (
+                          <option value={weekday} key={label}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
                 </div>
-              ))}
-              {day.exercises.length < 20 ? (
+              )}
+              {!scheduleIsValid && (
+                <p className="field-error" role="alert">
+                  Выберите разные дни недели в порядке тренировок. После воскресенья можно
+                  продолжить с понедельника.
+                </p>
+              )}
+            </section>
+            {activeProgramEdit &&
+            editingTemplate?.assigned_program_id != null &&
+            editingTemplate.current_revision_number != null ? (
+              settingsOpen ? (
+                <ActiveProgramPeriodization
+                  programId={editingTemplate.assigned_program_id}
+                  revision={editingTemplate.current_revision_number}
+                  duration={durationWeeks}
+                  initialWeek={Math.min(
+                    durationWeeks,
+                    Math.max(
+                      1,
+                      Math.floor(
+                        (Date.parse(`${defaultStartDate}T00:00:00Z`) -
+                          Date.parse(`${startDate}T00:00:00Z`)) /
+                          604800000,
+                      ) + 1,
+                    ),
+                  )}
+                  exercises={orderedExercises}
+                  dirty={snapshot !== originalSnapshot}
+                  readOnly={
+                    editingTemplate.assigned_by_user_id != null &&
+                    editingTemplate.assigned_by_user_id !== user?.id
+                  }
+                  onChanged={() => {
+                    void Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['templates'] }),
+                      queryClient.invalidateQueries({ queryKey: ['workout'] }),
+                      queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+                      queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
+                    ]).then(() => onSaved?.());
+                  }}
+                />
+              ) : null
+            ) : (
+              <ProgramPeriodization
+                cycle={weekCycle}
+                onChange={(value) => {
+                  setWeekCycle(value);
+                  if (value && value.length_weeks >= 1)
+                    setSourceWeek((current) =>
+                      value.length_weeks * sourceSetCount > 20000
+                        ? 1
+                        : typeof current === 'number'
+                          ? Math.min(current, value.length_weeks)
+                          : 1,
+                    );
+                }}
+                duration={durationWeeks}
+                onDurationChange={setDurationWeeks}
+                days={days}
+                disabled={false}
+              />
+            )}
+            {weekCycle && hasExtraWeeks && (
+              <div className="field-error" role="alert">
+                <p>
+                  В сокращаемых неделях сохранены предписания. Их нужно удалить, прежде чем
+                  сохранить новую длину цикла.
+                </p>
                 <button
                   type="button"
-                  className="secondary program-add-exercise"
-                  onClick={() =>
-                    updateDay(dayIndex, (currentDay) => ({
-                      ...currentDay,
-                      exercises: [...currentDay.exercises, blankExercise(defaultRestSeconds)],
-                    }))
-                  }
+                  className="secondary"
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: 'Удалить предписания лишних недель?',
+                        message: 'Останутся предписания только для недель выбранной длины цикла.',
+                        confirmText: 'Удалить предписания',
+                      })
+                    ) {
+                      setDays((current) =>
+                        current.map((day) => ({
+                          ...day,
+                          exercises: day.exercises.map((exercise) => ({
+                            ...exercise,
+                            weekly_prescriptions: exercise.weekly_prescriptions?.filter(
+                              (item) => item.week_number <= weekCycle.length_weeks,
+                            ),
+                          })),
+                        })),
+                      );
+                    }
+                  }}
                 >
-                  <Icon name="plus" size={16} />
-                  Добавить упражнение
+                  Подтвердить сокращение
                 </button>
-              ) : (
-                <span className="muted">В одной тренировке максимум 20 упражнений.</span>
-              )}
-            </div>
-          ))}
-          <details className="program-builder-settings compact-disclosure">
-            <summary className="yfc-disclosure-summary">
-              <span>
-                <strong>Настройки программы</strong>
-                <small>Цель, уровень, расписание, шаблон и общий отдых</small>
-              </span>
-              <DisclosureIcon />
-            </summary>
-            <div className="program-builder-settings__body stack">
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-program-profile-title`}
-              >
-                <h3 id={`${sectionId}-program-profile-title`}>Цель и уровень</h3>
-                <p className="muted">
-                  По умолчанию программа подходит для поддержания формы и начального уровня.
-                </p>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Цель</span>
-                    <select
-                      value={goal}
-                      onChange={(event) =>
-                        setGoal(event.target.value as ProgramTemplateCreate['goal'])
-                      }
-                    >
-                      <option value="fat_loss">Похудение</option>
-                      <option value="muscle_gain">Набор</option>
-                      <option value="maintenance">Поддержание</option>
-                      <option value="recomposition">Рекомпозиция</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Уровень</span>
-                    <select
-                      value={level}
-                      onChange={(event) =>
-                        setLevel(event.target.value as ProgramTemplateCreate['level'])
-                      }
-                    >
-                      <option value="beginner">Начальный</option>
-                      <option value="intermediate">Средний</option>
-                      <option value="advanced">Продвинутый</option>
-                    </select>
-                  </label>
-                </div>
-              </section>
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-program-schedule-title`}
-              >
-                <h3 id={`${sectionId}-program-schedule-title`}>Расписание</h3>
-                <p className="muted">
-                  {activeProgramEdit
-                    ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
-                    : 'По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.'}
-                </p>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Начать не раньше</span>
-                    <DateInput
-                      disabled={activeProgramEdit}
-                      min={defaultStartDate}
-                      value={startDate}
-                      onChange={(event) => {
-                        setStartDate(event.target.value);
-                        setScheduleWeekdays(scheduleForDays(days.length, event.target.value));
-                      }}
-                      required
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Длительность, недель</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      disabled={activeProgramEdit}
-                      min="1"
-                      max="24"
-                      value={durationWeeks}
-                      onChange={(event) => setDurationWeeks(Number(event.target.value))}
-                      required
-                    />
-                  </label>
-                </div>
-                {usesSequentialCycle ? (
-                  <ContextualHelp summary="Как устроен цикл?">
-                    <p>
-                      Восьмидневный цикл планируется последовательно и автоматически повторяется
-                      после восьмой тренировки.
-                    </p>
-                  </ContextualHelp>
-                ) : (
+              </div>
+            )}
+            <details className="program-builder-optional">
+              <summary className="yfc-disclosure-summary">
+                <span>
+                  <strong>Дополнительно</strong>
+                  <small>Быстрое заполнение и общий отдых</small>
+                </span>
+                <DisclosureIcon />
+              </summary>
+              <div className="program-builder-optional__body stack">
+                <section
+                  className="program-builder-section stack"
+                  aria-labelledby={`${sectionId}-strength-template-title`}
+                >
+                  <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
                   <div className="form-grid">
-                    {days.map((day, dayIndex) => (
-                      <label className="field" key={`schedule-${dayIndex}`}>
-                        <span>{day.title || simpleTrainingTitle(dayIndex + 1)}</span>
-                        <select
-                          value={effectiveScheduleWeekdays[dayIndex] ?? ''}
-                          onChange={(event) =>
-                            setScheduleWeekdays(
-                              effectiveScheduleWeekdays.map((value, index) =>
-                                index === dayIndex ? Number(event.target.value) : value,
-                              ),
-                            )
-                          }
-                        >
-                          {weekdayLabels.map((label, weekday) => (
-                            <option value={weekday} key={label}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
+                    <label className="field">
+                      <span>Схема</span>
+                      <select
+                        value={split}
+                        onChange={(event) => {
+                          const next = event.target.value as StrengthSplit;
+                          setSplit(next);
+                          setPresetDays(resolveStrengthRule(level, next).recommended);
+                        }}
+                      >
+                        <option value="fullbody">Всё тело</option>
+                        <option value="upper_lower">Верх/Низ</option>
+                        <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
+                        <option value="split">Сплит</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>
+                        Тренировок ({rule.min}–{rule.max})
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={rule.min}
+                        max={rule.max}
+                        value={presetDays}
+                        onChange={(event) => setPresetDays(Number(event.target.value))}
+                      />
+                    </label>
                   </div>
-                )}
-                {!scheduleIsValid && (
-                  <p className="field-error" role="alert">
-                    Выберите разные дни недели в порядке тренировок. После воскресенья можно
-                    продолжить с понедельника.
+                  {rule.warning && <p className="muted">{rule.warning}</p>}
+                  <button type="button" className="secondary" onClick={() => void loadPreset()}>
+                    Заполнить по шаблону
+                  </button>
+                </section>
+                <section
+                  className="program-builder-section stack"
+                  aria-labelledby={`${sectionId}-program-rest-title`}
+                >
+                  <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
+                  <p className="muted">
+                    Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
                   </p>
-                )}
-              </section>
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-strength-template-title`}
-              >
-                <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Схема</span>
-                    <select
-                      value={split}
-                      onChange={(event) => {
-                        const next = event.target.value as StrengthSplit;
-                        setSplit(next);
-                        setPresetDays(resolveStrengthRule(level, next).recommended);
+                  <div className="toolbar wrap program-builder-rest-actions">
+                    <label className="field">
+                      <span>Общий отдых, сек</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="15"
+                        max="600"
+                        value={defaultRestSeconds}
+                        onChange={(event) => setDefaultRestSeconds(Number(event.target.value))}
+                        required
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={
+                        defaultRestSeconds < 15 ||
+                        defaultRestSeconds > 600 ||
+                        hasDetailedPrescriptions
+                      }
+                      onClick={() => {
+                        setDays(applyRestSeconds(days, defaultRestSeconds));
+                        toast('Общее время отдыха применено ко всем упражнениям');
                       }}
                     >
-                      <option value="fullbody">Всё тело</option>
-                      <option value="upper_lower">Верх/Низ</option>
-                      <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
-                      <option value="split">Сплит</option>
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>
-                      Тренировок ({rule.min}–{rule.max})
-                    </span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={rule.min}
-                      max={rule.max}
-                      value={presetDays}
-                      onChange={(event) => setPresetDays(Number(event.target.value))}
-                    />
-                  </label>
-                </div>
-                {rule.warning && <p className="muted">{rule.warning}</p>}
-                <button type="button" className="secondary" onClick={() => void loadPreset()}>
-                  Заполнить по шаблону
-                </button>
-              </section>
-              <section
-                className="program-builder-section stack"
-                aria-labelledby={`${sectionId}-program-rest-title`}
-              >
-                <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
-                <p className="muted">
-                  Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
-                </p>
-                <div className="toolbar wrap program-builder-rest-actions">
-                  <label className="field">
-                    <span>Общий отдых, сек</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min="15"
-                      max="600"
-                      value={defaultRestSeconds}
-                      onChange={(event) => setDefaultRestSeconds(Number(event.target.value))}
-                      required
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={defaultRestSeconds < 15 || defaultRestSeconds > 600}
-                    onClick={() => {
-                      setDays(applyRestSeconds(days, defaultRestSeconds));
-                      toast('Общее время отдыха применено ко всем упражнениям');
-                    }}
-                  >
-                    Применить ко всем упражнениям
-                  </button>
-                </div>
-              </section>
-            </div>
-          </details>
-          <div className="program-builder-footer">
+                      Применить ко всем упражнениям
+                    </button>
+                  </div>
+                  {hasDetailedPrescriptions && (
+                    <p className="muted">
+                      Для сохранённой недельной схемы изменяйте отдых в упражнении.
+                    </p>
+                  )}
+                </section>
+              </div>
+            </details>
+          </ProgramSettingsPanel>
+          <div className="program-builder-footer" hidden={settingsOpen}>
             <div className="program-builder-footer__summary">
               <span className="eyebrow">Шаг 3</span>
               <strong>
@@ -1051,46 +1036,75 @@ export function ProgramBuilder({
                 упр.
               </strong>
             </div>
-            {days.length < 8 ? (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() =>
-                  setDays((currentDays) => [
-                    ...currentDays,
-                    {
-                      title: simpleTrainingTitle(currentDays.length + 1),
-                      exercises: [blankExercise(defaultRestSeconds)],
-                    },
-                  ])
-                }
-              >
-                <Icon name="plus" size={16} /> Добавить день
-              </button>
-            ) : (
-              <span className="muted">В одном цикле максимум 8 тренировочных дней.</span>
-            )}
             <button
+              type="button"
               className="program-builder-footer__save"
-              disabled={
-                mutation.isPending ||
-                !scheduleIsValid ||
-                durationWeeks < 1 ||
-                durationWeeks > 24 ||
-                days.some((day) => day.exercises.every((item) => !item.exercise_id))
-              }
+              onClick={() => setReviewOpen(true)}
             >
-              {mutation.isPending
-                ? 'Сохраняем…'
-                : saveAsCopy
-                  ? 'Сохранить личную копию'
-                  : editingTemplate
-                    ? 'Сохранить изменения'
-                    : targetTelegramId
-                      ? 'Создать и назначить'
-                      : 'Создать программу'}
+              {editingTemplate || saveAsCopy ? 'Проверить и сохранить' : 'Проверить и назначить'}
             </button>
           </div>
+          {reviewOpen && !settingsOpen && (
+            <section
+              className="program-builder-review"
+              role="dialog"
+              aria-modal="false"
+              aria-labelledby={sectionId + '-review-title'}
+            >
+              <h3 id={sectionId + '-review-title'}>Проверка программы</h3>
+              <strong>{title || 'Без названия'}</strong>
+              <p>
+                {trainingCountLabel(days.length)} · {totalExercises} упражнений
+              </p>
+              <p>
+                Начало: {startDate} · {durationWeeks} нед.
+              </p>
+              <p>
+                Расписание:{' '}
+                {usesSequentialCycle
+                  ? 'Последовательный цикл'
+                  : effectiveScheduleWeekdays.map((day) => weekdayLabels[day]).join(', ')}
+              </p>
+              {reviewIssues.length ? (
+                <div className="program-builder-review__errors" role="alert">
+                  <strong>Исправьте перед сохранением:</strong>
+                  <ul>
+                    {reviewIssues.map((message, index) => (
+                      <li key={index}>{message}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p role="status">Программа готова к сохранению.</p>
+              )}
+              {navigator.onLine === false && (
+                <p role="alert">Нет соединения. Черновик остаётся на устройстве.</p>
+              )}
+              {!editingTemplate && user?.has_active_program && (
+                <p>При замене текущая программа будет отправлена в архив после подтверждения.</p>
+              )}
+              <div className="program-builder-review__actions">
+                <button type="button" className="secondary" onClick={() => setReviewOpen(false)}>
+                  Вернуться к редактированию
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    Boolean(reviewIssues.length) || mutation.isPending || navigator.onLine === false
+                  }
+                  onClick={() => void submitReviewedProgram()}
+                >
+                  {mutation.isPending
+                    ? 'Сохраняем…'
+                    : saveAsCopy
+                      ? 'Сохранить личную копию'
+                      : editingTemplate
+                        ? 'Сохранить изменения'
+                        : 'Создать и назначить'}
+                </button>
+              </div>
+            </section>
+          )}
         </form>
       )}
       {guide && (

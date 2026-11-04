@@ -86,9 +86,10 @@ async function mockAuthApi(
       return route.fulfill({ json: { access_token: 'telegram-token' } });
     }
     if (path.endsWith('/me')) {
-      calls.meAuthorization.push(request.headers().authorization ?? '');
+      const authorization = request.headers().authorization ?? '';
+      calls.meAuthorization.push(authorization);
       return hasSession
-        ? route.fulfill({ json: activeUser })
+        ? route.fulfill({ json: authorization === 'Bearer web-token' ? initialUser : activeUser })
         : route.fulfill({ status: 401, json: { detail: 'Требуется вход' } });
     }
     if (path.endsWith('/workouts/today')) {
@@ -485,6 +486,8 @@ test('Telegram launch replaces a stale browser identity before loading current u
 }) => {
   await page.addInitScript(() => {
     sessionStorage.setItem('fit_access_token', 'web-token');
+    localStorage.setItem('fit_active_workout_v1_user_18_workout_25:v3', 'old-user-data');
+    localStorage.setItem('fit_active_workout_v1_user_19_workout_25:v3', 'unverified-data');
     window.Telegram = {
       WebApp: {
         initData: 'signed-init-data-for-telegram-user',
@@ -516,9 +519,17 @@ test('Telegram launch replaces a stale browser identity before loading current u
   await page.goto('/app?tgWebAppPlatform=android');
 
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+  await expect(page.getByText('Web A', { exact: true })).toHaveCount(0);
   expect(calls.telegramInit).toBe(1);
   expect(calls.refresh).toBe(0);
-  expect(calls.meAuthorization).toEqual(['Bearer telegram-token']);
+  expect(calls.meAuthorization).toEqual(['Bearer telegram-token', 'Bearer web-token']);
+  expect(
+    await page.evaluate(() => ({
+      userId: sessionStorage.getItem('fit_authenticated_user_id'),
+      previous: localStorage.getItem('fit_active_workout_v1_user_18_workout_25:v3'),
+      unverified: localStorage.getItem('fit_active_workout_v1_user_19_workout_25:v3'),
+    })),
+  ).toEqual({ userId: '19', previous: null, unverified: null });
 });
 
 test('invalid Telegram initData does not expose the stale browser identity', async ({ page }) => {

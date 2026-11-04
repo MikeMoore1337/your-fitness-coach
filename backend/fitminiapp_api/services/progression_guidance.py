@@ -5,8 +5,10 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Literal
 
+from sqlalchemy import or_, true
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import today_for_user
@@ -24,11 +26,21 @@ from fitminiapp_api.schemas.program import PrescriptionRepTarget, ProgramCoachin
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.prescription_semantics import parse_prescription_plan
 from fitminiapp_api.services.program_common import ProgramError
-from fitminiapp_api.services.program_versioning import get_program_for_actor
+from fitminiapp_api.services.program_versioning import (
+    _cycle_assignment,
+    _cycle_configurations,
+    _cycle_occurrence_overrides,
+    _cycle_plan_at,
+    _cycle_workout_plans,
+    get_program_for_actor,
+    workout_cycle_week_type,
+)
 from fitminiapp_api.services.workout_metrics import (
+    exercise_slot_identity,
     validate_workout_set_changes,
     workout_exercise_metric_type,
 )
+from fitminiapp_api.services.workout_sides import SIDE_MODES, serialize_sides
 from fitminiapp_api.services.workout_sync import (
     WorkoutSetSyncError,
     apply_workout_set_update,
@@ -45,6 +57,7 @@ ProgressionOutcome = Literal[
 LoadUnit = Literal["kg", "lb"]
 
 RULESET_VERSION = "progression-guidance-v2"
+TYPED_RULESET_VERSION = "progression-guidance-v3"
 _REP_RANGE = re.compile(r"^\s*(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?\s*$")
 _PROGRESS_MESSAGES: dict[ProgressionOutcome, str] = {
     "consider_progressing": "Можно рассмотреть небольшое увеличение веса",
@@ -304,8 +317,8 @@ def _rule_snapshot(rule: ProgramCoachingRule | None) -> dict[str, object]:
     return rule.model_dump(mode="json", exclude_none=True) if rule is not None else {}
 
 
-def _rule_id(rule_snapshot: dict[str, object]) -> str:
-    return _sha256({"ruleset_version": RULESET_VERSION, "rule": rule_snapshot})
+def _rule_id(rule_snapshot: dict[str, object], *, ruleset_version: str = RULESET_VERSION) -> str:
+    return _sha256({"ruleset_version": ruleset_version, "rule": rule_snapshot})
 
 
 def _rep_target_text(value: PrescriptionRepTarget | None) -> str | None:
@@ -331,6 +344,8 @@ def _progression_set_selection(
         return ProgressionSetSelection(None, (), 0, None, reason_code="invalid_prescription")
 
     if plan is None:
+        if exercise.prescribed_sets is None:
+            return ProgressionSetSelection(None, (), 0, None, reason_code="invalid_prescription")
         if rule_kind == "amrap_success_failure" and exercise.prescribed_sets != 1:
             return ProgressionSetSelection(None, (), 0, None, reason_code="ambiguous_amrap_sets")
         return ProgressionSetSelection(
@@ -449,11 +464,31 @@ def _driving_set_rows(
 def _session_facts_for_selection(
     exercise: UserWorkoutExercise,
     selection: ProgressionSetSelection,
+    *,
+    side: Literal["left", "right"] | None = None,
+    mode: str | None = None,
 ) -> SessionFacts:
     rows = _driving_set_rows(exercise, selection)
     completed = [item for item in rows if item.is_completed]
-    reps = [item.actual_reps for item in completed if item.actual_reps is not None]
-    weights = [float(item.actual_weight) for item in completed if item.actual_weight is not None]
+    facts = (
+        [
+            next(
+                (fact for fact in item.side_results if fact.side == side and fact.is_completed),
+                None,
+            )
+            if item.execution_mode == mode
+            else None
+            for item in completed
+        ]
+        if side is not None
+        else completed
+    )
+    reps = [item.actual_reps for item in facts if item is not None and item.actual_reps is not None]
+    weights = [
+        float(item.actual_weight)
+        for item in facts
+        if item is not None and item.actual_weight is not None
+    ]
     complete = (
         len(rows) == selection.expected_count
         and len(completed) == selection.expected_count
@@ -470,8 +505,8 @@ def _session_facts_for_selection(
         load=weights[0] if complete else None,
         reps_min=min(reps) if reps else None,
         reps_max=max(reps) if reps else None,
-        rir_values=tuple(item.rir for item in completed if item.rir is not None),
-        reached_failure=any(item.reached_failure is True for item in completed),
+        rir_values=tuple(item.rir for item in facts if item is not None and item.rir is not None),
+        reached_failure=any(item is not None and item.reached_failure is True for item in facts),
         complete=complete,
         completion_feedback=exercise.workout.completion_feedback,
         source_set_ids=tuple(item.id for item in completed),
@@ -506,6 +541,31 @@ def _week_block_number(metadata: object, week_number: int) -> int | None:
         and item["week_start"] <= week_number <= item["week_end"]
     ]
     return matches[0] if len(set(matches)) == 1 else None
+
+
+def _metadata_block_context(metadata: dict, week_number: int) -> str | None:
+    blocks = metadata.get("training_blocks", [])
+    if not isinstance(blocks, list):
+        return "invalid"
+    if any(
+        not isinstance(item, dict)
+        or type(item.get("week_start")) is not int
+        or type(item.get("week_end")) is not int
+        or item["week_start"] > item["week_end"]
+        for item in blocks
+    ):
+        return "invalid"
+    matches = [
+        item
+        for item in blocks
+        if isinstance(item, dict)
+        and isinstance(item.get("week_start"), int)
+        and isinstance(item.get("week_end"), int)
+        and item["week_start"] <= week_number <= item["week_end"]
+    ]
+    if len(matches) > 1:
+        return "invalid"
+    return _canonical_json(matches[0]) if matches else None
 
 
 def _resolve_coaching_rule(
@@ -616,6 +676,7 @@ def _snapshot_matches_target(
             if isinstance(item, dict)
             and item.get("exercise_id") == exercise.exercise_id
             and item.get("source_template_exercise_id") == exercise.source_template_exercise_id
+            and item.get("source_assignment_slot_id") == exercise.source_assignment_slot_id
             and item.get("sort_order") == exercise.sort_order
         ),
         None,
@@ -633,6 +694,110 @@ def _snapshot_matches_target(
             ("prescription", exercise.prescription),
         )
     )
+
+
+def _snapshot_metadata(revision: ProgramRevision | None) -> dict | None:
+    snapshot = revision.snapshot if revision is not None else None
+    program = snapshot.get("program") if isinstance(snapshot, dict) else None
+    metadata = program.get("program_metadata") if isinstance(program, dict) else None
+    return metadata if isinstance(metadata, dict) else None
+
+
+def _snapshot_block_context(revision: ProgramRevision, workout: UserWorkout) -> tuple | None:
+    snapshot = revision.snapshot if isinstance(revision.snapshot, dict) else {}
+    blocks = snapshot.get("training_blocks")
+    if not isinstance(blocks, list):
+        return ("invalid",)
+    try:
+        if any(
+            not isinstance(block, dict)
+            or date.fromisoformat(block["start_date"]) > date.fromisoformat(block["end_date"])
+            for block in blocks
+        ):
+            return ("invalid",)
+    except KeyError, TypeError, ValueError:
+        return ("invalid",)
+    day = workout.scheduled_date.isoformat()
+    matches = [
+        block
+        for block in blocks
+        if isinstance(block, dict)
+        and isinstance(block.get("start_date"), str)
+        and isinstance(block.get("end_date"), str)
+        and block["start_date"] <= day <= block["end_date"]
+    ]
+    if len(matches) > 1:
+        return ("invalid",)
+    if not matches:
+        return None
+    block = matches[0]
+    return tuple(
+        _canonical_json(block.get(field))
+        for field in ("id", "start_date", "end_date", "purpose", "is_deload", "priority_muscle_ids")
+    )
+
+
+def _matches_cycle_plan(
+    db: Session,
+    program: UserProgram,
+    revisions: list[ProgramRevision],
+    workout: UserWorkout,
+    exercise: UserWorkoutExercise,
+) -> bool:
+    try:
+        if (
+            workout.plan_revision_number is None
+            or workout.week_number is None
+            or exercise_slot_identity(exercise) is None
+        ):
+            return False
+        available = [
+            item for item in revisions if item.revision_number <= workout.plan_revision_number
+        ]
+        plans = _cycle_workout_plans(db, program, workout.week_number, revisions=available)
+        matching_plans = [item for item in plans if item["day_number"] == workout.day_number]
+        if len(matching_plans) != 1:
+            return False
+        matching_exercises = [
+            item
+            for item in matching_plans[0]["exercises"]
+            if item.get("source_template_exercise_id") == exercise.source_template_exercise_id
+            and item.get("source_assignment_slot_id") == exercise.source_assignment_slot_id
+            and item.get("sort_order") == exercise.sort_order
+            and item.get("exercise_id") == exercise.exercise_id
+        ]
+        if len(matching_exercises) != 1:
+            return False
+        planned = matching_exercises[0]
+        if not all(
+            planned.get(field) == value
+            for field, value in (
+                ("metric_type", workout_exercise_metric_type(exercise)),
+                ("prescribed_sets", exercise.prescribed_sets),
+                ("prescribed_reps", exercise.prescribed_reps),
+                ("prescribed_duration_minutes", exercise.prescribed_duration_minutes),
+                ("rest_seconds", exercise.rest_seconds),
+                ("prescription", exercise.prescription),
+            )
+        ):
+            return False
+        fields = (
+            "set_number",
+            "planned_role",
+            "planned_position",
+            "planned_group_id",
+            "planned_group_kind",
+            "planned_round",
+        )
+        expected = sorted(planned["sets"], key=lambda item: item["set_number"])
+        actual = sorted(exercise.sets, key=lambda item: item.set_number)
+        return len(actual) == len(expected) and all(
+            all(getattr(row, field) == saved.get(field) for field in fields)
+            and (row.set_kind or "working") == (saved.get("set_kind") or "working")
+            for row, saved in zip(actual, expected, strict=True)
+        )
+    except AttributeError, KeyError, OverflowError, TypeError, ValueError:
+        return False
 
 
 def _revision_for_completion(
@@ -675,6 +840,8 @@ def _rule_guidance(
     sessions: list[SessionFacts],
     current_is_deload: bool,
 ) -> tuple[dict, str, int | None, int | None]:
+    if current.prescribed_sets is None or current.prescribed_reps is None:
+        raise ProgramError("Для упражнения нет данных плана тренировки")
     base = _review_result(
         prescribed_sets=selection.expected_count or current.prescribed_sets,
         prescribed_reps=selection.target_reps or current.prescribed_reps,
@@ -693,7 +860,7 @@ def _rule_guidance(
     if selection.reason_code is not None:
         base["evidence"]["reason_keys"] = [selection.reason_code]
         base["detail"] = (
-            "Структура подходов не позволяет однозначно выбрать progression-driving set."
+            "Структура подходов не позволяет однозначно определить подходы для прогрессии."
         )
         return base, "hold", volume_percent, intensity_percent
 
@@ -734,7 +901,9 @@ def _rule_guidance(
         latest = sessions[0]
         if len(latest.rir_values) != latest.working_set_count:
             base["evidence"]["reason_keys"] = ["missing_rir_evidence"]
-            base["detail"] = "Не для каждого progression-driving подхода записан RIR."
+            base["detail"] = (
+                "Запас повторов (RIR) записан не для каждого подхода, который учитывается в прогрессии."
+            )
             return base, "hold", volume_percent, intensity_percent
         if _progression_failure(latest):
             base["outcome"] = "hold"
@@ -952,7 +1121,7 @@ def _target_set_updates(
     updates: list[dict[str, object]] = []
     direct_rows = _driving_set_rows(current, selection)
     if len(direct_rows) != selection.expected_count or any(
-        item.is_completed for item in direct_rows
+        item.is_completed or item.execution_mode in SIDE_MODES for item in direct_rows
     ):
         return []
     pending_rows = direct_rows
@@ -990,7 +1159,9 @@ def _target_set_updates(
             if row is None:
                 return []
             backoff_rows.append((row, factor))
-        if any(row.is_completed for row, _factor in backoff_rows):
+        if any(
+            row.is_completed or row.execution_mode in SIDE_MODES for row, _factor in backoff_rows
+        ):
             return []
         for row, factor in backoff_rows:
             updates.append(
@@ -1024,13 +1195,13 @@ def _attach_proposal(
     deload_intensity_percent: int | None = None,
 ) -> dict:
     snapshot = _rule_snapshot(rule)
-    rule_id = _rule_id(snapshot)
+    rule_id = _rule_id(snapshot, ruleset_version=result["ruleset_version"])
     source_ids = [
         f"workout:{item.workout_id}/set:{set_id}"
         for item in sessions[:3]
         for set_id in item.source_set_ids
     ]
-    if not source_ids:
+    if not source_ids and result["ruleset_version"] == RULESET_VERSION:
         source_ids = [f"rule:{rule_id}"]
     proposed_weight = result.get("suggested_weight")
     updates = _target_set_updates(exercise, selection, proposed_weight)
@@ -1041,7 +1212,7 @@ def _attach_proposal(
         result["suggested_weight"] = None
         result["suggested_increment"] = None
         result["evidence"]["reason_keys"].append("no_incomplete_target_sets")
-        result["detail"] = "Тренировка уже не содержит незавершённых progression-driving подходов."
+        result["detail"] = "В тренировке больше нет незавершённых подходов для прогрессии."
         proposed_weight = None
 
     if proposed_action == "set_load" and proposed_weight is not None:
@@ -1052,7 +1223,7 @@ def _attach_proposal(
         eligibility = "no_change"
     reasons = list(dict.fromkeys(result["evidence"].get("reason_keys", [])))
     proposal_material = {
-        "ruleset_version": RULESET_VERSION,
+        "ruleset_version": result["ruleset_version"],
         "rule_id": rule_id,
         "target": [program_id, revision_number, workout.id, exercise.exercise_id],
         "source_evidence_ids": source_ids,
@@ -1081,11 +1252,135 @@ def _attach_proposal(
         "proposed_action": proposed_action,
         "target_set_updates": updates,
         "source_evidence_ids": source_ids,
-        "comparable_session_count": sum(item.complete for item in sessions),
+        "comparable_session_count": result["evidence"]["comparable_session_count"],
         "reason_codes": reasons,
         "eligibility_status": eligibility,
         "requires_confirmation": True,
     }
+    return result
+
+
+def _attach_side_proposal(
+    result: dict,
+    *,
+    current: UserWorkoutExercise,
+    selection: ProgressionSetSelection,
+    mode: str,
+    sides: dict,
+    actions: dict[str, str],
+    sessions: dict[str, list[SessionFacts]],
+) -> dict:
+    left, right = sides["left"], sides["right"]
+    if (
+        actions != {"left": "set_load", "right": "set_load"}
+        or left["outcome"] != right["outcome"]
+        or left["evidence"]["reason_keys"] != right["evidence"]["reason_keys"]
+        or left.get("suggested_weight") is None
+        or right.get("suggested_weight") is None
+        or (
+            left["outcome"] == "consider_progressing"
+            and any(
+                _progression_failure(item) for values in sessions.values() for item in values[:3]
+            )
+        )
+    ):
+        return result
+    rows: list[tuple[UserWorkoutSet, float | None]] = [
+        (item, None) for item in _driving_set_rows(current, selection)
+    ]
+    if len(rows) != selection.expected_count:
+        return result
+    for position, factor in selection.relative_backoffs:
+        row = next(
+            (
+                item
+                for item in current.sets
+                if item.planned_position == position and item.planned_role == "backoff"
+            ),
+            None,
+        )
+        if row is None:
+            return result
+        rows.append((row, factor))
+    if any(
+        row.is_completed
+        or row.execution_mode != mode
+        or any(side.is_completed for side in row.side_results)
+        for row, _ in rows
+    ):
+        return result
+
+    updates = []
+    for row, target_factor in rows:
+        proposed = {}
+        for side in ("left", "right"):
+            try:
+                weight = Decimal(str(sides[side]["suggested_weight"])) * Decimal(
+                    str(target_factor or 1)
+                )
+                if (
+                    weight < 0
+                    or weight > Decimal("99999999.99")
+                    or weight != weight.quantize(Decimal("0.01"))
+                ):
+                    return result
+            except InvalidOperation:
+                return result
+            proposed[side] = float(weight)
+        updates.append(
+            {
+                "set_id": row.id,
+                "set_number": row.set_number,
+                "planned_role": row.planned_role,
+                "current_weight": None,
+                "set_version": row.version,
+                "relative_to_top": target_factor,
+                "proposed_weight": None,
+                "proposed_side_weights": proposed,
+            }
+        )
+    evidence = [
+        f"workout:{item.workout_id}/set:{set_id}/side:{side}"
+        for side in ("left", "right")
+        for item in sessions[side][:3]
+        for set_id in item.source_set_ids
+    ]
+    proposal = result["proposal"]
+    proposal.update(
+        {
+            "current_weight": None,
+            "proposed_weight": None,
+            "side_execution_mode": mode,
+            "proposed_side_weights": {
+                "left": left["suggested_weight"],
+                "right": right["suggested_weight"],
+            },
+            "proposed_action": "set_load",
+            "target_set_updates": updates,
+            "source_evidence_ids": evidence,
+            "comparable_session_count": min(
+                left["evidence"]["comparable_session_count"],
+                right["evidence"]["comparable_session_count"],
+            ),
+            "reason_codes": left["evidence"]["reason_keys"],
+            "eligibility_status": "eligible",
+        }
+    )
+    proposal["proposal_id"] = _sha256(
+        {
+            "rule_id": proposal["rule_id"],
+            "target": [
+                proposal["target_program_id"],
+                proposal["target_revision_number"],
+                proposal["target_workout_id"],
+                proposal["target_exercise_id"],
+            ],
+            "side_execution_mode": mode,
+            "updates": updates,
+            "sources": evidence,
+            "reasons": proposal["reason_codes"],
+        }
+    )
     return result
 
 
@@ -1103,7 +1398,7 @@ def build_progression_guidance(
         return {}
 
     program, revision, metadata, program_error = _current_program_snapshot(db, workout)
-    if program is None:
+    if program is None or workout.week_number is None:
         return {}
     revision_number = program.current_revision_number
     revisions = (
@@ -1112,6 +1407,69 @@ def build_progression_guidance(
         .order_by(ProgramRevision.revision_number.asc())
         .all()
     )
+    week_type, week_type_known = workout_cycle_week_type(db, workout, revisions)
+    target_plan_revision = next(
+        (item for item in revisions if item.revision_number == workout.plan_revision_number), None
+    )
+    target_cycle = (
+        _cycle_plan_at(
+            db,
+            program,
+            workout.week_number,
+            revisions=[
+                item for item in revisions if item.revision_number <= workout.plan_revision_number
+            ],
+        )
+        if workout.source_cycle_week is not None and workout.plan_revision_number is not None
+        else None
+    )
+    available = (
+        [item for item in revisions if item.revision_number <= workout.plan_revision_number]
+        if workout.plan_revision_number is not None
+        else []
+    )
+    assignment = _cycle_assignment(db, program, revisions=available) if target_cycle else None
+    first_cycle = (
+        assignment.changed_fields.get("week_cycle")
+        or (assignment.snapshot["program"].get("program_metadata") or {}).get("week_cycle")
+        if assignment
+        else None
+    )
+    has_typed_history = any(
+        item is not None
+        for cycle in (
+            [first_cycle]
+            + [
+                config["week_cycle"]
+                for config in _cycle_configurations(db, program, revisions=available)
+            ]
+        )
+        if cycle
+        for item in (cycle.get("week_types") or [])
+    )
+    typed_context = (
+        week_type is not None
+        or (target_cycle is not None and has_typed_history)
+        or (
+            target_cycle is not None
+            and any(
+                "week_type" in override
+                for override in _cycle_occurrence_overrides(
+                    db,
+                    program.id,
+                    revisions=available,
+                )
+            )
+        )
+    )
+    if typed_context:
+        target_metadata = _snapshot_metadata(target_plan_revision)
+        if target_metadata is None:
+            week_type_known = False
+        else:
+            metadata = target_metadata
+    if not week_type_known:
+        metadata = {}
     blocks = (
         db.query(TrainingBlock)
         .filter(TrainingBlock.user_program_id == workout.user_program_id)
@@ -1134,7 +1492,10 @@ def build_progression_guidance(
         db.query(UserWorkoutExercise)
         .join(UserWorkout, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserProgram, UserWorkout.user_program_id == UserProgram.id)
-        .options(joinedload(UserWorkoutExercise.sets), joinedload(UserWorkoutExercise.workout))
+        .options(
+            joinedload(UserWorkoutExercise.sets).joinedload(UserWorkoutSet.side_results),
+            joinedload(UserWorkoutExercise.workout),
+        )
         .filter(
             UserProgram.user_id == user.id,
             UserWorkout.user_program_id == workout.user_program_id,
@@ -1155,6 +1516,8 @@ def build_progression_guidance(
     for current in workout.exercises:
         if workout_exercise_metric_type(current) == "cardio":
             continue
+        if current.prescribed_sets is None or current.prescribed_reps is None:
+            raise ProgramError("Для упражнения нет данных плана тренировки")
         if workout.status not in {"planned", "in_progress"}:
             result = _review_result(
                 prescribed_sets=current.prescribed_sets,
@@ -1187,6 +1550,17 @@ def build_progression_guidance(
             week_number=workout.week_number,
         )
         selection = _progression_set_selection(current, rule_kind=rule.kind if rule else None)
+        target_modes = {
+            item.execution_mode
+            for item in _driving_set_rows(current, selection)
+            if item.execution_mode is not None
+        }
+        side_mode = next(iter(target_modes)) if len(target_modes) == 1 else None
+        if side_mode not in SIDE_MODES:
+            side_mode = None
+        side_guidance: dict[str, object] | None = None
+        side_actions: dict[str, str] = {}
+        side_sessions: dict[str, list[SessionFacts]] = {}
         target_reps = (
             _rep_target_text(rule.rep_target)
             if rule is not None and rule.kind == "double_progression"
@@ -1201,7 +1575,20 @@ def build_progression_guidance(
             )
             facts: list[SessionFacts] = []
             action = "hold"
-        elif not _snapshot_matches_target(revision, workout, current):
+        elif not week_type_known:
+            result = _review_result(
+                prescribed_sets=selection.expected_count or current.prescribed_sets,
+                prescribed_reps=target_reps or current.prescribed_reps,
+                reason_code="week_type_unverifiable",
+                detail="Не удалось проверить актуальную версию назначения программы.",
+            )
+            facts = []
+            action = "hold"
+        elif not (
+            _matches_cycle_plan(db, program, revisions, workout, current)
+            if typed_context
+            else _snapshot_matches_target(revision, workout, current)
+        ):
             result = _review_result(
                 prescribed_sets=selection.expected_count or current.prescribed_sets,
                 prescribed_reps=target_reps or current.prescribed_reps,
@@ -1224,40 +1611,177 @@ def build_progression_guidance(
                 prescribed_sets=current.prescribed_sets,
                 prescribed_reps=current.prescribed_reps,
                 reason_code=selection.reason_code,
-                detail="Структура подходов не позволяет выбрать progression-driving set.",
+                detail="Структура подходов не позволяет определить подходы для прогрессии.",
             )
             facts = []
             action = "hold"
         else:
             same_exercise = [item for item in candidates if item.exercise_id == current.exercise_id]
             comparable: list[UserWorkoutExercise] = []
+            same_type: list[UserWorkoutExercise] = []
             for item in same_exercise:
-                completed_at = item.workout.completed_at
-                if (
-                    completed_at is None
-                    or _revision_for_completion(revisions, completed_at) != revision_number
+                if typed_context and (
+                    item.workout.day_number != workout.day_number
+                    or item.sort_order != current.sort_order
+                    or exercise_slot_identity(item) != exercise_slot_identity(current)
                 ):
                     continue
-                if item.source_template_exercise_id != current.source_template_exercise_id:
+                if item.workout.completed_at is None:
+                    if typed_context:
+                        same_type.append(item)
+                        break
+                    continue
+                if item.workout.week_number is None:
+                    raise ProgramError("Для тренировки нет данных плана")
+                historical_metadata = metadata
+                if typed_context:
+                    historical_type, historical_known = workout_cycle_week_type(
+                        db, item.workout, revisions
+                    )
+                    if not historical_known:
+                        same_type.append(item)
+                        break
+                    if historical_type != week_type:
+                        continue
+                    same_type.append(item)
+                    historical_revision = next(
+                        (
+                            row
+                            for row in revisions
+                            if row.revision_number == item.workout.plan_revision_number
+                        ),
+                        None,
+                    )
+                    historical_snapshot_metadata = _snapshot_metadata(historical_revision)
+                    if (
+                        historical_revision is None
+                        or target_plan_revision is None
+                        or historical_snapshot_metadata is None
+                        or not _matches_cycle_plan(db, program, revisions, item.workout, item)
+                    ):
+                        break
+                    historical_metadata = historical_snapshot_metadata
+                    historical_block = _snapshot_block_context(historical_revision, item.workout)
+                    current_snapshot_block = _snapshot_block_context(target_plan_revision, workout)
+                    if (
+                        historical_block == ("invalid",)
+                        or current_snapshot_block == ("invalid",)
+                        or historical_block != current_snapshot_block
+                    ):
+                        break
+                    historical_metadata_block = _metadata_block_context(
+                        historical_metadata, item.workout.week_number
+                    )
+                    current_metadata_block = _metadata_block_context(metadata, workout.week_number)
+                    if (
+                        historical_metadata_block == "invalid"
+                        or current_metadata_block == "invalid"
+                        or historical_metadata_block != current_metadata_block
+                    ):
+                        break
+                elif (
+                    _revision_for_completion(revisions, item.workout.completed_at)
+                    != revision_number
+                ):
+                    continue
+                if exercise_slot_identity(item) != exercise_slot_identity(current):
                     continue
                 if _selection_signature(item) != _selection_signature(current):
+                    if typed_context:
+                        break
                     continue
                 if _block_id_for_date(blocks, item.workout.scheduled_date) != current_block_id:
+                    if typed_context:
+                        break
                     continue
-                if _week_block_number(metadata, item.workout.week_number) != current_block_number:
+                if (
+                    _week_block_number(historical_metadata, item.workout.week_number)
+                    != current_block_number
+                ):
+                    if typed_context:
+                        break
                     continue
                 historical_rule, historical_error = _resolve_coaching_rule(
-                    metadata,
+                    historical_metadata,
                     exercise_id=item.exercise_id,
                     week_number=item.workout.week_number,
                 )
                 if historical_error is not None or _rule_snapshot(
                     historical_rule
                 ) != _rule_snapshot(rule):
+                    if typed_context:
+                        break
                     continue
                 comparable.append(item)
-            facts = [_session_facts_for_selection(item, selection) for item in comparable]
-            context_changed = bool(same_exercise and not comparable)
+            all_facts = [_session_facts_for_selection(item, selection) for item in comparable]
+            facts = all_facts[:3] if typed_context else all_facts
+            context_changed = bool(
+                (same_type if typed_context else same_exercise) and not comparable
+            )
+            if side_mode is not None:
+                side_guidance = {"execution_mode": side_mode}
+                for side in ("left", "right"):
+                    matching = [
+                        item
+                        for item in comparable
+                        if any(
+                            row.execution_mode == side_mode
+                            for row in _driving_set_rows(item, selection)
+                        )
+                    ]
+                    side_facts = [
+                        _session_facts_for_selection(item, selection, side=side, mode=side_mode)
+                        for item in matching
+                    ]
+                    considered = side_facts[:3] if typed_context else side_facts
+                    if rule is not None:
+                        side_result, side_action, _, _ = _rule_guidance(
+                            rule=rule,
+                            selection=selection,
+                            current=current,
+                            sessions=considered,
+                            current_is_deload=scheduled_deload,
+                        )
+                    elif not isinstance(metadata, dict) or not metadata.get("coaching_rules"):
+                        side_result = evaluate_progression(
+                            prescribed_sets=selection.expected_count,
+                            prescribed_reps=target_reps or current.prescribed_reps,
+                            sessions=considered,
+                            load_unit="kg",
+                            context_changed=context_changed,
+                        )
+                        side_action = (
+                            "set_load"
+                            if side_result.get("suggested_weight") is not None
+                            else "hold"
+                        )
+                    else:
+                        side_result = _review_result(
+                            prescribed_sets=selection.expected_count,
+                            prescribed_reps=target_reps or current.prescribed_reps,
+                            reason_code="no_applicable_coaching_rule",
+                            detail="Для этого упражнения и недели программы нет применимого правила.",
+                        )
+                        side_action = "hold"
+                    if typed_context:
+                        side_result["ruleset_version"] = TYPED_RULESET_VERSION
+                        side_result["evidence"]["week_type"] = week_type
+                        side_result["evidence"]["comparable_session_count"] = sum(
+                            item.complete for item in side_facts
+                        )
+                    if considered and not considered[0].complete:
+                        side_result.update(
+                            outcome="review",
+                            message=_PROGRESS_MESSAGES["review"],
+                            detail="Последняя сопоставимая тренировка содержит неполный подход.",
+                            suggested_weight=None,
+                            suggested_increment=None,
+                        )
+                        side_result["evidence"]["reason_keys"].append("incomplete_session_facts")
+                        side_action = "hold"
+                    side_guidance[side] = side_result
+                    side_actions[side] = side_action
+                    side_sessions[side] = considered
             if rule is None:
                 if not isinstance(metadata, dict) or not metadata.get("coaching_rules"):
                     result = evaluate_progression(
@@ -1277,6 +1801,9 @@ def build_progression_guidance(
                         reason_code="no_applicable_coaching_rule",
                         detail="Для этого упражнения и недели программы нет применимого правила.",
                     )
+                    if typed_context:
+                        facts = []
+                        all_facts = []
                 action = "set_load" if result.get("suggested_weight") is not None else "hold"
             else:
                 result, action, _volume, _intensity = _rule_guidance(
@@ -1289,10 +1816,45 @@ def build_progression_guidance(
                 if context_changed and not facts:
                     result["evidence"]["reason_keys"].append("program_context_changed")
                     result["outcome"] = "review"
+                    if typed_context:
+                        result["message"] = _PROGRESS_MESSAGES["review"]
                     result["suggested_weight"] = None
                     result["suggested_increment"] = None
                     action = "hold"
 
+            if typed_context:
+                result["evidence"]["comparable_session_count"] = sum(
+                    item.complete for item in all_facts
+                )
+                if facts and not facts[0].complete and result.get("suggested_weight") is not None:
+                    result["outcome"] = "review"
+                    result["message"] = _PROGRESS_MESSAGES["review"]
+                    result["detail"] = (
+                        "Нужны полные сопоставимые рабочие подходы в текущем контексте программы."
+                    )
+                    result["suggested_weight"] = None
+                    result["suggested_increment"] = None
+                    result["evidence"]["reason_keys"].append("incomplete_session_facts")
+                    action = "hold"
+
+        if typed_context or not week_type_known:
+            result["ruleset_version"] = TYPED_RULESET_VERSION
+            result["evidence"]["week_type"] = week_type if week_type_known else None
+            reasons = result["evidence"].get("reason_keys", [])
+            if typed_context and (
+                any(
+                    reason in reasons
+                    for reason in ("too_few_comparable_sessions", "need_one_more_stable_session")
+                )
+                or (
+                    not facts
+                    and any(
+                        reason in reasons
+                        for reason in ("missing_amrap_evidence", "missing_rir_evidence")
+                    )
+                )
+            ):
+                reasons.append("insufficient_same_type_history")
         result["evidence"]["reason_keys"] = list(
             dict.fromkeys(result["evidence"].get("reason_keys", []))
         )
@@ -1311,6 +1873,17 @@ def build_progression_guidance(
             deload_volume_percent=volume,
             deload_intensity_percent=intensity,
         )
+        if side_guidance is not None and side_mode is not None:
+            guidance[current.id]["side_guidance"] = side_guidance
+            _attach_side_proposal(
+                guidance[current.id],
+                current=current,
+                selection=selection,
+                mode=side_mode,
+                sides=side_guidance,
+                actions=side_actions,
+                sessions=side_sessions,
+            )
     return guidance
 
 
@@ -1329,7 +1902,13 @@ def list_assigned_program_progression_proposals(
         .filter(
             UserWorkout.user_program_id == program.id,
             UserWorkout.status.in_({"planned", "in_progress"}),
-            UserWorkout.scheduled_date >= today_for_user(actor),
+            UserWorkout.rotation_epoch == program.rotation_epoch
+            if program.schedule_mode == "rotation"
+            else true(),
+            or_(
+                UserWorkout.status == "in_progress",
+                UserWorkout.scheduled_date >= today_for_user(actor),
+            ),
         )
         .order_by(
             (UserWorkout.status == "in_progress").desc(),
@@ -1544,19 +2123,58 @@ def review_assigned_program_progression_proposal(
         expected_ids = {int(item["set_id"]) for item in target_updates}
         if set(expected_set_versions) != expected_ids:
             raise ProgramError("Progression proposal target set versions are incomplete")
+        side_mode = proposal.get("side_execution_mode")
+        if side_mode is not None and decision == "adjust":
+            raise ProgramError("Adjust side weights separately in the workout")
+        for item in target_updates:
+            set_id = int(item["set_id"])
+            row = next((row for row in exercise.sets if row.id == set_id), None)
+            if (
+                row is None
+                or row.is_completed
+                or expected_set_versions[set_id] != row.version
+                or item["set_version"] != row.version
+                or (
+                    side_mode is not None
+                    and (
+                        row.execution_mode != side_mode
+                        or any(side.is_completed for side in row.side_results)
+                    )
+                )
+            ):
+                raise ProgramError("Progression proposal target set changed")
         for item in target_updates:
             set_id = int(item["set_id"])
             set_row = next((row for row in exercise.sets if row.id == set_id), None)
             if set_row is None or set_row.is_completed:
                 raise ProgramError("Progression proposal target set is no longer available")
-            chosen_weight = (
-                adjusted_weight if decision == "adjust" else float(item["proposed_weight"])
-            )
-            if chosen_weight is None:
-                raise ProgramError("Adjusted progression load is required")
-            if decision == "adjust" and item["relative_to_top"] is not None:
-                chosen_weight *= float(item["relative_to_top"])
-            changes = {"actual_weight": chosen_weight}
+            if side_mode is not None:
+                existing = serialize_sides(set_row) or {"left": None, "right": None}
+                sides = {}
+                for side in ("left", "right"):
+                    facts = existing[side] or {
+                        "actual_reps": None,
+                        "actual_weight": None,
+                        "rir": None,
+                        "reached_failure": None,
+                        "is_completed": False,
+                    }
+                    sides[side] = {**facts, "actual_weight": item["proposed_side_weights"][side]}
+                changes = {
+                    "execution_mode": side_mode,
+                    "first_side": set_row.first_side,
+                    "sides": sides,
+                    "is_completed": False,
+                }
+            else:
+                chosen_weight = (
+                    adjusted_weight if decision == "adjust" else float(item["proposed_weight"])
+                )
+                if chosen_weight is None:
+                    raise ProgramError("Adjusted progression load is required")
+                if decision == "adjust" and item["relative_to_top"] is not None:
+                    chosen_weight *= float(item["relative_to_top"])
+                changes = {"actual_weight": chosen_weight}
             mutation_id = _sha256(
                 {
                     "proposal_id": proposal_id,
@@ -1612,6 +2230,8 @@ def review_assigned_program_progression_proposal(
             "source_evidence_ids": proposal["source_evidence_ids"],
             "reason_codes": proposal["reason_codes"],
             "proposed_weight": proposal["proposed_weight"],
+            "proposed_side_weights": proposal.get("proposed_side_weights"),
+            "side_execution_mode": proposal.get("side_execution_mode"),
             "adjusted_weight": adjusted_weight,
             "actor_role": role,
             "changed_set_count": len(applied_set_ids),

@@ -213,3 +213,9 @@
     min-width: 0;
   }
 }
+
+@media (max-width: 360px) {
+  .program-example-modal__actions {
+    padding-inline: 16px;
+  }
+}

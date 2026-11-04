@@ -49,7 +49,7 @@ class ProgramGeneratorRequest(BaseModel):
 class ProgramGeneratorConfirmRequest(BaseModel):
     draft_token: str = Field(min_length=1, max_length=16_384)
     start_date: date | None = None
-    duration_weeks: int | None = Field(default=None, ge=1, le=24)
+    duration_weeks: int | None = Field(default=None, ge=1)
     replace_active: bool = False
 
 
@@ -96,6 +96,13 @@ class ProgramGeneratorProgram(BaseModel):
     split_type: ProgramSplitType | None = None
     days: list[ProgramGeneratorDay]
     estimated_duration_minutes: int
+    days_per_week: int
+
+
+class ProgramGeneratorSuggestion(BaseModel):
+    source: ProgramGeneratorSource
+    changes: list[str]
+    inputs: ProgramGeneratorRequest
 
 
 class ProgramGeneratorAdaptation(BaseModel):
@@ -132,6 +139,7 @@ class ProgramGeneratorPreviewResponse(BaseModel):
     unresolved_constraints: list[str] = Field(default_factory=list)
     reason_codes: list[str] = Field(default_factory=list)
     active_program: ProgramGeneratorActiveProgram | None = None
+    suggestions: list[ProgramGeneratorSuggestion] = Field(default_factory=list, max_length=3)
 
 
 class ProgramGeneratorConfirmResponse(BaseModel):

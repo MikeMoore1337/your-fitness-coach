@@ -1,7 +1,9 @@
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
+from scripts import check_online_migrations as online_migrations
 from scripts.check_online_migrations import (
     OnlineMigrationError,
     changed_migrations_from_manifest,
@@ -13,6 +15,75 @@ from scripts.check_online_migrations import (
 def _migration(path: Path, body: str) -> Path:
     path.write_text(body, encoding="utf-8")
     return path
+
+
+@pytest.mark.parametrize("path, hashes", online_migrations.DEV_DOWNGRADE_TRANSITIONS.items())
+def test_reviewed_dev_downgrade_target_matches_checked_in_source(
+    path: str, hashes: tuple[str, str]
+):
+    root = Path(__file__).resolve().parents[1]
+    source = (root / path).read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(source).hexdigest() == hashes[1]
+
+
+def test_reviewed_dev_downgrade_requires_exact_sources_and_unchanged_upgrade(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    path = Path("backend/alembic/versions/0139_workout_exercise_notes.py")
+    previous_root = tmp_path / "previous"
+    path.parent.mkdir(parents=True)
+    (previous_root / path.parent).mkdir(parents=True)
+    old = 'revision = "x"\ndef upgrade():\n    pass\ndef downgrade():\n    pass\n'
+    new = old.replace(
+        "def downgrade():\n    pass", 'def downgrade():\n    raise RuntimeError("guard")'
+    )
+    (previous_root / path).write_text(old, encoding="utf-8")
+    path.write_text(new, encoding="utf-8")
+
+    def sha(value: str) -> str:
+        return hashlib.sha256(value.encode()).hexdigest()
+
+    monkeypatch.setitem(
+        online_migrations.DEV_DOWNGRADE_TRANSITIONS, path.as_posix(), (sha(old), sha(new))
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "active_revision": "old",
+                "target_revision": "new",
+                "changes": [{"status": "M", "path": path.as_posix()}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations("old", "new", manifest=manifest)
+    assert (
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
+        == []
+    )
+    (previous_root / path).write_text(old + "# altered\n", encoding="utf-8")
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
+    (previous_root / path).write_text(old, encoding="utf-8")
+    changed_upgrade = new.replace("def upgrade():\n    pass", "def upgrade():\n    dangerous()")
+    path.write_text(changed_upgrade, encoding="utf-8")
+    monkeypatch.setitem(
+        online_migrations.DEV_DOWNGRADE_TRANSITIONS,
+        path.as_posix(),
+        (sha(old), sha(changed_upgrade)),
+    )
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
 
 
 def test_production_migration_manifest_is_revision_bound(tmp_path: Path) -> None:
@@ -58,6 +129,13 @@ def test_online_migration_accepts_declared_additive_expand(tmp_path: Path) -> No
     )
 
     validate_added_migration(path)
+
+
+def test_provider_provenance_migration_is_additive_and_online_safe() -> None:
+    root = Path(__file__).resolve().parents[1]
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0145_history_provider_provenance.py"
+    )
 
 
 def test_online_migration_accepts_empty_table_and_its_index(tmp_path: Path) -> None:
@@ -184,6 +262,50 @@ def test_online_migration_accepts_concurrent_index_on_existing_table(tmp_path: P
     )
 
     validate_added_migration(path)
+
+
+@pytest.mark.parametrize(
+    "kind", ["valid", "write", "other_index", "other_query", "non_pg", "dynamic"]
+)
+def test_concurrent_index_allows_only_exact_catalog_validation(tmp_path: Path, kind: str) -> None:
+    query = "SELECT indisvalid AND indisunique FROM pg_index WHERE indexrelid = 'ix_users_name'::regclass"
+    if kind == "write":
+        query += "; DELETE FROM users"
+    elif kind == "other_index":
+        query = query.replace("ix_users_name", "another_index")
+    elif kind == "other_query":
+        query = "SELECT * FROM users"
+    expression = "query" if kind == "dynamic" else repr(query)
+    dialect = "sqlite" if kind == "non_pg" else "postgresql"
+    path = _migration(
+        tmp_path / "0065_index_validation.py",
+        'online_rollout_phase = "expand"\nonline_rollout_notes = "Validate the concurrent index."\n'
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        f'    if bind.dialect.name == "{dialect}":\n'
+        "        with op.get_context().autocommit_block():\n"
+        '            op.create_index("ix_users_name", "users", ["name"], postgresql_concurrently=True, if_not_exists=True)\n'
+        f"            bind.execute(sa.text({expression})).scalar_one()\n",
+    )
+    if kind != "valid":
+        with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+            validate_added_migration(path)
+    else:
+        validate_added_migration(path)
+
+
+def test_rotation_index_validation_is_exact_and_scoped(tmp_path: Path) -> None:
+    source_path = (
+        Path(__file__).resolve().parents[1] / "backend/alembic/versions/0147_session_rotation.py"
+    )
+    source = source_path.read_text(encoding="utf-8")
+    validate_added_migration(source_path)
+    weakened = source.replace("AND indnkeyatts = 2 AND indnatts = 2", "AND indnkeyatts >= 1")
+    assert weakened != source
+    with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+        validate_added_migration(_migration(tmp_path / "0147_session_rotation.py", weakened))
+    with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+        validate_added_migration(_migration(tmp_path / "9999_unrelated.py", source))
 
 
 @pytest.mark.parametrize("operation", ["drop_table", "drop_column", "alter_column"])
@@ -421,6 +543,27 @@ def test_online_constraint_swap_rejects_unbounded_validating_replacement(
         validate_added_migration(path)
 
 
+def test_side_metadata_migrations_allow_only_read_only_sqlite_foreign_key_guard(
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions"
+    validate_added_migration(root / "0143_workout_set_sides.py")
+    source = (root / "0144_workout_side_metadata_ck.py").read_text(encoding="utf-8")
+    validate_added_migration(_migration(tmp_path / "0144_safe.py", source))
+    for unsafe in (
+        source.replace(".getconfig(", ".setconfig("),
+        source.replace("SQLITE_DBCONFIG_ENABLE_FKEY", "SQLITE_DBCONFIG_ENABLE_TRIGGER"),
+        source.replace(
+            'raise RuntimeError("SQLite migration requires a connection with foreign keys disabled")',
+            "pass",
+        ),
+    ):
+        with pytest.raises(
+            OnlineMigrationError, match="outside the 'constraint_swap' online allowlist"
+        ):
+            validate_added_migration(_migration(tmp_path / "0144_unsafe.py", unsafe))
+
+
 def test_rest_interval_migrations_use_strict_online_contract() -> None:
     root = Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions"
     validate_added_migration(root / "0131_rest_interval_expand.py")
@@ -467,3 +610,115 @@ def test_rest_unique_swap_rejects_undeclared_migration_name(tmp_path: Path) -> N
     ).read_text(encoding="utf-8")
     with pytest.raises(OnlineMigrationError, match="unapproved"):
         validate_added_migration(_migration(tmp_path / "9999_unrelated_unique_swap.py", source))
+
+
+def test_cycle_storage_migrations_use_declared_online_operations():
+    import runpy
+    from pathlib import Path
+
+    checker = runpy.run_path(
+        str(Path(__file__).resolve().parents[1] / "scripts" / "check_online_migrations.py")
+    )
+    for filename in (
+        "0134_program_cycle_storage.py",
+        "0135_program_duration_unbounded.py",
+        "0136_program_week_unbounded.py",
+    ):
+        checker["validate_added_migration"](
+            Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions" / filename
+        )
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        (
+            'batch_alter_table("program_template_exercise_weeks")',
+            'batch_alter_table("user_workouts")',
+        ),
+        (
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="check")',
+            'batch.drop_constraint("other", type_="check")',
+        ),
+        (
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="check")',
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="unique")',
+        ),
+        ('"week_number >= 1"', '"week_number >= 0"'),
+        (
+            'batch.drop_constraint("ck_program_template_exercise_weeks_number", type_="check")',
+            'batch.drop_column("week_number")',
+        ),
+    ],
+)
+def test_sqlite_check_swap_rejects_undeclared_or_mismatching_operations(tmp_path, old, new):
+    import runpy
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    checker = runpy.run_path(str(root / "scripts" / "check_online_migrations.py"))
+    source = (
+        root / "backend" / "alembic" / "versions" / "0136_program_week_unbounded.py"
+    ).read_text(encoding="utf-8")
+    assert old in source
+    invalid = tmp_path / "invalid.py"
+    invalid.write_text(source.replace(old, new), encoding="utf-8")
+    with pytest.raises(checker["OnlineMigrationError"]):
+        checker["validate_added_migration"](invalid)
+
+
+def test_workout_history_nullable_migration_has_exact_bounded_scope():
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0141_workout_history_nullable.py"
+    )
+    validate_added_migration(path)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("SET LOCAL lock_timeout = '3s'", "SET LOCAL lock_timeout = '30s'"),
+        ("user_program_id DROP NOT NULL", "user_program_id DROP DEFAULT"),
+        ("AND status = 'completed'", "AND status = 'planned'"),
+        (
+            "VALIDATE CONSTRAINT ck_user_workouts_plan_presence",
+            "DROP CONSTRAINT ck_user_workouts_plan_presence",
+        ),
+        ('batch.alter_column("rest_seconds"', 'batch.alter_column("exercise_id"'),
+        ("nullable=True)", "nullable=False)"),
+        ("import sqlalchemy as sa", "import sqlite3 as sa"),
+        ("def downgrade() -> None:", 'def downgrade(value=print("bad")) -> None:'),
+    ],
+)
+def test_workout_history_nullable_rejects_scope_changes(tmp_path: Path, old: str, new: str):
+    source_path = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0141_workout_history_nullable.py"
+    )
+    source = source_path.read_text(encoding="utf-8")
+    assert old in source
+    with pytest.raises(OnlineMigrationError, match="workout history nullable"):
+        validate_added_migration(
+            _migration(tmp_path / source_path.name, source.replace(old, new, 1))
+        )
+
+
+def test_workout_history_nullable_rejects_other_revision(tmp_path: Path):
+    source_path = (
+        Path(__file__).resolve().parents[1]
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0141_workout_history_nullable.py"
+    )
+    with pytest.raises(OnlineMigrationError, match="unapproved"):
+        validate_added_migration(
+            _migration(tmp_path / "9999_other.py", source_path.read_text(encoding="utf-8"))
+        )

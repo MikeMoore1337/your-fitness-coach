@@ -41,19 +41,33 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     def run(connection: Connection) -> None:
+        postgres = connection.dialect.name == "postgresql"
+        if postgres and connection.in_transaction():
+            raise RuntimeError("Commit the caller transaction before running PostgreSQL migrations")
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             version_table_schema=config.attributes.get("version_table_schema"),
         )
-        with context.begin_transaction():
-            if connection.dialect.name == "postgresql":
-                # Serialize automatic and manual migrations during container startup.
+        locked = False
+        try:
+            with context.begin_transaction():
+                if postgres:
+                    # Concurrent-index autocommit must retain the existing migrator lock.
+                    connection.execute(
+                        text("SELECT pg_advisory_lock(:lock_id)"),
+                        {"lock_id": MIGRATION_ADVISORY_LOCK_ID},
+                    )
+                    locked = True
+                context.run_migrations()
+        finally:
+            if locked:
+                connection.rollback()
                 connection.execute(
-                    text("SELECT pg_advisory_xact_lock(:lock_id)"),
+                    text("SELECT pg_advisory_unlock(:lock_id)"),
                     {"lock_id": MIGRATION_ADVISORY_LOCK_ID},
                 )
-            context.run_migrations()
+                connection.commit()
 
     supplied_connection = config.attributes.get("connection")
     if supplied_connection is not None:

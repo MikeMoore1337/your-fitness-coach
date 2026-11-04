@@ -17,6 +17,7 @@ ALLOWED_PHASES = {
     "constraint_swap",
     "rest_unique_swap",
     "numeric_precision",
+    "workout_history_nullable",
 }
 DESTRUCTIVE_CALLS = {
     "alter_column",
@@ -62,6 +63,59 @@ SAFE_COLUMN_TYPES = {
 # the strict AST contract below.
 LEGACY_ONLINE_MIGRATION_SHA256 = {
     "backend/alembic/versions/0118_measurement_eligibility.py": "13d4c9d6693d352b9ceb5b69b3a8713e124c505f65ba774620a8d5a12b3cdea8",
+}
+
+# These exact DEV transitions change only reviewed downgrade guards. Production
+# retains the immutable-history rule and never supplies the DEV source archive.
+DEV_DOWNGRADE_TRANSITIONS = {
+    "backend/alembic/versions/0134_workout_completed_at_utc.py": (
+        "b4c891fd9aedbefbecf2e51147a03a14174f3f0675c384a54935f74fe1bb2af4",
+        "821b3a4d340f86a8fe1f337e9bc2a7670f28469efe02fa789f9a82a2e84abf7d",
+    ),
+    "backend/alembic/versions/0134_program_cycle_storage.py": (
+        "06c4f101e60bd14884c7f5587b32184e1019ca03a6d92c62ba4df4a22e3e97b7",
+        "bde8abbf943b7104e95ca59018ab5674287eead1090a3d68cf016cfde5461fe9",
+    ),
+    "backend/alembic/versions/0135_program_duration_unbounded.py": (
+        "5525d6982929c0626dc4a932ab4ae00099ffaaf9d85e5e3abaa12a38d6b49666",
+        "2e2cb7dc1734ac0168cca6c2135cd1dcd8f2821cb9897f1ff4b62736eb8aa974",
+    ),
+    "backend/alembic/versions/0138_equipment_profiles.py": (
+        "f70abef0572a9599f189f89721d204104aad76accc7183015467fe5abfdc4df3",
+        "719485af759455829107b612c19d2eff8b194c5bc2aca453f2cc6d9eeb488d5a",
+    ),
+    "backend/alembic/versions/0139_workout_exercise_notes.py": (
+        "d53aa4cf9d303492094a6f9afa140fca490b2bc73b07fb9c307b8bc8b7d642c0",
+        "ba8312b58a34607d082b5aa1cbcb2438b65a537da214fc338e1773702b758284",
+    ),
+    "backend/alembic/versions/0140_workout_start_utc.py": (
+        "5e496a915f91c94fcaa40711052bdd872076d86affe6a34860d839f6555c8e2d",
+        "a596b7ad92e61c75b17418cd83cf822bf3994861764a0695d66a77e4226b6c05",
+    ),
+    "backend/alembic/versions/0142_workout_history_import.py": (
+        "83cd451557362201bf61339579cd5986c193687f41bad7cb7d9119d20de97351",
+        "c39c63e04b8f4343cd6ed57f8df84920152d8dde9bb67eb1fed9c91ba49373f6",
+    ),
+    "backend/alembic/versions/0143_workout_set_sides.py": (
+        "fe77022a71684b47220a31f2e26197a876a80ba0d7e68f5aa32c8882651e6ada",
+        "838561ad005469e5c39874e7078d99b9aa70f1ffa41d0d8818460f40625f1513",
+    ),
+    "backend/alembic/versions/0145_history_provider_provenance.py": (
+        "d3e5699d44427bad686fb81ee0110f8650a4360e558675a456fc9a97a0683f6c",
+        "5a120aa9bb4d3fffa234291dacffa09e6611315de5e547dd07e96c1141a63bd3",
+    ),
+    "backend/alembic/versions/0146_assignment_exercise_slots.py": (
+        "045a53811c6ac88758055378e310ac1e4b297d00b2ae3c4cefb04ad5bd54159d",
+        "dde58ebde2095ce38c5343bf175724751e366dd86016f57b899659de001beb1b",
+    ),
+    "backend/alembic/versions/0147_session_rotation.py": (
+        "1415c2097c56da861fcd38a37ac7616cdd2701d45555656531a984c0b3a026ac",
+        "774187c89c60c4e78e3eec8eb53ff9af88310ffe26f020788feac8630267aa5e",
+    ),
+    "backend/alembic/versions/0148_program_import_self_assignment.py": (
+        "e3c6f4fbb1cd5ef02976b2274c52cfda1a93ce79ae5514219b1e4f33f7adccd3",
+        "4b0ab56d3b8ce2ceceb08e5fb833dd467400b147e5dfc452251c67bd3ff2050d",
+    ),
 }
 
 
@@ -323,6 +377,106 @@ def _is_in_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST,
     return False
 
 
+ROTATION_INDEX_VALIDATIONS = {
+    "uq_user_workouts_rotation_mutation": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'user_workouts'::regclass "
+        "AND indnkeyatts = 2 AND indnatts = 2 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+        "AND pg_get_indexdef(indexrelid, 2, true) = 'rotation_mutation_id' "
+        "AND pg_get_expr(indpred, indrelid) = '(rotation_mutation_id IS NOT NULL)' "
+        "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_mutation'::regclass"
+    ),
+    "uq_user_workouts_rotation_in_progress": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'user_workouts'::regclass "
+        "AND indnkeyatts = 1 AND indnatts = 1 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+        "AND pg_get_expr(indpred, indrelid) = "
+        "'((rotation_epoch IS NOT NULL) AND ((status)::text = ''in_progress''::text))' "
+        "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_in_progress'::regclass"
+    ),
+}
+
+
+def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict, path: Path) -> bool:
+    if not (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "bind"
+        and call.func.attr == "execute"
+        and len(call.args) == 1
+    ):
+        return False
+    query = call.args[0]
+    sql = (
+        query.args[0].value
+        if isinstance(query, ast.Call)
+        and isinstance(query.func, ast.Attribute)
+        and isinstance(query.func.value, ast.Name)
+        and query.func.value.id == "sa"
+        and query.func.attr == "text"
+        and len(query.args) == 1
+        and isinstance(query.args[0], ast.Constant)
+        and isinstance(query.args[0].value, str)
+        else ""
+    )
+    checked = re.fullmatch(
+        r"SELECT indisvalid AND indisunique FROM pg_index WHERE indexrelid = "
+        r"'([a-z][a-z0-9_]*)'::regclass",
+        sql,
+    )
+    name = checked[1] if checked else None
+    if name is None and path.name == "0147_session_rotation.py":
+        name = next(
+            (key for key, value in ROTATION_INDEX_VALIDATIONS.items() if value == sql), None
+        )
+    return bool(
+        name
+        and _is_in_postgresql_branch(call, links)
+        and any(
+            item.func.attr == "create_index"
+            and item.args
+            and isinstance(item.args[0], ast.Constant)
+            and item.args[0].value == name
+            for item in _op_calls(upgrade)
+        )
+    )
+
+
+def _is_sqlite_foreign_key_guard(call: ast.Call, links: dict) -> bool:
+    if not (
+        (isinstance(call.func, ast.Attribute) and call.func.attr == "getconfig")
+        or (isinstance(call.func, ast.Name) and call.func.id == "RuntimeError")
+    ):
+        return False
+    current: ast.AST = call
+    while current in links:
+        parent, _ = links[current]
+        if isinstance(parent, ast.If):
+            expected = ast.parse(
+                'bind.dialect.name != "sqlite" or '
+                "bind.connection.driver_connection.getconfig(sqlite3.SQLITE_DBCONFIG_ENABLE_FKEY)",
+                mode="eval",
+            ).body
+            return bool(
+                ast.dump(parent.test) == ast.dump(expected)
+                and len(parent.body) == 1
+                and isinstance(parent.body[0], ast.Raise)
+                and isinstance(parent.body[0].exc, ast.Call)
+                and isinstance(parent.body[0].exc.func, ast.Name)
+                and parent.body[0].exc.func.id == "RuntimeError"
+                and len(parent.body[0].exc.args) == 1
+                and isinstance(parent.body[0].exc.args[0], ast.Constant)
+                and isinstance(parent.body[0].exc.args[0].value, str)
+                and not parent.body[0].exc.keywords
+                and not parent.orelse
+                and _is_in_non_postgresql_branch(parent, links)
+            )
+        current = parent
+    return False
+
+
 def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object) -> None:
     links = _parent_links(upgrade)
     created_tables = {
@@ -358,7 +512,16 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
             elif phase == "backfill":
                 allowed = owner == "op" and function.attr == "execute"
             elif phase == "constraint_swap":
-                allowed = owner == "op" and function.attr in {"execute", "get_bind"}
+                allowed = (owner == "op" and function.attr in {"execute", "get_bind"}) or (
+                    _is_in_non_postgresql_branch(call, links)
+                    and (
+                        (owner == "op" and function.attr == "batch_alter_table")
+                        or (
+                            owner == "batch"
+                            and function.attr in {"drop_constraint", "create_check_constraint"}
+                        )
+                    )
+                )
             elif phase == "rest_unique_swap":
                 allowed = (
                     (
@@ -380,6 +543,25 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 )
         elif phase == "numeric_precision" and isinstance(function, ast.Name):
             allowed = function.id == "_ensure_upgrade_safe"
+        if phase == "constraint_swap" and _is_sqlite_foreign_key_guard(call, links):
+            allowed = True
+        if phase == "expand":
+            if _is_index_validation(call, upgrade, links, path) or (
+                isinstance(function, ast.Attribute)
+                and function.attr == "scalar_one"
+                and isinstance(function.value, ast.Call)
+                and _is_index_validation(function.value, upgrade, links, path)
+            ):
+                allowed = True
+            if (
+                isinstance(function, ast.Name)
+                and function.id == "RuntimeError"
+                and isinstance(links.get(call, (None, ""))[0], ast.Raise)
+                and len(call.args) == 1
+                and isinstance(call.args[0], ast.Constant)
+                and isinstance(call.args[0].value, str)
+            ):
+                allowed = True
         if _is_autocommit_block_call(call):
             allowed = True
         if not allowed:
@@ -565,6 +747,95 @@ def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[st
         raise OnlineMigrationError(f"{path} rest unique swap batch must contain only its drop")
 
 
+def _validate_sqlite_check_swap(
+    path: Path, upgrade: ast.AST, statements: list[str], table_name: str, constraint_name: str
+) -> None:
+    batches = [
+        node
+        for node in ast.walk(upgrade)
+        if isinstance(node, ast.With)
+        and any(
+            isinstance(item.context_expr, ast.Call)
+            and _is_direct_op_call(item.context_expr, "batch_alter_table")
+            for item in node.items
+        )
+    ]
+    if not batches:
+        return
+    if len(batches) != 1:
+        raise OnlineMigrationError(f"{path} permits only one declared SQLite CHECK batch")
+    batch = batches[0]
+    links = _parent_links(upgrade)
+    if not _is_in_non_postgresql_branch(batch, links) or len(batch.items) != 1:
+        raise OnlineMigrationError(f"{path} CHECK batch must stay in the non-PostgreSQL fallback")
+    context = batch.items[0]
+    call = context.context_expr
+    if (
+        not isinstance(call, ast.Call)
+        or len(call.args) != 1
+        or call.keywords
+        or not isinstance(call.args[0], ast.Constant)
+        or call.args[0].value != table_name
+        or not isinstance(context.optional_vars, ast.Name)
+        or context.optional_vars.id != "batch"
+    ):
+        raise OnlineMigrationError(f"{path} CHECK batch must name only its declared table")
+    calls = []
+    for statement in batch.body:
+        if not isinstance(statement, ast.Expr) or not isinstance(statement.value, ast.Call):
+            raise OnlineMigrationError(
+                f"{path} CHECK batch may contain only a declared CHECK replacement"
+            )
+        calls.append(statement.value)
+    if len(calls) not in {1, 2}:
+        raise OnlineMigrationError(
+            f"{path} CHECK batch must create one CHECK and optionally drop its predecessor"
+        )
+    if len(calls) == 2:
+        drop = calls[0]
+        if (
+            not isinstance(drop.func, ast.Attribute)
+            or not isinstance(drop.func.value, ast.Name)
+            or drop.func.value.id != "batch"
+            or drop.func.attr != "drop_constraint"
+            or len(drop.args) != 1
+            or not isinstance(drop.args[0], ast.Constant)
+            or drop.args[0].value != constraint_name
+            or len(drop.keywords) != 1
+            or drop.keywords[0].arg != "type_"
+            or not isinstance(drop.keywords[0].value, ast.Constant)
+            or drop.keywords[0].value.value != "check"
+        ):
+            raise OnlineMigrationError(f"{path} CHECK batch may drop only its declared CHECK")
+    create = calls[-1]
+    condition = re.search(r" CHECK \((.*)\) NOT VALID$", re.sub(r"\s+", " ", statements[2]).strip())
+    if (
+        condition is None
+        or not isinstance(create.func, ast.Attribute)
+        or not isinstance(create.func.value, ast.Name)
+        or create.func.value.id != "batch"
+        or create.func.attr != "create_check_constraint"
+        or len(create.args) != 2
+        or create.keywords
+        or not all(
+            isinstance(item, ast.Constant) and isinstance(item.value, str) for item in create.args
+        )
+        or create.args[0].value != constraint_name
+        or re.sub(r"\s+", " ", create.args[1].value).strip() != condition.group(1)
+    ):
+        raise OnlineMigrationError(f"{path} SQLite CHECK must match the exact PostgreSQL CHECK")
+    batch_calls = [
+        node
+        for node in ast.walk(upgrade)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "batch"
+    ]
+    if set(batch_calls) != set(calls):
+        raise OnlineMigrationError(f"{path} CHECK operations cannot escape the declared batch")
+
+
 def _validate_nullable_add_column(path: Path, call: ast.Call) -> None:
     if len(call.args) < 2 or not isinstance(call.args[1], ast.Call):
         raise OnlineMigrationError(
@@ -630,6 +901,85 @@ def _is_constant_false_server_default(value: ast.AST | None) -> bool:
     )
 
 
+def _validate_workout_history_nullable(
+    path: Path, tree: ast.Module, upgrade: ast.FunctionDef | ast.AsyncFunctionDef
+) -> None:
+    # This exception is scoped to one reviewed operation, not arbitrary ALTER SQL.
+    if path.name != "0141_workout_history_nullable.py":
+        raise OnlineMigrationError(f"{path} unapproved workout history nullable migration")
+    expected = ast.parse(
+        """
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+
+from alembic import op
+
+revision: str = "0141_workout_history_nullable"
+down_revision: str | None = "0140_workout_start_utc"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+online_rollout_phase = "workout_history_nullable"
+online_rollout_notes = "Relax only the stated plan columns under bounded PostgreSQL locks."
+
+
+def upgrade() -> None:
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("SET LOCAL lock_timeout = '3s'")
+        op.execute("SET LOCAL statement_timeout = '30s'")
+        op.execute("ALTER TABLE user_workouts ADD COLUMN history_imported BOOLEAN, ALTER COLUMN user_program_id DROP NOT NULL, ALTER COLUMN day_number DROP NOT NULL, ALTER COLUMN week_number DROP NOT NULL, ADD CONSTRAINT ck_user_workouts_plan_presence CHECK ((history_imported IS TRUE AND user_program_id IS NULL AND day_number IS NULL AND week_number IS NULL AND status = 'completed') OR (history_imported IS NOT TRUE AND user_program_id IS NOT NULL AND day_number IS NOT NULL AND week_number IS NOT NULL)) NOT VALID")
+        op.execute("ALTER TABLE user_workout_exercises ADD COLUMN history_imported BOOLEAN, ALTER COLUMN prescribed_sets DROP NOT NULL, ALTER COLUMN prescribed_reps DROP NOT NULL, ALTER COLUMN rest_seconds DROP NOT NULL, ADD CONSTRAINT ck_user_workout_exercises_plan_presence CHECK ((history_imported IS TRUE AND prescribed_sets IS NULL AND prescribed_reps IS NULL AND rest_seconds IS NULL) OR (history_imported IS NOT TRUE AND prescribed_sets IS NOT NULL AND prescribed_reps IS NOT NULL AND rest_seconds IS NOT NULL)) NOT VALID")
+        op.execute("ALTER TABLE user_workouts VALIDATE CONSTRAINT ck_user_workouts_plan_presence")
+        op.execute("ALTER TABLE user_workout_exercises VALIDATE CONSTRAINT ck_user_workout_exercises_plan_presence")
+    else:
+        if bind.execute(sa.text("PRAGMA foreign_keys")).scalar_one() and bind.execute(
+            sa.text("SELECT 1 FROM user_workouts LIMIT 1")
+        ).first():
+            raise RuntimeError("SQLite migration requires a connection with foreign keys disabled")
+        with op.batch_alter_table("user_workouts") as batch:
+            batch.add_column(sa.Column("history_imported", sa.Boolean(), nullable=True))
+            batch.alter_column("user_program_id", existing_type=sa.Integer(), nullable=True)
+            batch.alter_column("day_number", existing_type=sa.Integer(), nullable=True)
+            batch.alter_column("week_number", existing_type=sa.Integer(), nullable=True)
+            batch.create_check_constraint("ck_user_workouts_plan_presence", "(history_imported IS TRUE AND user_program_id IS NULL AND day_number IS NULL AND week_number IS NULL AND status = 'completed') OR (history_imported IS NOT TRUE AND user_program_id IS NOT NULL AND day_number IS NOT NULL AND week_number IS NOT NULL)")
+        with op.batch_alter_table("user_workout_exercises") as batch:
+            batch.add_column(sa.Column("history_imported", sa.Boolean(), nullable=True))
+            batch.alter_column("prescribed_sets", existing_type=sa.Integer(), nullable=True)
+            batch.alter_column("prescribed_reps", existing_type=sa.String(32), nullable=True)
+            batch.alter_column("rest_seconds", existing_type=sa.Integer(), nullable=True)
+            batch.create_check_constraint("ck_user_workout_exercises_plan_presence", "(history_imported IS TRUE AND prescribed_sets IS NULL AND prescribed_reps IS NULL AND rest_seconds IS NULL) OR (history_imported IS NOT TRUE AND prescribed_sets IS NOT NULL AND prescribed_reps IS NOT NULL AND rest_seconds IS NOT NULL)")
+
+"""
+    )
+    body = [
+        node
+        for node in tree.body
+        if not (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        )
+        and not (isinstance(node, ast.FunctionDef) and node.name == "downgrade")
+    ]
+    downgrades = [
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "downgrade"
+    ]
+    expected_downgrade = ast.parse("def downgrade() -> None:\n    pass").body[0]
+    assert isinstance(expected_downgrade, ast.FunctionDef)
+    if (
+        len(downgrades) != 1
+        or downgrades[0].decorator_list
+        or getattr(downgrades[0], "type_params", [])
+        or ast.dump(downgrades[0].args) != ast.dump(expected_downgrade.args)
+        or downgrades[0].returns is None
+        or ast.dump(downgrades[0].returns) != ast.dump(expected_downgrade.returns)
+        or ast.dump(ast.Module(body=body, type_ignores=[])) != ast.dump(expected)
+        or upgrade not in body
+    ):
+        raise OnlineMigrationError(f"{path} workout history nullable upgrade must be exact")
+
+
 def validate_added_migration(path: Path) -> None:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     upgrade = _upgrade_body(tree, path)
@@ -644,6 +994,10 @@ def validate_added_migration(path: Path) -> None:
         raise OnlineMigrationError(
             f"{path} must declare non-empty online_rollout_notes with lock/data bounds"
         )
+
+    if phase == "workout_history_nullable":
+        _validate_workout_history_nullable(path, tree, upgrade)
+        return
 
     if phase == "backfill":
         batch_size = _assignment(tree, "online_rollout_batch_size")
@@ -730,6 +1084,8 @@ def validate_added_migration(path: Path) -> None:
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "op"
         ):
+            if phase == "expand" and _is_index_validation(node, upgrade, links, path):
+                continue
             raise OnlineMigrationError(
                 f"{path} uses SQL execution outside the verified op.execute online contract"
             )
@@ -773,7 +1129,11 @@ def validate_added_migration(path: Path) -> None:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online backfill"
             )
-        elif phase == "constraint_swap" and operation not in {"execute", "get_bind"}:
+        elif phase == "constraint_swap" and operation not in {
+            "execute",
+            "get_bind",
+            "batch_alter_table",
+        }:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online constraint_swap"
             )
@@ -848,6 +1208,12 @@ def validate_added_migration(path: Path) -> None:
             statement_timeout_seconds=constraint_swap_config[3],
         )
 
+    if phase == "constraint_swap":
+        assert constraint_swap_config is not None
+        _validate_sqlite_check_swap(
+            path, upgrade, execute_statements, constraint_swap_config[0], constraint_swap_config[1]
+        )
+
     if phase == "rest_unique_swap":
         _validate_rest_unique_swap(path, upgrade, execute_statements)
 
@@ -864,21 +1230,72 @@ def validate_added_migration(path: Path) -> None:
     _validate_upgrade_call_allowlist(path, upgrade, phase)
 
 
+def _reviewed_dev_downgrade(path: Path, source_root: Path) -> bool:
+    expected = DEV_DOWNGRADE_TRANSITIONS.get(path.as_posix())
+    if expected is None:
+        return False
+    try:
+        sources = [
+            (source_root / path).read_bytes().replace(b"\r\n", b"\n"),
+            path.read_bytes().replace(b"\r\n", b"\n"),
+        ]
+    except OSError:
+        return False
+    if tuple(hashlib.sha256(source).hexdigest() for source in sources) != expected:
+        return False
+    trees = [ast.parse(source.decode("utf-8")) for source in sources]
+    for tree in trees:
+        downgrades = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "downgrade"
+        ]
+        if len(downgrades) != 1:
+            return False
+        downgrades[0].body = [ast.Pass()]
+        if any(
+            isinstance(node, ast.Name)
+            and node.id in {"downgrade", "eval", "exec", "getattr", "globals", "locals"}
+            for node in ast.walk(tree)
+        ):
+            return False
+    return ast.dump(trees[0], include_attributes=False) == ast.dump(
+        trees[1], include_attributes=False
+    )
+
+
 def check_online_migrations(
-    active_revision: str, target_revision: str, *, manifest: Path | None = None
+    active_revision: str,
+    target_revision: str,
+    *,
+    manifest: Path | None = None,
+    dev_reviewed_source: Path | None = None,
 ) -> list[Path]:
+    if dev_reviewed_source is not None and manifest is None:
+        raise OnlineMigrationError("DEV migration review requires a revision-bound manifest")
     changes = (
         changed_migrations_from_manifest(active_revision, target_revision, manifest)
         if manifest is not None
         else changed_migrations(active_revision, target_revision)
     )
-    unsafe_history = [(status, path) for status, path in changes if status != "A"]
+    unsafe_history = []
+    for status, path in changes:
+        if status == "A":
+            continue
+        if (
+            status == "M"
+            and dev_reviewed_source
+            and _reviewed_dev_downgrade(path, dev_reviewed_source)
+        ):
+            print(f"DEV-only reviewed downgrade change: {path}")
+        else:
+            unsafe_history.append((status, path))
     if unsafe_history:
         details = ", ".join(f"{status}:{path}" for status, path in unsafe_history)
         raise OnlineMigrationError(
             "applied migration history is immutable during an online rollout: " + details
         )
-    added = [path for _status, path in changes]
+    added = [path for status, path in changes if status == "A"]
     for path in added:
         if not validate_legacy_migration_compatibility(path):
             validate_added_migration(path)
@@ -890,6 +1307,7 @@ def main() -> int:
     parser.add_argument("active_revision", nargs="?")
     parser.add_argument("target_revision", nargs="?")
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--dev-reviewed-source", type=Path)
     parser.add_argument("--write-manifest", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -897,7 +1315,7 @@ def main() -> int:
         if not args.active_revision or not args.target_revision:
             raise OnlineMigrationError("active and target revisions are required")
         if args.write_manifest:
-            if args.manifest is not None or args.output is None:
+            if args.manifest is not None or args.output is None or args.dev_reviewed_source:
                 raise OnlineMigrationError("--write-manifest requires only --output")
             changes = changed_migrations(args.active_revision, args.target_revision)
             args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -921,7 +1339,10 @@ def main() -> int:
         if args.output is not None:
             raise OnlineMigrationError("--output is valid only with --write-manifest")
         migrations = check_online_migrations(
-            args.active_revision, args.target_revision, manifest=args.manifest
+            args.active_revision,
+            args.target_revision,
+            manifest=args.manifest,
+            dev_reviewed_source=args.dev_reviewed_source,
         )
     except (OSError, SyntaxError, subprocess.CalledProcessError, OnlineMigrationError) as exc:
         print(f"Online migration gate failed: {exc}")

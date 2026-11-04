@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
-import type { ApiSchemas } from '../../shared/api/types';
+import type { ApiSchemas, Exercise } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
 import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import {
@@ -19,6 +19,9 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
 import { AiAdaptationProposal } from '../ai/AiAdaptationProposal';
 import { ProgressionGuidance } from '../workouts/ProgressionGuidance';
+import { ActiveProgramPeriodization } from './ActiveProgramPeriodization';
+import { SessionRotationSettings } from './SessionRotationSettings';
+import './ProgramBuilderFocus.css';
 import { hasDecimalScale, parseDecimalDraft } from '../../shared/numeric/decimalDraft';
 import {
   blockStatusLabel,
@@ -279,6 +282,7 @@ export function AssignedProgramDetails({
   currentRevisionNumber,
   startDate,
   durationWeeks,
+  periodizationReadOnly = false,
   showAiAdaptation = false,
   workoutHistoryReturnPath,
 }: {
@@ -286,6 +290,7 @@ export function AssignedProgramDetails({
   currentRevisionNumber: number;
   startDate: string;
   durationWeeks: number;
+  periodizationReadOnly?: boolean;
   showAiAdaptation?: boolean;
   workoutHistoryReturnPath?: string;
 }) {
@@ -297,6 +302,7 @@ export function AssignedProgramDetails({
   const [editingBlock, setEditingBlock] = useState<TrainingBlock | 'new' | null>(null);
   const [historyReason, setHistoryReason] = useState('');
   const [lifecycleActionsOpen, setLifecycleActionsOpen] = useState(false);
+  const [periodizationOpen, setPeriodizationOpen] = useState(false);
   const [dismissedProposals, setDismissedProposals] = useState<Set<string>>(() => new Set());
   const [adjustedWeights, setAdjustedWeights] = useState<Record<string, string>>({});
   const returnedRevisionRef = useRef<HTMLDetailsElement>(null);
@@ -317,6 +323,11 @@ export function AssignedProgramDetails({
   const blocks = useQuery({
     queryKey: ['assigned-program', programId, 'blocks'],
     queryFn: () => api<TrainingBlock[]>(`/api/v1/programs/assigned/${programId}/blocks`),
+  });
+  const exercises = useQuery({
+    queryKey: ['exercises'],
+    queryFn: () => api<Exercise[]>('/api/v1/programs/exercises'),
+    enabled: periodizationOpen,
   });
   const progressionProposals = useQuery({
     queryKey: ['assigned-program', programId, 'progression-proposals'],
@@ -634,19 +645,26 @@ export function AssignedProgramDetails({
         />
       ) : lifecycle.data ? (
         <>
+          {canManageProgram && (
+            <SessionRotationSettings programId={programId} readOnly={periodizationReadOnly} />
+          )}
           <article className="program-lifecycle" aria-label="Жизненный цикл программы">
             <div className="program-lifecycle__summary">
               <div className="program-lifecycle__status">
                 <Badge
                   tone={
-                    lifecycle.data.status === 'active'
-                      ? 'success'
-                      : lifecycle.data.status === 'paused'
-                        ? 'warning'
-                        : 'neutral'
+                    lifecycle.data.rotation_status === 'expired'
+                      ? 'warning'
+                      : lifecycle.data.status === 'active'
+                        ? 'success'
+                        : lifecycle.data.status === 'paused'
+                          ? 'warning'
+                          : 'neutral'
                   }
                 >
-                  {programStatusLabels[lifecycle.data.status]}
+                  {lifecycle.data.rotation_status === 'expired'
+                    ? 'Ожидает продления'
+                    : programStatusLabels[lifecycle.data.status]}
                 </Badge>
                 <strong>
                   {lifecycle.data.current_week_number
@@ -656,7 +674,10 @@ export function AssignedProgramDetails({
               </div>
               <div className="program-lifecycle__next">
                 <span>Следующая тренировка</span>
-                {lifecycle.data.next_workout ? (
+                {lifecycle.data.schedule_mode === 'rotation' &&
+                lifecycle.data.rotation_current_title ? (
+                  <strong>{lifecycle.data.rotation_current_title} · по очереди</strong>
+                ) : lifecycle.data.next_workout ? (
                   <strong>
                     {lifecycle.data.next_workout.title} ·{' '}
                     {formatProgramDate(lifecycle.data.next_workout.scheduled_date)}
@@ -753,6 +774,34 @@ export function AssignedProgramDetails({
           </article>
         </>
       ) : null}
+
+      {canManageProgram && (
+        <details
+          open={periodizationOpen}
+          onToggle={(event) => setPeriodizationOpen(event.currentTarget.open)}
+        >
+          <summary className="yfc-disclosure-summary">
+            <span>Периодизация и будущие недели</span>
+            <DisclosureIcon />
+          </summary>
+          {periodizationOpen && (
+            <ActiveProgramPeriodization
+              programId={programId}
+              revision={revisionNumber}
+              duration={lifecycle.data?.duration_weeks ?? durationWeeks}
+              initialWeek={lifecycle.data?.current_week_number ?? 1}
+              exercises={exercises.data ?? []}
+              dirty={false}
+              readOnly={periodizationReadOnly}
+              onChanged={(nextRevision) => {
+                setMutationRevisionNumber(nextRevision);
+                void invalidateProgramContext();
+                toast('Будущий план обновлён');
+              }}
+            />
+          )}
+        </details>
+      )}
 
       {blocks.isLoading ? (
         <LoadingState label="Загружаем текущий этап…" />
@@ -872,6 +921,7 @@ export function AssignedProgramDetails({
                 adjustedWeights[proposal.proposal_id] ?? String(proposal.proposed_weight ?? '');
               const adjustedWeightValue = parseDecimalDraft(adjustedWeight) ?? Number.NaN;
               const alreadyApplied =
+                !proposal.proposed_side_weights &&
                 updates.length > 0 &&
                 updates.every((update) => update.current_weight === update.proposed_weight);
               return (
@@ -884,7 +934,7 @@ export function AssignedProgramDetails({
                     onApply={
                       proposal.eligibility_status === 'eligible'
                         ? () =>
-                            progressionReview.mutate({
+                            progressionReview.mutateAsync({
                               exerciseId: item.exercise_id,
                               proposalId: proposal.proposal_id,
                               workoutId: proposal.target_workout_id,
@@ -904,54 +954,56 @@ export function AssignedProgramDetails({
                       })
                     }
                   />
-                  {proposal.eligibility_status === 'eligible' && canManageProgram && (
-                    <div className="progression-proposals__adjust">
-                      <Field
-                        label="Изменить предложенный вес, кг"
-                        labelFor={`progression-adjust-${proposal.proposal_id}`}
-                        hint="Тренерское или пользовательское изменение применится к незавершённым подходам."
-                      >
-                        <Input
-                          id={`progression-adjust-${proposal.proposal_id}`}
-                          inputMode="decimal"
-                          type="text"
-                          min="0.01"
-                          max="100000"
-                          step="0.01"
-                          value={adjustedWeight}
-                          onChange={(event) =>
-                            setAdjustedWeights((current) => ({
-                              ...current,
-                              [proposal.proposal_id]: event.target.value,
-                            }))
+                  {proposal.eligibility_status === 'eligible' &&
+                    canManageProgram &&
+                    !proposal.proposed_side_weights && (
+                      <div className="progression-proposals__adjust">
+                        <Field
+                          label="Изменить предложенный вес, кг"
+                          labelFor={`progression-adjust-${proposal.proposal_id}`}
+                          hint="Тренерское или пользовательское изменение применится к незавершённым подходам."
+                        >
+                          <Input
+                            id={`progression-adjust-${proposal.proposal_id}`}
+                            inputMode="decimal"
+                            type="text"
+                            min="0.01"
+                            max="100000"
+                            step="0.01"
+                            value={adjustedWeight}
+                            onChange={(event) =>
+                              setAdjustedWeights((current) => ({
+                                ...current,
+                                [proposal.proposal_id]: event.target.value,
+                              }))
+                            }
+                          />
+                        </Field>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={
+                            progressionReview.isPending ||
+                            !Number.isFinite(adjustedWeightValue) ||
+                            adjustedWeightValue <= 0 ||
+                            !hasDecimalScale(adjustedWeight, 2)
                           }
-                        />
-                      </Field>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={
-                          progressionReview.isPending ||
-                          !Number.isFinite(adjustedWeightValue) ||
-                          adjustedWeightValue <= 0 ||
-                          !hasDecimalScale(adjustedWeight, 2)
-                        }
-                        onClick={() =>
-                          progressionReview.mutate({
-                            exerciseId: item.exercise_id,
-                            proposalId: proposal.proposal_id,
-                            workoutId: proposal.target_workout_id,
-                            decision: 'adjust',
-                            adjustedWeight: adjustedWeightValue,
-                            expectedRevisionNumber: proposal.target_revision_number,
-                            expectedSetVersions,
-                          })
-                        }
-                      >
-                        Применить изменённый вес
-                      </Button>
-                    </div>
-                  )}
+                          onClick={() =>
+                            progressionReview.mutate({
+                              exerciseId: item.exercise_id,
+                              proposalId: proposal.proposal_id,
+                              workoutId: proposal.target_workout_id,
+                              decision: 'adjust',
+                              adjustedWeight: adjustedWeightValue,
+                              expectedRevisionNumber: proposal.target_revision_number,
+                              expectedSetVersions,
+                            })
+                          }
+                        >
+                          Применить изменённый вес
+                        </Button>
+                      </div>
+                    )}
                 </article>
               );
             })}

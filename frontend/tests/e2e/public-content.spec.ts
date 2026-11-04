@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
+const pwaTest = test.extend({ serviceWorkers: 'allow' });
+
 function channelToLinear(channel: number): number {
   const normalized = channel / 255;
   return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
@@ -77,7 +79,7 @@ const publicArticleCard = {
   article_kind: 'evergreen_explainer',
   published_at: '2026-09-01T10:00:00Z',
   updated_at: '2026-09-02T10:00:00Z',
-  canonical_url: 'http://127.0.0.1:4173/articles/strength-basics',
+  canonical_url: 'https://example.test/articles/strength-basics',
 };
 
 const publicArticle = {
@@ -363,7 +365,7 @@ test('landing emits a privacy-safe acquisition event without changing the deskto
   expect(analyticsEvents.every((event) => !('url' in event))).toBe(true);
 });
 
-test('публичные страницы сохраняют hierarchy и не создают overflow', async ({ page }) => {
+test('публичные страницы сохраняют hierarchy и не создают overflow', async ({ page, baseURL }) => {
   await page.route('**/api/v1/public/exercises', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -400,11 +402,11 @@ test('публичные страницы сохраняют hierarchy и не �
       await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
       await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
         'href',
-        `http://127.0.0.1:4173${publicPage.path}`,
+        new URL(publicPage.path, baseURL).href,
       );
       await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
         'content',
-        'http://127.0.0.1:4173/assets/brand/yfc-social-preview.png',
+        new URL('/assets/brand/yfc-social-preview.png', baseURL).href,
       );
       await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
         'content',
@@ -513,7 +515,8 @@ test('related materials use one editorial measure and compact inline CTAs', asyn
   }
 });
 
-test('canonical three-day program stays useful, stateless and responsive', async ({ page }) => {
+const programTestTitle = 'canonical three-day program stays useful, stateless and responsive';
+pwaTest(programTestTitle, async ({ page, baseURL }) => {
   await page.route('**/api/v1/public/programs/full-body-3-days', async (route) => {
     await route.fulfill({
       contentType: 'application/json',
@@ -569,7 +572,7 @@ test('canonical three-day program stays useful, stateless and responsive', async
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       'href',
-      'http://127.0.0.1:4173/programs/full-body-3-days',
+      new URL('/programs/full-body-3-days', baseURL).href,
     );
     await expect(page.locator('.public-shell')).toHaveClass(
       state.colorScheme === 'dark' ? /public-shell--dark/ : /public-shell--light/,
@@ -721,6 +724,7 @@ test('mobile menu, skip link and contextual navigation work without an auth wall
 
 test('public KBJU calculator works without auth or sensitive transport and stays responsive', async ({
   page,
+  baseURL,
 }) => {
   const apiRequests: string[] = [];
   const evidenceDirectory = process.env.TASK_241B_EVIDENCE_DIR;
@@ -783,7 +787,7 @@ test('public KBJU calculator works without auth or sensitive transport and stays
     ).toEqual({
       content: viewport.width,
       viewport: viewport.width,
-      url: `http://127.0.0.1:4173/nutrition`,
+      url: new URL('/nutrition', baseURL).href,
       sensitiveStoredKeys: [],
     });
   }
@@ -791,9 +795,9 @@ test('public KBJU calculator works without auth or sensitive transport and stays
   expect(apiRequests).toEqual([]);
 });
 
-test('public 1RM calculator stays stateless, bounded and readable in light and dark themes', async ({
-  page,
-}) => {
+const calculatorTestTitle =
+  'public 1RM calculator stays stateless, bounded and readable in light and dark themes';
+pwaTest(calculatorTestTitle, async ({ page, baseURL }) => {
   const apiRequests: string[] = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/')) apiRequests.push(`${request.method()} ${request.url()}`);
@@ -868,7 +872,7 @@ test('public 1RM calculator stays stateless, bounded and readable in light and d
     expect(pageState).toMatchObject({
       content: state.width,
       viewport: state.width,
-      url: `http://127.0.0.1:4173/calculators/1rm`,
+      url: new URL('/calculators/1rm', baseURL).href,
       sensitiveStoredKeys: [],
     });
     expect(pageState.html).not.toContain('one_rm_');
@@ -1097,6 +1101,7 @@ test('bench exemplar stays readable across the public visual matrix', async ({ p
 test('campaign parameters keep one canonical URL and a fetchable social preview', async ({
   page,
   request,
+  baseURL,
 }) => {
   await page.goto(
     '/training?utm_source=telegram&utm_medium=organic_social&utm_campaign=strength_start_guide&utm_content=channel_post',
@@ -1104,16 +1109,16 @@ test('campaign parameters keep one canonical URL and a fetchable social preview'
 
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'http://127.0.0.1:4173/training',
+    new URL('/training', baseURL).href,
   );
   await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
     'content',
-    'http://127.0.0.1:4173/training',
+    new URL('/training', baseURL).href,
   );
   const socialImage = page.locator('meta[property="og:image"]');
   await expect(socialImage).toHaveAttribute(
     'content',
-    'http://127.0.0.1:4173/assets/brand/yfc-social-preview.png',
+    new URL('/assets/brand/yfc-social-preview.png', baseURL).href,
   );
   await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
     'content',

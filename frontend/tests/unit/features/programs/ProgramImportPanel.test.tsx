@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProgramImportPanel } from '../../../../src/features/programs/ProgramImportPanel';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
@@ -133,14 +134,14 @@ const previewWithAi = {
   ],
 };
 
-function renderPanel() {
+function renderPanel(props: ComponentProps<typeof ProgramImportPanel> = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <ProgramImportPanel />
+        <ProgramImportPanel {...props} />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
@@ -531,5 +532,439 @@ describe('ProgramImportPanel', () => {
     await user.keyboard('{Escape}');
     expect(picker).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Ничего не найдено')).not.toBeInTheDocument();
+  });
+
+  it('lets an imported K=3 matrix repeat to N=16 without inferring week types', async () => {
+    const matrix = {
+      ...resolvedPreview,
+      source_format: 'xlsx',
+      layout_version: 'weekly-matrix-v1',
+      draft_version: 1,
+      duration_weeks: 3,
+      assignment_duration_weeks: 3,
+      repeat: false,
+      week_types: [null, null, null],
+      week_type_candidates: [
+        { week_number: 1, week_type: 'light', source_text: 'Лёгкая', source_cell: 'C2' },
+        { week_number: 2, week_type: 'heavy', source_text: 'Тяжёлая', source_cell: 'F2' },
+        { week_number: 3, week_type: 'medium', source_text: 'Средняя', source_cell: 'I2' },
+      ],
+      rows: [1, 2, 3].map((week) => ({
+        ...resolvedPreview.rows[0],
+        row_number: week + 2,
+        week_number: week,
+        source_auxiliary: '70/72.5/75',
+        source_cells: { source_auxiliary: `C${week + 2}` },
+      })),
+    };
+    const next = {
+      ...matrix,
+      draft_version: 2,
+      assignment_duration_weeks: 16,
+      repeat: true,
+      week_types: ['light', 'heavy', 'medium'],
+    };
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/programs/imports' && init?.method === 'POST') {
+        return new Response(JSON.stringify(matrix), { status: 201 });
+      }
+      if (path === '/api/v1/programs/exercises' || path === '/api/v1/programs/imports/targets') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (path.endsWith('/resolve')) {
+        return new Response(JSON.stringify(next), { status: 200 });
+      }
+      if (path.endsWith('/confirm')) {
+        return new Response(
+          JSON.stringify({
+            import_id: 'import-1',
+            template: { id: 501 },
+            workouts_created: 0,
+            workouts_updated: 0,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
+      target: { files: [new File(['xlsx'], 'matrix.xlsx')] },
+    });
+    expect(await screen.findByText('Исходных недель: 3')).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox', { name: /Тип исходной недели/ })).toHaveLength(3);
+    expect(screen.getByRole('combobox', { name: 'Тип исходной недели 1' })).toHaveValue('');
+
+    fireEvent.change(screen.getByLabelText('Всего недель программы'), {
+      target: { value: '16' },
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('включите повтор');
+    fireEvent.click(
+      screen.getByRole('checkbox', {
+        name: 'Повторять исходные недели до конца срока',
+      }),
+    );
+    expect(screen.getByText('Неделя 16 → исходная 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Принять текстовые подсказки' }));
+    expect(screen.getByRole('combobox', { name: 'Тип исходной недели 2' })).toHaveValue('heavy');
+    const confirmButton = screen.getByRole('button', { name: 'Подтвердить и сохранить шаблон' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Применить исправления' }));
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    const requests = vi.mocked(globalThis.fetch).mock.calls;
+    const resolve = requests.find(([input]) => String(input).endsWith('/resolve'));
+    expect(JSON.parse(String(resolve?.[1]?.body))).toMatchObject({
+      expected_draft_version: 1,
+      assignment_duration_weeks: 16,
+      repeat: true,
+      week_types: ['light', 'heavy', 'medium'],
+    });
+    fireEvent.click(confirmButton);
+    await waitFor(() =>
+      expect(screen.getByText('Программа импортирована в личные шаблоны')).toBeInTheDocument(),
+    );
+    const confirm = requests.find(([input]) => String(input).endsWith('/confirm'));
+    expect(JSON.parse(String(confirm?.[1]?.body))).toMatchObject({ expected_draft_version: 2 });
+  });
+
+  it('requires explicit correction before treating auxiliary XLSX values as planned loads', async () => {
+    const matrix = {
+      ...resolvedPreview,
+      source_format: 'xlsx',
+      layout_version: 'weekly-matrix-v1',
+      draft_version: 1,
+      duration_weeks: 1,
+      assignment_duration_weeks: 1,
+      repeat: false,
+      week_types: [null],
+      week_type_candidates: [],
+      rows: [
+        {
+          ...resolvedPreview.rows[0],
+          source_auxiliary: '70/72.5/75',
+          source_cells: { source_auxiliary: 'C3' },
+        },
+      ],
+    };
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/programs/imports' && init?.method === 'POST') {
+        return new Response(JSON.stringify(matrix), { status: 201 });
+      }
+      if (path === '/api/v1/programs/exercises' || path === '/api/v1/programs/imports/targets') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (path.endsWith('/resolve')) {
+        return new Response(
+          JSON.stringify({
+            ...matrix,
+            draft_version: 2,
+            rows: [
+              {
+                ...matrix.rows[0],
+                manual_planned_loads: '70/72.5/75',
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    renderPanel();
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
+      target: { files: [new File(['xlsx'], 'matrix.xlsx')] },
+    });
+    await screen.findByText('Исходных недель: 1');
+    expect(screen.getByText(/не считается плановым весом без подтверждения/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Исправить назначение'));
+    const weights = screen.getByLabelText('Плановые веса, кг');
+    expect(weights).toHaveValue('');
+    fireEvent.change(weights, { target: { value: '70/72.5/75' } });
+    expect(screen.getByRole('button', { name: 'Подтвердить и сохранить шаблон' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Применить исправления' }));
+    await waitFor(() => {
+      const resolve = vi
+        .mocked(globalThis.fetch)
+        .mock.calls.find(([input]) => String(input).endsWith('/resolve'));
+      expect(JSON.parse(String(resolve?.[1]?.body))).toMatchObject({
+        expected_draft_version: 1,
+        rows: [{ row_number: 3, planned_loads: '70/72.5/75' }],
+      });
+    });
+  });
+});
+
+describe('личный импорт и назначение', () => {
+  const template = {
+    id: 501,
+    title: 'Моя программа',
+    default_duration_weeks: 1,
+    program_metadata: {},
+    days: [{ title: 'Силовая 1', exercises: [] }],
+  };
+  const warning = {
+    code: 'external_link',
+    severity: 'warning',
+    message: 'Внешние ссылки не импортируются',
+    location: 'Файл',
+  };
+  const ready = {
+    ...resolvedPreview,
+    issues: [warning],
+    summary: { ...resolvedPreview.summary, warning_count: 1 },
+  };
+  let active: object[];
+  let assignRequests: unknown[];
+  let confirmCount: number;
+  let assignmentBehavior: 'success' | 'conflict' | 'network';
+
+  beforeEach(() => {
+    sessionStorage.removeItem('program-import-confirmation-v1');
+    active = [];
+    assignRequests = [];
+    confirmCount = 0;
+    assignmentBehavior = 'success';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+      if (path === '/api/v1/programs/imports' && init?.method === 'POST') return json(ready, 201);
+      if (path === '/api/v1/programs/exercises' || path === '/api/v1/programs/imports/targets')
+        return json([]);
+      if (path === '/api/v1/programs/templates/mine') return json(active);
+      if (path === '/api/v1/programs/templates/501') return json(template);
+      if (path === '/api/v1/programs/imports/import-1' && !init?.method)
+        return json({
+          ...ready,
+          status: 'confirmed',
+          confirmed_template_id: 501,
+          self_assigned_program_id: null,
+        });
+      if (path.endsWith('/confirm')) {
+        confirmCount += 1;
+        return json({
+          import_id: 'import-1',
+          template,
+          assigned_program_id: null,
+          target_user: { id: 1 },
+        });
+      }
+      if (path.endsWith('/assign-to-me')) {
+        assignRequests.push(JSON.parse(String(init?.body)));
+        if (assignmentBehavior === 'network') throw new TypeError('offline');
+        if (assignmentBehavior === 'conflict')
+          return json(
+            {
+              detail: {
+                code: 'active_program_conflict',
+                message: 'Программа изменилась. Проверьте выбор',
+              },
+            },
+            409,
+          );
+        return json({
+          user_program_id: 804,
+          status: 'scheduled',
+          start_date: '2026-11-04',
+          duration_weeks: 4,
+        });
+      }
+      return json({ detail: `Unexpected request: ${path}` }, 500);
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    sessionStorage.removeItem('program-import-confirmation-v1');
+    vi.restoreAllMocks();
+  });
+
+  async function uploadReady() {
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
+      target: { files: [new File(['test'], 'test.csv', { type: 'text/csv' })] },
+    });
+    await screen.findByRole('button', { name: 'Сохранить и назначить' });
+  }
+
+  function renderPersonal(onOpenProgram = vi.fn()) {
+    const onOpenTemplates = vi.fn();
+    renderPanel({
+      allowSelfAssignment: true,
+      defaultStartDate: '2026-11-03',
+      onOpenProgram,
+      onOpenTemplates,
+    });
+    return { onOpenProgram, onOpenTemplates };
+  }
+
+  it('сохраняет без назначения и показывает предупреждение без блокировки', async () => {
+    const { onOpenTemplates } = renderPersonal();
+    await uploadReady();
+    expect(screen.getByText('Особенности импорта')).toBeInTheDocument();
+    expect(screen.queryByText('Сначала проверьте найденные проблемы')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Сохранить и назначить' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить шаблон' }));
+    expect(await screen.findByRole('heading', { name: 'Шаблон сохранён' })).toBeInTheDocument();
+    expect(screen.getByText('Моя программа')).toBeInTheDocument();
+    expect(assignRequests).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть в моих шаблонах' }));
+    expect(onOpenTemplates).toHaveBeenCalledOnce();
+  });
+
+  it('назначает с выбранным расписанием и открывает подтверждённый id', async () => {
+    const { onOpenProgram } = renderPersonal();
+    await uploadReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и назначить' }));
+    const dialog = screen.getByRole('dialog', { name: 'Моя программа' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить и назначить' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Программа запланирована' }),
+    ).toBeInTheDocument();
+    expect(confirmCount).toBe(1);
+    expect(assignRequests).toEqual([
+      expect.objectContaining({
+        start_date: '2026-11-03',
+        replace_active: false,
+        expected_active_program_id: null,
+      }),
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть программу' }));
+    expect(onOpenProgram).toHaveBeenCalledWith(804);
+  });
+
+  it('отмена замены сохраняет предпросмотр и не делает записывающих запросов', async () => {
+    active = [
+      {
+        title: 'Старая программа',
+        is_active_for_current_user: true,
+        assigned_program_id: 77,
+        current_revision_number: 3,
+      },
+    ];
+    renderPersonal();
+    await uploadReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и назначить' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Моя программа' })).getByRole('button', {
+        name: 'Сохранить и назначить',
+      }),
+    );
+    const confirmation = await screen.findByRole('dialog', {
+      name: 'Заменить активную программу?',
+    });
+    expect(screen.queryByRole('dialog', { name: 'Моя программа' })).not.toBeInTheDocument();
+    expect(within(confirmation).getByText(/Старая программа/)).toHaveTextContent('Моя программа');
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('dialog', { name: 'Моя программа' })).getByRole('button', {
+          name: 'Сохранить и назначить',
+        }),
+      ).toBeEnabled(),
+    );
+    expect(confirmCount).toBe(0);
+    expect(assignRequests).toHaveLength(0);
+  });
+
+  it('после 409 повторяет только назначение сохранённого шаблона', async () => {
+    assignmentBehavior = 'conflict';
+    renderPersonal();
+    await uploadReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и назначить' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Моя программа' })).getByRole('button', {
+        name: 'Сохранить и назначить',
+      }),
+    );
+    await screen.findByRole('heading', { name: 'Данные программы изменились' });
+    assignmentBehavior = 'success';
+    fireEvent.click(screen.getByRole('button', { name: 'Обновить данные' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Моя программа' })).getByRole('button', {
+        name: 'Назначить программу',
+      }),
+    );
+    await screen.findByRole('heading', { name: 'Программа запланирована' });
+    expect(confirmCount).toBe(1);
+    expect(assignRequests).toHaveLength(2);
+  });
+
+  it('показывает ошибку проверки текущей программы и сохраняет предпросмотр', async () => {
+    const original = vi.mocked(globalThis.fetch).getMockImplementation();
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      if (String(input) === '/api/v1/programs/templates/mine') throw new TypeError('offline');
+      return original!(input, init);
+    });
+    renderPersonal();
+    await uploadReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и назначить' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Моя программа' })).getByRole('button', {
+        name: 'Сохранить и назначить',
+      }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Нет соединения с сервером');
+    expect(screen.queryByRole('dialog', { name: 'Моя программа' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Проверьте план перед сохранением' }),
+    ).toBeInTheDocument();
+    expect(confirmCount).toBe(0);
+  });
+
+  it('после потери ответа и перезагрузки повторяет точный запрос без повторного сохранения', async () => {
+    assignmentBehavior = 'network';
+    renderPersonal();
+    await uploadReady();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить и назначить' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Моя программа' })).getByRole('button', {
+        name: 'Сохранить и назначить',
+      }),
+    );
+    await screen.findByRole('heading', { name: 'Результат назначения пока неизвестен' });
+    expect(screen.getByRole('button', { name: 'Открыть в моих шаблонах' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Импортировать другую программу' })).toBeEnabled();
+    cleanup();
+    assignmentBehavior = 'success';
+    renderPersonal();
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить результат' }));
+    await screen.findByRole('heading', { name: 'Программа запланирована' });
+    expect(confirmCount).toBe(1);
+    expect(assignRequests).toHaveLength(2);
+    expect(assignRequests[1]).toEqual(assignRequests[0]);
+  });
+
+  it('не называет архивное назначение активным при восстановлении', async () => {
+    sessionStorage.setItem(
+      'program-import-confirmation-v1',
+      JSON.stringify({ id: 'import-1', intent: 'assign' }),
+    );
+    vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+      const path = String(input);
+      if (path === '/api/v1/programs/imports/import-1')
+        return new Response(
+          JSON.stringify({
+            ...ready,
+            status: 'confirmed',
+            confirmed_template_id: 501,
+            self_assigned_program_id: 804,
+          }),
+          { status: 200 },
+        );
+      if (path === '/api/v1/programs/templates/501')
+        return new Response(JSON.stringify(template), { status: 200 });
+      if (path === '/api/v1/programs/assigned/804/lifecycle')
+        return new Response(JSON.stringify({ status: 'archived', start_date: '2026-11-03' }), {
+          status: 200,
+        });
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    renderPersonal();
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить результат' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Назначение было создано' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Программа назначена' })).not.toBeInTheDocument();
   });
 });

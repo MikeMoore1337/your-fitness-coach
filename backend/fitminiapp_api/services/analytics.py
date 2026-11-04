@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import timedelta
+from datetime import date, timedelta
+from typing import Literal
 
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, joinedload
@@ -15,18 +16,33 @@ from fitminiapp_api.models.exercise import (
     Muscle,
 )
 from fitminiapp_api.models.program import (
+    ProgramRevision,
     UserProgram,
     UserWorkout,
     UserWorkoutExercise,
     UserWorkoutSet,
+    UserWorkoutSetSide,
 )
 from fitminiapp_api.models.user import BodyMeasurement, User
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.services.data_quality import (
     build_training_data_sufficiency,
     collect_training_data_counts,
 )
 from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
 from fitminiapp_api.services.period_bounds import MAX_REPORT_DAYS, resolve_progress_bounds
+from fitminiapp_api.services.program_versioning import workout_cycle_week_type
+from fitminiapp_api.services.workout_ownership import workout_owner_id
+from fitminiapp_api.services.workout_sides import (
+    SIDE_MODES,
+    completed_set_volume,
+    serialize_side_results,
+    serialize_sides,
+    sql_common_rir,
+    sql_completed_set_reps,
+    sql_completed_set_volume,
+    sql_side_rir_count,
+)
 from fitminiapp_api.services.workouts import (
     counts_toward_working_volume,
     is_pr_record_set,
@@ -38,7 +54,7 @@ from fitminiapp_api.services.workouts import (
 def _completed_set_volume(workout_set) -> float:
     if not workout_set.is_completed or not counts_toward_working_volume(workout_set):
         return 0.0
-    return float((workout_set.actual_reps or 0) * (workout_set.actual_weight or 0))
+    return float(completed_set_volume(workout_set) or 0)
 
 
 def _load_workouts(
@@ -49,13 +65,17 @@ def _load_workouts(
 ) -> list[UserWorkout]:
     query = (
         db.query(UserWorkout)
-        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .options(
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
+            joinedload(UserWorkout.exercises)
+            .joinedload(UserWorkoutExercise.sets)
+            .joinedload(UserWorkoutSet.side_results),
         )
     )
-    filters = [UserProgram.user_id == user.id]
+    filters = [workout_owner_id() == user.id]
     if workout_id is not None:
         filters.append(UserWorkout.id == workout_id)
     return (
@@ -71,17 +91,24 @@ def build_user_progress(db: Session, user: User) -> dict:
     due_workouts = [
         workout
         for workout in workouts
-        if workout.scheduled_date <= today and workout.status != "cancelled"
+        if workout.user_program_id is not None
+        and workout.scheduled_date <= today
+        and workout.status != "cancelled"
     ]
-    completed = [workout for workout in due_workouts if workout.status == "completed"]
+    scheduled_completed = [workout for workout in due_workouts if workout.status == "completed"]
+    completed = [
+        workout
+        for workout in workouts
+        if workout.scheduled_date <= today and workout.status == "completed"
+    ]
     skipped = [workout for workout in due_workouts if workout.status == "skipped"]
     missed = [
         workout
         for workout in due_workouts
         if workout.status in {"planned", "in_progress"} and workout.scheduled_date < today
     ]
-    adherence_base = len(completed) + len(skipped) + len(missed)
-    adherence = round(len(completed) * 100 / adherence_base, 1) if adherence_base else 0.0
+    adherence_base = len(scheduled_completed) + len(skipped) + len(missed)
+    adherence = round(len(scheduled_completed) * 100 / adherence_base, 1) if adherence_base else 0.0
 
     streak = 0
     for workout in reversed(due_workouts):
@@ -129,23 +156,48 @@ def build_user_progress(db: Session, user: User) -> dict:
                     else f"Упражнение {exercise.exercise_id}"
                 )
             )
-            record = records.setdefault(
-                exercise.exercise_id,
-                {
-                    "exercise_id": exercise.exercise_id,
-                    "exercise_title": exercise_title,
-                    "max_weight_kg": None,
-                    "best_set_volume_kg": 0.0,
-                    "last_performed_on": workout.scheduled_date,
-                },
+            has_side_set = any(item.execution_mode in SIDE_MODES for item in exercise.sets)
+            has_scalar_record = any(
+                item.execution_mode not in SIDE_MODES
+                and item.is_completed
+                and is_pr_record_set(item)
+                and (item.actual_weight is not None or item.actual_reps is not None)
+                for item in exercise.sets
             )
-            record["last_performed_on"] = max(record["last_performed_on"], workout.scheduled_date)
+            record = (
+                records.setdefault(
+                    exercise.exercise_id,
+                    {
+                        "exercise_id": exercise.exercise_id,
+                        "exercise_title": exercise_title,
+                        "max_weight_kg": None,
+                        "best_set_volume_kg": 0.0,
+                        "last_performed_on": workout.scheduled_date,
+                    },
+                )
+                if not has_side_set or has_scalar_record
+                else None
+            )
+            if record is not None:
+                record["last_performed_on"] = max(
+                    record["last_performed_on"], workout.scheduled_date
+                )
             for workout_set in exercise.sets:
                 volume = _completed_set_volume(workout_set)
                 weekly[week_start]["volume_kg"] += volume
-                record["best_set_volume_kg"] = max(record["best_set_volume_kg"], volume)
                 if (
                     workout_set.is_completed
+                    and workout_set.execution_mode in SIDE_MODES
+                    and counts_toward_working_volume(workout_set)
+                    and completed_set_volume(workout_set) is None
+                ):
+                    weekly[week_start]["volume_incomplete"] = True
+                if record is not None and workout_set.execution_mode not in SIDE_MODES:
+                    record["best_set_volume_kg"] = max(record["best_set_volume_kg"], volume)
+                if (
+                    record is not None
+                    and workout_set.execution_mode not in SIDE_MODES
+                    and workout_set.is_completed
                     and is_pr_record_set(workout_set)
                     and workout_set.actual_weight is not None
                 ):
@@ -156,7 +208,7 @@ def build_user_progress(db: Session, user: User) -> dict:
                     )
 
     return {
-        "workouts_total": len(due_workouts),
+        "workouts_total": len(due_workouts) + sum(w.user_program_id is None for w in completed),
         "workouts_completed": len(completed),
         "workouts_skipped": len(skipped),
         "workouts_missed": len(missed),
@@ -169,6 +221,7 @@ def build_user_progress(db: Session, user: User) -> dict:
                 "week_start": week_start,
                 "completed_workouts": values["completed_workouts"],
                 "volume_kg": round(values["volume_kg"], 2),
+                "volume_incomplete": values.get("volume_incomplete"),
             }
             for week_start, values in sorted(weekly.items())
         ],
@@ -183,41 +236,62 @@ def build_user_progress(db: Session, user: User) -> dict:
 RIR_VALUES = ("0", "1", "2", "3", "4+")
 
 
-def _period_exercise_aggregates(db: Session, user: User, period_start, period_end) -> list:
-    set_volume = UserWorkoutSet.actual_reps * UserWorkoutSet.actual_weight
-    return (
+def _period_exercise_aggregates(
+    db: Session, user: User, period_start, period_end, *, workout_ids: list[int] | None = None
+) -> list:
+    set_reps = sql_completed_set_reps()
+    set_volume = sql_completed_set_volume()
+    common_rir = sql_common_rir()
+    query = (
         db.query(
             UserWorkoutExercise.exercise_id.label("exercise_id"),
             func.count(func.distinct(UserWorkoutExercise.id)).label("performed_session_count"),
             func.count(UserWorkoutSet.id).label("completed_set_count"),
             func.min(UserWorkout.scheduled_date).label("first_performed_on"),
             func.max(UserWorkout.scheduled_date).label("last_performed_on"),
-            func.sum(UserWorkoutSet.actual_reps).label("reps_total"),
-            func.count(UserWorkoutSet.actual_reps).label("reps_recorded_sets"),
+            func.sum(set_reps).label("reps_total"),
+            func.count(set_reps).label("reps_recorded_sets"),
             func.max(UserWorkoutSet.actual_weight).label("max_external_load_kg"),
-            func.max(set_volume).label("best_set_volume_kg"),
+            func.max(UserWorkoutSet.actual_reps * UserWorkoutSet.actual_weight).label(
+                "best_set_volume_kg"
+            ),
             func.sum(set_volume).label("external_load_volume_kg"),
             func.count(set_volume).label("volume_recorded_sets"),
-            func.sum(case((UserWorkoutSet.rir == "0", 1), else_=0)).label("rir_0"),
-            func.sum(case((UserWorkoutSet.rir == "1", 1), else_=0)).label("rir_1"),
-            func.sum(case((UserWorkoutSet.rir == "2", 1), else_=0)).label("rir_2"),
-            func.sum(case((UserWorkoutSet.rir == "3", 1), else_=0)).label("rir_3"),
-            func.sum(case((UserWorkoutSet.rir == "4+", 1), else_=0)).label("rir_4_plus"),
+            func.sum(case((common_rir == "0", 1), else_=0)).label("rir_0"),
+            func.sum(case((common_rir == "1", 1), else_=0)).label("rir_1"),
+            func.sum(case((common_rir == "2", 1), else_=0)).label("rir_2"),
+            func.sum(case((common_rir == "3", 1), else_=0)).label("rir_3"),
+            func.sum(case((common_rir == "4+", 1), else_=0)).label("rir_4_plus"),
+            func.sum(
+                case(
+                    (
+                        and_(
+                            UserWorkoutSet.execution_mode.in_(SIDE_MODES),
+                            sql_side_rir_count() == 2,
+                            common_rir.is_(None),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("rir_mixed"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
             UserWorkoutSet.is_completed.is_(True),
             working_volume_set_filter(),
         )
-        .group_by(UserWorkoutExercise.exercise_id)
-        .all()
     )
+    if workout_ids is not None:
+        query = query.filter(UserWorkout.id.in_(workout_ids))
+    return query.group_by(UserWorkoutExercise.exercise_id).all()
 
 
 def _period_exercise_session_aggregates(
@@ -236,12 +310,13 @@ def _period_exercise_session_aggregates(
             UserWorkout.scheduled_date.label("performed_on"),
             func.count(UserWorkoutSet.id).label("completed_set_count"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
             UserWorkoutSet.is_completed.is_(True),
@@ -260,10 +335,11 @@ def _period_exercise_session_aggregates(
 def _completed_workout_dates(db: Session, user: User, period_start, period_end) -> list:
     return (
         db.query(UserWorkout.scheduled_date)
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
         )
@@ -278,33 +354,37 @@ def _bounded_exercise_history(
     period_start,
     period_end,
     history_limit: int,
+    *,
+    workout_ids: list[int] | None = None,
 ) -> list:
-    performed = (
+    performed_query = (
         db.query(
             UserWorkoutExercise.id.label("workout_exercise_id"),
             UserWorkoutExercise.exercise_id.label("exercise_id"),
             UserWorkout.id.label("workout_id"),
             UserWorkout.scheduled_date.label("performed_on"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .join(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .join(UserWorkoutSet, UserWorkoutSet.workout_exercise_id == UserWorkoutExercise.id)
         .filter(
-            UserProgram.user_id == user.id,
+            workout_owner_id() == user.id,
             UserWorkout.status == "completed",
             UserWorkout.scheduled_date.between(period_start, period_end),
             UserWorkoutSet.is_completed.is_(True),
             working_volume_set_filter(),
         )
-        .group_by(
-            UserWorkoutExercise.id,
-            UserWorkoutExercise.exercise_id,
-            UserWorkout.id,
-            UserWorkout.scheduled_date,
-        )
-        .subquery()
     )
+    if workout_ids is not None:
+        performed_query = performed_query.filter(UserWorkout.id.in_(workout_ids))
+    performed = performed_query.group_by(
+        UserWorkoutExercise.id,
+        UserWorkoutExercise.exercise_id,
+        UserWorkout.id,
+        UserWorkout.scheduled_date,
+    ).subquery()
     ranked = db.query(
         performed,
         func.row_number()
@@ -324,9 +404,13 @@ def _bounded_exercise_history(
             ranked.c.workout_id,
             ranked.c.workout_exercise_id,
             ranked.c.performed_on,
+            UserWorkoutSet.id.label("set_id"),
+            UserWorkoutSet.execution_mode,
+            UserWorkoutSet.first_side,
             UserWorkoutSet.set_number,
-            UserWorkoutSet.actual_reps,
+            sql_completed_set_reps().label("actual_reps"),
             UserWorkoutSet.actual_weight,
+            sql_completed_set_volume().label("set_volume"),
             UserWorkoutSet.rir,
             UserWorkoutSet.set_kind,
             UserWorkoutSet.reached_failure,
@@ -418,7 +502,19 @@ def _exercise_metadata(db: Session, user: User, exercise_ids: set[int]) -> dict[
     }
 
 
-def _serialize_training_session(rows: list) -> dict:
+def _history_sides(db: Session, rows: list) -> dict[int, list[UserWorkoutSetSide]]:
+    side_set_ids = [row.set_id for row in rows if row.execution_mode in SIDE_MODES]
+    if not side_set_ids:
+        return {}
+    result: dict[int, list[UserWorkoutSetSide]] = defaultdict(list)
+    for side in db.query(UserWorkoutSetSide).filter(
+        UserWorkoutSetSide.workout_set_id.in_(side_set_ids)
+    ):
+        result[side.workout_set_id].append(side)
+    return result
+
+
+def _serialize_training_session(rows: list, sides: dict[int, list[UserWorkoutSetSide]]) -> dict:
     sets: list[dict] = []
     reps_total = 0
     reps_recorded_sets = 0
@@ -428,9 +524,7 @@ def _serialize_training_session(rows: list) -> dict:
     for row in rows:
         reps = row.actual_reps
         external_load = float(row.actual_weight) if row.actual_weight is not None else None
-        set_volume = (
-            float(reps) * external_load if reps is not None and external_load is not None else None
-        )
+        set_volume = float(row.set_volume) if row.set_volume is not None else None
         if reps is not None:
             reps_total += reps
             reps_recorded_sets += 1
@@ -452,6 +546,14 @@ def _serialize_training_session(rows: list) -> dict:
             "set_kind": row.set_kind,
             "reached_failure": row.reached_failure,
         }
+        if row.execution_mode in SIDE_MODES:
+            serialized.update(
+                {
+                    "execution_mode": row.execution_mode,
+                    "first_side": row.first_side,
+                    "sides": serialize_side_results(sides.get(row.set_id, [])),
+                }
+            )
         if row.planned_role is not None:
             serialized.update(
                 {
@@ -475,6 +577,128 @@ def _serialize_training_session(rows: list) -> dict:
         ),
         "volume_recorded_sets": volume_recorded_sets,
         "sets": sets,
+    }
+
+
+def build_week_type_training_analytics(
+    db: Session,
+    user: User,
+    period_start: date,
+    period_end: date,
+    *,
+    week_type: Literal["light", "medium", "heavy"],
+    exercise_history_limit: int,
+) -> dict:
+    workouts = (
+        db.query(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
+        .options(joinedload(UserWorkout.user_program))
+        .filter(
+            workout_owner_id() == user.id,
+            UserWorkout.status == "completed",
+            UserWorkout.scheduled_date.between(period_start, period_end),
+        )
+        .all()
+    )
+    program_ids = {item.user_program_id for item in workouts if item.user_program_id is not None}
+    revisions_by_program: dict[int, list[ProgramRevision]] = defaultdict(list)
+    if program_ids:
+        revisions = (
+            db.query(ProgramRevision)
+            .filter(ProgramRevision.user_program_id.in_(program_ids))
+            .order_by(ProgramRevision.user_program_id, ProgramRevision.revision_number)
+            .all()
+        )
+        for revision in revisions:
+            revisions_by_program[revision.user_program_id].append(revision)
+    selected_ids = []
+    untyped = unknown = 0
+    for workout in workouts:
+        if workout.user_program_id is None:
+            untyped += 1
+            continue
+        actual_type, known = workout_cycle_week_type(
+            db, workout, revisions_by_program[workout.user_program_id]
+        )
+        if not known:
+            unknown += 1
+        elif actual_type is None:
+            untyped += 1
+        elif actual_type == week_type:
+            selected_ids.append(workout.id)
+
+    aggregates = _period_exercise_aggregates(
+        db, user, period_start, period_end, workout_ids=selected_ids
+    )
+    history = _bounded_exercise_history(
+        db, user, period_start, period_end, exercise_history_limit, workout_ids=selected_ids
+    )
+    sides = _history_sides(db, history)
+    metadata = _exercise_metadata(db, user, {row.exercise_id for row in aggregates})
+    history_groups: dict[tuple[int, int], list] = defaultdict(list)
+    for row in history:
+        history_groups[(row.exercise_id, row.workout_exercise_id)].append(row)
+    sessions: dict[int, list[dict]] = defaultdict(list)
+    for (exercise_id, _), rows in history_groups.items():
+        sessions[exercise_id].append(_serialize_training_session(rows, sides))
+    exercises = []
+    for row in aggregates:
+        details = metadata.get(row.exercise_id, {})
+        exercise_sessions = sessions[row.exercise_id]
+        exercise_sessions.sort(
+            key=lambda item: (
+                item["performed_on"],
+                item["workout_id"],
+                item["workout_exercise_id"],
+            ),
+            reverse=True,
+        )
+        exercises.append(
+            {
+                "exercise_id": row.exercise_id,
+                "exercise_title": details.get("title", f"Упражнение {row.exercise_id}"),
+                "uses_bodyweight_equipment": "bodyweight" in details.get("equipment", set()),
+                "performed_session_count": row.performed_session_count,
+                "completed_set_count": row.completed_set_count,
+                "first_performed_on": row.first_performed_on,
+                "last_performed_on": row.last_performed_on,
+                "reps_total": int(row.reps_total) if row.reps_total is not None else None,
+                "reps_recorded_sets": row.reps_recorded_sets,
+                "max_external_load_kg": float(row.max_external_load_kg)
+                if row.max_external_load_kg is not None
+                else None,
+                "best_set_volume_kg": round(float(row.best_set_volume_kg), 2)
+                if row.best_set_volume_kg is not None
+                else None,
+                "external_load_volume_kg": round(float(row.external_load_volume_kg), 2)
+                if row.external_load_volume_kg is not None
+                else None,
+                "volume_recorded_sets": row.volume_recorded_sets,
+                "history_truncated": row.performed_session_count > len(exercise_sessions),
+                "sessions": exercise_sessions,
+            }
+        )
+    exercises.sort(
+        key=lambda item: (item["last_performed_on"], item["exercise_title"]), reverse=True
+    )
+    volume_count = sum(row.volume_recorded_sets for row in aggregates)
+    return {
+        "week_type": week_type,
+        "period_start": period_start,
+        "period_end": period_end,
+        "exercise_history_limit": exercise_history_limit,
+        "completed_workout_count": len(selected_ids),
+        "completed_set_count": sum(row.completed_set_count for row in aggregates),
+        "external_load_volume_kg": round(
+            sum(float(row.external_load_volume_kg or 0) for row in aggregates), 2
+        )
+        if volume_count
+        else None,
+        "volume_recorded_sets": volume_count,
+        "untyped_workout_count": untyped,
+        "unknown_type_workout_count": unknown,
+        "exercises": exercises,
     }
 
 
@@ -561,11 +785,12 @@ def _build_training_analytics(
     metadata = _exercise_metadata(db, user, exercise_ids)
 
     history_groups: dict[tuple[int, int], list] = defaultdict(list)
+    sides = _history_sides(db, history_rows)
     for row in history_rows:
         history_groups[(row.exercise_id, row.workout_exercise_id)].append(row)
     sessions_by_exercise: dict[int, list[dict]] = defaultdict(list)
     for (exercise_id, _workout_exercise_id), rows in history_groups.items():
-        sessions_by_exercise[exercise_id].append(_serialize_training_session(rows))
+        sessions_by_exercise[exercise_id].append(_serialize_training_session(rows, sides))
 
     workload_buckets: dict[tuple[str, str], dict[str, dict | None]] = {}
     workload_contributors: dict[tuple[str, str], dict[int, dict]] = defaultdict(dict)
@@ -670,7 +895,8 @@ def _build_training_analytics(
     completed_set_count = sum(row.completed_set_count for row in aggregates)
     reps_recorded_sets = sum(row.reps_recorded_sets for row in aggregates)
     volume_recorded_sets = sum(row.volume_recorded_sets for row in aggregates)
-    rir_recorded_sets = sum(rir_distribution.values())
+    rir_mixed_sets = sum(int(row.rir_mixed or 0) for row in aggregates)
+    rir_recorded_sets = sum(rir_distribution.values()) + rir_mixed_sets
 
     def workload_period_payload(values: dict | None) -> dict | None:
         if values is None:
@@ -801,6 +1027,7 @@ def _build_training_analytics(
             "completed_set_count": completed_set_count,
             "recorded_set_count": rir_recorded_sets,
             "missing_set_count": completed_set_count - rir_recorded_sets,
+            "mixed_side_set_count": rir_mixed_sets,
             "distribution": [
                 {"value": value, "completed_set_count": rir_distribution[value]}
                 for value in RIR_VALUES
@@ -827,13 +1054,21 @@ def build_workout_timeline(
     for workout in workouts:
         completed_sets = 0
         volume = 0.0
+        volume_incomplete = False
         exercises: list[dict] = []
         for exercise in sorted(workout.exercises, key=lambda item: item.sort_order):
             sets = []
             for workout_set in sorted(exercise.sets, key=lambda item: item.set_number):
                 completed_sets += int(workout_set.is_completed)
                 volume += _completed_set_volume(workout_set)
-                serialized_set = {
+                if (
+                    workout_set.is_completed
+                    and workout_set.execution_mode in SIDE_MODES
+                    and counts_toward_working_volume(workout_set)
+                    and completed_set_volume(workout_set) is None
+                ):
+                    volume_incomplete = True
+                serialized_set: dict[str, object] = {
                     "set_number": workout_set.set_number,
                     "actual_reps": workout_set.actual_reps,
                     "actual_weight": workout_set.actual_weight,
@@ -842,6 +1077,14 @@ def build_workout_timeline(
                     "reached_failure": workout_set.reached_failure,
                     "is_completed": workout_set.is_completed,
                 }
+                if workout_set.execution_mode in SIDE_MODES:
+                    serialized_set.update(
+                        {
+                            "execution_mode": workout_set.execution_mode,
+                            "first_side": workout_set.first_side,
+                            "sides": serialize_sides(workout_set),
+                        }
+                    )
                 if workout_set.planned_role is not None:
                     serialized_set.update(
                         {
@@ -879,6 +1122,7 @@ def build_workout_timeline(
                 "completed_at": workout.completed_at,
                 "completed_sets": completed_sets,
                 "volume_kg": round(volume, 2),
+                "volume_incomplete": volume_incomplete or None,
                 "completion_feedback": workout.completion_feedback,
                 "completion_note": workout.completion_note,
                 "exercises": exercises,

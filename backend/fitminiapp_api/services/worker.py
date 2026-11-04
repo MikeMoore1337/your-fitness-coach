@@ -70,6 +70,7 @@ from fitminiapp_api.services.weekly_digest import (
     mark_digest_delivery_succeeded,
     prune_weekly_digest,
 )
+from fitminiapp_api.services.workout_history_import import expire_history_import_drafts
 
 logger = logging.getLogger(__name__)
 TELEGRAM_DELIVERY_RATE_PER_SECOND = 20
@@ -677,6 +678,7 @@ async def run_once(*, sync_reminders: bool = True) -> None:
     with get_session_context() as db:
         prune_account_exports(db)
         expire_program_imports(db)
+        expire_history_import_drafts(db)
         if sync_reminders:
             prune_audit_events(db, retention_days=settings.audit_event_retention_days)
             prune_lifecycle_milestones(

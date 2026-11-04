@@ -1,8 +1,33 @@
+from types import SimpleNamespace
+
 from fitminiapp_api.core.timezone import today_msk
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.program import ProgramRevision, UserProgram
 from fitminiapp_api.models.user import CoachClient, User
+from fitminiapp_api.services.coach_program_rollout import _target_preview
+
+
+def test_rollout_with_missing_planned_week_requires_manual_review():
+    workout = SimpleNamespace(
+        week_number=None, day_number=1, status="planned", scheduled_date=today_msk()
+    )
+    program = SimpleNamespace(id=1, current_revision_number=1, duration_weeks=1, workouts=[workout])
+    template = SimpleNamespace(
+        effective_duration_weeks=1, days=[SimpleNamespace(day_number=1, exercises=[])]
+    )
+
+    result = _target_preview(
+        client=User(id=1),
+        client_name="Test",
+        program=program,
+        template=template,
+        visible_exercises={},
+    )
+
+    assert result["classification"] == "manual_review_required"
+    assert result["can_apply"] is False
+    assert "schedule_mismatch" in result["reason_codes"]
 
 
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:

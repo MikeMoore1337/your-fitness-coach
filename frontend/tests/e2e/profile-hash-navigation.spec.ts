@@ -96,7 +96,7 @@ test('profile AFTER evidence keeps the approved composition in light and dark th
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
       await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
-      await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(5);
+      await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(6);
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({
         path: `${AFTER_EVIDENCE}/profile-${surface.name}-${theme}.png`,

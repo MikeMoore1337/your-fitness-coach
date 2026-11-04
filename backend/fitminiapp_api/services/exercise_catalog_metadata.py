@@ -74,6 +74,24 @@ CANONICAL_EXERCISE_REDIRECTS = {
 
 
 CATALOG_METADATA: dict[str, ExerciseCatalogMetadata] = {
+    "bench-press": {
+        "aliases": ("barbell bench press",),
+        "movement_pattern": "chest_press",
+        "machine_variant_tags": (),
+        "execution_variant_tags": (),
+    },
+    "dumbbell-bench-press": {
+        "aliases": ("dumbbell bench press",),
+        "movement_pattern": "chest_press",
+        "machine_variant_tags": (),
+        "execution_variant_tags": (),
+    },
+    "incline-dumbbell-press": {
+        "aliases": ("incline dumbbell bench press",),
+        "movement_pattern": "chest_press",
+        "machine_variant_tags": (),
+        "execution_variant_tags": (),
+    },
     "cable-fly": {
         "aliases": (
             "cable crossover",

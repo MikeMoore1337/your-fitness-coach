@@ -1,5 +1,15 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
+import { QuickAddPlacementContext } from '../../app/QuickAddPlacementContext';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -32,10 +42,14 @@ import {
 } from '../../shared/ui/common';
 import { NutritionPeriodReport, type ControlledNutritionPeriod } from './NutritionReport';
 import { Icon } from '../../shared/ui/Icon';
+import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
-import { MuscleWorkloadList as SharedMuscleWorkloadList } from './MuscleWorkload';
+import { MuscleWorkloadDistribution } from './MuscleWorkload';
+import { formatWorkoutSides } from './workoutSideDisplay';
+import { ActivityHeatmap, type ActivityHeatmapData } from './ActivityHeatmap';
+import { weekTypeGenitive, weekTypeLabels, type WeekType } from './weekTypes';
 import {
   nutritionPeriodForProgress,
   parseProgressSelection,
@@ -136,8 +150,8 @@ function SectionHeading({
   trailing,
 }: {
   description: string;
-  eyebrow: string;
-  title: string;
+  eyebrow: ReactNode;
+  title: ReactNode;
   titleId: string;
   trailing?: ReactNode;
 }) {
@@ -747,8 +761,29 @@ function SetValue({ label, value }: { label: string; value: string | number | nu
   );
 }
 
-function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
+function ExerciseHistory({
+  analytics,
+  weekType,
+}: {
+  analytics: Pick<
+    TrainingAnalytics,
+    'exercises' | 'exercise_history_limit' | 'completed_workout_count'
+  > &
+    Partial<Pick<ApiSchemas['WeekTypeTrainingAnalyticsResponse'], 'unknown_type_workout_count'>>;
+  weekType: 'all' | WeekType;
+}) {
   if (!analytics.exercises.length) {
+    if (weekType !== 'all') {
+      return (
+        <p className="progress-note">
+          {analytics.completed_workout_count > 0
+            ? `В тренировках ${weekTypeGenitive[weekType]} типа пока нет записанных рабочих подходов.`
+            : analytics.unknown_type_workout_count
+              ? `За выбранный период нет подтверждённых тренировок ${weekTypeGenitive[weekType]} типа.`
+              : `За выбранный период тренировок ${weekTypeGenitive[weekType]} типа пока нет.`}
+        </p>
+      );
+    }
     return (
       <EmptyState
         title="История упражнений пока пуста"
@@ -810,18 +845,27 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
                   aria-label={`Подходы ${exercise.exercise_title}`}
                 >
                   {session.sets.map((set) => (
-                    <div className="progress-set" key={set.set_number}>
+                    <div
+                      className={`progress-set${set.sides ? ' progress-set--sides' : ''}`}
+                      key={set.set_number}
+                    >
                       <b>{set.set_number}</b>
-                      <SetValue
-                        label="Вес"
-                        value={
-                          set.external_load_kg == null
-                            ? '—'
-                            : `${formatNumber(set.external_load_kg, 2)} кг`
-                        }
-                      />
-                      <SetValue label="Повторы" value={set.reps} />
-                      <SetValue label="Повторы в запасе" value={set.rir} />
+                      {set.sides ? (
+                        <SetValue label="Стороны" value={formatWorkoutSides(set.sides)} />
+                      ) : (
+                        <>
+                          <SetValue
+                            label="Вес"
+                            value={
+                              set.external_load_kg == null
+                                ? '—'
+                                : `${formatNumber(set.external_load_kg, 2)} кг`
+                            }
+                          />
+                          <SetValue label="Повторы" value={set.reps} />
+                          <SetValue label="Повторы в запасе" value={set.rir} />
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -841,11 +885,43 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
 
 function TrainingSection({
   analytics,
+  selection,
   summary,
 }: {
   analytics: ReturnType<typeof useTrainingAnalytics>;
+  selection: ProgressSelection;
   summary?: ProgressSummary;
 }) {
+  const quickAddTarget = useContext(QuickAddPlacementContext);
+  const online = useOnlineStatus();
+  const [weekType, setWeekType] = useState<'all' | WeekType>('all');
+  const showAllHistory = weekType === 'all';
+  const historyDescription = showAllHistory
+    ? 'Показаны все завершённые тренировки.'
+    : `Показаны тренировки: ${weekTypeLabels[weekType].toLowerCase()} неделя.`;
+  const weekTypeAnalytics = useQuery({
+    queryKey: [
+      'workout',
+      'training-analytics',
+      'week-type',
+      progressSelectionKey(selection),
+      weekType,
+    ],
+    queryFn: async () => {
+      const result = await api<ApiSchemas['WeekTypeTrainingAnalyticsResponse']>(
+        `/api/v1/workouts/progress/training-analytics/week-type${progressApiQuery(selection)}&week_type=${weekType}`,
+      );
+      if (result.week_type !== weekType) {
+        throw new Error('Полученная история не соответствует выбранному типу недели.');
+      }
+      return result;
+    },
+    enabled: !showAllHistory && Boolean(analytics.data),
+    staleTime: 0,
+    retry: false,
+  });
+  const presetPeriod = selection.kind === 'preset';
+  const periodLabel = presetPeriod ? `${selection.days} дней` : 'свой период';
   return (
     <section
       className="progress-section"
@@ -853,22 +929,38 @@ function TrainingSection({
       aria-labelledby="progress-training-title"
     >
       <SectionHeading
-        eyebrow="Нагрузка"
-        title="Тренировки"
+        eyebrow={
+          <>
+            <span className="progress-training-heading__mobile">Нагрузка</span>
+            <span className="progress-training-heading__desktop">Тренировки · {periodLabel}</span>
+          </>
+        }
+        title={
+          <>
+            <span className="progress-training-heading__mobile">Тренировки</span>
+            <span className="progress-training-heading__desktop">Показатели за период</span>
+          </>
+        }
         titleId="progress-training-title"
         description="Фактические подходы, нагрузка и история упражнений — без расчётных коэффициентов."
         trailing={
-          summary && (
-            <Badge>
-              {summary.training.new_personal_records}{' '}
-              {plural(
-                summary.training.new_personal_records,
-                'новый рекорд',
-                'новых рекорда',
-                'новых рекордов',
-              )}
-            </Badge>
-          )
+          <div className="progress-training-actions">
+            {summary && (
+              <Badge>
+                {summary.training.new_personal_records}{' '}
+                {plural(
+                  summary.training.new_personal_records,
+                  'новый рекорд',
+                  'новых рекорда',
+                  'новых рекордов',
+                )}
+              </Badge>
+            )}
+            <div
+              className="progress-training-actions__quick-add"
+              ref={quickAddTarget ?? undefined}
+            />
+          </div>
         }
       />
       {analytics.isLoading ? (
@@ -882,12 +974,29 @@ function TrainingSection({
         <>
           <TrainingFacts analytics={analytics.data} />
           <p className="progress-training-meta">
-            Частота:{' '}
+            {analytics.data.completed_workout_count}{' '}
+            {plural(
+              analytics.data.completed_workout_count,
+              'тренировка',
+              'тренировки',
+              'тренировок',
+            )}{' '}
+            ·{' '}
             {formatNumber(
               analytics.data.frequency_per_week ?? summary?.training.frequency_per_week ?? 0,
               2,
             )}{' '}
             в неделю
+          </p>
+          <p className="progress-training-meta">
+            Предыдущий равный период: {analytics.data.previous_completed_workout_count}{' '}
+            {plural(
+              analytics.data.previous_completed_workout_count,
+              'тренировка',
+              'тренировки',
+              'тренировок',
+            )}{' '}
+            · {formatNumber(analytics.data.previous_frequency_per_week, 2)} в неделю
           </p>
           <DataConfidence
             isStale={analytics.isPlaceholderData}
@@ -896,23 +1005,59 @@ function TrainingSection({
             action={<AppLink to="/app?section=today">Открыть тренировку</AppLink>}
           />
           <div className="progress-subsection">
-            <div className="progress-subsection__head">
-              <div>
-                <h3>Распределение по мышечным группам</h3>
-                <p>Текущий период, предыдущий равный период и упражнения-источники.</p>
-              </div>
-            </div>
-            <SharedMuscleWorkloadList analytics={analytics.data} />
+            <MuscleWorkloadDistribution analytics={analytics.data} />
           </div>
           <div className="progress-subsection">
             <div className="progress-subsection__head">
               <div>
                 <h3>История упражнений</h3>
-                <p>Раскройте упражнение, чтобы увидеть тренировки и записанные подходы.</p>
+                <p>Фильтр влияет только на историю. Общие показатели выше не меняются.</p>
               </div>
               <a href="#progress-methodology">Как читать данные</a>
             </div>
-            <ExerciseHistory analytics={analytics.data} />
+            <div className="progress-week-type">
+              <SegmentedControl
+                ariaLabel="Тип недели"
+                value={weekType}
+                onChange={(value) => setWeekType(value as 'all' | WeekType)}
+                options={[
+                  { value: 'all', label: 'Все' },
+                  { value: 'light', label: weekTypeLabels.light },
+                  { value: 'medium', label: weekTypeLabels.medium },
+                  { value: 'heavy', label: weekTypeLabels.heavy },
+                ]}
+              />
+            </div>
+            <p className="progress-training-meta">{historyDescription}</p>
+            <div aria-live="polite">
+              {showAllHistory ? (
+                <ExerciseHistory analytics={analytics.data} weekType={weekType} />
+              ) : !online && !weekTypeAnalytics.data ? (
+                <p className="progress-note">История выбранного типа недоступна офлайн.</p>
+              ) : weekTypeAnalytics.isLoading || (online && weekTypeAnalytics.isFetching) ? (
+                <LoadingState label="Загружаем историю выбранного типа недели…" />
+              ) : weekTypeAnalytics.error ? (
+                <ErrorState
+                  message={(weekTypeAnalytics.error as Error).message}
+                  retry={() => void weekTypeAnalytics.refetch()}
+                />
+              ) : weekTypeAnalytics.data ? (
+                <>
+                  {!online && (
+                    <p className="progress-note">Нет сети: показаны сохранённые данные.</p>
+                  )}
+                  <ExerciseHistory analytics={weekTypeAnalytics.data} weekType={weekType} />
+                  {(weekTypeAnalytics.data.untyped_workout_count > 0 ||
+                    weekTypeAnalytics.data.unknown_type_workout_count > 0) && (
+                    <p className="progress-note">
+                      Без типа недели: {weekTypeAnalytics.data.untyped_workout_count}; тип не
+                      удалось определить: {weekTypeAnalytics.data.unknown_type_workout_count}. Эти
+                      тренировки доступны в общей истории.
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
           <details className="progress-methodology" id="progress-methodology">
             <summary className="yfc-disclosure-summary">
@@ -1490,7 +1635,9 @@ function ProgressDetailHeader({
     history: 'История тренировок',
   };
   return (
-    <header className="progress-detail-header">
+    <header
+      className={`progress-detail-header${view === 'training' ? ' progress-detail-header--training' : ''}`}
+    >
       <AppLink className="progress-detail-header__back" to={progressViewPath(search, 'overview')}>
         <Icon name="arrow-left" size={16} /> Обзор
       </AppLink>
@@ -1549,6 +1696,21 @@ export function ProgressExperience({
     enabled: view === 'overview',
   });
   const analytics = useTrainingAnalytics(selection, view === 'training');
+  const showTrainingFallback = Boolean(summary.error && view === 'training');
+  const [activityYear, setActivityYear] = useState(Number(today.slice(0, 4)));
+  const activity = useQuery({
+    queryKey: ['workout', 'activity-heatmap', activityYear],
+    queryFn: async () => {
+      const result = await api<ActivityHeatmapData>(
+        `/api/v1/workouts/progress/activity-heatmap?year=${activityYear}`,
+      );
+      if (!result || !Array.isArray(result.days)) {
+        throw new Error('Не удалось загрузить календарь активности.');
+      }
+      return result;
+    },
+    enabled: view === 'training',
+  });
   const controlledNutritionPeriod = useMemo<ControlledNutritionPeriod>(
     () => nutritionPeriodForProgress(selection),
     [selection],
@@ -1656,7 +1818,28 @@ export function ProgressExperience({
               <ProgressDetailHeader search={search} view={view} />
               <div className="progress-details" aria-label="Подробности прогресса">
                 {view === 'training' && (
-                  <TrainingSection analytics={analytics} summary={summary.data} />
+                  <>
+                    {activity.isLoading ? (
+                      <LoadingState label="Загружаем календарь активности…" />
+                    ) : activity.error ? (
+                      <ErrorState
+                        message={(activity.error as Error).message}
+                        retry={() => void activity.refetch()}
+                      />
+                    ) : activity.data ? (
+                      <ActivityHeatmap
+                        key={activityYear}
+                        data={activity.data}
+                        year={activityYear}
+                        onYearChange={setActivityYear}
+                      />
+                    ) : null}
+                    <TrainingSection
+                      analytics={analytics}
+                      selection={selection}
+                      summary={summary.data}
+                    />
+                  </>
                 )}
                 {view === 'cardio' && (
                   <CardioHistory
@@ -1700,7 +1883,7 @@ export function ProgressExperience({
         </>
       ) : null}
 
-      {summary.error && view === 'training' && <TrainingSection analytics={analytics} />}
+      {showTrainingFallback && <TrainingSection analytics={analytics} selection={selection} />}
       <AiCoachContextualEntry
         context={{
           surface: 'progress',

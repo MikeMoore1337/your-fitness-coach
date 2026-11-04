@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -26,7 +28,7 @@ class WorkoutValidationError(ValueError):
 def counts_toward_working_volume(workout_set: UserWorkoutSet) -> bool:
     """Legacy null kinds retain their historical working-volume behavior."""
 
-    if workout_set.set_kind == "warmup":
+    if workout_set.set_kind_known is False or workout_set.set_kind == "warmup":
         return False
     if workout_set.planned_role in {"warmup", "activation"}:
         return False
@@ -42,6 +44,8 @@ def is_pr_record_set(workout_set: UserWorkoutSet) -> bool:
 
 
 def set_analytics_bucket(workout_set: UserWorkoutSet) -> str:
+    if getattr(workout_set, "set_kind_known", None) is False:
+        return "unknown"
     if workout_set.planned_role in {"drop", "mini_set", "cluster_member"}:
         return "intensifier"
     if workout_set.planned_role in {"warmup", "activation"}:
@@ -50,19 +54,22 @@ def set_analytics_bucket(workout_set: UserWorkoutSet) -> str:
 
 
 def working_volume_set_filter():
-    return or_(
-        and_(
-            UserWorkoutSet.planned_role.is_(None),
-            or_(
-                UserWorkoutSet.set_kind.is_(None),
-                UserWorkoutSet.set_kind.in_(("working", "drop")),
+    return and_(
+        UserWorkoutSet.set_kind_known.is_not(False),
+        or_(
+            and_(
+                UserWorkoutSet.planned_role.is_(None),
+                or_(
+                    UserWorkoutSet.set_kind.is_(None),
+                    UserWorkoutSet.set_kind.in_(("working", "drop")),
+                ),
             ),
-        ),
-        and_(
-            UserWorkoutSet.planned_role.notin_(("warmup", "activation")),
-            or_(
-                UserWorkoutSet.set_kind.is_(None),
-                UserWorkoutSet.set_kind.in_(("working", "drop")),
+            and_(
+                UserWorkoutSet.planned_role.notin_(("warmup", "activation")),
+                or_(
+                    UserWorkoutSet.set_kind.is_(None),
+                    UserWorkoutSet.set_kind.in_(("working", "drop")),
+                ),
             ),
         ),
     )
@@ -108,6 +115,7 @@ def get_today_workout(db: Session, user: User) -> UserWorkout | None:
             UserProgram.user_id == user.id,
             UserProgram.is_active.is_(True),
             UserProgram.status.in_({"scheduled", "active"}),
+            UserProgram.schedule_mode == "calendar",
             UserWorkout.scheduled_date == recovery_today_for_user(user),
             UserWorkout.status.in_({"planned", "completed"}),
         )
@@ -143,7 +151,7 @@ def add_or_update_set(
         raise WorkoutValidationError("Exercise does not belong to workout")
     if payload.set_number < 1:
         raise WorkoutValidationError("set_number must be >= 1")
-    if payload.set_number > exercise.prescribed_sets:
+    if exercise.prescribed_sets is None or payload.set_number > exercise.prescribed_sets:
         raise WorkoutValidationError("set_number exceeds prescribed_sets")
 
     row = (
@@ -196,15 +204,18 @@ def complete_workout(db: Session, workout: UserWorkout) -> UserWorkout:
     if workout.started_at is None:
         workout.started_at = now_msk_naive()
     workout.completed_at = now_msk_naive()
+    workout.completed_at_utc = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
     db.refresh(workout)
     return workout
 
 
 def _sets_volume(sets: list[UserWorkoutSet]) -> float:
+    from fitminiapp_api.services.workout_sides import completed_set_volume
+
     return float(
         sum(
-            (row.actual_reps or 0) * (row.actual_weight or 0)
+            completed_set_volume(row) or 0
             for row in sets
             if row.is_completed and counts_toward_working_volume(row)
         )

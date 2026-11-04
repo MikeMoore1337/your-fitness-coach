@@ -12,6 +12,7 @@ from fitminiapp_api.schemas.program import (
     ExercisePrescriptionPlan,
     PrescriptionGroupKind,
     PrescriptionRole,
+    SessionRotationDay,
 )
 from fitminiapp_api.schemas.workout_rest import RestSessionResponse
 
@@ -35,6 +36,22 @@ MuscleWorkloadTrend = Literal["increased", "decreased", "unchanged", "no_compara
 ExerciseRepRange = Literal["1-5", "6-10", "11-15", "16+"]
 ExerciseProgressionEventKind = Literal["confirm", "adjust", "reject"]
 WORKOUT_COMPLETION_NOTE_MAX_LENGTH = 500
+
+
+class ActivityHeatmapDay(BaseModel):
+    date: date
+    is_future: bool = False
+    completed_workouts: int | None
+    working_sets: int | None
+
+
+class ActivityHeatmapResponse(BaseModel):
+    timezone: str
+    start_date: date
+    end_date: date
+    history_complete: bool
+    undated_workouts: int
+    days: list[ActivityHeatmapDay]
 
 
 class WorkoutAdaptationRequest(BaseModel):
@@ -119,11 +136,48 @@ class WorkoutAdaptationPreviewResponse(BaseModel):
 class WorkoutAlternativeItem(BaseModel):
     exercise_id: int
     title: str
+    aliases: list[str] = Field(default_factory=list)
     equipment_ids: list[str]
     score: int | None = None
     reason_keys: list[str] = Field(default_factory=list)
     media_thumbnail_url: str | None = None
     media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
+
+
+WorkoutExecutionMode = Literal["bilateral", "per_side", "alternating"]
+WorkoutSide = Literal["left", "right"]
+
+
+class WorkoutSideFact(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actual_reps: int | None = Field(default=None, ge=0, le=2147483647)
+    actual_weight: Decimal | None = Field(
+        default=None, ge=0, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
+    rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
+    reached_failure: bool | None = None
+    is_completed: bool = False
+
+
+class WorkoutSideFacts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    left: WorkoutSideFact | None
+    right: WorkoutSideFact | None
+
+
+class WorkoutSideResult(BaseModel):
+    actual_reps: int | None = None
+    actual_weight: float | None = None
+    rir: RirValue | None = None
+    reached_failure: bool | None = None
+    is_completed: bool
+
+
+class WorkoutSideResults(BaseModel):
+    left: WorkoutSideResult | None
+    right: WorkoutSideResult | None
 
 
 class WorkoutSetCreate(BaseModel):
@@ -137,6 +191,21 @@ class WorkoutSetCreate(BaseModel):
     set_kind: SetKind | None = "working"
     reached_failure: bool | None = None
     is_completed: bool = True
+
+
+class WorkoutSetPlannedTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    weight_kg: Decimal = Field(ge=0, max_digits=10, decimal_places=2, allow_inf_nan=False)
+    reps: int = Field(ge=1, le=1_000, strict=True)
+    confirmed: bool = Field(strict=True)
+
+    @field_validator("confirmed")
+    @classmethod
+    def require_confirmation(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Подтвердите изменение плана подхода")
+        return value
 
 
 class WorkoutSetUpdate(BaseModel):
@@ -153,7 +222,13 @@ class WorkoutSetUpdate(BaseModel):
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
     set_kind: SetKind | None = None
     reached_failure: bool | None = None
-    is_completed: bool | None = None
+    is_completed: bool | Literal["sides-v1"] | None = None
+    side_is_completed: bool | None = None
+    execution_mode: WorkoutExecutionMode | None = None
+    first_side: WorkoutSide | None = None
+    sides: WorkoutSideFacts | None = None
+    confirm_mode_change: bool = False
+    planned_target: WorkoutSetPlannedTarget | None = None
     expected_version: int | None = Field(default=None, ge=1)
     mutation_id: str | None = Field(default=None, min_length=16, max_length=64)
 
@@ -161,12 +236,33 @@ class WorkoutSetUpdate(BaseModel):
     def validate_offline_sync_fields(self):
         if (self.expected_version is None) != (self.mutation_id is None):
             raise ValueError("expected_version и mutation_id должны передаваться вместе")
+        if "planned_target" in self.model_fields_set:
+            if self.planned_target is None or self.expected_version is None:
+                raise ValueError("Для изменения плана нужны подтверждение и версия подхода")
+            if self.model_fields_set - {"planned_target", "expected_version", "mutation_id"}:
+                raise ValueError("План подхода нельзя изменять вместе с результатами")
+        uses_side_contract = (
+            self.execution_mode in {"per_side", "alternating"} or self.confirm_mode_change
+        )
+        if uses_side_contract and (
+            self.is_completed != "sides-v1" or self.side_is_completed is None
+        ):
+            raise ValueError("Для изменения сторон требуется версия контракта sides-v1")
+        if self.is_completed == "sides-v1" and (
+            not uses_side_contract or self.side_is_completed is None
+        ):
+            raise ValueError("Некорректный контракт изменения сторон")
+        if self.is_completed != "sides-v1" and self.side_is_completed is not None:
+            raise ValueError("Некорректный признак завершения сторон")
         return self
 
 
 class LoggedSetItem(BaseModel):
     id: int
     set_number: int
+    execution_mode: WorkoutExecutionMode | None = None
+    first_side: WorkoutSide | None = None
+    sides: WorkoutSideResults | None = None
     actual_reps: int | None = None
     actual_weight: float | None = None
     duration_minutes: int | None = None
@@ -185,6 +281,47 @@ class LoggedSetItem(BaseModel):
     planned_round: int | None = None
 
 
+class WorkoutSetResult(BaseModel):
+    set_id: int
+    set_number: int
+    set_version: int
+    execution_mode: WorkoutExecutionMode | None = None
+    first_side: WorkoutSide | None = None
+    sides: WorkoutSideResults | None = None
+    is_completed: bool = True
+    actual_weight: float | None = None
+    actual_reps: int | None = None
+
+
+class WorkoutSetPastResult(WorkoutSetResult):
+    workout_id: int
+    workout_exercise_id: int
+    completed_at: datetime
+    performed_on: date
+
+
+class WorkoutSetHistoryItem(BaseModel):
+    set_id: int
+    set_number: int
+    set_version: int
+    workout_exercise_id: int
+    exercise_id: int
+    source_template_exercise_id: int | None
+    source_assignment_slot_id: str | None = None
+    previous_today: WorkoutSetResult | None = None
+    previous_workout: WorkoutSetPastResult | None = None
+    history_status: Literal[
+        "matched", "no_previous_workout", "no_matching_set", "identity_unproven"
+    ]
+
+
+class WorkoutSetHistoryResponse(BaseModel):
+    workout_id: int
+    user_program_id: int
+    program_revision_number: int
+    sets: list[WorkoutSetHistoryItem]
+
+
 class ProgressionSessionEvidence(BaseModel):
     workout_id: int
     scheduled_date: date
@@ -200,6 +337,7 @@ class ProgressionSessionEvidence(BaseModel):
 
 
 class ProgressionEvidence(BaseModel):
+    week_type: Literal["light", "medium", "heavy"] | None = None
     target_reps_min: int | None = Field(default=None, ge=1)
     target_reps_max: int | None = Field(default=None, ge=1)
     prescribed_sets: int = Field(ge=1)
@@ -211,6 +349,11 @@ class ProgressionEvidence(BaseModel):
     sessions: list[ProgressionSessionEvidence]
 
 
+class ProgressionSideWeights(BaseModel):
+    left: float = Field(ge=0)
+    right: float = Field(ge=0)
+
+
 class ProgressionTargetSetUpdate(BaseModel):
     set_id: int = Field(ge=1)
     set_number: int = Field(ge=1)
@@ -218,7 +361,10 @@ class ProgressionTargetSetUpdate(BaseModel):
     current_weight: float | None = Field(default=None, ge=0)
     set_version: int = Field(ge=1)
     relative_to_top: float | None = Field(default=None, gt=0, le=1)
-    proposed_weight: float = Field(ge=0)
+    proposed_weight: float | None = Field(default=None, ge=0)
+    proposed_side_weights: ProgressionSideWeights | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
 
 
 class ProgressionProposal(BaseModel):
@@ -241,6 +387,12 @@ class ProgressionProposal(BaseModel):
     target_workout_id: int = Field(ge=1)
     current_weight: float | None = Field(default=None, ge=0)
     proposed_weight: float | None = Field(default=None, ge=0)
+    side_execution_mode: Literal["per_side", "alternating"] | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
+    proposed_side_weights: ProgressionSideWeights | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
     deload_volume_percent: int | None = Field(default=None, ge=0, le=100)
     deload_intensity_percent: int | None = Field(default=None, ge=0, le=100)
     proposed_action: Literal["set_load", "hold", "reset_recommended", "deload"]
@@ -274,8 +426,25 @@ class ProgressionProposalReviewResponse(BaseModel):
     current_revision_number: int = Field(ge=0)
 
 
+class SideProgressionGuidance(BaseModel):
+    ruleset_version: Literal["progression-guidance-v2", "progression-guidance-v3"]
+    outcome: Literal["consider_progressing", "hold", "review", "consider_reducing"]
+    message: str
+    detail: str
+    suggested_increment: float | None = None
+    suggested_weight: float | None = Field(default=None, ge=0)
+    load_unit: Literal["kg", "lb"]
+    evidence: ProgressionEvidence
+
+
+class SideProgressionPair(BaseModel):
+    execution_mode: Literal["per_side", "alternating"]
+    left: SideProgressionGuidance
+    right: SideProgressionGuidance
+
+
 class ProgressionGuidance(BaseModel):
-    ruleset_version: Literal["progression-guidance-v2"]
+    ruleset_version: Literal["progression-guidance-v2", "progression-guidance-v3"]
     outcome: Literal["consider_progressing", "hold", "review", "consider_reducing"]
     message: str
     detail: str
@@ -284,6 +453,7 @@ class ProgressionGuidance(BaseModel):
     load_unit: Literal["kg", "lb"]
     evidence: ProgressionEvidence
     proposal: ProgressionProposal | None = None
+    side_guidance: SideProgressionPair | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class ProgramProgressionProposalExercise(BaseModel):
@@ -316,6 +486,7 @@ class WorkoutExerciseItem(BaseModel):
     superset_order: int | None = None
     prescription: ExercisePrescriptionPlan | None = None
     source_template_exercise_id: int | None = None
+    source_assignment_slot_id: str | None = None
     source_weekly_prescription_id: int | None = None
     group_id: int | None = None
     group_kind: PrescriptionGroupKind | None = None
@@ -385,10 +556,61 @@ class WorkoutTodayResponse(BaseModel):
     status: str
     day_number: int
     week_number: int = 1
+    source_cycle_week: int | None = None
+    cycle_iteration: int | None = None
+    week_type: Literal["light", "medium", "heavy"] | None = None
+    week_type_known: bool | None = None
+    plan_revision_number: int | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     exercises: list[WorkoutExerciseItem]
     completion_summary: WorkoutCompletionSummary | None = None
+
+
+class SessionRotationStateResponse(BaseModel):
+    mode: Literal["calendar", "rotation"]
+    status: Literal[
+        "disabled", "ready", "in_progress", "cancelled", "expired", "review_required", "empty"
+    ]
+    program_id: int | None = None
+    revision_number: int | None = None
+    cursor: str | None = None
+    current: SessionRotationDay | None = None
+    next: SessionRotationDay | None = None
+    days: list[SessionRotationDay] = Field(default_factory=list)
+    program_end_date: date | None = None
+    duration_weeks: int | None = None
+    default_plan_week: int | None = None
+    days_since_last_completion: int | None = None
+    min_extension_weeks: int | None = None
+    can_extend: bool = True
+    undo_skip_workout_id: int | None = None
+
+
+class SessionRotationActionRequest(BaseModel):
+    expected_cursor: str = Field(min_length=64, max_length=64)
+    expected_day_number: int = Field(ge=1)
+    mutation_id: str = Field(min_length=16, max_length=64)
+    plan_week_number: int | None = Field(default=None, ge=1)
+    out_of_order: bool = False
+
+
+class SessionRotationTransitionRequest(BaseModel):
+    expected_cursor: str = Field(min_length=64, max_length=64)
+    workout_id: int = Field(ge=1)
+    mutation_id: str = Field(min_length=16, max_length=64)
+
+
+class SessionRotationPlanExercise(BaseModel):
+    title: str
+    prescribed_sets: int | None = None
+    prescribed_reps: str | None = None
+
+
+class SessionRotationPlanResponse(BaseModel):
+    title: str
+    week_number: int
+    exercises: list[SessionRotationPlanExercise]
 
 
 class WorkoutAdaptationApplyResponse(BaseModel):
@@ -446,6 +668,9 @@ class WarmupProposalApplyResponse(BaseModel):
 class WorkoutStatusResponse(BaseModel):
     id: int
     set_number: int
+    execution_mode: WorkoutExecutionMode | None = None
+    first_side: WorkoutSide | None = None
+    sides: WorkoutSideResults | None = None
     actual_reps: int | None = None
     actual_weight: float | None = None
     duration_minutes: int | None = None
@@ -573,6 +798,7 @@ class WorkoutRestHistoryItem(BaseModel):
 
 class WorkoutHistoryItem(BaseModel):
     id: int
+    is_imported: bool = False
     scheduled_date: date
     scheduled_time: time | None = None
     title: str
@@ -581,6 +807,7 @@ class WorkoutHistoryItem(BaseModel):
     completed_at: datetime | None = None
     completed_sets: int
     volume_kg: float
+    volume_incomplete: bool | None = Field(default=None, exclude_if=lambda value: value is None)
     completion_feedback: WorkoutCompletionFeedback | None = None
     completion_note: str | None = None
     exercises: list[WorkoutHistoryExerciseItem]
@@ -588,13 +815,24 @@ class WorkoutHistoryItem(BaseModel):
     rest_sessions: list[RestSessionResponse] = Field(default_factory=list)
 
 
+class WorkoutHistorySideSet(BaseModel):
+    set_number: int
+    execution_mode: Literal["per_side", "alternating"]
+    first_side: WorkoutSide | None = None
+    is_completed: bool
+    sides: WorkoutSideResults
+
+
 class WorkoutHistoryExerciseItem(BaseModel):
     workout_exercise_id: int
     exercise_id: int
     title: str
-    prescribed_sets: int
-    prescribed_reps: str
+    prescribed_sets: int | None
+    prescribed_reps: str | None
     sort_order: int
+    side_sets: list[WorkoutHistorySideSet] = Field(
+        default_factory=list, exclude_if=lambda value: not value
+    )
 
 
 class WorkoutAdaptationHistoryItem(BaseModel):
@@ -614,6 +852,7 @@ class WorkoutHistorySummary(BaseModel):
     workouts_completed: int
     completed_sets: int
     volume_kg: float
+    volume_incomplete: bool | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ProgressWeightPoint(BaseModel):
@@ -625,6 +864,7 @@ class ProgressVolumePoint(BaseModel):
     week_start: date
     completed_workouts: int
     volume_kg: float
+    volume_incomplete: bool | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ExerciseProgressItem(BaseModel):
@@ -658,6 +898,11 @@ class TrainingAnalyticsSet(BaseModel):
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
     set_kind: SetKind | None = None
     reached_failure: bool | None = None
+    execution_mode: WorkoutExecutionMode | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
+    first_side: WorkoutSide | None = Field(default=None, exclude_if=lambda v: v is None)
+    sides: WorkoutSideResults | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class ExerciseTrainingSession(BaseModel):
@@ -691,6 +936,20 @@ class ExerciseTrainingProgression(BaseModel):
     sessions: list[ExerciseTrainingSession]
 
 
+class WeekTypeTrainingAnalyticsResponse(BaseModel):
+    week_type: Literal["light", "medium", "heavy"]
+    period_start: date
+    period_end: date
+    exercise_history_limit: int = Field(ge=1, le=100)
+    completed_workout_count: int = Field(ge=0)
+    completed_set_count: int = Field(ge=0)
+    external_load_volume_kg: float | None = None
+    volume_recorded_sets: int = Field(ge=0)
+    untyped_workout_count: int = Field(ge=0)
+    unknown_type_workout_count: int = Field(ge=0)
+    exercises: list[ExerciseTrainingProgression]
+
+
 class ExerciseHistoryWorkout(BaseModel):
     workout_id: int = Field(ge=1)
     workout_title: str
@@ -706,14 +965,20 @@ class ExerciseHistorySet(BaseModel):
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
     set_kind: SetKind | None = None
     planned_role: PrescriptionRole | None = None
-    analytics_bucket: Literal["working", "preparation", "intensifier"]
+    analytics_bucket: Literal["working", "preparation", "intensifier", "unknown"]
     pr_eligible: bool
+    execution_mode: WorkoutExecutionMode | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
+    first_side: WorkoutSide | None = Field(default=None, exclude_if=lambda v: v is None)
+    sides: WorkoutSideResults | None = Field(default=None, exclude_if=lambda v: v is None)
+    is_completed: bool | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class ExerciseHistorySession(BaseModel):
     workout: ExerciseHistoryWorkout
     workout_exercise_id: int = Field(ge=1)
-    prescribed_reps: str
+    prescribed_reps: str | None
     completed_set_count: int = Field(ge=0)
     authoritative_set_count: int = Field(ge=0)
     reps_total: int | None = Field(default=None, ge=0)
@@ -758,6 +1023,27 @@ class ExerciseProgressionPoint(BaseModel):
     authoritative_set_count: int = Field(ge=0)
 
 
+class ExerciseSideRecordContext(BaseModel):
+    program_id: int | None
+    revision_number: int | None
+    day_number: int | None
+    source_template_exercise_id: int | None
+    week_type: Literal["light", "medium", "heavy"] | None
+    planned_role: PrescriptionRole | None
+    planned_position: int | None
+    verified: bool
+
+
+class ExerciseSideRecord(BaseModel):
+    execution_mode: Literal["per_side", "alternating"]
+    side: WorkoutSide
+    context: ExerciseSideRecordContext
+    best_authoritative_load: ExerciseHistoryMetric | None
+    estimated_1rm_kg: float | None
+    rep_prs: list[ExerciseRepPR]
+    progression: list[ExerciseProgressionPoint]
+
+
 class ExerciseProgressionEvent(BaseModel):
     event_id: int = Field(ge=1)
     event_kind: ExerciseProgressionEventKind
@@ -796,6 +1082,7 @@ class ExerciseHistoryResponse(BaseModel):
     best_authoritative_load: ExerciseHistoryMetric | None = None
     estimated_1rm: ExerciseEstimated1RM | None = None
     rep_prs: list[ExerciseRepPR]
+    side_records: list[ExerciseSideRecord] = Field(default_factory=list)
     windows: list[ExerciseHistoryWindow]
     recent_sessions: list[ExerciseHistorySession]
     progression: list[ExerciseProgressionPoint]
@@ -812,6 +1099,7 @@ class RirTrainingAnalytics(BaseModel):
     completed_set_count: int
     recorded_set_count: int
     missing_set_count: int
+    mixed_side_set_count: int = 0
     distribution: list[RirDistributionBucket]
 
 
@@ -885,6 +1173,11 @@ class WorkoutTimelineSet(BaseModel):
     set_kind: SetKind | None = None
     reached_failure: bool | None = None
     is_completed: bool
+    execution_mode: WorkoutExecutionMode | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
+    first_side: WorkoutSide | None = Field(default=None, exclude_if=lambda v: v is None)
+    sides: WorkoutSideResults | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 class WorkoutTimelineExercise(BaseModel):
@@ -906,6 +1199,7 @@ class WorkoutTimelineItem(BaseModel):
     completed_at: datetime | None = None
     completed_sets: int
     volume_kg: float
+    volume_incomplete: bool | None = Field(default=None, exclude_if=lambda value: value is None)
     completion_feedback: WorkoutCompletionFeedback | None = None
     completion_note: str | None = None
     exercises: list[WorkoutTimelineExercise]

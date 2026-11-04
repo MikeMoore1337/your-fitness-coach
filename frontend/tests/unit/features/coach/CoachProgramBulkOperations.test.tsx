@@ -136,7 +136,12 @@ describe('CoachProgramBulkOperations', () => {
 
   it('confirms only matching eligible proposal classes', async () => {
     const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
-    const makeProposals = (programId: number, weight: number, setId: number) => ({
+    const makeProposals = (
+      programId: number,
+      weight: number,
+      setId: number,
+      weekType: 'heavy' | 'light',
+    ) => ({
       target_program_id: programId,
       target_revision_number: programId === 44 ? 7 : 4,
       target_workout_id: programId + 100,
@@ -146,12 +151,12 @@ describe('CoachProgramBulkOperations', () => {
           exercise_id: 9,
           exercise_title: 'Жим лёжа',
           guidance: {
-            ruleset_version: 'progression-guidance-v2',
+            ruleset_version: 'progression-guidance-v3',
             outcome: 'consider_progressing',
             message: 'Подходящие данные',
             detail: 'Стабильная нагрузка',
             load_unit: 'kg',
-            evidence: {},
+            evidence: { week_type: weekType },
             proposal: {
               proposal_id: String(programId).padStart(64, 'a'),
               rule_id: String(programId).padStart(64, 'b'),
@@ -187,13 +192,16 @@ describe('CoachProgramBulkOperations', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.endsWith('/44/progression-proposals')) {
-        return new Response(JSON.stringify(makeProposals(44, 42.5, 101)), { status: 200 });
+        return new Response(JSON.stringify(makeProposals(44, 42.5, 101, 'heavy')), { status: 200 });
       }
       if (url.endsWith('/45/progression-proposals')) {
-        return new Response(JSON.stringify(makeProposals(45, 42.5, 201)), { status: 200 });
+        return new Response(JSON.stringify(makeProposals(45, 42.5, 201, 'heavy')), { status: 200 });
       }
       if (url.endsWith('/46/progression-proposals')) {
-        return new Response(JSON.stringify(makeProposals(46, 45, 301)), { status: 200 });
+        return new Response(JSON.stringify(makeProposals(46, 42.5, 301, 'light')), { status: 200 });
+      }
+      if (url.endsWith('/47/progression-proposals')) {
+        return new Response(JSON.stringify(makeProposals(47, 45, 401, 'heavy')), { status: 200 });
       }
       if (url.includes('/progression-proposals/') && url.endsWith('/review')) {
         requests.push({ url, body: JSON.parse(String(init?.body)) });
@@ -211,7 +219,11 @@ describe('CoachProgramBulkOperations', () => {
         status: 500,
       });
     });
-    renderBulk([program(44, 71, 7), program(45, 72, 4), program(46, 73, 3)], clients);
+    const selected = [...clients, { id: 74, status: 'active', full_name: 'Ольга' } as Client];
+    renderBulk(
+      [program(44, 71, 7), program(45, 72, 4), program(46, 73, 3), program(47, 74, 3)],
+      selected,
+    );
 
     fireEvent.click(screen.getByText('Проверить одинаковые предложения прогрессии'));
     fireEvent.click(

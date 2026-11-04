@@ -2,8 +2,30 @@ import { describe, expect, it } from 'vitest';
 import type { ProgramTemplate } from '../../../../src/shared/api/types';
 import {
   programPreviewFacts,
+  programWeeklySessions,
   previewSourceSignature,
 } from '../../../../src/features/programs/programPreviewFacts';
+
+it('uses session frequency independently of the distinct cycle days', () => {
+  expect(
+    programWeeklySessions(
+      template({ program_metadata: { days_per_week: 3, representation_days: 2 } }),
+    ),
+  ).toBe(3);
+  expect(programWeeklySessions(template({ program_metadata: { days_per_week: '3' } }))).toBe(1);
+  expect(programWeeklySessions(template({ program_metadata: { days_per_week: 9 } }))).toBe(1);
+  expect(programWeeklySessions(template())).toBe(1);
+  expect(
+    programWeeklySessions(
+      template({
+        program_metadata: {
+          days_per_week: 3,
+          week_cycle: { schema_version: 1, length_weeks: 1, week_types: null, repeat: true },
+        },
+      }),
+    ),
+  ).toBe(1);
+});
 
 function template(override: Partial<ProgramTemplate> = {}): ProgramTemplate {
   return {

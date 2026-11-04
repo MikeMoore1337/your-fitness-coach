@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PwaProvider, usePwa } from '../../../src/shared/pwa/PwaProvider';
 import { PWA_INSTALL_STATE_KEY, PWA_SAFE_UPDATE_EVENT } from '../../../src/shared/pwa/pwaRuntime';
@@ -8,6 +8,7 @@ function Probe() {
   return (
     <>
       <output data-testid="install-visible">{String(pwa.shouldShowInstallPrompt)}</output>
+      <output data-testid="update-available">{String(pwa.updateAvailable)}</output>
       <output data-testid="update-blocked">{String(pwa.updateBlockedByWorkout)}</output>
     </>
   );
@@ -97,6 +98,55 @@ describe('PwaProvider', () => {
     expect(screen.queryByText('Быстрый возврат к тренировке')).not.toBeInTheDocument();
   });
 
+  it('does not treat the first installed controller as a waiting update', async () => {
+    const worker = Object.assign(new EventTarget(), { state: 'installing', postMessage: vi.fn() });
+    const registration = {
+      waiting: null as typeof worker | null,
+      installing: worker as typeof worker | null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      update: vi.fn().mockResolvedValue(undefined),
+    };
+    const serviceWorker = {
+      controller: null as typeof worker | null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      register: vi.fn().mockResolvedValue(registration),
+    };
+    overrideNavigatorProperty('serviceWorker', serviceWorker);
+    const key = 'fit_active_workout_queue_v4_user_7_workout_42';
+    const pending = JSON.stringify({ workout_snapshot: { status: 'in_progress' }, queue: [] });
+    localStorage.setItem(key, pending);
+
+    render(
+      <PwaProvider>
+        <Probe />
+      </PwaProvider>,
+    );
+    await waitFor(() =>
+      expect(registration.addEventListener).toHaveBeenCalledWith(
+        'updatefound',
+        expect.any(Function),
+      ),
+    );
+    const onUpdateFound = registration.addEventListener.mock.calls.find(
+      ([type]) => type === 'updatefound',
+    )?.[1] as () => void;
+    expect(onUpdateFound).toBeTypeOf('function');
+    onUpdateFound();
+    serviceWorker.controller = worker;
+    registration.waiting = worker;
+    registration.installing = null;
+    worker.state = 'installed';
+    act(() => worker.dispatchEvent(new Event('statechange')));
+
+    expect(screen.getByTestId('update-available')).toHaveTextContent('false');
+    expect(screen.getByTestId('update-blocked')).toHaveTextContent('false');
+    expect(screen.queryByText('Доступно обновление')).not.toBeInTheDocument();
+    expect(worker.postMessage).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).toBe(pending);
+  });
+
   it('blocks a waiting update while active workout data exists and applies it after safe completion', async () => {
     const postMessage = vi.fn();
     const waiting = { postMessage };
@@ -114,7 +164,7 @@ describe('PwaProvider', () => {
       register: vi.fn().mockResolvedValue(registration),
     });
     localStorage.setItem(
-      'fit_active_workout_v1_user_7_workout_42',
+      'fit_active_workout_queue_v4_user_7_workout_42',
       JSON.stringify({ workout_snapshot: { status: 'in_progress' }, queue: [] }),
     );
 
@@ -130,7 +180,7 @@ describe('PwaProvider', () => {
     });
     expect(postMessage).not.toHaveBeenCalled();
 
-    localStorage.removeItem('fit_active_workout_v1_user_7_workout_42');
+    localStorage.removeItem('fit_active_workout_queue_v4_user_7_workout_42');
     window.dispatchEvent(new Event(PWA_SAFE_UPDATE_EVENT));
     await waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'YFC_PWA_SKIP_WAITING' }));
   });

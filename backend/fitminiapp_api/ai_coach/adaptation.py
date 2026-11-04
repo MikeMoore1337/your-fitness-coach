@@ -179,14 +179,17 @@ def _target_workout(
         )
         .filter(UserWorkout.user_program_id == program.id)
     )
+    if program.schedule_mode == "rotation":
+        query = query.filter(
+            UserWorkout.rotation_epoch == program.rotation_epoch,
+            UserWorkout.status == "in_progress",
+        )
     if payload.target_workout_id is not None:
         workout = query.filter(UserWorkout.id == payload.target_workout_id).one_or_none()
     else:
-        workout = (
-            query.filter(UserWorkout.status == "planned")
-            .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
-            .first()
-        )
+        if program.schedule_mode == "calendar":
+            query = query.filter(UserWorkout.status == "planned")
+        workout = query.order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc()).first()
     if workout is None or workout.status not in {"planned", "in_progress"}:
         raise AdaptationError("No upcoming planned workout for adaptation")
     return workout
@@ -743,6 +746,9 @@ class AiCoachAdaptationService:
 
         applied = False
         if payload.decision == "confirm" and patch.operation != "explanation_only":
+            rest_seconds = patch.rest_seconds or exercise.rest_seconds
+            if rest_seconds is None:
+                raise AdaptationError("AI proposal target prescription is no longer available")
             candidate_id = token_payload.get("candidate_id")
             if proposal_type == AiCoachAdaptationProposalType.EXERCISE_SUBSTITUTION.value:
                 if (
@@ -760,7 +766,7 @@ class AiCoachAdaptationService:
                     prescribed_sets=exercise.prescribed_sets,
                     prescribed_reps=exercise.prescribed_reps,
                     prescribed_duration_minutes=exercise.prescribed_duration_minutes,
-                    rest_seconds=patch.rest_seconds or exercise.rest_seconds,
+                    rest_seconds=rest_seconds,
                     notes=exercise.notes,
                     prescription=None,
                     target_template_exercise_id=exercise.source_template_exercise_id,
@@ -777,7 +783,7 @@ class AiCoachAdaptationService:
                     exercise_id=exercise.exercise_id,
                     prescribed_sets=patch.prescribed_sets or exercise.prescribed_sets,
                     prescribed_reps=patch.prescribed_reps or exercise.prescribed_reps,
-                    rest_seconds=patch.rest_seconds or exercise.rest_seconds,
+                    rest_seconds=rest_seconds,
                     notes=exercise.notes,
                     reason="AI Coach proposal confirmed",
                 )

@@ -614,6 +614,7 @@ export async function installPlatformApi(
       {
         id: 101,
         exercise_id: 11,
+        metric_type: 'strength',
         exercise_title: options.longExerciseName
           ? 'Приседания со штангой с контролируемой паузой в нижней точке'
           : 'Приседания',
@@ -1327,6 +1328,9 @@ export async function installPlatformApi(
     const url = new URL(request.url());
     const path = url.pathname;
     if (offline && !path.endsWith('/public/config')) return route.abort('internetdisconnected');
+    if (path.endsWith('/me/equipment-profiles')) {
+      return route.fulfill({ json: { revision: 0, active_profile_id: null, profiles: [] } });
+    }
     if (path.endsWith('/public/config')) {
       return route.fulfill({
         json: {
@@ -1758,6 +1762,52 @@ export async function installPlatformApi(
         ],
       });
     }
+    if (path.endsWith('/workouts/42/exercise-notes/101') && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          workout_id: 42,
+          workout_exercise_id: 101,
+          exercise_id: 11,
+          source_template_exercise_id: null,
+          plan_revision_number: null,
+          week_number: 1,
+          day_number: 1,
+          source_cycle_week: null,
+          cycle_iteration: null,
+          version: 0,
+          current_note: null,
+          previous_note: null,
+        },
+      });
+    }
+    if (path.endsWith('/workouts/42/exercise-notes') && request.method() === 'GET') {
+      return route.fulfill({ json: [] });
+    }
+    if (path.endsWith('/workouts/42/set-history')) {
+      return route.fulfill({
+        json: {
+          workout_id: 42,
+          user_program_id: 1,
+          program_revision_number: 1,
+          sets: [
+            {
+              set_id: 201,
+              set_number: 1,
+              set_version: setVersion,
+              workout_exercise_id: 101,
+              exercise_id: 11,
+              source_template_exercise_id: null,
+              previous_today: null,
+              previous_workout: null,
+              history_status: 'identity_unproven',
+            },
+          ],
+        },
+      });
+    }
+    if (path.endsWith('/workouts/session-rotation')) {
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
+    }
     if (path.endsWith('/workouts/today')) {
       if (workoutStatus === 'none') {
         return route.fulfill({
@@ -1775,6 +1825,9 @@ export async function installPlatformApi(
     }
     if (path.endsWith('/workouts/schedule')) {
       return route.fulfill({ json: contextIsCompleted ? [] : [contextWorkout] });
+    }
+    if (/\/workouts\/\d+\/previous-completion-note$/.test(path) && request.method() === 'GET') {
+      return route.fulfill({ json: { previous_note: null } });
     }
     if (path.endsWith('/workouts/recovery')) {
       return route.fulfill({

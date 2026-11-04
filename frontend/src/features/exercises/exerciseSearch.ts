@@ -54,7 +54,6 @@ function buildSearchGroups<T extends ExerciseSearchItem>(exercises: T[]): Search
       ...(record.aliases ?? []),
       ...(record.machine_variant_tags ?? []),
       ...(record.execution_variant_tags ?? []),
-      ...(record.alternatives ?? []).map((alternative) => alternative.title),
     ]);
     return {
       exercise: canonical,
@@ -63,6 +62,42 @@ function buildSearchGroups<T extends ExerciseSearchItem>(exercises: T[]): Search
       haystack: normalizeExerciseSearchText(searchableValues.join(' ')),
     };
   });
+}
+
+function oneEditApart(left: string, right: string): boolean {
+  if (left.length < 5 || left.slice(0, 2) !== right.slice(0, 2)) return false;
+  if (Math.abs(left.length - right.length) > 1) return false;
+  let i = 0;
+  while (i < left.length && left[i] === right[i]) i += 1;
+  if (left.length === right.length) {
+    return (
+      left.slice(i + 1) === right.slice(i + 1) ||
+      (left[i] === right[i + 1] &&
+        left[i + 1] === right[i] &&
+        left.slice(i + 2) === right.slice(i + 2))
+    );
+  }
+  return left.length > right.length
+    ? left.slice(i + 1) === right.slice(i)
+    : left.slice(i) === right.slice(i + 1);
+}
+
+function fuzzyMatches(value: string, tokens: string[]): boolean {
+  const words = value.split(' ');
+  let edits = 0;
+  for (const token of tokens) {
+    if (words.some((word) => word.includes(token))) continue;
+    if (
+      !words.some(
+        (word) =>
+          oneEditApart(token, word.slice(0, token.length + 1)) ||
+          (word.length >= token.length && oneEditApart(token, word.slice(0, token.length - 1))),
+      )
+    )
+      return false;
+    edits += 1;
+  }
+  return edits === 1;
 }
 
 function searchRank<T extends ExerciseSearchItem>(
@@ -76,7 +111,8 @@ function searchRank<T extends ExerciseSearchItem>(
   if (group.aliases.some((alias) => alias.startsWith(query))) return 3;
 
   const tokens = query.split(' ').filter(Boolean);
-  return tokens.every((token) => group.haystack.includes(token)) ? 4 : null;
+  if (tokens.every((token) => group.haystack.includes(token))) return 4;
+  return null;
 }
 
 export function rankExercisesForSearch<T extends ExerciseSearchItem>(
@@ -84,8 +120,19 @@ export function rankExercisesForSearch<T extends ExerciseSearchItem>(
   rawQuery: string,
 ): T[] {
   const query = normalizeExerciseSearchText(rawQuery);
-  return buildSearchGroups(exercises)
-    .map((group) => ({ group, rank: searchRank(group, query) }))
+  const groups = buildSearchGroups(exercises);
+  const ranked = groups.map((group) => ({ group, rank: searchRank(group, query) }));
+  if (query && !ranked.some((item) => item.rank !== null)) {
+    const tokens = query.split(' ');
+    for (const item of ranked) {
+      if (
+        [...item.group.titles, ...item.group.aliases].some((value) => fuzzyMatches(value, tokens))
+      ) {
+        item.rank = 5;
+      }
+    }
+  }
+  return ranked
     .filter((item): item is { group: SearchGroup<T>; rank: number } => item.rank !== null)
     .sort(
       (left, right) =>

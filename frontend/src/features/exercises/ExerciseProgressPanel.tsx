@@ -1,6 +1,7 @@
 import type { ExerciseHistory } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
 import { DisclosureIcon, ErrorState, LoadingState } from '../../shared/ui/common';
+import { formatWorkoutSides } from '../workouts/workoutSideDisplay';
 
 const eventLabels: Record<ExerciseHistory['progression_events'][number]['event_kind'], string> = {
   confirm: 'Подтверждено',
@@ -30,6 +31,8 @@ function setLabel(
   set: ExerciseHistory['recent_sessions'][number]['sets'][number],
   loadUnit: string,
 ): string {
+  if (set.sides)
+    return `${formatWorkoutSides(set.sides)}${set.is_completed === false ? ' · подход не завершён' : ''}`;
   const reps = set.reps == null ? 'повторы не записаны' : `${set.reps} повт.`;
   const load = set.load_kg == null ? 'внешний вес не записан' : `${set.load_kg} ${loadUnit}`;
   return `${reps} × ${load}${set.pr_eligible ? '' : ' · вспомогательный подход'}`;
@@ -122,6 +125,59 @@ export function ExerciseProgressPanel({
                   ))}
                 </div>
               </section>
+
+              {!!data.side_records?.length && (
+                <section aria-labelledby="exercise-progress-side-records">
+                  <h3 id="exercise-progress-side-records">Результаты по сторонам</h3>
+                  <div className="exercise-progress__prs">
+                    {data.side_records.map((record, index) => (
+                      <article
+                        className="exercise-progress__pr"
+                        key={`${record.execution_mode}-${record.side}-${index}`}
+                      >
+                        <strong>
+                          {record.side === 'left' ? 'Левая' : 'Правая'} ·{' '}
+                          {record.execution_mode === 'per_side' ? 'по сторонам' : 'поочерёдно'}
+                        </strong>
+                        <small>
+                          {record.context.verified
+                            ? 'Сопоставимый контекст программы'
+                            : 'Сопоставимость контекста не подтверждена: данные одной тренировки'}
+                        </small>
+                        <span>
+                          {record.best_authoritative_load
+                            ? `Лучший вес: ${formatLoad(record.best_authoritative_load.value_kg, unit)}`
+                            : 'Вес не записан'}
+                        </span>
+                        <span>
+                          {record.estimated_1rm_kg == null
+                            ? 'Оценочный 1ПМ: недостаточно данных'
+                            : `Оценочный 1ПМ: ${formatLoad(record.estimated_1rm_kg, unit)}`}
+                        </span>
+                        {record.rep_prs.map((pr) => (
+                          <span key={pr.range_key}>
+                            {pr.range_label}: {pr.best_reps} повт.
+                            {pr.best_load_kg == null
+                              ? ''
+                              : ` · ${formatLoad(pr.best_load_kg, unit)}`}
+                          </span>
+                        ))}
+                        {record.progression.map((point) => (
+                          <AppLink
+                            key={`${point.workout_id}-${point.performed_on}`}
+                            to={workoutLink(point.workout_id)}
+                          >
+                            {point.performed_on} ·{' '}
+                            {point.max_authoritative_load_kg == null
+                              ? 'вес не указан'
+                              : formatLoad(point.max_authoritative_load_kg, unit)}
+                          </AppLink>
+                        ))}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {!!data.rep_prs.length && (
                 <section aria-labelledby="exercise-progress-prs">

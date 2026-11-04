@@ -26,6 +26,7 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program import (
+    EquipmentIdentifier,
     ExerciseMetricType,
     ExerciseMovementPattern,
     ExercisePrescriptionPlan,
@@ -49,6 +50,7 @@ from fitminiapp_api.schemas.program_generator import (
     ProgramGeneratorProgram,
     ProgramGeneratorRequest,
     ProgramGeneratorSource,
+    ProgramGeneratorSuggestion,
 )
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.exercise_catalog import (
@@ -73,20 +75,13 @@ from fitminiapp_api.services.programs import (
 )
 from fitminiapp_api.services.workout_metrics import exercise_metric_type
 
-SELECTION_POLICY_VERSION = "program_generator_v1"
+SELECTION_POLICY_VERSION = "program_generator_v2"
 _TOKEN_SALT = "program-generator-v1"
 _TOKEN_MAX_AGE_SECONDS = 60 * 60
 _DURATION_TOLERANCE_MINUTES = 10
 _DURATION_TOLERANCE_RATIO = 0.20
 _ACTIVE_SECONDS_PER_SET = 45
 _TRANSITION_SECONDS_PER_EXERCISE = 60
-_GOAL_ORDER = {
-    "fat_loss": ("fat_loss", "recomposition", "maintenance"),
-    "recomposition": ("recomposition", "muscle_gain", "maintenance"),
-    "maintenance": ("maintenance", "recomposition", "muscle_gain"),
-    "muscle_gain": ("muscle_gain", "recomposition"),
-    "strength": ("strength",),
-}
 _LEVEL_RANK = {"beginner": 0, "intermediate": 1, "advanced": 2}
 _SPLIT_LABELS = {
     "full_body": "всё тело за тренировку",
@@ -244,13 +239,17 @@ def _exercise_movement_pattern(exercise: Exercise) -> ExerciseMovementPattern | 
     return cast(ExerciseMovementPattern, metadata["movement_pattern"])
 
 
-def _prescription_sets(item: ProgramTemplateExercise) -> int:
+def _prescription_sets(
+    item: ProgramTemplateExercise | ProgramTemplateExerciseWeekPrescription,
+) -> int:
     if isinstance(item.prescription, dict) and isinstance(item.prescription.get("segments"), list):
         return max(1, len(item.prescription["segments"]))
     return max(1, item.prescribed_sets)
 
 
-def _estimate_item_minutes(item: ProgramTemplateExercise, exercise: Exercise) -> int:
+def _estimate_item_minutes(
+    item: ProgramTemplateExercise | ProgramTemplateExerciseWeekPrescription, exercise: Exercise
+) -> int:
     if exercise_metric_type(exercise) == "cardio":
         duration = item.prescribed_duration_minutes or 0
         return duration + (1 if duration else 0)
@@ -263,18 +262,20 @@ def _estimate_item_minutes(item: ProgramTemplateExercise, exercise: Exercise) ->
 
 def _estimate_day_minutes(slots: list[_Slot]) -> int:
     return sum(
-        _estimate_item_minutes(slot.source_item, slot.selected_exercise)
+        max(
+            [_estimate_item_minutes(slot.source_item, slot.selected_exercise)]
+            + [
+                _estimate_item_minutes(weekly, weekly.exercise)
+                for weekly in slot.source_item.weekly_prescriptions
+            ]
+        )
         for slot in slots
         if not slot.removed
     )
 
 
 def _source_frequency(template: ProgramTemplate) -> int:
-    metadata = template.program_metadata or {}
-    representation = metadata.get("representation_days")
-    if isinstance(representation, int) and representation == len(template.days):
-        return representation
-    return len(template.days)
+    return template.sessions_per_week
 
 
 def _template_fingerprint_payload(template: ProgramTemplate) -> dict[str, object]:
@@ -465,6 +466,7 @@ def _choose_exercise(
     alternatives: dict[int, set[int]],
     available_equipment: set[str],
     excluded_ids: set[int],
+    experience: str,
 ) -> tuple[Exercise, bool]:
     source_id = _effective_exercise_id(source)
     current = visible.get(source_id)
@@ -488,6 +490,7 @@ def _choose_exercise(
             or candidate_id in excluded_ids
             or not candidate_complete
             or not candidate_equipment.issubset(available_equipment)
+            or _LEVEL_RANK.get(candidate.difficulty_level, 99) > _LEVEL_RANK[experience]
             or exercise_metric_type(candidate) != exercise_metric_type(current)
         ):
             continue
@@ -535,27 +538,28 @@ def _adapt_candidate(
         for item in sorted(day.exercises, key=lambda row: (row.sort_order, row.id)):
             source = item.exercise
             source_id = _effective_exercise_id(source)
-            if source_id not in selected_by_source_id:
-                selected, substituted = _choose_exercise(
-                    source,
-                    visible=visible,
-                    alternatives=alternatives,
-                    available_equipment=available_equipment,
-                    excluded_ids=excluded_ids,
-                )
-                selected_by_source_id[source_id] = selected
-                if substituted:
-                    substitutions.append(
-                        {
-                            "code": "equipment_substitution",
-                            "message": (
-                                f"«{source.title}» заменено на «{selected.title}» из канонического каталога."
-                            ),
-                            "day_number": day.day_number,
-                            "source_exercise_id": source_id,
-                            "replacement_exercise_id": _effective_exercise_id(selected),
-                        }
+            for exercise in [source, *(weekly.exercise for weekly in item.weekly_prescriptions)]:
+                exercise_id = _effective_exercise_id(exercise)
+                if exercise_id not in selected_by_source_id:
+                    selected, substituted = _choose_exercise(
+                        exercise,
+                        visible=visible,
+                        alternatives=alternatives,
+                        available_equipment=available_equipment,
+                        excluded_ids=excluded_ids,
+                        experience=payload.experience,
                     )
+                    selected_by_source_id[exercise_id] = selected
+                    if substituted:
+                        substitutions.append(
+                            {
+                                "code": "equipment_substitution",
+                                "message": f"«{exercise.title}» заменено на «{selected.title}» из каталога упражнений.",
+                                "day_number": day.day_number,
+                                "source_exercise_id": exercise_id,
+                                "replacement_exercise_id": _effective_exercise_id(selected),
+                            }
+                        )
             selected = selected_by_source_id[source_id]
             slots.append(
                 _Slot(
@@ -587,7 +591,12 @@ def _adapt_candidate(
                 groups.setdefault(key, []).append(slot)
             removable: list[tuple[int, tuple[str, int], list[_Slot]]] = []
             for key, group in groups.items():
-                if any(slot.source_item.sort_order <= 2 for slot in group):
+                if any(
+                    slot.source_item.sort_order <= 2
+                    or slot.source_item.prescription is not None
+                    or slot.source_item.weekly_prescriptions
+                    for slot in group
+                ):
                     continue
                 if any(_exercise_muscles(slot.selected_exercise) & priority_ids for slot in group):
                     continue
@@ -645,7 +654,7 @@ def _candidate_rank(
     payload: ProgramGeneratorRequest,
 ) -> tuple[int, tuple[object, ...], dict[str, int]]:
     template = candidate.template
-    goal_penalty = _GOAL_ORDER[payload.goal].index(template.goal)
+    goal_penalty = 0
     level_penalty = abs(_LEVEL_RANK[payload.experience] - _LEVEL_RANK.get(template.level, 99))
     duration_fit = sum(
         abs(value - payload.preferred_session_duration_minutes)
@@ -703,7 +712,7 @@ def _fit_reasons(candidate: _AdaptedCandidate, payload: ProgramGeneratorRequest)
     reasons = [
         f"Цель программы — {_goal_label(template.goal)}; запрос — {_goal_label(payload.goal)}.",
         f"Уровень программы: {_level_label(template.level)}; выбранный опыт: {_level_label(payload.experience)}.",
-        f"В структуре {len(template.days)} тренировочных дней — частота запроса соблюдена.",
+        f"Занятий в неделю: {_source_frequency(template)}; разных тренировок в цикле: {len(template.days)}.",
     ]
     split_label = _SPLIT_LABELS.get(template.split_type or "")
     if split_label:
@@ -742,20 +751,16 @@ def _fit_reasons(candidate: _AdaptedCandidate, payload: ProgramGeneratorRequest)
     if preferred_matches:
         reasons.append(f"Сохранено предпочитаемых упражнений: {len(preferred_matches)}.")
     if payload.excluded_exercise_ids:
-        reasons.append("Исключённые упражнения не вошли в итоговый draft.")
+        reasons.append("Исключённые упражнения не вошли в программу.")
     return tuple(reasons)
 
 
 def _tradeoffs(candidate: _AdaptedCandidate, payload: ProgramGeneratorRequest) -> tuple[str, ...]:
     template = candidate.template
     result: list[str] = []
-    if template.goal != payload.goal:
-        result.append(
-            f"Точного шаблона для цели «{_goal_label(payload.goal)}» нет; выбран ближайший совместимый источник."
-        )
     if template.level != payload.experience:
         result.append(
-            f"Источник рассчитан на {_level_label(template.level)} уровень, без advanced-only структуры для выбранного опыта."
+            f"Программа рассчитана на {_level_label(template.level)} уровень и не превышает выбранный опыт."
         )
     max_duration = max(candidate.day_estimates.values(), default=0)
     if max_duration != payload.preferred_session_duration_minutes:
@@ -763,21 +768,17 @@ def _tradeoffs(candidate: _AdaptedCandidate, payload: ProgramGeneratorRequest) -
             f"Длительность не является обещанием точного времени: расчёт составляет до {max_duration} мин."
         )
     if candidate.removals:
-        result.append(
-            "Часть необязательной аксессуарной работы сокращена; core-структура сохранена."
-        )
+        result.append("Часть вспомогательных упражнений сокращена; основные упражнения сохранены.")
     if payload.priority_muscle_ids and not (
         set(payload.priority_muscle_ids) & set(candidate.primary_muscle_ids)
     ):
-        result.append(
-            "Источник не содержит отдельного source-backed priority slot для выбранных групп."
-        )
+        result.append("В исходной программе нет отдельного акцента на выбранных группах мышц.")
     missing_preferences = set(payload.preferred_exercise_ids) - set(candidate.selected_ids)
     if missing_preferences:
         result.append("Некоторые предпочитаемые упражнения отсутствуют в выбранной структуре.")
     if candidate.schedule_adapted:
         result.append(
-            "Частота использует представление source-backed структуры в текущей модели YFC."
+            "Тренировки чередуются непрерывно: начало новой недели не сбрасывает порядок цикла."
         )
     return tuple(result)
 
@@ -838,6 +839,7 @@ def _program_from_candidate(
         split_type=cast(ProgramSplitType | None, candidate.template.split_type),
         days=days,
         estimated_duration_minutes=max(candidate.day_estimates.values(), default=0),
+        days_per_week=_source_frequency(candidate.template),
     )
 
 
@@ -847,7 +849,7 @@ def _adaptation_models(candidate: _AdaptedCandidate) -> list[ProgramGeneratorAda
         values.append(
             {
                 "code": "schedule_representation",
-                "message": "Source-backed частотная модель представлена в поддерживаемом цикле YFC.",
+                "message": "Сохранены частота занятий и непрерывное чередование тренировок исходной программы.",
                 "day_number": None,
                 "source_exercise_id": None,
                 "replacement_exercise_id": None,
@@ -957,6 +959,153 @@ def _confirm_options(metadata: dict[str, object]) -> dict[str, object]:
     return {}
 
 
+def _source_model(template: ProgramTemplate) -> ProgramGeneratorSource:
+    return ProgramGeneratorSource(
+        template_id=template.id,
+        slug=template.slug,
+        title=template.title,
+        goal=cast(ProgramRecommendationGoal, template.goal),
+        level=cast(ProgramExperience, template.level),
+        split_type=cast(ProgramSplitType | None, template.split_type),
+        provenance_type=cast(ProgramProvenanceType, template.provenance_type or "CUSTOM"),
+    )
+
+
+def _evaluate_candidate(
+    template: ProgramTemplate,
+    payload: ProgramGeneratorRequest,
+    visible: dict[int, Exercise],
+    alternatives: dict[int, set[int]],
+) -> _AdaptedCandidate:
+    if template.split_type not in _SPLIT_LABELS or not template.days:
+        raise _CandidateIncompatible("unsupported_structure")
+    if template.goal != payload.goal:
+        raise _CandidateIncompatible("goal_not_supported")
+    if _LEVEL_RANK.get(template.level, 99) > _LEVEL_RANK[payload.experience]:
+        raise _CandidateIncompatible("experience_incompatible")
+    if _source_frequency(template) != payload.days_per_week:
+        raise _CandidateIncompatible("frequency_not_supported")
+    candidate = _adapt_candidate(
+        template,
+        payload=payload,
+        visible=visible,
+        alternatives=alternatives,
+        available_equipment=set(payload.available_equipment_ids),
+        excluded_ids=set(payload.excluded_exercise_ids),
+    )
+    _candidate_rank(candidate, payload)
+    return candidate
+
+
+def _verified_suggestions(
+    templates: list[ProgramTemplate],
+    payload: ProgramGeneratorRequest,
+    visible: dict[int, Exercise],
+    alternatives: dict[int, set[int]],
+) -> list[ProgramGeneratorSuggestion]:
+    ranked: list[tuple[tuple[object, ...], ProgramGeneratorSuggestion]] = []
+    for template in templates:
+        frequency = _source_frequency(template)
+        if (
+            not 2 <= frequency <= 6
+            or _LEVEL_RANK.get(template.level, 99) > _LEVEL_RANK[payload.experience]
+        ):
+            continue
+        required: set[str] = set(payload.available_equipment_ids)
+        for day in template.days:
+            for item in day.exercises:
+                for exercise in [
+                    item.exercise,
+                    *(row.exercise for row in item.weekly_prescriptions),
+                ]:
+                    required.update(_exercise_equipment(exercise)[0])
+        inventories = [payload.available_equipment_ids]
+        if required != set(payload.available_equipment_ids):
+            inventories.append(cast(list[EquipmentIdentifier], sorted(required)))
+        found = False
+        for inventory in inventories:
+            for duration in sorted(
+                {payload.preferred_session_duration_minutes, 30, 45, 60, 90, 120}
+            ):
+                if duration < payload.preferred_session_duration_minutes:
+                    continue
+                inputs = ProgramGeneratorRequest.model_validate(
+                    {
+                        **payload.model_dump(),
+                        "goal": template.goal,
+                        "days_per_week": frequency,
+                        "preferred_session_duration_minutes": duration,
+                        "available_equipment_ids": inventory,
+                    }
+                )
+                try:
+                    _evaluate_candidate(template, inputs, visible, alternatives)
+                except _CandidateIncompatible:
+                    continue
+                changes: list[str] = []
+                if inputs.goal != payload.goal:
+                    changes.append(
+                        f"Цель: «{_goal_label(payload.goal)}» → «{_goal_label(inputs.goal)}»."
+                    )
+                if frequency != payload.days_per_week:
+                    changes.append(f"Занятий в неделю: {payload.days_per_week} → {frequency}.")
+                if duration != payload.preferred_session_duration_minutes:
+                    changes.append(
+                        f"Время на тренировку: {payload.preferred_session_duration_minutes} → {duration} мин."
+                    )
+                added = set(inventory) - set(payload.available_equipment_ids)
+                if added:
+                    changes.append(
+                        "Понадобится дополнительно: "
+                        + ", ".join(EQUIPMENT_NAME_BY_IDENTIFIER[key] for key in sorted(added))
+                        + "."
+                    )
+                if not changes:
+                    continue
+                rank = (
+                    len(changes),
+                    int(inputs.goal != payload.goal),
+                    len(added),
+                    abs(frequency - payload.days_per_week),
+                    duration - payload.preferred_session_duration_minutes,
+                    template.slug,
+                )
+                ranked.append(
+                    (
+                        rank,
+                        ProgramGeneratorSuggestion(
+                            source=_source_model(template), changes=changes, inputs=inputs
+                        ),
+                    )
+                )
+                found = True
+                break
+            if found:
+                break
+    suggestions: list[ProgramGeneratorSuggestion] = []
+    seen: set[str] = set()
+    for _rank, suggestion in sorted(ranked, key=lambda item: item[0]):
+        key = _sha256(_normalized_inputs(suggestion.inputs))
+        if key not in seen:
+            suggestions.append(suggestion)
+            seen.add(key)
+        if len(suggestions) == 3:
+            break
+    return suggestions
+
+
+_FAILURE_REASONS = {
+    "unsupported_structure": "структура не поддерживается подбором",
+    "goal_not_supported": "цель отличается от выбранной",
+    "experience_incompatible": "нужен более высокий уровень опыта",
+    "frequency_not_supported": "частота занятий отличается от выбранной",
+    "exercise_not_canonical": "обязательное упражнение недоступно в каталоге",
+    "equipment_no_canonical_substitution": "не хватает оборудования и нет проверенной замены",
+    "excluded_exercise_no_substitution": "исключённое упражнение нельзя безопасно заменить",
+    "duration_incompatible": "основные упражнения не помещаются в выбранное время",
+}
+
+
 def _build_decision(
     db: Session,
     current_user: User,
@@ -970,7 +1119,13 @@ def _build_decision(
     dict[str, object] | None,
 ]:
     templates, visible, alternatives, catalog_revision, hidden_ids = _load_catalog(db, current_user)
-    available, preferred, excluded = _validate_request_domain(db, current_user, payload, visible)
+    _available, preferred, excluded = _validate_request_domain(db, current_user, payload, visible)
+    payload = payload.model_copy(
+        update={
+            "preferred_exercise_ids": sorted(preferred),
+            "excluded_exercise_ids": sorted(excluded),
+        }
+    )
     active_state = _active_state(db, current_user)
     fingerprint = _build_fingerprint(
         payload,
@@ -979,65 +1134,36 @@ def _build_decision(
         active_state=active_state,
     )
     candidates: list[_AdaptedCandidate] = []
-    reason_codes: set[str] = set()
-    for template in templates:
-        if template.id in hidden_ids:
-            continue
+    failures: list[tuple[ProgramTemplate, str]] = []
+    eligible = [template for template in templates if template.id not in hidden_ids]
+    for template in eligible:
         if expected_source_template_id is not None and template.id != expected_source_template_id:
             continue
-        if template.split_type not in _SPLIT_LABELS:
-            reason_codes.add("unsupported_structure")
-            continue
-        if template.goal not in _GOAL_ORDER[payload.goal]:
-            reason_codes.add("goal_not_supported")
-            continue
-        if _LEVEL_RANK.get(template.level, 99) > _LEVEL_RANK[payload.experience]:
-            reason_codes.add("experience_incompatible")
-            continue
-        if _source_frequency(template) != payload.days_per_week:
-            reason_codes.add("frequency_not_supported")
-            continue
         try:
-            candidate = _adapt_candidate(
-                template,
-                payload=payload,
-                visible=visible,
-                alternatives=alternatives,
-                available_equipment=available,
-                excluded_ids=excluded,
-            )
+            candidate = _evaluate_candidate(template, payload, visible, alternatives)
         except _CandidateIncompatible as exc:
-            reason_codes.add(exc.code)
+            failures.append((template, exc.code))
             continue
-        # Reuse the normalized canonical IDs for ranking rather than trusting the raw client order.
-        payload_for_rank = payload.model_copy(
-            update={
-                "preferred_exercise_ids": sorted(preferred),
-                "excluded_exercise_ids": sorted(excluded),
-            }
-        )
-        _candidate_rank(candidate, payload_for_rank)
         candidates.append(candidate)
 
     candidates.sort(key=lambda item: item.rank)
     if not candidates:
-        if not reason_codes:
-            reason_codes.add("no_compatible_program")
-        ordered_codes = sorted(reason_codes)
-        message = "Не удалось подобрать программу под все выбранные ограничения. Измените конкретные параметры и повторите подбор."
-        if "duration_incompatible" in reason_codes:
-            message = "Расчётная структура не помещается в допустимую длительность даже после безопасного сокращения аксессуарной работы."
-        elif "equipment_no_canonical_substitution" in reason_codes:
-            message = "Не найдено канонической замены для обязательного упражнения под выбранное оборудование."
-        elif "frequency_not_supported" in reason_codes:
-            message = "Для выбранной частоты нет совместимой source-backed структуры."
+        code = "no_compatible_program"
+        message = "В доступном каталоге нет программы под все выбранные условия."
+        if failures:
+            depth = {key: index for index, key in enumerate(_FAILURE_REASONS)}
+            closest, code = min(failures, key=lambda item: (-depth[item[1]], item[0].slug))
+            message += f" Для программы «{closest.title}»: {_FAILURE_REASONS[code]}."
         response = ProgramGeneratorPreviewResponse(
             status="no_compatible",
             selection_policy_version=SELECTION_POLICY_VERSION,
             input_fingerprint=fingerprint,
             message=message,
-            reason_codes=ordered_codes,
+            reason_codes=[code],
             active_program=_active_response(active_state, current_user),
+            suggestions=_verified_suggestions(eligible, payload, visible, alternatives)
+            if expected_source_template_id is None
+            else [],
         )
         return response, None, catalog_revision, active_state
 
@@ -1051,15 +1177,7 @@ def _build_decision(
         source_template_id=selected.template.id,
         input_fingerprint=fingerprint,
     )
-    source = ProgramGeneratorSource(
-        template_id=selected.template.id,
-        slug=selected.template.slug,
-        title=selected.template.title,
-        goal=cast(ProgramRecommendationGoal, selected.template.goal),
-        level=cast(ProgramExperience, selected.template.level),
-        split_type=cast(ProgramSplitType | None, selected.template.split_type),
-        provenance_type=cast(ProgramProvenanceType, selected.template.provenance_type or "CUSTOM"),
-    )
+    source = _source_model(selected.template)
     response = ProgramGeneratorPreviewResponse(
         status="preview",
         selection_policy_version=SELECTION_POLICY_VERSION,
@@ -1159,7 +1277,7 @@ def _copy_weekly_prescriptions(
                 selected = source_candidate.selected_by_source_id.get(
                     _effective_exercise_id(source_weekly), source_weekly
                 )
-                db.add(
+                target_item.weekly_prescriptions.append(
                     ProgramTemplateExerciseWeekPrescription(
                         template_exercise_id=target_item.id,
                         exercise_id=_effective_exercise_id(selected),
@@ -1171,6 +1289,7 @@ def _copy_weekly_prescriptions(
                         prescription=copy.deepcopy(weekly.prescription),
                     )
                 )
+    db.flush()
 
 
 def _generated_metadata(

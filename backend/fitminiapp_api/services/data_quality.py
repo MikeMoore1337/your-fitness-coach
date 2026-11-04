@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, case, or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.program import (
@@ -14,9 +14,16 @@ from fitminiapp_api.models.program import (
     UserWorkoutExercise,
     UserWorkoutSet,
 )
+from fitminiapp_api.models.workout_history_import import ImportedWorkout
 from fitminiapp_api.schemas.data_quality import (
     DataSufficiencyReasonKey,
     DataSufficiencyStatus,
+)
+from fitminiapp_api.services.workout_ownership import workout_owner_id
+from fitminiapp_api.services.workout_sides import (
+    SIDE_MODES,
+    sql_completed_set_reps,
+    sql_side_rir_count,
 )
 
 RULESET_VERSION = "data-sufficiency-v1"
@@ -225,17 +232,21 @@ def collect_training_data_counts(
         return {}
     rows = (
         db.query(
-            UserProgram.user_id.label("user_id"),
+            workout_owner_id().label("user_id"),
             UserWorkout.id.label("workout_id"),
             UserWorkoutExercise.id.label("workout_exercise_id"),
             UserWorkoutExercise.prescribed_sets.label("prescribed_sets"),
             UserWorkoutSet.id.label("set_id"),
-            UserWorkoutSet.actual_reps.label("actual_reps"),
+            sql_completed_set_reps().label("actual_reps"),
             UserWorkoutSet.set_kind.label("set_kind"),
-            UserWorkoutSet.rir.label("rir"),
+            case(
+                (UserWorkoutSet.execution_mode.in_(SIDE_MODES), sql_side_rir_count() == 2),
+                else_=UserWorkoutSet.rir.is_not(None),
+            ).label("rir_recorded"),
         )
-        .select_from(UserProgram)
-        .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
+        .select_from(UserWorkout)
+        .outerjoin(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .outerjoin(ImportedWorkout, ImportedWorkout.workout_id == UserWorkout.id)
         .outerjoin(UserWorkoutExercise, UserWorkoutExercise.workout_id == UserWorkout.id)
         .outerjoin(
             UserWorkoutSet,
@@ -253,7 +264,7 @@ def collect_training_data_counts(
             or_(
                 *(
                     and_(
-                        UserProgram.user_id == user_id,
+                        workout_owner_id() == user_id,
                         UserWorkout.scheduled_date.between(
                             period_starts[user_id],
                             period_ends[user_id],
@@ -288,7 +299,7 @@ def collect_training_data_counts(
             continue
         sessions_with_sets[row.user_id].add(row.workout_id)
         working_set_count[row.user_id] += 1
-        rir_recorded_set_count[row.user_id] += int(row.rir is not None)
+        rir_recorded_set_count[row.user_id] += int(bool(row.rir_recorded))
 
     result: dict[int, TrainingDataCounts] = {}
     for user_id in user_ids:

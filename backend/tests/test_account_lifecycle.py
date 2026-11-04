@@ -107,6 +107,7 @@ def test_export_job_is_current_user_only_zip_and_replaces_previous_artifact(clie
             "nutrition-target-history.csv",
             "weekly-check-ins.csv",
             "workout-history.csv",
+            "workout-history-neutral-v2.csv",
         }
         payload = json.loads(archive.read("account.json"))
         measurements_csv = archive.read("measurements.csv").decode("utf-8-sig")

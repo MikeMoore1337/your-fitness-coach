@@ -1,0 +1,195 @@
+import { test, expect } from '@playwright/test';
+import { installPlatformApi } from './fixtures/platform-api';
+import { resolve } from 'node:path';
+
+const output = resolve(process.cwd(), '../.artifacts/tasks/917/temporary/concept');
+const viewports = [
+  { name: '320', width: 320, height: 844 },
+  { name: '360', width: 360, height: 844 },
+  { name: '393', width: 393, height: 844 },
+  { name: '430', width: 430, height: 932 },
+  { name: 'desktop', width: 1440, height: 900 },
+];
+
+test('Issue 917 concept in actual workout and progress contexts', async ({ browser }) => {
+  test.setTimeout(180_000);
+  for (const theme of ['dark', 'light'] as const) {
+    for (const viewport of viewports) {
+      const page = await browser.newPage({ viewport, reducedMotion: 'reduce' });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await installPlatformApi(page, {
+        browserSession: true,
+        fixedDate: '2026-10-30',
+        workoutStatus: 'in_progress',
+        progressionOutcome: 'consider_progressing',
+        progressState: 'populated',
+        programHistory: 'many',
+      });
+      await page.route('**/workouts/progress/training-analytics?**', (route) => route.fulfill({
+        json: {
+          period_days: 30, period_start: '2026-10-01', period_end: '2026-10-30',
+          previous_period_start: '2026-09-01', previous_period_end: '2026-09-30',
+          exercise_history_limit: 20, completed_set_count: 4, completed_workout_count: 4,
+          frequency_per_week: 0.93, previous_completed_workout_count: 2, previous_frequency_per_week: 0.47,
+          reps_total: 36, reps_recorded_sets: 4, external_load_volume_kg: 1360, volume_recorded_sets: 4,
+          exercises: [], rir: { completed_set_count: 4, recorded_set_count: 4, missing_set_count: 0, distribution: [] },
+          primary_muscle_exposure: [], secondary_muscle_exposure: [], completed_sets_without_muscle_metadata: 0,
+          muscle_group_workload: [{
+            muscle_id: 'quadriceps', muscle_name: 'Передняя поверхность бедра',
+            current: { completed_set_count: 4, primary_completed_set_count: 4, secondary_completed_set_count: 0, completed_session_count: 4, frequency_per_week: 0.93 },
+            previous: null, completed_set_count_change: null, frequency_per_week_change: null, trend: 'no_comparable_data', contributing_exercises: [{ exercise_id: 11, exercise_title: 'Приседания', contribution_roles: ['primary'], completed_set_count: 4, performed_session_count: 4, history_truncated: false, sessions: [] }],
+          }],
+          data_sufficiency: { working_sets: { status: 'limited', counters: { working_set_count: 4, workout_session_count: 4, required_working_set_count: 6, required_workout_session_count: 2 }, reason_keys: [] } },
+        },
+      }));
+      await page.goto('/app?section=today');
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      await page.getByRole('button', { name: 'Что делать сейчас?' }).click();
+      const guidance = page.locator('.active-session-summary .progression-guidance');
+      await expect(guidance).toBeVisible();
+      await page.locator('.active-session-summary').evaluate((node) => {
+        const label = [...node.querySelectorAll('span')].find((item) => item.textContent === 'Предыдущий результат');
+        if (!label?.parentElement) throw new Error('Previous-result tile missing');
+        label.textContent = 'Последний результат';
+        label.parentElement.querySelector('strong')!.textContent = '35 кг × 8';
+        label.parentElement.querySelector('small')!.textContent = 'По всей истории упражнения';
+      });
+      for (const state of ['heavy', 'light', 'medium'] as const) {
+        await guidance.evaluate((node, value) => {
+          const copy = node.querySelector('.progression-guidance__copy')!;
+          const title = copy.querySelector('span')!;
+          const message = copy.querySelector('strong')!;
+          const detail = copy.querySelector('p:not([data-concept-previous]):not(.progression-guidance__rule)')!;
+          const previous = copy.querySelector('[data-concept-previous]') ?? document.createElement('p');
+          previous.setAttribute('data-concept-previous', 'true');
+          previous.className = 'progression-guidance__rule';
+          message.after(previous);
+          const apply = node.querySelector('.progression-guidance__actions button') as HTMLButtonElement;
+          if (value === 'heavy') {
+            title.textContent = 'Следующая нагрузка · Тяжёлая неделя';
+            message.textContent = 'Можно рассмотреть увеличение до 42,5 кг';
+            previous.textContent = 'Прошлая сопоставимая: 40 кг × 10 · 20 октября';
+            detail.textContent = 'В двух сопоставимых тяжёлых тренировках достигнут верх диапазона; шаг 2,5 кг задан правилом.';
+            apply.style.display = '';
+          } else if (value === 'medium') {
+            title.textContent = 'Следующая нагрузка · Средняя неделя';
+            message.textContent = 'Пока оставьте текущую нагрузку';
+            previous.textContent = 'Прошлая сопоставимая: 35 кг × 8 · 23 октября';
+            detail.textContent = 'Верх диапазона повторений ещё не повторился.';
+            apply.style.display = 'none';
+          } else {
+            title.textContent = 'Следующая нагрузка · Лёгкая неделя';
+            message.textContent = 'Пока недостаточно данных';
+            previous.textContent = 'Сопоставимых тренировок пока нет.';
+            detail.textContent = 'Для рекомендации нужны полные результаты лёгких недель по этому упражнению.';
+            apply.style.display = 'none';
+          }
+          const details = node.querySelector('details')!;
+          const evidence = details.querySelector('.progression-guidance__evidence')!;
+          evidence.innerHTML = value === 'light'
+            ? '<p class="progression-guidance__empty">Нет сопоставимых тренировок лёгкого типа.</p><div class="progression-guidance__facts" style="display:grid;gap:4px;font-size:12px;line-height:1.45"><span>Причина: insufficient_same_type_history</span><span>Правило: progression-guidance-v3</span></div>'
+            : `<div class="progression-guidance__facts"><span>Сопоставимых тренировок: 2</span><span>Запас повторов записан в 2 из 2 рабочих подходов</span></div><ol class="progression-guidance__history"><li><span>20 октября · ${value === 'heavy' ? '40 кг × 10' : '35 кг × 8'}</span><small>1 рабочий подход · RIR 2</small></li><li><span>13 октября · ${value === 'heavy' ? '40 кг × 10' : '35 кг × 8'}</span><small>1 рабочий подход · RIR 2</small></li></ol><div class="progression-guidance__facts"><span>Источники: workout:17/set:41 · workout:12/set:43</span><span>Причины: ${value === 'heavy' ? 'top_range_repeated · full_rir_coverage' : 'target_range_not_repeated'}</span><span>Правило: progression-guidance-v3</span></div>`;
+        }, state);
+        await page.locator('.active-workout-exercise').first().screenshot({ path: resolve(output, `workout-${state}-${theme}-${viewport.name}.png`), animations: 'disabled', style: '#appBottomNav { visibility: hidden !important; }' });
+        if (state === 'heavy' && ['393', 'desktop'].includes(viewport.name)) {
+          await guidance.locator('details').evaluate((node) => { node.open = true; });
+          await guidance.screenshot({ path: resolve(output, `workout-heavy-details-${theme}-${viewport.name}.png`), animations: 'disabled', style: '#appBottomNav { visibility: hidden !important; }' });
+          await guidance.locator('details').evaluate((node) => { node.open = false; });
+        }
+      }
+      await page.goto('/app?section=progress&progress_view=training');
+      const training = page.locator('#progress-training');
+      await expect(training).toBeVisible();
+      const section = training.locator('.progress-subsection').last();
+      await expect(section).toBeVisible();
+      for (const state of ['all', 'heavy', 'medium', 'light'] as const) {
+        await section.evaluate((node, value) => {
+          const labels = { all: 'Все', light: 'Лёгкая', medium: 'Средняя', heavy: 'Тяжёлая' };
+          const options = Object.entries(labels).map(([key, label]) => `<button type="button" role="tab" class="ui-tab" style="min-width:0;padding-inline:4px;font-size:12px" data-yfc-choice="capsule" aria-selected="${key === value}">${label}</button>`).join('');
+          const disclosure = document.querySelector('.disclosure-icon')?.outerHTML ?? '';
+          const description = value === 'all' ? 'Показаны все завершённые тренировки.' : `Показаны тренировки: ${labels[value as keyof typeof labels].toLowerCase()} неделя.`;
+          const rows = [
+            { date: '23 октября', type: 'medium', weight: 35, reps: 8 },
+            { date: '20 октября', type: 'heavy', weight: 40, reps: 10 },
+            { date: '16 октября', type: 'medium', weight: 35, reps: 8 },
+            { date: '13 октября', type: 'heavy', weight: 40, reps: 10 },
+          ].filter((row) => value === 'all' || row.type === value);
+          const sessions = rows.map((row) => `<article class="progress-session"><header><div><strong>${row.date}</strong><small>1 рабочий подход · ${row.weight * row.reps} кг внешней нагрузки</small></div></header><div class="progress-session__sets"><div class="progress-set"><b>1</b><span><small>Вес</small><strong>${row.weight} кг</strong></span><span><small>Повторы</small><strong>${row.reps}</strong></span><span><small>Повторы в запасе</small><strong>2</strong></span></div></div></article>`).join('');
+          const content = value === 'light'
+            ? '<p class="progress-note">За выбранный период тренировок лёгкого типа пока нет.</p>'
+            : `<div class="progress-exercises"><details class="progress-exercise" open><summary class="yfc-disclosure-summary"><span><strong>Приседания</strong><small>${value === 'all' ? '4 тренировки · 4 рабочих подхода' : '2 тренировки · 2 рабочих подхода'}</small></span><span class="progress-exercise__best">до ${value === 'medium' ? '35' : '40'} кг</span>${disclosure}</summary><div class="progress-exercise__sessions">${sessions}</div></details></div>`;
+          node.innerHTML = `<div class="progress-subsection__head"><div><h3>История упражнений</h3><p>Фильтр влияет только на историю. Общие показатели выше не меняются.</p></div></div><div class="ui-tabs" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;max-width:480px" role="tablist" aria-label="Тип недели">${options}</div><p class="progress-training-meta">${description}</p>${content}`;
+        }, state);
+        const tabs = await section.locator('[role="tab"]').evaluateAll((nodes) => nodes.map((node) => {
+          const box = node.getBoundingClientRect();
+          return { width: box.width, height: box.height, left: box.left, right: box.right };
+        }));
+        expect(tabs).toHaveLength(4);
+        expect(tabs.every((box) => box.width >= 44 && box.height >= 44 && box.left >= -1 && box.right <= viewport.width + 1)).toBe(true);
+        await training.screenshot({ path: resolve(output, `analytics-${state}-${theme}-${viewport.name}.png`), animations: 'disabled', style: '#appBottomNav { visibility: hidden !important; }' });
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
+      expect(overflow).toBe(false);
+      const sourceGuidance = await page.evaluate(async () => {
+        const response = await fetch('/api/v1/workouts/today');
+        return (await response.json()).exercises[0].progression_guidance;
+      });
+      await page.route('**/programs/assigned/77/progression-proposals', (route) => route.fulfill({
+        json: { target_program_id: 77, target_revision_number: 4, target_workout_id: 943,
+          scheduled_date: '2026-10-30', exercises: [{ exercise_id: 11, exercise_title: 'Приседания', guidance: sourceGuidance }] },
+      }));
+      await page.goto('/app?section=programs&view=manage&panel=operations');
+      const proposal = page.locator('.progression-proposals');
+      await expect(proposal.locator('.progression-guidance')).toBeVisible();
+      for (const state of ['heavy', 'light', 'medium'] as const) {
+        await proposal.evaluate((node, value) => {
+          const guidance = node.querySelector('.progression-guidance')!;
+          const copy = guidance.querySelector('.progression-guidance__copy')!;
+          const title = copy.querySelector('span')!;
+          const message = copy.querySelector('strong')!;
+          const detail = copy.querySelector('p:not([data-concept-previous]):not(.progression-guidance__rule)')!;
+          const previous = copy.querySelector('[data-concept-previous]') ?? document.createElement('p');
+          previous.setAttribute('data-concept-previous', 'true');
+          previous.className = 'progression-guidance__rule';
+          message.after(previous);
+          const apply = guidance.querySelector('.progression-guidance__actions button') as HTMLButtonElement;
+          const adjustment = node.querySelector('.progression-proposals__adjust') as HTMLElement | null;
+          const evidence = guidance.querySelector('.progression-guidance__evidence')!;
+          if (value === 'heavy') {
+            title.textContent = 'Следующая нагрузка · Тяжёлая неделя';
+            message.textContent = 'Можно рассмотреть увеличение до 42,5 кг';
+            previous.textContent = 'Прошлая сопоставимая: 40 кг × 10 · 20 октября';
+            detail.textContent = 'В двух сопоставимых тяжёлых тренировках достигнут верх диапазона; шаг 2,5 кг задан правилом.';
+            apply.style.display = '';
+            if (adjustment) adjustment.style.display = '';
+          } else if (value === 'medium') {
+            title.textContent = 'Следующая нагрузка · Средняя неделя';
+            message.textContent = 'Пока оставьте текущую нагрузку';
+            previous.textContent = 'Прошлая сопоставимая: 35 кг × 8 · 23 октября';
+            detail.textContent = 'Верх диапазона повторений ещё не повторился.';
+            apply.style.display = 'none';
+            if (adjustment) adjustment.style.display = 'none';
+          } else {
+            title.textContent = 'Следующая нагрузка · Лёгкая неделя';
+            message.textContent = 'Пока недостаточно данных';
+            previous.textContent = 'Сопоставимых тренировок пока нет.';
+            detail.textContent = 'Для рекомендации нужны полные результаты лёгких недель по этому упражнению.';
+            apply.style.display = 'none';
+            if (adjustment) adjustment.style.display = 'none';
+          }
+          evidence.innerHTML = value === 'light'
+            ? '<p class="progression-guidance__empty">Нет сопоставимых тренировок лёгкого типа.</p><div class="progression-guidance__facts" style="display:grid;gap:4px;font-size:12px;line-height:1.45"><span>Причина: insufficient_same_type_history</span><span>Правило: progression-guidance-v3</span></div>'
+            : `<div class="progression-guidance__facts" style="display:grid;gap:4px;font-size:12px;line-height:1.45"><span>Сопоставимых тренировок: 2</span><span>Запас повторов записан в 2 из 2 рабочих подходов</span><span>Источники: workout:17/set:41 · workout:12/set:43</span><span>Причины: ${value === 'heavy' ? 'top_range_repeated · full_rir_coverage' : 'target_range_not_repeated'}</span><span>Правило: progression-guidance-v3</span></div>`;
+        }, state);
+        await proposal.screenshot({ path: resolve(output, `program-${state}-${theme}-${viewport.name}.png`), animations: 'disabled', style: '#appBottomNav { visibility: hidden !important; }' });
+        if (state === 'heavy' && ['393', 'desktop'].includes(viewport.name)) {
+          await proposal.locator('.progression-guidance details').evaluate((node) => { node.open = true; });
+          await proposal.screenshot({ path: resolve(output, `program-heavy-details-${theme}-${viewport.name}.png`), animations: 'disabled', style: '#appBottomNav { visibility: hidden !important; }' });
+          await proposal.locator('.progression-guidance details').evaluate((node) => { node.open = false; });
+        }
+      }
+      await page.close();
+    }
+  }
+});

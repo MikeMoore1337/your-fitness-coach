@@ -1,13 +1,29 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
-import type { ExerciseHistory, Workout, WorkoutScheduleItem } from '../../shared/api/types';
+import type {
+  ExerciseHistory,
+  Workout,
+  WorkoutScheduleItem,
+  WorkoutSetHistory,
+} from '../../shared/api/types';
 import { haptic } from '../../shared/telegram/useTelegram';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
 import { Icon } from '../../shared/ui/Icon';
 import { glassProps } from '../../shared/ui/Glass';
+import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { TaskProgress } from '../../shared/ui/DataViz';
 import {
   DisclosureIcon,
@@ -15,6 +31,8 @@ import {
   Button,
   Card,
   CheckIcon,
+  CloseIcon,
+  IconButton,
   EmptyState,
   ErrorState,
   LoadingState,
@@ -43,10 +61,15 @@ import {
 } from './restSessions';
 import { hasWorkoutExecutionEvidence, WorkoutAdaptation } from './WorkoutAdaptation';
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
+import { PreviousWorkoutNote } from './PreviousWorkoutNote';
 import { WorkoutRecovery } from './WorkoutRecovery';
+import { WorkoutSetPlanEditor } from './WorkoutSetPlanEditor';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
+import { ActiveWorkoutSyncContext } from './ActiveWorkoutSync';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
+import { formatCalendarDate } from '../../shared/dateTime';
 import {
   productEventSurface,
   trackCoreProductEvent,
@@ -59,17 +82,23 @@ import {
   PWA_SAFE_UPDATE_EVENT,
 } from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
+import { weekTypeLabels } from './weekTypes';
 import { useScreenWakeLock } from './useScreenWakeLock';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { WarmupProposal } from './WarmupProposal';
 import { PlateCalculator } from './PlateCalculator';
 import { ExerciseSetupMemory } from './ExerciseSetupMemory';
+import { ExerciseExecutionNote } from './ExerciseExecutionNote';
+import { ExerciseNoteRecovery } from './ExerciseNoteRecovery';
+import { noteIdentity } from './exerciseNoteQueue';
 import { ActiveSessionSummary } from './ActiveSessionSummary';
+import { boundSetHistory, previousCompletedSet } from './workoutSetHistory';
 import {
   hasDecimalScale,
   isCompleteDecimalDraft,
   parseDecimalDraft,
 } from '../../shared/numeric/decimalDraft';
+import './SideWorkout.css';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -86,6 +115,7 @@ type PreviousSetSource = Pick<
   WorkoutSet,
   'actual_reps' | 'actual_weight' | 'duration_minutes' | 'distance_km'
 >;
+type SetHistoryState = 'ready' | 'loading' | 'offline' | 'unavailable';
 
 export function resolvePreviousSetValues(
   set: PreviousSetSource,
@@ -184,6 +214,18 @@ export function formatPlannedGroupKind(kind: WorkoutSet['planned_group_kind']): 
   return kind ? plannedGroupKindLabels[kind] : null;
 }
 
+function changedPlanText(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const plan = value as {
+    load_target?: { kind?: string; value?: number };
+    rep_target?: { kind?: string; value?: number };
+  };
+  if (plan.load_target?.kind !== 'absolute' || plan.rep_target?.kind !== 'exact') return null;
+  if (typeof plan.load_target.value !== 'number' || typeof plan.rep_target.value !== 'number')
+    return null;
+  return `${plan.load_target.value} кг · ${plan.rep_target.value} повторов`;
+}
+
 function focusWorkoutControl(
   row: HTMLDivElement | null,
   field: 'reps' | 'distance' | 'rir' | 'done',
@@ -229,11 +271,13 @@ function RirSelector({
   disabled,
   value,
   onChange,
+  sideLabel,
 }: {
   compact?: boolean;
   disabled: boolean;
   value: RirValue | null;
   onChange: (value: RirValue | null) => void;
+  sideLabel?: string;
 }) {
   return (
     <fieldset className={`active-workout-rir${compact ? ' active-workout-rir--quick' : ''}`}>
@@ -243,7 +287,7 @@ function RirSelector({
           <button
             type="button"
             disabled={disabled}
-            aria-label={option.label}
+            aria-label={sideLabel ? `${sideLabel}: ${option.label}` : option.label}
             aria-pressed={value === option.value}
             data-yfc-choice="compact"
             className={value === option.value ? 'is-selected' : ''}
@@ -400,6 +444,10 @@ function WorkoutSetRow({
   isCurrent,
   previousResult,
   previousValues,
+  previousSetNumber,
+  previousPending,
+  pastHistory,
+  historyState,
   restSeconds,
   userId,
   workoutId,
@@ -410,6 +458,8 @@ function WorkoutSetRow({
   durable,
   syncing,
   syncFailed,
+  exerciseNote,
+  onEditPlan,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -420,6 +470,10 @@ function WorkoutSetRow({
   isCurrent: boolean;
   previousResult: string | null;
   previousValues?: PreviousSetValues;
+  previousSetNumber?: number;
+  previousPending: boolean;
+  pastHistory?: WorkoutSetHistory['sets'][number];
+  historyState: SetHistoryState;
   restSeconds: number;
   userId?: number;
   workoutId: number;
@@ -430,6 +484,8 @@ function WorkoutSetRow({
   durable: boolean;
   syncing: boolean;
   syncFailed: boolean;
+  exerciseNote?: ReactNode;
+  onEditPlan?: () => void;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -465,16 +521,34 @@ function WorkoutSetRow({
   const serverVersion = set.version ?? 1;
   const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
   const canPrefillWeight = weight === '' && previousValues?.actual_weight != null;
-  const [prefillDismissed, setPrefillDismissed] = useState(false);
   const canPrefill =
     isCurrent &&
     !disabled &&
     !completed &&
     previousResult !== null &&
-    !prefillDismissed &&
     (canPrefillReps || canPrefillWeight);
-  const prefillSpaceReserved =
-    prefillDismissed && isCurrent && !disabled && !completed && previousResult !== null;
+  const past =
+    historyState === 'ready' && pastHistory?.history_status === 'matched'
+      ? pastHistory.previous_workout
+      : null;
+  const pastResult = past?.sides
+    ? sideHistoryText(past.sides)
+    : past
+      ? formatSetResult(past.actual_reps, past.actual_weight)
+      : null;
+  const canPrefillPast =
+    isCurrent &&
+    !disabled &&
+    !completed &&
+    past != null &&
+    !past.sides &&
+    ((reps === '' && past.actual_reps != null) || (weight === '' && past.actual_weight != null));
+  const pastMessage = {
+    offline: 'История недоступна без сети',
+    loading: 'Обновляем историю…',
+    unavailable: 'История временно недоступна',
+    ready: pastResult ?? 'Нет прошлого результата',
+  }[historyState];
   const completedFieldsDisabled = disabled || completing || (completed && !editingCompleted);
 
   const canStartRest = (nextSetKind: SetKind, nextCompleted: boolean) =>
@@ -761,9 +835,37 @@ function WorkoutSetRow({
         </div>
       )}
 
-      {isCurrent && previousResult && (
-        <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
-      )}
+      <div
+        className="active-workout-set__history"
+        role="group"
+        aria-label={`История подхода ${set.set_number}`}
+      >
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Предыдущий сегодня</b>
+            <small>
+              {previousSetNumber == null
+                ? 'В этом упражнении'
+                : `Подход ${previousSetNumber} · ${previousPending ? (durable ? 'сохранён на устройстве' : 'не синхронизирован') : 'завершён'}`}
+            </small>
+          </span>
+          <strong className="active-workout-sides__history-value">
+            {previousResult ?? 'Нет завершённого подхода'}
+          </strong>
+        </div>
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Прошлая тренировка</b>
+            <small>
+              {past
+                ? `Этот подход · №${past.set_number} · ${formatCalendarDate(past.performed_on, { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+                : 'Этот подход'}
+            </small>
+            {past && <small>Справочно: тип недели может отличаться</small>}
+          </span>
+          <strong className="active-workout-sides__history-value">{pastMessage}</strong>
+        </div>
+      </div>
       {isCurrent && (
         <p className="active-workout-set__context">
           <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
@@ -794,7 +896,6 @@ function WorkoutSetRow({
             onChange={(event) => {
               const nextWeight = event.target.value;
               editing.current = true;
-              setPrefillDismissed(nextWeight !== '' && reps !== '');
               setWeight(nextWeight);
               if (!editingCompleted) enqueueSave({ weight: nextWeight });
             }}
@@ -821,7 +922,6 @@ function WorkoutSetRow({
             onChange={(event) => {
               const nextReps = event.target.value;
               editing.current = true;
-              setPrefillDismissed(nextReps !== '' && weight !== '');
               setReps(nextReps);
               if (!editingCompleted) enqueueSave({ reps: nextReps });
             }}
@@ -871,19 +971,15 @@ function WorkoutSetRow({
         </Button>
       </div>
 
-      {(canPrefill || prefillSpaceReserved) && (
-        <div
-          className={`active-workout-set__prefill-actions${prefillSpaceReserved ? ' is-hidden' : ''}`}
-          aria-hidden={prefillSpaceReserved || undefined}
-        >
+      {isCurrent && !completed && (
+        <div className="active-workout-set__prefill-actions active-workout-set__prefill-actions--history">
           <button
             className="active-workout-set__prefill"
-            disabled={completing}
+            disabled={!canPrefill || completing}
             type="button"
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
               const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
-              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
@@ -893,27 +989,25 @@ function WorkoutSetRow({
               });
             }}
           >
-            Подставить предыдущий результат
+            Подставить предыдущий подход сегодня
           </button>
           <button
-            className="active-workout-set__prefill active-workout-set__prefill--commit"
-            disabled={completing}
+            className="active-workout-set__prefill"
+            disabled={!canPrefillPast || completing}
             type="button"
             onClick={() => {
-              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
-              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
-              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
+              if (!past) return;
+              const nextReps =
+                reps === '' && past.actual_reps != null ? String(past.actual_reps) : reps;
+              const nextWeight =
+                weight === '' && past.actual_weight != null ? String(past.actual_weight) : weight;
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
-              enqueueSave({ reps: nextReps, weight: nextWeight, completed: true }, true);
-              trackProductEvent({
-                name: 'previous_set_reuse_used',
-                surface: productEventSurface(),
-              });
+              void enqueueSave({ reps: nextReps, weight: nextWeight });
             }}
           >
-            Подставить и завершить
+            Подставить из прошлой тренировки
           </button>
         </div>
       )}
@@ -922,6 +1016,14 @@ function WorkoutSetRow({
         <div className="active-workout-set__contextual-help">
           <RirContextualHelp />
         </div>
+      )}
+
+      {isCurrent && exerciseNote}
+
+      {onEditPlan && !completed && (
+        <Button type="button" variant="secondary" disabled={disabled} onClick={onEditPlan}>
+          Изменить план подхода
+        </Button>
       )}
 
       {isCurrent && set.set_kind !== 'warmup' && set.planned_role !== 'warmup' && (
@@ -962,12 +1064,14 @@ function WorkoutSetRow({
 
           {!isCurrent && (
             <RirSelector
-              disabled={completedFieldsDisabled}
+              disabled={disabled || completing}
               value={rir}
               onChange={(nextRir) => {
                 editing.current = true;
                 setRir(nextRir);
-                if (!editingCompleted) enqueueSave({ rir: nextRir });
+                // Completed sets allow quick metadata edits without reopening the set.
+                // Keep the explicit completed state and do not start a second rest period.
+                if (!editingCompleted) void enqueueSave({ rir: nextRir }, false, false);
               }}
             />
           )}
@@ -975,13 +1079,15 @@ function WorkoutSetRow({
           <label className="active-workout-failure">
             <input
               type="checkbox"
-              disabled={completedFieldsDisabled}
+              disabled={disabled || completing}
               checked={reachedFailure}
               onChange={(event) => {
                 const nextReachedFailure = event.target.checked;
                 editing.current = true;
                 setReachedFailure(nextReachedFailure);
-                if (!editingCompleted) enqueueSave({ reachedFailure: nextReachedFailure });
+                if (!editingCompleted) {
+                  void enqueueSave({ reachedFailure: nextReachedFailure }, false, false);
+                }
               }}
             />
             <span>Подход до отказа</span>
@@ -994,6 +1100,627 @@ function WorkoutSetRow({
           )}
         </div>
       </details>
+    </div>
+  );
+}
+
+type SideMode = 'per_side' | 'alternating';
+type SideName = 'left' | 'right';
+type SideFact = NonNullable<NonNullable<WorkoutSet['sides']>['left']>;
+type SideDraft = {
+  reps: string;
+  weight: string;
+  rir: RirValue | null;
+  failure: boolean | null;
+  completed: boolean;
+  present: boolean;
+};
+type SidesDraft = Record<SideName, SideDraft>;
+
+function sideDraft(value: SideFact | null | undefined): SideDraft {
+  return {
+    reps: value?.actual_reps == null ? '' : String(value.actual_reps),
+    weight: value?.actual_weight == null ? '' : String(value.actual_weight),
+    rir: value?.rir ?? null,
+    failure: value?.reached_failure ?? null,
+    completed: value?.is_completed ?? false,
+    present: value != null,
+  };
+}
+
+function sideDrafts(values: WorkoutSet['sides']): SidesDraft {
+  return { left: sideDraft(values?.left), right: sideDraft(values?.right) };
+}
+
+function encodeSide(value: SideDraft): SideFact | null | undefined {
+  if (!value.present) return null;
+  const reps = value.reps.trim() === '' ? null : Number(value.reps);
+  const weight = value.weight.trim() === '' ? null : parseDecimalDraft(value.weight);
+  if (
+    (reps !== null && (!Number.isInteger(reps) || reps < 0 || reps > 2147483647)) ||
+    (value.weight.trim() !== '' &&
+      (weight == null || weight < 0 || weight > 99999999.99 || !hasDecimalScale(value.weight, 2)))
+  )
+    return undefined;
+  return {
+    actual_reps: reps,
+    actual_weight: weight,
+    rir: value.rir,
+    reached_failure: value.failure,
+    is_completed: value.completed,
+  };
+}
+
+function sideHistoryText(sides: WorkoutSet['sides']): string {
+  if (!sides) return 'Нет данных по сторонам';
+  return (['left', 'right'] as const)
+    .map((key) => {
+      const side = sides[key];
+      const label = key === 'left' ? 'Левая' : 'Правая';
+      if (!side) return `${label}: нет данных`;
+      const value = formatSetResult(side.actual_reps, side.actual_weight) ?? 'значения не указаны';
+      return `${label}: ${value}${side.rir == null ? '' : ` · RIR ${side.rir}`}${side.reached_failure ? ' · до отказа' : ''}${side.is_completed ? '' : ' · не завершена'}`;
+    })
+    .join('\n');
+}
+
+function sideVersionText(value: {
+  execution_mode?: WorkoutSet['execution_mode'];
+  first_side?: WorkoutSet['first_side'];
+  sides?: WorkoutSet['sides'];
+  actual_reps?: number | null;
+  actual_weight?: number | null;
+  rir?: RirValue | null;
+  reached_failure?: boolean | null;
+  is_completed: boolean;
+}): string {
+  const mode =
+    value.execution_mode === 'per_side'
+      ? 'По сторонам'
+      : value.execution_mode === 'alternating'
+        ? 'Поочерёдно'
+        : 'Обычное';
+  const first = value.first_side
+    ? ` · первая: ${value.first_side === 'left' ? 'левая' : 'правая'}`
+    : '';
+  const state = value.is_completed ? 'подход завершён' : 'подход не завершён';
+  const effort = (rir: RirValue | null | undefined, failure: boolean | null | undefined) =>
+    `RIR ${rir ?? 'не указан'} · отказ ${failure == null ? 'не указан' : failure ? 'да' : 'нет'}`;
+  if (!value.sides)
+    return `${mode}${first} · ${state}\n${formatSetResult(value.actual_reps, value.actual_weight) ?? 'значения не указаны'} · ${effort(value.rir, value.reached_failure)}`;
+  return `${mode}${first} · ${state}\n${(['left', 'right'] as const)
+    .map((key) => {
+      const side = value.sides?.[key];
+      const label = key === 'left' ? 'Левая' : 'Правая';
+      return side
+        ? `${label}: ${formatSetResult(side.actual_reps, side.actual_weight) ?? 'значения не указаны'} · ${effort(side.rir, side.reached_failure)} · ${side.is_completed ? 'выполнена' : 'не завершена'}`
+        : `${label}: нет данных`;
+    })
+    .join('\n')}`;
+}
+
+function SideWorkoutSetRow({
+  set,
+  mode,
+  setPosition,
+  setTotal,
+  prescribedReps,
+  disabled,
+  isCurrent,
+  previousSet,
+  previousPending,
+  pastHistory,
+  historyState,
+  restSeconds,
+  userId,
+  workoutId,
+  exerciseTitle,
+  pending,
+  durable,
+  syncing,
+  exerciseNote,
+  enqueue,
+}: {
+  set: WorkoutSet;
+  mode: SideMode;
+  setPosition: number;
+  setTotal: number;
+  prescribedReps: string | null;
+  disabled: boolean;
+  isCurrent: boolean;
+  previousSet?: WorkoutSet;
+  previousPending?: ActiveWorkoutMutation;
+  pastHistory?: WorkoutSetHistory['sets'][number];
+  historyState: SetHistoryState;
+  restSeconds: number;
+  userId?: number;
+  workoutId: number;
+  exerciseTitle: string;
+  pending?: ActiveWorkoutMutation;
+  durable: boolean;
+  syncing: boolean;
+  exerciseNote?: ReactNode;
+  enqueue: (
+    setId: number,
+    serverVersion: number,
+    values: ActiveWorkoutSetValues,
+    immediate?: boolean,
+    completing?: boolean,
+  ) => Promise<boolean>;
+}) {
+  const { confirm } = useFeedback();
+  const sourceSides = pending?.values.sides ?? set.sides;
+  const [draft, setDraft] = useState<SidesDraft>(() => sideDrafts(sourceSides));
+  const [splitRequested, setSplitRequested] = useState(
+    () => JSON.stringify(sourceSides?.left ?? null) !== JSON.stringify(sourceSides?.right ?? null),
+  );
+  const [firstSide, setFirstSide] = useState<SideName | ''>(
+    pending?.values.first_side ?? set.first_side ?? '',
+  );
+  const [editingCompleted, setEditingCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const activeInput = useRef(false);
+  const inFlight = useRef(false);
+  const completed = pending?.values.is_completed ?? set.is_completed;
+  const split = splitRequested || JSON.stringify(draft.left) !== JSON.stringify(draft.right);
+  const setKind = pending?.values.set_kind ?? set.set_kind ?? 'working';
+  const past =
+    historyState === 'ready' && pastHistory?.history_status === 'matched'
+      ? pastHistory.previous_workout
+      : null;
+  const previousMode = previousPending?.values.execution_mode ?? previousSet?.execution_mode;
+  const previousSides = previousPending?.values.sides ?? previousSet?.sides;
+  const pastSides = past?.execution_mode === mode ? past.sides : null;
+  const canUsePrevious = previousMode === mode && !!previousSides;
+  const canUsePast = past?.execution_mode === mode && !!pastSides;
+
+  useEffect(() => {
+    if (activeInput.current || editingCompleted) return;
+    const incoming = pending?.values.sides ?? set.sides;
+    setDraft(sideDrafts(incoming));
+    setFirstSide(pending?.values.first_side ?? set.first_side ?? '');
+  }, [pending, set.sides, set.first_side, set.version, editingCompleted]);
+
+  const persist = async (
+    next: SidesDraft,
+    parentCompleted: boolean,
+    immediate = false,
+    startRest = false,
+    nextFirstSide = firstSide,
+  ) => {
+    const left = encodeSide(next.left);
+    const right = encodeSide(next.right);
+    if (left === undefined || right === undefined || inFlight.current) return false;
+    if (immediate) {
+      inFlight.current = true;
+      setSaving(true);
+    }
+    try {
+      const accepted = await enqueue(
+        set.id,
+        set.version ?? 1,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          rir: null,
+          reached_failure: null,
+          execution_mode: mode,
+          first_side: mode === 'alternating' ? nextFirstSide || null : null,
+          sides: { left, right },
+          set_kind: setKind,
+          is_completed: parentCompleted,
+          confirm_mode_change: pending?.values.confirm_mode_change ?? false,
+        },
+        immediate,
+        startRest && parentCompleted,
+      );
+      if (accepted && startRest && parentCompleted) {
+        haptic('success');
+        if (
+          userId &&
+          setKind === 'working' &&
+          !['warmup', 'activation'].includes(set.planned_role ?? '')
+        ) {
+          const rest = beginMeasuredRest(userId, workoutId, set.id, restSeconds, Date.now());
+          if (rest)
+            window.dispatchEvent(
+              new CustomEvent('fit:rest', {
+                detail: {
+                  workoutId,
+                  setId: set.id,
+                  seconds: restSeconds,
+                  deadline: rest.deadline,
+                },
+              }),
+            );
+        }
+      }
+      return accepted;
+    } finally {
+      if (immediate) {
+        inFlight.current = false;
+        setSaving(false);
+      }
+    }
+  };
+
+  const update = (next: SidesDraft) => {
+    setDraft(next);
+    if (!editingCompleted) void persist(next, false);
+  };
+  const updateOne = (key: SideName, changes: Partial<SideDraft>) => {
+    const next = { ...draft, [key]: { ...draft[key], ...changes, present: true } };
+    update(next);
+  };
+  const updateBoth = (changes: Partial<SideDraft>) => {
+    const shared = { ...draft.left, ...changes, present: true };
+    update({ left: shared, right: { ...shared } });
+  };
+  const applyHistory = (sides: WorkoutSet['sides']) => {
+    if (!sides) return;
+    const copy = (value: SideFact | null, current: SideDraft): SideDraft => {
+      if (!value?.is_completed || current.completed) return current;
+      return {
+        ...current,
+        reps: current.reps || (value.actual_reps == null ? '' : String(value.actual_reps)),
+        weight: current.weight || (value.actual_weight == null ? '' : String(value.actual_weight)),
+        present: true,
+      };
+    };
+    const next = { left: copy(sides.left, draft.left), right: copy(sides.right, draft.right) };
+    setSplitRequested(JSON.stringify(next.left) !== JSON.stringify(next.right));
+    update(next);
+  };
+  const switchToSame = async () => {
+    if (JSON.stringify(draft.left) !== JSON.stringify(draft.right)) {
+      const accepted = await confirm({
+        title: 'Сделать значения одинаковыми?',
+        message: 'Данные левой стороны заменят данные правой. Подтвердите изменение.',
+        confirmText: 'Использовать левую',
+        danger: false,
+      });
+      if (!accepted) return;
+    }
+    const shared = { ...draft.left, completed: completed && editingCompleted };
+    setSplitRequested(false);
+    update({ left: shared, right: { ...shared } });
+  };
+  const finish = async () => {
+    const next = split
+      ? draft
+      : {
+          left: { ...draft.left, present: true, completed: true },
+          right: { ...draft.left, present: true, completed: true },
+        };
+    setDraft(next);
+    await persist(next, true, true, true);
+  };
+  const reopen = async () => {
+    if (
+      !(await confirm({
+        title: 'Вернуть подход в работу?',
+        message: 'Сохранённые результаты сторон останутся.',
+        confirmText: 'Вернуть в работу',
+        danger: false,
+      }))
+    )
+      return;
+    await persist(draft, false, true);
+  };
+  const locked = disabled || saving || (completed && !editingCompleted);
+  const inputs = (key: SideName, label: string, shared: boolean) => {
+    const value = draft[key];
+    const blocked = locked || (!shared && value.completed && !editingCompleted);
+    const change = (changes: Partial<SideDraft>) =>
+      shared ? updateBoth(changes) : updateOne(key, changes);
+    return (
+      <>
+        <div className="active-workout-set__controls has-rir active-workout-sides__inputs">
+          <label className="active-workout-input">
+            <span>Вес · {shared ? 'на сторону' : label}, кг</span>
+            <input
+              data-workout-field="weight"
+              aria-label={`Вес, ${shared ? 'на сторону' : label}, ${exerciseTitle}, подход ${set.set_number}`}
+              type="text"
+              inputMode="decimal"
+              value={value.weight}
+              disabled={blocked}
+              onFocus={() => {
+                activeInput.current = true;
+              }}
+              onBlur={() => {
+                activeInput.current = false;
+              }}
+              onChange={(event) => change({ weight: event.target.value })}
+            />
+          </label>
+          <label className="active-workout-input">
+            <span>Повторы · {shared ? 'на сторону' : label}</span>
+            <input
+              data-workout-field="reps"
+              aria-label={`Повторы, ${shared ? 'на сторону' : label}, ${exerciseTitle}, подход ${set.set_number}`}
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={value.reps}
+              disabled={blocked}
+              onFocus={() => {
+                activeInput.current = true;
+              }}
+              onBlur={() => {
+                activeInput.current = false;
+              }}
+              onChange={(event) => change({ reps: event.target.value })}
+            />
+          </label>
+        </div>
+        <RirSelector
+          compact
+          sideLabel={shared ? undefined : label}
+          disabled={blocked}
+          value={value.rir}
+          onChange={(rir) => change({ rir })}
+        />
+        <label className="active-workout-failure">
+          <input
+            type="checkbox"
+            aria-label={shared ? 'До отказа на обе стороны' : `До отказа · ${label}`}
+            disabled={blocked}
+            checked={value.failure === true}
+            onChange={(event) => change({ failure: event.target.checked })}
+          />
+          <span>До отказа{shared ? ' на обе стороны' : ''}</span>
+        </label>
+      </>
+    );
+  };
+
+  return (
+    <div
+      className={`active-workout-set ${isCurrent ? 'is-current' : ''} ${completed ? 'is-completed' : ''}`}
+      data-workout-set-id={set.id}
+      aria-current={isCurrent ? 'step' : undefined}
+      aria-busy={syncing || undefined}
+    >
+      <div className="active-workout-set__head">
+        <div className="active-workout-set__identity">
+          <span className="active-workout-set__number">{set.set_number}</span>
+          <div>
+            <strong>
+              {isCurrent ? `Подход ${setPosition} из ${setTotal}` : `Подход ${set.set_number}`}
+            </strong>
+            {isCurrent && <span>Сначала вес, затем повторы</span>}
+          </div>
+        </div>
+        {(formatPlannedSetRole(set.planned_role) ||
+          formatPlannedGroupKind(set.planned_group_kind)) && (
+          <div className="active-workout-set__roles" aria-label="Структура подхода">
+            {formatPlannedSetRole(set.planned_role) && (
+              <span className="active-workout-set__role">
+                {formatPlannedSetRole(set.planned_role)}
+              </span>
+            )}
+            {formatPlannedGroupKind(set.planned_group_kind) && (
+              <span className="active-workout-set__role active-workout-set__role--group">
+                {formatPlannedGroupKind(set.planned_group_kind)}
+              </span>
+            )}
+          </div>
+        )}
+        {completed && (
+          <span className="active-workout-set__complete-label">
+            <CheckIcon />
+            {pending ? (durable ? 'Сохранено на устройстве' : 'Не сохранено') : 'Выполнен'}
+          </span>
+        )}
+      </div>
+      <div
+        className="active-workout-set__history"
+        role="group"
+        aria-label={`История подхода ${set.set_number}`}
+      >
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Предыдущий сегодня</b>
+            <small>{previousSet ? `Подход ${previousSet.set_number}` : 'В этом упражнении'}</small>
+          </span>
+          <strong className="active-workout-sides__history-value">
+            {canUsePrevious
+              ? sideHistoryText(previousSides)
+              : previousSet
+                ? 'Другой способ выполнения'
+                : 'Нет завершённого подхода'}
+          </strong>
+        </div>
+        <div className="active-workout-set__history-row">
+          <span>
+            <b>Прошлая тренировка</b>
+            <small>
+              {past
+                ? `Этот подход · №${past.set_number} · ${formatCalendarDate(past.performed_on, { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+                : 'Этот подход'}
+            </small>
+          </span>
+          <strong className="active-workout-sides__history-value">
+            {canUsePast
+              ? sideHistoryText(pastSides)
+              : historyState !== 'ready'
+                ? 'История временно недоступна'
+                : past
+                  ? 'Результат без сопоставимых сторон'
+                  : 'Нет прошлого результата'}
+          </strong>
+        </div>
+      </div>
+      {isCurrent && (
+        <p className="active-workout-set__context">
+          <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
+          <span aria-hidden="true">·</span>
+          <span>Отдых {restSeconds} с</span>
+        </p>
+      )}
+      {completed && (
+        <div className="active-workout-set__completed-actions app-action-group">
+          {editingCompleted ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDraft(sideDrafts(sourceSides));
+                  setEditingCompleted(false);
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  void persist(draft, true, true).then((ok) => {
+                    if (ok) setEditingCompleted(false);
+                  })
+                }
+              >
+                Сохранить
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={disabled || saving}
+                onClick={() => setEditingCompleted(true)}
+              >
+                Редактировать
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={disabled || saving}
+                onClick={() => void reopen()}
+              >
+                Вернуть в работу
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {mode === 'alternating' && (
+        <label className="active-workout-advanced-field">
+          <span>Первая сторона</span>
+          <select
+            value={firstSide}
+            disabled={locked}
+            onChange={(event) => {
+              const next = event.target.value as SideName | '';
+              setFirstSide(next);
+              if (!editingCompleted) void persist(draft, false, false, false, next);
+            }}
+          >
+            <option value="">Не указана</option>
+            <option value="left">Левая</option>
+            <option value="right">Правая</option>
+          </select>
+        </label>
+      )}
+      <div className="active-workout-sides__heading">
+        <span>
+          <b>{split ? 'Раздельно по сторонам' : 'Одинаково на обе стороны'}</b>
+          <small>
+            {split ? 'Вес и повторы для каждой стороны' : 'Значения относятся к каждой стороне'}
+          </small>
+        </span>
+        <button
+          type="button"
+          disabled={locked}
+          onClick={() => (split ? void switchToSame() : setSplitRequested(true))}
+        >
+          {split ? 'Одинаково' : 'Указать раздельно'}
+        </button>
+      </div>
+      {split ? (
+        (['left', 'right'] as const).map((key) => {
+          const label = key === 'left' ? 'Левая' : 'Правая';
+          return (
+            <section
+              className="active-workout-sides__side"
+              key={key}
+              aria-label={`${label} сторона`}
+            >
+              <div className="active-workout-sides__side-heading">
+                <strong>{label} сторона</strong>
+                <span className={draft[key].completed ? 'is-completed' : undefined}>
+                  {draft[key].completed ? 'Выполнена' : 'Не завершена'}
+                </span>
+              </div>
+              {inputs(key, label, false)}
+              {!completed && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={disabled || saving}
+                  onClick={() => {
+                    const next = {
+                      ...draft,
+                      [key]: { ...draft[key], present: true, completed: !draft[key].completed },
+                    };
+                    setDraft(next);
+                    void persist(next, false, true);
+                  }}
+                >
+                  {draft[key].completed ? 'Изменить' : 'Отметить выполненной'}
+                </Button>
+              )}
+            </section>
+          );
+        })
+      ) : (
+        <div className="active-workout-sides__side">
+          {inputs('left', 'Левая', true)}
+          <small>Завершая подход, подтверждаете обе стороны.</small>
+        </div>
+      )}
+      {!completed && (
+        <Button
+          type="button"
+          variant="primary"
+          data-workout-field="done"
+          disabled={
+            disabled || saving || (split && (!draft.left.completed || !draft.right.completed))
+          }
+          onClick={() => void finish()}
+        >
+          {saving ? 'Сохраняем…' : 'Завершить подход'}
+        </Button>
+      )}
+      {!completed && split && (!draft.left.completed || !draft.right.completed) && (
+        <small>Подход будет завершён после подтверждения обеих сторон.</small>
+      )}
+      {isCurrent && !completed && (
+        <div className="active-workout-set__prefill-actions active-workout-set__prefill-actions--history">
+          <button
+            className="active-workout-set__prefill"
+            type="button"
+            disabled={!canUsePrevious || disabled || saving}
+            onClick={() => applyHistory(previousSides)}
+          >
+            Подставить предыдущий подход сегодня
+          </button>
+          <button
+            className="active-workout-set__prefill"
+            type="button"
+            disabled={!canUsePast || disabled || saving}
+            onClick={() => applyHistory(pastSides)}
+          >
+            Подставить из прошлой тренировки
+          </button>
+        </div>
+      )}
+      {isCurrent && <RirContextualHelp />}
+      {isCurrent && exerciseNote}
     </div>
   );
 }
@@ -1016,6 +1743,7 @@ function CardioWorkoutRow({
   durable,
   syncing,
   syncFailed,
+  exerciseNote,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -1028,6 +1756,7 @@ function CardioWorkoutRow({
   durable: boolean;
   syncing: boolean;
   syncFailed: boolean;
+  exerciseNote?: ReactNode;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -1472,6 +2201,8 @@ function CardioWorkoutRow({
         </p>
       )}
 
+      {isCurrent && exerciseNote}
+
       <details className="active-workout-set__advanced">
         <summary className="yfc-disclosure-summary">
           Пульс (необязательно)
@@ -1523,14 +2254,12 @@ export function RestTimer({
   userId,
   workoutId,
   nextLabel,
-  nextExercise,
   nextPosition,
   eligibleRestSourceSetIds = [],
 }: {
   userId: number;
   workoutId: number;
   nextLabel: string;
-  nextExercise: string;
   nextPosition: string;
   eligibleRestSourceSetIds?: readonly number[];
 }) {
@@ -1556,9 +2285,11 @@ export function RestTimer({
   );
   const [restRecords, setRestRecords] = useState(() => loadRestJournal(userId, workoutId));
   const [restSaveError, setRestSaveError] = useState<string | null>(null);
+  const [restDialog, setRestDialog] = useState<'sync' | { recoveryId: string } | null>(null);
   const [compact, setCompact] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const panel = useRef<HTMLElement>(null);
+  const restSpacer = useRef<HTMLDivElement>(null);
   const pressedPointers = useRef(new Set<number>());
   const compactWhenPointersRelease = useRef(false);
   const layoutAnchor = useRef<{ element: Element; top: number } | null>(null);
@@ -1586,20 +2317,47 @@ export function RestTimer({
   const restPendingLabel = isOfflineRest
     ? 'Нет сети · отдых ожидает сохранения'
     : 'Отдых сохраняется…';
-  let collapsedRestStatus = 'Отдых идёт';
+  const needsReview = Boolean(measuredRest?.needs_review);
+  const recoveryDialogOpen =
+    needsReview &&
+    typeof restDialog === 'object' &&
+    restDialog?.recoveryId === measuredRest?.start_mutation_id;
+  const syncDialogOpen = restDialog === 'sync';
+  const restDialogOpen = recoveryDialogOpen || syncDialogOpen;
+  const restDialogTitle = recoveryDialogOpen ? 'Сколько отдыхали?' : 'Сохранение отдыха';
+  const restDialogRef = useModalA11y<HTMLDivElement>(
+    restDialogOpen,
+    () => setRestDialog(null),
+    recoveryDialogOpen ? 'input' : '.active-workout-rest-dialog__close',
+  );
+  const terminalRestLabel =
+    completedNotice === 'Отдых завершён по отметке' ||
+    completedNotice === 'Отдых сохранён по вашей отметке'
+      ? 'Отдых завершён'
+      : (completedNotice?.split(' · ')[0] ??
+        (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён'));
+  const hasPendingRest =
+    restIsUnconfirmed ||
+    Boolean(!measuredRest && latestRest && (!latestRest.server_id || latestRest.pending.length));
+  let collapsedRestStatus = seconds === 0 ? 'План готов' : 'Отдых идёт';
   if (restSaveError) {
     collapsedRestStatus = restSaveError.startsWith('Конфликт')
       ? 'Конфликт сохранения'
       : 'Ошибка сохранения';
-  } else if (restIsUnconfirmed) {
-    collapsedRestStatus = isOfflineRest ? 'Нет сети' : 'Отдых сохраняется…';
+  } else if (isOfflineRest) {
+    collapsedRestStatus = 'Нет сети';
+  } else if (hasPendingRest) {
+    collapsedRestStatus = 'Сохраняется…';
   }
   const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
   const showCompact = compact || restoredTerminal;
   const restPanelClassName = [
     'active-workout-rest',
     completedNotice || restoredTerminal ? 'active-workout-rest--complete' : null,
-    showCompact || collapsed ? 'is-compact' : null,
+    isRunningRest && seconds === 0 && !needsReview ? 'active-workout-rest--expired' : null,
+    showCompact || collapsed || needsReview ? 'is-compact' : null,
+    needsReview ? 'active-workout-rest--review' : null,
+    terminalNoticeDismissed ? 'active-workout-rest--dismissed' : null,
     showCompact && !(collapsed && isRunningRest) ? 'active-workout-rest--terminal' : null,
     showCompact && !restartCandidate && !terminalNoticeDismissed
       ? 'active-workout-rest--terminal-single'
@@ -1614,6 +2372,22 @@ export function RestTimer({
   const captureLayoutAnchor = useCallback(() => {
     const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
     if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
+  }, []);
+  const restoreLayoutAnchor = useCallback(() => {
+    const anchor = layoutAnchor.current;
+    if (!anchor) return;
+    const spacer = restSpacer.current;
+    // WebKit can resize the fixed panel before its inherited spacer height is committed.
+    if (
+      spacer?.getClientRects().length &&
+      spacer.getBoundingClientRect().height !== panel.current?.getBoundingClientRect().height
+    )
+      return;
+    layoutAnchor.current = null;
+    if (anchor.element.isConnected) {
+      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
+      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+    }
   }, []);
   const compactNotice = useCallback(() => {
     if (pressedPointers.current.size) {
@@ -1671,7 +2445,7 @@ export function RestTimer({
         setRestSaveError(
           status === 409
             ? 'Конфликт сохранения отдыха. Данные сохранены на устройстве.'
-            : 'Сервер временно недоступен. Отдых ожидает сохранения.',
+            : 'Сервер временно недоступен. Данные отдыха сохранены на устройстве и ожидают синхронизации.',
         );
       })
         .then(() => {
@@ -1869,13 +2643,22 @@ export function RestTimer({
       // same horizontal alignment without tracking vertical scroll frame by frame.
       const bounds = parent.getBoundingClientRect();
       if (bounds.width > 0) {
-        element.style.setProperty('--yfc-active-workout-rest-fixed-left', `${bounds.left}px`);
         element.style.setProperty('--yfc-active-workout-rest-fixed-width', `${bounds.width}px`);
+        const width = Math.min(bounds.width, element.getBoundingClientRect().width);
+        element.style.setProperty(
+          '--yfc-active-workout-rest-fixed-left',
+          `${bounds.left + (bounds.width - width) / 2}px`,
+        );
       }
     };
     updateClearance();
     const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateClearance);
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            updateClearance();
+            restoreLayoutAnchor();
+          });
     observer?.observe(element);
     observer?.observe(parent);
     window.addEventListener('resize', updateClearance);
@@ -1889,16 +2672,11 @@ export function RestTimer({
       element.style.removeProperty('--yfc-active-workout-rest-fixed-left');
       element.style.removeProperty('--yfc-active-workout-rest-fixed-width');
     };
-  }, [hasDeadline, collapsed, showCompact, completedNotice]);
+  }, [hasDeadline, collapsed, showCompact, completedNotice, restoreLayoutAnchor]);
 
   useLayoutEffect(() => {
-    const anchor = layoutAnchor.current;
-    layoutAnchor.current = null;
-    if (anchor?.element.isConnected) {
-      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
-      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
-    }
-  }, [collapsed, showCompact, completedNotice]);
+    restoreLayoutAnchor();
+  }, [collapsed, showCompact, completedNotice, restoreLayoutAnchor]);
 
   useEffect(() => {
     const element = panel.current;
@@ -1923,6 +2701,25 @@ export function RestTimer({
   }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
   if (!deadline && !completedNotice && !restartCandidate) return null;
+  const restStatus = (
+    <button
+      type="button"
+      className="active-workout-rest__status"
+      aria-haspopup="dialog"
+      aria-label={`Состояние отдыха: ${collapsedRestStatus}. Подробнее`}
+      onClick={(event) => {
+        // A second click from restart must not activate a newly placed control.
+        if (event.detail > 1) return;
+        event.currentTarget.focus();
+        setRestDialog('sync');
+      }}
+    >
+      {(hasPendingRest || restSaveError || isOfflineRest) && (
+        <Icon name={restSaveError || isOfflineRest ? 'warning' : 'sync'} size={16} />
+      )}
+      <span role="status">{collapsedRestStatus}</span>
+    </button>
+  );
   const restPanel = (
     <aside
       ref={panel}
@@ -1935,180 +2732,101 @@ export function RestTimer({
       }}
       onClick={(event) => event.stopPropagation()}
     >
-      {collapsed && isRunningRest ? (
+      {needsReview ? (
+        <div className="active-workout-rest__review">
+          <Icon name="warning" size={20} />
+          <div>
+            <strong>Уточнить отдых</strong>
+            <span>Время в фоне не засчитано</span>
+          </div>
+          <Button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={(event) => {
+              if (event.detail > 1) return;
+              event.currentTarget.focus();
+              if (measuredRest) setRestDialog({ recoveryId: measuredRest.start_mutation_id });
+            }}
+          >
+            Уточнить
+          </Button>
+        </div>
+      ) : collapsed && isRunningRest ? (
         <div className="active-workout-rest__collapsed">
           <div>
-            <strong aria-live="polite">{collapsedRestStatus}</strong>
-            <span>
-              ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
+            <strong role="status">{collapsedRestStatus}</strong>
+            <span className="active-workout-rest__collapsed-times">
+              Осталось{' '}
+              <span role="timer" aria-label="Отдых" aria-live="off">
+                {formatWorkoutDuration(seconds)}
+              </span>
+              {' · '}
+              <span>ФАКТ {formatWorkoutDuration(measuredElapsedSeconds)}</span>
             </span>
           </div>
           <Button
             type="button"
             variant="secondary"
-            glass="clear"
-            onClick={() => {
+            aria-label="Развернуть таймер"
+            onClick={(event) => {
+              if (event.detail > 1) return;
               captureLayoutAnchor();
               setCollapsed(false);
               writeStorage(`${storageKey}:panel-collapsed`, false);
             }}
           >
-            Показать таймер
+            Развернуть
           </Button>
         </div>
       ) : (
         <>
-          <div className="active-workout-rest__time" hidden={showCompact}>
-            <span>Отдых</span>
-            <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
-              {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
-            </strong>
-          </div>
-          <div className="active-workout-rest__next" hidden={showCompact}>
-            <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
-            <span className="active-workout-rest__next-meta">
-              <span>{nextPosition}</span>
-              {restIsUnconfirmed && (
-                <span
-                  className="active-workout-rest__next-status"
-                  aria-live="polite"
-                  title={restPendingLabel}
+          {!showCompact && (
+            <div className="active-workout-rest__top">
+              <div className="active-workout-rest__time">
+                <span>ОСТАЛОСЬ</span>
+                <strong
+                  role={completedNotice ? undefined : 'timer'}
+                  aria-label="Отдых"
+                  aria-live="off"
                 >
-                  <Icon name={isOfflineRest ? 'warning' : 'sync'} size={16} />
-                  <span className="sr-only">{restPendingLabel}</span>
-                </span>
-              )}
-            </span>
-          </div>
-          {measuredRest && !showCompact && (
-            <div className="active-workout-rest__actual">
-              <div className="active-workout-rest__actual-value">
-                <span>ФАКТ</span>
-                <strong aria-label="Время по отметке пользователя" aria-live="off">
-                  {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
+                  {formatWorkoutDuration(seconds)}
                 </strong>
               </div>
-              {!measuredRest.needs_review && (
-                <button
-                  className="active-workout-rest__stop"
+              {measuredRest && (
+                <div className="active-workout-rest__actual">
+                  <div className="active-workout-rest__actual-value">
+                    <span>ФАКТ</span>
+                    <strong aria-label="Время по отметке пользователя" aria-live="off">
+                      {formatWorkoutDuration(measuredElapsedSeconds)}
+                    </strong>
+                  </div>
+                </div>
+              )}
+              {restStatus}
+              {isRunningRest && (
+                <Button
                   type="button"
-                  aria-label="Завершить отдых"
-                  onClick={() => {
-                    const stoppedAt = Date.now();
-                    const result = updateMeasuredRest(
-                      userId,
-                      workoutId,
-                      measuredRest.source_set_id,
-                      'complete',
-                      stoppedAt,
-                    );
-                    setMeasuredRest(null);
-                    removeStorage(storageKey);
-                    setDeadline(0);
-                    setNow(stoppedAt);
-                    setCompletedNotice(
-                      result?.status === 'completed'
-                        ? 'Отдых завершён по отметке'
-                        : 'Нет достоверного замера отдыха',
-                    );
-                    compactNotice();
+                  variant="ghost"
+                  className="active-workout-rest__collapse"
+                  aria-label="Свернуть таймер"
+                  onClick={(event) => {
+                    if (event.detail > 1) return;
+                    captureLayoutAnchor();
+                    setCollapsed(true);
+                    writeStorage(`${storageKey}:panel-collapsed`, true);
                   }}
                 >
-                  Стоп
-                </button>
+                  <Icon name="chevron-up" size={20} />
+                </Button>
               )}
             </div>
           )}
-          {measuredRest?.needs_review && !showCompact && (
-            <section
-              className="active-workout-rest__recovery"
-              role="group"
-              aria-label="Уточнение фактического отдыха"
-            >
-              <strong>Вы забыли завершить отдых?</strong>
-              <p>
-                Приложение было неактивно, поэтому прошедшее время не считается достоверным замером.
-              </p>
-              <label htmlFor={`rest-recovery-${workoutId}`}>
-                Сколько вы фактически отдыхали (минуты)?
-              </label>
-              <input
-                id={`rest-recovery-${workoutId}`}
-                type="text"
-                inputMode="decimal"
-                className="ui-input"
-                placeholder="Например, 2,5"
-                value={recoveredMinutes}
-                onChange={(event) => {
-                  setRecoveredMinutes(event.target.value);
-                  setRecoveryValidation('');
-                }}
-              />
-              {recoveryValidation && <span role="alert">{recoveryValidation}</span>}
-              <div className="active-workout-rest__recovery-actions">
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => {
-                    const value = Number(recoveredMinutes.trim().replace(',', '.'));
-                    const correctedSeconds = Math.round(value * 60);
-                    if (
-                      !recoveredMinutes.trim() ||
-                      !Number.isFinite(value) ||
-                      correctedSeconds < 0 ||
-                      correctedSeconds > 86400
-                    ) {
-                      setRecoveryValidation('Введите время от 0 до 1440 минут');
-                      return;
-                    }
-                    const result = updateMeasuredRest(
-                      userId,
-                      workoutId,
-                      measuredRest.source_set_id,
-                      'complete',
-                      Date.now(),
-                      correctedSeconds,
-                    );
-                    if (result?.status !== 'completed') {
-                      setRecoveryValidation('Не удалось сохранить уточнение. Попробуйте ещё раз.');
-                      return;
-                    }
-                    setMeasuredRest(null);
-                    removeStorage(storageKey);
-                    setDeadline(0);
-                    setCompletedNotice('Отдых сохранён по вашей отметке');
-                    compactNotice();
-                  }}
-                >
-                  Сохранить время
-                </Button>
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => {
-                    updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
-                    setMeasuredRest(null);
-                    removeStorage(storageKey);
-                    setDeadline(0);
-                    setCompletedNotice('Отдых не учитывается');
-                    compactNotice();
-                  }}
-                >
-                  Не учитывать
-                </Button>
-              </div>
-            </section>
-          )}
-          <div
-            className="active-workout-rest__actions"
-            hidden={showCompact || Boolean(measuredRest?.needs_review)}
-          >
+          <div className="active-workout-rest__actions" hidden={showCompact}>
             {[30, 60].map((extraSeconds) => (
               <Button
                 key={extraSeconds}
                 aria-label={`+${extraSeconds} сек`}
                 type="button"
-                glass="clear"
                 variant="secondary"
                 aria-disabled={Boolean(completedNotice)}
                 tabIndex={completedNotice ? -1 : undefined}
@@ -2136,9 +2854,37 @@ export function RestTimer({
                 <Icon name="plus" size={16} /> {extraSeconds} сек
               </Button>
             ))}
+            {measuredRest && !measuredRest.needs_review && (
+              <Button
+                className="active-workout-rest__stop"
+                type="button"
+                aria-label="Стоп: завершить отдых"
+                onClick={() => {
+                  const stoppedAt = Date.now();
+                  const result = updateMeasuredRest(
+                    userId,
+                    workoutId,
+                    measuredRest.source_set_id,
+                    'complete',
+                    stoppedAt,
+                  );
+                  setMeasuredRest(null);
+                  removeStorage(storageKey);
+                  setDeadline(0);
+                  setNow(stoppedAt);
+                  setCompletedNotice(
+                    result?.status === 'completed'
+                      ? 'Отдых завершён по отметке'
+                      : 'Нет достоверного замера отдыха',
+                  );
+                  compactNotice();
+                }}
+              >
+                Стоп
+              </Button>
+            )}
             <Button
               type="button"
-              glass="clear"
               variant="secondary"
               aria-disabled={Boolean(completedNotice)}
               tabIndex={completedNotice ? -1 : undefined}
@@ -2157,34 +2903,42 @@ export function RestTimer({
             >
               Пропустить
             </Button>
-            {isRunningRest && !measuredRest?.needs_review && (
-              <button
-                type="button"
-                className="active-workout-rest__collapse"
-                aria-label="Свернуть таймер"
-                onClick={() => {
-                  captureLayoutAnchor();
-                  setCollapsed(true);
-                  writeStorage(`${storageKey}:panel-collapsed`, true);
-                }}
-              >
-                <Icon name="chevron-up" size={20} />
-              </button>
-            )}
           </div>
           {showCompact && (
             <>
               {!terminalNoticeDismissed && (
-                <div className="active-workout-rest__complete-summary">
-                  <span className="active-workout-rest__complete-copy">
-                    {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
-                  </span>
+                <button
+                  type="button"
+                  className="active-workout-rest__complete-summary"
+                  aria-haspopup="dialog"
+                  onClick={(event) => {
+                    if (event.detail > 1) return;
+                    event.currentTarget.focus();
+                    setRestDialog('sync');
+                  }}
+                >
+                  {(hasPendingRest ||
+                    restSaveError ||
+                    isOfflineRest ||
+                    terminalRestLabel.startsWith('Нет')) && (
+                    <span className="active-workout-rest__complete-mark" aria-hidden="true">
+                      <Icon
+                        name={
+                          restSaveError || isOfflineRest || terminalRestLabel.startsWith('Нет')
+                            ? 'warning'
+                            : 'sync'
+                        }
+                        size={16}
+                      />
+                    </span>
+                  )}
+                  <span className="active-workout-rest__complete-copy">{terminalRestLabel}</span>
                   {isCompletedLatestRest && latestRest?.measured_seconds != null && (
                     <span className="active-workout-rest__complete-copy">
                       ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
                     </span>
                   )}
-                </div>
+                </button>
               )}
               {(restartCandidate || !terminalNoticeDismissed) && (
                 <div className="active-workout-rest__complete-actions">
@@ -2217,14 +2971,13 @@ export function RestTimer({
                         writeStorage(`${storageKey}:panel-collapsed`, false);
                       }}
                     >
-                      Начать отдых
+                      Новый отдых
                     </Button>
                   )}
                   {!terminalNoticeDismissed && (
                     <Button
                       type="button"
                       variant="secondary"
-                      glass="clear"
                       onClick={() => {
                         captureLayoutAnchor();
                         setTerminalNoticeDismissed(Boolean(restartCandidate));
@@ -2239,30 +2992,159 @@ export function RestTimer({
               )}
             </>
           )}
-          {((measuredRest && restIsUnconfirmed && (showCompact || collapsed)) ||
-            (!measuredRest &&
-              latestRest &&
-              (!latestRest.server_id || latestRest.pending.length > 0))) && (
-            <p className="active-workout-rest__sync" aria-live="polite">
-              {isOfflineRest ? 'Нет сети · отдых ожидает сохранения' : 'Отдых сохраняется…'}
-            </p>
-          )}
-          {restSaveError && (
-            <p className="active-workout-rest__sync" role="alert">
-              {restSaveError}
-            </p>
-          )}
-          <span className="sr-only" role="status" aria-atomic="true">
-            {completedNotice ?? announcement}
-          </span>
         </>
       )}
+      <span className="sr-only" role="status" aria-atomic="true">
+        {needsReview
+          ? 'Уточните длительность отдыха или не учитывайте замер'
+          : (completedNotice ?? announcement)}
+      </span>
     </aside>
   );
   return (
     <>
       {restPanel}
-      <div className="active-workout-rest-spacer" aria-hidden="true" />
+      <div ref={restSpacer} className="active-workout-rest-spacer" aria-hidden="true" />
+      {restDialogOpen &&
+        createPortal(
+          <div
+            className="modal app-section--design-v2 active-workout-rest-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`rest-dialog-title-${workoutId}`}
+            aria-describedby={`rest-dialog-description-${workoutId}`}
+          >
+            <button
+              type="button"
+              className="modal__backdrop"
+              aria-label="Закрыть сведения об отдыхе"
+              onClick={(event) => {
+                if (event.detail <= 1) setRestDialog(null);
+              }}
+            />
+            <div
+              className="modal__panel active-workout-rest-dialog__panel"
+              ref={restDialogRef}
+              tabIndex={-1}
+            >
+              <header className="active-workout-rest-dialog__header">
+                <h2 id={`rest-dialog-title-${workoutId}`}>{restDialogTitle}</h2>
+                <IconButton
+                  type="button"
+                  className="active-workout-rest-dialog__close"
+                  aria-label="Закрыть сведения об отдыхе"
+                  onClick={() => setRestDialog(null)}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </header>
+              {recoveryDialogOpen && measuredRest?.needs_review && (
+                <section
+                  className="active-workout-rest__recovery"
+                  role="group"
+                  aria-label="Уточнение фактического отдыха"
+                >
+                  <p id={`rest-dialog-description-${workoutId}`}>
+                    Приложение было неактивно, поэтому прошедшее время не считается достоверным
+                    замером.
+                  </p>
+                  <label htmlFor={`rest-recovery-${workoutId}`}>Фактическое время, минуты</label>
+                  <input
+                    aria-invalid={Boolean(recoveryValidation)}
+                    aria-describedby={
+                      recoveryValidation ? `rest-recovery-error-${workoutId}` : undefined
+                    }
+                    id={`rest-recovery-${workoutId}`}
+                    type="text"
+                    inputMode="decimal"
+                    className="ui-input"
+                    placeholder="Например, 2,5"
+                    value={recoveredMinutes}
+                    onChange={(event) => {
+                      setRecoveredMinutes(event.target.value);
+                      setRecoveryValidation('');
+                    }}
+                  />
+                  {recoveryValidation && (
+                    <span id={`rest-recovery-error-${workoutId}`} role="alert">
+                      {recoveryValidation}
+                    </span>
+                  )}
+                  <div className="active-workout-rest__recovery-actions">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => {
+                        updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
+                        setMeasuredRest(null);
+                        removeStorage(storageKey);
+                        setDeadline(0);
+                        setCompletedNotice('Отдых не учитывается');
+                        setRestDialog(null);
+                        compactNotice();
+                      }}
+                    >
+                      Не учитывать
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        const value = Number(recoveredMinutes.trim().replace(',', '.'));
+                        const correctedSeconds = Math.round(value * 60);
+                        if (
+                          !recoveredMinutes.trim() ||
+                          !Number.isFinite(value) ||
+                          correctedSeconds < 0 ||
+                          correctedSeconds > 86400
+                        ) {
+                          setRecoveryValidation('Введите время от 0 до 1440 минут');
+                          return;
+                        }
+                        const result = updateMeasuredRest(
+                          userId,
+                          workoutId,
+                          measuredRest.source_set_id,
+                          'complete',
+                          Date.now(),
+                          correctedSeconds,
+                        );
+                        if (result?.status !== 'completed') {
+                          setRecoveryValidation(
+                            'Не удалось сохранить уточнение. Попробуйте ещё раз.',
+                          );
+                          return;
+                        }
+                        setMeasuredRest(null);
+                        removeStorage(storageKey);
+                        setDeadline(0);
+                        setCompletedNotice('Отдых сохранён по вашей отметке');
+                        setRestDialog(null);
+                        compactNotice();
+                      }}
+                    >
+                      Сохранить время
+                    </Button>
+                  </div>
+                </section>
+              )}
+
+              {syncDialogOpen && (
+                <p
+                  id={`rest-dialog-description-${workoutId}`}
+                  role={restSaveError ? 'alert' : 'status'}
+                >
+                  {restSaveError ??
+                    (hasPendingRest
+                      ? `${restPendingLabel}. Данные сохранены на устройстве и ожидают синхронизации.`
+                      : isOfflineRest
+                        ? 'Нет сети. Таймер продолжает работать. Данные сохранены на устройстве.'
+                        : 'Данные отдыха синхронизированы.')}
+                </p>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -2282,6 +3164,10 @@ export function TodayWorkout({
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [dismissedGuidance, setDismissedGuidance] = useState<Set<number>>(() => new Set());
   const [expandedExercises, setExpandedExercises] = useState<Set<number>>(() => new Set());
+  const [executionModes, setExecutionModes] = useState<Record<number, 'bilateral' | SideMode>>({});
+  const [modeChoicesOpen, setModeChoicesOpen] = useState<Set<number>>(() => new Set());
+  const [modeSaving, setModeSaving] = useState<Set<number>>(() => new Set());
+  const [planEdit, setPlanEdit] = useState<{ exerciseId: number; setId: number } | null>(null);
   const workout = useQuery({
     queryKey: ['workout', 'today'],
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
@@ -2290,7 +3176,43 @@ export function TodayWorkout({
     refetchOnReconnect: false,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
-  const activeSync = useActiveWorkoutQueue(user?.id, workout.data);
+  const sharedSync = useContext(ActiveWorkoutSyncContext);
+  const localSync = useActiveWorkoutQueue(
+    sharedSync ? undefined : user?.id,
+    sharedSync ? undefined : workout.data,
+  );
+  const activeSync = sharedSync ?? localSync;
+  const online = useOnlineStatus();
+  const historyEnabled = Boolean(
+    user?.id &&
+    workout.data &&
+    online &&
+    !workout.isFetching &&
+    !workout.isError &&
+    activeSync.pendingCount === 0 &&
+    !['pending', 'syncing', 'offline', 'error', 'conflict'].includes(activeSync.syncState),
+  );
+  const setHistory = useQuery({
+    queryKey: ['workout', 'set-history', user?.id, workout.data?.id, workout.dataUpdatedAt],
+    queryFn: ({ signal }) =>
+      api<WorkoutSetHistory>(`/api/v1/workouts/${workout.data!.id}/set-history`, {
+        signal,
+        cache: 'no-store',
+      }),
+    enabled: historyEnabled,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+  });
+  const historyState: SetHistoryState = !online
+    ? 'offline'
+    : workout.isError || ['error', 'conflict'].includes(activeSync.syncState) || setHistory.isError
+      ? 'unavailable'
+      : !historyEnabled || setHistory.isFetching || setHistory.isPending
+        ? 'loading'
+        : 'ready';
   useScreenWakeLock(workout.data?.status === 'in_progress');
   const mutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
@@ -2693,21 +3615,28 @@ export function TodayWorkout({
       if (!row || !controls || !dock?.height || !timer) return;
       const viewport = window.visualViewport;
       const top = Math.max(viewport?.offsetTop ?? 0, timer.bottom);
-      const bottom =
-        Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight), dock.top) - 8;
+      const viewportBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const bottom = Math.min(viewportBottom, dock.top) - 8;
       const nextRow = row.nextElementSibling;
       const next = nextRow?.querySelector('[data-workout-field="done"]')?.getBoundingClientRect();
-      const visibleNext =
-        nextRow &&
-        nextRow.getBoundingClientRect().top <
-          (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const nextTop = nextRow?.getBoundingClientRect().top;
+      const visibleNext = nextTop != null && nextTop < viewportBottom;
       const rir = row.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
       const overlap = Math.max(
         0,
         controls.bottom - bottom,
         visibleNext && next ? next.bottom - bottom : 0,
       );
-      const delta = Math.min(overlap, Math.min(controls.top, rir?.top ?? controls.top) - top);
+      const availableScroll = Math.min(controls.top, rir?.top ?? controls.top) - top;
+      // Keep current controls visible when both sets cannot fit above the dock.
+      if (visibleNext && next && next.bottom > bottom && overlap > availableScroll) {
+        const hideNext = viewportBottom - nextTop + 1;
+        if (hideNext <= bottom - controls.bottom) {
+          window.scrollBy({ top: -Math.ceil(hideNext), behavior: 'instant' });
+          return;
+        }
+      }
+      const delta = Math.min(overlap, availableScroll);
       if (delta > 0) window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -2798,6 +3727,28 @@ export function TodayWorkout({
     );
   }
 
+  const editedExercise = data.exercises.find((item) => item.id === planEdit?.exerciseId);
+  const editedSet = editedExercise?.sets.find((item) => item.id === planEdit?.setId);
+  if (planEdit && editedExercise && editedSet && started) {
+    return (
+      <WorkoutSetPlanEditor
+        exercise={editedExercise}
+        set={editedSet}
+        pendingBySet={activeSync.pendingBySet}
+        online={online}
+        ready={
+          activeSync.durable &&
+          activeSync.pendingCount === 0 &&
+          !workout.isFetching &&
+          !workout.isError &&
+          !['pending', 'syncing', 'offline', 'error', 'conflict'].includes(activeSync.syncState)
+        }
+        onClose={() => setPlanEdit(null)}
+        onApply={activeSync.changePlannedTarget}
+      />
+    );
+  }
+
   return (
     <>
       <section
@@ -2808,6 +3759,14 @@ export function TodayWorkout({
             <div className="active-workout-hero__copy">
               <span className="eyebrow">Тренировка · день {data.day_number}</span>
               <h2>{data.title}</h2>
+              {data.source_cycle_week != null && data.week_type_known && (
+                <p>
+                  Неделя {data.week_number} ·{' '}
+                  {data.week_type
+                    ? `${weekTypeLabels[data.week_type]} неделя`
+                    : 'тип недели не задан'}
+                </p>
+              )}
               <p>
                 {data.scheduled_date}
                 {data.scheduled_time ? ` · ${data.scheduled_time.slice(0, 5)}` : ''}
@@ -2846,11 +3805,18 @@ export function TodayWorkout({
                 <strong>{syncText}</strong>
                 {activeSync.message && <span>{activeSync.message}</span>}
               </div>
-              {syncNeedsAction && activeSync.pendingCount > 0 && navigator.onLine && (
-                <button className="secondary" type="button" onClick={() => void activeSync.retry()}>
-                  Повторить
-                </button>
-              )}
+              {syncNeedsAction &&
+                !activeSync.planConflict &&
+                activeSync.pendingCount > 0 &&
+                navigator.onLine && (
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => void activeSync.retry()}
+                  >
+                    Повторить
+                  </button>
+                )}
             </div>
           )}
         </header>
@@ -2880,7 +3846,6 @@ export function TodayWorkout({
             userId={user.id}
             workoutId={data.id}
             nextLabel={nextLabel}
-            nextExercise={currentSet?.exercise.exercise_title ?? 'Завершите тренировку'}
             nextPosition={
               currentSet
                 ? `Подход ${currentSet.set.set_number} из ${currentSet.exercise.sets.length}`
@@ -2901,9 +3866,172 @@ export function TodayWorkout({
           />
         )}
 
+        <PreviousWorkoutNote workoutId={data.id} />
+
+        {user && capabilities.canMutatePrograms && (
+          <ExerciseNoteRecovery userId={user.id} workout={data} />
+        )}
+
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
             const metricType = exercise.metric_type === 'cardio' ? 'cardio' : 'strength';
+            const modeTarget =
+              currentSet?.exercise.id === exercise.id
+                ? currentSet.set
+                : exercise.sets.find(
+                    (item) =>
+                      !(
+                        activeSync.pendingBySet.get(item.id)?.values.is_completed ??
+                        item.is_completed
+                      ),
+                  );
+            const targetPending = modeTarget
+              ? activeSync.pendingBySet.get(modeTarget.id)?.values
+              : undefined;
+            const targetMode = targetPending?.execution_mode ?? modeTarget?.execution_mode;
+            const lastExplicitMode = [...exercise.sets]
+              .reverse()
+              .map(
+                (item) =>
+                  activeSync.pendingBySet.get(item.id)?.values.execution_mode ??
+                  item.execution_mode,
+              )
+              .find((mode) => mode != null);
+            const executionMode =
+              executionModes[exercise.id] ?? targetMode ?? lastExplicitMode ?? 'bilateral';
+            const supportsSides = !!modeTarget && Object.hasOwn(modeTarget, 'sides');
+            const modeBusy = modeSaving.has(exercise.id);
+            const chooseExecutionMode = async (nextMode: 'bilateral' | SideMode) => {
+              if (!modeTarget || !supportsSides || !started || activeSync.sideConflict || modeBusy)
+                return;
+              if (nextMode === targetMode) {
+                setExecutionModes((current) => ({ ...current, [exercise.id]: nextMode }));
+                setModeChoicesOpen((current) => {
+                  const next = new Set(current);
+                  next.delete(exercise.id);
+                  return next;
+                });
+                return;
+              }
+              const existing = targetPending ?? modeTarget;
+              const hasFacts =
+                existing.is_completed ||
+                existing.actual_reps != null ||
+                existing.actual_weight != null ||
+                existing.rir != null ||
+                existing.reached_failure != null ||
+                (!!existing.sides &&
+                  [existing.sides.left, existing.sides.right].some(
+                    (side) =>
+                      side &&
+                      (side.is_completed ||
+                        side.actual_reps != null ||
+                        side.actual_weight != null ||
+                        side.rir != null ||
+                        side.reached_failure != null),
+                  ));
+              if (
+                hasFacts &&
+                !(await confirm({
+                  title: 'Изменить способ выполнения?',
+                  message:
+                    'Введённые данные этого незавершённого подхода будут очищены. Завершённые подходы не изменятся.',
+                  confirmText: 'Изменить и очистить',
+                  danger: false,
+                }))
+              )
+                return;
+              setModeSaving((current) => new Set(current).add(exercise.id));
+              try {
+                const accepted = await enqueueSet(
+                  modeTarget.id,
+                  modeTarget.version ?? 1,
+                  {
+                    actual_reps: null,
+                    actual_weight: null,
+                    rir: null,
+                    reached_failure: null,
+                    execution_mode: nextMode,
+                    first_side: null,
+                    sides: nextMode === 'bilateral' ? null : { left: null, right: null },
+                    confirm_mode_change: true,
+                    set_kind: existing.set_kind ?? 'working',
+                    is_completed: false,
+                  },
+                  true,
+                  false,
+                );
+                if (accepted) {
+                  for (const other of exercise.sets) {
+                    if (other.id === modeTarget.id) continue;
+                    const pending = activeSync.pendingBySet.get(other.id)?.values;
+                    const value = pending ?? other;
+                    const sideHasFacts =
+                      value.sides &&
+                      [value.sides.left, value.sides.right].some(
+                        (side) =>
+                          side &&
+                          (side.is_completed ||
+                            side.actual_reps != null ||
+                            side.actual_weight != null ||
+                            side.rir != null ||
+                            side.reached_failure != null),
+                      );
+                    if (
+                      value.is_completed ||
+                      value.actual_reps != null ||
+                      value.actual_weight != null ||
+                      value.rir != null ||
+                      value.reached_failure != null ||
+                      sideHasFacts
+                    )
+                      continue;
+                    const saved = await activeSync.enqueue(
+                      other.id,
+                      other.version ?? 1,
+                      {
+                        actual_reps: null,
+                        actual_weight: null,
+                        rir: null,
+                        reached_failure: null,
+                        execution_mode: nextMode,
+                        first_side: null,
+                        sides: nextMode === 'bilateral' ? null : { left: null, right: null },
+                        confirm_mode_change: true,
+                        set_kind: value.set_kind ?? 'working',
+                        is_completed: false,
+                      },
+                      true,
+                      true,
+                    );
+                    if (!saved) {
+                      toast(
+                        'Не удалось сохранить способ выполнения для всех незаполненных подходов.',
+                        'error',
+                      );
+                      break;
+                    }
+                  }
+                  setExecutionModes((current) => ({ ...current, [exercise.id]: nextMode }));
+                  setModeChoicesOpen((current) => {
+                    const next = new Set(current);
+                    next.delete(exercise.id);
+                    return next;
+                  });
+                  if (navigator.onLine)
+                    void queryClient.invalidateQueries({
+                      queryKey: ['workout', 'today'],
+                      exact: true,
+                    });
+                }
+              } finally {
+                setModeSaving((current) => {
+                  const next = new Set(current);
+                  next.delete(exercise.id);
+                  return next;
+                });
+              }
+            };
             const exerciseCompleted = exercise.sets.filter(
               (set) => activeSync.pendingBySet.get(set.id)?.values.is_completed ?? set.is_completed,
             ).length;
@@ -2918,6 +4046,16 @@ export function TodayWorkout({
             );
             const isCurrentExercise = currentSet?.exercise.id === exercise.id;
             const exerciseOpen = isCurrentExercise || expandedExercises.has(exercise.id);
+            const exerciseNote =
+              user && started && capabilities.canMutatePrograms ? (
+                <ExerciseExecutionNote
+                  key={`${user.id}-${data.id}-${exercise.id}-${JSON.stringify(noteIdentity(data, exercise))}`}
+                  userId={user.id}
+                  workout={data}
+                  exercise={exercise}
+                  visible={exerciseOpen}
+                />
+              ) : null;
             const groupKind =
               exercise.group_kind ?? (exercise.superset_group ? ('superset' as const) : null);
             const groupLabel =
@@ -2929,12 +4067,16 @@ export function TodayWorkout({
                   }`
                 : null;
             const suggestedWeight =
-              metricType === 'strength'
+              metricType === 'strength' && executionMode === 'bilateral'
                 ? (exercise.progression_guidance?.suggested_weight ?? null)
                 : null;
             const targetSetUpdates =
               exercise.progression_guidance?.proposal?.target_set_updates ?? [];
+            const sideProposal = exercise.progression_guidance?.proposal?.proposed_side_weights
+              ? exercise.progression_guidance.proposal
+              : null;
             const guidanceApplied =
+              !sideProposal &&
               targetSetUpdates.length > 0 &&
               targetSetUpdates.every((update) => {
                 const set = exercise.sets.find((item) => item.id === update.set_id);
@@ -2944,7 +4086,7 @@ export function TodayWorkout({
                   (pending?.actual_weight ?? set.actual_weight) === update.proposed_weight
                 );
               });
-            const applyGuidance =
+            const applyScalarGuidance =
               started && suggestedWeight != null && targetSetUpdates.length > 0
                 ? () => {
                     for (const update of targetSetUpdates) {
@@ -2954,7 +4096,7 @@ export function TodayWorkout({
                       if (pending?.is_completed ?? set.is_completed) continue;
                       activeSync.enqueue(set.id, update.set_version, {
                         actual_reps: pending?.actual_reps ?? set.actual_reps ?? null,
-                        actual_weight: update.proposed_weight,
+                        actual_weight: update.proposed_weight ?? null,
                         rir: pending?.rir ?? set.rir ?? null,
                         set_kind: pending?.set_kind ?? set.set_kind ?? 'working',
                         reached_failure: pending?.reached_failure ?? set.reached_failure ?? false,
@@ -2963,15 +4105,52 @@ export function TodayWorkout({
                     }
                   }
                 : undefined;
+            const applySideGuidance =
+              started && sideProposal?.eligibility_status === 'eligible'
+                ? async () => {
+                    if (!(await activeSync.flushNow())) {
+                      toast('Сначала синхронизируйте сохранённые подходы.', 'error');
+                      throw new Error('Очередь не синхронизирована');
+                    }
+                    try {
+                      await api(
+                        `/api/v1/programs/assigned/${sideProposal.target_program_id}/progression-proposals/${sideProposal.proposal_id}/review`,
+                        {
+                          method: 'POST',
+                          body: {
+                            decision: 'confirm',
+                            workout_id: sideProposal.target_workout_id,
+                            exercise_id: sideProposal.target_exercise_id,
+                            expected_revision_number: sideProposal.target_revision_number,
+                            expected_set_versions: Object.fromEntries(
+                              targetSetUpdates.map((item) => [item.set_id, item.set_version]),
+                            ),
+                          },
+                        },
+                      );
+                      await queryClient.invalidateQueries({
+                        queryKey: ['workout', 'today'],
+                        exact: true,
+                      });
+                    } catch (error) {
+                      toast(
+                        'Не удалось применить рекомендации. Обновите тренировку и проверьте данные.',
+                        'error',
+                      );
+                      throw error;
+                    }
+                  }
+                : undefined;
             const guidanceElement =
               metricType === 'strength' &&
               exercise.progression_guidance &&
+              (executionMode === 'bilateral' || exercise.progression_guidance.side_guidance) &&
               !dismissedGuidance.has(exercise.id) ? (
                 <ProgressionGuidance
                   applied={guidanceApplied}
                   exerciseKey={exercise.id}
                   guidance={exercise.progression_guidance}
-                  onApply={applyGuidance}
+                  onApply={sideProposal ? applySideGuidance : applyScalarGuidance}
                   onDismiss={() =>
                     setDismissedGuidance((current) => new Set(current).add(exercise.id))
                   }
@@ -3070,6 +4249,137 @@ export function TodayWorkout({
                   </div>
                 </header>
 
+                {metricType === 'strength' && supportsSides && exerciseOpen && started && (
+                  <div className="active-workout-sides__mode">
+                    <button
+                      type="button"
+                      aria-expanded={modeChoicesOpen.has(exercise.id)}
+                      aria-controls={`workout-mode-${exercise.id}`}
+                      onClick={() =>
+                        setModeChoicesOpen((current) => {
+                          const next = new Set(current);
+                          if (next.has(exercise.id)) next.delete(exercise.id);
+                          else next.add(exercise.id);
+                          return next;
+                        })
+                      }
+                    >
+                      Выполнение упражнения:{' '}
+                      {executionMode === 'per_side'
+                        ? 'по сторонам'
+                        : executionMode === 'alternating'
+                          ? 'поочерёдно'
+                          : 'обычное'}{' '}
+                      · изменить
+                    </button>
+                    <fieldset
+                      id={`workout-mode-${exercise.id}`}
+                      hidden={!modeChoicesOpen.has(exercise.id)}
+                    >
+                      <legend>Как выполняется упражнение?</legend>
+                      {(
+                        [
+                          ['bilateral', 'Обычное'],
+                          ['per_side', 'По сторонам'],
+                          ['alternating', 'Поочерёдно'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <label key={value}>
+                          <input
+                            type="radio"
+                            name={`workout-mode-${exercise.id}`}
+                            value={value}
+                            checked={executionMode === value}
+                            disabled={!!activeSync.sideConflict || modeBusy}
+                            onChange={() => void chooseExecutionMode(value)}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                      <small>Завершённые результаты не изменятся.</small>
+                    </fieldset>
+                  </div>
+                )}
+
+                {activeSync.sideConflict &&
+                  exercise.sets.some((item) => item.id === activeSync.sideConflict?.setId) && (
+                    <div className="active-workout-sides__conflict" role="alert">
+                      <strong>Сравнить версии подхода</strong>
+                      <p>
+                        Эта вкладка: <span>{sideVersionText(activeSync.sideConflict.local)}</span>
+                      </p>
+                      <p>
+                        Другая вкладка:{' '}
+                        <span>{sideVersionText(activeSync.sideConflict.server)}</span>
+                      </p>
+                      <p>Выберите полный вариант для обеих сторон.</p>
+                      <div className="app-action-group">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void activeSync.resolveSideConflict('local')}
+                        >
+                          Оставить эту версию
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void activeSync.resolveSideConflict('server')}
+                        >
+                          Выбрать другую версию
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                {activeSync.planConflict &&
+                  exercise.sets.some((item) => item.id === activeSync.planConflict?.setId) && (
+                    <div className="active-workout-sides__conflict" role="alert">
+                      <strong>
+                        {activeSync.planConflict.planChanged
+                          ? 'План подхода изменился'
+                          : 'Подход уже выполнен'}
+                      </strong>
+                      {activeSync.planConflict.planChanged && (
+                        <p>
+                          Новый план:{' '}
+                          {changedPlanText(activeSync.planConflict.plan) ??
+                            'недоступен для проверки'}
+                        </p>
+                      )}
+                      <p>
+                        Сохранено на устройстве:{' '}
+                        {formatSetResult(
+                          activeSync.planConflict.local.actual_reps,
+                          activeSync.planConflict.local.actual_weight,
+                        ) ?? 'значения не указаны'}
+                      </p>
+                      {activeSync.planConflict.server.is_completed ? (
+                        <p>Подход уже выполнен в другой вкладке. Локальный результат сохранён.</p>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={!changedPlanText(activeSync.planConflict.plan)}
+                          onClick={async () => {
+                            if (
+                              await confirm({
+                                title: 'Сохранить результат?',
+                                message:
+                                  'Проверьте новый план и сохранённые на устройстве значения.',
+                                confirmText: 'Сохранить результат',
+                                danger: false,
+                              })
+                            )
+                              await activeSync.resolvePlanConflict();
+                          }}
+                        >
+                          Проверить и сохранить результат
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                 {isCurrentExercise && currentSet && (
                   <ActiveSessionSummary
                     key={`active-session-summary-${exercise.id}-${exercise.exercise_id}`}
@@ -3145,24 +4455,58 @@ export function TodayWorkout({
 
                   <div className="active-workout-exercise__sets">
                     {exercise.sets.map((set, setIndex) => {
-                      const previousSet = setIndex > 0 ? exercise.sets[setIndex - 1] : undefined;
-                      const previousPending = previousSet
-                        ? activeSync.pendingBySet.get(previousSet.id)
-                        : undefined;
+                      const previousStrength =
+                        metricType === 'strength'
+                          ? previousCompletedSet(exercise.sets, setIndex, activeSync.pendingBySet)
+                          : undefined;
+                      const previousSet =
+                        metricType === 'strength'
+                          ? previousStrength?.set
+                          : setIndex > 0
+                            ? exercise.sets[setIndex - 1]
+                            : undefined;
+                      const previousPending =
+                        metricType === 'strength'
+                          ? previousStrength?.pending
+                          : previousSet
+                            ? activeSync.pendingBySet.get(previousSet.id)
+                            : undefined;
                       const previousValues = previousSet
                         ? resolvePreviousSetValues(previousSet, previousPending)
                         : undefined;
-                      const previousResult = previousValues
-                        ? metricType === 'cardio'
-                          ? formatCardioResult(
-                              previousValues.duration_minutes,
-                              previousValues.distance_km,
-                            )
-                          : formatSetResult(
-                              previousValues.actual_reps,
-                              previousValues.actual_weight,
-                            )
-                        : null;
+                      const previousSides = previousPending?.values.sides ?? previousSet?.sides;
+                      const previousResult =
+                        previousSides && metricType === 'strength'
+                          ? sideHistoryText(previousSides)
+                          : previousValues
+                            ? metricType === 'cardio'
+                              ? formatCardioResult(
+                                  previousValues.duration_minutes,
+                                  previousValues.distance_km,
+                                )
+                              : formatSetResult(
+                                  previousValues.actual_reps,
+                                  previousValues.actual_weight,
+                                )
+                            : null;
+                      const pastHistory =
+                        metricType === 'strength' && historyState === 'ready'
+                          ? boundSetHistory(setHistory.data, data.id, exercise, set)
+                          : undefined;
+                      const pendingValues = activeSync.pendingBySet.get(set.id)?.values;
+                      const savedMode = pendingValues?.execution_mode ?? set.execution_mode;
+                      const scalar = pendingValues ?? set;
+                      const hasScalarFacts =
+                        scalar.actual_reps != null ||
+                        scalar.actual_weight != null ||
+                        scalar.rir != null ||
+                        scalar.reached_failure != null;
+                      const rowMode =
+                        savedMode === 'per_side' || savedMode === 'alternating'
+                          ? savedMode
+                          : savedMode === 'bilateral' || hasScalarFacts || set.is_completed
+                            ? 'bilateral'
+                            : executionMode;
                       return metricType === 'cardio' ? (
                         <CardioWorkoutRow
                           key={set.id}
@@ -3176,6 +4520,38 @@ export function TodayWorkout({
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
+                          exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
+                          enqueue={enqueueSet}
+                        />
+                      ) : rowMode === 'per_side' || rowMode === 'alternating' ? (
+                        <SideWorkoutSetRow
+                          key={set.id}
+                          set={set}
+                          mode={rowMode}
+                          setPosition={setIndex + 1}
+                          setTotal={exercise.sets.length}
+                          prescribedReps={exercise.prescribed_reps}
+                          disabled={
+                            !started ||
+                            modeBusy ||
+                            activeSync.sideConflict?.setId === set.id ||
+                            activeSync.planConflict?.setId === set.id
+                          }
+                          isCurrent={currentSet?.set.id === set.id}
+                          previousSet={previousSet}
+                          previousPending={previousPending}
+                          pastHistory={pastHistory}
+                          historyState={
+                            historyState === 'ready' && !pastHistory ? 'unavailable' : historyState
+                          }
+                          restSeconds={exercise.rest_seconds}
+                          userId={user?.id}
+                          workoutId={data.id}
+                          exerciseTitle={exercise.exercise_title}
+                          pending={activeSync.pendingBySet.get(set.id)}
+                          durable={activeSync.durable}
+                          syncing={activeSync.syncState === 'syncing'}
+                          exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
                           enqueue={enqueueSet}
                         />
                       ) : (
@@ -3187,7 +4563,9 @@ export function TodayWorkout({
                           prescribedReps={exercise.prescribed_reps}
                           restSeconds={exercise.rest_seconds}
                           userId={user?.id}
-                          disabled={!started}
+                          disabled={
+                            !started || modeBusy || activeSync.planConflict?.setId === set.id
+                          }
                           workoutId={data.id}
                           workoutExerciseId={exercise.id}
                           exerciseTitle={exercise.exercise_title}
@@ -3197,15 +4575,28 @@ export function TodayWorkout({
                           isCurrent={currentSet?.set.id === set.id}
                           previousResult={previousResult}
                           previousValues={previousValues}
+                          previousSetNumber={previousSet?.set_number}
+                          previousPending={Boolean(previousPending)}
+                          pastHistory={pastHistory}
+                          historyState={
+                            historyState === 'ready' && !pastHistory ? 'unavailable' : historyState
+                          }
                           pending={activeSync.pendingBySet.get(set.id)}
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
+                          exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
+                          onEditPlan={
+                            started && capabilities.canMutatePrograms
+                              ? () => setPlanEdit({ exerciseId: exercise.id, setId: set.id })
+                              : undefined
+                          }
                           enqueue={enqueueSet}
                         />
                       );
                     })}
                   </div>
+                  {!isCurrentExercise && exerciseNote}
                 </div>
               </article>
             );

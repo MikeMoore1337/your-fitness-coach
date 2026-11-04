@@ -14,6 +14,7 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { profileGoals } from './goals';
 import { BodyPriorityPicker, isBodyPriorityComplete } from './BodyPriorityPicker';
 import { TrainingPreferencesForm } from './TrainingPreferencesForm';
+import { EquipmentProfilesCard } from '../equipment/EquipmentProfiles';
 import { Icon } from '../../shared/ui/Icon';
 import { AccountAvatar } from '../../shared/account/AccountIdentity';
 import { AvatarSettings } from './AvatarSettings';
@@ -720,6 +721,7 @@ export function ProfileForm() {
         </form>
       </Card>
       <TrainingPreferencesForm />
+      <EquipmentProfilesCard />
       <AvatarSettings open={avatarEditorOpen} onClose={() => setAvatarEditorOpen(false)} />
     </>
   );

@@ -4,7 +4,7 @@ import { installPlatformApi } from './fixtures/platform-api';
 
 type PerformanceWindow = typeof window & {
   __yfcLabMetrics?: {
-    cls: number;
+    cls: number | null;
     clsEntries: Array<{ value: number; sources: string[] }>;
     lcp: number | null;
     inp: number | null;
@@ -14,41 +14,47 @@ type PerformanceWindow = typeof window & {
 
 async function observeLabMetrics(page: Page) {
   await page.addInitScript(() => {
+    const supported = PerformanceObserver.supportedEntryTypes ?? [];
     const state: NonNullable<PerformanceWindow['__yfcLabMetrics']> = {
-      cls: 0,
+      cls: supported.includes('layout-shift') ? 0 : null,
       clsEntries: [],
       lcp: null as number | null,
       inp: null as number | null,
       eventTimingSupported: false,
     };
     (window as PerformanceWindow).__yfcLabMetrics = state;
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        const shift = entry as PerformanceEntry & {
-          hadRecentInput?: boolean;
-          value?: number;
-          sources?: Array<{ node?: Node | null }>;
-        };
-        if (!shift.hadRecentInput) {
-          const value = shift.value ?? 0;
-          state.cls += value;
-          state.clsEntries.push({
-            value,
-            sources: (shift.sources ?? []).map(({ node }) =>
-              node instanceof HTMLElement
-                ? `${node.tagName.toLowerCase()}.${node.className}`
-                : (node?.nodeName ?? 'unknown'),
-            ),
-          });
+    if (state.cls !== null) {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const shift = entry as PerformanceEntry & {
+            hadRecentInput?: boolean;
+            value?: number;
+            sources?: Array<{ node?: Node | null }>;
+          };
+          if (!shift.hadRecentInput) {
+            const value = shift.value ?? 0;
+            state.cls = (state.cls ?? 0) + value;
+            state.clsEntries.push({
+              value,
+              sources: (shift.sources ?? []).map(({ node }) =>
+                node instanceof HTMLElement
+                  ? `${node.tagName.toLowerCase()}.${node.className}`
+                  : (node?.nodeName ?? 'unknown'),
+              ),
+            });
+          }
         }
-      }
-    }).observe({ type: 'layout-shift', buffered: true });
-    new PerformanceObserver((list) => {
-      const entries = list.getEntries();
-      const lastEntry = entries.at(-1);
-      if (lastEntry) state.lcp = lastEntry.startTime;
-    }).observe({ type: 'largest-contentful-paint', buffered: true });
+      }).observe({ type: 'layout-shift', buffered: true });
+    }
+    if (supported.includes('largest-contentful-paint')) {
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        const lastEntry = entries.at(-1);
+        if (lastEntry) state.lcp = lastEntry.startTime;
+      }).observe({ type: 'largest-contentful-paint', buffered: true });
+    }
     try {
+      if (!supported.includes('event')) return;
       new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           const interaction = entry as PerformanceEntry & {
@@ -127,6 +133,14 @@ test('Telegram demo handoff clears private demo tokens before entering the app',
 function captureConsoleFailures(page: Page) {
   const failures: string[] = [];
   page.on('console', (message) => {
+    if (message.type() === 'warning' && message.location().url.startsWith('chrome://juggler/'))
+      return;
+    if (
+      message.type() === 'warning' &&
+      message.location().url === 'web-inspector://bootstrap.js' &&
+      message.text() === 'Service Worker registration blocked by Playwright'
+    )
+      return;
     if (message.type() === 'error' || message.type() === 'warning') {
       failures.push(`${message.type()}: ${message.text()}`);
     }
@@ -183,6 +197,7 @@ test('Landing and login keep public/auth initial work bounded in desktop and mob
         hasTouch: viewport.hasTouch,
         isMobile: viewport.isMobile,
         reducedMotion: 'reduce',
+        serviceWorkers: 'allow',
       });
       const page = await context.newPage();
       const consoleFailures = captureConsoleFailures(page);
@@ -223,7 +238,14 @@ test('Landing and login keep public/auth initial work bounded in desktop and mob
       const metrics = await readLabMetrics(page);
       expect(metrics).not.toBeUndefined();
       console.log(`H50_LAB_METRICS ${viewport.name} ${route} ${JSON.stringify(metrics)}`);
-      expect(metrics?.cls ?? 0).toBeLessThanOrEqual(0.1);
+      if (metrics?.cls !== null && metrics?.cls !== undefined) {
+        expect(metrics.cls).toBeLessThanOrEqual(0.1);
+      } else {
+        testInfo.annotations.push({
+          type: 'lab-metric-unavailable',
+          description: 'CLS unsupported',
+        });
+      }
       if (metrics?.lcp !== null && metrics?.lcp !== undefined) {
         expect(metrics.lcp).toBeLessThanOrEqual(2500);
       }
@@ -254,6 +276,7 @@ test('Mobile Web and mocked TMA share one frontend resource graph', async ({ bro
       hasTouch: true,
       isMobile: true,
       reducedMotion: 'reduce',
+      serviceWorkers: browser.browserType().name() === 'webkit' ? 'block' : 'allow',
     });
     const page = await context.newPage();
     const consoleFailures = captureConsoleFailures(page);
@@ -304,9 +327,11 @@ test('Today initial queries settle without duplicate fetches', async ({ page }) 
     '/api/v1/nutrition/hydration',
     '/api/v1/public/config',
     '/api/v1/workouts/42/comments',
+    '/api/v1/workouts/42/previous-completion-note',
     '/api/v1/workouts/cardio',
     '/api/v1/workouts/progress/summary',
     '/api/v1/workouts/recovery',
+    '/api/v1/workouts/session-rotation',
     '/api/v1/workouts/today',
     '/api/v1/workouts/week',
   ];

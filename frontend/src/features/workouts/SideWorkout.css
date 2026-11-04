@@ -1,0 +1,120 @@
+.active-workout-sides__mode {
+  margin: 0 0 var(--v2-space-3);
+}
+
+.active-workout-sides__mode > button,
+.active-workout-sides__heading > button {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--v2-accent-text);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+}
+
+.active-workout-sides__mode fieldset,
+.active-workout-sides__conflict {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  margin: 0 0 var(--v2-space-3);
+  padding: var(--v2-space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--v2-control-radius);
+}
+
+.active-workout-sides__mode fieldset[hidden] {
+  display: none;
+}
+
+.active-workout-sides__mode label {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--v2-space-2);
+}
+
+.active-workout-sides__mode input {
+  accent-color: var(--v2-lime);
+}
+
+.active-workout-sides__heading,
+.active-workout-sides__side-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+}
+
+.active-workout-sides__heading {
+  border-block: 1px solid var(--border);
+}
+
+.active-workout-sides__heading small {
+  display: block;
+  color: var(--muted);
+}
+
+.active-workout-sides__side {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  padding-bottom: var(--v2-space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.active-workout-sides__side[aria-label] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.active-workout-sides__side[aria-label] > * {
+  grid-column: 1 / -1;
+}
+
+.active-workout-sides__side[aria-label] > .active-workout-failure {
+  grid-column: 1;
+}
+
+.active-workout-sides__side[aria-label] > .ui-button {
+  grid-column: 2;
+  justify-self: end;
+  padding-inline: var(--v2-space-3);
+  font-size: var(--font-size-caption);
+}
+
+.active-workout-sides__inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-2);
+}
+
+.active-workout-sides__inputs > * {
+  min-width: 0;
+}
+
+.active-workout-sides__side-heading span,
+.active-workout-sides__side > small {
+  color: var(--muted);
+  font-size: var(--font-size-caption);
+}
+
+.active-workout-sides__side-heading span.is-completed {
+  color: var(--v2-accent-text);
+}
+
+.active-workout-sides__history-value,
+.active-workout-sides__conflict span {
+  white-space: pre-line;
+  font-variant-numeric: tabular-nums;
+}
+
+.active-workout-sides__conflict p {
+  margin: 0;
+}
+
+.active-workout-sides__conflict .app-action-group > * {
+  flex: 1 1 auto;
+}

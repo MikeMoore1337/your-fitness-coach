@@ -19,6 +19,17 @@ def workout_exercise_metric_type(exercise: UserWorkoutExercise) -> str:
     return exercise_metric_type(exercise.exercise)
 
 
+def exercise_slot_identity(exercise: UserWorkoutExercise) -> tuple[str, int | str] | None:
+    template = exercise.source_template_exercise_id
+    assignment = exercise.source_assignment_slot_id
+    if (template is None) == (assignment is None):
+        return None
+    if template is not None:
+        return ("template", template)
+    assert assignment is not None
+    return ("assignment", assignment)
+
+
 @dataclass(frozen=True)
 class ExercisePrescription:
     prescribed_sets: int
@@ -66,7 +77,16 @@ def validate_workout_set_changes(
     *,
     current_duration_minutes: int | None = None,
 ) -> None:
-    strength_fields = {"actual_reps", "actual_weight", "rir", "set_kind", "reached_failure"}
+    strength_fields = {
+        "actual_reps",
+        "actual_weight",
+        "rir",
+        "set_kind",
+        "reached_failure",
+        "execution_mode",
+        "first_side",
+        "sides",
+    }
     cardio_fields = {
         "duration_minutes",
         "distance_km",
