@@ -91,3 +91,8 @@ Downgrade миграции `0138` откажется удалять заполн
 Failed deploy не оставляет вечного local lock/owner: queued/running Actions завершает работу по
 native concurrency, а deployment evidence и health checks сообщают результат. Real deployment
 failure fail-closed; cleanup/archive failure — warning.
+
+Перед rollback workflow проверяет, что `.env` активного release и корневой `.env` совпадают.
+При различии операция останавливается до изменения сервисов; причину расхождения нужно
+разобрать отдельно, не выводя значения секретов. Файл используется как конфигурация Compose
+и не исполняется оболочкой.
