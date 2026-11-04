@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { expectNoHorizontalOverflow, installTelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 const exercises = [
   {
@@ -152,7 +153,9 @@ for (const theme of ['dark', 'light'] as const) {
           });
       };
       await shot('off');
-      await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+      const periodization = builder.getByRole('checkbox', { name: /Включить периодизацию/ });
+      await scrollIntoStablePosition(periodization);
+      await periodization.check();
       await builder.getByRole('spinbutton', { name: 'Исходных недель' }).fill('3');
       await builder.getByRole('spinbutton', { name: 'Всего недель' }).fill('3');
       await shot('single');

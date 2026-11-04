@@ -4,6 +4,7 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { installTelegramHarness, TelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi, type PlatformApiController } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 const avatarFile = {
   name: 'new-avatar.png',
@@ -21,7 +22,9 @@ async function openPersonalData(page: Page) {
 
 async function openAvatarSettings(page: Page) {
   await openPersonalData(page);
-  await page.getByRole('button', { name: 'Изменить аватар' }).click();
+  const button = page.getByRole('button', { name: 'Изменить аватар' });
+  await scrollIntoStablePosition(button);
+  await button.click();
   await expect(page.getByRole('dialog', { name: 'Аватар' })).toBeVisible();
 }
 
