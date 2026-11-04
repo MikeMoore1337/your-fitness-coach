@@ -1739,7 +1739,14 @@ test('Task 752 review workspace composes facts and keeps actions explicit on des
     .getByLabel('Основание предложения')
     .fill('Обсудить увеличение объёма после следующего review.');
   await workspace.getByLabel('Срок предложения').fill('2030-01-10T12:00');
-  await workspace.getByRole('button', { name: 'Зафиксировать предложение', exact: true }).click();
+  const proposalButton = workspace.getByRole('button', {
+    name: 'Зафиксировать предложение',
+    exact: true,
+  });
+  await proposalButton.evaluate((button) =>
+    button.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  );
+  await proposalButton.click();
   await expect(page.getByText('Действие тренера зафиксировано', { exact: true })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });

@@ -309,7 +309,8 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
     expect(waterBox.x + waterBox.width).toBeLessThanOrEqual(
       nutritionBox.x + nutritionBox.width + 1,
     );
-    expect(actionBox!.height).toBeGreaterThanOrEqual(44);
+    // Firefox can report a 44px box as 43.9999847px.
+    expect(actionBox!.height).toBeGreaterThanOrEqual(44 - 0.0001);
     expect(await action.evaluate((element) => (element as HTMLElement).innerText)).toBe(
       'Добавить питание',
     );

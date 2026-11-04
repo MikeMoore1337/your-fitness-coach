@@ -700,15 +700,14 @@ for (const theme of ['dark', 'light'] as const) {
     await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
     const guidance = summary.locator('.progression-guidance');
     const apply = guidance.getByRole('button', { name: 'Применить 42,5 кг' });
-    await guidance.evaluate((node) => node.scrollIntoView({ block: 'center' }));
-    await page.evaluate(() => window.scrollBy(0, 100));
+    const injury = summary.getByRole('button', { name: 'Боль или травма во время тренировки' });
+    await injury.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await expect(apply).toBeVisible();
+    await expect(apply).toBeInViewport();
+    await expect(injury).toBeInViewport();
     await expectTouchTargets(guidance.getByRole('button'));
     await expectNoOverlap(apply, page.locator('#appBottomNav'));
-    await expectNoOverlap(
-      summary.getByRole('button', { name: 'Боль или травма во время тренировки' }),
-      page.locator('#appBottomNav'),
-    );
+    await expectNoOverlap(injury, page.locator('#appBottomNav'));
     await expectNoHorizontalOverflow(page);
     if (evidenceDir && test.info().project.name === 'chromium') {
       await page.screenshot({

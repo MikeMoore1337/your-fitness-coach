@@ -13,19 +13,6 @@ const viewports = [
   { width: 1440, height: 1000 },
 ];
 
-const screenshotRoot = resolve(
-  process.cwd(),
-  '..',
-  '..',
-  '..',
-  '..',
-  '.artifacts',
-  'tasks',
-  '241D',
-  'evidence',
-  'screenshots',
-);
-
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const dimensions = await page.evaluate(() => ({
     content: document.documentElement.scrollWidth,
@@ -62,7 +49,11 @@ async function expectTrainingPage(page: Page): Promise<void> {
   }
 }
 
-async function runThemeMatrix(browser: Browser, theme: 'light' | 'dark'): Promise<void> {
+async function runThemeMatrix(
+  browser: Browser,
+  theme: 'light' | 'dark',
+  screenshotRoot: string,
+): Promise<void> {
   const context = await browser.newContext({
     colorScheme: theme,
     locale: 'ru-RU',
@@ -78,10 +69,11 @@ async function runThemeMatrix(browser: Browser, theme: 'light' | 'dark'): Promis
   await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
 
   try {
-    for (const viewport of viewports) {
+    for (const [index, viewport] of viewports.entries()) {
       await page.setViewportSize(viewport);
       const response = await page.goto('/training', { waitUntil: 'domcontentloaded' });
-      expect(response?.status()).toBe(200);
+      if (index === 0) expect(response?.status()).toBe(200);
+      else expect([200, 304]).toContain(response?.status());
       await expectTrainingPage(page);
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expectNoHorizontalOverflow(page);
@@ -107,8 +99,9 @@ async function runThemeMatrix(browser: Browser, theme: 'light' | 'dark'): Promis
 
 test('training acquisition page keeps the canonical content contract across themes and viewports', async ({
   browser,
-}) => {
+}, testInfo) => {
   test.setTimeout(120_000);
-  await runThemeMatrix(browser, 'light');
-  await runThemeMatrix(browser, 'dark');
+  const screenshotRoot = testInfo.outputPath('training-screenshots');
+  await runThemeMatrix(browser, 'light', screenshotRoot);
+  await runThemeMatrix(browser, 'dark', screenshotRoot);
 });
