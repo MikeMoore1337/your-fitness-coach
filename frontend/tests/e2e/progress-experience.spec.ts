@@ -26,17 +26,6 @@ const signal = (
   reason_keys: reasonKeys,
 });
 
-const TASK_111_SCREENSHOTS = resolve(
-  process.cwd(),
-  '..',
-  '..',
-  '..',
-  'tasks',
-  '111',
-  'deliverables',
-  'screenshots',
-);
-
 type NutritionReportState = 'partial' | 'no-data' | 'long';
 
 const REDUCED_MOTION_MAX_DURATION_MS = 0.01;
@@ -3546,7 +3535,7 @@ test('exercise catalogue uses the selected folder and dumbbell glyph on desktop 
 test('progress overview keeps matching light and dark visual forms for the same data', async ({
   browser,
   baseURL,
-}) => {
+}, testInfo) => {
   test.setTimeout(120_000);
   const surfaces = [
     { name: 'desktop-1440x900', width: 1440, height: 900 },
@@ -3597,7 +3586,7 @@ test('progress overview keeps matching light and dark visual forms for the same 
       ).toHaveAttribute('aria-selected', 'true');
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(surface.width);
       await page.screenshot({
-        path: resolve(TASK_111_SCREENSHOTS, `progress-overview-${surface.name}-${theme}.png`),
+        path: testInfo.outputPath(`progress-overview-${surface.name}-${theme}.png`),
       });
       await context.close();
     }

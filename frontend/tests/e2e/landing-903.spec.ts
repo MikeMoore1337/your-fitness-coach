@@ -16,6 +16,7 @@ test.describe('Landing #903 weekly score scale', () => {
           await summary.click();
           const scores = page.locator('.ref-scores label');
           await expect(scores).toHaveCount(5);
+          await expect(scores.first()).toBeVisible();
           const styleValues = await scores.evaluateAll((elements) =>
             elements.map((element) => {
               const style = getComputedStyle(element);
