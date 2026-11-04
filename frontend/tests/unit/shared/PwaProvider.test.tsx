@@ -114,7 +114,7 @@ describe('PwaProvider', () => {
       register: vi.fn().mockResolvedValue(registration),
     });
     localStorage.setItem(
-      'fit_active_workout_v1_user_7_workout_42',
+      'fit_active_workout_queue_v4_user_7_workout_42',
       JSON.stringify({ workout_snapshot: { status: 'in_progress' }, queue: [] }),
     );
 
@@ -130,7 +130,7 @@ describe('PwaProvider', () => {
     });
     expect(postMessage).not.toHaveBeenCalled();
 
-    localStorage.removeItem('fit_active_workout_v1_user_7_workout_42');
+    localStorage.removeItem('fit_active_workout_queue_v4_user_7_workout_42');
     window.dispatchEvent(new Event(PWA_SAFE_UPDATE_EVENT));
     await waitFor(() => expect(postMessage).toHaveBeenCalledWith({ type: 'YFC_PWA_SKIP_WAITING' }));
   });

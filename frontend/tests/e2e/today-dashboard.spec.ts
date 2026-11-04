@@ -565,7 +565,7 @@ test('persists active workout on suspend and refreshes Today on return', async (
   await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   await expect
     .poll(() =>
-      page.evaluate(() => localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3')),
+      page.evaluate(() => localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42')),
     )
     .not.toBeNull();
 

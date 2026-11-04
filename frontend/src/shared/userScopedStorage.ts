@@ -1,10 +1,17 @@
-export const AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_authenticated_user_id';
+import {
+  AUTHENTICATED_USER_ID_STORAGE_KEY,
+  LEGACY_AUTH_CANARY_KEY,
+} from './auth/legacySessionKeys';
+
+export { AUTHENTICATED_USER_ID_STORAGE_KEY } from './auth/legacySessionKeys';
 const LAST_AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_last_authenticated_user_id_v1';
 
 export const ACTIVE_WORKOUT_STORAGE_PREFIXES = {
   queue: 'fit_active_workout_v1_',
+  protectedQueue: 'fit_active_workout_queue_v4_',
   rest: 'fit_active_workout_rest_v1_',
   pointer: 'fit_active_workout_current_v1_user_',
+  protectedPointer: 'fit_active_workout_pointer_v2_user_',
 } as const;
 
 export const LEGACY_ACTIVE_WORKOUT_STORAGE_PREFIXES = [
@@ -18,8 +25,10 @@ export const USER_SCOPED_PERSISTENT_STORAGE_REGISTRY = [
     domain: 'active_workout',
     prefixes: [
       ACTIVE_WORKOUT_STORAGE_PREFIXES.queue,
+      ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedQueue,
       ACTIVE_WORKOUT_STORAGE_PREFIXES.rest,
       ACTIVE_WORKOUT_STORAGE_PREFIXES.pointer,
+      ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedPointer,
       ...LEGACY_ACTIVE_WORKOUT_STORAGE_PREFIXES,
     ],
   },
@@ -67,6 +76,10 @@ export function activeWorkoutQueueStorageKey(userId: number, workoutId: number):
   return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.queue}user_${userId}_workout_${workoutId}`;
 }
 
+export function protectedWorkoutQueueStorageKey(userId: number, workoutId: number): string {
+  return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedQueue}user_${userId}_workout_${workoutId}`;
+}
+
 export function lastAuthenticatedUserId(): number | undefined {
   try {
     const id = Number(localStorage.getItem(LAST_AUTHENTICATED_USER_ID_STORAGE_KEY));
@@ -90,6 +103,10 @@ export function activeWorkoutRestStorageKey(userId: number, workoutId: number): 
 
 export function activeWorkoutPointerStorageKey(userId: number): string {
   return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.pointer}${userId}`;
+}
+
+export function protectedWorkoutPointerStorageKey(userId: number): string {
+  return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedPointer}${userId}`;
 }
 
 export function legacyWorkoutSetStorageKey(setId: number): string {
@@ -181,6 +198,7 @@ export function clearSensitiveUserScopedStorage(
   const preservedPrefixes = preserveId
     ? [
         `${ACTIVE_WORKOUT_STORAGE_PREFIXES.queue}user_${preserveId}_workout_`,
+        `${ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedQueue}user_${preserveId}_workout_`,
         `${ACTIVE_WORKOUT_STORAGE_PREFIXES.rest}user_${preserveId}_workout_`,
       ]
     : [];
@@ -202,7 +220,7 @@ export function clearSensitiveUserScopedStorage(
         pendingKeys.add(LAST_AUTHENTICATED_USER_ID_STORAGE_KEY);
       for (const key of keys) {
         const match = key?.match(
-          /^fit_active_workout_v1_user_([1-9]\d*)_workout_([1-9]\d*)(?::v3)?$/,
+          /^fit_active_workout_(?:v1|queue_v4)_user_([1-9]\d*)_workout_([1-9]\d*)(?::v3)?$/,
         );
         if (!match || !validRequestedId) continue;
         const userId = Number(match[1]);
@@ -232,8 +250,13 @@ export function clearSensitiveUserScopedStorage(
           const queueKey = activeWorkoutQueueStorageKey(userId, workoutId);
           pendingKeys.add(queueKey);
           pendingKeys.add(`${queueKey}:v3`);
-          const pointerKey = activeWorkoutPointerStorageKey(userId);
-          if (localStorage.getItem(pointerKey) === String(workoutId)) pendingKeys.add(pointerKey);
+          pendingKeys.add(protectedWorkoutQueueStorageKey(userId, workoutId));
+          for (const pointerKey of [
+            activeWorkoutPointerStorageKey(userId),
+            protectedWorkoutPointerStorageKey(userId),
+          ]) {
+            if (localStorage.getItem(pointerKey) === String(workoutId)) pendingKeys.add(pointerKey);
+          }
         } catch {
           // Invalid local records cannot be recovered as an active workout.
         }
@@ -243,7 +266,9 @@ export function clearSensitiveUserScopedStorage(
       if (
         key &&
         !pendingKeys.has(key) &&
+        key !== LEGACY_AUTH_CANARY_KEY &&
         key !== (preserveId ? activeWorkoutPointerStorageKey(preserveId) : null) &&
+        key !== (preserveId ? protectedWorkoutPointerStorageKey(preserveId) : null) &&
         !preservedPrefixes.some((prefix) => key.startsWith(prefix)) &&
         (SENSITIVE_LOCAL_STORAGE_EXACT_KEYS.some((candidate) => candidate === key) ||
           sensitiveLocalStoragePrefixes.some((prefix) => key.startsWith(prefix)))
