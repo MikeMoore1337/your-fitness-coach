@@ -12,6 +12,10 @@ import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 
 const apiMock = vi.hoisted(() => vi.fn());
 
+vi.mock('../../../../src/features/programs/SessionRotationSettings', () => ({
+  SessionRotationSettings: () => null,
+}));
+
 vi.mock('../../../../src/shared/api/client', async () => {
   const actual = await vi.importActual<typeof import('../../../../src/shared/api/client')>(
     '../../../../src/shared/api/client',

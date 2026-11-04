@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -62,8 +63,10 @@ import { hasWorkoutExecutionEvidence, WorkoutAdaptation } from './WorkoutAdaptat
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
 import { PreviousWorkoutNote } from './PreviousWorkoutNote';
 import { WorkoutRecovery } from './WorkoutRecovery';
+import { WorkoutSetPlanEditor } from './WorkoutSetPlanEditor';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
+import { ActiveWorkoutSyncContext } from './ActiveWorkoutSync';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { formatCalendarDate } from '../../shared/dateTime';
@@ -209,6 +212,18 @@ export function formatPlannedSetRole(role: WorkoutSet['planned_role']): string |
 
 export function formatPlannedGroupKind(kind: WorkoutSet['planned_group_kind']): string | null {
   return kind ? plannedGroupKindLabels[kind] : null;
+}
+
+function changedPlanText(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const plan = value as {
+    load_target?: { kind?: string; value?: number };
+    rep_target?: { kind?: string; value?: number };
+  };
+  if (plan.load_target?.kind !== 'absolute' || plan.rep_target?.kind !== 'exact') return null;
+  if (typeof plan.load_target.value !== 'number' || typeof plan.rep_target.value !== 'number')
+    return null;
+  return `${plan.load_target.value} кг · ${plan.rep_target.value} повторов`;
 }
 
 function focusWorkoutControl(
@@ -444,6 +459,7 @@ function WorkoutSetRow({
   syncing,
   syncFailed,
   exerciseNote,
+  onEditPlan,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -469,6 +485,7 @@ function WorkoutSetRow({
   syncing: boolean;
   syncFailed: boolean;
   exerciseNote?: ReactNode;
+  onEditPlan?: () => void;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -1002,6 +1019,12 @@ function WorkoutSetRow({
       )}
 
       {isCurrent && exerciseNote}
+
+      {onEditPlan && !completed && (
+        <Button type="button" variant="secondary" disabled={disabled} onClick={onEditPlan}>
+          Изменить план подхода
+        </Button>
+      )}
 
       {isCurrent && set.set_kind !== 'warmup' && set.planned_role !== 'warmup' && (
         <WorkoutSetHelpers
@@ -3144,6 +3167,7 @@ export function TodayWorkout({
   const [executionModes, setExecutionModes] = useState<Record<number, 'bilateral' | SideMode>>({});
   const [modeChoicesOpen, setModeChoicesOpen] = useState<Set<number>>(() => new Set());
   const [modeSaving, setModeSaving] = useState<Set<number>>(() => new Set());
+  const [planEdit, setPlanEdit] = useState<{ exerciseId: number; setId: number } | null>(null);
   const workout = useQuery({
     queryKey: ['workout', 'today'],
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
@@ -3152,7 +3176,12 @@ export function TodayWorkout({
     refetchOnReconnect: false,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
-  const activeSync = useActiveWorkoutQueue(user?.id, workout.data);
+  const sharedSync = useContext(ActiveWorkoutSyncContext);
+  const localSync = useActiveWorkoutQueue(
+    sharedSync ? undefined : user?.id,
+    sharedSync ? undefined : workout.data,
+  );
+  const activeSync = sharedSync ?? localSync;
   const online = useOnlineStatus();
   const historyEnabled = Boolean(
     user?.id &&
@@ -3698,6 +3727,28 @@ export function TodayWorkout({
     );
   }
 
+  const editedExercise = data.exercises.find((item) => item.id === planEdit?.exerciseId);
+  const editedSet = editedExercise?.sets.find((item) => item.id === planEdit?.setId);
+  if (planEdit && editedExercise && editedSet && started) {
+    return (
+      <WorkoutSetPlanEditor
+        exercise={editedExercise}
+        set={editedSet}
+        pendingBySet={activeSync.pendingBySet}
+        online={online}
+        ready={
+          activeSync.durable &&
+          activeSync.pendingCount === 0 &&
+          !workout.isFetching &&
+          !workout.isError &&
+          !['pending', 'syncing', 'offline', 'error', 'conflict'].includes(activeSync.syncState)
+        }
+        onClose={() => setPlanEdit(null)}
+        onApply={activeSync.changePlannedTarget}
+      />
+    );
+  }
+
   return (
     <>
       <section
@@ -3754,11 +3805,18 @@ export function TodayWorkout({
                 <strong>{syncText}</strong>
                 {activeSync.message && <span>{activeSync.message}</span>}
               </div>
-              {syncNeedsAction && activeSync.pendingCount > 0 && navigator.onLine && (
-                <button className="secondary" type="button" onClick={() => void activeSync.retry()}>
-                  Повторить
-                </button>
-              )}
+              {syncNeedsAction &&
+                !activeSync.planConflict &&
+                activeSync.pendingCount > 0 &&
+                navigator.onLine && (
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => void activeSync.retry()}
+                  >
+                    Повторить
+                  </button>
+                )}
             </div>
           )}
         </header>
@@ -4274,6 +4332,54 @@ export function TodayWorkout({
                     </div>
                   )}
 
+                {activeSync.planConflict &&
+                  exercise.sets.some((item) => item.id === activeSync.planConflict?.setId) && (
+                    <div className="active-workout-sides__conflict" role="alert">
+                      <strong>
+                        {activeSync.planConflict.planChanged
+                          ? 'План подхода изменился'
+                          : 'Подход уже выполнен'}
+                      </strong>
+                      {activeSync.planConflict.planChanged && (
+                        <p>
+                          Новый план:{' '}
+                          {changedPlanText(activeSync.planConflict.plan) ??
+                            'недоступен для проверки'}
+                        </p>
+                      )}
+                      <p>
+                        Сохранено на устройстве:{' '}
+                        {formatSetResult(
+                          activeSync.planConflict.local.actual_reps,
+                          activeSync.planConflict.local.actual_weight,
+                        ) ?? 'значения не указаны'}
+                      </p>
+                      {activeSync.planConflict.server.is_completed ? (
+                        <p>Подход уже выполнен в другой вкладке. Локальный результат сохранён.</p>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={!changedPlanText(activeSync.planConflict.plan)}
+                          onClick={async () => {
+                            if (
+                              await confirm({
+                                title: 'Сохранить результат?',
+                                message:
+                                  'Проверьте новый план и сохранённые на устройстве значения.',
+                                confirmText: 'Сохранить результат',
+                                danger: false,
+                              })
+                            )
+                              await activeSync.resolvePlanConflict();
+                          }}
+                        >
+                          Проверить и сохранить результат
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                 {isCurrentExercise && currentSet && (
                   <ActiveSessionSummary
                     key={`active-session-summary-${exercise.id}-${exercise.exercise_id}`}
@@ -4426,7 +4532,10 @@ export function TodayWorkout({
                           setTotal={exercise.sets.length}
                           prescribedReps={exercise.prescribed_reps}
                           disabled={
-                            !started || modeBusy || activeSync.sideConflict?.setId === set.id
+                            !started ||
+                            modeBusy ||
+                            activeSync.sideConflict?.setId === set.id ||
+                            activeSync.planConflict?.setId === set.id
                           }
                           isCurrent={currentSet?.set.id === set.id}
                           previousSet={previousSet}
@@ -4454,7 +4563,9 @@ export function TodayWorkout({
                           prescribedReps={exercise.prescribed_reps}
                           restSeconds={exercise.rest_seconds}
                           userId={user?.id}
-                          disabled={!started || modeBusy}
+                          disabled={
+                            !started || modeBusy || activeSync.planConflict?.setId === set.id
+                          }
                           workoutId={data.id}
                           workoutExerciseId={exercise.id}
                           exerciseTitle={exercise.exercise_title}
@@ -4475,6 +4586,11 @@ export function TodayWorkout({
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
                           exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
+                          onEditPlan={
+                            started && capabilities.canMutatePrograms
+                              ? () => setPlanEdit({ exerciseId: exercise.id, setId: set.id })
+                              : undefined
+                          }
                           enqueue={enqueueSet}
                         />
                       );

@@ -197,7 +197,10 @@ test('client exercise rows stay compact-first across supported mobile widths', a
       .getByRole('button', { name: /Техника и детали|Подробнее/ });
     const createToggle = page.locator('.exercise-create > summary');
     await expect(createToggle).toBeVisible();
+    const clearSearch = page.getByRole('button', { name: 'Очистить поиск', exact: true });
     await search.press('Tab');
+    await expect(clearSearch).toBeFocused();
+    await page.keyboard.press('Tab');
     await expect(resultButton).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(createToggle).toBeFocused();
@@ -215,6 +218,8 @@ test('client exercise rows stay compact-first across supported mobile widths', a
     await expect(createToggle).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     await expect(resultButton).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(clearSearch).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     await expect(search).toBeFocused();
   }
@@ -255,8 +260,13 @@ test('client exercise rows stay compact-first across supported mobile widths', a
     resultsOrder: '0',
   });
   const desktopFilter = page.locator('.exercise-catalog__filters select').first();
+  const desktopClear = page.getByRole('button', { name: 'Очистить поиск', exact: true });
   await desktopSearch.press('Tab');
+  await expect(desktopClear).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(desktopFilter).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(desktopClear).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(desktopSearch).toBeFocused();
   await expectNoHorizontalOverflow(page);

@@ -64,6 +64,14 @@ React-интерфейс работает в браузере и Telegram Mini A
 - [Запуск через Docker Compose](#быстрый-запуск-через-docker) и [разработка с hot reload](#разработка-с-hot-reload)
 - [Тесты и проверки](#проверки), [Mobile Web / TMA](#mobile-web-и-telegram-mini-app)
 - [Техническая документация](#документация) и [production delivery](#production-и-deployment)
+- [Доска разработки YFC](https://github.com/users/MikeMoore1337/projects/1) и [правила Issues/PR](docs/ISSUE_GOVERNANCE.md)
+
+Целевая единая очередь - **Your Fitness Coach - Delivery Board** на существующем Project №1
+(ранее `YFC Development`). Текущие Status, Priority, Area и Release ведутся в Project;
+описание и критерии приёмки остаются в Issues. Живая настройка и миграция принимаются отдельно
+в [#1106](https://github.com/MikeMoore1337/your-fitness-coach/issues/1106); ссылка не означает,
+что этот этап завершён. [#959](https://github.com/MikeMoore1337/your-fitness-coach/issues/959)
+сохраняет правила визуальной приёмки и исторические связи.
 
 ---
 

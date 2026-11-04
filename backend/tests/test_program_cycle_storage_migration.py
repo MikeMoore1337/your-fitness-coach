@@ -15,6 +15,61 @@ CYCLE_REVISIONS = (
 )
 
 
+def test_assignment_slot_migration_preserves_existing_data_and_blocks_unsafe_downgrade(tmp_path):
+    engine = sa.create_engine(f"sqlite:///{(tmp_path / 'assignment-slots.db').as_posix()}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE user_workout_exercises (id INTEGER PRIMARY KEY, exercise_id INTEGER)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE workout_exercise_notes (id INTEGER PRIMARY KEY, body TEXT)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE program_revisions (id INTEGER PRIMARY KEY, changed_fields JSON, snapshot JSON)"
+        )
+        connection.exec_driver_sql("INSERT INTO user_workout_exercises VALUES (1, 42)")
+        connection.exec_driver_sql("INSERT INTO workout_exercise_notes VALUES (1, 'сохранено')")
+        connection.exec_driver_sql("INSERT INTO program_revisions VALUES (1, '{}', '{}')")
+        with Operations.context(MigrationContext.configure(connection)):
+            migration = _load("0146_assignment_exercise_slots")
+            migration.upgrade()
+            assert connection.exec_driver_sql(
+                "SELECT exercise_id, source_assignment_slot_id FROM user_workout_exercises"
+            ).one() == (42, None)
+            assert connection.exec_driver_sql(
+                "SELECT body, source_assignment_slot_id FROM workout_exercise_notes"
+            ).one() == ("сохранено", None)
+            connection.exec_driver_sql(
+                "UPDATE program_revisions SET changed_fields = ? WHERE id=1",
+                ('{"occurrence_override":{"source_assignment_slot_id":"slot"}}',),
+            )
+            with pytest.raises(RuntimeError, match="Cannot discard"):
+                migration.downgrade()
+            connection.exec_driver_sql(
+                "UPDATE program_revisions SET changed_fields = '{}' WHERE id=1"
+            )
+            connection.exec_driver_sql(
+                "UPDATE user_workout_exercises SET source_assignment_slot_id = 'slot' WHERE id=1"
+            )
+            with pytest.raises(RuntimeError, match="Cannot discard"):
+                migration.downgrade()
+            connection.exec_driver_sql(
+                "UPDATE user_workout_exercises SET source_assignment_slot_id = NULL WHERE id=1"
+            )
+            migration.downgrade()
+            assert (
+                connection.exec_driver_sql(
+                    "SELECT exercise_id FROM user_workout_exercises"
+                ).scalar_one()
+                == 42
+            )
+            assert (
+                connection.exec_driver_sql("SELECT body FROM workout_exercise_notes").scalar_one()
+                == "сохранено"
+            )
+    engine.dispose()
+
+
 def _load(revision):
     path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / f"{revision}.py"
     spec = importlib.util.spec_from_file_location(revision, path)

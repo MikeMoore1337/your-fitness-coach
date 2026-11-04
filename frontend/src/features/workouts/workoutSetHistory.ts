@@ -53,13 +53,14 @@ export function boundSetHistory(
     item.set_version !== (set.version ?? 1) ||
     item.workout_exercise_id !== exercise.id ||
     item.exercise_id !== exercise.exercise_id ||
-    item.source_template_exercise_id !== (exercise.source_template_exercise_id ?? null)
+    item.source_template_exercise_id !== (exercise.source_template_exercise_id ?? null) ||
+    (item.source_assignment_slot_id ?? null) !== (exercise.source_assignment_slot_id ?? null)
   )
     return undefined;
   if (item.history_status === 'matched') {
     const past = item.previous_workout;
     if (
-      item.source_template_exercise_id == null ||
+      (item.source_template_exercise_id == null) === (item.source_assignment_slot_id == null) ||
       !past ||
       past.set_number !== set.set_number ||
       past.workout_id === workoutId ||

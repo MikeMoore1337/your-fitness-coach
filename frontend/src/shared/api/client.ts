@@ -1,15 +1,118 @@
 import { crossContextCoordinator, type CrossContextCoordinator } from '../browser/crossContextLock';
 import { getApiRuntime } from '../runtime/runtime';
+import {
+  AUTHENTICATED_USER_ID_STORAGE_KEY,
+  LEGACY_AUTH_CANARY_KEY,
+  LEGACY_AUTH_GUARD_KEY,
+  LEGACY_AUTH_REAUTH_KEY,
+} from '../auth/legacySessionKeys';
 
 const ACCESS_TOKEN_KEY = 'fit_access_token';
 const AUTH_CHANNEL_NAME = 'fit_auth_session';
 const AUTH_STORAGE_EVENT_KEY = 'fit_auth_session_event_v1';
 const AUTH_GENERATION_KEY = 'fit_auth_session_generation_v1';
+const AUTH_DISCARD_GENERATION_KEY = 'fit_auth_discard_generation_v1';
+const AUTH_VERIFIED_LOGIN_KEY = 'fit_auth_verified_login_v1';
 const AUTH_REFRESH_LOCK_NAME = 'fit-auth-refresh';
 export const AUTH_LOGOUT_EVENT = 'fit:auth-logout';
-const AUTH_TOKEN_RECEIVED_EVENT = 'fit:auth-token-received';
+export const AUTH_SESSION_EXPIRED_EVENT = 'fit:auth-session-expired';
+export const AUTH_ACCOUNT_SWITCH_EVENT = 'fit:auth-account-switch';
+export const AUTH_TOKEN_RECEIVED_EVENT = 'fit:auth-token-received';
+export const AUTH_VERIFIED_LOGIN_EVENT = 'fit:auth-verified-login';
+export const AUTH_UNVERIFIED_TOKEN_EVENT = 'fit:auth-unverified-token';
 
-type AuthChannelMessage = { type: 'access-token'; token: string } | { type: 'logout' };
+type AuthChannelMessage =
+  | {
+      type: 'access-token';
+      token: string;
+      userId?: number;
+      loginId?: string;
+      source?: 'refresh';
+      refreshUserId?: number;
+    }
+  | { type: 'logout'; cause?: 'explicit-logout' }
+  | { type: 'session-expired' }
+  | { type: 'account-switch'; userId: number };
+type AuthChange = AuthChannelMessage['type'] | 'verified-login' | 'legacy-logout';
+
+let authRevision = 0;
+let authBoundaryRevision = 0;
+let authDiscardRevision = 0;
+let authLoginRevision = 0;
+let legacyReauthRequired = false;
+let unverifiedTokenPending = false;
+const pendingVerifiedLogins = new Map<
+  string,
+  Extract<AuthChannelMessage, { type: 'access-token' }>
+>();
+
+export function authIdentityPending(): boolean {
+  return unverifiedTokenPending;
+}
+
+export function authBoundarySnapshot(): number {
+  return authBoundaryRevision;
+}
+
+export function acceptLegacyAccessToken(token: string): boolean {
+  if (!unverifiedTokenPending || requiresLegacyReauthentication()) return false;
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+  unverifiedTokenPending = false;
+  recordAuthChange('verified-login');
+  return true;
+}
+
+export function requiresLegacyReauthentication(): boolean {
+  try {
+    return (
+      legacyReauthRequired ||
+      localStorage.getItem(LEGACY_AUTH_REAUTH_KEY) !== null ||
+      (localStorage.getItem(LEGACY_AUTH_GUARD_KEY) === '1' &&
+        localStorage.getItem(LEGACY_AUTH_CANARY_KEY) !== '1')
+    );
+  } catch {
+    return legacyReauthRequired;
+  }
+}
+
+export function establishLegacyAuthGuard(force = false): void {
+  try {
+    if (force || !localStorage.getItem(LEGACY_AUTH_GUARD_KEY)) {
+      localStorage.setItem(LEGACY_AUTH_CANARY_KEY, '1');
+      localStorage.setItem(LEGACY_AUTH_GUARD_KEY, '1');
+    }
+  } catch {
+    // Browser storage may be unavailable.
+  }
+}
+
+function setLegacyReauthentication(required: boolean): void {
+  legacyReauthRequired = false;
+  try {
+    if (required && localStorage.getItem(LEGACY_AUTH_REAUTH_KEY) === null) {
+      let previousId = '';
+      try {
+        const previous = JSON.parse(localStorage.getItem(AUTH_VERIFIED_LOGIN_KEY) ?? 'null') as {
+          id?: unknown;
+        } | null;
+        if (typeof previous?.id === 'string') previousId = previous.id;
+      } catch {
+        // An unreadable marker cannot establish a previous login.
+      }
+      localStorage.setItem(LEGACY_AUTH_REAUTH_KEY, `blocked:${previousId}`);
+    } else if (!required) localStorage.removeItem(LEGACY_AUTH_REAUTH_KEY);
+  } catch {
+    legacyReauthRequired = required;
+    // The in-memory marker still protects the current tab.
+  }
+}
+
+function recordAuthChange(type: AuthChange): void {
+  authRevision += 1;
+  if (type !== 'session-expired') authBoundaryRevision += 1;
+  if (type === 'logout' || type === 'account-switch') authDiscardRevision += 1;
+  if (type === 'verified-login') authLoginRevision += 1;
+}
 
 const authChannel =
   typeof window !== 'undefined' && typeof window.BroadcastChannel === 'function'
@@ -18,11 +121,74 @@ const authChannel =
 
 function receiveAuthMessage(message: AuthChannelMessage): void {
   if (message.type === 'access-token' && typeof message.token === 'string') {
+    if (message.userId !== undefined && message.loginId !== undefined) {
+      if (!Number.isSafeInteger(message.userId) || message.userId <= 0) return;
+      if (typeof message.loginId !== 'string' || !message.loginId) return;
+      try {
+        const verified = JSON.parse(localStorage.getItem(AUTH_VERIFIED_LOGIN_KEY) ?? 'null') as {
+          id?: unknown;
+          userId?: unknown;
+        } | null;
+        if (verified?.id !== message.loginId || verified.userId !== message.userId) {
+          pendingVerifiedLogins.set(message.loginId, message);
+          if (pendingVerifiedLogins.size > 8)
+            pendingVerifiedLogins.delete(pendingVerifiedLogins.keys().next().value!);
+          return;
+        }
+        if (requiresLegacyReauthentication()) {
+          const blocked = localStorage.getItem(LEGACY_AUTH_REAUTH_KEY);
+          if (blocked === null) {
+            setLegacyReauthentication(true);
+            return;
+          }
+          if (blocked === `blocked:${verified.id}`) return;
+        }
+      } catch {
+        return;
+      }
+      pendingVerifiedLogins.clear();
+      setLegacyReauthentication(false);
+      establishLegacyAuthGuard(true);
+      unverifiedTokenPending = false;
+      recordAuthChange('verified-login');
+      window.dispatchEvent(new CustomEvent(AUTH_VERIFIED_LOGIN_EVENT, { detail: message.userId }));
+    } else {
+      if (requiresLegacyReauthentication() || unverifiedTokenPending) return;
+      recordAuthChange(message.type);
+      const localId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+      if (
+        message.userId !== undefined ||
+        message.source !== 'refresh' ||
+        !Number.isSafeInteger(message.refreshUserId) ||
+        message.refreshUserId !== localId ||
+        localId <= 0
+      ) {
+        unverifiedTokenPending = true;
+        sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+        window.dispatchEvent(
+          new CustomEvent(AUTH_UNVERIFIED_TOKEN_EVENT, { detail: message.token }),
+        );
+        return;
+      }
+    }
     sessionStorage.setItem(ACCESS_TOKEN_KEY, message.token);
     window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
-  } else if (message.type === 'logout') {
+  } else if (message.type === 'logout' || message.type === 'session-expired') {
+    pendingVerifiedLogins.clear();
+    const explicit = message.type === 'logout' && message.cause === 'explicit-logout';
+    if (message.type === 'logout') setLegacyReauthentication(true);
+    recordAuthChange(message.type === 'logout' && !explicit ? 'legacy-logout' : message.type);
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
+    window.dispatchEvent(new Event(explicit ? AUTH_LOGOUT_EVENT : AUTH_SESSION_EXPIRED_EVENT));
+  } else if (
+    message.type === 'account-switch' &&
+    Number.isSafeInteger(message.userId) &&
+    message.userId > 0
+  ) {
+    pendingVerifiedLogins.clear();
+    recordAuthChange(message.type);
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: message.userId }));
   }
 }
 
@@ -32,10 +198,38 @@ authChannel?.addEventListener('message', (event: MessageEvent<AuthChannelMessage
 });
 
 window.addEventListener('storage', (event) => {
+  if (event.key === AUTH_VERIFIED_LOGIN_KEY && event.newValue) {
+    try {
+      const marker = JSON.parse(event.newValue) as { id?: unknown };
+      if (typeof marker.id === 'string') {
+        const pending = pendingVerifiedLogins.get(marker.id);
+        if (pending) receiveAuthMessage(pending);
+      }
+    } catch {
+      // Ignore malformed markers.
+    }
+    return;
+  }
+  if (
+    event.key === LEGACY_AUTH_CANARY_KEY &&
+    event.newValue === null &&
+    requiresLegacyReauthentication()
+  ) {
+    setLegacyReauthentication(true);
+    recordAuthChange('legacy-logout');
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+    return;
+  }
   if (event.key !== AUTH_STORAGE_EVENT_KEY || authChannel || !event.newValue) return;
   try {
     const envelope = JSON.parse(event.newValue) as { message?: AuthChannelMessage };
-    if (envelope.message?.type === 'logout' || envelope.message?.type === 'access-token') {
+    if (
+      envelope.message?.type === 'logout' ||
+      envelope.message?.type === 'session-expired' ||
+      envelope.message?.type === 'account-switch' ||
+      envelope.message?.type === 'access-token'
+    ) {
       receiveAuthMessage(envelope.message);
     }
   } catch {
@@ -68,13 +262,21 @@ function authGeneration(): string | null {
   }
 }
 
-function advanceAuthGeneration(): void {
+function advanceAuthGeneration(type: AuthChange, userId?: number): string | undefined {
+  recordAuthChange(type);
   try {
     const id =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
     localStorage.setItem(AUTH_GENERATION_KEY, id);
+    if (type === 'logout' || type === 'account-switch') {
+      localStorage.setItem(AUTH_DISCARD_GENERATION_KEY, id);
+      localStorage.removeItem(AUTH_VERIFIED_LOGIN_KEY);
+    }
+    if (type === 'verified-login')
+      localStorage.setItem(AUTH_VERIFIED_LOGIN_KEY, JSON.stringify({ id, userId }));
+    return id;
   } catch {
     // BroadcastChannel remains the primary transport when shared storage is unavailable.
   }
@@ -200,20 +402,113 @@ function migrateLegacyToken(): void {
 migrateLegacyToken();
 
 export function getAccessToken(): string | null {
-  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  return unverifiedTokenPending || requiresLegacyReauthentication()
+    ? null
+    : sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-export function setAccessToken(token: string): void {
+export function setAccessToken(token: string, verifiedUserId?: number): void {
+  if (
+    verifiedUserId !== undefined &&
+    (!Number.isSafeInteger(verifiedUserId) || verifiedUserId <= 0)
+  )
+    throw new Error('Некорректный идентификатор аккаунта');
+  const storedUserId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
   sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-  advanceAuthGeneration();
-  broadcastAuthMessage({ type: 'access-token', token });
+  const loginId = advanceAuthGeneration(
+    verifiedUserId === undefined ? 'access-token' : 'verified-login',
+    verifiedUserId,
+  );
+  const message: AuthChannelMessage =
+    verifiedUserId === undefined
+      ? {
+          type: 'access-token',
+          token,
+          source: 'refresh',
+          ...(Number.isSafeInteger(storedUserId) && storedUserId > 0
+            ? { refreshUserId: storedUserId }
+            : {}),
+        }
+      : { type: 'access-token', token, userId: verifiedUserId, ...(loginId ? { loginId } : {}) };
+  if (verifiedUserId !== undefined) {
+    establishLegacyAuthGuard(true);
+    setLegacyReauthentication(false);
+    unverifiedTokenPending = false;
+  }
+  broadcastAuthMessage(message);
 }
 
 export function clearAccessToken(): void {
+  pendingVerifiedLogins.clear();
+  setLegacyReauthentication(true);
+  unverifiedTokenPending = false;
+  try {
+    localStorage.removeItem(LEGACY_AUTH_GUARD_KEY);
+    localStorage.removeItem(LEGACY_AUTH_CANARY_KEY);
+  } catch {
+    // Storage may be unavailable.
+  }
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  advanceAuthGeneration();
+  advanceAuthGeneration('logout');
   window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
-  broadcastAuthMessage({ type: 'logout' });
+  broadcastAuthMessage({ type: 'logout', cause: 'explicit-logout' });
+}
+
+export function expireAccessToken(): void {
+  pendingVerifiedLogins.clear();
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  advanceAuthGeneration('session-expired');
+  window.dispatchEvent(new Event(AUTH_SESSION_EXPIRED_EVENT));
+  broadcastAuthMessage({ type: 'session-expired' });
+}
+
+export function switchAuthenticatedAccount(userId: number): void {
+  if (!Number.isSafeInteger(userId) || userId <= 0)
+    throw new Error('Некорректный идентификатор аккаунта');
+  pendingVerifiedLogins.clear();
+  advanceAuthGeneration('account-switch');
+  window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: userId }));
+  broadcastAuthMessage({ type: 'account-switch', userId });
+}
+
+export function invalidateLocalAccount(userId: number): void {
+  recordAuthChange('account-switch');
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.dispatchEvent(new CustomEvent(AUTH_ACCOUNT_SWITCH_EVENT, { detail: userId }));
+}
+
+function verifiedLoginGeneration(): string | null {
+  try {
+    return localStorage.getItem(AUTH_VERIFIED_LOGIN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function authDiscardSnapshot() {
+  let generation: string | null = null;
+  try {
+    generation = localStorage.getItem(AUTH_DISCARD_GENERATION_KEY);
+  } catch {
+    // The in-memory revision still protects this tab when storage is unavailable.
+  }
+  return { generation, revision: authDiscardRevision, verifiedLogin: verifiedLoginGeneration() };
+}
+
+export function authDiscardChanged(
+  snapshot: ReturnType<typeof authDiscardSnapshot> & { userId?: number },
+): boolean {
+  const current = authDiscardSnapshot();
+  if (snapshot.generation !== current.generation || snapshot.revision !== current.revision)
+    return true;
+  if (snapshot.userId && snapshot.verifiedLogin !== current.verifiedLogin) {
+    try {
+      return JSON.parse(current.verifiedLogin ?? 'null')?.userId !== snapshot.userId;
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function responseError(response: Response): Promise<ApiError> {
@@ -230,6 +525,8 @@ async function responseError(response: Response): Promise<ApiError> {
 let refreshPromise: Promise<boolean> | null = null;
 
 async function requestAccessTokenRefresh(tokenBeforeRequest: string | null): Promise<boolean> {
+  const session = authSessionSnapshot();
+  const discard = authDiscardSnapshot();
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 15_000);
   try {
@@ -240,22 +537,33 @@ async function requestAccessTokenRefresh(tokenBeforeRequest: string | null): Pro
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
     });
+    if (authDiscardChanged(discard)) return false;
+    if (authSessionChanged(session)) {
+      const winnerToken = getAccessToken();
+      return Boolean(winnerToken && winnerToken !== tokenBeforeRequest);
+    }
     if (!response.ok) {
       const winnerToken = getAccessToken();
       if (winnerToken && winnerToken !== tokenBeforeRequest) return true;
-      if (response.status === 401 || response.status === 403) clearAccessToken();
+      if (response.status === 401 || response.status === 403) expireAccessToken();
       return false;
     }
     const data = (await response.json()) as { access_token?: unknown };
+    if (authDiscardChanged(discard)) return false;
+    if (authSessionChanged(session)) {
+      const winnerToken = getAccessToken();
+      return Boolean(winnerToken && winnerToken !== tokenBeforeRequest);
+    }
     if (typeof data.access_token !== 'string' || !data.access_token) {
       const winnerToken = getAccessToken();
       if (winnerToken && winnerToken !== tokenBeforeRequest) return true;
-      clearAccessToken();
+      expireAccessToken();
       return false;
     }
     setAccessToken(data.access_token);
     return true;
   } catch {
+    if (authDiscardChanged(discard)) return false;
     const winnerToken = getAccessToken();
     return Boolean(winnerToken && winnerToken !== tokenBeforeRequest);
   } finally {
@@ -266,14 +574,20 @@ async function requestAccessTokenRefresh(tokenBeforeRequest: string | null): Pro
 export async function coordinateAccessTokenRefresh(
   coordinator: CrossContextCoordinator = crossContextCoordinator,
 ): Promise<boolean> {
+  if (unverifiedTokenPending || requiresLegacyReauthentication()) return false;
   const tokenBeforeLock = getAccessToken();
   const generationBeforeLock = authGeneration();
+  const revisionBeforeLock = authRevision;
+  const discard = authDiscardSnapshot();
   try {
     return await coordinator.run(AUTH_REFRESH_LOCK_NAME, async () => {
+      if (unverifiedTokenPending || requiresLegacyReauthentication() || authDiscardChanged(discard))
+        return false;
       const tokenAfterLock = getAccessToken();
       if (tokenAfterLock && tokenAfterLock !== tokenBeforeLock) return true;
-      if (authGeneration() !== generationBeforeLock) {
-        return waitForWinnerToken(tokenBeforeLock);
+      if (authGeneration() !== generationBeforeLock || authRevision !== revisionBeforeLock) {
+        const winner = await waitForWinnerToken(tokenBeforeLock);
+        return !authDiscardChanged(discard) && winner;
       }
       return requestAccessTokenRefresh(tokenAfterLock);
     });
@@ -300,14 +614,47 @@ export interface ApiOptions extends Omit<RequestInit, 'body'> {
   retryAuth?: boolean;
 }
 
+function authSessionSnapshot() {
+  return {
+    token: getAccessToken(),
+    generation: authGeneration(),
+    revision: authRevision,
+    boundaryRevision: authBoundaryRevision,
+    loginRevision: authLoginRevision,
+    verifiedLogin: verifiedLoginGeneration(),
+  };
+}
+
+function authLoginChanged(session: ReturnType<typeof authSessionSnapshot>): boolean {
+  return (
+    session.loginRevision !== authLoginRevision ||
+    session.verifiedLogin !== verifiedLoginGeneration()
+  );
+}
+
+function authSessionChanged(session: ReturnType<typeof authSessionSnapshot>): boolean {
+  return (
+    session.token !== getAccessToken() ||
+    session.generation !== authGeneration() ||
+    session.revision !== authRevision ||
+    authLoginChanged(session)
+  );
+}
+
+function assertCurrentAuthSession(session: ReturnType<typeof authSessionSnapshot>): void {
+  if (authSessionChanged(session)) throw new DOMException('Сессия изменилась', 'AbortError');
+}
+
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { body, timeoutMs = 15_000, retryAuth = true, headers, signal, ...init } = options;
+  const discard = authDiscardSnapshot();
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   const abortFromCaller = () => controller.abort(signal?.reason);
   if (signal?.aborted) abortFromCaller();
   else signal?.addEventListener('abort', abortFromCaller, { once: true });
-  const token = getAccessToken();
+  const session = authSessionSnapshot();
+  const token = session.token;
   const formData = typeof FormData !== 'undefined' && body instanceof FormData;
   const runtime = getApiRuntime();
   try {
@@ -351,16 +698,29 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
           }
         : {}),
     });
-    if (response.status === 401 && retryAuth && (await refreshAccessToken())) {
-      return api<T>(path, { ...options, retryAuth: false });
+    assertCurrentAuthSession(session);
+    if (response.status === 401 && retryAuth) {
+      const refreshed = await refreshAccessToken();
+      if (authDiscardChanged(discard) || authLoginChanged(session))
+        throw new DOMException('Сессия изменилась', 'AbortError');
+      if (refreshed) return api<T>(path, { ...options, retryAuth: false });
+      if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
     }
-    if (!response.ok) throw await responseError(response);
+    if (!response.ok) {
+      const error = await responseError(response);
+      if (response.status !== 401 || !retryAuth) assertCurrentAuthSession(session);
+      else if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
+      throw error;
+    }
     if (response.status === 204) return undefined as T;
     const text = await response.text();
+    assertCurrentAuthSession(session);
     return (text ? JSON.parse(text) : null) as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      if (signal?.aborted) throw error;
+      if (signal?.aborted || authSessionChanged(session)) throw error;
       throw new ApiError('Сервер не ответил вовремя. Попробуйте снова.', 0);
     }
     if (error instanceof TypeError) {
@@ -388,25 +748,42 @@ export async function apiFile(
   path: string,
   { retryAuth = true }: { retryAuth?: boolean } = {},
 ): Promise<ApiFile> {
+  const discard = authDiscardSnapshot();
   if (getApiRuntime().kind === 'demo') {
     throw new ApiError('Скачивание файлов недоступно в демо-режиме.', 403);
   }
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 15_000);
-  const token = getAccessToken();
+  const session = authSessionSnapshot();
+  const token = session.token;
   try {
     const response = await fetch(path, {
       credentials: 'same-origin',
       signal: controller.signal,
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
-    if (response.status === 401 && retryAuth && (await refreshAccessToken())) {
-      return apiFile(path, { retryAuth: false });
+    assertCurrentAuthSession(session);
+    if (response.status === 401 && retryAuth) {
+      const refreshed = await refreshAccessToken();
+      if (authDiscardChanged(discard) || authLoginChanged(session))
+        throw new DOMException('Сессия изменилась', 'AbortError');
+      if (refreshed) return apiFile(path, { retryAuth: false });
+      if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
     }
-    if (!response.ok) throw await responseError(response);
-    return { blob: await response.blob(), filename: responseFilename(response) };
+    if (!response.ok) {
+      const error = await responseError(response);
+      if (response.status !== 401 || !retryAuth) assertCurrentAuthSession(session);
+      else if (session.boundaryRevision !== authBoundaryRevision)
+        throw new DOMException('Сессия изменилась', 'AbortError');
+      throw error;
+    }
+    const blob = await response.blob();
+    assertCurrentAuthSession(session);
+    return { blob, filename: responseFilename(response) };
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
+      if (authSessionChanged(session)) throw error;
       throw new ApiError('Сервер не ответил вовремя. Попробуйте снова.', 0);
     }
     if (error instanceof TypeError) {

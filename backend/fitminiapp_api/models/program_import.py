@@ -71,6 +71,8 @@ class ProgramImport(Base):
     confirmed_program_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     confirmed_revision_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     confirmed_workouts_updated: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    self_assigned_program_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    self_assignment_request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=now_msk_naive, server_default=func.now()
     )

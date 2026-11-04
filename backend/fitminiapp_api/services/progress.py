@@ -454,6 +454,7 @@ def build_progress_summaries(
             UserWorkout.scheduled_time,
             UserWorkout.title,
             UserWorkout.status,
+            UserWorkout.rotation_epoch,
         )
         .select_from(UserProgram)
         .outerjoin(
@@ -473,9 +474,22 @@ def build_progress_summaries(
         .order_by(UserProgram.user_id, UserWorkout.scheduled_date, UserWorkout.id)
         .all()
     )
+    from fitminiapp_api.services.schedule_modes import (
+        calendar_active_on,
+        calendar_segments,
+        mode_changes,
+    )
+
+    changes_by_program = mode_changes(db, {row.program_id for row in workout_rows})
     workouts_by_user: dict[int, list] = defaultdict(list)
     for workout_row in workout_rows:
-        if workout_row.id is not None:
+        if workout_row.id is not None and not (
+            workout_row.rotation_epoch is None
+            and workout_row.status == "planned"
+            and not calendar_active_on(
+                changes_by_program.get(workout_row.program_id, []), workout_row.scheduled_date
+            )
+        ):
             workouts_by_user[workout_row.user_id].append(workout_row)
     cycle_program_ids = {row.program_id for row in workout_rows if row.is_cycle}
 
@@ -504,13 +518,14 @@ def build_progress_summaries(
                     db, [program.id], current_day, current_day + timedelta(days=27)
                 )
                 db.expire(program, ["workouts"])
-            missing_workouts_by_user[program.user_id] += cycle_workout_count(
-                db,
-                program,
-                start=start_by_user[program.user_id],
-                end=min(today_by_user[program.user_id], current_day - timedelta(days=1)),
-                missing_only=True,
-            )
+            for segment_start, segment_end in calendar_segments(
+                changes_by_program.get(program.id, []),
+                start_by_user[program.user_id],
+                min(today_by_user[program.user_id], current_day - timedelta(days=1)),
+            ):
+                missing_workouts_by_user[program.user_id] += cycle_workout_count(
+                    db, program, start=segment_start, end=segment_end, missing_only=True
+                )
 
     cardio_rows = (
         db.query(CardioSession)
@@ -541,7 +556,16 @@ def build_progress_summaries(
     for cardio_row in cardio_rows:
         cardio_by_user[cardio_row.user_id].append(cardio_row)
 
-    next_candidates = (
+    rotation_dates = []
+    for program_id, changes in changes_by_program.items():
+        for index, (start, mode) in enumerate(changes):
+            if mode != "rotation":
+                continue
+            conditions = [UserProgram.id == program_id, UserWorkout.scheduled_date >= start]
+            if index + 1 < len(changes):
+                conditions.append(UserWorkout.scheduled_date < changes[index + 1][0])
+            rotation_dates.append(and_(*conditions))
+    next_candidates_query = (
         db.query(
             UserProgram.user_id.label("user_id"),
             UserWorkout.id.label("id"),
@@ -563,6 +587,8 @@ def build_progress_summaries(
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .filter(
             UserWorkout.status.in_({"planned", "in_progress"}),
+            UserProgram.is_active.is_(True),
+            UserProgram.schedule_mode == "calendar",
             or_(
                 *(
                     and_(
@@ -573,8 +599,10 @@ def build_progress_summaries(
                 )
             ),
         )
-        .subquery()
     )
+    if rotation_dates:
+        next_candidates_query = next_candidates_query.filter(~or_(*rotation_dates))
+    next_candidates = next_candidates_query.subquery()
     next_rows = db.query(next_candidates).filter(next_candidates.c.row_number == 1).all()
     next_by_user = {row.user_id: row for row in next_rows}
 
@@ -872,7 +900,7 @@ def build_progress_summaries(
         evaluated_workouts = [
             row
             for row in workouts
-            if row.scheduled_date < actual_today_by_user[user.id]
+            if (row.rotation_epoch is None and row.scheduled_date < actual_today_by_user[user.id])
             or row.status in {"completed", "skipped"}
         ]
         completed_workouts = [row for row in evaluated_workouts if row.status == "completed"]

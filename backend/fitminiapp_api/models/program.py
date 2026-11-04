@@ -20,6 +20,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from fitminiapp_api.core.timezone import now_msk_naive
@@ -259,6 +260,26 @@ class UserProgram(Base):
     schedule_weekdays: Mapped[list[int]] = mapped_column(
         JSON, nullable=False, default=list, server_default="[]"
     )
+    _schedule_mode: Mapped[str | None] = mapped_column(
+        "schedule_mode", String(16), nullable=True, default="calendar"
+    )
+    rotation_epoch: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_first_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_accepted_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    @hybrid_property
+    def schedule_mode(self) -> str:
+        return self._schedule_mode or "calendar"
+
+    @schedule_mode.inplace.setter
+    def _set_schedule_mode(self, value: str) -> None:
+        self._schedule_mode = value
+
+    @schedule_mode.inplace.expression
+    @classmethod
+    def _schedule_mode_expression(cls):
+        return func.coalesce(cls._schedule_mode, "calendar")
+
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="active", server_default="active"
     )
@@ -440,6 +461,21 @@ class UserWorkout(Base):
             postgresql_where=text("source_cycle_week IS NOT NULL"),
             sqlite_where=text("source_cycle_week IS NOT NULL"),
         ),
+        Index(
+            "uq_user_workouts_rotation_mutation",
+            "user_program_id",
+            "rotation_mutation_id",
+            unique=True,
+            postgresql_where=text("rotation_mutation_id IS NOT NULL"),
+            sqlite_where=text("rotation_mutation_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_user_workouts_rotation_in_progress",
+            "user_program_id",
+            unique=True,
+            postgresql_where=text("rotation_epoch IS NOT NULL AND status = 'in_progress'"),
+            sqlite_where=text("rotation_epoch IS NOT NULL AND status = 'in_progress'"),
+        ),
         CheckConstraint(
             "completion_feedback IS NULL OR completion_feedback IN "
             "('easier_than_expected', 'as_expected', 'harder_than_expected')",
@@ -470,9 +506,35 @@ class UserWorkout(Base):
         Integer, nullable=True, default=1, server_default="1"
     )
     plan_materialized: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=True)
-    source_cycle_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    _source_cycle_week: Mapped[int | None] = mapped_column(
+        "source_cycle_week", Integer, nullable=True
+    )
+    rotation_source_cycle_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cycle_iteration: Mapped[int | None] = mapped_column(Integer, nullable=True)
     plan_revision_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_epoch: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rotation_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    rotation_mutation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rotation_request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rotation_transition_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    rotation_transition_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    @hybrid_property
+    def source_cycle_week(self) -> int | None:
+        return self.rotation_source_cycle_week or self._source_cycle_week
+
+    @source_cycle_week.inplace.setter
+    def _set_source_cycle_week(self, value: int | None) -> None:
+        if self.rotation_epoch is None:
+            self._source_cycle_week = value
+        else:
+            self.rotation_source_cycle_week = value
+
+    @source_cycle_week.inplace.expression
+    @classmethod
+    def _source_cycle_week_expression(cls):
+        return func.coalesce(cls.rotation_source_cycle_week, cls._source_cycle_week)
+
     title: Mapped[str] = mapped_column(String(128))
     status: Mapped[str] = mapped_column(String(32), default="planned")
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -565,6 +627,7 @@ class UserWorkoutExercise(Base):
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
     source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_assignment_slot_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     source_weekly_prescription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
@@ -629,6 +692,7 @@ class UserWorkoutSet(Base):
     heart_rate_zone: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
     set_kind: Mapped[str | None] = mapped_column(String(16), nullable=True, default="working")
+    set_kind_known: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     planned_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
     planned_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

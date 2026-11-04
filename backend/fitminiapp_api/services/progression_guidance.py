@@ -8,6 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Literal
 
+from sqlalchemy import or_, true
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import today_for_user
@@ -35,6 +36,7 @@ from fitminiapp_api.services.program_versioning import (
     workout_cycle_week_type,
 )
 from fitminiapp_api.services.workout_metrics import (
+    exercise_slot_identity,
     validate_workout_set_changes,
     workout_exercise_metric_type,
 )
@@ -674,6 +676,7 @@ def _snapshot_matches_target(
             if isinstance(item, dict)
             and item.get("exercise_id") == exercise.exercise_id
             and item.get("source_template_exercise_id") == exercise.source_template_exercise_id
+            and item.get("source_assignment_slot_id") == exercise.source_assignment_slot_id
             and item.get("sort_order") == exercise.sort_order
         ),
         None,
@@ -745,7 +748,7 @@ def _matches_cycle_plan(
         if (
             workout.plan_revision_number is None
             or workout.week_number is None
-            or exercise.source_template_exercise_id is None
+            or exercise_slot_identity(exercise) is None
         ):
             return False
         available = [
@@ -759,6 +762,7 @@ def _matches_cycle_plan(
             item
             for item in matching_plans[0]["exercises"]
             if item.get("source_template_exercise_id") == exercise.source_template_exercise_id
+            and item.get("source_assignment_slot_id") == exercise.source_assignment_slot_id
             and item.get("sort_order") == exercise.sort_order
             and item.get("exercise_id") == exercise.exercise_id
         ]
@@ -1554,7 +1558,7 @@ def build_progression_guidance(
         side_mode = next(iter(target_modes)) if len(target_modes) == 1 else None
         if side_mode not in SIDE_MODES:
             side_mode = None
-        side_guidance = None
+        side_guidance: dict[str, object] | None = None
         side_actions: dict[str, str] = {}
         side_sessions: dict[str, list[SessionFacts]] = {}
         target_reps = (
@@ -1619,7 +1623,7 @@ def build_progression_guidance(
                 if typed_context and (
                     item.workout.day_number != workout.day_number
                     or item.sort_order != current.sort_order
-                    or item.source_template_exercise_id != current.source_template_exercise_id
+                    or exercise_slot_identity(item) != exercise_slot_identity(current)
                 ):
                     continue
                 if item.workout.completed_at is None:
@@ -1680,7 +1684,7 @@ def build_progression_guidance(
                     != revision_number
                 ):
                     continue
-                if item.source_template_exercise_id != current.source_template_exercise_id:
+                if exercise_slot_identity(item) != exercise_slot_identity(current):
                     continue
                 if _selection_signature(item) != _selection_signature(current):
                     if typed_context:
@@ -1898,7 +1902,13 @@ def list_assigned_program_progression_proposals(
         .filter(
             UserWorkout.user_program_id == program.id,
             UserWorkout.status.in_({"planned", "in_progress"}),
-            UserWorkout.scheduled_date >= today_for_user(actor),
+            UserWorkout.rotation_epoch == program.rotation_epoch
+            if program.schedule_mode == "rotation"
+            else true(),
+            or_(
+                UserWorkout.status == "in_progress",
+                UserWorkout.scheduled_date >= today_for_user(actor),
+            ),
         )
         .order_by(
             (UserWorkout.status == "in_progress").desc(),

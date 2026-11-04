@@ -1,10 +1,15 @@
 import { expect, test, type Route } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expectNoHorizontalOverflow, installTelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
 
 const diaryDate = '2026-09-12';
-const labelPhoto = resolve(process.cwd(), 'public/assets/marketing/nutrition-photo.webp');
+const labelPhoto = {
+  name: 'nutrition-photo.webp',
+  mimeType: 'image/webp',
+  buffer: readFileSync(resolve(process.cwd(), 'public/assets/marketing/nutrition-photo.webp')),
+};
 
 const zeroNutrition = {
   energy_kcal: '0.00',

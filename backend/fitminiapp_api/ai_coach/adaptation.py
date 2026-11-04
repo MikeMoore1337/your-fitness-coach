@@ -179,14 +179,17 @@ def _target_workout(
         )
         .filter(UserWorkout.user_program_id == program.id)
     )
+    if program.schedule_mode == "rotation":
+        query = query.filter(
+            UserWorkout.rotation_epoch == program.rotation_epoch,
+            UserWorkout.status == "in_progress",
+        )
     if payload.target_workout_id is not None:
         workout = query.filter(UserWorkout.id == payload.target_workout_id).one_or_none()
     else:
-        workout = (
-            query.filter(UserWorkout.status == "planned")
-            .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
-            .first()
-        )
+        if program.schedule_mode == "calendar":
+            query = query.filter(UserWorkout.status == "planned")
+        workout = query.order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc()).first()
     if workout is None or workout.status not in {"planned", "in_progress"}:
         raise AdaptationError("No upcoming planned workout for adaptation")
     return workout

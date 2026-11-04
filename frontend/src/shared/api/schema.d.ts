@@ -1488,6 +1488,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/assigned/{program_id}/session-rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Rotation Settings */
+        get: operations["get_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/session-rotation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Session Rotation Settings */
+        post: operations["preview_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/session-rotation/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Session Rotation Settings */
+        post: operations["apply_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/session-rotation/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extend Session Rotation Program */
+        post: operations["extend_session_rotation_program_api_v1_programs_assigned__program_id__session_rotation_extend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/assigned/{program_id}/cycle": {
         parameters: {
             query?: never;
@@ -1516,6 +1584,57 @@ export interface paths {
         put?: never;
         /** Preview Assigned Week Type */
         post: operations["preview_assigned_week_type_api_v1_programs_assigned__program_id__cycle_week_type_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/revision/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Assigned Cycle Revision */
+        post: operations["preview_assigned_cycle_revision_api_v1_programs_assigned__program_id__cycle_revision_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/structure/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Assigned Cycle Structure */
+        post: operations["preview_assigned_cycle_structure_api_v1_programs_assigned__program_id__cycle_structure_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/cycle/structure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Assigned Cycle Structure */
+        post: operations["update_assigned_cycle_structure_api_v1_programs_assigned__program_id__cycle_structure_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1771,6 +1890,23 @@ export interface paths {
         put?: never;
         /** Confirm Import Preview */
         post: operations["confirm_import_preview_api_v1_programs_imports__import_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}/assign-to-me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Import To Me */
+        post: operations["assign_import_to_me_api_v1_programs_imports__import_id__assign_to_me_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2924,6 +3060,91 @@ export interface paths {
         get: operations["get_my_workout_comments_api_v1_workouts__workout_id__comments_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Rotation State */
+        get: operations["get_session_rotation_state_api_v1_workouts_session_rotation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Session Rotation */
+        post: operations["start_session_rotation_api_v1_workouts_session_rotation_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Rotation Plan */
+        get: operations["get_session_rotation_plan_api_v1_workouts_session_rotation_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip Session Rotation */
+        post: operations["skip_session_rotation_api_v1_workouts_session_rotation_skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/session-rotation/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transition Session Rotation */
+        post: operations["transition_session_rotation_api_v1_workouts_session_rotation__action__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7737,6 +7958,18 @@ export interface components {
         Body_upload_history_api_v1_workout_history_imports_post: {
             /** File */
             file: string;
+            /**
+             * Provider
+             * @default yfc-neutral-csv
+             * @enum {string}
+             */
+            provider: "yfc-neutral-csv" | "hevy" | "strong" | "fitnotes";
+            /**
+             * Weight Unit
+             * @default
+             * @enum {string}
+             */
+            weight_unit: "" | "kg" | "lb";
         };
         /** Body_upload_program_import_api_v1_programs_imports_post */
         Body_upload_program_import_api_v1_programs_imports_post: {
@@ -9202,6 +9435,8 @@ export interface components {
             group_order?: number | null;
             /** Target Template Exercise Id */
             target_template_exercise_id?: number | null;
+            /** Target Assignment Slot Id */
+            target_assignment_slot_id?: string | null;
             /** Reason */
             reason?: string | null;
         };
@@ -11031,7 +11266,7 @@ export interface components {
              * Analytics Bucket
              * @enum {string}
              */
-            analytics_bucket: "working" | "preparation" | "intensifier";
+            analytics_bucket: "working" | "preparation" | "intensifier" | "unknown";
             /** Pr Eligible */
             pr_eligible: boolean;
             /** Execution Mode */
@@ -11132,6 +11367,8 @@ export interface components {
             exercise_id: number;
             /** Source Template Exercise Id */
             source_template_exercise_id?: number | null;
+            /** Source Assignment Slot Id */
+            source_assignment_slot_id?: string | null;
             /** Plan Revision Number */
             plan_revision_number?: number | null;
             /** Week Number */
@@ -11171,6 +11408,8 @@ export interface components {
             exercise_id: number;
             /** Source Template Exercise Id */
             source_template_exercise_id: number | null;
+            /** Source Assignment Slot Id */
+            source_assignment_slot_id?: string | null;
             /** Plan Revision Number */
             plan_revision_number: number | null;
             /** Week Number */
@@ -11218,6 +11457,8 @@ export interface components {
             exercise_id: number;
             /** Source Template Exercise Id */
             source_template_exercise_id?: number | null;
+            /** Source Assignment Slot Id */
+            source_assignment_slot_id?: string | null;
             /** Plan Revision Number */
             plan_revision_number?: number | null;
             /** Week Number */
@@ -12630,6 +12871,8 @@ export interface components {
             version: number;
             /** Preview Signature */
             preview_signature: string;
+            /** Completion Confirmed */
+            completion_confirmed?: boolean | null;
         };
         /** HistoryImportDraftSummary */
         HistoryImportDraftSummary: {
@@ -12773,6 +13016,10 @@ export interface components {
             exercise_choices?: {
                 [key: string]: number;
             };
+            /** Set Kind Choices */
+            set_kind_choices?: {
+                [key: string]: ("warmup" | "working" | "drop") | null;
+            };
             /** Excluded Lines */
             excluded_lines?: number[];
             /** Duplicate Choices */
@@ -12794,6 +13041,12 @@ export interface components {
             /** Line */
             line: number;
             source: components["schemas"]["HistoryImportSource"];
+            /** Provider Fields */
+            provider_fields?: {
+                [key: string]: string;
+            } | null;
+            /** Manual Set Kind */
+            manual_set_kind?: ("warmup" | "working" | "drop") | null;
             /** Completed At Utc */
             completed_at_utc: string | null;
             /** Completed On */
@@ -12847,6 +13100,8 @@ export interface components {
         HistoryImportSource: {
             /** Workout Ref */
             workout_ref: string;
+            /** Started At */
+            started_at?: string | null;
             /** Completed At */
             completed_at: string;
             /** Timezone */
@@ -15137,6 +15392,65 @@ export interface components {
              */
             offset: number;
         };
+        /**
+         * ProgramCycleImpactPreviewRequest
+         * @description Read-only impact view; unlike a week-type mutation it may cover all future weeks.
+         */
+        ProgramCycleImpactPreviewRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
+            /** From Week */
+            from_week?: number | null;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
+        /** ProgramCycleRevisionPreviewRequest */
+        ProgramCycleRevisionPreviewRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Effective From Week */
+            effective_from_week: number;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
+            /** Source Week Order */
+            source_week_order?: number[] | null;
+            /** Remove Day Number */
+            remove_day_number?: number | null;
+            /** Copy Day Number */
+            copy_day_number?: number | null;
+            /** New Day Weekday */
+            new_day_weekday?: number | null;
+            /** New Day Title */
+            new_day_title?: string | null;
+            /** Swap Day Number */
+            swap_day_number?: number | null;
+            /** Swap With Day Number */
+            swap_with_day_number?: number | null;
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /** Week Types */
+            week_types?: (("light" | "medium" | "heavy") | null)[] | null;
+            /** Repeat */
+            repeat?: boolean | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
         /** ProgramCycleRevisionRequest */
         ProgramCycleRevisionRequest: {
             /** Expected Revision Number */
@@ -15147,12 +15461,60 @@ export interface components {
             duration_weeks?: number | null;
             /** Source Week Order */
             source_week_order?: number[] | null;
+            /** Remove Day Number */
+            remove_day_number?: number | null;
+            /** Copy Day Number */
+            copy_day_number?: number | null;
+            /** New Day Weekday */
+            new_day_weekday?: number | null;
+            /** New Day Title */
+            new_day_title?: string | null;
+            /** Swap Day Number */
+            swap_day_number?: number | null;
+            /** Swap With Day Number */
+            swap_with_day_number?: number | null;
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
             /** Week Types */
             week_types?: (("light" | "medium" | "heavy") | null)[] | null;
             /** Repeat */
             repeat?: boolean | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** ProgramCycleStructureRequest */
+        ProgramCycleStructureRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
+            /** Occurrence Weeks */
+            occurrence_weeks?: number[] | null;
+            /** From Week */
+            from_week?: number | null;
+            /** Source Cycle Week */
+            source_cycle_week?: number | null;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "add_exercise" | "remove_exercise" | "move_earlier" | "move_later";
+            /** Day Number */
+            day_number: number;
+            /** Target Template Exercise Id */
+            target_template_exercise_id?: number | null;
+            /** Target Assignment Slot Id */
+            target_assignment_slot_id?: string | null;
+            /** Assignment Slot Id */
+            assignment_slot_id?: string | null;
+            exercise?: components["schemas"]["ProgramTemplateExerciseCreate"] | null;
         };
         /** ProgramGeneratorActiveProgram */
         ProgramGeneratorActiveProgram: {
@@ -15442,6 +15804,44 @@ export interface components {
              */
             applied: boolean;
         };
+        /** ProgramImportAssignmentRequest */
+        ProgramImportAssignmentRequest: {
+            /** Start Date */
+            start_date?: string | null;
+            /**
+             * Duration Weeks
+             * @default 1
+             */
+            duration_weeks: number;
+            /** Schedule Weekdays */
+            schedule_weekdays?: number[] | null;
+            /**
+             * Replace Active
+             * @default false
+             */
+            replace_active: boolean;
+            /** Expected Active Program Id */
+            expected_active_program_id: number | null;
+            /** Expected Active Revision Number */
+            expected_active_revision_number: number | null;
+        };
+        /** ProgramImportAssignmentResponse */
+        ProgramImportAssignmentResponse: {
+            /** User Program Id */
+            user_program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+        };
         /** ProgramImportBlock */
         ProgramImportBlock: {
             /** Block Number */
@@ -15479,6 +15879,8 @@ export interface components {
         };
         /** ProgramImportConfirmRequest */
         ProgramImportConfirmRequest: {
+            /** Expected Draft Version */
+            expected_draft_version?: number | null;
             /** Target Program Id */
             target_program_id?: number | null;
             /** Expected Revision Number */
@@ -15552,6 +15954,14 @@ export interface components {
         };
         /** ProgramImportResolveRequest */
         ProgramImportResolveRequest: {
+            /** Expected Draft Version */
+            expected_draft_version?: number | null;
+            /** Assignment Duration Weeks */
+            assignment_duration_weeks?: number | null;
+            /** Repeat */
+            repeat?: boolean | null;
+            /** Week Types */
+            week_types?: (("light" | "medium" | "heavy") | null)[] | null;
             /** Title */
             title?: string | null;
             /** Goal */
@@ -15571,6 +15981,10 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "confirmed" | "cancelled" | "expired";
+            /** Confirmed Template Id */
+            confirmed_template_id?: number | null;
+            /** Self Assigned Program Id */
+            self_assigned_program_id?: number | null;
             /**
              * Source Format
              * @enum {string}
@@ -15584,6 +15998,16 @@ export interface components {
             layout_version?: string | null;
             /** Duration Weeks */
             duration_weeks?: number | null;
+            /** Draft Version */
+            draft_version?: number | null;
+            /** Assignment Duration Weeks */
+            assignment_duration_weeks?: number | null;
+            /** Repeat */
+            repeat?: boolean | null;
+            /** Week Types */
+            week_types?: (("light" | "medium" | "heavy") | null)[] | null;
+            /** Week Type Candidates */
+            week_type_candidates?: components["schemas"]["ProgramImportWeekTypeCandidate"][];
             /**
              * Expires At
              * Format: date-time
@@ -15645,6 +16069,8 @@ export interface components {
             notes?: string | null;
             /** Source Auxiliary */
             source_auxiliary?: string | null;
+            /** Manual Planned Loads */
+            manual_planned_loads?: string | null;
             /** Superset Group */
             superset_group?: number | null;
             /** Superset Order */
@@ -15686,6 +16112,12 @@ export interface components {
             row_number: number;
             /** Exercise Id */
             exercise_id?: number | null;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+            /** Planned Loads */
+            planned_loads?: string | null;
         };
         /** ProgramImportSummary */
         ProgramImportSummary: {
@@ -15721,6 +16153,22 @@ export interface components {
             status: "scheduled" | "active";
             /** Day Numbers */
             day_numbers: number[];
+        };
+        /** ProgramImportWeekTypeCandidate */
+        ProgramImportWeekTypeCandidate: {
+            /** Week Number */
+            week_number: number;
+            /**
+             * Week Type
+             * @enum {string}
+             */
+            week_type: "light" | "medium" | "heavy";
+            /** Source Text */
+            source_text: string;
+            /** Source Sheet */
+            source_sheet?: string | null;
+            /** Source Cell */
+            source_cell: string;
         };
         /** ProgramLifecycleActionRequest */
         ProgramLifecycleActionRequest: {
@@ -15798,6 +16246,16 @@ export interface components {
             start_date: string;
             /** Duration Weeks */
             duration_weeks: number;
+            /**
+             * Schedule Mode
+             * @default calendar
+             * @enum {string}
+             */
+            schedule_mode: "calendar" | "rotation";
+            /** Rotation Current Title */
+            rotation_current_title?: string | null;
+            /** Rotation Status */
+            rotation_status?: string | null;
             /** Current Revision Number */
             current_revision_number: number;
             /** Current Week Number */
@@ -17578,6 +18036,234 @@ export interface components {
              */
             unit: "g" | "ml";
         };
+        /** SessionRotationActionRequest */
+        SessionRotationActionRequest: {
+            /** Expected Cursor */
+            expected_cursor: string;
+            /** Expected Day Number */
+            expected_day_number: number;
+            /** Mutation Id */
+            mutation_id: string;
+            /** Plan Week Number */
+            plan_week_number?: number | null;
+            /**
+             * Out Of Order
+             * @default false
+             */
+            out_of_order: boolean;
+        };
+        /** SessionRotationApplyRequest */
+        SessionRotationApplyRequest: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** First Day Number */
+            first_day_number?: number | null;
+            /** Resume Calendar Week */
+            resume_calendar_week?: number | null;
+            /** Resume Calendar Day */
+            resume_calendar_day?: number | null;
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** SessionRotationCalendarOption */
+        SessionRotationCalendarOption: {
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Title */
+            title: string;
+        };
+        /** SessionRotationDay */
+        SessionRotationDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Workout Id */
+            workout_id?: number | null;
+            /** Status */
+            status?: string | null;
+            /**
+             * From Template
+             * @default false
+             */
+            from_template: boolean;
+            /** Exercise Count */
+            exercise_count?: number | null;
+            /** Set Count */
+            set_count?: number | null;
+            /** Default Plan Week */
+            default_plan_week?: number | null;
+        };
+        /** SessionRotationExtendRequest */
+        SessionRotationExtendRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Expected Cursor */
+            expected_cursor: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Mutation Id */
+            mutation_id: string;
+        };
+        /** SessionRotationPlanExercise */
+        SessionRotationPlanExercise: {
+            /** Title */
+            title: string;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+        };
+        /** SessionRotationPlanResponse */
+        SessionRotationPlanResponse: {
+            /** Title */
+            title: string;
+            /** Week Number */
+            week_number: number;
+            /** Exercises */
+            exercises: components["schemas"]["SessionRotationPlanExercise"][];
+        };
+        /** SessionRotationReminder */
+        SessionRotationReminder: {
+            /** Workout Id */
+            workout_id: number;
+            /** Title */
+            title: string;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Status */
+            status: string;
+        };
+        /** SessionRotationSettingsRequest */
+        SessionRotationSettingsRequest: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** First Day Number */
+            first_day_number?: number | null;
+            /** Resume Calendar Week */
+            resume_calendar_week?: number | null;
+            /** Resume Calendar Day */
+            resume_calendar_day?: number | null;
+        };
+        /** SessionRotationSettingsResponse */
+        SessionRotationSettingsResponse: {
+            /** Program Id */
+            program_id: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /** Revision Number */
+            revision_number: number;
+            /** Days */
+            days: components["schemas"]["SessionRotationDay"][];
+            /** First Day Number */
+            first_day_number?: number | null;
+            /**
+             * Future Reminders
+             * @default 0
+             */
+            future_reminders: number;
+            /** Reminders */
+            reminders?: components["schemas"]["SessionRotationReminder"][];
+            /** Calendar Options */
+            calendar_options?: components["schemas"]["SessionRotationCalendarOption"][];
+            calendar_resume?: components["schemas"]["SessionRotationCalendarOption"] | null;
+            /** Template Plans */
+            template_plans?: components["schemas"]["SessionRotationSupplementPlan"][];
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** SessionRotationStateResponse */
+        SessionRotationStateResponse: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "calendar" | "rotation";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disabled" | "ready" | "in_progress" | "cancelled" | "expired" | "review_required" | "empty";
+            /** Program Id */
+            program_id?: number | null;
+            /** Revision Number */
+            revision_number?: number | null;
+            /** Cursor */
+            cursor?: string | null;
+            current?: components["schemas"]["SessionRotationDay"] | null;
+            next?: components["schemas"]["SessionRotationDay"] | null;
+            /** Days */
+            days?: components["schemas"]["SessionRotationDay"][];
+            /** Program End Date */
+            program_end_date?: string | null;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
+            /** Default Plan Week */
+            default_plan_week?: number | null;
+            /** Days Since Last Completion */
+            days_since_last_completion?: number | null;
+            /** Min Extension Weeks */
+            min_extension_weeks?: number | null;
+            /**
+             * Can Extend
+             * @default true
+             */
+            can_extend: boolean;
+            /** Undo Skip Workout Id */
+            undo_skip_workout_id?: number | null;
+        };
+        /** SessionRotationSupplementExercise */
+        SessionRotationSupplementExercise: {
+            /** Title */
+            title: string;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+        };
+        /** SessionRotationSupplementPlan */
+        SessionRotationSupplementPlan: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Week Number */
+            week_number: number;
+            /** Exercises */
+            exercises: components["schemas"]["SessionRotationSupplementExercise"][];
+        };
+        /** SessionRotationTransitionRequest */
+        SessionRotationTransitionRequest: {
+            /** Expected Cursor */
+            expected_cursor: string;
+            /** Workout Id */
+            workout_id: number;
+            /** Mutation Id */
+            mutation_id: string;
+        };
         /** SideProgressionGuidance */
         SideProgressionGuidance: {
             /**
@@ -19354,6 +20040,8 @@ export interface components {
             prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
             /** Source Template Exercise Id */
             source_template_exercise_id?: number | null;
+            /** Source Assignment Slot Id */
+            source_assignment_slot_id?: string | null;
             /** Source Weekly Prescription Id */
             source_weekly_prescription_id?: number | null;
             /** Group Id */
@@ -19670,6 +20358,8 @@ export interface components {
             exercise_id: number;
             /** Source Template Exercise Id */
             source_template_exercise_id: number | null;
+            /** Source Assignment Slot Id */
+            source_assignment_slot_id?: string | null;
             previous_today?: components["schemas"]["WorkoutSetResult"] | null;
             previous_workout?: components["schemas"]["WorkoutSetPastResult"] | null;
             /**
@@ -19725,6 +20415,15 @@ export interface components {
              * Format: date
              */
             performed_on: string;
+        };
+        /** WorkoutSetPlannedTarget */
+        WorkoutSetPlannedTarget: {
+            /** Weight Kg */
+            weight_kg: number | string;
+            /** Reps */
+            reps: number;
+            /** Confirmed */
+            confirmed: boolean;
         };
         /** WorkoutSetResult */
         WorkoutSetResult: {
@@ -19786,6 +20485,7 @@ export interface components {
              * @default false
              */
             confirm_mode_change: boolean;
+            planned_target?: components["schemas"]["WorkoutSetPlannedTarget"] | null;
             /** Expected Version */
             expected_version?: number | null;
             /** Mutation Id */
@@ -23194,6 +23894,142 @@ export interface operations {
             };
         };
     };
+    get_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_session_rotation_settings_api_v1_programs_assigned__program_id__session_rotation_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extend_session_rotation_program_api_v1_programs_assigned__program_id__session_rotation_extend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationExtendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_assigned_cycle_api_v1_programs_assigned__program_id__cycle_patch: {
         parameters: {
             query?: never;
@@ -23240,7 +24076,112 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProgramWeekTypeRevisionRequest"];
+                "application/json": components["schemas"]["ProgramCycleImpactPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_assigned_cycle_revision_api_v1_programs_assigned__program_id__cycle_revision_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleRevisionPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_assigned_cycle_structure_api_v1_programs_assigned__program_id__cycle_structure_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleStructureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_assigned_cycle_structure_api_v1_programs_assigned__program_id__cycle_structure_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramCycleStructureRequest"];
             };
         };
         responses: {
@@ -23706,6 +24647,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgramImportConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_import_to_me_api_v1_programs_imports__import_id__assign_to_me_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramImportAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportAssignmentResponse"];
                 };
             };
             /** @description Validation Error */
@@ -26209,6 +27185,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutCommentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_rotation_state_api_v1_workouts_session_rotation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationStateResponse"];
+                };
+            };
+        };
+    };
+    start_session_rotation_api_v1_workouts_session_rotation_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutTodayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_rotation_plan_api_v1_workouts_session_rotation_plan_get: {
+        parameters: {
+            query: {
+                day_number: number;
+                week_number: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationPlanResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_session_rotation_api_v1_workouts_session_rotation_skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationStateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transition_session_rotation_api_v1_workouts_session_rotation__action__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: "cancel" | "restore" | "undo-skip";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionRotationTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRotationStateResponse"];
                 };
             };
             /** @description Validation Error */

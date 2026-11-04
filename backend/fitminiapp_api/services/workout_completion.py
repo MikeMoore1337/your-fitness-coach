@@ -201,6 +201,9 @@ def _personal_records(
 
 
 def _next_workout(db: Session, user: User, workout: UserWorkout) -> dict | None:
+    program = db.get(UserProgram, workout.user_program_id) if workout.user_program_id else None
+    if workout.rotation_epoch is not None or (program and program.schedule_mode == "rotation"):
+        return None
     next_workout = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)

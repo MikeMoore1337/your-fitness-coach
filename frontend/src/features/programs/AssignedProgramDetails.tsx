@@ -20,6 +20,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { AiAdaptationProposal } from '../ai/AiAdaptationProposal';
 import { ProgressionGuidance } from '../workouts/ProgressionGuidance';
 import { ActiveProgramPeriodization } from './ActiveProgramPeriodization';
+import { SessionRotationSettings } from './SessionRotationSettings';
 import './ProgramBuilderFocus.css';
 import { hasDecimalScale, parseDecimalDraft } from '../../shared/numeric/decimalDraft';
 import {
@@ -644,19 +645,26 @@ export function AssignedProgramDetails({
         />
       ) : lifecycle.data ? (
         <>
+          {canManageProgram && (
+            <SessionRotationSettings programId={programId} readOnly={periodizationReadOnly} />
+          )}
           <article className="program-lifecycle" aria-label="Жизненный цикл программы">
             <div className="program-lifecycle__summary">
               <div className="program-lifecycle__status">
                 <Badge
                   tone={
-                    lifecycle.data.status === 'active'
-                      ? 'success'
-                      : lifecycle.data.status === 'paused'
-                        ? 'warning'
-                        : 'neutral'
+                    lifecycle.data.rotation_status === 'expired'
+                      ? 'warning'
+                      : lifecycle.data.status === 'active'
+                        ? 'success'
+                        : lifecycle.data.status === 'paused'
+                          ? 'warning'
+                          : 'neutral'
                   }
                 >
-                  {programStatusLabels[lifecycle.data.status]}
+                  {lifecycle.data.rotation_status === 'expired'
+                    ? 'Ожидает продления'
+                    : programStatusLabels[lifecycle.data.status]}
                 </Badge>
                 <strong>
                   {lifecycle.data.current_week_number
@@ -666,7 +674,10 @@ export function AssignedProgramDetails({
               </div>
               <div className="program-lifecycle__next">
                 <span>Следующая тренировка</span>
-                {lifecycle.data.next_workout ? (
+                {lifecycle.data.schedule_mode === 'rotation' &&
+                lifecycle.data.rotation_current_title ? (
+                  <strong>{lifecycle.data.rotation_current_title} · по очереди</strong>
+                ) : lifecycle.data.next_workout ? (
                   <strong>
                     {lifecycle.data.next_workout.title} ·{' '}
                     {formatProgramDate(lifecycle.data.next_workout.scheduled_date)}

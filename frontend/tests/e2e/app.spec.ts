@@ -6,6 +6,7 @@ import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platf
 import { expectSelectedChoice } from './fixtures/selected-state';
 import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
 import { installTelegramHarness } from './fixtures/mobile-tma';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -501,6 +502,8 @@ async function mockApi(
         },
       });
     }
+    if (path.endsWith('/workouts/session-rotation'))
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
     if (path.endsWith('/workouts/today'))
       return route.fulfill({ status: 404, json: { detail: 'На сегодня тренировка не назначена' } });
     if (path.endsWith('/workouts/progress/summary'))
@@ -2723,7 +2726,10 @@ test('рекомендация кардио меняется с целью, а �
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
   await page.locator('#profile-personal > summary').click();
-  await page.getByText('Пульс и кардио-ориентиры').click();
+  const cardioSettings = page.getByText('Пульс и кардио-ориентиры');
+  await scrollIntoStablePosition(cardioSettings);
+  await cardioSettings.click();
+  await expect(page.getByLabel('Средний пульс в покое, уд/мин')).toBeVisible();
 
   await page.getByLabel('Дата рождения').fill('1992-08-12');
   await page.getByText('Средний пульс в покое, уд/мин').locator('..').locator('input').fill('75');
@@ -3770,9 +3776,10 @@ test('клиент собирает и проверяет личную прог�
 
 test('сенсорное поле даты сохраняет нативный пикер и показывает иконку календаря', async ({
   browser,
+  baseURL,
 }) => {
   const context = await browser.newContext({
-    baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
+    baseURL,
     viewport: { width: 390, height: 844 },
     hasTouch: true,
     isMobile: true,

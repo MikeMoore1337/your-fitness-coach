@@ -1,7 +1,9 @@
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
+from scripts import check_online_migrations as online_migrations
 from scripts.check_online_migrations import (
     OnlineMigrationError,
     changed_migrations_from_manifest,
@@ -13,6 +15,75 @@ from scripts.check_online_migrations import (
 def _migration(path: Path, body: str) -> Path:
     path.write_text(body, encoding="utf-8")
     return path
+
+
+@pytest.mark.parametrize("path, hashes", online_migrations.DEV_DOWNGRADE_TRANSITIONS.items())
+def test_reviewed_dev_downgrade_target_matches_checked_in_source(
+    path: str, hashes: tuple[str, str]
+):
+    root = Path(__file__).resolve().parents[1]
+    source = (root / path).read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(source).hexdigest() == hashes[1]
+
+
+def test_reviewed_dev_downgrade_requires_exact_sources_and_unchanged_upgrade(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    path = Path("backend/alembic/versions/0139_workout_exercise_notes.py")
+    previous_root = tmp_path / "previous"
+    path.parent.mkdir(parents=True)
+    (previous_root / path.parent).mkdir(parents=True)
+    old = 'revision = "x"\ndef upgrade():\n    pass\ndef downgrade():\n    pass\n'
+    new = old.replace(
+        "def downgrade():\n    pass", 'def downgrade():\n    raise RuntimeError("guard")'
+    )
+    (previous_root / path).write_text(old, encoding="utf-8")
+    path.write_text(new, encoding="utf-8")
+
+    def sha(value: str) -> str:
+        return hashlib.sha256(value.encode()).hexdigest()
+
+    monkeypatch.setitem(
+        online_migrations.DEV_DOWNGRADE_TRANSITIONS, path.as_posix(), (sha(old), sha(new))
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "active_revision": "old",
+                "target_revision": "new",
+                "changes": [{"status": "M", "path": path.as_posix()}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations("old", "new", manifest=manifest)
+    assert (
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
+        == []
+    )
+    (previous_root / path).write_text(old + "# altered\n", encoding="utf-8")
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
+    (previous_root / path).write_text(old, encoding="utf-8")
+    changed_upgrade = new.replace("def upgrade():\n    pass", "def upgrade():\n    dangerous()")
+    path.write_text(changed_upgrade, encoding="utf-8")
+    monkeypatch.setitem(
+        online_migrations.DEV_DOWNGRADE_TRANSITIONS,
+        path.as_posix(),
+        (sha(old), sha(changed_upgrade)),
+    )
+    with pytest.raises(OnlineMigrationError, match="immutable"):
+        online_migrations.check_online_migrations(
+            "old", "new", manifest=manifest, dev_reviewed_source=previous_root
+        )
 
 
 def test_production_migration_manifest_is_revision_bound(tmp_path: Path) -> None:
@@ -58,6 +129,13 @@ def test_online_migration_accepts_declared_additive_expand(tmp_path: Path) -> No
     )
 
     validate_added_migration(path)
+
+
+def test_provider_provenance_migration_is_additive_and_online_safe() -> None:
+    root = Path(__file__).resolve().parents[1]
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0145_history_provider_provenance.py"
+    )
 
 
 def test_online_migration_accepts_empty_table_and_its_index(tmp_path: Path) -> None:
@@ -214,6 +292,20 @@ def test_concurrent_index_allows_only_exact_catalog_validation(tmp_path: Path, k
             validate_added_migration(path)
     else:
         validate_added_migration(path)
+
+
+def test_rotation_index_validation_is_exact_and_scoped(tmp_path: Path) -> None:
+    source_path = (
+        Path(__file__).resolve().parents[1] / "backend/alembic/versions/0147_session_rotation.py"
+    )
+    source = source_path.read_text(encoding="utf-8")
+    validate_added_migration(source_path)
+    weakened = source.replace("AND indnkeyatts = 2 AND indnatts = 2", "AND indnkeyatts >= 1")
+    assert weakened != source
+    with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+        validate_added_migration(_migration(tmp_path / "0147_session_rotation.py", weakened))
+    with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+        validate_added_migration(_migration(tmp_path / "9999_unrelated.py", source))
 
 
 @pytest.mark.parametrize("operation", ["drop_table", "drop_column", "alter_column"])

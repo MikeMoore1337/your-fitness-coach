@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_coach, require_user
@@ -17,7 +18,10 @@ from fitminiapp_api.schemas.program import (
     ProgramCycleDisableRequest,
     ProgramCycleDurationPreviewRequest,
     ProgramCycleEnableRequest,
+    ProgramCycleImpactPreviewRequest,
+    ProgramCycleRevisionPreviewRequest,
     ProgramCycleRevisionRequest,
+    ProgramCycleStructureRequest,
     ProgramLifecycleActionRequest,
     ProgramLifecycleMutationResponse,
     ProgramLifecycleResponse,
@@ -28,6 +32,10 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateCreateResponse,
     ProgramTemplateResponse,
     ProgramWeekTypeRevisionRequest,
+    SessionRotationApplyRequest,
+    SessionRotationExtendRequest,
+    SessionRotationSettingsRequest,
+    SessionRotationSettingsResponse,
     TemplateExerciseReplacementRequest,
     TrainingBlockActionRequest,
     TrainingBlockAdvanceResponse,
@@ -49,6 +57,7 @@ from fitminiapp_api.schemas.workout import (
     ProgressionProposalReviewRequest,
     ProgressionProposalReviewResponse,
 )
+from fitminiapp_api.services import session_rotation
 from fitminiapp_api.services.exercise_catalog import (
     _effective_exercise_id,
     _source_exercise_slug,
@@ -91,6 +100,7 @@ from fitminiapp_api.services.program_versioning import (
     program_lifecycle_summary,
     repeat_training_block,
     revise_program_cycle,
+    revise_program_cycle_structure,
     revise_program_week_type,
     update_training_block,
     upsert_future_program_exercise,
@@ -124,6 +134,8 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
     detail = str(exc)
     if detail in {"Assigned program not found", "Training block not found"}:
         return HTTPException(status_code=404, detail=detail)
+    if detail == "Изменения программы согласуйте с тренером":
+        return HTTPException(status_code=403, detail=detail)
     if detail in {
         "Program revision conflict",
         "Progression proposal is stale",
@@ -587,7 +599,11 @@ def edit_template(
         detail = str(exc)
         if detail == "Template not found":
             raise HTTPException(status_code=404, detail=detail)
-        if detail in {"No permission to edit template", "No permission to manage this user"}:
+        if detail in {
+            "No permission to edit template",
+            "No permission to manage this user",
+            "Изменения программы согласуйте с тренером",
+        }:
             raise HTTPException(status_code=403, detail=detail)
         if detail == "Program revision conflict":
             raise HTTPException(status_code=409, detail=detail)
@@ -901,6 +917,103 @@ def repeat_assigned_program_block(
     }
 
 
+@router.get(
+    "/assigned/{program_id}/session-rotation", response_model=SessionRotationSettingsResponse
+)
+def get_session_rotation_settings(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return session_rotation.settings(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    except session_rotation.SessionRotationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _rotation_program_error(
+    db: Session,
+    actor: User,
+    program_id: int,
+    exc: ProgramError | session_rotation.SessionRotationError,
+) -> HTTPException:
+    error = (
+        _assigned_program_error(exc)
+        if isinstance(exc, ProgramError)
+        else HTTPException(status_code=exc.status_code, detail=exc.detail)
+    )
+    if error.status_code != 409:
+        return error
+    try:
+        program, _ = session_rotation.get_program_for_actor(db, actor, program_id)
+        current = (
+            session_rotation._state(db, program, session_rotation._owner(db, program))
+            if program.schedule_mode == "rotation"
+            else session_rotation.settings(db, actor, program_id)
+        )
+    except ProgramError, session_rotation.SessionRotationError:
+        return error
+    return HTTPException(
+        status_code=409,
+        detail={"message": error.detail, "current": jsonable_encoder(current)},
+    )
+
+
+@router.post(
+    "/assigned/{program_id}/session-rotation/preview",
+    response_model=SessionRotationSettingsResponse,
+)
+def preview_session_rotation_settings(
+    program_id: int,
+    payload: SessionRotationSettingsRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return session_rotation.preview_settings(db, current_user, program_id, payload)
+    except (ProgramError, session_rotation.SessionRotationError) as exc:
+        db.rollback()
+        raise _rotation_program_error(db, current_user, program_id, exc) from exc
+
+
+@router.post(
+    "/assigned/{program_id}/session-rotation/apply",
+    response_model=SessionRotationSettingsResponse,
+)
+def apply_session_rotation_settings(
+    program_id: int,
+    payload: SessionRotationApplyRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        request = SessionRotationSettingsRequest.model_validate(
+            payload.model_dump(exclude={"preview_token"})
+        )
+        return session_rotation.apply_settings(
+            db, current_user, program_id, request, payload.preview_token
+        )
+    except (ProgramError, session_rotation.SessionRotationError) as exc:
+        db.rollback()
+        raise _rotation_program_error(db, current_user, program_id, exc) from exc
+
+
+@router.post("/assigned/{program_id}/session-rotation/extend")
+def extend_session_rotation_program(
+    program_id: int,
+    payload: SessionRotationExtendRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return session_rotation.extend_program(db, current_user, program_id, payload)
+    except (ProgramError, session_rotation.SessionRotationError) as exc:
+        db.rollback()
+        raise _rotation_program_error(db, current_user, program_id, exc) from exc
+
+
 @router.patch("/assigned/{program_id}/cycle")
 def update_assigned_cycle(
     program_id: int,
@@ -919,13 +1032,53 @@ def update_assigned_cycle(
 @router.post("/assigned/{program_id}/cycle/week-type/preview")
 def preview_assigned_week_type(
     program_id: int,
-    payload: ProgramWeekTypeRevisionRequest,
+    payload: ProgramCycleImpactPreviewRequest,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
     try:
         return revise_program_week_type(db, current_user, program_id, payload, preview=True)
     except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/revision/preview")
+def preview_assigned_cycle_revision(
+    program_id: int,
+    payload: ProgramCycleRevisionPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/structure/preview")
+def preview_assigned_cycle_structure(
+    program_id: int,
+    payload: ProgramCycleStructureRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle_structure(db, current_user, program_id, payload, preview=True)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post("/assigned/{program_id}/cycle/structure")
+def update_assigned_cycle_structure(
+    program_id: int,
+    payload: ProgramCycleStructureRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return revise_program_cycle_structure(db, current_user, program_id, payload, preview=False)
+    except ProgramError as exc:
+        db.rollback()
         raise _assigned_program_error(exc) from exc
 
 

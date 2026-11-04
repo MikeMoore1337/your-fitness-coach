@@ -35,6 +35,9 @@ const allowedLatinWords = new Map([
   ['YFC', 'official product abbreviation'],
   ['XLSX', 'file format abbreviation'],
   ['Telegram', 'official external platform name'],
+  ['Hevy', 'official workout app name'],
+  ['Strong', 'official workout app name'],
+  ['FitNotes', 'official workout app name'],
 ]);
 
 const allowedLatinPhrases = new Map([

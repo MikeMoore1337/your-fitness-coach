@@ -1,9 +1,17 @@
-export const AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_authenticated_user_id';
+import {
+  AUTHENTICATED_USER_ID_STORAGE_KEY,
+  LEGACY_AUTH_CANARY_KEY,
+} from './auth/legacySessionKeys';
+
+export { AUTHENTICATED_USER_ID_STORAGE_KEY } from './auth/legacySessionKeys';
+const LAST_AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_last_authenticated_user_id_v1';
 
 export const ACTIVE_WORKOUT_STORAGE_PREFIXES = {
   queue: 'fit_active_workout_v1_',
+  protectedQueue: 'fit_active_workout_queue_v4_',
   rest: 'fit_active_workout_rest_v1_',
   pointer: 'fit_active_workout_current_v1_user_',
+  protectedPointer: 'fit_active_workout_pointer_v2_user_',
 } as const;
 
 export const LEGACY_ACTIVE_WORKOUT_STORAGE_PREFIXES = [
@@ -17,8 +25,10 @@ export const USER_SCOPED_PERSISTENT_STORAGE_REGISTRY = [
     domain: 'active_workout',
     prefixes: [
       ACTIVE_WORKOUT_STORAGE_PREFIXES.queue,
+      ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedQueue,
       ACTIVE_WORKOUT_STORAGE_PREFIXES.rest,
       ACTIVE_WORKOUT_STORAGE_PREFIXES.pointer,
+      ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedPointer,
       ...LEGACY_ACTIVE_WORKOUT_STORAGE_PREFIXES,
     ],
   },
@@ -52,7 +62,11 @@ export const USER_SCOPED_PERSISTENT_STORAGE_REGISTRY = [
   },
 ] as const;
 
-const SENSITIVE_LOCAL_STORAGE_EXACT_KEYS = ['fit_access_token', 'fit_refresh_token'] as const;
+const SENSITIVE_LOCAL_STORAGE_EXACT_KEYS = [
+  'fit_access_token',
+  'fit_refresh_token',
+  LAST_AUTHENTICATED_USER_ID_STORAGE_KEY,
+] as const;
 
 const sensitiveLocalStoragePrefixes = USER_SCOPED_PERSISTENT_STORAGE_REGISTRY.flatMap(
   ({ prefixes }) => prefixes,
@@ -62,12 +76,37 @@ export function activeWorkoutQueueStorageKey(userId: number, workoutId: number):
   return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.queue}user_${userId}_workout_${workoutId}`;
 }
 
+export function protectedWorkoutQueueStorageKey(userId: number, workoutId: number): string {
+  return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedQueue}user_${userId}_workout_${workoutId}`;
+}
+
+export function lastAuthenticatedUserId(): number | undefined {
+  try {
+    const id = Number(localStorage.getItem(LAST_AUTHENTICATED_USER_ID_STORAGE_KEY));
+    return Number.isSafeInteger(id) && id > 0 ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function rememberAuthenticatedUserId(userId: number): void {
+  try {
+    localStorage.setItem(LAST_AUTHENTICATED_USER_ID_STORAGE_KEY, String(userId));
+  } catch {
+    // Authentication still works when persistent storage is unavailable.
+  }
+}
+
 export function activeWorkoutRestStorageKey(userId: number, workoutId: number): string {
   return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.rest}user_${userId}_workout_${workoutId}`;
 }
 
 export function activeWorkoutPointerStorageKey(userId: number): string {
   return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.pointer}${userId}`;
+}
+
+export function protectedWorkoutPointerStorageKey(userId: number): string {
+  return `${ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedPointer}${userId}`;
 }
 
 export function legacyWorkoutSetStorageKey(setId: number): string {
@@ -145,12 +184,92 @@ export function programDraftStorageKey(
   return `fit_program_${field}_${scope}`;
 }
 
-export function clearSensitiveUserScopedStorage(): void {
+type PendingWorkoutRetention = { pendingOnly: true; userId?: number };
+
+export function clearSensitiveUserScopedStorage(
+  preserveActiveWorkoutForUserId?: number | PendingWorkoutRetention,
+): void {
+  const preserveId =
+    typeof preserveActiveWorkoutForUserId === 'number' &&
+    Number.isSafeInteger(preserveActiveWorkoutForUserId) &&
+    preserveActiveWorkoutForUserId > 0
+      ? preserveActiveWorkoutForUserId
+      : undefined;
+  const preservedPrefixes = preserveId
+    ? [
+        `${ACTIVE_WORKOUT_STORAGE_PREFIXES.queue}user_${preserveId}_workout_`,
+        `${ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedQueue}user_${preserveId}_workout_`,
+        `${ACTIVE_WORKOUT_STORAGE_PREFIXES.rest}user_${preserveId}_workout_`,
+      ]
+    : [];
   try {
     const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+    const pendingKeys = new Set<string>();
+    const rememberedId = lastAuthenticatedUserId();
+    if (preserveId && rememberedId === preserveId)
+      pendingKeys.add(LAST_AUTHENTICATED_USER_ID_STORAGE_KEY);
+    if (typeof preserveActiveWorkoutForUserId === 'object') {
+      const requestedId = preserveActiveWorkoutForUserId.userId;
+      const validRequestedId =
+        requestedId === undefined || (Number.isSafeInteger(requestedId) && requestedId > 0);
+      if (
+        rememberedId &&
+        validRequestedId &&
+        (requestedId === undefined || requestedId === rememberedId)
+      )
+        pendingKeys.add(LAST_AUTHENTICATED_USER_ID_STORAGE_KEY);
+      for (const key of keys) {
+        const match = key?.match(
+          /^fit_active_workout_(?:v1|queue_v4)_user_([1-9]\d*)_workout_([1-9]\d*)(?::v3)?$/,
+        );
+        if (!match || !validRequestedId) continue;
+        const userId = Number(match[1]);
+        const workoutId = Number(match[2]);
+        if (
+          !Number.isSafeInteger(userId) ||
+          !Number.isSafeInteger(workoutId) ||
+          (requestedId !== undefined && requestedId !== userId)
+        )
+          continue;
+        try {
+          const stored = JSON.parse(localStorage.getItem(key!) || 'null') as {
+            schema_version?: number;
+            user_id?: number;
+            workout_id?: number;
+            queue?: unknown;
+          } | null;
+          if (
+            !stored ||
+            ![1, 2, 3].includes(stored.schema_version ?? 0) ||
+            stored.user_id !== userId ||
+            stored.workout_id !== workoutId ||
+            !Array.isArray(stored.queue) ||
+            stored.queue.length === 0
+          )
+            continue;
+          const queueKey = activeWorkoutQueueStorageKey(userId, workoutId);
+          pendingKeys.add(queueKey);
+          pendingKeys.add(`${queueKey}:v3`);
+          pendingKeys.add(protectedWorkoutQueueStorageKey(userId, workoutId));
+          for (const pointerKey of [
+            activeWorkoutPointerStorageKey(userId),
+            protectedWorkoutPointerStorageKey(userId),
+          ]) {
+            if (localStorage.getItem(pointerKey) === String(workoutId)) pendingKeys.add(pointerKey);
+          }
+        } catch {
+          // Invalid local records cannot be recovered as an active workout.
+        }
+      }
+    }
     for (const key of keys) {
       if (
         key &&
+        !pendingKeys.has(key) &&
+        key !== LEGACY_AUTH_CANARY_KEY &&
+        key !== (preserveId ? activeWorkoutPointerStorageKey(preserveId) : null) &&
+        key !== (preserveId ? protectedWorkoutPointerStorageKey(preserveId) : null) &&
+        !preservedPrefixes.some((prefix) => key.startsWith(prefix)) &&
         (SENSITIVE_LOCAL_STORAGE_EXACT_KEYS.some((candidate) => candidate === key) ||
           sensitiveLocalStoragePrefixes.some((prefix) => key.startsWith(prefix)))
       ) {

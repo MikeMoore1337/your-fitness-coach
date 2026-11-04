@@ -1068,7 +1068,7 @@ def build_workout_timeline(
                     and completed_set_volume(workout_set) is None
                 ):
                     volume_incomplete = True
-                serialized_set = {
+                serialized_set: dict[str, object] = {
                     "set_number": workout_set.set_number,
                     "actual_reps": workout_set.actual_reps,
                     "actual_weight": workout_set.actual_weight,

@@ -7,12 +7,20 @@ import {
   activeWorkoutRestStorageKey,
   legacyWorkoutPendingStorageKey,
   legacyWorkoutSetStorageKey,
+  protectedWorkoutPointerStorageKey,
+  protectedWorkoutQueueStorageKey,
 } from '../../shared/userScopedStorage';
 import { getApiRuntime } from '../../shared/runtime/runtime';
+import {
+  LEGACY_AUTH_CANARY_KEY,
+  LEGACY_AUTH_GUARD_KEY,
+  LEGACY_AUTH_REAUTH_KEY,
+} from '../../shared/auth/legacySessionKeys';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 
 export const ACTIVE_WORKOUT_QUEUE_VERSION = 3 as const;
+export const ACTIVE_WORKOUT_QUEUE_CHANGED_EVENT = 'fit:active-workout-queue-changed';
 const LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION = 1 as const;
 const PREVIOUS_ACTIVE_WORKOUT_QUEUE_VERSION = 2 as const;
 const MAX_QUEUE_LENGTH = 256;
@@ -58,7 +66,7 @@ function runtimeStorageKey(key: string): string {
 }
 
 function activeWorkoutPointerKey(userId: number): string {
-  return runtimeStorageKey(activeWorkoutPointerStorageKey(userId));
+  return runtimeStorageKey(protectedWorkoutPointerStorageKey(userId));
 }
 
 type StoredActiveWorkoutQueue = Omit<ActiveWorkoutQueue, 'schema_version'> & {
@@ -66,7 +74,7 @@ type StoredActiveWorkoutQueue = Omit<ActiveWorkoutQueue, 'schema_version'> & {
 };
 
 export function activeWorkoutQueueKey(userId: number, workoutId: number): string {
-  return `${legacyActiveWorkoutQueueKey(userId, workoutId)}:v3`;
+  return runtimeStorageKey(protectedWorkoutQueueStorageKey(userId, workoutId));
 }
 
 export function legacyActiveWorkoutQueueKey(userId: number, workoutId: number): string {
@@ -292,34 +300,38 @@ function migrateLegacyQueue(
 }
 
 function mergePreviousQueue(state: ActiveWorkoutQueue, workout?: Workout): ActiveWorkoutQueue {
-  try {
-    const raw = localStorage.getItem(legacyActiveWorkoutQueueKey(state.user_id, state.workout_id));
-    if (!raw) return state;
-    const previous = JSON.parse(raw) as StoredActiveWorkoutQueue;
-    if (
-      previous.user_id !== state.user_id ||
-      previous.workout_id !== state.workout_id ||
-      ![LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION, PREVIOUS_ACTIVE_WORKOUT_QUEUE_VERSION].includes(
-        previous.schema_version as 1 | 2,
-      ) ||
-      !Array.isArray(previous.queue) ||
-      previous.queue.length > MAX_QUEUE_LENGTH ||
-      !previous.queue.every(validMutation)
-    )
-      return state;
-    if (previous.schema_version === LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION && !workout) return state;
-    const items =
-      previous.schema_version === LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION
-        ? migrateLegacyQueue(previous, workout!).queue
-        : previous.queue;
-    const known = new Set(state.queue.map((item) => item.mutation_id));
-    const added = items.filter((item) => !known.has(item.mutation_id));
-    return added.length
-      ? { ...state, queue: [...state.queue, ...added].sort((a, b) => a.created_at - b.created_at) }
-      : state;
-  } catch {
-    return state;
+  const legacyKey = legacyActiveWorkoutQueueKey(state.user_id, state.workout_id);
+  for (const key of [`${legacyKey}:v3`, legacyKey]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const previous = JSON.parse(raw) as StoredActiveWorkoutQueue;
+      if (
+        previous.user_id !== state.user_id ||
+        previous.workout_id !== state.workout_id ||
+        ![1, 2, 3].includes(previous.schema_version) ||
+        !Array.isArray(previous.queue) ||
+        previous.queue.length > MAX_QUEUE_LENGTH ||
+        !previous.queue.every(validMutation) ||
+        (previous.schema_version === LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION && !workout)
+      )
+        continue;
+      const items =
+        previous.schema_version === LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION
+          ? migrateLegacyQueue(previous, workout!).queue
+          : previous.queue;
+      const known = new Set(state.queue.map((item) => item.mutation_id));
+      const added = items.filter((item) => !known.has(item.mutation_id));
+      if (added.length)
+        state = {
+          ...state,
+          queue: [...state.queue, ...added].sort((a, b) => a.created_at - b.created_at),
+        };
+    } catch {
+      // Keep unreadable legacy data for recovery.
+    }
   }
+  return state;
 }
 
 export function loadActiveWorkoutQueue(
@@ -332,7 +344,7 @@ export function loadActiveWorkoutQueue(
   const oldKey = legacyActiveWorkoutQueueKey(userId, workoutId);
   try {
     const currentRaw = localStorage.getItem(key);
-    const raw = currentRaw ?? localStorage.getItem(oldKey);
+    const raw = currentRaw ?? localStorage.getItem(`${oldKey}:v3`) ?? localStorage.getItem(oldKey);
     if (raw === null) return emptyActiveWorkoutQueue(userId, workoutId);
     const parsed = JSON.parse(raw) as Partial<StoredActiveWorkoutQueue>;
     const isLegacy = parsed.schema_version === LEGACY_ACTIVE_WORKOUT_QUEUE_VERSION;
@@ -346,17 +358,21 @@ export function loadActiveWorkoutQueue(
       parsed.workout_id === workoutId &&
       Array.isArray(parsed.queue) &&
       parsed.queue.length <= MAX_QUEUE_LENGTH * 2 &&
-      snapshotValid &&
       parsed.queue.every(validMutation);
+    const safeParsed = snapshotValid ? parsed : { ...parsed, workout_snapshot: undefined };
     if (valid && isPrevious) {
       const migrated = {
-        ...parsed,
+        ...safeParsed,
         schema_version: ACTIVE_WORKOUT_QUEUE_VERSION,
       } as ActiveWorkoutQueue;
       saveActiveWorkoutQueue(migrated);
       return migrated;
     }
-    if (valid && !isLegacy) return mergePreviousQueue(parsed as ActiveWorkoutQueue, workout);
+    if (valid && !isLegacy) {
+      const merged = mergePreviousQueue(safeParsed as ActiveWorkoutQueue, workout);
+      if (currentRaw === null) saveActiveWorkoutQueue(merged);
+      return merged;
+    }
     if (valid && workout && validWorkoutSnapshot(workout, workoutId, true)) {
       const migrated = migrateLegacyQueue(parsed as StoredActiveWorkoutQueue, workout);
       saveActiveWorkoutQueue(migrated);
@@ -379,33 +395,43 @@ export function acknowledgeLegacyWorkoutMutation(
   workoutId: number,
   mutationId: string,
 ): void {
-  const key = legacyActiveWorkoutQueueKey(userId, workoutId);
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return;
-    const previous = JSON.parse(raw) as Partial<StoredActiveWorkoutQueue>;
-    if (
-      previous.user_id !== userId ||
-      previous.workout_id !== workoutId ||
-      !Array.isArray(previous.queue) ||
-      !previous.queue.some((item) => item.mutation_id === mutationId)
-    )
-      return;
-    localStorage.setItem(
-      key,
-      JSON.stringify({
-        ...previous,
-        queue: previous.queue.filter((item) => item.mutation_id !== mutationId),
-      }),
-    );
-  } catch {
-    // Keep unreadable legacy data for recovery.
+  const legacyKey = legacyActiveWorkoutQueueKey(userId, workoutId);
+  for (const key of [`${legacyKey}:v3`, legacyKey]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const previous = JSON.parse(raw) as Partial<StoredActiveWorkoutQueue>;
+      if (
+        previous.user_id !== userId ||
+        previous.workout_id !== workoutId ||
+        !Array.isArray(previous.queue) ||
+        !previous.queue.some((item) => item.mutation_id === mutationId)
+      )
+        continue;
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          ...previous,
+          queue: previous.queue.filter((item) => item.mutation_id !== mutationId),
+        }),
+      );
+    } catch {
+      // Keep unreadable legacy data for recovery.
+    }
   }
 }
 
 export function saveActiveWorkoutQueue(state: ActiveWorkoutQueue): boolean {
   const key = activeWorkoutQueueKey(state.user_id, state.workout_id);
   try {
+    if (getApiRuntime().kind !== 'demo') {
+      if (localStorage.getItem(LEGACY_AUTH_REAUTH_KEY) !== null) return false;
+      if (!localStorage.getItem(LEGACY_AUTH_GUARD_KEY)) {
+        localStorage.setItem(LEGACY_AUTH_CANARY_KEY, '1');
+        localStorage.setItem(LEGACY_AUTH_GUARD_KEY, '1');
+      }
+      if (localStorage.getItem(LEGACY_AUTH_CANARY_KEY) !== '1') return false;
+    }
     if (state.queue.length === 0 && !state.workout_snapshot && !state.accepted_versions)
       localStorage.removeItem(key);
     else localStorage.setItem(key, JSON.stringify(state));
@@ -584,6 +610,7 @@ export function latestMutationForSet(
 export function clearActiveWorkoutDataForUser(userId: number): void {
   const prefixes = [
     `${ACTIVE_WORKOUT_STORAGE_PREFIXES.queue}user_${userId}_`,
+    `${ACTIVE_WORKOUT_STORAGE_PREFIXES.protectedQueue}user_${userId}_`,
     `${ACTIVE_WORKOUT_STORAGE_PREFIXES.rest}user_${userId}_`,
     ...LEGACY_ACTIVE_WORKOUT_STORAGE_PREFIXES,
   ];
@@ -593,6 +620,23 @@ export function clearActiveWorkoutDataForUser(userId: number): void {
       if (key && prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
     }
     localStorage.removeItem(activeWorkoutPointerKey(userId));
+    localStorage.removeItem(runtimeStorageKey(activeWorkoutPointerStorageKey(userId)));
+  } catch {
+    // Storage is optional in restrictive webviews.
+  }
+}
+
+export function discardActiveWorkoutDataAfterAuthChange(userId: number, workoutId: number): void {
+  try {
+    localStorage.removeItem(activeWorkoutQueueKey(userId, workoutId));
+    localStorage.removeItem(legacyActiveWorkoutQueueKey(userId, workoutId));
+    localStorage.removeItem(`${legacyActiveWorkoutQueueKey(userId, workoutId)}:v3`);
+    localStorage.removeItem(activeWorkoutRestKey(userId, workoutId));
+    const pointerKey = activeWorkoutPointerKey(userId);
+    if (localStorage.getItem(pointerKey) === String(workoutId)) localStorage.removeItem(pointerKey);
+    const previousPointerKey = runtimeStorageKey(activeWorkoutPointerStorageKey(userId));
+    if (localStorage.getItem(previousPointerKey) === String(workoutId))
+      localStorage.removeItem(previousPointerKey);
   } catch {
     // Storage is optional in restrictive webviews.
   }
@@ -624,7 +668,7 @@ export function saveActiveWorkoutSnapshot(
   userId: number,
   workout: Workout,
 ): ActiveWorkoutQueue | undefined {
-  if (workout.status !== 'in_progress') return undefined;
+  if (!validWorkoutSnapshot(workout, workout.id, true)) return undefined;
   const pointerKey = activeWorkoutPointerKey(userId);
   try {
     const previousWorkoutId = Number(localStorage.getItem(pointerKey));
@@ -692,12 +736,17 @@ export function saveActiveWorkoutSnapshot(
 export function loadCurrentActiveWorkoutSnapshot(userId: number): Workout | undefined {
   try {
     const pointerKey = activeWorkoutPointerKey(userId);
-    const workoutId = Number(localStorage.getItem(pointerKey));
+    const workoutId = Number(
+      localStorage.getItem(pointerKey) ??
+        localStorage.getItem(runtimeStorageKey(activeWorkoutPointerStorageKey(userId))),
+    );
     if (!Number.isInteger(workoutId) || workoutId <= 0) {
       localStorage.removeItem(pointerKey);
       return undefined;
     }
-    return loadActiveWorkoutQueue(userId, workoutId).workout_snapshot;
+    const snapshot = loadActiveWorkoutQueue(userId, workoutId).workout_snapshot;
+    if (snapshot) localStorage.setItem(pointerKey, String(workoutId));
+    return snapshot;
   } catch {
     return undefined;
   }
@@ -707,9 +756,14 @@ export function clearActiveWorkoutData(userId: number, workoutId: number): boole
   try {
     if (loadActiveWorkoutQueue(userId, workoutId).queue.length > 0) return false;
     localStorage.removeItem(activeWorkoutQueueKey(userId, workoutId));
+    localStorage.removeItem(`${legacyActiveWorkoutQueueKey(userId, workoutId)}:v3`);
+    localStorage.removeItem(legacyActiveWorkoutQueueKey(userId, workoutId));
     localStorage.removeItem(activeWorkoutRestKey(userId, workoutId));
     const pointerKey = activeWorkoutPointerKey(userId);
     if (localStorage.getItem(pointerKey) === String(workoutId)) localStorage.removeItem(pointerKey);
+    const previousPointerKey = runtimeStorageKey(activeWorkoutPointerStorageKey(userId));
+    if (localStorage.getItem(previousPointerKey) === String(workoutId))
+      localStorage.removeItem(previousPointerKey);
     return true;
   } catch {
     // Storage is optional in restrictive webviews.

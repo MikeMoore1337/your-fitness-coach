@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
-import { ApiError, api } from '../../shared/api/client';
+import {
+  ApiError,
+  api,
+  authDiscardChanged,
+  authDiscardSnapshot,
+  requiresLegacyReauthentication,
+} from '../../shared/api/client';
 import type {
   CardioSession,
   FoodDiaryDay,
@@ -12,6 +18,7 @@ import type {
   WorkoutComment,
   WorkoutRecoveryState,
   WorkoutScheduleItem,
+  ApiSchemas,
 } from '../../shared/api/types';
 import { calendarWeek, dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
@@ -19,6 +26,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
 import {
   activeWorkoutLockName,
+  discardActiveWorkoutDataAfterAuthChange,
   loadActiveWorkoutQueue,
   loadCurrentActiveWorkoutSnapshot,
   saveActiveWorkoutSnapshot,
@@ -26,6 +34,8 @@ import {
 import { WorkoutAdaptation } from '../workouts/WorkoutAdaptation';
 import { WorkoutRecovery } from '../workouts/WorkoutRecovery';
 import { TodayWorkout } from '../workouts/TodayWorkout';
+import { ActiveWorkoutSyncNotice } from '../workouts/ActiveWorkoutSync';
+import { SessionRotationToday } from './SessionRotationToday';
 import { PreviousWorkoutNote } from '../workouts/PreviousWorkoutNote';
 import { ExerciseNoteRecovery } from '../workouts/ExerciseNoteRecovery';
 import { Badge, Button, SemanticCard, Skeleton } from '../../shared/ui/common';
@@ -1048,6 +1058,15 @@ export function TodayDashboard({
     queryFn: () => api<WorkoutRecoveryState>('/api/v1/workouts/recovery'),
     enabled: Boolean(user),
   });
+  const rotation = useQuery({
+    queryKey: ['workout', 'session-rotation'],
+    queryFn: () =>
+      api<ApiSchemas['SessionRotationStateResponse']>('/api/v1/workouts/session-rotation', {
+        cache: 'no-store',
+      }),
+    enabled: Boolean(user?.has_active_program),
+    retry: false,
+  });
   const cardioWeek = useQuery({
     queryKey: queryKeys.cardio.range(weekStart, weekEnd),
     queryFn: () =>
@@ -1072,15 +1091,22 @@ export function TodayDashboard({
     user && workout.data && loadActiveWorkoutQueue(user.id, workout.data.id).queue.length > 0,
   );
   const visibleWorkout = noTodayWorkout && !hasPendingLocalChanges ? undefined : workout.data;
+  const suspendDiscard = useMemo(
+    () => ({ ...authDiscardSnapshot(), userId: user?.id, workoutId: workout.data?.id }),
+    [user?.id, workout.data?.id],
+  );
 
   const persistSnapshotOnSuspend = useCallback(() => {
     if (!user || !workout.data || workout.data.status !== 'in_progress') return;
     void crossContextCoordinator
       .run(activeWorkoutLockName(user.id, workout.data.id), () => {
+        if (authDiscardChanged(suspendDiscard) || requiresLegacyReauthentication()) return;
         saveActiveWorkoutSnapshot(user.id, workout.data!);
+        if (authDiscardChanged(suspendDiscard))
+          discardActiveWorkoutDataAfterAuthChange(user.id, workout.data!.id);
       })
       .catch(() => undefined);
-  }, [user, workout.data]);
+  }, [suspendDiscard, user, workout.data]);
 
   useEffect(() => {
     const refreshOnReturn = () => {
@@ -1347,6 +1373,7 @@ export function TodayDashboard({
 
   return (
     <div className="today-dashboard today-dashboard--design-v2">
+      <ActiveWorkoutSyncNotice />
       {user && capabilities.canMutatePrograms && <ExerciseNoteRecovery userId={user.id} />}
       <header className="today-dashboard__header">
         <p className="today-dashboard__date">{heading.title.replace(/^Сегодня · /, '')}</p>
@@ -1406,6 +1433,41 @@ export function TodayDashboard({
                   <p>Выберите другой день или откройте программу тренировок.</p>
                 </div>
               )
+            ) : rotation.isLoading ? (
+              <div className="today-inline-state" role="status">
+                Проверяем порядок тренировок…
+              </div>
+            ) : rotation.data?.mode === 'rotation' ? (
+              <SessionRotationToday
+                state={rotation.data}
+                refreshing={rotation.isFetching}
+                pendingLocalChanges={hasPendingLocalChanges}
+                onStarted={(startedWorkout) => {
+                  queryClient.setQueryData(['workout', 'today'], startedWorkout);
+                  setDetailsOpen(true);
+                }}
+                onResume={() => {
+                  if (visibleWorkout?.id === rotation.data?.current?.workout_id) {
+                    setDetailsOpen(true);
+                    return;
+                  }
+                  void workout.refetch().then((result) => {
+                    if (result.data?.id === rotation.data?.current?.workout_id)
+                      setDetailsOpen(true);
+                  });
+                }}
+              />
+            ) : rotation.isError && visibleWorkout?.status !== 'in_progress' ? (
+              <div className="today-inline-state" role="alert">
+                <strong id="today-workout-title">Не удалось проверить порядок тренировок</strong>
+                <button
+                  className="today-text-link"
+                  type="button"
+                  onClick={() => void rotation.refetch()}
+                >
+                  Повторить
+                </button>
+              </div>
             ) : workout.isLoading ||
               priorityContextLoading ||
               (noTodayWorkout && progress.isLoading && user?.has_active_program) ? (

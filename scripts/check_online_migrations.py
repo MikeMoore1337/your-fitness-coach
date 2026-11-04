@@ -65,6 +65,59 @@ LEGACY_ONLINE_MIGRATION_SHA256 = {
     "backend/alembic/versions/0118_measurement_eligibility.py": "13d4c9d6693d352b9ceb5b69b3a8713e124c505f65ba774620a8d5a12b3cdea8",
 }
 
+# These exact DEV transitions change only reviewed downgrade guards. Production
+# retains the immutable-history rule and never supplies the DEV source archive.
+DEV_DOWNGRADE_TRANSITIONS = {
+    "backend/alembic/versions/0134_workout_completed_at_utc.py": (
+        "b4c891fd9aedbefbecf2e51147a03a14174f3f0675c384a54935f74fe1bb2af4",
+        "821b3a4d340f86a8fe1f337e9bc2a7670f28469efe02fa789f9a82a2e84abf7d",
+    ),
+    "backend/alembic/versions/0134_program_cycle_storage.py": (
+        "06c4f101e60bd14884c7f5587b32184e1019ca03a6d92c62ba4df4a22e3e97b7",
+        "bde8abbf943b7104e95ca59018ab5674287eead1090a3d68cf016cfde5461fe9",
+    ),
+    "backend/alembic/versions/0135_program_duration_unbounded.py": (
+        "5525d6982929c0626dc4a932ab4ae00099ffaaf9d85e5e3abaa12a38d6b49666",
+        "2e2cb7dc1734ac0168cca6c2135cd1dcd8f2821cb9897f1ff4b62736eb8aa974",
+    ),
+    "backend/alembic/versions/0138_equipment_profiles.py": (
+        "f70abef0572a9599f189f89721d204104aad76accc7183015467fe5abfdc4df3",
+        "719485af759455829107b612c19d2eff8b194c5bc2aca453f2cc6d9eeb488d5a",
+    ),
+    "backend/alembic/versions/0139_workout_exercise_notes.py": (
+        "d53aa4cf9d303492094a6f9afa140fca490b2bc73b07fb9c307b8bc8b7d642c0",
+        "ba8312b58a34607d082b5aa1cbcb2438b65a537da214fc338e1773702b758284",
+    ),
+    "backend/alembic/versions/0140_workout_start_utc.py": (
+        "5e496a915f91c94fcaa40711052bdd872076d86affe6a34860d839f6555c8e2d",
+        "a596b7ad92e61c75b17418cd83cf822bf3994861764a0695d66a77e4226b6c05",
+    ),
+    "backend/alembic/versions/0142_workout_history_import.py": (
+        "83cd451557362201bf61339579cd5986c193687f41bad7cb7d9119d20de97351",
+        "c39c63e04b8f4343cd6ed57f8df84920152d8dde9bb67eb1fed9c91ba49373f6",
+    ),
+    "backend/alembic/versions/0143_workout_set_sides.py": (
+        "fe77022a71684b47220a31f2e26197a876a80ba0d7e68f5aa32c8882651e6ada",
+        "838561ad005469e5c39874e7078d99b9aa70f1ffa41d0d8818460f40625f1513",
+    ),
+    "backend/alembic/versions/0145_history_provider_provenance.py": (
+        "d3e5699d44427bad686fb81ee0110f8650a4360e558675a456fc9a97a0683f6c",
+        "5a120aa9bb4d3fffa234291dacffa09e6611315de5e547dd07e96c1141a63bd3",
+    ),
+    "backend/alembic/versions/0146_assignment_exercise_slots.py": (
+        "045a53811c6ac88758055378e310ac1e4b297d00b2ae3c4cefb04ad5bd54159d",
+        "dde58ebde2095ce38c5343bf175724751e366dd86016f57b899659de001beb1b",
+    ),
+    "backend/alembic/versions/0147_session_rotation.py": (
+        "1415c2097c56da861fcd38a37ac7616cdd2701d45555656531a984c0b3a026ac",
+        "774187c89c60c4e78e3eec8eb53ff9af88310ffe26f020788feac8630267aa5e",
+    ),
+    "backend/alembic/versions/0148_program_import_self_assignment.py": (
+        "e3c6f4fbb1cd5ef02976b2274c52cfda1a93ce79ae5514219b1e4f33f7adccd3",
+        "4b0ab56d3b8ce2ceceb08e5fb833dd467400b147e5dfc452251c67bd3ff2050d",
+    ),
+}
+
 
 class OnlineMigrationError(RuntimeError):
     """The release cannot coexist with the currently active revision."""
@@ -324,7 +377,29 @@ def _is_in_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST,
     return False
 
 
-def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict) -> bool:
+ROTATION_INDEX_VALIDATIONS = {
+    "uq_user_workouts_rotation_mutation": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'user_workouts'::regclass "
+        "AND indnkeyatts = 2 AND indnatts = 2 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+        "AND pg_get_indexdef(indexrelid, 2, true) = 'rotation_mutation_id' "
+        "AND pg_get_expr(indpred, indrelid) = '(rotation_mutation_id IS NOT NULL)' "
+        "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_mutation'::regclass"
+    ),
+    "uq_user_workouts_rotation_in_progress": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'user_workouts'::regclass "
+        "AND indnkeyatts = 1 AND indnatts = 1 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'user_program_id' "
+        "AND pg_get_expr(indpred, indrelid) = "
+        "'((rotation_epoch IS NOT NULL) AND ((status)::text = ''in_progress''::text))' "
+        "FROM pg_index WHERE indexrelid = 'uq_user_workouts_rotation_in_progress'::regclass"
+    ),
+}
+
+
+def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict, path: Path) -> bool:
     if not (
         isinstance(call.func, ast.Attribute)
         and isinstance(call.func.value, ast.Name)
@@ -351,14 +426,19 @@ def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict) -> bool:
         r"'([a-z][a-z0-9_]*)'::regclass",
         sql,
     )
+    name = checked[1] if checked else None
+    if name is None and path.name == "0147_session_rotation.py":
+        name = next(
+            (key for key, value in ROTATION_INDEX_VALIDATIONS.items() if value == sql), None
+        )
     return bool(
-        checked
+        name
         and _is_in_postgresql_branch(call, links)
         and any(
             item.func.attr == "create_index"
             and item.args
             and isinstance(item.args[0], ast.Constant)
-            and item.args[0].value == checked[1]
+            and item.args[0].value == name
             for item in _op_calls(upgrade)
         )
     )
@@ -466,11 +546,11 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
         if phase == "constraint_swap" and _is_sqlite_foreign_key_guard(call, links):
             allowed = True
         if phase == "expand":
-            if _is_index_validation(call, upgrade, links) or (
+            if _is_index_validation(call, upgrade, links, path) or (
                 isinstance(function, ast.Attribute)
                 and function.attr == "scalar_one"
                 and isinstance(function.value, ast.Call)
-                and _is_index_validation(function.value, upgrade, links)
+                and _is_index_validation(function.value, upgrade, links, path)
             ):
                 allowed = True
             if (
@@ -1004,7 +1084,7 @@ def validate_added_migration(path: Path) -> None:
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "op"
         ):
-            if phase == "expand" and _is_index_validation(node, upgrade, links):
+            if phase == "expand" and _is_index_validation(node, upgrade, links, path):
                 continue
             raise OnlineMigrationError(
                 f"{path} uses SQL execution outside the verified op.execute online contract"
@@ -1150,21 +1230,72 @@ def validate_added_migration(path: Path) -> None:
     _validate_upgrade_call_allowlist(path, upgrade, phase)
 
 
+def _reviewed_dev_downgrade(path: Path, source_root: Path) -> bool:
+    expected = DEV_DOWNGRADE_TRANSITIONS.get(path.as_posix())
+    if expected is None:
+        return False
+    try:
+        sources = [
+            (source_root / path).read_bytes().replace(b"\r\n", b"\n"),
+            path.read_bytes().replace(b"\r\n", b"\n"),
+        ]
+    except OSError:
+        return False
+    if tuple(hashlib.sha256(source).hexdigest() for source in sources) != expected:
+        return False
+    trees = [ast.parse(source.decode("utf-8")) for source in sources]
+    for tree in trees:
+        downgrades = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "downgrade"
+        ]
+        if len(downgrades) != 1:
+            return False
+        downgrades[0].body = [ast.Pass()]
+        if any(
+            isinstance(node, ast.Name)
+            and node.id in {"downgrade", "eval", "exec", "getattr", "globals", "locals"}
+            for node in ast.walk(tree)
+        ):
+            return False
+    return ast.dump(trees[0], include_attributes=False) == ast.dump(
+        trees[1], include_attributes=False
+    )
+
+
 def check_online_migrations(
-    active_revision: str, target_revision: str, *, manifest: Path | None = None
+    active_revision: str,
+    target_revision: str,
+    *,
+    manifest: Path | None = None,
+    dev_reviewed_source: Path | None = None,
 ) -> list[Path]:
+    if dev_reviewed_source is not None and manifest is None:
+        raise OnlineMigrationError("DEV migration review requires a revision-bound manifest")
     changes = (
         changed_migrations_from_manifest(active_revision, target_revision, manifest)
         if manifest is not None
         else changed_migrations(active_revision, target_revision)
     )
-    unsafe_history = [(status, path) for status, path in changes if status != "A"]
+    unsafe_history = []
+    for status, path in changes:
+        if status == "A":
+            continue
+        if (
+            status == "M"
+            and dev_reviewed_source
+            and _reviewed_dev_downgrade(path, dev_reviewed_source)
+        ):
+            print(f"DEV-only reviewed downgrade change: {path}")
+        else:
+            unsafe_history.append((status, path))
     if unsafe_history:
         details = ", ".join(f"{status}:{path}" for status, path in unsafe_history)
         raise OnlineMigrationError(
             "applied migration history is immutable during an online rollout: " + details
         )
-    added = [path for _status, path in changes]
+    added = [path for status, path in changes if status == "A"]
     for path in added:
         if not validate_legacy_migration_compatibility(path):
             validate_added_migration(path)
@@ -1176,6 +1307,7 @@ def main() -> int:
     parser.add_argument("active_revision", nargs="?")
     parser.add_argument("target_revision", nargs="?")
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--dev-reviewed-source", type=Path)
     parser.add_argument("--write-manifest", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -1183,7 +1315,7 @@ def main() -> int:
         if not args.active_revision or not args.target_revision:
             raise OnlineMigrationError("active and target revisions are required")
         if args.write_manifest:
-            if args.manifest is not None or args.output is None:
+            if args.manifest is not None or args.output is None or args.dev_reviewed_source:
                 raise OnlineMigrationError("--write-manifest requires only --output")
             changes = changed_migrations(args.active_revision, args.target_revision)
             args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -1207,7 +1339,10 @@ def main() -> int:
         if args.output is not None:
             raise OnlineMigrationError("--output is valid only with --write-manifest")
         migrations = check_online_migrations(
-            args.active_revision, args.target_revision, manifest=args.manifest
+            args.active_revision,
+            args.target_revision,
+            manifest=args.manifest,
+            dev_reviewed_source=args.dev_reviewed_source,
         )
     except (OSError, SyntaxError, subprocess.CalledProcessError, OnlineMigrationError) as exc:
         print(f"Online migration gate failed: {exc}")

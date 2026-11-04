@@ -7,7 +7,6 @@ const programShare = {
   share_type: 'program',
   status: 'active',
   created_at: '2026-10-03T10:00:00Z',
-  public_url: `http://127.0.0.1:4173/share/${shareId}`,
   preview_hash: 'a'.repeat(64),
   snapshot: {
     kind: 'program',
@@ -79,7 +78,12 @@ async function installPublicShareApi(page: Page) {
     route.fulfill({ json: { access_token: 'refreshed-token' } }),
   );
   await page.route(`**/api/v1/public/shares/${shareId}`, (route) =>
-    route.fulfill({ json: programShare }),
+    route.fulfill({
+      json: {
+        ...programShare,
+        public_url: new URL(`/share/${shareId}`, route.request().url()).href,
+      },
+    }),
   );
 }
 

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -10,6 +11,10 @@ from fitminiapp_api.models.program import (
     UserWorkoutSetSide,
     WorkoutSetMutation,
 )
+from fitminiapp_api.schemas.program import PrescriptionLoadTarget, PrescriptionRepTarget
+from fitminiapp_api.services.prescription_semantics import ensure_plan
+from fitminiapp_api.services.program_common import ProgramError
+from fitminiapp_api.services.workout_metrics import workout_exercise_metric_type
 from fitminiapp_api.services.workout_sides import SIDE_MODES, serialize_sides, side_facts_present
 
 
@@ -94,6 +99,58 @@ def replayed_workout_set(
     return set_row
 
 
+def _apply_planned_target(set_row: UserWorkoutSet, target: dict) -> None:
+    exercise = set_row.workout_exercise
+    if set_row.is_completed or any(side.is_completed for side in set_row.side_results):
+        raise WorkoutSetSyncError(409, "Выполненный подход нельзя изменить как плановый")
+    if set_row.execution_mode in SIDE_MODES or workout_exercise_metric_type(exercise) != "strength":
+        raise WorkoutSetSyncError(422, "Для этого подхода изменение плана недоступно")
+    reps = (exercise.prescribed_reps or "").replace("–", "-").replace("—", "-")
+    if exercise.prescription is None and not re.fullmatch(r"\s*\d+(?:\s*-\s*\d+)?\s*", reps):
+        raise WorkoutSetSyncError(422, "Исходное предписание нельзя безопасно изменить")
+    if exercise.rest_seconds is None:
+        raise WorkoutSetSyncError(422, "Исходное предписание нельзя безопасно изменить")
+    try:
+        plan, _ = ensure_plan(
+            exercise.prescription,
+            metric_type="strength",
+            prescribed_sets=exercise.prescribed_sets,
+            prescribed_reps=reps,
+            prescribed_duration_minutes=exercise.prescribed_duration_minutes,
+            rest_seconds=exercise.rest_seconds,
+        )
+    except (ProgramError, ValueError) as exc:
+        raise WorkoutSetSyncError(422, "Исходное предписание нельзя безопасно изменить") from exc
+    if plan.groups or any(
+        segment.role not in {"working", "warmup"}
+        or segment.load_target.kind in {"relative_to_top", "relative_to_previous"}
+        for segment in plan.segments
+    ):
+        raise WorkoutSetSyncError(
+            422, "Сложное предписание пока нельзя изменить во время тренировки"
+        )
+    position = set_row.planned_position
+    if position is None:
+        ordered = sorted(exercise.sets, key=lambda item: item.set_number)
+        if (
+            len(ordered) != len(plan.segments)
+            or [item.set_number for item in ordered] != list(range(1, len(ordered) + 1))
+            or any(item.planned_position is not None for item in ordered)
+            or any(item.set_kind not in {None, "working"} for item in ordered)
+        ):
+            raise WorkoutSetSyncError(422, "Не удалось однозначно определить план подхода")
+        position = set_row.set_number
+    elif sum(item.planned_position == position for item in exercise.sets) != 1:
+        raise WorkoutSetSyncError(422, "Не удалось однозначно определить план подхода")
+    if position < 1 or position > len(plan.segments):
+        raise WorkoutSetSyncError(422, "Не удалось однозначно определить план подхода")
+    updated = plan.model_copy(deep=True)
+    segment = updated.segments[position - 1]
+    segment.rep_target = PrescriptionRepTarget(kind="exact", value=target["reps"])
+    segment.load_target = PrescriptionLoadTarget(kind="absolute", value=float(target["weight_kg"]))
+    exercise.prescription = updated.model_dump(mode="json")
+
+
 def apply_workout_set_update(
     db: Session,
     set_row: UserWorkoutSet,
@@ -114,14 +171,51 @@ def apply_workout_set_update(
             },
         )
     if expected_version is not None and expected_version != set_row.version:
+        plan_changed = set_row.plan_version is not None and expected_version < set_row.plan_version
+        current_plan = None
+        if plan_changed and isinstance(set_row.workout_exercise.prescription, dict):
+            position = set_row.planned_position or set_row.set_number
+            segments = set_row.workout_exercise.prescription.get("segments")
+            if isinstance(segments, list):
+                current_plan = next(
+                    (
+                        segment
+                        for segment in segments
+                        if isinstance(segment, dict) and segment.get("position") == position
+                    ),
+                    None,
+                )
         raise WorkoutSetSyncError(
             409,
             {
-                "code": "workout_set_version_conflict",
-                "message": "Подход изменён в другой вкладке. Локальное изменение можно повторить.",
+                "code": "workout_set_plan_conflict"
+                if plan_changed
+                else "workout_set_version_conflict",
+                "message": (
+                    "План подхода изменился. Проверьте его перед сохранением результата."
+                    if plan_changed
+                    else "Подход изменён в другой вкладке. Локальное изменение можно повторить."
+                ),
                 "current": serialize_workout_set(set_row),
+                **({"current_plan": current_plan} if plan_changed else {}),
             },
         )
+
+    if "planned_target" in changes:
+        if mutation_id is None or expected_version is None:
+            raise WorkoutSetSyncError(422, "Для изменения плана нужны версия и идентификатор")
+        _apply_planned_target(set_row, changes["planned_target"])
+        set_row.version += 1
+        set_row.plan_version = set_row.version
+        db.add(
+            WorkoutSetMutation(
+                workout_set_id=set_row.id,
+                mutation_id=mutation_id,
+                request_fingerprint=_request_fingerprint(changes),
+                applied_version=set_row.version,
+            )
+        )
+        return set_row
 
     previous_mode = set_row.execution_mode
     next_mode = changes.get("execution_mode", previous_mode)

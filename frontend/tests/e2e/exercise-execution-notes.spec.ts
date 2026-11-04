@@ -324,7 +324,14 @@ for (const theme of ['dark', 'light'] as const) {
           return [rect.top - top, rect.width, rect.height];
         });
       });
-      expect(after).toEqual(before);
+      expect(after).toHaveLength(before.length);
+      after.forEach((metrics, rowIndex) => {
+        expect(metrics).toHaveLength(before[rowIndex]!.length);
+        metrics.forEach((value, metricIndex) => {
+          // Firefox can round scrolled coordinates by a fraction of a CSS pixel.
+          expect(Math.abs(value - before[rowIndex]![metricIndex]!)).toBeLessThanOrEqual(1 / 16_384);
+        });
+      });
       const timerAfter = await timer.boundingBox();
       expect([timerAfter!.width, timerAfter!.height]).toEqual([
         timerBefore!.width,

@@ -4,6 +4,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.program import UserProgram, UserWorkout, UserWorkoutExercise
+from fitminiapp_api.services.workout_metrics import exercise_slot_identity
 
 
 class WorkoutNotFound(ValueError):
@@ -13,8 +14,8 @@ class WorkoutNotFound(ValueError):
 def _same_day_context(
     current: list[UserWorkoutExercise], previous: list[UserWorkoutExercise]
 ) -> bool:
-    current_slots = {item.source_template_exercise_id for item in current}
-    previous_slots = {item.source_template_exercise_id for item in previous}
+    current_slots = {exercise_slot_identity(item) for item in current}
+    previous_slots = {exercise_slot_identity(item) for item in previous}
     current_slots.discard(None)
     previous_slots.discard(None)
     if current_slots or previous_slots:

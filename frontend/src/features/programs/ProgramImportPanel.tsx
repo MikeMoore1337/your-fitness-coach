@@ -1,5 +1,5 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiFile, ApiError } from '../../shared/api/client';
 import type {
@@ -7,14 +7,104 @@ import type {
   ProgramImport,
   ProgramImportConfirmResponse,
   ProgramImportTarget,
+  ProgramTemplate,
 } from '../../shared/api/types';
+import { dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DisclosureIcon, Badge, Button, Card, Field, Input, Select } from '../../shared/ui/common';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { SearchableExercisePicker, type ExercisePickerExercise } from './SearchableExercisePicker';
+import {
+  assignmentPlanFromTemplate,
+  assignmentFirstDate,
+  ProgramAssignmentDialog,
+  type AssignmentSchedule,
+} from './ProgramAssignmentDialog';
 import './program-import.css';
 
 const PAGE_SIZE = 50;
+const WEEK_PAGE_SIZE = 8;
+const RECOVERY_KEY = 'program-import-confirmation-v1';
+type AssignmentRequest = AssignmentSchedule & {
+  replace_active: boolean;
+  expected_active_program_id: number | null;
+  expected_active_revision_number: number | null;
+};
+type Recovery = { id: string; intent: 'save' | 'assign'; assignment?: AssignmentRequest };
+type ImportResult = {
+  kind: 'saved' | 'assigned' | 'partial' | 'uncertain';
+  id: string;
+  title?: string;
+  template?: ProgramTemplate;
+  assignedId?: number;
+  scheduled?: boolean;
+  startDate?: string;
+  notCurrent?: boolean;
+  reason?: string;
+  message?: string;
+};
+
+function outcomeUnknown(error: unknown): boolean {
+  return (
+    !(error instanceof ApiError) ||
+    error.status === 0 ||
+    error.status >= 500 ||
+    error.status === 408 ||
+    error.status === 429
+  );
+}
+
+function assignmentFailureCode(error: unknown): string | undefined {
+  if (!(error instanceof ApiError) || !error.body || typeof error.body !== 'object')
+    return undefined;
+  const detail = (error.body as { detail?: unknown }).detail;
+  if (!detail || typeof detail !== 'object') return undefined;
+  const code = (detail as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function readRecovery(): Recovery | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(RECOVERY_KEY) ?? 'null') as Recovery | null;
+    return value &&
+      typeof value.id === 'string' &&
+      (value.intent === 'save' || value.intent === 'assign')
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberRecovery(value: Recovery | null): void {
+  try {
+    if (value) sessionStorage.setItem(RECOVERY_KEY, JSON.stringify(value));
+    else sessionStorage.removeItem(RECOVERY_KEY);
+  } catch {
+    // The current screen still supports recovery if storage is unavailable.
+  }
+}
+type WeekType = 'light' | 'medium' | 'heavy' | null;
+type MatrixImport = ProgramImport & {
+  draft_version?: number | null;
+  assignment_duration_weeks?: number | null;
+  repeat?: boolean | null;
+  week_types?: WeekType[] | null;
+  week_type_candidates?: {
+    week_number: number;
+    week_type: Exclude<WeekType, null>;
+    source_text: string;
+    source_sheet?: string | null;
+    source_cell: string;
+  }[];
+  rows: (ProgramImport['rows'][number] & { manual_planned_loads?: string | null })[];
+};
+const weekTypeLabels: Record<Exclude<WeekType, null>, string> = {
+  light: 'Лёгкая',
+  medium: 'Средняя',
+  heavy: 'Тяжёлая',
+};
+
 type ImportProvenance = NonNullable<ProgramImport['provenance']>;
 type ImportCoachingRule = NonNullable<ProgramImport['coaching_rules']>[number];
 
@@ -247,6 +337,13 @@ function formatError(error: unknown): string {
   return 'Не удалось обработать файл. Попробуйте ещё раз.';
 }
 
+function formatStartDate(value: string): string {
+  return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' }).replace(
+    /\s*г\.$/,
+    '',
+  );
+}
+
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -264,10 +361,24 @@ function importLayoutLabel(layoutVersion: string | null | undefined): string {
   return layoutVersion ? (importLayoutLabels[layoutVersion] ?? 'табличный формат') : 'определяется';
 }
 
-export function ProgramImportPanel({ onImported }: { onImported?: () => void } = {}) {
-  const { toast } = useFeedback();
+export function ProgramImportPanel({
+  onImported,
+  allowSelfAssignment = false,
+  defaultStartDate = dateInputValue(new Date()),
+  onOpenTemplates,
+  onOpenProgram,
+  onOpenWorkout,
+}: {
+  onImported?: () => void;
+  allowSelfAssignment?: boolean;
+  defaultStartDate?: string;
+  onOpenTemplates?: () => void;
+  onOpenProgram?: (id: number) => void;
+  onOpenWorkout?: () => void;
+} = {}) {
+  const { toast, confirm: confirmAction } = useFeedback();
   const queryClient = useQueryClient();
-  const [preview, setPreview] = useState<ProgramImport | null>(null);
+  const [preview, setPreview] = useState<MatrixImport | null>(null);
   const [title, setTitle] = useState('');
   const [goal, setGoal] = useState('');
   const [level, setLevel] = useState('');
@@ -276,9 +387,31 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   });
   const [targetProgramId, setTargetProgramId] = useState<number | ''>('');
   const [selectedExercises, setSelectedExercises] = useState<Record<number, number | ''>>({});
+  const [rowSets, setRowSets] = useState<Record<number, string>>({});
+  const [rowReps, setRowReps] = useState<Record<number, string>>({});
+  const [plannedLoads, setPlannedLoads] = useState<Record<number, string>>({});
+  const [weekTypes, setWeekTypes] = useState<WeekType[]>([]);
+  const [assignmentWeeks, setAssignmentWeeks] = useState('1');
+  const [repeatCycle, setRepeatCycle] = useState(false);
+  const [weekPage, setWeekPage] = useState(0);
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recovery, setRecovery] = useState<Recovery | null>(() =>
+    allowSelfAssignment ? readRecovery() : null,
+  );
+  const [result, setResult] = useState<ImportResult | null>(() => {
+    const pending = allowSelfAssignment ? readRecovery() : null;
+    return pending ? { kind: 'uncertain', id: pending.id } : null;
+  });
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [confirmingReplacement, setConfirmingReplacement] = useState(false);
+  const requestLock = useRef(false);
+
+  const updateRecovery = (value: Recovery | null) => {
+    setRecovery(value);
+    rememberRecovery(value);
+  };
 
   const exercises = useQuery({
     queryKey: ['program-import', 'exercises'],
@@ -301,6 +434,40 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   const pageCount = preview ? Math.max(1, Math.ceil(preview.rows.length / PAGE_SIZE)) : 1;
   const previewBlocks = preview?.blocks ?? [];
   const previewCoachingRules = preview?.coaching_rules ?? [];
+  const sourceWeeks = preview?.duration_weeks ?? 1;
+  const isMatrix = preview?.layout_version === 'weekly-matrix-v1' && preview.draft_version != null;
+  const totalWeeks = Number(assignmentWeeks);
+  const invalidDuration =
+    isMatrix &&
+    (!Number.isSafeInteger(totalWeeks) ||
+      totalWeeks < 1 ||
+      totalWeeks > 20000 ||
+      (!repeatCycle && totalWeeks > sourceWeeks));
+  const previewWeeks = [...new Set([1, Math.ceil(totalWeeks / 2), totalWeeks])].filter(
+    (week) => Number.isSafeInteger(week) && week > 0 && week <= 20000,
+  );
+  const hasPendingChanges = Boolean(
+    preview &&
+    (title !== (preview.program_title ?? '') ||
+      goal !== (preview.goal ?? '') ||
+      level !== (preview.level ?? '') ||
+      JSON.stringify(provenance) !==
+        JSON.stringify(preview.provenance ?? { provenance_type: 'CUSTOM' }) ||
+      (isMatrix &&
+        (assignmentWeeks !== String(preview.assignment_duration_weeks ?? sourceWeeks) ||
+          repeatCycle !== Boolean(preview.repeat) ||
+          JSON.stringify(weekTypes) !==
+            JSON.stringify(preview.week_types ?? Array(sourceWeeks).fill(null)))) ||
+      preview.rows.some(
+        (row) =>
+          (selectedExercises[row.row_number] !== undefined &&
+            selectedExercises[row.row_number] !== (row.resolved_exercise_id ?? '')) ||
+          rowSets[row.row_number] !== undefined ||
+          rowReps[row.row_number] !== undefined ||
+          (plannedLoads[row.row_number] !== undefined &&
+            plannedLoads[row.row_number] !== (row.manual_planned_loads ?? '')),
+      )),
+  );
   const selectedTarget = importTargets.data?.find(
     (target) => target.program_id === targetProgramId,
   );
@@ -313,11 +480,19 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     : [];
 
   const targetMatchesImport = (target: ProgramImportTarget) =>
-    target.duration_weeks === (preview?.duration_weeks ?? 1) &&
+    target.duration_weeks ===
+      (preview?.assignment_duration_weeks ?? preview?.duration_weeks ?? 1) &&
     target.day_numbers.join(',') === previewDayNumbers.join(',');
 
-  const applyPreview = (next: ProgramImport) => {
+  const applyPreview = (next: MatrixImport) => {
     setPreview(next);
+    setWeekTypes(next.week_types ?? Array(next.duration_weeks ?? 1).fill(null));
+    setAssignmentWeeks(String(next.assignment_duration_weeks ?? next.duration_weeks ?? 1));
+    setRepeatCycle(Boolean(next.repeat));
+    setWeekPage(0);
+    setRowSets({});
+    setRowReps({});
+    setPlannedLoads({});
     setTitle(next.program_title ?? '');
     setGoal(next.goal ?? '');
     setLevel(next.level ?? '');
@@ -343,7 +518,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     try {
       const body = new FormData();
       body.append('file', file);
-      const next = await api<ProgramImport>('/api/v1/programs/imports', {
+      const next = await api<MatrixImport>('/api/v1/programs/imports', {
         method: 'POST',
         body,
         timeoutMs: 30_000,
@@ -359,13 +534,17 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   };
 
   const resolve = async () => {
-    if (!preview) return;
+    if (!preview || invalidDuration) return;
     setBusy(true);
     setError(null);
     try {
-      const next = await api<ProgramImport>(`/api/v1/programs/imports/${preview.id}/resolve`, {
+      const next = await api<MatrixImport>(`/api/v1/programs/imports/${preview.id}/resolve`, {
         method: 'POST',
         body: {
+          expected_draft_version: preview.draft_version ?? undefined,
+          assignment_duration_weeks: isMatrix ? totalWeeks : undefined,
+          repeat: isMatrix ? repeatCycle : undefined,
+          week_types: isMatrix ? weekTypes : undefined,
           title: title.trim() || undefined,
           goal: goal || undefined,
           level: level || undefined,
@@ -379,11 +558,21 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             source_date: provenance.source_date || null,
             adaptation_notes: provenance.adaptation_notes?.trim() || null,
           },
-          rows: Object.entries(selectedExercises)
-            .filter(([, exerciseId]) => exerciseId !== '')
-            .map(([rowNumber, exerciseId]) => ({
-              row_number: Number(rowNumber),
-              exercise_id: exerciseId,
+          rows: preview.rows
+            .filter(
+              (row) =>
+                selectedExercises[row.row_number] !== undefined ||
+                rowSets[row.row_number] !== undefined ||
+                rowReps[row.row_number] !== undefined ||
+                plannedLoads[row.row_number] !== undefined,
+            )
+            .map((row) => ({
+              row_number: row.row_number,
+              exercise_id: selectedExercises[row.row_number] || undefined,
+              prescribed_sets:
+                rowSets[row.row_number] !== undefined ? Number(rowSets[row.row_number]) : undefined,
+              prescribed_reps: rowReps[row.row_number],
+              planned_loads: plannedLoads[row.row_number],
             })),
         },
       });
@@ -396,33 +585,254 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
   };
 
   const confirm = async () => {
-    if (!preview || preview.summary.blocking_issue_count > 0) return;
+    if (
+      !preview ||
+      preview.summary.blocking_issue_count > 0 ||
+      hasPendingChanges ||
+      invalidDuration
+    )
+      return;
     if (targetProgramId !== '' && !selectedTarget) return;
+    if (requestLock.current) return;
+    requestLock.current = true;
+    setBusy(true);
+    setError(null);
+    if (allowSelfAssignment && !selectedTarget) updateRecovery({ id: preview.id, intent: 'save' });
+    try {
+      const saved = await api<ProgramImportConfirmResponse>(
+        `/api/v1/programs/imports/${preview.id}/confirm`,
+        {
+          method: 'POST',
+          body: {
+            target_program_id: selectedTarget?.program_id ?? null,
+            expected_revision_number: selectedTarget?.current_revision_number ?? null,
+            expected_draft_version: preview.draft_version ?? undefined,
+          },
+        },
+      );
+      setPreview(null);
+      if (allowSelfAssignment && !selectedTarget) {
+        setResult({ kind: 'saved', id: preview.id, title: saved.template.title });
+      }
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['templates'] }),
+        queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+        queryClient.invalidateQueries({ queryKey: ['program-import', 'targets'] }),
+      ]);
+      onImported?.();
+      if (!allowSelfAssignment || selectedTarget)
+        toast(
+          selectedTarget
+            ? 'Новая ревизия программы сохранена'
+            : 'Программа импортирована в личные шаблоны',
+        );
+      trackProductEvent({ name: 'program_import_confirmed', surface: productEventSurface() });
+    } catch (reason) {
+      if (allowSelfAssignment && !selectedTarget && outcomeUnknown(reason)) {
+        setResult({ kind: 'uncertain', id: preview.id });
+        setPreview(null);
+      } else if (allowSelfAssignment && !selectedTarget) {
+        updateRecovery(null);
+      }
+      setError(
+        reason instanceof ApiError && reason.status === 409
+          ? 'Черновик или программа изменились. Проверьте актуальные данные и повторите подтверждение.'
+          : formatError(reason),
+      );
+      trackProductEvent({ name: 'program_import_failed', surface: productEventSurface() });
+    } finally {
+      requestLock.current = false;
+      setBusy(false);
+    }
+  };
+
+  const finishAssignment = (
+    id: string,
+    template: ProgramTemplate,
+    assigned: { user_program_id: number; status: string; start_date: string },
+  ) => {
+    setPreview(null);
+    setAssignmentOpen(false);
+    setResult({
+      kind: 'assigned',
+      id,
+      title: template.title,
+      assignedId: assigned.user_program_id,
+      scheduled: assigned.status === 'scheduled',
+      startDate: assigned.start_date,
+      notCurrent: assigned.status !== 'scheduled' && assigned.status !== 'active',
+    });
+    updateRecovery({ id, intent: 'assign' });
+    void Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: ['templates'] }),
+      queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+      queryClient.invalidateQueries({ queryKey: ['workout'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+    ]);
+    onImported?.();
+    trackProductEvent({ name: 'program_import_confirmed', surface: productEventSurface() });
+  };
+
+  const assign = async (schedule: AssignmentSchedule) => {
+    if (requestLock.current || (!preview && !result?.template)) return;
+    requestLock.current = true;
+    setBusy(true);
+    setError(null);
+    const importId = preview?.id ?? result!.id;
+    let savedTemplate = result?.template;
+    let assignmentRequest: AssignmentRequest | undefined;
+    try {
+      const templates = await api<ProgramTemplate[]>('/api/v1/programs/templates/mine');
+      const active = templates.find((item) => item.is_active_for_current_user);
+      if (
+        active &&
+        (active.assigned_program_id == null || active.current_revision_number == null)
+      ) {
+        throw new Error(
+          'Не удалось проверить текущую программу. Обновите данные и попробуйте снова.',
+        );
+      }
+      const newTitle = savedTemplate?.title ?? title;
+      const firstDate = assignmentFirstDate(schedule);
+      const assignmentDescription =
+        firstDate > defaultStartDate
+          ? `будет запланирована с ${formatStartDate(firstDate)}`
+          : 'будет назначена';
+      if (active) {
+        setConfirmingReplacement(true);
+        const approved = await confirmAction({
+          title: 'Заменить активную программу?',
+          message: `«${active.title}» будет сразу отправлена в архив. «${newTitle}» ${assignmentDescription}. Выполненные тренировки и история сохранятся.`,
+          confirmText: 'Заменить программу',
+          danger: true,
+        });
+        setConfirmingReplacement(false);
+        if (!approved) return;
+      }
+      assignmentRequest = {
+        ...schedule,
+        replace_active: Boolean(active),
+        expected_active_program_id: active?.assigned_program_id ?? null,
+        expected_active_revision_number: active?.current_revision_number ?? null,
+      };
+      updateRecovery({ id: importId, intent: 'assign', assignment: assignmentRequest });
+      if (!savedTemplate && preview) {
+        const saved = await api<ProgramImportConfirmResponse>(
+          `/api/v1/programs/imports/${importId}/confirm`,
+          {
+            method: 'POST',
+            body: {
+              target_program_id: null,
+              expected_revision_number: null,
+              expected_draft_version: preview.draft_version ?? undefined,
+            },
+          },
+        );
+        savedTemplate = saved.template;
+      }
+      if (!savedTemplate) throw new Error('Сохранённый шаблон недоступен.');
+      const assigned = await api<{ user_program_id: number; status: string; start_date: string }>(
+        `/api/v1/programs/imports/${importId}/assign-to-me`,
+        {
+          method: 'POST',
+          body: assignmentRequest,
+        },
+      );
+      finishAssignment(importId, savedTemplate, assigned);
+    } catch (reason) {
+      const uncertain = outcomeUnknown(reason);
+      if (assignmentRequest && uncertain) {
+        setPreview(null);
+        setAssignmentOpen(false);
+        setResult({ kind: 'uncertain', id: importId, title: savedTemplate?.title });
+      } else if (savedTemplate && assignmentRequest) {
+        updateRecovery({ id: importId, intent: 'assign' });
+        setPreview(null);
+        setAssignmentOpen(false);
+        setResult({
+          kind: 'partial',
+          id: importId,
+          title: savedTemplate.title,
+          template: savedTemplate,
+          reason: assignmentFailureCode(reason),
+          message: reason instanceof Error ? reason.message : 'Не удалось назначить программу.',
+        });
+        void queryClient.invalidateQueries({ queryKey: ['templates'] });
+      } else {
+        if (assignmentRequest) updateRecovery(null);
+        setAssignmentOpen(false);
+        setError(reason instanceof Error ? reason.message : 'Не удалось проверить программу.');
+      }
+    } finally {
+      requestLock.current = false;
+      setBusy(false);
+    }
+  };
+
+  const checkResult = async () => {
+    if (!recovery || requestLock.current) return;
+    requestLock.current = true;
     setBusy(true);
     setError(null);
     try {
-      await api<ProgramImportConfirmResponse>(`/api/v1/programs/imports/${preview.id}/confirm`, {
-        method: 'POST',
-        body: {
-          target_program_id: selectedTarget?.program_id ?? null,
-          expected_revision_number: selectedTarget?.current_revision_number ?? null,
-        },
-      });
-      setPreview(null);
-      await queryClient.invalidateQueries({ queryKey: ['templates'] });
-      await queryClient.invalidateQueries({ queryKey: ['assigned-program'] });
-      await queryClient.invalidateQueries({ queryKey: ['program-import', 'targets'] });
-      onImported?.();
-      toast(
-        selectedTarget
-          ? 'Новая ревизия программы сохранена'
-          : 'Программа импортирована в личные шаблоны',
+      const current = await api<MatrixImport>(`/api/v1/programs/imports/${recovery.id}`);
+      if (current.status === 'pending') {
+        applyPreview(current);
+        setResult(null);
+        updateRecovery(null);
+        return;
+      }
+      if (current.status !== 'confirmed' || current.confirmed_template_id == null) {
+        throw new Error('Результат импорта недоступен. Проверьте личные шаблоны.');
+      }
+      const template = await api<ProgramTemplate>(
+        `/api/v1/programs/templates/${current.confirmed_template_id}`,
       );
-      trackProductEvent({ name: 'program_import_confirmed', surface: productEventSurface() });
+      if (current.self_assigned_program_id != null) {
+        const lifecycle = await api<{ status: string; start_date: string }>(
+          `/api/v1/programs/assigned/${current.self_assigned_program_id}/lifecycle`,
+        );
+        finishAssignment(current.id, template, {
+          user_program_id: current.self_assigned_program_id,
+          status: lifecycle.status,
+          start_date: lifecycle.start_date,
+        });
+      } else if (recovery.intent === 'assign' && recovery.assignment) {
+        try {
+          const assigned = await api<{
+            user_program_id: number;
+            status: string;
+            start_date: string;
+          }>(`/api/v1/programs/imports/${current.id}/assign-to-me`, {
+            method: 'POST',
+            body: recovery.assignment,
+          });
+          finishAssignment(current.id, template, assigned);
+        } catch (reason) {
+          if (outcomeUnknown(reason)) throw reason;
+          updateRecovery({ id: current.id, intent: 'assign' });
+          setResult({
+            kind: 'partial',
+            id: current.id,
+            title: template.title,
+            template,
+            reason: assignmentFailureCode(reason),
+            message: reason instanceof Error ? reason.message : undefined,
+          });
+        }
+      } else if (recovery.intent === 'assign') {
+        setResult({ kind: 'partial', id: current.id, title: template.title, template });
+      } else {
+        setResult({ kind: 'saved', id: current.id, title: template.title });
+      }
     } catch (reason) {
-      setError(formatError(reason));
-      trackProductEvent({ name: 'program_import_failed', surface: productEventSurface() });
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Не удалось проверить результат. Попробуйте ещё раз.',
+      );
     } finally {
+      requestLock.current = false;
       setBusy(false);
     }
   };
@@ -466,15 +876,159 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     return [...byId.values()].sort((left, right) => left.title.localeCompare(right.title, 'ru'));
   };
 
+  const previewDays =
+    preview?.rows.filter((row) => row.week_number == null || row.week_number === 1) ?? [];
+  const days = [
+    ...new Set(
+      previewDays.map((row) => row.day_number).filter((day): day is number => day != null),
+    ),
+  ]
+    .sort((left, right) => left - right)
+    .map((day) => ({
+      title: previewDays.find((row) => row.day_number === day)?.day_title || `День ${day}`,
+    }));
+  const assignmentPlan = result?.template
+    ? assignmentPlanFromTemplate(result.template)
+    : preview
+      ? {
+          title: title || 'Программа',
+          days,
+          frequency: days.length,
+          defaultDurationWeeks: preview.assignment_duration_weeks ?? preview.duration_weeks ?? 1,
+          cycle: isMatrix ? { length_weeks: sourceWeeks, repeat: Boolean(preview.repeat) } : null,
+        }
+      : null;
+  const confirmationDisabled =
+    busy ||
+    !preview ||
+    preview.summary.blocking_issue_count > 0 ||
+    hasPendingChanges ||
+    Boolean(invalidDuration) ||
+    (targetProgramId !== '' && (!selectedTarget || !targetMatchesImport(selectedTarget)));
+
   return (
     <Card
       className="program-import-card"
       collapsible={false}
       family="training"
-      title="Импорт программы"
-      description="Загрузите XLSX, CSV, TXT или DOCX с программой. YFC сначала детерминированно извлечёт данные, а программа появится только после проверки и подтверждения."
+      title={result ? undefined : 'Импорт программы'}
+      description={
+        result
+          ? undefined
+          : 'Загрузите XLSX, CSV, TXT или DOCX с программой. YFC сначала детерминированно извлечёт данные, а программа появится только после проверки и подтверждения.'
+      }
     >
-      {!preview ? (
+      {result ? (
+        <section className="program-import-outcome" role="status" aria-live="polite">
+          <span className="eyebrow">Результат импорта</span>
+          <h3>
+            {result.kind === 'saved'
+              ? 'Шаблон сохранён'
+              : result.kind === 'assigned'
+                ? result.notCurrent
+                  ? 'Назначение было создано'
+                  : result.scheduled
+                    ? 'Программа запланирована'
+                    : 'Программа назначена'
+                : result.kind === 'partial'
+                  ? result.reason === 'workout_in_progress'
+                    ? 'Сначала завершите тренировку'
+                    : result.reason === 'trainer_owned_program'
+                      ? 'Программа назначена тренером'
+                      : result.reason === 'active_program_conflict'
+                        ? 'Данные программы изменились'
+                        : 'Шаблон сохранён, назначение не выполнено'
+                  : recovery?.intent === 'save'
+                    ? 'Результат сохранения пока неизвестен'
+                    : 'Результат назначения пока неизвестен'}
+          </h3>
+          <div className="program-import-result">
+            {result.title && (
+              <p>
+                <strong>{result.title}</strong>
+              </p>
+            )}
+            <p>
+              {result.kind === 'saved'
+                ? 'Программа доступна в личной библиотеке. Текущий план не изменился.'
+                : result.kind === 'assigned'
+                  ? result.notCurrent
+                    ? 'Назначение уже не является текущим. Проверьте программу в плане.'
+                    : `${result.startDate ? `Начало: ${formatStartDate(result.startDate)}. ` : ''}${result.scheduled ? 'До этой даты программа будет запланирована.' : 'Тренировки доступны в разделе «План».'}`
+                  : result.kind === 'partial'
+                    ? `Шаблон сохранён. ${result.message || 'Повторите только назначение, загружать файл заново не нужно.'}`
+                    : recovery?.intent === 'save'
+                      ? 'Связь прервалась. Проверьте, сохранился ли шаблон.'
+                      : 'Связь прервалась. Проверьте результат; при необходимости мы безопасно повторим подтверждённое назначение.'}
+            </p>
+          </div>
+          <div className="program-import-actions">
+            {result.kind === 'uncertain' && (
+              <Button disabled={busy} type="button" onClick={() => void checkResult()}>
+                {busy ? 'Проверяем…' : 'Проверить результат'}
+              </Button>
+            )}
+            {result.kind === 'partial' &&
+              result.reason === 'workout_in_progress' &&
+              onOpenWorkout && (
+                <Button type="button" onClick={onOpenWorkout}>
+                  Открыть тренировку
+                </Button>
+              )}
+            {result.kind === 'partial' &&
+              result.template &&
+              result.reason !== 'trainer_owned_program' &&
+              result.reason !== 'workout_in_progress' && (
+                <Button disabled={busy} type="button" onClick={() => setAssignmentOpen(true)}>
+                  {result.reason === 'active_program_conflict'
+                    ? 'Обновить данные'
+                    : 'Повторить назначение'}
+                </Button>
+              )}
+            {result.kind === 'assigned' && result.assignedId != null && onOpenProgram && (
+              <Button
+                type="button"
+                onClick={() => {
+                  updateRecovery(null);
+                  onOpenProgram(result.assignedId!);
+                }}
+              >
+                Открыть программу
+              </Button>
+            )}
+            {(result.kind === 'saved' ||
+              result.kind === 'partial' ||
+              result.kind === 'uncertain') &&
+              onOpenTemplates && (
+                <Button
+                  type="button"
+                  variant={
+                    result.kind === 'saved' || result.reason === 'trainer_owned_program'
+                      ? undefined
+                      : 'secondary'
+                  }
+                  onClick={() => {
+                    if (result.kind !== 'uncertain') updateRecovery(null);
+                    onOpenTemplates();
+                  }}
+                >
+                  Открыть в моих шаблонах
+                </Button>
+              )}
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                updateRecovery(null);
+                setResult(null);
+                setError(null);
+              }}
+            >
+              Импортировать другую программу
+            </button>
+          </div>
+        </section>
+      ) : !preview ? (
         <div className="program-import-intro">
           <div className="program-import-intro__actions">
             <label className="program-import-upload">
@@ -524,19 +1078,37 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             </Badge>
           </div>
 
-          {!!preview.issues.length && (
-            <div className="program-import-issues" role="status">
-              <strong>Сначала проверьте найденные проблемы</strong>
-              <ul>
-                {preview.issues.map((issue, index) => (
-                  <li key={`${issue.code}-${issue.location}-${index}`}>
-                    <span>{issue.message}</span>
-                    {issue.location && <small>{issue.location}</small>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {(['blocking', 'warning'] as const).map((severity) => {
+            const issues = preview.issues.filter((issue) =>
+              severity === 'blocking'
+                ? preview.summary.blocking_issue_count > 0 && issue.severity === 'blocking'
+                : issue.severity === 'warning' ||
+                  (preview.summary.blocking_issue_count === 0 && issue.severity === 'blocking'),
+            );
+            return (
+              !!issues.length && (
+                <div
+                  key={severity}
+                  className={`program-import-issues${severity === 'warning' ? ' program-import-issues--warning' : ''}`}
+                  role="status"
+                >
+                  <strong>
+                    {severity === 'blocking'
+                      ? 'Сначала проверьте найденные проблемы'
+                      : 'Особенности импорта'}
+                  </strong>
+                  <ul>
+                    {issues.map((issue, index) => (
+                      <li key={`${issue.code}-${issue.location}-${index}`}>
+                        <span>{issue.message}</span>
+                        {issue.location && <small>{issue.location}</small>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            );
+          })}
 
           <div className="program-import-fields">
             <Field label="Название программы" labelFor="program-import-title">
@@ -576,6 +1148,154 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               </Select>
             </Field>
           </div>
+
+          {isMatrix && (
+            <section className="program-import-cycle" aria-labelledby="import-cycle-heading">
+              <div className="program-import-cycle__heading">
+                <div>
+                  <span className="eyebrow">Периодизация · по желанию</span>
+                  <h4 id="import-cycle-heading">Исходные недели и срок программы</h4>
+                  <p className="muted">
+                    В файле распознано {sourceWeeks} исходных недель. Типы недель не зависят от
+                    цвета.
+                  </p>
+                </div>
+                <strong>Исходных недель: {sourceWeeks}</strong>
+              </div>
+              <div className="program-import-cycle__fields">
+                <label htmlFor="program-import-duration">
+                  Всего недель программы
+                  <Input
+                    id="program-import-duration"
+                    type="number"
+                    min={1}
+                    max={20000}
+                    value={assignmentWeeks}
+                    onChange={(event) => setAssignmentWeeks(event.target.value)}
+                    aria-invalid={invalidDuration}
+                  />
+                </label>
+                <label className="program-import-cycle__repeat">
+                  <input
+                    type="checkbox"
+                    checked={repeatCycle}
+                    onChange={(event) => setRepeatCycle(event.target.checked)}
+                  />
+                  Повторять исходные недели до конца срока
+                </label>
+              </div>
+              {invalidDuration && (
+                <p className="field-error" role="alert">
+                  Укажите положительное число недель. Если срок больше исходного цикла, включите
+                  повтор.
+                </p>
+              )}
+              <div
+                className="program-import-week-map"
+                aria-label="Пример повторения исходных недель"
+              >
+                {previewWeeks.map((week) => {
+                  const sourceWeek = repeatCycle ? ((week - 1) % sourceWeeks) + 1 : week;
+                  return (
+                    <span key={week}>
+                      Неделя {week} → исходная {sourceWeek}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="program-import-cycle__heading">
+                <strong>Типы исходных недель</strong>
+                {!!preview.week_type_candidates?.length && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      setWeekTypes((current) =>
+                        current.map(
+                          (currentType, index) =>
+                            currentType ??
+                            preview.week_type_candidates?.find(
+                              (item) => item.week_number === index + 1,
+                            )?.week_type ??
+                            null,
+                        ),
+                      )
+                    }
+                  >
+                    Принять текстовые подсказки
+                  </Button>
+                )}
+              </div>
+              <div className="program-import-week-types">
+                {weekTypes
+                  .slice(weekPage * WEEK_PAGE_SIZE, (weekPage + 1) * WEEK_PAGE_SIZE)
+                  .map((weekType, index) => {
+                    const number = weekPage * WEEK_PAGE_SIZE + index + 1;
+                    const candidate = preview.week_type_candidates?.find(
+                      (item) => item.week_number === number,
+                    );
+                    return (
+                      <label key={number}>
+                        Неделя {number}
+                        <Select
+                          aria-label={`Тип исходной недели ${number}`}
+                          value={weekType ?? ''}
+                          onChange={(event) => {
+                            const value = (event.target.value || null) as WeekType;
+                            setWeekTypes((current) =>
+                              current.map((item, position) =>
+                                position === number - 1 ? value : item,
+                              ),
+                            );
+                          }}
+                        >
+                          <option value="">Без типа</option>
+                          {Object.entries(weekTypeLabels).map(([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ))}
+                        </Select>
+                        {candidate && (
+                          <small>
+                            В файле: {candidate.source_text} · {candidate.source_cell}. Подсказка не
+                            применяется автоматически.
+                          </small>
+                        )}
+                      </label>
+                    );
+                  })}
+              </div>
+              {sourceWeeks > WEEK_PAGE_SIZE && (
+                <nav className="program-import-pagination" aria-label="Страницы типов недель">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={weekPage === 0}
+                    onClick={() => setWeekPage((current) => current - 1)}
+                  >
+                    Ранее
+                  </Button>
+                  <span>
+                    {weekPage + 1} из {Math.ceil(sourceWeeks / WEEK_PAGE_SIZE)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={(weekPage + 1) * WEEK_PAGE_SIZE >= sourceWeeks}
+                    onClick={() => setWeekPage((current) => current + 1)}
+                  >
+                    Далее
+                  </Button>
+                </nav>
+              )}
+              <p className="muted">
+                Тип недели можно оставить пустым. Повтор не копирует выполненные тренировки. Если
+                недели распознаны неправильно, исправьте заголовки в исходном файле и загрузите его
+                повторно.
+              </p>
+            </section>
+          )}
 
           <details className="program-import-provenance">
             <summary className="yfc-disclosure-summary">
@@ -763,7 +1483,8 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
           <p className="muted program-import-layout-summary">
             Формат: {importLayoutLabel(preview.layout_version)} · Дней:{' '}
             {new Set(preview.rows.map((row) => row.day_number).filter((day) => day != null)).size}
-            {preview.duration_weeks ? ` · Недель: ${preview.duration_weeks}` : ''}
+            {preview.duration_weeks ? ` · Исходных недель: ${preview.duration_weeks}` : ''}
+            {isMatrix ? ` · Срок: ${preview.assignment_duration_weeks ?? sourceWeeks}` : ''}
           </p>
 
           {preview.ai && preview.ai.status !== 'not_needed' && (
@@ -809,12 +1530,12 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         {row.source_range ?? `строка ${row.row_number}`}
                       </small>
                     </th>
-                    <td>{row.week_number ?? '—'}</td>
-                    <td>
+                    <td data-label="Неделя">{row.week_number ?? '—'}</td>
+                    <td data-label="День">
                       <strong>{row.day_number ?? '—'}</strong>
                       <small>{row.day_title || 'Название дня не указано'}</small>
                     </td>
-                    <td>
+                    <td data-label="Упражнение">
                       {row.match_status === 'matched' ? (
                         <strong>{rowExerciseLabel(row)}</strong>
                       ) : (
@@ -853,7 +1574,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         </small>
                       ))}
                     </td>
-                    <td>
+                    <td data-label="Назначение">
                       {row.metric_type === 'cardio'
                         ? `${row.prescribed_duration_minutes ?? '—'} мин`
                         : `${row.prescribed_sets ?? '—'} × ${row.prescribed_reps ?? '—'}`}
@@ -864,10 +1585,69 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         </small>
                       ))}
                       {row.source_auxiliary && (
-                        <small>Из файла: {row.source_auxiliary} (не импортируется как вес)</small>
+                        <small>
+                          Дополнительная ячейка: {row.source_auxiliary} (не считается плановым весом
+                          без подтверждения)
+                        </small>
+                      )}
+                      {isMatrix && row.metric_type !== 'cardio' && (
+                        <details className="program-import-edit">
+                          <summary className="yfc-disclosure-summary">
+                            Исправить назначение
+                            <DisclosureIcon />
+                          </summary>
+                          <label>
+                            Подходы
+                            <Input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={rowSets[row.row_number] ?? String(row.prescribed_sets ?? '')}
+                              onChange={(event) =>
+                                setRowSets((current) => ({
+                                  ...current,
+                                  [row.row_number]: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            Повторы
+                            <Input
+                              value={rowReps[row.row_number] ?? row.prescribed_reps ?? ''}
+                              maxLength={32}
+                              onChange={(event) =>
+                                setRowReps((current) => ({
+                                  ...current,
+                                  [row.row_number]: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            Плановые веса, кг
+                            <Input
+                              value={plannedLoads[row.row_number] ?? row.manual_planned_loads ?? ''}
+                              maxLength={256}
+                              placeholder={row.source_auxiliary ?? 'например, 70/72.5/75/77.5'}
+                              onChange={(event) =>
+                                setPlannedLoads((current) => ({
+                                  ...current,
+                                  [row.row_number]: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                          {row.source_cells?.source_auxiliary && (
+                            <small>
+                              Ячейка: {row.source_cells.source_auxiliary}. Значение из файла
+                              применяется только после вашего ввода и подтверждения.
+                            </small>
+                          )}
+                        </details>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Статус">
                       <span
                         className={
                           row.match_status === 'matched'
@@ -920,7 +1700,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               Отменить
             </Button>
             <Button
-              disabled={busy}
+              disabled={busy || Boolean(invalidDuration)}
               type="button"
               variant="secondary"
               onClick={() => void resolve()}
@@ -928,22 +1708,35 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               Применить исправления
             </Button>
             <Button
-              disabled={
-                busy ||
-                preview.summary.blocking_issue_count > 0 ||
-                (targetProgramId !== '' &&
-                  (!selectedTarget || !targetMatchesImport(selectedTarget)))
-              }
+              disabled={confirmationDisabled}
               type="button"
+              variant={allowSelfAssignment && !selectedTarget ? 'secondary' : undefined}
               onClick={() => void confirm()}
             >
               {busy
                 ? 'Сохраняем…'
                 : selectedTarget
                   ? 'Подтвердить и создать ревизию'
-                  : 'Подтвердить и сохранить шаблон'}
+                  : allowSelfAssignment
+                    ? 'Сохранить шаблон'
+                    : 'Подтвердить и сохранить шаблон'}
             </Button>
+            {allowSelfAssignment && targetProgramId === '' && (
+              <Button
+                disabled={confirmationDisabled || days.length === 0}
+                type="button"
+                onClick={() => setAssignmentOpen(true)}
+              >
+                Сохранить и назначить
+              </Button>
+            )}
           </div>
+          {hasPendingChanges && (
+            <p className="muted" role="status">
+              Сначала нажмите «Применить исправления», проверьте обновлённый план, затем подтвердите
+              импорт.
+            </p>
+          )}
           <p className="muted program-import-retention">
             Черновик доступен {new Date(preview.expires_at).toLocaleString('ru-RU')}. После
             подтверждения исходные данные предпросмотра удаляются.
@@ -954,6 +1747,18 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
         <p className="field-error program-import-error" role="alert">
           {error}
         </p>
+      )}
+      {assignmentOpen && assignmentPlan && (
+        <ProgramAssignmentDialog
+          plan={assignmentPlan}
+          defaultStartDate={defaultStartDate}
+          busy={busy}
+          concealed={confirmingReplacement}
+          submitLabel={result?.template ? 'Назначить программу' : 'Сохранить и назначить'}
+          backLabel={result?.template ? 'Вернуться к результату' : 'Вернуться к импорту'}
+          onClose={() => setAssignmentOpen(false)}
+          onSubmit={(schedule) => void assign(schedule)}
+        />
       )}
     </Card>
   );

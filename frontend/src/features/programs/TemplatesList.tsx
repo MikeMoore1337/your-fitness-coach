@@ -18,15 +18,19 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { ProgramBuilder } from './ProgramBuilder';
 import { shouldSaveTemplateAsCopy } from './templateEditing';
-import { programWeeklySessions, templateWeekCycle } from './programPreviewFacts';
-import { DateInput } from '../../shared/ui/PickerInput';
 import { ProgramRecommendation } from './ProgramRecommendation';
 import { LegacyProgramRecommendation } from './LegacyProgramRecommendation';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { AssignedProgramDetails } from './AssignedProgramDetails';
 import { ProgramImportPanel } from './ProgramImportPanel';
+import {
+  assignmentPlanFromTemplate,
+  ProgramAssignmentDialog,
+  type AssignmentSchedule,
+} from './ProgramAssignmentDialog';
 import { PublicProgramSharePanel } from './PublicProgramSharePanel';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import { Icon, type IconName } from '../../shared/ui/Icon';
 import { programPreviewFacts, previewSourceSignature } from './programPreviewFacts';
 import { exerciseCountLabel } from './programDefaults';
@@ -45,34 +49,6 @@ const levelLabels: Record<string, string> = {
   intermediate: 'Средний уровень',
   advanced: 'Продвинутый уровень',
 };
-const weekdayLabels = [
-  'Понедельник',
-  'Вторник',
-  'Среда',
-  'Четверг',
-  'Пятница',
-  'Суббота',
-  'Воскресенье',
-];
-
-function weekdayFromDate(value: string): number {
-  const date = new Date(`${value}T12:00:00Z`);
-  return Number.isNaN(date.valueOf()) ? 0 : (date.getUTCDay() + 6) % 7;
-}
-
-function defaultWeekdays(template: ProgramTemplate, startDate: string): number[] {
-  const frequency = programWeeklySessions(template);
-  if (frequency > 7) return [];
-  const firstWeekday = weekdayFromDate(startDate);
-  return Array.from(
-    { length: frequency },
-    (_, index) =>
-      (firstWeekday +
-        (frequency === template.days.length ? index : Math.floor((index * 7) / frequency))) %
-      7,
-  );
-}
-
 function weeksLabel(value: number): string {
   const remainder = value % 10;
   const suffix =
@@ -188,6 +164,7 @@ export function TemplatesList({
     params.set('section', 'programs');
     params.set('view', 'manage');
     params.delete('start');
+    params.delete('assigned_program_id');
     if (next === 'overview') params.delete('panel');
     else params.set('panel', next);
     navigate('/app?' + params.toString());
@@ -243,9 +220,6 @@ export function TemplatesList({
     new Date(),
     user?.profile?.timezone || detectedTimeZone(),
   );
-  const [assignmentStartDate, setAssignmentStartDate] = useState(defaultStartDate);
-  const [assignmentDuration, setAssignmentDuration] = useState(4);
-  const [assignmentWeekdays, setAssignmentWeekdays] = useState<number[]>([]);
   const examplePanelRef = useModalA11y<HTMLDivElement>(Boolean(selectedExample), () =>
     setSelectedExample(null),
   );
@@ -253,9 +227,6 @@ export function TemplatesList({
     selectedExample?.is_active_for_current_user === true &&
     selectedExample.assigned_by_user_id != null &&
     selectedExample.assigned_by_user_id !== user?.id;
-  const assignmentPanelRef = useModalA11y<HTMLDivElement>(Boolean(assignmentTemplate), () =>
-    setAssignmentTemplate(null),
-  );
   const templates = useQuery({
     queryKey: ['templates', 'mine'],
     queryFn: () => api<ProgramTemplate[]>('/api/v1/programs/templates/mine'),
@@ -314,14 +285,19 @@ export function TemplatesList({
   };
 
   const assignmentMutation = useMutation({
-    mutationFn: ({ templateId, replaceActive }: { templateId: number; replaceActive: boolean }) =>
+    mutationFn: ({
+      templateId,
+      replaceActive,
+      schedule,
+    }: {
+      templateId: number;
+      replaceActive: boolean;
+      schedule: AssignmentSchedule;
+    }) =>
       api(`/api/v1/programs/templates/${templateId}/assign-to-me`, {
         method: 'POST',
         body: {
-          start_date: assignmentStartDate,
-          duration_weeks: assignmentDuration,
-          schedule_weekdays:
-            assignmentTemplate && assignmentTemplate.days.length > 7 ? null : assignmentWeekdays,
+          ...schedule,
           replace_active: replaceActive,
         },
       }),
@@ -391,38 +367,7 @@ export function TemplatesList({
     },
   });
 
-  const assignmentCycle = templateWeekCycle(assignmentTemplate);
-  const assignmentMax = assignmentCycle
-    ? assignmentCycle.repeat
-      ? undefined
-      : assignmentCycle.length_weeks
-    : assignmentTemplate && assignmentTemplate.default_duration_weeks > 1
-      ? assignmentTemplate.default_duration_weeks
-      : 24;
-  const assignmentOffsets = assignmentWeekdays.map(
-    (weekday) => (weekday - (assignmentWeekdays[0] ?? weekday) + 7) % 7,
-  );
-  const assignmentScheduleIsValid =
-    Boolean(assignmentTemplate) &&
-    ((assignmentTemplate?.days.length ?? 0) > 7
-      ? assignmentWeekdays.length === 0
-      : assignmentWeekdays.length ===
-          (assignmentTemplate ? programWeeklySessions(assignmentTemplate) : 0) &&
-        new Set(assignmentWeekdays).size === assignmentWeekdays.length &&
-        assignmentOffsets.every(
-          (offset, index) => index === 0 || offset > assignmentOffsets[index - 1]!,
-        ));
-
   const openAssignment = (template: ProgramTemplate) => {
-    setAssignmentStartDate(defaultStartDate);
-    setAssignmentDuration(
-      templateWeekCycle(template)
-        ? template.default_duration_weeks
-        : template.default_duration_weeks > 1
-          ? template.default_duration_weeks
-          : 4,
-    );
-    setAssignmentWeekdays(defaultWeekdays(template, defaultStartDate));
     setAssignmentTemplate(template);
   };
 
@@ -457,6 +402,11 @@ export function TemplatesList({
   };
 
   const activeTemplate = templates.data?.find((item) => item.is_active_for_current_user) ?? null;
+  const operationParams = new URLSearchParams(search);
+  const operationId = positiveIntegerParam(operationParams, 'assigned_program_id');
+  const operationsTemplate = operationParams.has('assigned_program_id')
+    ? (templates.data?.find((item) => item.assigned_program_id === operationId) ?? null)
+    : activeTemplate;
   const deleteActiveProgram = async () => {
     const assignedProgramId = activeTemplate?.assigned_program_id;
     if (assignedProgramId == null || deleteAssignedMutation.isPending) return;
@@ -626,7 +576,11 @@ export function TemplatesList({
                   <h2 id="active-program-title">{activeTemplate.title}</h2>
                   <p>{programMeta(activeTemplate)}</p>
                 </div>
-                <Badge tone="success">Активна</Badge>
+                <Badge tone="success">
+                  {activeTemplate.assigned_program_status === 'scheduled'
+                    ? 'Запланирована'
+                    : 'Активна'}
+                </Badge>
               </div>
               {isSummary ? (
                 <div className="program-active__summary">
@@ -790,19 +744,19 @@ export function TemplatesList({
           <section className="program-manage-destination" hidden={panel !== 'operations'}>
             <h2>Назначение и изменения</h2>
             {panel === 'operations' &&
-            activeTemplate?.assigned_program_id &&
-            activeTemplate.assigned_program_start_date &&
-            activeTemplate.assigned_program_duration_weeks != null &&
-            activeTemplate.current_revision_number != null ? (
+            operationsTemplate?.assigned_program_id &&
+            operationsTemplate.assigned_program_start_date &&
+            operationsTemplate.assigned_program_duration_weeks != null &&
+            operationsTemplate.current_revision_number != null ? (
               <AssignedProgramDetails
-                key={activeTemplate.assigned_program_id}
-                programId={activeTemplate.assigned_program_id}
-                currentRevisionNumber={activeTemplate.current_revision_number}
-                startDate={activeTemplate.assigned_program_start_date}
-                durationWeeks={activeTemplate.assigned_program_duration_weeks}
+                key={operationsTemplate.assigned_program_id}
+                programId={operationsTemplate.assigned_program_id}
+                currentRevisionNumber={operationsTemplate.current_revision_number}
+                startDate={operationsTemplate.assigned_program_start_date}
+                durationWeeks={operationsTemplate.assigned_program_duration_weeks}
                 periodizationReadOnly={
-                  activeTemplate.assigned_by_user_id != null &&
-                  activeTemplate.assigned_by_user_id !== user?.id
+                  operationsTemplate.assigned_by_user_id != null &&
+                  operationsTemplate.assigned_by_user_id !== user?.id
                 }
                 showAiAdaptation
                 workoutHistoryReturnPath="/app?section=programs&view=manage&panel=operations"
@@ -834,7 +788,18 @@ export function TemplatesList({
           </section>
           <div className="program-manage-destination" hidden={panel !== 'create'}>
             {children}
-            <ProgramImportPanel />
+            <ProgramImportPanel
+              allowSelfAssignment
+              defaultStartDate={defaultStartDate}
+              onImported={() => void refreshProgramState()}
+              onOpenTemplates={() => openPanel('library')}
+              onOpenProgram={(id) =>
+                navigate(
+                  `/app?section=programs&view=manage&panel=operations&assigned_program_id=${id}`,
+                )
+              }
+              onOpenWorkout={() => navigate('/app?section=today')}
+            />
           </div>
           <LegacyProgramRecommendation
             open={recommendationOpen}
@@ -1114,7 +1079,9 @@ export function TemplatesList({
                       className="program-example-modal__primary-action"
                       disabled
                     >
-                      Уже запущена
+                      {selectedExample.assigned_program_status === 'scheduled'
+                        ? 'Уже запланирована'
+                        : 'Уже запущена'}
                     </button>
                   ) : (
                     <button
@@ -1134,154 +1101,29 @@ export function TemplatesList({
         </div>
       )}
       {assignmentTemplate && (
-        <div
-          className="modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="assign-program-title"
-        >
-          <button
-            type="button"
-            className="modal__backdrop"
-            aria-label="Закрыть настройку расписания"
-            onClick={() => setAssignmentTemplate(null)}
-          />
-          <div
-            className="modal__panel card assignment-modal"
-            ref={assignmentPanelRef}
-            tabIndex={-1}
-          >
-            <div className="section-head">
-              <div>
-                <span className="eyebrow">Расписание программы</span>
-                <h2 id="assign-program-title">{assignmentTemplate.title}</h2>
-              </div>
-              <button
-                type="button"
-                className="secondary"
-                aria-label="Закрыть настройку расписания"
-                onClick={() => setAssignmentTemplate(null)}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <form
-              className="stack"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                const active = templates.data?.find(
-                  (template) => template.is_active_for_current_user,
-                );
-                let replaceActive = false;
-                if (
-                  active &&
-                  !(await confirm({
-                    title: 'Заменить активную программу?',
-                    message: `«${active.title}» будет отправлена в архив, а «${assignmentTemplate.title}» станет активной.`,
-                    confirmText: 'Заменить программу',
-                  }))
-                )
-                  return;
-                replaceActive = Boolean(active);
-                assignmentMutation.mutate({ templateId: assignmentTemplate.id, replaceActive });
-              }}
-            >
-              <div className="form-grid">
-                <label className="field">
-                  <span>Начать не раньше</span>
-                  <DateInput
-                    min={defaultStartDate}
-                    value={assignmentStartDate}
-                    onChange={(event) => {
-                      const nextStartDate = event.target.value;
-                      setAssignmentStartDate(nextStartDate);
-                      setAssignmentWeekdays(defaultWeekdays(assignmentTemplate, nextStartDate));
-                    }}
-                    required
-                  />
-                </label>
-                <label className="field">
-                  <span>Длительность, недель</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={assignmentMax}
-                    value={assignmentDuration}
-                    onChange={(event) => setAssignmentDuration(Number(event.target.value))}
-                    required
-                  />
-                </label>
-              </div>
-              {assignmentCycle && (
-                <p className="auth-notice">
-                  Исходных недель: {assignmentCycle.length_weeks}.{' '}
-                  {assignmentCycle.repeat
-                    ? 'Цикл повторяется до конца программы.'
-                    : 'Повтор цикла выключен.'}
-                </p>
-              )}
-              {!assignmentCycle && assignmentTemplate.default_duration_weeks > 1 && (
-                <p className="auth-notice">
-                  Для этого шаблона доступны назначения на{' '}
-                  {assignmentTemplate.default_duration_weeks} недель с сохранённой схемой
-                  повторений.
-                </p>
-              )}
-              {assignmentTemplate.days.length > 7 ? (
-                <p className="auth-notice">
-                  Восьмидневный цикл планируется последовательно: одна тренировка за другой, начиная
-                  с выбранной даты.
-                </p>
-              ) : (
-                <div className="form-grid">
-                  {assignmentWeekdays.map((_, dayIndex) => (
-                    <label className="field" key={dayIndex}>
-                      <span>
-                        {programWeeklySessions(assignmentTemplate) ===
-                        assignmentTemplate.days.length
-                          ? assignmentTemplate.days[dayIndex]?.title || `День ${dayIndex + 1}`
-                          : `Занятие ${dayIndex + 1}`}
-                      </span>
-                      <select
-                        value={assignmentWeekdays[dayIndex] ?? ''}
-                        onChange={(event) =>
-                          setAssignmentWeekdays(
-                            assignmentWeekdays.map((value, index) =>
-                              index === dayIndex ? Number(event.target.value) : value,
-                            ),
-                          )
-                        }
-                      >
-                        {weekdayLabels.map((label, weekday) => (
-                          <option value={weekday} key={label}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-              )}
-              {!assignmentScheduleIsValid && (
-                <p className="field-error" role="alert">
-                  Выберите разные дни недели в порядке тренировок. В одной неделе доступно до семи
-                  дней.
-                </p>
-              )}
-              <button
-                disabled={
-                  assignmentMutation.isPending ||
-                  !assignmentScheduleIsValid ||
-                  assignmentDuration < 1 ||
-                  !Number.isSafeInteger(assignmentDuration) ||
-                  (assignmentMax != null && assignmentDuration > assignmentMax)
-                }
-              >
-                {assignmentMutation.isPending ? 'Назначаем…' : 'Назначить по расписанию'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <ProgramAssignmentDialog
+          plan={assignmentPlanFromTemplate(assignmentTemplate)}
+          defaultStartDate={defaultStartDate}
+          busy={assignmentMutation.isPending}
+          onClose={() => setAssignmentTemplate(null)}
+          onSubmit={async (schedule) => {
+            const active = templates.data?.find((template) => template.is_active_for_current_user);
+            if (
+              active &&
+              !(await confirm({
+                title: 'Заменить активную программу?',
+                message: `«${active.title}» будет сразу отправлена в архив. «${assignmentTemplate.title}» будет назначена. Выполненные тренировки и история сохранятся.`,
+                confirmText: 'Заменить программу',
+              }))
+            )
+              return;
+            assignmentMutation.mutate({
+              templateId: assignmentTemplate.id,
+              replaceActive: Boolean(active),
+              schedule,
+            });
+          }}
+        />
       )}
       {guide && (
         <ExerciseGuideDialog

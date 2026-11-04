@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { activeWorkoutRestStorageKey } from '../../src/shared/userScopedStorage';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
 import {
   expectTouchTargets,
   installTelegramHarness,
@@ -841,6 +842,9 @@ async function mockActiveWorkout(
         },
       });
     }
+    if (path.endsWith('/workouts/session-rotation')) {
+      return route.fulfill({ json: { mode: 'calendar', status: 'disabled', days: [] } });
+    }
     if (path.endsWith('/workouts/today')) {
       if (finished) {
         return route.fulfill({ status: 404, json: { detail: 'На сегодня тренировка завершена' } });
@@ -1450,7 +1454,7 @@ async function captureIssue1162State(page: Page, info: TestInfo, theme: string, 
 
 async function activeWorkoutQueueLength(page: Page) {
   return page.evaluate(() => {
-    const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
+    const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
     return stored ? ((JSON.parse(stored) as { queue?: unknown[] }).queue?.length ?? 0) : 0;
   });
 }
@@ -3414,7 +3418,9 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
             .getAttribute('data-workout-set-id'),
           timers: await page.getByRole('timer', { name: 'Отдых' }).count(),
           queue: await page.evaluate(() =>
-            JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
+            JSON.parse(
+              localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}',
+            ),
           ),
         },
         null,
@@ -3690,7 +3696,7 @@ for (const width of [320, 360, 393, 430]) {
       );
       expect(rests).toHaveLength(1);
       const queue = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3') ?? '{}'),
+        JSON.parse(localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42') ?? '{}'),
       );
       expect(queue.queue).toEqual([]);
       await page.screenshot({ path: info.outputPath(`completion-after-${width}-${theme}.png`) });
@@ -3856,7 +3862,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate(() => {
       const write = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key: string, value: string) {
-        if (key.startsWith('fit_active_workout_v1_'))
+        if (key.startsWith('fit_active_workout_queue_v4_'))
           throw new DOMException('Quota', 'QuotaExceededError');
         return write.call(this, key, value);
       };
@@ -3943,7 +3949,7 @@ test('P1 combined API and storage failure never claims durable completion', asyn
   await page.evaluate(() => {
     const write = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (key.startsWith('fit_active_workout_v1_'))
+      if (key.startsWith('fit_active_workout_queue_v4_'))
         throw new DOMException('Quota', 'QuotaExceededError');
       return write.call(this, key, value);
     };
@@ -4688,7 +4694,7 @@ for (const [theme, width] of [
   });
 }
 
-for (const width of [320, 360, 393, 430]) {
+for (const width of [320, 360, 361, 375, 390, 393, 430]) {
   for (const theme of ['dark', 'light'] as const) {
     test(`#996 footer geometry ${theme} ${width}px`, async ({ page }) => {
       const dialog = await openIssue996Replacement(page, { width, theme });
@@ -5996,9 +6002,11 @@ for (const width of [320, 360, 393, 430]) {
           const done = element
             .querySelector('[data-workout-field="done"]')!
             .getBoundingClientRect();
+          // Normalize Firefox coordinate rounding without changing the 12–16px bounds.
+          const normalize = (value: number) => Math.round(value * 16_384) / 16_384;
           return {
-            above: rir.top - Math.max(weight.bottom, reps.bottom),
-            below: done.top - rir.bottom,
+            above: normalize(rir.top - Math.max(weight.bottom, reps.bottom)),
+            below: normalize(done.top - rir.bottom),
           };
         });
         if (process.env.YFC_1272_CAPTURE_DIR) {
@@ -6306,7 +6314,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42:v3');
+        const stored = localStorage.getItem('fit_active_workout_queue_v4_user_7_workout_42');
         if (!stored) return -1;
         return (JSON.parse(stored) as { queue: unknown[] }).queue.length;
       }),
@@ -7550,7 +7558,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
         safeAreaInset: { top: 24, right: 0, bottom: 34, left: 0 },
       });
     }
-    await mockActiveWorkout(page);
+    const server = await mockActiveWorkout(page);
     await page.goto(telegram ? '/app?tgWebAppPlatform=ios' : '/app');
     if (!telegram) await page.getByRole('button', { name: 'Клиент', exact: true }).click();
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
@@ -7565,7 +7573,14 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await expect(current).toHaveAttribute('aria-current', 'step');
     await current.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
     await current.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
-    await current.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+    const rir = current.getByRole('button', { name: '2 — ещё примерно 2 повтора' });
+    await scrollIntoStablePosition(rir);
+    await rir.click();
+    await expect(rir).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .poll(() => server.readSet(202))
+      .toMatchObject({ actual_weight: 42.5, actual_reps: 9, rir: '2' });
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
     await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
     await page.clock.setFixedTime(new Date('2026-10-10T12:00:02Z'));
     const writes: Array<{ method: string; path: string; completed: unknown }> = [];
@@ -8750,6 +8765,7 @@ for (const theme of ['light', 'dark'] as const) {
     const past = row.getByRole('button', { name: 'Подставить из прошлой тренировки' });
     const help = row.getByText('Что такое RIR?', { exact: true });
     const note = row.locator('.exercise-execution-note > summary');
+    const editPlan = row.getByRole('button', { name: 'Изменить план подхода' });
     const helpers = row.getByText('Разминка и блины', { exact: true });
     const advanced = row.getByText('Дополнительно', { exact: true });
     await expect(prefill).toBeVisible();
@@ -8848,7 +8864,7 @@ for (const theme of ['light', 'dark'] as const) {
     await capture('prefill-collapsed');
 
     await done.focus();
-    for (const next of [prefill, help, note, helpers, advanced]) {
+    for (const next of [prefill, help, note, editPlan, helpers, advanced]) {
       await page.keyboard.press('Tab');
       await expect(next).toBeFocused();
     }
@@ -8997,6 +9013,7 @@ test('Issue #1293 disables prefill without a previous result', async ({ page }) 
   for (const next of [
     row.getByText('Что такое RIR?', { exact: true }),
     row.locator('.exercise-execution-note > summary'),
+    row.getByRole('button', { name: 'Изменить план подхода' }),
     row.getByText('Разминка и блины', { exact: true }),
     row.getByText('Дополнительно', { exact: true }),
   ]) {

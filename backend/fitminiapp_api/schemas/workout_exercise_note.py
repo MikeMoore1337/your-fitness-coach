@@ -16,6 +16,9 @@ class ExerciseNoteVersion(BaseModel):
 class ExerciseNoteIdentity(ExerciseNoteVersion):
     exercise_id: int = Field(gt=0)
     source_template_exercise_id: int | None = Field(default=None, gt=0)
+    source_assignment_slot_id: str | None = Field(
+        default=None, max_length=36, exclude_if=lambda v: v is None
+    )
     plan_revision_number: int | None = Field(default=None, ge=0)
     week_number: int = Field(ge=1)
     day_number: int = Field(ge=1)
@@ -99,6 +102,7 @@ class ExerciseNoteResponse(BaseModel):
     workout_exercise_id: int
     exercise_id: int
     source_template_exercise_id: int | None
+    source_assignment_slot_id: str | None = Field(default=None, exclude_if=lambda v: v is None)
     plan_revision_number: int | None
     week_number: int
     day_number: int

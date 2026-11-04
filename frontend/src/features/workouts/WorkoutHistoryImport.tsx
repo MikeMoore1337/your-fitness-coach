@@ -26,6 +26,8 @@ type Stage =
   | 'stale'
   | 'expired';
 type Choice = 'keep' | 'skip';
+type Provider = 'yfc-neutral-csv' | 'hevy' | 'strong' | 'fitnotes';
+type SetKind = 'warmup' | 'working' | 'drop';
 type Duplicate = ApiSchemas['HistoryImportDuplicate'];
 type Fact = Duplicate['source_sets'][number];
 
@@ -64,7 +66,7 @@ function setText(row: WorkoutHistoryImportRow): string {
     working: 'Рабочий',
     drop: 'Дроп-сет',
   };
-  const kind = labels[row.source.set_kind] ?? 'Подход';
+  const kind = labels[row.manual_set_kind || row.source.set_kind] ?? 'Подход';
   if (row.sides) return `${kind} · ${sidesText(row.sides)}`;
   const weight = row.weight_kg === null ? 'вес не указан' : `${row.weight_kg} кг`;
   const sourceWeight = row.source.weight_unit === 'lb' ? ` (${row.source.weight} lb)` : '';
@@ -75,7 +77,14 @@ function setText(row: WorkoutHistoryImportRow): string {
 function factText(fact: Fact, names: Map<number, string>): string {
   const [exerciseId, , reps, weight, kind, rir] = fact;
   const label = names.get(exerciseId) ?? `Упражнение ${exerciseId}`;
-  const type = kind === 'warmup' ? 'разминка' : kind === 'drop' ? 'дроп-сет' : 'рабочий';
+  const type =
+    kind === 'warmup'
+      ? 'разминка'
+      : kind === 'drop'
+        ? 'дроп-сет'
+        : kind === 'working'
+          ? 'рабочий'
+          : 'тип не указан';
   if (fact.length > 6 && fact[9]) return `${label} · ${type} · ${sidesText(fact[9])}`;
   return `${label} · ${weight === null ? 'вес не указан' : `${weight} кг`} × ${reps === null ? 'повторы не указаны' : reps} · ${type}${rir ? ` · резерв ${rir}` : ''}`;
 }
@@ -104,6 +113,57 @@ function displayZone(timestamp: string, zone: string): string {
   }
 }
 
+function displayImportTime(row: WorkoutHistoryImportRow): string {
+  if (row.source.completed_at && row.source.timezone) {
+    return `${row.source.completed_at.slice(11, 16)} · ${displayZone(row.source.completed_at, row.source.timezone)}`;
+  }
+  const timestamp = row.source.completed_at || row.source.started_at;
+  if (!timestamp) return 'Время не указано';
+  const label = row.source.completed_at ? 'Окончание' : 'Начало';
+  return `${label}: ${timestamp.slice(11, 16)} · ${row.completed_at_utc ? 'смещение указано в файле' : 'часовой пояс не указан'}`;
+}
+
+const sourceLabels: Record<string, string> = {
+  description: 'Заметка к тренировке',
+  exercise_notes: 'Заметка к упражнению',
+  'Workout Notes': 'Заметка к тренировке',
+  Notes: 'Заметка',
+  Comment: 'Комментарий',
+  Category: 'Категория',
+  Duration: 'Длительность тренировки',
+  'Duration (sec)': 'Длительность тренировки в секундах',
+  duration_seconds: 'Длительность в секундах',
+  Distance: 'Расстояние',
+  distance_km: 'Расстояние в километрах',
+  distance_miles: 'Расстояние в милях',
+  Seconds: 'Длительность в секундах',
+  Time: 'Длительность',
+  superset_id: 'Группа упражнений',
+  'Set Order': 'Порядок подхода',
+  set_type: 'Тип подхода',
+  Kind: 'Тип результата',
+  'Distance (meters)': 'Расстояние в метрах',
+  'Weight (kg)': 'Исходный вес, кг',
+};
+
+function sourceDetails(row: WorkoutHistoryImportRow) {
+  return Object.entries(row.provider_fields ?? {}).filter(
+    ([key, value]) =>
+      value &&
+      ((key === 'Weight (kg)' && value !== row.source.weight) ||
+        [
+          'description',
+          'exercise_notes',
+          'Workout Notes',
+          'Notes',
+          'Comment',
+          'Category',
+          'Duration',
+          'Duration (sec)',
+        ].includes(key)),
+  );
+}
+
 function groupExercises(rows: WorkoutHistoryImportRow[]) {
   const groups = new Map<string, [WorkoutHistoryImportRow, ...WorkoutHistoryImportRow[]]>();
   for (const row of rows) {
@@ -120,11 +180,14 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
   const [stage, setStage] = useState<Stage>('drafts');
   const [preview, setPreview] = useState<WorkoutHistoryImportPreview | null>(null);
   const [fileName, setFileName] = useState('Черновик импорта');
+  const [provider, setProvider] = useState<Provider>('yfc-neutral-csv');
+  const [weightUnit, setWeightUnit] = useState('');
   const [selectedLine, setSelectedLine] = useState<number | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<number | ''>('');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [completionConfirmed, setCompletionConfirmed] = useState(false);
   const [page, setPage] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -232,6 +295,8 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
     try {
       const body = new FormData();
       body.append('file', file);
+      body.append('provider', provider);
+      if (provider === 'strong') body.append('weight_unit', weightUnit);
       apply(
         await api<WorkoutHistoryImportPreview>(IMPORT_URL, {
           method: 'POST',
@@ -250,6 +315,7 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
     exercise?: [number, number];
     excluded?: number[];
     duplicateChoices?: Record<string, Choice>;
+    setKindChoices?: Record<number, SetKind | null>;
   }) => {
     if (!preview) return;
     setBusy(true);
@@ -260,6 +326,7 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
         body: {
           version: preview.version,
           exercise_choices: options.exercise ? { [options.exercise[0]]: options.exercise[1] } : {},
+          set_kind_choices: options.setKindChoices ?? {},
           excluded_lines:
             options.excluded ?? rows.filter((row) => row.excluded).map((row) => row.line),
           duplicate_choices: options.duplicateChoices ?? choices,
@@ -300,7 +367,13 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
       setSelectedLine(issue.line);
       if (
         issue.blocking_issues.some((item) =>
-          ['unsupported_side', 'unsupported_rpe', 'unsupported_metric'].includes(item.code),
+          [
+            'unsupported_side',
+            'unsupported_rpe',
+            'unsupported_metric',
+            'unsupported_field',
+            'unsupported_set_kind',
+          ].includes(item.code),
         )
       )
         setStage('unsupported');
@@ -310,16 +383,28 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
         setStage('match');
       } else setStage('conflicts');
     } else if (unresolvedDuplicates) setStage('conflicts');
-    else setStage('confirm');
+    else {
+      setCompletionConfirmed(false);
+      setStage('confirm');
+    }
   };
   const confirm = async () => {
-    if (!preview?.preview_signature || !canConfirm) return;
+    if (
+      !preview?.preview_signature ||
+      !canConfirm ||
+      (preview.provider === 'fitnotes' && !completionConfirmed)
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
       const result = await api<WorkoutHistoryImportPreview>(`${IMPORT_URL}/${preview.id}/confirm`, {
         method: 'POST',
-        body: { version: preview.version, preview_signature: preview.preview_signature },
+        body: {
+          version: preview.version,
+          preview_signature: preview.preview_signature,
+          ...(preview.provider === 'fitnotes' ? { completion_confirmed: completionConfirmed } : {}),
+        },
         timeoutMs: 30_000,
       });
       setPreview(result);
@@ -453,7 +538,44 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
         <>
           <div className="history-import__upload">
             <strong>Выберите файл</strong>
-            <p>Используйте шаблон YFC. Перед сохранением вы сможете проверить каждую тренировку.</p>
+            <label htmlFor="history-import-provider">Источник</label>
+            <Select
+              id="history-import-provider"
+              value={provider}
+              onChange={(event) => {
+                setProvider(event.target.value as Provider);
+                setWeightUnit('');
+              }}
+            >
+              <option value="yfc-neutral-csv">Шаблон YFC</option>
+              <option value="hevy">Hevy</option>
+              <option value="strong">Strong</option>
+              <option value="fitnotes">FitNotes</option>
+            </Select>
+            {provider === 'strong' && (
+              <>
+                <label htmlFor="history-import-weight-unit">Единица веса в файле</label>
+                <Select
+                  id="history-import-weight-unit"
+                  value={weightUnit}
+                  onChange={(event) => setWeightUnit(event.target.value)}
+                >
+                  <option value="">Не знаю</option>
+                  <option value="kg">Килограммы</option>
+                  <option value="lb">Фунты</option>
+                </Select>
+                <p>
+                  В некоторых файлах Strong единица не указана. Выберите её, если она одинакова во
+                  всём файле.
+                </p>
+              </>
+            )}
+            <p>
+              {provider === 'yfc-neutral-csv'
+                ? 'Используйте шаблон YFC.'
+                : 'Выберите CSV с историей тренировок из приложения.'}{' '}
+              Перед сохранением вы сможете проверить каждую тренировку.
+            </p>
             <input
               ref={fileInput}
               className="history-import__file"
@@ -502,6 +624,13 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
               {grouped.length} тренировок · {rows.length} строк
             </span>
           </div>
+          {preview.provider === 'fitnotes' && (
+            <p className="history-import__muted">
+              В файле FitNotes нет отметок выполнения. Исключите невыполненные подходы. Время и тип
+              подхода тоже не указаны. Записи одного дня объединены; подходы без типа не участвуют в
+              рабочих показателях и рекордах. Если знаете тип, выберите его ниже.
+            </p>
+          )}
           {(unresolved || unresolvedDuplicates) && (
             <Note title="Нужно проверить записи">
               Выберите упражнение, сравните возможные дубли и проверьте строки с ошибкой.
@@ -514,9 +643,7 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
                 <span>{displayDate(group[0].completed_on ?? undefined)}</span>
               </div>
               <p>
-                {group[0].completed_at_utc
-                  ? `${group[0].source.completed_at.slice(11, 16)} · ${displayZone(group[0].source.completed_at, group[0].source.timezone)}`
-                  : 'Время не распознано'}
+                {displayImportTime(group[0])}
                 {choices[ref] === 'skip' ? ' · исключена' : ''}
                 {duplicates.some((item) => item.workout_ref === ref && item.candidates.length > 0)
                   ? ' · возможный дубль'
@@ -546,6 +673,54 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
                     {exerciseRows.map((row) => (
                       <li key={row.line}>
                         {setText(row)}
+                        {preview.provider !== 'yfc-neutral-csv' && !row.source.set_kind && (
+                          <div>
+                            <label htmlFor={`history-import-kind-${row.line}`}>
+                              Тип подхода, если знаете
+                            </label>
+                            <Select
+                              id={`history-import-kind-${row.line}`}
+                              value={row.manual_set_kind ?? ''}
+                              disabled={busy || row.excluded}
+                              onChange={(event) =>
+                                void saveResolution({
+                                  setKindChoices: {
+                                    [row.line]: (event.target.value || null) as SetKind | null,
+                                  },
+                                })
+                              }
+                            >
+                              <option value="">Не указан</option>
+                              <option value="warmup">Разминка</option>
+                              <option value="working">Рабочий</option>
+                              <option value="drop">Дроп-сет</option>
+                            </Select>
+                          </div>
+                        )}
+                        {sourceDetails(row).length > 0 && (
+                          <details>
+                            <summary className="yfc-disclosure-summary">
+                              Другие данные из файла
+                              <Icon name="chevron-down" size={16} />
+                            </summary>
+                            <p>Сохраним их вместе с источником; в показатели они не попадут.</p>
+                            {sourceDetails(row).map(([key, value]) => (
+                              <p key={key}>
+                                {sourceLabels[key]}: {value}
+                              </p>
+                            ))}
+                          </details>
+                        )}
+                        {preview.provider === 'fitnotes' && !row.excluded && (
+                          <Button
+                            variant="secondary"
+                            disabled={busy}
+                            aria-label={`Исключить строку ${row.line}`}
+                            onClick={() => exclude(row.line, true)}
+                          >
+                            Исключить строку
+                          </Button>
+                        )}
                         {row.excluded && (
                           <>
                             {' · исключено '}
@@ -712,6 +887,14 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
               )}
             </p>
             {selected.source.rpe && <p>RPE: {selected.source.rpe}</p>}
+            {selected.blocking_issues.map((issue) => {
+              const value = selected.provider_fields?.[issue.field];
+              return value && sourceLabels[issue.field] ? (
+                <p key={issue.field}>
+                  {sourceLabels[issue.field]}: {value}
+                </p>
+              ) : null;
+            })}
             <p>{selected.blocking_issues.map((issue) => issue.message).join('. ')}</p>
             <Button
               variant="secondary"
@@ -872,10 +1055,32 @@ export function WorkoutHistoryImport({ onClose }: { onClose: () => void }) {
             </p>
           )}
           <p className="history-import__muted">
-            После подтверждения эти данные появятся в истории и статистике.
+            {preview.provider === 'fitnotes'
+              ? 'После подтверждения данные появятся в истории. Подходы без типа не попадут в рабочие показатели и рекорды.'
+              : 'После подтверждения эти данные появятся в истории и статистике.'}
           </p>
+          {preview.provider === 'fitnotes' && (
+            <div className="history-import__completion">
+              <p>
+                В файле нет отметок выполнения. Исключите невыполненные подходы перед сохранением.
+              </p>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={completionConfirmed}
+                  onChange={(event) => setCompletionConfirmed(event.target.checked)}
+                />
+                <span>Подтверждаю, что выбранные подходы выполнены</span>
+              </label>
+            </div>
+          )}
           <div className="history-import__actions">
-            <Button disabled={busy || !canConfirm} onClick={() => void confirm()}>
+            <Button
+              disabled={
+                busy || !canConfirm || (preview.provider === 'fitnotes' && !completionConfirmed)
+              }
+              onClick={() => void confirm()}
+            >
               Сохранить историю
             </Button>
             <Button variant="secondary" onClick={() => setStage('preview')}>

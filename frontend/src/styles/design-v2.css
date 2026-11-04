@@ -3799,9 +3799,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 430px) {
   .workout-adaptation-dialog__choice-row .ui-button {
     padding-inline: 4px;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .workout-adaptation-dialog__choice-row .ui-button {
     font-size: 0.75rem;
   }
 }
@@ -5081,6 +5087,17 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
     #appContent
     :where(button, a, input, select, textarea, summary):focus {
     scroll-margin-block: 16px 40%;
+  }
+
+  @supports (-moz-appearance: none) {
+    /* Firefox otherwise counts the keyboard clearance twice during input focus. */
+    html[data-yfc-keyboard='visible']
+      .app-shell--design-v2
+      #appContent
+      .active-workout-set.is-current
+      input:focus {
+      scroll-margin-block-end: 0;
+    }
   }
 }
 

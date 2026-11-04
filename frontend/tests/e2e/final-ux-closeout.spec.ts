@@ -370,11 +370,26 @@ async function exerciseDisclosures(page: Page, root: Locator, label: string) {
     await expect(glyph).toHaveCount(1);
     await expect(glyph).toHaveAttribute('aria-hidden', 'true');
     await summary.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
     await expect(summary).toBeFocused();
     await summary.press('Enter');
     await expect
       .poll(() => summary.evaluate((element) => element.closest('details')!.open))
       .toBe(!initial.open);
+    await expect
+      .poll(() =>
+        summary.evaluate((element) => {
+          const icon = element.querySelector(
+            'svg[data-icon^="chevron-"],svg[data-icon^="disclosure-"]',
+          );
+          return [
+            icon?.getAttribute('data-icon') ?? null,
+            icon ? getComputedStyle(icon).transform : null,
+          ];
+        }),
+      )
+      .not.toEqual([initial.icon, initial.iconTransform]);
     const state = await summary.evaluate((element) => {
       const icon = element.querySelector(
         'svg[data-icon^="chevron-"],svg[data-icon^="disclosure-"]',

@@ -35,6 +35,7 @@ class WorkoutExerciseNote(Base):
     exercise_id: Mapped[int] = mapped_column(Integer, nullable=False)
     context_key: Mapped[str] = mapped_column(String(64), nullable=False)
     source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_assignment_slot_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     plan_revision_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     week_type: Mapped[str | None] = mapped_column(String(8), nullable=True)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -2,7 +2,8 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import case, func
+from fastapi.encoders import jsonable_encoder
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.api.dependencies.auth import require_user
@@ -45,6 +46,10 @@ from fitminiapp_api.schemas.workout import (
     BodyMeasurementDefinitionUpdate,
     BodyMeasurementResponse,
     BodyMeasurementSave,
+    SessionRotationActionRequest,
+    SessionRotationPlanResponse,
+    SessionRotationStateResponse,
+    SessionRotationTransitionRequest,
     TrainingAnalyticsResponse,
     WarmupProposalApplyRequest,
     WarmupProposalApplyResponse,
@@ -73,6 +78,7 @@ from fitminiapp_api.schemas.workout import (
     WorkoutStatusResponse,
     WorkoutTodayResponse,
 )
+from fitminiapp_api.services import session_rotation
 from fitminiapp_api.services.activity_heatmap import build_activity_heatmap
 from fitminiapp_api.services.analytics import (
     build_training_analytics_for_range,
@@ -369,19 +375,40 @@ def _require_active_program(program: UserProgram) -> None:
         raise HTTPException(status_code=409, detail="Программа сейчас неактивна")
 
 
+def _visible_calendar_workouts(db: Session, workouts: list[UserWorkout]) -> list[UserWorkout]:
+    from fitminiapp_api.services.schedule_modes import calendar_active_on, mode_changes
+
+    changes = mode_changes(db, {row.user_program_id for row in workouts if row.user_program_id})
+    return [
+        row
+        for row in workouts
+        if row.status != "planned"
+        or row.rotation_epoch is not None
+        or calendar_active_on(changes.get(row.user_program_id or -1, []), row.scheduled_date)
+    ]
+
+
+def _require_visible_calendar_workout(db: Session, workout: UserWorkout) -> None:
+    if not _visible_calendar_workouts(db, [workout]):
+        raise HTTPException(status_code=409, detail="Эта дата не входит в действующее расписание")
+
+
 def _reconcile_program_completion(db: Session, program: UserProgram, current_user: User) -> None:
     db.flush()
+    if program.schedule_mode == "rotation":
+        return
     from fitminiapp_api.services.program_versioning import materialize_next_cycle_window
 
     materialize_next_cycle_window(db, program)
-    remaining_workout = (
-        db.query(UserWorkout.id)
+    remaining_workouts = (
+        db.query(UserWorkout)
         .filter(
             UserWorkout.user_program_id == program.id,
             UserWorkout.status.notin_({"completed", "skipped", "cancelled"}),
         )
-        .first()
+        .all()
     )
+    remaining_workout = next(iter(_visible_calendar_workouts(db, remaining_workouts)), None)
     if remaining_workout is None and program.status != "completed":
         previous_status = program.status
         program.status = "completed"
@@ -543,6 +570,7 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 "superset_order": item.superset_order,
                 "prescription": item.prescription,
                 "source_template_exercise_id": item.source_template_exercise_id,
+                "source_assignment_slot_id": item.source_assignment_slot_id,
                 "source_weekly_prescription_id": item.source_weekly_prescription_id,
                 "group_id": item.group_id,
                 "group_kind": item.group_kind,
@@ -620,11 +648,108 @@ def _materialize_user_cycle_window(
             UserProgram.user_id == current_user.id,
             UserProgram.is_active.is_(True),
             UserProgram.status.in_({"scheduled", "active"}),
+            UserProgram.schedule_mode == "calendar",
             UserProgram.workouts.any(UserWorkout.source_cycle_week.is_not(None)),
         )
         .all()
     )
     materialize_cycle_read_window(db, [program.id for program in programs], target_date, end)
+
+
+@router.get("/session-rotation", response_model=SessionRotationStateResponse)
+def get_session_rotation_state(
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        return session_rotation.state(db, current_user)
+    except session_rotation.SessionRotationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+def _rotation_action_error(
+    db: Session, user: User, error: session_rotation.SessionRotationError
+) -> HTTPException:
+    if error.status_code == 409:
+        try:
+            current = session_rotation.state(db, user)
+        except session_rotation.SessionRotationError:
+            pass
+        else:
+            return HTTPException(
+                status_code=409,
+                detail={"message": error.detail, "current": jsonable_encoder(current)},
+            )
+    return HTTPException(status_code=error.status_code, detail=error.detail)
+
+
+@router.post("/session-rotation/start", response_model=WorkoutTodayResponse)
+def start_session_rotation(
+    payload: SessionRotationActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        workout = session_rotation.create_session(db, current_user, payload)
+        return _serialize_workout(workout, db, current_user)
+    except session_rotation.SessionRotationError as exc:
+        db.rollback()
+        raise _rotation_action_error(db, current_user, exc) from exc
+    except ProgramError as exc:
+        db.rollback()
+        raise _rotation_action_error(
+            db, current_user, session_rotation.SessionRotationError(str(exc))
+        ) from exc
+
+
+@router.get("/session-rotation/plan", response_model=SessionRotationPlanResponse)
+def get_session_rotation_plan(
+    response: Response,
+    day_number: int = Query(ge=1),
+    week_number: int = Query(ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        return session_rotation.preview_plan(db, current_user, day_number, week_number)
+    except session_rotation.SessionRotationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post("/session-rotation/skip", response_model=SessionRotationStateResponse)
+def skip_session_rotation(
+    payload: SessionRotationActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        session_rotation.create_session(db, current_user, payload, skip=True)
+        return session_rotation.state(db, current_user)
+    except session_rotation.SessionRotationError as exc:
+        db.rollback()
+        raise _rotation_action_error(db, current_user, exc) from exc
+    except ProgramError as exc:
+        db.rollback()
+        raise _rotation_action_error(
+            db, current_user, session_rotation.SessionRotationError(str(exc))
+        ) from exc
+
+
+@router.post("/session-rotation/{action}", response_model=SessionRotationStateResponse)
+def transition_session_rotation(
+    action: Literal["cancel", "restore", "undo-skip"],
+    payload: SessionRotationTransitionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return session_rotation.transition(db, current_user, payload, action)
+    except session_rotation.SessionRotationError as exc:
+        db.rollback()
+        raise _rotation_action_error(db, current_user, exc) from exc
 
 
 @router.get("/today", response_model=WorkoutTodayResponse)
@@ -651,7 +776,7 @@ def get_today_workout(
         .order_by(UserWorkout.started_at.desc(), UserWorkout.id.desc())
         .first()
     )
-    workout = active_workout or (
+    candidates = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .options(
@@ -662,6 +787,7 @@ def get_today_workout(
             UserProgram.user_id == current_user.id,
             UserProgram.is_active.is_(True),
             UserProgram.status.in_({"scheduled", "active"}),
+            UserProgram.schedule_mode == "calendar",
             UserWorkout.scheduled_date == today,
             UserWorkout.status.in_({"planned", "completed"}),
         )
@@ -671,8 +797,9 @@ def get_today_workout(
             UserWorkout.completed_at.desc(),
             UserWorkout.id.desc(),
         )
-        .first()
+        .all()
     )
+    workout = active_workout or next(iter(_visible_calendar_workouts(db, candidates)), None)
 
     if not workout:
         raise HTTPException(status_code=404, detail="На сегодня тренировка не назначена")
@@ -949,6 +1076,10 @@ def get_week_schedule(
             UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date.between(week_start, week_end),
             UserWorkout.status != "cancelled",
+            or_(
+                UserProgram.schedule_mode == "calendar",
+                UserWorkout.status.in_({"in_progress", "completed", "skipped"}),
+            ),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
@@ -960,7 +1091,7 @@ def get_week_schedule(
             current_user,
             status_override="missed" if workout.id in missed_ids else None,
         )
-        for workout in workouts
+        for workout in _visible_calendar_workouts(db, workouts)
     ]
 
 
@@ -991,6 +1122,10 @@ def get_schedule(
             UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date.between(start, end),
             UserWorkout.status != "cancelled",
+            or_(
+                UserProgram.schedule_mode == "calendar",
+                UserWorkout.status.in_({"in_progress", "completed", "skipped"}),
+            ),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
@@ -1002,7 +1137,7 @@ def get_schedule(
             current_user,
             status_override="missed" if workout.id in missed_ids else None,
         )
-        for workout in workouts
+        for workout in _visible_calendar_workouts(db, workouts)
     ]
 
 
@@ -1280,6 +1415,9 @@ def delete_today_workout(
     program = _lock_program(db, workout.user_program_id)
     db.refresh(workout)
     _require_active_program(program)
+    if program.schedule_mode == "rotation":
+        raise HTTPException(status_code=409, detail="Используйте пропуск в очереди тренировок")
+    _require_visible_calendar_workout(db, workout)
     if workout.status == "in_progress":
         raise HTTPException(
             status_code=409,
@@ -1317,6 +1455,10 @@ def start_workout(
     workout = _get_user_workout_or_404(db, current_user, workout_id, lock=True)
     program = _workout_program_or_404(workout)
 
+    if program.schedule_mode == "rotation" and workout.rotation_epoch != program.rotation_epoch:
+        raise HTTPException(status_code=409, detail="Откройте текущую очередь тренировок")
+    if program.schedule_mode == "calendar":
+        _require_visible_calendar_workout(db, workout)
     if workout.status == "completed":
         raise HTTPException(status_code=409, detail="Тренировка уже завершена")
     _require_active_program(program)
@@ -1501,6 +1643,12 @@ def update_workout_set(
     changes = payload.model_dump(exclude_unset=True)
     expected_version = changes.pop("expected_version", None)
     mutation_id = changes.pop("mutation_id", None)
+    if "planned_target" in changes or (
+        expected_version is not None
+        and set_row.plan_version is not None
+        and expected_version < set_row.plan_version
+    ):
+        db.refresh(workout_exercise)
     if changes.get("is_completed") == "sides-v1":
         changes["is_completed"] = changes.pop("side_is_completed")
     # Exact retries depend on the original request, not today's mutable set state.
@@ -1536,6 +1684,16 @@ def update_workout_set(
             expected_version=expected_version,
             mutation_id=mutation_id,
         )
+        if "planned_target" in changes:
+            record_audit_event(
+                db,
+                actor_user_id=current_user.id,
+                target_user_id=program.user_id,
+                action="workout.set_plan_updated",
+                resource_type="user_workout_set",
+                resource_id=set_row.id,
+                details={"workout_id": workout.id, "set_version": set_row.version},
+            )
     except WorkoutSetSyncError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
@@ -1554,6 +1712,9 @@ def reschedule_workout(
     workout = _get_user_workout_or_404(db, current_user, workout_id, lock=True)
     program = _workout_program_or_404(workout)
     _require_active_program(program)
+    if program.schedule_mode == "rotation":
+        raise HTTPException(status_code=409, detail="В режиме очереди дата не задаёт порядок")
+    _require_visible_calendar_workout(db, workout)
     if workout.status != "planned":
         raise HTTPException(
             status_code=409,
@@ -1625,6 +1786,9 @@ def skip_workout(
     workout = _get_user_workout_or_404(db, current_user, workout_id, lock=True)
     program = _workout_program_or_404(workout)
     _require_active_program(program)
+    if program.schedule_mode == "rotation":
+        raise HTTPException(status_code=409, detail="Используйте пропуск в очереди тренировок")
+    _require_visible_calendar_workout(db, workout)
     if workout.status != "planned":
         raise HTTPException(
             status_code=409,

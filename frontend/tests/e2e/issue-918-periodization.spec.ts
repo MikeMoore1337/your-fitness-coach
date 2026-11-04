@@ -1,6 +1,20 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoHorizontalOverflow, installTelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
+import { scrollIntoStablePosition } from './fixtures/stable-position';
+
+async function openProgramSettings(builder: Locator) {
+  const settings = builder.locator('.program-builder-settings > summary');
+  await scrollIntoStablePosition(settings);
+  await settings.click();
+  await expect(settings).toHaveAttribute('aria-expanded', 'true');
+}
+
+async function enableBuilderPeriodization(builder: Locator) {
+  const periodization = builder.getByRole('checkbox', { name: /Включить периодизацию/ });
+  await scrollIntoStablePosition(periodization);
+  await periodization.check();
+}
 
 const exercises = [
   {
@@ -95,8 +109,8 @@ test('редактор сохраняет разные исходные неде
   await expect(builder).toBeVisible();
   await builder.getByRole('combobox', { name: 'Поиск упражнения' }).click();
   await page.getByRole('option', { name: /Жим штанги лёжа/ }).click();
-  await builder.getByText('Настройки программы').click();
-  await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+  await openProgramSettings(builder);
+  await enableBuilderPeriodization(builder);
   await builder.getByRole('spinbutton', { name: 'Исходных недель' }).fill('3');
   await builder.getByRole('spinbutton', { name: 'Всего недель' }).fill('16');
   await builder.getByRole('checkbox', { name: /Повторять исходный цикл/ }).check();
@@ -108,9 +122,13 @@ test('редактор сохраняет разные исходные неде
   await preview.getByRole('button', { name: 'Следующие недели' }).click();
   await expect(preview.getByText(/Неделя 16 · исходная 1 · проход 6/)).toBeVisible();
   await builder.getByRole('button', { name: 'Сохранить настройки' }).click();
-  await builder.getByRole('spinbutton', { name: 'Исходная неделя' }).fill('2');
+  const sourceWeek = builder.getByRole('spinbutton', { name: 'Исходная неделя' });
+  const addExercise = builder.getByRole('button', { name: 'Добавить упражнение', exact: true });
+  await sourceWeek.fill('2');
+  await expect(addExercise).toBeDisabled();
   await builder.getByRole('spinbutton', { name: 'Рабочие подходы' }).fill('5');
-  await builder.getByRole('spinbutton', { name: 'Исходная неделя' }).fill('1');
+  await sourceWeek.fill('1');
+  await expect(addExercise).toBeEnabled();
   await expect(builder.getByRole('spinbutton', { name: 'Рабочие подходы' })).toHaveValue('3');
   await builder.getByRole('button', { name: 'Проверить и назначить' }).click();
   await builder.getByRole('button', { name: 'Создать и назначить' }).click();
@@ -144,7 +162,7 @@ for (const theme of ['dark', 'light'] as const) {
         await builder.screenshot({
           path: `../docs/ux/issue-918-after/${testInfo.project.name}-${theme}-${width}-editor.png`,
         });
-      await builder.getByText('Настройки программы').click();
+      await openProgramSettings(builder);
       const shot = async (state: string) => {
         if (process.env.YFC_CAPTURE_918)
           await builder.locator('.program-builder-settings').screenshot({
@@ -152,7 +170,7 @@ for (const theme of ['dark', 'light'] as const) {
           });
       };
       await shot('off');
-      await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+      await enableBuilderPeriodization(builder);
       await builder.getByRole('spinbutton', { name: 'Исходных недель' }).fill('3');
       await builder.getByRole('spinbutton', { name: 'Всего недель' }).fill('3');
       await shot('single');
@@ -456,8 +474,8 @@ for (const mode of ['pwa', 'tma'] as const) {
         await installCycleApi(page);
         await page.goto('/app?section=programs&view=manage&start=create');
         const builder = page.locator('#program-builder');
-        await builder.getByText('Настройки программы').click();
-        await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+        await openProgramSettings(builder);
+        await enableBuilderPeriodization(builder);
         await builder.getByRole('spinbutton', { name: 'Исходных недель' }).fill('3');
         await builder.getByRole('spinbutton', { name: 'Всего недель' }).fill('16');
         await builder.getByRole('checkbox', { name: /Повторять исходный цикл/ }).check();
@@ -473,7 +491,17 @@ for (const mode of ['pwa', 'tma'] as const) {
         await expect(panel.getByRole('combobox', { name: 'Новый тип недели' })).toBeVisible();
         await panel.getByRole('combobox', { name: 'Новый тип недели' }).selectOption('light');
         await panel.getByRole('radio', { name: /Будущие повторы/ }).check();
-        await panel.getByRole('button', { name: 'Проверить изменения' }).click();
+        const preview = panel.getByRole('button', { name: 'Проверить изменения' });
+        await scrollIntoStablePosition(preview);
+        const [previewResponse] = await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              new URL(response.url()).pathname.endsWith('/cycle/week-type/preview'),
+          ),
+          preview.click(),
+        ]);
+        expect(previewResponse.ok()).toBe(true);
         await expect(panel.getByText('История сохранится')).toBeVisible();
         await panel.scrollIntoViewIfNeeded();
         if (process.env.YFC_CAPTURE_918)
@@ -497,8 +525,8 @@ test('настройка доступна внутри имитации Telegram
   await page.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: exercises }));
   await page.goto('/app?section=programs&view=manage&start=create');
   const builder = page.locator('#program-builder');
-  await builder.getByText('Настройки программы').click();
-  await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+  await openProgramSettings(builder);
+  await enableBuilderPeriodization(builder);
   await expect(builder.getByRole('spinbutton', { name: 'Исходных недель' })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
@@ -521,8 +549,8 @@ test('настройка доступна в имитации установле
     true,
   );
   const builder = page.locator('#program-builder');
-  await builder.getByText('Настройки программы').click();
-  await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+  await openProgramSettings(builder);
+  await enableBuilderPeriodization(builder);
   await expect(builder.getByRole('spinbutton', { name: 'Исходных недель' })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
@@ -533,8 +561,8 @@ test('числовые поля сохраняют фокус при умень�
   await page.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: exercises }));
   await page.goto('/app?section=programs&view=manage&start=create');
   const builder = page.locator('#program-builder');
-  await builder.getByText('Настройки программы').click();
-  await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+  await openProgramSettings(builder);
+  await enableBuilderPeriodization(builder);
   const input = builder.getByRole('spinbutton', { name: 'Всего недель' });
   await input.focus();
   await page.setViewportSize({ width: 393, height: 540 });
@@ -549,8 +577,8 @@ test('предпросмотр поддерживает 7/16 и 3/30', async ({ 
   await page.route('**/api/v1/programs/exercises', (route) => route.fulfill({ json: exercises }));
   await page.goto('/app?section=programs&view=manage&start=create');
   const builder = page.locator('#program-builder');
-  await builder.getByText('Настройки программы').click();
-  await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+  await openProgramSettings(builder);
+  await enableBuilderPeriodization(builder);
   const length = builder.getByRole('spinbutton', { name: 'Исходных недель' });
   const duration = builder.getByRole('spinbutton', { name: 'Всего недель' });
   await length.fill('7');
@@ -576,6 +604,7 @@ test('повторное открытие настроек с клавиатур
   const builder = page.locator('#program-builder');
   const trigger = builder.locator('.program-builder-settings > summary');
   for (let index = 0; index < 5; index += 1) {
+    await scrollIntoStablePosition(trigger);
     if (index % 2) {
       await trigger.focus();
       await trigger.press('Enter');
@@ -610,4 +639,78 @@ test('предпросмотр будущих повторов предупре�
   await panel.getByRole('button', { name: 'Вернуться' }).click();
   await expect(panel.getByRole('combobox', { name: 'Новый тип недели' })).toHaveValue('light');
   await expectNoHorizontalOverflow(page);
+});
+
+test('#920 две вкладки отклоняют устаревшую ревизию и повторяют после обновления', async ({
+  page,
+  context,
+}) => {
+  let revision = 4;
+  const attempts: { revision: number; weekType: string; weeks: number[] }[] = [];
+  const setup = async (tab: Page, weekType: 'light' | 'medium') => {
+    await installPlatformApi(tab, { browserSession: true, programHistory: 'many' });
+    await installCycleApi(tab);
+    await tab.route('**/api/v1/programs/assigned/77/lifecycle', (route) =>
+      route.fulfill({
+        json: {
+          program_id: 77,
+          status: 'active',
+          is_active: true,
+          duration_weeks: 10,
+          current_revision_number: revision,
+          current_week_number: 3,
+          current_block: null,
+          next_block: null,
+          next_workout: null,
+          next_deload: null,
+          restarted_from_program_id: null,
+        },
+      }),
+    );
+    await tab.route('**/api/v1/programs/assigned/77/cycle/week-type', (route) => {
+      const body = route.request().postDataJSON();
+      attempts.push({
+        revision: body.expected_revision_number,
+        weekType: body.week_type,
+        weeks: body.occurrence_weeks,
+      });
+      if (body.expected_revision_number !== revision)
+        return route.fulfill({ status: 409, json: { detail: 'Program revision conflict' } });
+      revision += 1;
+      return route.fulfill({ json: { current_revision_number: revision } });
+    });
+    await tab.goto('/app?section=programs&view=manage&panel=operations');
+    await tab.getByText('Периодизация и будущие недели').click();
+    const panel = tab.getByRole('region', { name: 'Периодизация назначения' });
+    await expect(panel.getByText(/Неделя 3 · исходная 1/)).toBeVisible();
+    await panel.getByRole('combobox', { name: 'Новый тип недели' }).selectOption(weekType);
+    await panel.getByRole('button', { name: 'Проверить изменения' }).click();
+    return panel;
+  };
+  const first = await setup(page, 'light');
+  const other = await context.newPage();
+  const second = await setup(other, 'medium');
+
+  const firstRefresh = page.waitForResponse((response) =>
+    response.url().endsWith('/programs/assigned/77/lifecycle'),
+  );
+  await first.getByRole('button', { name: 'Применить изменения' }).click();
+  await firstRefresh;
+  await expect.poll(() => revision).toBe(5);
+  await second.getByRole('button', { name: 'Применить изменения' }).click();
+  await expect(second.getByRole('alert')).toContainText('План уже изменился');
+  await second.getByRole('button', { name: 'Обновить план' }).click();
+  await expect(second.getByRole('combobox', { name: 'Новый тип недели' })).toHaveValue('medium');
+  await second.getByRole('button', { name: 'Проверить изменения' }).click();
+  const secondRefresh = other.waitForResponse((response) =>
+    response.url().endsWith('/programs/assigned/77/lifecycle'),
+  );
+  await second.getByRole('button', { name: 'Применить изменения' }).click();
+  await secondRefresh;
+  await expect.poll(() => revision).toBe(6);
+  expect(attempts).toEqual([
+    { revision: 4, weekType: 'light', weeks: [3] },
+    { revision: 4, weekType: 'medium', weeks: [3] },
+    { revision: 5, weekType: 'medium', weeks: [3] },
+  ]);
 });
