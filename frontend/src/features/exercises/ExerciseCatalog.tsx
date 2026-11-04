@@ -1,5 +1,5 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
 import type { CoachAssignedProgram, Exercise } from '../../shared/api/types';
@@ -64,6 +64,7 @@ export function ExerciseCatalog({
   const { active: activeProfile, query: profilesQuery } = useEquipmentProfiles(profileEnabled);
   const [availability, setAvailability] = useState<'available' | 'all'>('available');
   const [search, setSearch] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(
     () =>
       typeof window !== 'undefined' && (window.matchMedia?.('(max-width: 760px)').matches ?? false),
@@ -656,10 +657,13 @@ export function ExerciseCatalog({
         title="Упражнения"
         description="Найдите движение по названию, мышцам или доступному оборудованию."
       >
-        <div className="exercise-catalog__search top-gap">
+        <div
+          className={`exercise-catalog__search top-gap${search ? ' exercise-catalog__search--has-clear' : ''}`}
+        >
           <label className="field">
             <span>Поиск</span>
             <input
+              ref={searchInputRef}
               type="search"
               value={search}
               onChange={(event) => {
@@ -669,6 +673,21 @@ export function ExerciseCatalog({
               placeholder="Например, приседание или гантели"
             />
           </label>
+          {search && (
+            <button
+              type="button"
+              className="ui-icon-button exercise-catalog__search-clear"
+              aria-label="Очистить поиск"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                setSearch('');
+                setVisibleLimit(PAGE_SIZE);
+                searchInputRef.current?.focus({ preventScroll: true });
+              }}
+            >
+              <CloseIcon />
+            </button>
+          )}
         </div>
         {catalogFlow}
       </Card>
