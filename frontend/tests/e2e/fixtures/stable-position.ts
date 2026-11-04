@@ -1,7 +1,9 @@
 import { expect, type Locator } from '@playwright/test';
 
 export async function scrollIntoStablePosition(target: Locator) {
-  await target.scrollIntoViewIfNeeded();
+  await target.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' }),
+  );
   let previous: { x: number; y: number } | null = null;
   let stableSamples = 0;
   await expect

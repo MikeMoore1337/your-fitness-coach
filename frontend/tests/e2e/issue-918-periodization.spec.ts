@@ -459,8 +459,13 @@ for (const mode of ['pwa', 'tma'] as const) {
         await installCycleApi(page);
         await page.goto('/app?section=programs&view=manage&start=create');
         const builder = page.locator('#program-builder');
-        await builder.getByText('Настройки программы').click();
-        await builder.getByRole('checkbox', { name: /Включить периодизацию/ }).check();
+        const settings = builder.locator('.program-builder-settings > summary');
+        await scrollIntoStablePosition(settings);
+        await settings.click();
+        await expect(settings).toHaveAttribute('aria-expanded', 'true');
+        const periodization = builder.getByRole('checkbox', { name: /Включить периодизацию/ });
+        await scrollIntoStablePosition(periodization);
+        await periodization.check();
         await builder.getByRole('spinbutton', { name: 'Исходных недель' }).fill('3');
         await builder.getByRole('spinbutton', { name: 'Всего недель' }).fill('16');
         await builder.getByRole('checkbox', { name: /Повторять исходный цикл/ }).check();
