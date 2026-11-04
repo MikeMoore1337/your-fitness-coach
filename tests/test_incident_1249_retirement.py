@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import re
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -61,16 +64,33 @@ def test_rollback_uses_matching_compose_config_as_data(tmp_path: Path) -> None:
     environment = f"BACKEND_IMAGE=backend\nBOT_IMAGE=bot\nUNTRUSTED=$(touch '{injected}')\n"
     (app_root / ".env").write_text(environment, encoding="utf-8")
     (release / ".env").write_text(environment, encoding="utf-8")
+    source = (ROOT / "scripts/zero_downtime_deploy.py").read_text(encoding="utf-8")
+    parsed = ast.parse(source)
+    setting = next(
+        node
+        for node in parsed.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_deployment_setting"
+    )
+    setting_source = ast.get_source_segment(source, setting)
+    assert setting_source
+    scripts = release / "scripts"
+    scripts.mkdir()
+    (scripts / "zero_downtime_deploy.py").write_text(
+        "import os, re, sys\nfrom pathlib import Path\n\n"
+        + setting_source
+        + '\n\nif __name__ == "__main__":\n'
+        + '    Path(os.environ["CALLS_FILE"]).write_text("\\n".join(['
+        + 'os.environ["COMPOSE_PROJECT_NAME"], os.environ["DEPLOY_STATE_ROOT"], '
+        + 'os.environ["BACKEND_IMAGE"], os.environ["BOT_IMAGE"], *sys.argv[1:]]) + "\\n")\n',
+        encoding="utf-8",
+    )
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     ssh = bin_dir / "ssh"
     ssh.write_text('#!/bin/sh\nfor last do :; done\nexec /bin/bash -c "$last"\n', encoding="utf-8")
     ssh.chmod(0o755)
     python = bin_dir / "python3"
-    python.write_text(
-        '#!/bin/sh\nprintf "%s\\n%s\\n%s\\n%s\\n" "$COMPOSE_PROJECT_NAME" "$DEPLOY_STATE_ROOT" "${BACKEND_IMAGE-unset}" "${BOT_IMAGE-unset}" > "$CALLS_FILE"\n',
-        encoding="utf-8",
-    )
+    python.write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n', encoding="utf-8")
     python.chmod(0o755)
     calls = tmp_path / "calls"
     env = {
@@ -94,11 +114,25 @@ def test_rollback_uses_matching_compose_config_as_data(tmp_path: Path) -> None:
     assert calls.read_text(encoding="utf-8").splitlines() == [
         "fit-mini-app",
         str(state_root),
-        "unset",
-        "unset",
+        "backend",
+        "bot",
+        "rollback",
+        "a" * 40,
+        "https://app.example.test",
+        "https://example.test",
     ]
 
     calls.unlink()
+    incomplete = f"BACKEND_IMAGE=backend\nUNTRUSTED=$(touch '{injected}')\n"
+    (app_root / ".env").write_text(incomplete, encoding="utf-8")
+    (release / ".env").write_text(incomplete, encoding="utf-8")
+    result = subprocess.run(["/bin/bash", "-c", command], env=env, capture_output=True, text=True)
+
+    assert result.returncode != 0
+    assert "rollback requires BACKEND_IMAGE and BOT_IMAGE" in result.stderr
+    assert not calls.exists()
+    assert not injected.exists()
+
     (app_root / ".env").write_text(environment + "DIFFERENT=1\n", encoding="utf-8")
     result = subprocess.run(["/bin/bash", "-c", command], env=env, capture_output=True, text=True)
 

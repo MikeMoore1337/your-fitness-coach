@@ -953,4 +953,4 @@ jobs:
              export COMPOSE_PROJECT_NAME=fit-mini-app
              unset BACKEND_IMAGE BOT_IMAGE
              DEPLOY_STATE_ROOT='$PROD_PATH/.artifacts/operations/deployments' \
-             python3 scripts/zero_downtime_deploy.py rollback '$ACTIVE_REVISION' '$PROD_URL' '$PROD_PUBLIC_URL'"
+             python3 -c 'import os,sys; from scripts.zero_downtime_deploy import _deployment_setting; names=(\"BACKEND_IMAGE\",\"BOT_IMAGE\"); values={name:_deployment_setting(name,\"\").strip() for name in names}; all(values.values()) or sys.exit(\"rollback requires BACKEND_IMAGE and BOT_IMAGE\"); os.environ.update(values); os.execv(sys.executable,[sys.executable,\"scripts/zero_downtime_deploy.py\",\"rollback\",*sys.argv[1:]])' '$ACTIVE_REVISION' '$PROD_URL' '$PROD_PUBLIC_URL'"
