@@ -139,6 +139,43 @@ def test_selected_food_preview_uses_food_ids_and_preserves_unknown_values(client
     )
 
 
+@pytest.mark.parametrize("count", [1, 3, 6])
+def test_selected_food_batch_sizes_commit_once(client, count: int) -> None:
+    telegram_id = 28_200 + count
+    headers = _auth(client, telegram_id)
+    food_ids = [_store_food(f"Продукт {index}") for index in range(count)]
+    payload = {
+        "diary_date": _today().isoformat(),
+        "meal_type": "breakfast",
+        "items": [
+            {"row_id": f"row-{index}", "food_id": food_id, "amount": "100", "amount_unit": "g"}
+            for index, food_id in enumerate(food_ids)
+        ],
+    }
+    preview = client.post("/api/v1/nutrition/diary/batch/preview", headers=headers, json=payload)
+    assert preview.status_code == 200, preview.text
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_id).one()
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == 0
+    commit_headers = {**headers, "Idempotency-Key": f"batch-count-{count}-951"}
+    first = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit", headers=commit_headers, json=payload
+    )
+    replay = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit", headers=commit_headers, json=payload
+    )
+    assert first.status_code == replay.status_code == 201
+    assert first.json()["replayed"] is False and replay.json()["replayed"] is True
+    assert [item["food_id"] for item in first.json()["entries"]] == food_ids
+    assert [item["id"] for item in first.json()["entries"]] == [
+        item["id"] for item in replay.json()["entries"]
+    ]
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_id).one()
+        assert db.query(FoodDiaryBatchOperation).filter_by(user_id=user.id).count() == 1
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == count
+
+
 @pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
 def test_concurrent_batch_confirmation_with_same_key_is_replayed(client) -> None:
     headers = _auth(client, 28_096)

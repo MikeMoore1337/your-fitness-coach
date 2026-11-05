@@ -750,8 +750,16 @@ export function FoodPickerDialog({
     () => (searchQuery.length >= 2 ? search.data?.items : activeCollection.data?.items) ?? [],
     [activeCollection.data?.items, search.data?.items, searchQuery.length],
   );
-  const activeError = searchQuery.length >= 2 ? search.error : activeCollection.error;
-  const activeLoading = searchQuery.length >= 2 ? search.isFetching : activeCollection.isLoading;
+  const searchPending =
+    normalizedSearchInput !== searchQuery &&
+    (normalizedSearchInput.length >= 2 || searchQuery.length >= 2);
+  const activeError = searchPending
+    ? null
+    : searchQuery.length >= 2
+      ? search.error
+      : activeCollection.error;
+  const activeLoading =
+    searchPending || (searchQuery.length >= 2 ? search.isLoading : activeCollection.isLoading);
   const quantityMode = Boolean(draft.food || selectedRecipe);
   const selectedIds = useMemo(
     () => new Set(batch.items.map((item) => item.food.id)),
@@ -1662,10 +1670,11 @@ export function FoodPickerDialog({
                     className="nutrition-batch__tray"
                     data-empty={batch.items.length === 0 ? 'true' : undefined}
                   >
-                    <summary>
+                    <summary className="yfc-disclosure-summary">
                       <strong>Подборка · {batch.items.length}</strong>
                       <span className="nutrition-batch__open">Изменить</span>
                       <span className="nutrition-batch__close">Свернуть</span>
+                      <DisclosureIcon />
                     </summary>
                     <div className="nutrition-batch__items">
                       {batch.items.length === 0 && (
@@ -1703,6 +1712,9 @@ export function FoodPickerDialog({
                                 id={`nutrition-batch-${item.food.id}`}
                                 aria-label={`Количество: ${itemLabel}`}
                                 aria-invalid={invalid}
+                                aria-describedby={
+                                  invalid ? `nutrition-batch-error-${item.food.id}` : undefined
+                                }
                                 type="number"
                                 inputMode="decimal"
                                 min="0.001"
@@ -1737,7 +1749,11 @@ export function FoodPickerDialog({
                                 </small>
                               )}
                             {invalid && (
-                              <p className="nutrition-form-error" role="alert">
+                              <p
+                                id={`nutrition-batch-error-${item.food.id}`}
+                                className="nutrition-form-error"
+                                role="alert"
+                              >
                                 Введите количество больше нуля.
                               </p>
                             )}
@@ -1807,7 +1823,9 @@ export function FoodPickerDialog({
                 )}
                 {importExternal.error && (
                   <p className="nutrition-form-error" role="alert">
-                    {importExternal.error instanceof ApiError && importExternal.error.status === 409
+                    {importExternal.error instanceof ApiError &&
+                    importExternal.error.status === 409 &&
+                    importExternal.variables?.barcode
                       ? 'Продукт с таким штрихкодом уже есть с другими данными. Проверьте источник.'
                       : 'Не удалось сохранить продукт. Попробуйте снова.'}
                   </p>

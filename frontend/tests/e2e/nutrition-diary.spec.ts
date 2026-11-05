@@ -2221,114 +2221,118 @@ test('variant B keeps the first result visible in mocked TMA with safe-area inse
   await expect(search).toHaveValue('рис');
 });
 
-test('951 batch keeps search, first result and confirmation visible with a mocked TMA keyboard', async ({
-  page,
-}, info) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await installTelegramHarness(page, {
-    colorScheme: 'dark',
-    viewportHeight: 844,
-    viewportStableHeight: 844,
-    safeAreaInset: { top: 24, right: 0, bottom: 20, left: 0 },
-    contentSafeAreaInset: { top: 24, right: 0, bottom: 20, left: 0 },
-  });
-  await mockNutritionApi(page);
-  await page.route('**/api/v1/nutrition/diary/batch/preview', (route) =>
-    route.fulfill({
-      json: {
-        energy_kcal: '130',
-        protein_g: '2',
-        fat_g: '1',
-        carbs_g: '28',
-        fiber_g: null,
-      },
-    }),
-  );
-  await page.route('**/api/v1/nutrition/foods/search*', (route) =>
-    route.fulfill({
-      json: {
-        items: [
-          { ...importedRiceFood, nutrition_basis_kind: 'per_100_g' },
-          { ...verifiedRiceFood, nutrition_basis_kind: 'per_100_g' },
-        ],
-        external_items: [],
-        total: 2,
-        limit: 20,
-        offset: 0,
-        provider_status: 'not_requested',
-      },
-    }),
-  );
-  await page.goto('/app?section=nutrition');
-  await page
-    .getByRole('region', { name: 'Завтрак' })
-    .getByRole('button', { name: /Добавить/ })
-    .click();
-  const search = page.getByRole('searchbox', { name: 'Найти продукт' });
-  await search.fill('рис');
-  const first = page.locator('.nutrition-food-result--picker').first();
-  await first.getByRole('button', { name: /в подборку/ }).click();
-  const confirm = page.getByRole('button', { name: 'Добавить в дневник', exact: true });
-  await expect(confirm).toBeEnabled();
-  await search.focus();
-  await page.setViewportSize({ width: 390, height: 420 });
-  await expect
-    .poll(() =>
-      page.evaluate(() => document.documentElement.style.getPropertyValue('--yfc-viewport-height')),
-    )
-    .toBe('420px');
-  const geometry = await page.evaluate(() => {
-    const viewport = window.visualViewport;
-    const searchInput = document.querySelector<HTMLElement>('#nutrition-food-search');
-    const title = document.querySelector<HTMLElement>(
-      '.nutrition-food-result--picker .nutrition-food-result__main strong',
+for (const theme of ['light', 'dark'] as const) {
+  test(`951 batch keeps search, first result and confirmation visible with a mocked TMA keyboard ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await installTelegramHarness(page, {
+      colorScheme: theme,
+      viewportHeight: 844,
+      viewportStableHeight: 844,
+      safeAreaInset: { top: 24, right: 0, bottom: 20, left: 0 },
+      contentSafeAreaInset: { top: 24, right: 0, bottom: 20, left: 0 },
+    });
+    await mockNutritionApi(page);
+    await page.route('**/api/v1/nutrition/diary/batch/preview', (route) =>
+      route.fulfill({
+        json: {
+          energy_kcal: '130',
+          protein_g: '2',
+          fat_g: '1',
+          carbs_g: '28',
+          fiber_g: null,
+        },
+      }),
     );
-    const facts = document.querySelector<HTMLElement>(
-      '.nutrition-food-result--picker .nutrition-food-result__main span',
+    await page.route('**/api/v1/nutrition/foods/search*', (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            { ...importedRiceFood, nutrition_basis_kind: 'per_100_g' },
+            { ...verifiedRiceFood, nutrition_basis_kind: 'per_100_g' },
+          ],
+          external_items: [],
+          total: 2,
+          limit: 20,
+          offset: 0,
+          provider_status: 'not_requested',
+        },
+      }),
     );
-    const footer = document.querySelector<HTMLElement>('.nutrition-batch__footer');
-    const button = footer?.querySelector<HTMLElement>('button');
-    if (!viewport || !searchInput || !title || !facts || !footer || !button)
-      throw new Error('Missing batch keyboard geometry nodes');
-    const visible = (element: HTMLElement, bottom = viewport.height) => {
-      const bounds = element.getBoundingClientRect();
-      return bounds.top >= viewport.offsetTop - 0.5 && bounds.bottom <= bottom + 0.5;
-    };
-    return {
-      searchVisible: visible(searchInput),
-      titleVisible: visible(title, footer.getBoundingClientRect().top),
-      factsVisible: visible(facts, footer.getBoundingClientRect().top),
-      buttonVisible: visible(button),
-      scrollY: window.scrollY,
-      flowScrollTop: document.querySelector<HTMLElement>('.nutrition-picker__search-flow')
-        ?.scrollTop,
-      bounds: Object.fromEntries(
-        Object.entries({ searchInput, title, facts, footer, button }).map(([name, element]) => [
-          name,
-          {
-            top: element.getBoundingClientRect().top,
-            bottom: element.getBoundingClientRect().bottom,
-          },
-        ]),
-      ),
-    };
+    await page.goto('/app?section=nutrition');
+    await page
+      .getByRole('region', { name: 'Завтрак' })
+      .getByRole('button', { name: /Добавить/ })
+      .click();
+    const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+    await search.fill('рис');
+    const first = page.locator('.nutrition-food-result--picker').first();
+    await first.getByRole('button', { name: /в подборку/ }).click();
+    const confirm = page.getByRole('button', { name: 'Добавить в дневник', exact: true });
+    await expect(confirm).toBeEnabled();
+    await search.focus();
+    await page.setViewportSize({ width: 390, height: 420 });
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.documentElement.style.getPropertyValue('--yfc-viewport-height'),
+        ),
+      )
+      .toBe('420px');
+    const geometry = await page.evaluate(() => {
+      const viewport = window.visualViewport;
+      const searchInput = document.querySelector<HTMLElement>('#nutrition-food-search');
+      const title = document.querySelector<HTMLElement>(
+        '.nutrition-food-result--picker .nutrition-food-result__main strong',
+      );
+      const facts = document.querySelector<HTMLElement>(
+        '.nutrition-food-result--picker .nutrition-food-result__main span',
+      );
+      const footer = document.querySelector<HTMLElement>('.nutrition-batch__footer');
+      const button = footer?.querySelector<HTMLElement>('button');
+      if (!viewport || !searchInput || !title || !facts || !footer || !button)
+        throw new Error('Missing batch keyboard geometry nodes');
+      const visible = (element: HTMLElement, bottom = viewport.height) => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.top >= viewport.offsetTop - 0.5 && bounds.bottom <= bottom + 0.5;
+      };
+      return {
+        searchVisible: visible(searchInput),
+        titleVisible: visible(title, footer.getBoundingClientRect().top),
+        factsVisible: visible(facts, footer.getBoundingClientRect().top),
+        buttonVisible: visible(button),
+        scrollY: window.scrollY,
+        flowScrollTop: document.querySelector<HTMLElement>('.nutrition-picker__search-flow')
+          ?.scrollTop,
+        bounds: Object.fromEntries(
+          Object.entries({ searchInput, title, facts, footer, button }).map(([name, element]) => [
+            name,
+            {
+              top: element.getBoundingClientRect().top,
+              bottom: element.getBoundingClientRect().bottom,
+            },
+          ]),
+        ),
+      };
+    });
+    await page.screenshot({ path: info.outputPath('keyboard-diagnostic.png') });
+    console.log('951_KEYBOARD_GEOMETRY', JSON.stringify(geometry));
+    expect(geometry).toMatchObject({
+      searchVisible: true,
+      titleVisible: true,
+      factsVisible: true,
+      buttonVisible: true,
+      scrollY: 0,
+      flowScrollTop: 0,
+    });
+    const dir = resolve('..', 'docs', 'ux-proposals', 'issue-951', 'after');
+    await mkdir(dir, { recursive: true });
+    await page.screenshot({
+      path: resolve(dir, `tma-${info.project.name}-390x420-${theme}-keyboard.png`),
+    });
   });
-  await page.screenshot({ path: info.outputPath('keyboard-diagnostic.png') });
-  console.log('951_KEYBOARD_GEOMETRY', JSON.stringify(geometry));
-  expect(geometry).toMatchObject({
-    searchVisible: true,
-    titleVisible: true,
-    factsVisible: true,
-    buttonVisible: true,
-    scrollY: 0,
-    flowScrollTop: 0,
-  });
-  const dir = resolve('..', 'docs', 'ux-proposals', 'issue-951', 'after');
-  await mkdir(dir, { recursive: true });
-  await page.screenshot({
-    path: resolve(dir, `tma-${info.project.name}-390x420-dark-keyboard.png`),
-  });
-});
+}
 
 test('Russian search shows separate preparation states with their own macros', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

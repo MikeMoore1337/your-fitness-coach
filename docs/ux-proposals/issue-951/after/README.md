@@ -29,6 +29,6 @@
 
 Длинные названия и способы приготовления, 393×844: [Chromium Light](chromium-393x844-light-long-names.png), [Chromium Dark](chromium-393x844-dark-long-names.png), [WebKit Light](webkit-393x844-light-long-names.png), [WebKit Dark](webkit-393x844-dark-long-names.png).
 
-Открытая клавиатура при моделировании Telegram Mini App, уменьшенный viewport 390×420, Dark: [Chromium](tma-chromium-390x420-dark-keyboard.png), [WebKit](tma-webkit-390x420-dark-keyboard.png). Это эмуляция safe-area и viewport, а не проверка на физическом телефоне или в настоящем клиенте Telegram.
+Открытая клавиатура при моделировании Telegram Mini App, уменьшенный viewport 390×420: [Chromium Light](tma-chromium-390x420-light-keyboard.png), [Chromium Dark](tma-chromium-390x420-dark-keyboard.png), [WebKit Light](tma-webkit-390x420-light-keyboard.png), [WebKit Dark](tma-webkit-390x420-dark-keyboard.png). Это эмуляция safe-area и viewport, а не проверка на физическом телефоне или в настоящем клиенте Telegram.
 
 Проверены отсутствие горизонтального переполнения в основной матрице, управление выбором с клавиатуры, возвращение фокуса после Escape, `aria-pressed`, reduced motion и контраст текста выбранной кнопки на её вычисленном фоне. Полная проверка screen reader, zoom и физические iOS/Android/TMA остаются непроверенными.

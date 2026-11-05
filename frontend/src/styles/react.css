@@ -9542,6 +9542,10 @@ html[data-yfc-keyboard='visible'] .nutrition-picker {
 .nutrition-batch__tray > summary::-webkit-details-marker {
   display: none;
 }
+.nutrition-batch__tray > summary strong {
+  flex: 1;
+  min-width: 0;
+}
 .nutrition-batch__tray > summary span {
   color: var(--muted);
   font-size: 0.75rem;
@@ -9632,6 +9636,9 @@ html[data-yfc-keyboard='visible'] .nutrition-picker {
 @media (max-width: 640px) {
   html[data-yfc-keyboard='visible'] .nutrition-batch__tray[data-empty='true']:not([open]) {
     display: none;
+  }
+  html[data-yfc-keyboard='visible'] .nutrition-batch__tray > summary {
+    padding-block: 6px;
   }
   html[data-yfc-keyboard='visible'] .nutrition-picker__panel--batch .nutrition-picker__header {
     padding-block: 6px;

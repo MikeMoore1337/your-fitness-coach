@@ -174,6 +174,7 @@ describe('FoodPicker batch selection', () => {
     });
     fireEvent.change(amount, { target: { value: '0' } });
     expect(screen.getByText('Введите количество больше нуля.')).toBeVisible();
+    expect(amount).toHaveAccessibleDescription('Введите количество больше нуля.');
     expect(screen.getByRole('button', { name: 'Добавить в дневник' })).toBeDisabled();
     fireEvent.change(amount, { target: { value: '150' } });
     fireEvent.click(
@@ -456,5 +457,33 @@ describe('FoodPicker batch selection', () => {
     renderPicker();
     expect(await screen.findByText('Подборка · 0')).toBeVisible();
     expect(apiMock.mock.calls.some(([path]) => path.endsWith('/commit'))).toBe(false);
+  });
+
+  it('does not leave a stale result clickable while a new search is being prepared', async () => {
+    apiMock.mockImplementation((path: string) =>
+      Promise.resolve({
+        items: path.includes('/foods/search') ? [{ ...baseFood, name: 'Другой продукт' }] : foods,
+        total: 1,
+        limit: 20,
+        offset: 0,
+      }),
+    );
+    renderPicker();
+    await screen.findByRole('button', { name: 'Выбрать Йогурт натуральный, Марка А' });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Найти продукт' }), {
+      target: { value: 'д' },
+    });
+    expect(
+      screen.getByRole('button', { name: 'Выбрать Йогурт натуральный, Марка А' }),
+    ).toBeVisible();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Найти продукт' }), {
+      target: { value: 'другой продукт' },
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Выбрать Йогурт натуральный, Марка А' }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Выбрать Другой продукт, Марка А' }),
+    ).toBeVisible();
   });
 });
