@@ -130,9 +130,12 @@ def _calculate_amount(
     amount_unit: DiaryAmountUnit,
 ) -> FoodNutrition:
     try:
-        return calculate_food_amount(food, amount, amount_unit)
+        calculation = calculate_food_amount(food, amount, amount_unit)
     except FoodError as exc:
         raise FoodDiaryError(str(exc)) from exc
+    if calculation.energy_kcal is None:
+        raise FoodDiaryError("food has no known energy value")
+    return calculation
 
 
 def _recipe_as_food(calculation: RecipeCalculation) -> Food:
@@ -611,10 +614,10 @@ def create_food_diary_batch(
                 day_scope=True,
             )
             record_progress_weekly_action_completion(db, user, "nutrition")
+        db.flush()
+        response = _batch_response(db, operation, replayed=False)
         if commit:
             db.commit()
-        else:
-            db.flush()
     except FoodDiaryError:
         db.rollback()
         raise
@@ -624,7 +627,7 @@ def create_food_diary_batch(
         if replay is None:
             raise FoodDiaryConflictError("batch diary request could not be completed")
         return replay
-    return _batch_response(db, operation, replayed=False)
+    return response
 
 
 def update_food_diary_entry(

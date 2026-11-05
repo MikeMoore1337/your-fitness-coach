@@ -1222,6 +1222,75 @@ def test_diary_uses_per_100_ml_snapshot_without_fabricating_grams(client) -> Non
         assert entry.legacy_protein_g_per_100g == Decimal("0.000")
 
 
+def test_batch_preview_and_commit_keep_volume_and_unknown_serving_mass(client) -> None:
+    headers = _auth(client, 128_108)
+    examples = [
+        (
+            "Напиток",
+            "per_100_ml",
+            "ml",
+            "Per 100 ml\nEnergy 40 kcal\nProtein 2 g\nFat 1 g\nCarbohydrate 5 g",
+        ),
+        (
+            "Порция",
+            "per_serving",
+            "serving",
+            "Per serving\nEnergy 250 kcal\nProtein 10 g\nFat 5 g\nCarbohydrate 30 g",
+        ),
+    ]
+    ids = []
+    with get_session_context() as db:
+        for name, basis, unit, text in examples:
+            food = Food(
+                name=name,
+                brand="YFC Test",
+                energy_kcal_per_100g=None,
+                protein_g_per_100g=None,
+                fat_g_per_100g=None,
+                carbs_g_per_100g=None,
+                fiber_g_per_100g=None,
+                nutrition_basis_kind=basis,
+                nutrition_basis_amount=Decimal("1" if unit == "serving" else "100"),
+                nutrition_basis_unit=unit,
+                canonical_facts=build_draft_from_ocr(text).model_dump(mode="json"),
+                canonical_complete=True,
+                catalog_quality="community_unverified",
+                food_type="branded",
+                owner_user_id=None,
+                provenance="user_confirmed_package",
+                source_name="yfc_community",
+                source_version="nutrition-label-local-v1",
+                trust_level="unverified",
+                status="active",
+            )
+            db.add(food)
+            db.flush()
+            ids.append(food.id)
+    payload = {
+        "diary_date": date.today().isoformat(),
+        "meal_type": "lunch",
+        "items": [
+            {"row_id": "drink", "food_id": ids[0], "amount": "250", "amount_unit": "ml"},
+            {"row_id": "serving", "food_id": ids[1], "amount": "2", "amount_unit": "serving"},
+        ],
+    }
+    preview = client.post("/api/v1/nutrition/diary/batch/preview", headers=headers, json=payload)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["energy_kcal"] == "600.00"
+    assert preview.json()["fiber_g"] is None
+    commit = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit",
+        headers={**headers, "Idempotency-Key": "batch-units-951"},
+        json=payload,
+    )
+    assert commit.status_code == 201, commit.text
+    entries = commit.json()["entries"]
+    assert [entry["food_id"] for entry in entries] == ids
+    assert [entry["amount_unit"] for entry in entries] == ["ml", "serving"]
+    assert [entry["weight_g"] for entry in entries] == [None, None]
+    assert [entry["nutrition"]["fiber_g"] for entry in entries] == [None, None]
+
+
 def test_account_deletion_removes_draft_and_anonymizes_shared_contribution(
     client, monkeypatch
 ) -> None:

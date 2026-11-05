@@ -43,6 +43,7 @@ from fitminiapp_api.services.food_diary import (
 from fitminiapp_api.services.food_search_aliases import normalize_food_search_query
 from fitminiapp_api.services.foods import (
     FoodError,
+    FoodNotFoundError,
     FoodNutrition,
     calculate_food_amount,
     calculate_food_nutrition,
@@ -776,6 +777,27 @@ def commit_natural_input(
         idempotency_key=idempotency_key,
         operation_kind="natural_input",
     )
+
+
+def preview_selected_foods(
+    db: Session,
+    user: User,
+    payload: NaturalInputCommitRequest,
+) -> FoodDiaryNutrition:
+    if len({item.row_id for item in payload.items}) != len(payload.items):
+        raise NutritionPowerError("natural input rows must be unique")
+    values = []
+    for item in payload.items:
+        try:
+            food = get_visible_food(db, user, item.food_id)
+            values.append(
+                _required_nutrition(calculate_food_amount(food, item.amount, item.amount_unit))
+            )
+        except FoodNotFoundError as exc:
+            raise NutritionPowerNotFoundError("food not found") from exc
+        except FoodError as exc:
+            raise NutritionPowerError(str(exc)) from exc
+    return _sum_nutrition(values)
 
 
 def _alias_response(db: Session, user: User, alias: FoodSearchAlias) -> FoodSearchAliasResponse:

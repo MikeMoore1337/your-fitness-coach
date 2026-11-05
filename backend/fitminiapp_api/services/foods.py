@@ -439,6 +439,8 @@ def _serialize_food(
         name=food.name,
         brand=food.brand,
         barcode=food.barcode,
+        source_name=food.source_name,
+        external_id=food.external_id,
         energy_kcal_per_100g=cast(Decimal, food.energy_kcal_per_100g),
         protein_g_per_100g=cast(Decimal, food.protein_g_per_100g),
         fat_g_per_100g=cast(Decimal, food.fat_g_per_100g),

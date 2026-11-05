@@ -217,6 +217,8 @@ class FoodResponse(BaseModel):
     name: str
     brand: str | None
     barcode: str | None
+    source_name: str | None = None
+    external_id: str | None = None
     energy_kcal_per_100g: Decimal | None
     protein_g_per_100g: Decimal | None
     fat_g_per_100g: Decimal | None

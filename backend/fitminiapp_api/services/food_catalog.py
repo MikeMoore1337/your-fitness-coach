@@ -5,7 +5,6 @@ import time
 from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from decimal import Decimal
 from threading import Lock
 
 from sqlalchemy.orm import Session
@@ -151,77 +150,26 @@ def _normalized_identity(value: str | None) -> str:
     return normalize_food_search_query(value or "")
 
 
-def _macros_match(left: ProviderFood, right: ProviderFood) -> bool:
-    return (
-        abs(left.energy_kcal_per_100g - right.energy_kcal_per_100g) <= Decimal("0.5")
-        and abs(left.protein_g_per_100g - right.protein_g_per_100g) <= Decimal("0.1")
-        and abs(left.fat_g_per_100g - right.fat_g_per_100g) <= Decimal("0.1")
-        and abs(left.carbs_g_per_100g - right.carbs_g_per_100g) <= Decimal("0.1")
-    )
-
-
-def _weak_provider_duplicate(left: ProviderFood, right: ProviderFood) -> bool:
-    return (
-        left.barcode is None
-        and right.barcode is None
-        and _normalized_identity(left.name) == _normalized_identity(right.name)
-        and _normalized_identity(left.brand) == _normalized_identity(right.brand)
-        and _macros_match(left, right)
-    )
-
-
-def _weak_local_duplicate(local: FoodResponse, external: ProviderFood) -> bool:
-    local_energy = local.energy_kcal_per_100g
-    local_protein = local.protein_g_per_100g
-    local_fat = local.fat_g_per_100g
-    local_carbs = local.carbs_g_per_100g
-    if any(value is None for value in (local_energy, local_protein, local_fat, local_carbs)):
-        return False
-    return (
-        local.barcode is None
-        and external.barcode is None
-        and _normalized_identity(local.name) == _normalized_identity(external.name)
-        and _normalized_identity(local.brand) == _normalized_identity(external.brand)
-        and local_energy is not None
-        and local_protein is not None
-        and local_fat is not None
-        and local_carbs is not None
-        and abs(local_energy - external.energy_kcal_per_100g) <= Decimal("0.5")
-        and abs(local_protein - external.protein_g_per_100g) <= Decimal("0.1")
-        and abs(local_fat - external.fat_g_per_100g) <= Decimal("0.1")
-        and abs(local_carbs - external.carbs_g_per_100g) <= Decimal("0.1")
-    )
-
-
 def deduplicate_provider_foods(
-    local_items: list[FoodResponse],
+    _local_items: list[FoodResponse],
     external_items: list[ProviderFood],
 ) -> tuple[list[ProviderFood], int]:
     kept: list[ProviderFood] = []
-    local_barcodes = {item.barcode for item in local_items if item.barcode is not None}
-    seen_provider_ids: set[tuple[str, str]] = set()
-    seen_barcodes: set[str] = set()
+    seen_provider_ids: set[tuple[str, str, str | None, str, str]] = set()
     removed = 0
     for candidate in external_items:
-        provider_identity = (candidate.provider, candidate.external_id)
+        provider_identity = (
+            candidate.provider,
+            candidate.external_id,
+            candidate.barcode,
+            _normalized_identity(candidate.name),
+            _normalized_identity(candidate.brand),
+        )
         if provider_identity in seen_provider_ids:
-            removed += 1
-            continue
-        if candidate.barcode is not None and (
-            candidate.barcode in local_barcodes or candidate.barcode in seen_barcodes
-        ):
-            removed += 1
-            continue
-        if any(_weak_local_duplicate(local, candidate) for local in local_items):
-            removed += 1
-            continue
-        if any(_weak_provider_duplicate(existing, candidate) for existing in kept):
             removed += 1
             continue
         kept.append(candidate)
         seen_provider_ids.add(provider_identity)
-        if candidate.barcode is not None:
-            seen_barcodes.add(candidate.barcode)
     return kept, removed
 
 

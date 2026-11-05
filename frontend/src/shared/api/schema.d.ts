@@ -4931,6 +4931,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/diary/batch/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Diary Batch */
+        post: operations["preview_diary_batch_api_v1_nutrition_diary_batch_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/diary/natural-input/commit": {
         parameters: {
             query?: never;
@@ -12427,6 +12444,10 @@ export interface components {
             brand: string | null;
             /** Barcode */
             barcode: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** External Id */
+            external_id?: string | null;
             /** Energy Kcal Per 100G */
             energy_kcal_per_100g: string | null;
             /** Protein G Per 100G */
@@ -31512,6 +31533,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NaturalInputPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_diary_batch_api_v1_nutrition_diary_batch_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NaturalInputCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryNutrition"];
                 };
             };
             /** @description Validation Error */

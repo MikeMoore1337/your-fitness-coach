@@ -42,6 +42,7 @@ from fitminiapp_api.schemas.food_diary import (
     FoodDiaryEntryCreate,
     FoodDiaryEntryResponse,
     FoodDiaryEntryUpdate,
+    FoodDiaryNutrition,
     MealType,
 )
 from fitminiapp_api.schemas.grocery_list import (
@@ -223,6 +224,7 @@ from fitminiapp_api.services.nutrition_power import (
     list_food_search_aliases,
     list_meal_templates,
     preview_natural_input,
+    preview_selected_foods,
     update_food_search_alias,
     update_meal_template,
 )
@@ -1253,6 +1255,18 @@ def preview_nutrition_natural_input(
 ):
     try:
         return preview_natural_input(db, current_user, payload.text)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.post("/diary/batch/preview", response_model=FoodDiaryNutrition)
+def preview_diary_batch(
+    payload: NaturalInputCommitRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_selected_foods(db, current_user, payload)
     except NutritionPowerError as exc:
         _raise_nutrition_power_http_error(exc)
 

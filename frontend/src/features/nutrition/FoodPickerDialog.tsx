@@ -1,5 +1,5 @@
 import { TimeInput } from '../../shared/ui/PickerInput';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { ApiError, api } from '../../shared/api/client';
@@ -9,14 +9,16 @@ import type {
   FoodBarcodeLookup,
   FoodDiaryEntry,
   FoodDiaryBatchResponse,
+  FoodDiaryNutrition,
   FoodList,
   FoodSearch,
   NutritionLabelConfirmResponse,
+  NaturalInputCommitRequest,
   PhotoMealConfirmResponse,
   Recipe,
   UserFoodCreate,
 } from '../../shared/api/types';
-import { usePersistentState } from '../../shared/storage';
+import { usePersistentState, writeStorage } from '../../shared/storage';
 import { Icon } from '../../shared/ui/Icon';
 import { foodDraftStorageKey } from '../../shared/userScopedStorage';
 import { invalidateNutritionSummaries } from '../../shared/queryKeys';
@@ -132,6 +134,16 @@ interface AddDraft {
   requestId?: string;
 }
 
+type BatchItem = {
+  food: Food;
+  amount: string;
+  amountUnit: FoodAmountUnit;
+  sourceLabel: string;
+  externalKey?: string;
+};
+
+type BatchDraft = { items: BatchItem[]; requestId: string; pending: boolean };
+
 const emptyQuickAdd: QuickAddDraft = {
   name: '',
   calories: '',
@@ -149,12 +161,30 @@ function newEntryRequestId(): string {
   return `entry-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function foodSourceLabel(food: Pick<Food, 'food_type' | 'catalog_quality'>): string {
+function foodSourceLabel(
+  food: Pick<Food, 'food_type' | 'catalog_quality'> &
+    Partial<Pick<Food, 'source_name' | 'external_id'>>,
+): string {
+  if (food.external_id && food.source_name === 'open_food_facts') return 'Open Food Facts';
+  if (food.external_id && food.source_name === 'usda_fdc') return 'USDA';
+  if (food.external_id && food.source_name) return food.source_name;
   if (food.catalog_quality === 'community_unverified') return 'Добавлено пользователем';
   if (food.catalog_quality === 'verified') return 'Проверено YFC';
   if (food.food_type === 'user') return 'Мой продукт';
   if (food.food_type === 'branded') return 'Брендовый';
   return 'Каталог';
+}
+
+function foodIdentityLabel(food: Food, duplicate = false): string {
+  return [
+    food.name,
+    food.brand,
+    food.external_id ? `${foodSourceLabel(food)} ${food.external_id}` : null,
+    food.barcode ? `штрихкод ${food.barcode}` : null,
+    duplicate ? `продукт ${food.id}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
 }
 
 function isUserFood(food: Pick<Food, 'food_type'>): boolean {
@@ -205,26 +235,78 @@ function foodAmountUnit(
   return food.standard_serving_weight_g ? 'serving' : 'g';
 }
 
-function foodEnergyValue(
-  food: Pick<Food, 'energy_kcal_per_100g' | 'canonical_facts'>,
-): string | null {
-  if (food.energy_kcal_per_100g !== null) return food.energy_kcal_per_100g;
-  const normalized = food.canonical_facts?.normalized_facts;
-  if (!normalized || typeof normalized !== 'object') return null;
-  const value = (normalized as { energy_kcal?: { value?: unknown } }).energy_kcal?.value;
-  return value === null || value === undefined ? null : String(value);
+function foodAmountUnits(food: Food): FoodAmountUnit[] {
+  const units: FoodAmountUnit[] = [];
+  const basis = food.nutrition_basis_kind ?? 'per_100_g';
+  const servingSize = food.canonical_facts?.serving_size;
+  const servingUnit =
+    servingSize && typeof servingSize === 'object' && 'unit' in servingSize
+      ? servingSize.unit
+      : undefined;
+  if (basis === 'per_100_g' || (basis === 'per_serving' && servingUnit === 'g')) units.push('g');
+  if (basis === 'per_100_ml' || (basis === 'per_serving' && servingUnit === 'ml')) units.push('ml');
+  if (
+    basis === 'per_serving' ||
+    (basis === 'per_100_g' && (food.standard_serving_weight_g || servingUnit === 'g')) ||
+    (basis === 'per_100_ml' && servingUnit === 'ml')
+  )
+    units.push('serving');
+  return units;
+}
+
+type FoodFact = { value?: string | number | null; basis_ref?: string; evidence?: string };
+type FoodFactName = 'energy_kcal' | 'protein_g' | 'fat_g' | 'carbohydrate_g' | 'fiber_g';
+
+function foodBasisData(
+  food: Pick<Food, 'nutrition_basis_kind' | 'energy_kcal_per_100g' | 'canonical_facts'>,
+): { basis: string; energy: string | null } {
+  const normalized = food.canonical_facts?.normalized_facts as
+    Partial<Record<FoodFactName, FoodFact | null>> | undefined;
+  const source = food.canonical_facts?.source_facts as
+    Partial<Record<FoodFactName, FoodFact[] | null>> | undefined;
+  const fact =
+    normalized?.energy_kcal ??
+    (food.nutrition_basis_kind === 'per_serving'
+      ? source?.energy_kcal?.find(
+          (value) => value.evidence === 'read' && value.basis_ref === 'per_serving',
+        )
+      : undefined);
+  const basis = fact?.basis_ref ?? food.nutrition_basis_kind ?? 'per_100_g';
+  const value =
+    fact?.value ??
+    (!food.canonical_facts && basis === 'per_100_g' ? food.energy_kcal_per_100g : null);
+  return { basis, energy: value === null ? null : String(value) };
 }
 
 function foodBasisLabel(
   food: Pick<Food, 'nutrition_basis_kind' | 'energy_kcal_per_100g' | 'canonical_facts'>,
 ): string {
-  const basis =
-    food.nutrition_basis_kind === 'per_100_ml'
-      ? '100 мл'
-      : food.nutrition_basis_kind === 'per_serving'
-        ? 'порцию'
-        : '100 г';
-  return `${formatNumber(foodEnergyValue(food))} ккал / ${basis}`;
+  const { basis, energy } = foodBasisData(food);
+  const label = basis === 'per_100_ml' ? '100 мл' : basis === 'per_serving' ? 'порцию' : '100 г';
+  return `${formatNumber(energy)} ккал / ${label}`;
+}
+
+function foodMacroLabel(food: Food): string {
+  const { basis } = foodBasisData(food);
+  const normalized = food.canonical_facts?.normalized_facts as
+    Partial<Record<FoodFactName, FoodFact | null>> | undefined;
+  const source = food.canonical_facts?.source_facts as
+    Partial<Record<FoodFactName, FoodFact[] | null>> | undefined;
+  const value = (name: FoodFactName, fallback: string | null) => {
+    const normalizedFact = normalized?.[name];
+    const fact =
+      normalizedFact?.basis_ref === basis
+        ? normalizedFact
+        : basis === 'per_serving'
+          ? source?.[name]?.find(
+              (item) => item.evidence === 'read' && item.basis_ref === 'per_serving',
+            )
+          : undefined;
+    const result =
+      fact?.value ?? (!food.canonical_facts && basis === 'per_100_g' ? fallback : null);
+    return formatNumber(result === null ? null : String(result));
+  };
+  return `Б ${value('protein_g', food.protein_g_per_100g)} · Ж ${value('fat_g', food.fat_g_per_100g)} · У ${value('carbohydrate_g', food.carbs_g_per_100g)} · клетчатка ${value('fiber_g', food.fiber_g_per_100g)}`;
 }
 
 function providerMessage(status: FoodSearch['provider_status']): string | null {
@@ -246,6 +328,10 @@ function FoodResults({
   onSelect,
   pendingFavorite,
   allowManage = true,
+  allowBatch = true,
+  selectedIds,
+  onToggle,
+  selectionLocked,
 }: {
   foods: Food[];
   onEdit: (food: Food) => void;
@@ -253,6 +339,10 @@ function FoodResults({
   onSelect: (food: Food) => void;
   pendingFavorite: number | null;
   allowManage?: boolean;
+  allowBatch?: boolean;
+  selectedIds: Set<number>;
+  onToggle: (food: Food) => void;
+  selectionLocked: boolean;
 }) {
   if (!foods.length)
     return (
@@ -268,54 +358,87 @@ function FoodResults({
         Нажмите на карточку, чтобы выбрать продукт
       </p>
       <ul className="nutrition-food-results" aria-label="Продукты">
-        {foods.map((food) => (
-          <li className="nutrition-food-result nutrition-food-result--picker" key={food.id}>
-            <button
-              className="nutrition-food-result__select"
-              type="button"
-              onClick={() => onSelect(food)}
-              aria-describedby="nutrition-food-results-hint"
-              aria-label={`Выбрать ${food.name}`}
+        {foods.map((food) => {
+          const duplicate = foods.some(
+            (other) =>
+              other.id !== food.id && other.name === food.name && other.brand === food.brand,
+          );
+          const identity = foodIdentityLabel(food, duplicate);
+          return (
+            <li
+              className={`nutrition-food-result nutrition-food-result--picker${selectedIds.has(food.id) ? ' nutrition-food-result--selected' : ''}`}
+              key={food.id}
             >
-              <span className="nutrition-food-result__main">
-                <strong>{food.name}</strong>
-                <span>
-                  {food.brand ? `${food.brand} · ` : ''}
-                  {foodBasisLabel(food)}
+              <button
+                className="nutrition-food-result__select"
+                type="button"
+                onClick={() => onSelect(food)}
+                disabled={selectionLocked}
+                aria-describedby="nutrition-food-results-hint"
+                aria-label={`Выбрать ${identity}`}
+              >
+                <span className="nutrition-food-result__main">
+                  <strong>{food.name}</strong>
+                  <span>
+                    {food.brand ? `${food.brand} · ` : ''}
+                    {foodBasisLabel(food)}
+                  </span>
+                  {(food.barcode || food.external_id) && (
+                    <span>
+                      {food.external_id ? `${foodSourceLabel(food)} · ${food.external_id}` : ''}
+                      {food.external_id && food.barcode ? ' · ' : ''}
+                      {food.barcode ? `штрихкод ${food.barcode}` : ''}
+                    </span>
+                  )}
                 </span>
-              </span>
-            </button>
-            <div className="nutrition-food-result__meta">
-              <Badge>{foodSourceLabel(food)}</Badge>
-              {allowManage && (
-                <button
-                  type="button"
-                  className="nutrition-food-result__favorite"
-                  aria-label={
-                    food.is_favorite
-                      ? `Убрать ${food.name} из избранного`
-                      : `Добавить ${food.name} в избранное`
-                  }
-                  aria-pressed={food.is_favorite}
-                  disabled={pendingFavorite === food.id}
-                  onClick={() => onFavorite(food)}
-                >
-                  <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
-                </button>
-              )}
-              {isUserFood(food) && allowManage && (
-                <button
-                  type="button"
-                  className="nutrition-food-result__edit"
-                  onClick={() => onEdit(food)}
-                  aria-label={`Изменить ${food.name}`}
-                >
-                  Изменить
-                </button>
-              )}
-            </div>
-          </li>
-        ))}
+              </button>
+              <div className="nutrition-food-result__meta">
+                <Badge>{foodSourceLabel(food)}</Badge>
+                {allowManage && (
+                  <button
+                    type="button"
+                    className="nutrition-food-result__favorite"
+                    aria-label={
+                      food.is_favorite
+                        ? `Убрать ${identity} из избранного`
+                        : `Добавить ${identity} в избранное`
+                    }
+                    aria-pressed={food.is_favorite}
+                    disabled={pendingFavorite === food.id}
+                    onClick={() => onFavorite(food)}
+                  >
+                    <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
+                  </button>
+                )}
+                {isUserFood(food) && allowManage && (
+                  <button
+                    type="button"
+                    className="nutrition-food-result__edit"
+                    onClick={() => onEdit(food)}
+                    aria-label={`Изменить ${identity}`}
+                    disabled={selectionLocked}
+                  >
+                    Изменить
+                  </button>
+                )}
+                {allowBatch && (
+                  <button
+                    type="button"
+                    className="nutrition-food-result__batch"
+                    data-yfc-choice="compact"
+                    aria-pressed={selectedIds.has(food.id)}
+                    aria-label={`${selectedIds.has(food.id) ? 'Убрать' : 'Выбрать'} ${identity} ${selectedIds.has(food.id) ? 'из подборки' : 'в подборку'}`}
+                    disabled={selectionLocked}
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={() => onToggle(food)}
+                  >
+                    {selectedIds.has(food.id) ? 'Выбрано' : 'Выбрать'}
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </>
   );
@@ -345,14 +468,30 @@ function externalFoodPayload(food: ExternalFood): UserFoodCreate {
   };
 }
 
+function externalFoodKey(food: ExternalFood): string {
+  return JSON.stringify([
+    food.source.provider,
+    food.external_id,
+    food.barcode,
+    food.brand,
+    food.name,
+  ]);
+}
+
 function ExternalResults({
   response,
   onSelect,
   pendingExternalKey,
+  onToggle,
+  selectedExternalKeys,
+  selectionLocked,
 }: {
   response: FoodSearch;
   onSelect: (food: ExternalFood) => void;
   pendingExternalKey: string | null;
+  onToggle: (food: ExternalFood) => void;
+  selectedExternalKeys: Set<string>;
+  selectionLocked: boolean;
 }) {
   const fallback = providerMessage(response.provider_status);
   if (fallback)
@@ -380,14 +519,15 @@ function ExternalResults({
       )}
       <p>Выберите карточку — продукт сохранится в «Мои продукты», затем укажите порцию.</p>
       {response.external_items.map((food: ExternalFood) => (
-        <article
-          className="nutrition-external-result"
-          key={`${food.source.provider}-${food.external_id}`}
-        >
+        <article className="nutrition-external-result" key={externalFoodKey(food)}>
           <div>
             <strong>{food.name}</strong>
             <span>
               {food.brand || 'Без бренда'} · {formatNumber(food.energy_kcal_per_100g)} ккал / 100 г
+            </span>
+            <span>
+              {food.source.attribution} · {food.external_id}
+              {food.barcode ? ` · штрихкод ${food.barcode}` : ''}
             </span>
           </div>
           <div className="nutrition-external-result__links">
@@ -401,13 +541,29 @@ function ExternalResults({
           <Button
             fullWidth
             type="button"
-            disabled={pendingExternalKey !== null}
+            aria-label={
+              (response.external_items?.length ?? 0) > 1
+                ? `Выбрать продукт ${food.name}${food.brand ? `, ${food.brand}` : ''}, ${food.source.attribution} ${food.external_id}`
+                : undefined
+            }
+            disabled={pendingExternalKey !== null || selectionLocked}
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => onSelect(food)}
           >
-            {pendingExternalKey === `${food.source.provider}-${food.external_id}`
-              ? 'Сохраняем…'
-              : 'Выбрать продукт'}
+            {pendingExternalKey === externalFoodKey(food) ? 'Сохраняем…' : 'Выбрать продукт'}
+          </Button>
+          <Button
+            fullWidth
+            type="button"
+            variant="secondary"
+            data-yfc-choice="compact"
+            aria-pressed={selectedExternalKeys.has(externalFoodKey(food))}
+            aria-label={`${selectedExternalKeys.has(externalFoodKey(food)) ? 'Убрать' : 'Выбрать'} ${food.name}${food.brand ? `, ${food.brand}` : ''}, ${food.source.attribution} ${food.external_id} ${selectedExternalKeys.has(externalFoodKey(food)) ? 'из подборки' : 'в подборку'}`}
+            disabled={pendingExternalKey !== null || selectionLocked}
+            onPointerDown={(event) => event.preventDefault()}
+            onClick={() => onToggle(food)}
+          >
+            {selectedExternalKeys.has(externalFoodKey(food)) ? 'Выбрано' : 'Выбрать в подборку'}
           </Button>
         </article>
       ))}
@@ -437,15 +593,6 @@ export function FoodPickerDialog({
   const { user } = useAuth();
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
-  const panelRef = useModalA11y<HTMLDivElement>(
-    true,
-    onClose,
-    initialView === 'quick-add'
-      ? '#nutrition-quick-calories'
-      : demoSafeMode
-        ? '#nutrition-food-search'
-        : '#nutrition-food-search',
-  );
   const [view, setView] = useState<PickerView>(initialView);
   const [source, setSource] = useState<PickerSource>('recent');
   const [entryMethod, setEntryMethod] = useState<FoodEntryMethod>(
@@ -468,6 +615,25 @@ export function FoodPickerDialog({
       quick: emptyQuickAdd,
       requestId: newEntryRequestId(),
     },
+  );
+  const batchStorageKey = `${foodDraftStorageKey(user?.id ?? 'anonymous', diaryDate, mealType)}_batch`;
+  const [batch, setBatch, clearBatch] = usePersistentState<BatchDraft>(batchStorageKey, {
+    items: [],
+    requestId: newEntryRequestId(),
+    pending: false,
+  });
+  const batchInFlight = useRef(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
+  const [importedExternal, setImportedExternal] = useState<Record<string, Food>>({});
+  const handleClose = () => {
+    if (batchInFlight.current) return;
+    if (!batch.pending) clearBatch();
+    onClose();
+  };
+  const panelRef = useModalA11y<HTMLDivElement>(
+    true,
+    handleClose,
+    initialView === 'quick-add' ? '#nutrition-quick-calories' : '#nutrition-food-search',
   );
   const quick = useMemo(() => ({ ...emptyQuickAdd, ...(draft.quick ?? {}) }), [draft.quick]);
 
@@ -559,7 +725,14 @@ export function FoodPickerDialog({
           const existing = await api<FoodBarcodeLookup>(
             `/api/v1/nutrition/foods/barcode/${encodeURIComponent(food.barcode)}`,
           );
-          if (existing.local_item) return existing.local_item;
+          if (
+            existing.local_item?.source_name === food.source.provider &&
+            existing.local_item.external_id === food.external_id &&
+            existing.local_item.barcode === food.barcode &&
+            existing.local_item.name === food.name &&
+            existing.local_item.brand === food.brand
+          )
+            return existing.local_item;
         }
         throw error;
       }
@@ -580,6 +753,44 @@ export function FoodPickerDialog({
   const activeError = searchQuery.length >= 2 ? search.error : activeCollection.error;
   const activeLoading = searchQuery.length >= 2 ? search.isFetching : activeCollection.isLoading;
   const quantityMode = Boolean(draft.food || selectedRecipe);
+  const selectedIds = useMemo(
+    () => new Set(batch.items.map((item) => item.food.id)),
+    [batch.items],
+  );
+  const selectedExternalKeys = useMemo(
+    () => new Set(batch.items.flatMap((item) => (item.externalKey ? [item.externalKey] : []))),
+    [batch.items],
+  );
+  const batchPayload = useMemo<NaturalInputCommitRequest>(
+    () => ({
+      diary_date: diaryDate,
+      meal_type: mealType,
+      items: batch.items.map((item) => ({
+        row_id: `food-${item.food.id}`,
+        food_id: item.food.id,
+        amount: item.amount.replace(',', '.'),
+        amount_unit: item.amountUnit,
+      })),
+    }),
+    [batch.items, diaryDate, mealType],
+  );
+  const batchValid =
+    batch.items.length > 0 &&
+    batch.items.every((item) => {
+      const amount = Number(item.amount.replace(',', '.'));
+      return item.amount.trim() !== '' && Number.isFinite(amount) && amount > 0;
+    });
+  const batchPreview = useQuery({
+    queryKey: ['nutrition', 'diary', 'batch-preview', batchPayload],
+    queryFn: ({ signal }) =>
+      api<FoodDiaryNutrition>('/api/v1/nutrition/diary/batch/preview', {
+        method: 'POST',
+        body: batchPayload,
+        signal,
+      }),
+    enabled: batchValid && view === 'browse' && !quantityMode,
+    retry: false,
+  });
 
   useEffect(() => {
     if (!searchQuery || !search.data) return;
@@ -757,6 +968,96 @@ export function FoodPickerDialog({
     );
     onClose();
   };
+  const commitBatch = useMutation({
+    mutationFn: ({
+      payload,
+      requestId,
+    }: {
+      payload: NaturalInputCommitRequest;
+      requestId: string;
+    }) =>
+      api<FoodDiaryBatchResponse>('/api/v1/nutrition/diary/natural-input/commit', {
+        method: 'POST',
+        body: payload,
+        headers: { 'Idempotency-Key': requestId },
+      }),
+    onSuccess: async (response) => {
+      batchInFlight.current = false;
+      clearBatch({ items: [], requestId: newEntryRequestId(), pending: false });
+      await handleBatchCompleted(response);
+    },
+    onError: (error) => {
+      batchInFlight.current = false;
+      if (error instanceof ApiError && [400, 401, 403, 404, 422, 429].includes(error.status)) {
+        setBatch((current) => ({ ...current, pending: false, requestId: newEntryRequestId() }));
+        setBatchError('Не удалось добавить подборку. Проверьте продукты и повторите.');
+      } else {
+        setBatchError(
+          'Не удалось узнать результат. Повторите подтверждение: записи не продублируются.',
+        );
+      }
+    },
+  });
+  const submitBatch = () => {
+    if (batchInFlight.current || importExternal.isPending) return;
+    if (
+      !batch.pending &&
+      (!batchValid || !batchPreview.data || batchPreview.isFetching || batchPreview.error)
+    )
+      return;
+    const pending = { ...batch, pending: true };
+    if (!writeStorage(batchStorageKey, pending)) {
+      setBatchError('Не удалось подготовить добавление. Проверьте настройки браузера и повторите.');
+      return;
+    }
+    batchInFlight.current = true;
+    setBatch(pending);
+    setBatchError(null);
+    commitBatch.mutate({ payload: batchPayload, requestId: pending.requestId });
+  };
+  const toggleBatchFood = (
+    food: Food,
+    sourceLabel = foodSourceLabel(food),
+    externalKey?: string,
+    onlyAdd = false,
+  ) => {
+    if (batch.pending || batchInFlight.current) return;
+    setBatch((current) => {
+      if (current.items.some((item) => item.food.id === food.id)) {
+        if (onlyAdd) return current;
+        return { ...current, items: current.items.filter((item) => item.food.id !== food.id) };
+      }
+      if (current.items.length >= 100) return current;
+      const amountUnit = foodAmountUnit(food);
+      return {
+        ...current,
+        items: [
+          ...current.items,
+          {
+            food,
+            amount: amountUnit === 'serving' ? '1' : '100',
+            amountUnit,
+            sourceLabel,
+            externalKey,
+          },
+        ],
+      };
+    });
+    setBatchError(null);
+  };
+  const updateBatchItem = (
+    foodId: number,
+    changes: Partial<Pick<BatchItem, 'amount' | 'amountUnit'>>,
+  ) => {
+    if (batch.pending || batchInFlight.current) return;
+    setBatch((current) => ({
+      ...current,
+      items: current.items.map((item) =>
+        item.food.id === foodId ? { ...item, ...changes } : item,
+      ),
+    }));
+    setBatchError(null);
+  };
   const updateDraft = (changes: Partial<AddDraft>) => {
     addEntry.reset();
     setDraft({ ...draft, ...changes, requestId: newEntryRequestId() });
@@ -811,6 +1112,30 @@ export function FoodPickerDialog({
       },
     });
   };
+  const toggleExternalFood = (food: ExternalFood) => {
+    if (demoSafeMode || importExternal.isPending || batch.pending || batchInFlight.current) return;
+    const key = externalFoodKey(food);
+    const selected = batch.items.find((item) => item.externalKey === key);
+    if (selected) {
+      toggleBatchFood(selected.food);
+      return;
+    }
+    const cached = importedExternal[key];
+    if (cached) {
+      if (selectedIds.has(cached.id)) {
+        setBatchError('Этот продукт уже выбран. Проверьте источник и штрихкод.');
+        return;
+      }
+      toggleBatchFood(cached, food.source.attribution, key, true);
+      return;
+    }
+    importExternal.mutate(food, {
+      onSuccess: (savedFood) => {
+        setImportedExternal((current) => ({ ...current, [key]: savedFood }));
+        toggleBatchFood(savedFood, food.source.attribution, key, true);
+      },
+    });
+  };
   const selectRecipe = (recipe: Recipe) => {
     trackProductEvent({
       name: 'food_log_started',
@@ -826,7 +1151,7 @@ export function FoodPickerDialog({
     selectedRecipe?.name ||
     (
       {
-        browse: 'Выберите продукт',
+        browse: 'Выберите продукты',
         'quick-add': 'Быстрый ввод',
         'food-editor': editingFood ? 'Изменить продукт' : 'Новый продукт',
         recipes: 'Рецепты',
@@ -844,14 +1169,24 @@ export function FoodPickerDialog({
       aria-modal="true"
       aria-labelledby="nutrition-picker-title"
     >
-      <div className="modal__backdrop" aria-hidden="true" onClick={onClose} />
-      <div className="modal__panel nutrition-picker__panel" ref={panelRef} tabIndex={-1}>
+      <div className="modal__backdrop" aria-hidden="true" onClick={handleClose} />
+      <div
+        className={`modal__panel nutrition-picker__panel${view === 'browse' && !quantityMode && !disabled && !demoSafeMode && batch.items.length ? ' nutrition-picker__panel--batch' : ''}`}
+        ref={panelRef}
+        tabIndex={-1}
+      >
         <header data-glass="" data-glass-variant="regular" className="nutrition-picker__header">
           <div>
             <span className="eyebrow">Добавить в {mealLabels[mealType]}</span>
             <h2 id="nutrition-picker-title">{title}</h2>
           </div>
-          <Button variant="ghost" type="button" aria-label="Закрыть добавление" onClick={onClose}>
+          <Button
+            variant="ghost"
+            type="button"
+            aria-label="Закрыть добавление"
+            onClick={handleClose}
+            disabled={commitBatch.isPending}
+          >
             <CloseIcon />
           </Button>
         </header>
@@ -1321,6 +1656,163 @@ export function FoodPickerDialog({
               </Field>
             </div>
             <div className="nutrition-picker__search-flow">
+              <div className="nutrition-picker__result-content">
+                {!demoSafeMode && (
+                  <details
+                    className="nutrition-batch__tray"
+                    data-empty={batch.items.length === 0 ? 'true' : undefined}
+                  >
+                    <summary>
+                      <strong>Подборка · {batch.items.length}</strong>
+                      <span className="nutrition-batch__open">Изменить</span>
+                      <span className="nutrition-batch__close">Свернуть</span>
+                    </summary>
+                    <div className="nutrition-batch__items">
+                      {batch.items.length === 0 && (
+                        <p className="muted">Вы пока не выбрали продукты.</p>
+                      )}
+                      {batch.items.map((item) => {
+                        const itemLabel = `${item.food.name}${item.food.brand ? `, ${item.food.brand}` : ''}, ${item.sourceLabel}`;
+                        const amount = Number(item.amount.replace(',', '.'));
+                        const invalid =
+                          item.amount.trim() === '' || !Number.isFinite(amount) || amount <= 0;
+                        return (
+                          <div className="nutrition-batch__item" key={item.food.id}>
+                            <div className="nutrition-batch__item-header">
+                              <div>
+                                <strong>{item.food.name}</strong>
+                                <small>
+                                  {item.food.brand ? `${item.food.brand} · ` : ''}
+                                  {item.sourceLabel} · {foodBasisLabel(item.food)}
+                                </small>
+                                <small>{foodMacroLabel(item.food)}</small>
+                              </div>
+                              <button
+                                type="button"
+                                className="nutrition-batch__remove"
+                                aria-label={`Убрать ${itemLabel} из подборки`}
+                                disabled={batch.pending || commitBatch.isPending}
+                                onClick={() => toggleBatchFood(item.food)}
+                              >
+                                Убрать
+                              </button>
+                            </div>
+                            <div className="nutrition-batch__amount">
+                              <label htmlFor={`nutrition-batch-${item.food.id}`}>Количество</label>
+                              <Input
+                                id={`nutrition-batch-${item.food.id}`}
+                                aria-label={`Количество: ${itemLabel}`}
+                                aria-invalid={invalid}
+                                type="number"
+                                inputMode="decimal"
+                                min="0.001"
+                                step="any"
+                                value={item.amount}
+                                disabled={batch.pending || commitBatch.isPending}
+                                onChange={(event) =>
+                                  updateBatchItem(item.food.id, { amount: event.target.value })
+                                }
+                              />
+                              <Select
+                                aria-label={`Единица: ${itemLabel}`}
+                                value={item.amountUnit}
+                                disabled={batch.pending || commitBatch.isPending}
+                                onChange={(event) =>
+                                  updateBatchItem(item.food.id, {
+                                    amountUnit: event.target.value as FoodAmountUnit,
+                                  })
+                                }
+                              >
+                                {foodAmountUnits(item.food).map((unit) => (
+                                  <option key={unit} value={unit}>
+                                    {unit === 'g' ? 'г' : unit === 'ml' ? 'мл' : 'порц.'}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                            {item.amountUnit === 'serving' &&
+                              item.food.standard_serving_weight_g && (
+                                <small>
+                                  1 порция ≈ {formatNumber(item.food.standard_serving_weight_g)} г
+                                </small>
+                              )}
+                            {invalid && (
+                              <p className="nutrition-form-error" role="alert">
+                                Введите количество больше нуля.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                )}
+                {activeLoading && <LoadingState label="Ищем продукты…" />}
+                {activeError && (
+                  <ErrorState
+                    message="Локальный каталог сейчас не ответил. Попробуйте снова."
+                    retry={() =>
+                      void (searchQuery.length >= 2 ? search.refetch() : activeCollection.refetch())
+                    }
+                  />
+                )}
+                {!activeLoading && !activeError && (
+                  <FoodResults
+                    foods={shownFoods}
+                    onSelect={(food) =>
+                      selectFood(food, {
+                        sourceOverride:
+                          searchQuery.length >= 2 ? undefined : pickerSourceAnalytics(source),
+                      })
+                    }
+                    onFavorite={(food) => favorite.mutate(food)}
+                    pendingFavorite={favorite.isPending ? (favorite.variables?.id ?? null) : null}
+                    selectedIds={selectedIds}
+                    onToggle={(food) => toggleBatchFood(food)}
+                    selectionLocked={batch.pending || commitBatch.isPending}
+                    allowManage={!demoSafeMode}
+                    allowBatch={!demoSafeMode}
+                    onEdit={(food) => {
+                      setEditingFood(food);
+                      setEditorBarcode('');
+                      setView('food-editor');
+                    }}
+                  />
+                )}
+                {favorite.error && (
+                  <p className="nutrition-form-error" role="alert">
+                    Не удалось обновить избранное.
+                  </p>
+                )}
+                {external.isFetching && <LoadingState label="Проверяем внешний каталог…" />}
+                {external.error && (
+                  <div className="nutrition-provider-fallback" role="status">
+                    <strong>Внешний каталог временно недоступен</strong>
+                    <span>Можно использовать локальный поиск или создать свой продукт.</span>
+                  </div>
+                )}
+                {!demoSafeMode && external.data && externalQuery === searchQuery && (
+                  <ExternalResults
+                    response={external.data}
+                    onSelect={selectExternalFood}
+                    onToggle={toggleExternalFood}
+                    selectedExternalKeys={selectedExternalKeys}
+                    selectionLocked={batch.pending || commitBatch.isPending}
+                    pendingExternalKey={
+                      importExternal.isPending && importExternal.variables
+                        ? externalFoodKey(importExternal.variables)
+                        : null
+                    }
+                  />
+                )}
+                {importExternal.error && (
+                  <p className="nutrition-form-error" role="alert">
+                    {importExternal.error instanceof ApiError && importExternal.error.status === 409
+                      ? 'Продукт с таким штрихкодом уже есть с другими данными. Проверьте источник.'
+                      : 'Не удалось сохранить продукт. Попробуйте снова.'}
+                  </p>
+                )}
+              </div>
               {!demoSafeMode && (
                 <div className="nutrition-picker__primary-path-actions">
                   <Button
@@ -1499,67 +1991,73 @@ export function FoodPickerDialog({
                   </div>
                 </details>
               )}
-              <div className="nutrition-picker__result-content">
-                {activeLoading && <LoadingState label="Ищем продукты…" />}
-                {activeError && (
-                  <ErrorState
-                    message="Локальный каталог сейчас не ответил. Попробуйте снова."
-                    retry={() =>
-                      void (searchQuery.length >= 2 ? search.refetch() : activeCollection.refetch())
-                    }
-                  />
-                )}
-                {!activeLoading && !activeError && (
-                  <FoodResults
-                    foods={shownFoods}
-                    onSelect={(food) =>
-                      selectFood(food, {
-                        sourceOverride:
-                          searchQuery.length >= 2 ? undefined : pickerSourceAnalytics(source),
-                      })
-                    }
-                    onFavorite={(food) => favorite.mutate(food)}
-                    pendingFavorite={favorite.isPending ? (favorite.variables?.id ?? null) : null}
-                    allowManage={!demoSafeMode}
-                    onEdit={(food) => {
-                      setEditingFood(food);
-                      setEditorBarcode('');
-                      setView('food-editor');
-                    }}
-                  />
-                )}
-                {favorite.error && (
-                  <p className="nutrition-form-error" role="alert">
-                    Не удалось обновить избранное.
-                  </p>
-                )}
-                {external.isFetching && <LoadingState label="Проверяем внешний каталог…" />}
-                {external.error && (
-                  <div className="nutrition-provider-fallback" role="status">
-                    <strong>Внешний каталог временно недоступен</strong>
-                    <span>Можно использовать локальный поиск или создать свой продукт.</span>
-                  </div>
-                )}
-                {!demoSafeMode && external.data && externalQuery === searchQuery && (
-                  <ExternalResults
-                    response={external.data}
-                    onSelect={selectExternalFood}
-                    pendingExternalKey={
-                      importExternal.isPending && importExternal.variables
-                        ? `${importExternal.variables.source.provider}-${importExternal.variables.external_id}`
-                        : null
-                    }
-                  />
-                )}
-                {importExternal.error && (
-                  <p className="nutrition-form-error" role="alert">
-                    Не удалось сохранить продукт. Попробуйте снова.
-                  </p>
-                )}
-              </div>
             </div>
           </div>
         )}
+        {view === 'browse' &&
+          !quantityMode &&
+          !disabled &&
+          !demoSafeMode &&
+          batch.items.length > 0 && (
+            <footer className="nutrition-batch__footer">
+              {(batchError || batch.pending || batchPreview.error) && (
+                <p className="nutrition-form-error" role="alert">
+                  {batchError ||
+                    (batch.pending
+                      ? 'Результат предыдущего добавления неизвестен. Повторите подтверждение.'
+                      : 'Не удалось рассчитать подборку. Проверьте продукты и количество.')}
+                </p>
+              )}
+              {batchPreview.error && !batch.pending && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void batchPreview.refetch()}
+                >
+                  Повторить расчёт
+                </Button>
+              )}
+              <div className="nutrition-batch__totals">
+                <div>
+                  <strong>Итого</strong>
+                  <small>Выбрано: {batch.items.length}</small>
+                </div>
+                <div aria-live="polite">
+                  <strong>
+                    {batchPreview.isFetching
+                      ? 'Рассчитываем…'
+                      : `${formatNumber(batchPreview.data?.energy_kcal ?? null)} ккал`}
+                  </strong>
+                  <small>
+                    Б {formatNumber(batchPreview.data?.protein_g ?? null)} · Ж{' '}
+                    {formatNumber(batchPreview.data?.fat_g ?? null)} · У{' '}
+                    {formatNumber(batchPreview.data?.carbs_g ?? null)} г
+                  </small>
+                  <small>Клетчатка {formatNumber(batchPreview.data?.fiber_g ?? null)} г</small>
+                </div>
+              </div>
+              <Button
+                fullWidth
+                type="button"
+                disabled={
+                  commitBatch.isPending ||
+                  importExternal.isPending ||
+                  (!batch.pending &&
+                    (!batchValid ||
+                      !batchPreview.data ||
+                      batchPreview.isFetching ||
+                      Boolean(batchPreview.error)))
+                }
+                onClick={submitBatch}
+              >
+                {commitBatch.isPending
+                  ? 'Добавляем…'
+                  : batch.pending
+                    ? 'Повторить подтверждение'
+                    : 'Добавить в дневник'}
+              </Button>
+            </footer>
+          )}
       </div>
     </div>
   );
