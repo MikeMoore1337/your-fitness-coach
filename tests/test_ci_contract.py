@@ -486,7 +486,7 @@ def test_migrated_postgres_stack_uses_prebuilt_chromium_and_service_dns() -> Non
     assert "npx playwright install --with-deps chromium" not in migrated
     assert "Cache Playwright browsers" not in migrated
     assert "test -d /ms-playwright" in migrated
-    assert migrated.count("postgresql+psycopg://fitminiapp:test-password@postgres:5432/") == 2
+    assert migrated.count("postgresql+psycopg://fitminiapp:test-password@db:5432/") == 2
     assert "run-group migrated-stack" in migrated
 
 
