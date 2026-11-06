@@ -183,6 +183,8 @@ export function PhotoMealScanner({
   }, [previewUrl]);
 
   const chooseFile = (candidate: File) => {
+    generationRef.current += 1;
+    requestRef.current = null;
     setError('');
     setSubmitError('');
     setDraft(null);

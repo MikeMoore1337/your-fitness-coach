@@ -289,7 +289,7 @@ def confirm_photo_meal_draft(
             for item in row.canonical_payload.get("candidates", [])
         )
     }
-    if any(item.candidate_id not in stored_candidates for item in request.items):
+    if {item.candidate_id for item in request.items} != set(stored_candidates):
         raise PhotoMealError("unknown_candidate")
 
     calories = sum((item.energy_kcal for item in request.items), start=Decimal("0"))

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PhotoMealScanner } from '../../../../src/features/nutrition/PhotoMealScanner';
 import { ApiError } from '../../../../src/shared/api/client';
@@ -120,5 +120,68 @@ describe('PhotoMealScanner', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Добавить вручную' }));
     expect(onManualFallback).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the request key for retries, but not for a different photo', async () => {
+    apiMock
+      .mockRejectedValueOnce(new ApiError('Network error', 0))
+      .mockRejectedValueOnce(new ApiError('Network error', 0))
+      .mockResolvedValueOnce(draft);
+    render(
+      <PhotoMealScanner
+        userId={10}
+        diaryDate="2026-10-01"
+        mealType="lunch"
+        onCancel={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+    const input = document.querySelector('input[type="file"]')!;
+    fireEvent.change(input, {
+      target: { files: [new File(['first'], 'first.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить' }));
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    await screen.findByRole('button', { name: 'Повторить' });
+    fireEvent.change(input, {
+      target: { files: [new File(['second'], 'second.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    await screen.findByRole('heading', { name: 'Проверьте оценку блюда' });
+    const keys = apiMock.mock.calls.map(([, options]) => options.headers['Idempotency-Key']);
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[2]).not.toBe(keys[0]);
+  });
+
+  it('ignores an earlier recognition when a different photo is selected', async () => {
+    let resolveFirst!: (value: PhotoMealDraft) => void;
+    apiMock
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+      .mockResolvedValueOnce({
+        ...draft,
+        candidates: [{ ...draft.candidates[0], name: 'Овощи' }],
+      });
+    render(
+      <PhotoMealScanner
+        userId={10}
+        diaryDate="2026-10-01"
+        mealType="lunch"
+        onCancel={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+    const input = document.querySelector('input[type="file"]')!;
+    fireEvent.change(input, {
+      target: { files: [new File(['first'], 'first.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    fireEvent.change(input, {
+      target: { files: [new File(['second'], 'second.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    expect(await screen.findByDisplayValue('Овощи')).toBeVisible();
+    await act(async () => resolveFirst(draft));
+    expect(screen.getByDisplayValue('Овощи')).toBeVisible();
   });
 });

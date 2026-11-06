@@ -13715,7 +13715,6 @@ export interface components {
             amount: number | string;
             /**
              * Amount Unit
-             * @default g
              * @enum {string}
              */
             amount_unit: "g" | "ml" | "serving";

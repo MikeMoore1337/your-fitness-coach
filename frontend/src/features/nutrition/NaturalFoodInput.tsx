@@ -139,9 +139,10 @@ function sumNutrition(rows: NaturalRow[]): FoodDiaryNutrition | null {
 }
 
 function rowStatusLabel(row: NaturalRow): string {
+  if (row.status === 'excluded') return 'Не добавляется';
+  if (!row.amount || !row.amount_unit) return 'Уточните количество';
   if (row.status === 'matched') return 'Проверено';
   if (row.status === 'ambiguous') return 'Нужно выбрать';
-  if (row.status === 'excluded') return 'Не добавляется';
   return 'Не найдено';
 }
 
