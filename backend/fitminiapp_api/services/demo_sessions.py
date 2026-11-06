@@ -49,6 +49,7 @@ class _DemoSession:
     revision: int
     created_at: datetime
     expires_at: datetime
+    hydration_generation: int = 0
 
 
 def _training_fixture() -> dict[str, Any]:
@@ -489,6 +490,7 @@ class DemoSessionStore:
             now = self._now()
             session = self._session(token, now)
             session.state = _fixture_for(session.scenario)
+            session.hydration_generation += 1
             session.revision += 1
             session.expires_at = now + self._ttl
             return self._snapshot(session)

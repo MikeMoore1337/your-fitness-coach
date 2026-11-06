@@ -401,6 +401,50 @@ def test_demo_transport_exposes_owned_fixture_history_and_denies_unknown_exercis
     )
 
 
+def test_demo_hydration_rejects_delayed_request_after_reset(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    path = "/api/v1/nutrition/hydration/entries"
+    day = _transport(client, token, "/api/v1/nutrition/hydration").json()
+    generation = day["demo_generation"]
+    body = {
+        "volume_ml": 250,
+        "beverage_type": "water",
+        "source": "quick_preset",
+        "_hydration_retry_key": "before-reset",
+        "_hydration_generation": generation,
+    }
+    assert _transport(client, token, path, "POST", body).status_code == 200
+    assert (
+        client.post(
+            "/api/v1/demo/sessions/current/reset", headers={"X-Demo-Session": token}
+        ).status_code
+        == 200
+    )
+    assert _transport(client, token, path, "POST", body).status_code == 409
+    next_day = _transport(client, token, "/api/v1/nutrition/hydration").json()
+    assert next_day["demo_generation"] != generation
+    assert next_day["total_ml"] == 1350
+    assert (
+        _transport(client, token, path, "POST", {**body, "_hydration_generation": True}).status_code
+        == 403
+    )
+    assert (
+        _transport(
+            client,
+            token,
+            path,
+            "POST",
+            {
+                **body,
+                "_hydration_retry_key": "after-reset",
+                "_hydration_generation": next_day["demo_generation"],
+            },
+        ).status_code
+        == 200
+    )
+    assert _transport(client, token, "/api/v1/nutrition/hydration").json()["total_ml"] == 1600
+
+
 def test_demo_hydration_retry_reuses_entry_and_rejects_key_conflicts(client) -> None:
     token, _ = _create_session(client, "nutrition")
     other_token, _ = _create_session(client, "nutrition")
