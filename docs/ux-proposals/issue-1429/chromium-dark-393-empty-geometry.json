@@ -1,54 +1,54 @@
 {
   "before": {
     ".nutrition-day-summary": {
-      "top": 411,
-      "bottom": 793
+      "top": 579,
+      "bottom": 961
     },
     ".nutrition-suggestions": {
-      "top": 811,
-      "bottom": 1265
+      "top": 979,
+      "bottom": 1433
     },
     ".nutrition-completeness": {
-      "top": 1283,
-      "bottom": 1520
+      "top": 1451,
+      "bottom": 1688
     },
     ".nutrition-food-card": {
-      "top": 1538,
-      "bottom": 1905
+      "top": 1706,
+      "bottom": 2073
     },
     ".hydration-card": {
-      "top": 1923,
-      "bottom": 2782
+      "top": 2091,
+      "bottom": 2950
     },
     ".hydration-presets": {
-      "top": 2045,
-      "bottom": 2213
+      "top": 2213,
+      "bottom": 2381
     }
   },
   "proposal": {
     ".nutrition-day-summary": {
-      "top": 411,
-      "bottom": 793
+      "top": 579,
+      "bottom": 961
     },
     ".nutrition-suggestions": {
-      "top": 2327,
-      "bottom": 2782
+      "top": 2495,
+      "bottom": 2950
     },
     ".nutrition-completeness": {
-      "top": 2073,
-      "bottom": 2309
+      "top": 2241,
+      "bottom": 2477
     },
     ".nutrition-food-card": {
-      "top": 811,
-      "bottom": 1177
+      "top": 979,
+      "bottom": 1345
     },
     ".hydration-card": {
-      "top": 1195,
-      "bottom": 2055
+      "top": 1363,
+      "bottom": 2223
     },
     ".hydration-presets": {
-      "top": 1317,
-      "bottom": 1485
+      "top": 1485,
+      "bottom": 1653
     }
   }
 }

@@ -99,13 +99,13 @@
     ],
     "sections": {
       ".nutrition-repeat-default": {
-        "top": 2661,
-        "bottom": 2811,
+        "top": 411,
+        "bottom": 561,
         "height": 150
       },
       ".nutrition-day-summary": {
-        "top": 411,
-        "bottom": 793,
+        "top": 579,
+        "bottom": 961,
         "height": 382
       },
       ".nutrition-suggestions": {
@@ -114,23 +114,23 @@
         "height": 455
       },
       ".nutrition-completeness": {
-        "top": 2388,
-        "bottom": 2643,
+        "top": 2556,
+        "bottom": 2811,
         "height": 255
       },
       ".nutrition-food-card": {
-        "top": 811,
-        "bottom": 1355,
+        "top": 979,
+        "bottom": 1523,
         "height": 545
       },
       ".hydration-card": {
-        "top": 1373,
-        "bottom": 2370,
+        "top": 1541,
+        "bottom": 2538,
         "height": 996
       },
       ".hydration-presets": {
-        "top": 1495,
-        "bottom": 1663,
+        "top": 1663,
+        "bottom": 1831,
         "height": 168
       }
     }
