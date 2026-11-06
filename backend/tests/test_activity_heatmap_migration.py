@@ -84,7 +84,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0150_nutrition_date_overrides",)
+            ("0151_nutrition_schedule_rules",)
         ]
         assert connection.exec_driver_sql(
             "SELECT status, self_assigned_program_id, self_assignment_request_hash FROM program_imports"

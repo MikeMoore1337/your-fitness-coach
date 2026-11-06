@@ -54,9 +54,11 @@ from fitminiapp_api.models.notification import (
 )
 from fitminiapp_api.models.nutrition import (
     EnergyCalibration,
+    NutritionScheduleBinding,
     NutritionTarget,
     NutritionTargetDateOverride,
     NutritionTargetDaySnapshot,
+    NutritionTargetScheduleRule,
 )
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.nutrition_plan import NutritionPlan
@@ -98,7 +100,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 28
+ACCOUNT_EXPORT_SCHEMA_VERSION = 29
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -115,8 +117,10 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "body_measurement_custom_values": "measurements",
     "cardio_sessions": "cardio_sessions",
     "nutrition_targets": "nutrition",
+    "nutrition_schedule_bindings": "nutrition",
     "nutrition_target_date_overrides": "nutrition",
     "nutrition_target_day_snapshots": "nutrition",
+    "nutrition_target_schedule_rules": "nutrition",
     "hydration_goals": "hydration",
     "hydration_entries": "hydration",
     "hydration_presets": "hydration",
@@ -950,6 +954,18 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         )
         .all()
     )
+    nutrition_bindings = (
+        db.query(NutritionScheduleBinding)
+        .filter(NutritionScheduleBinding.user_id == user.id)
+        .order_by(NutritionScheduleBinding.effective_from, NutritionScheduleBinding.id)
+        .all()
+    )
+    nutrition_schedule_rules = (
+        db.query(NutritionTargetScheduleRule)
+        .filter(NutritionTargetScheduleRule.user_id == user.id)
+        .order_by(NutritionTargetScheduleRule.effective_from, NutritionTargetScheduleRule.id)
+        .all()
+    )
     hydration_goals = (
         db.query(HydrationGoal)
         .filter(HydrationGoal.user_id == user.id)
@@ -1441,6 +1457,33 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ("id", "target_date", "target_id", "created_by_user_id", "created_at"),
             )
             for override in nutrition_overrides
+        ],
+        "nutrition_schedule_bindings": [
+            _fields(
+                item,
+                ("id", "program_revision_id", "effective_from", "created_by_user_id", "created_at"),
+            )
+            for item in nutrition_bindings
+        ],
+        "nutrition_target_schedule_rules": [
+            _fields(
+                item,
+                (
+                    "id",
+                    "target_id",
+                    "program_id",
+                    "scope",
+                    "day_type",
+                    "week_type",
+                    "effective_from",
+                    "source_cycle_week",
+                    "cycle_boundary",
+                    "weekday",
+                    "created_by_user_id",
+                    "created_at",
+                ),
+            )
+            for item in nutrition_schedule_rules
         ],
         "hydration": {
             "goals": [

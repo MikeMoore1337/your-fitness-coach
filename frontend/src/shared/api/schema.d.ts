@@ -5153,6 +5153,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/targets/dates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Date Override History */
+        get: operations["date_override_history_api_v1_nutrition_targets_dates_get"];
+        put?: never;
+        /** Save Date Override */
+        post: operations["save_date_override_api_v1_nutrition_targets_dates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Schedule Rule History */
+        get: operations["schedule_rule_history_api_v1_nutrition_targets_schedule_get"];
+        put?: never;
+        /** Save Schedule Rule */
+        post: operations["save_schedule_rule_api_v1_nutrition_targets_schedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/binding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Schedule Binding Status */
+        get: operations["schedule_binding_status_api_v1_nutrition_targets_schedule_binding_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/binding/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Schedule Binding */
+        post: operations["preview_schedule_binding_api_v1_nutrition_targets_schedule_binding_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/binding/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Schedule Binding */
+        post: operations["confirm_schedule_binding_api_v1_nutrition_targets_schedule_binding_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/program-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nutrition Program Day */
+        get: operations["nutrition_program_day_api_v1_nutrition_targets_program_day_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/targets/current": {
         parameters: {
             query?: never;
@@ -13768,6 +13872,40 @@ export interface components {
             /** Full Name */
             full_name?: string | null;
         };
+        /** NutritionDateOverrideResponse */
+        NutritionDateOverrideResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            target: components["schemas"]["NutritionTargetResponse"];
+        };
+        /** NutritionDateOverrideSave */
+        NutritionDateOverrideSave: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+        };
         /** NutritionLabelConfirmRequest */
         NutritionLabelConfirmRequest: {
             /** Revision */
@@ -14291,6 +14429,22 @@ export interface components {
             /** Nutrition Complete */
             nutrition_complete: boolean;
         };
+        /** NutritionProgramDayResponse */
+        NutritionProgramDayResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /** Day Type */
+            day_type: ("training" | "rest") | null;
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
+        };
         /** NutritionReportDailyPoint */
         NutritionReportDailyPoint: {
             /**
@@ -14495,6 +14649,206 @@ export interface components {
             average_deviation?: number | null;
             /** Evaluated Days */
             evaluated_days: number;
+        };
+        /** NutritionScheduleBindingConfirm */
+        NutritionScheduleBindingConfirm: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /**
+             * Confirm
+             * @constant
+             */
+            confirm: true;
+        };
+        /** NutritionScheduleBindingResponse */
+        NutritionScheduleBindingResponse: {
+            /** Id */
+            id: number;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+        };
+        /** NutritionScheduleBindingStatus */
+        NutritionScheduleBindingStatus: {
+            /** Id */
+            id: number;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Program Changed */
+            program_changed: boolean;
+        };
+        /** NutritionSchedulePreviewChange */
+        NutritionSchedulePreviewChange: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            before: components["schemas"]["NutritionSchedulePreviewTarget"] | null;
+            after: components["schemas"]["NutritionSchedulePreviewTarget"] | null;
+        };
+        /** NutritionSchedulePreviewRequest */
+        NutritionSchedulePreviewRequest: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+        };
+        /** NutritionSchedulePreviewResponse */
+        NutritionSchedulePreviewResponse: {
+            /** Expected Binding Id */
+            expected_binding_id: number | null;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Changes */
+            changes: components["schemas"]["NutritionSchedulePreviewChange"][];
+        };
+        /** NutritionSchedulePreviewTarget */
+        NutritionSchedulePreviewTarget: {
+            /** Id */
+            id: number;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+        };
+        /** NutritionScheduleRuleResponse */
+        NutritionScheduleRuleResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "template" | "future" | "recovery";
+            /**
+             * Day Type
+             * @enum {string}
+             */
+            day_type: "training" | "rest" | "recovery";
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Program Id */
+            program_id: number | null;
+            /** Source Cycle Week */
+            source_cycle_week: number | null;
+            /** Cycle Boundary */
+            cycle_boundary: number | null;
+            /** Weekday */
+            weekday: number | null;
+            target: components["schemas"]["NutritionTargetResponse"];
+        };
+        /** NutritionScheduleRuleSave */
+        NutritionScheduleRuleSave: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "template" | "future" | "recovery";
+            /**
+             * Day Type
+             * @enum {string}
+             */
+            day_type: "training" | "rest" | "recovery";
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
         };
         /** NutritionSuggestionCandidate */
         NutritionSuggestionCandidate: {
@@ -32006,6 +32360,272 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NutritionTargetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    date_override_history_api_v1_nutrition_targets_dates_get: {
+        parameters: {
+            query?: {
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionDateOverrideResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_date_override_api_v1_nutrition_targets_dates_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionDateOverrideSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionDateOverrideResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_rule_history_api_v1_nutrition_targets_schedule_get: {
+        parameters: {
+            query?: {
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleRuleResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_schedule_rule_api_v1_nutrition_targets_schedule_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionScheduleRuleSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleRuleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_binding_status_api_v1_nutrition_targets_schedule_binding_get: {
+        parameters: {
+            query: {
+                target_date: string;
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleBindingStatus"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_schedule_binding_api_v1_nutrition_targets_schedule_binding_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionSchedulePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSchedulePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_schedule_binding_api_v1_nutrition_targets_schedule_binding_confirm_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionScheduleBindingConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleBindingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nutrition_program_day_api_v1_nutrition_targets_program_day_get: {
+        parameters: {
+            query: {
+                program_id: number;
+                revision_number: number;
+                target_date: string;
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionProgramDayResponse"];
                 };
             };
             /** @description Validation Error */

@@ -17,6 +17,7 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries
 from fitminiapp_api.services.nutrition import load_nutrition_targets_and_date_overrides
+from fitminiapp_api.services.nutrition_schedule import load_scheduled_nutrition_targets
 from fitminiapp_api.services.period_bounds import (
     PeriodBoundsError,
     ReportBounds,
@@ -239,8 +240,11 @@ def build_nutrition_report(
         .all()
     }
     previous_day = bounds.start - timedelta(days=1) if bounds.start > date.min else bounds.start
-    history, snapshots = load_nutrition_targets_and_date_overrides(
+    history, snapshots, scheduled_users = load_nutrition_targets_and_date_overrides(
         db, {user.id}, previous_day, bounds.end
+    )
+    scheduled_targets = load_scheduled_nutrition_targets(
+        db, scheduled_users, previous_day, bounds.end
     )
     targets = sorted(
         (
@@ -276,7 +280,11 @@ def build_nutrition_report(
 
     def target_for_day(day: date) -> NutritionTarget | None:
         key = (user.id, day)
-        return snapshots[key] if key in snapshots else _effective_target(targets, day)
+        if key in snapshots:
+            return snapshots[key]
+        if key in scheduled_targets:
+            return scheduled_targets[key]
+        return _effective_target(targets, day)
 
     previous_target = target_for_day(previous_day) if previous_day < bounds.start else None
     effective_changes: dict[date, NutritionTarget | None] = {}

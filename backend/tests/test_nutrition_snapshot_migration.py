@@ -134,3 +134,49 @@ def test_date_override_migration_preserves_data_and_blocks_lossy_downgrade(tmp_p
         assert (
             connection.execute(text("SELECT calories FROM nutrition_targets")).scalar_one() == 2000
         )
+
+
+def test_schedule_migration_blocks_loss_of_bindings_rules_and_targets(tmp_path: Path) -> None:
+    path = Path(__file__).resolve().parents[1] / "alembic/versions/0151_nutrition_schedule_rules.py"
+    spec = importlib.util.spec_from_file_location("nutrition_schedule_migration", path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    engine = create_engine(f"sqlite:///{(tmp_path / 'schedule.db').as_posix()}", poolclass=NullPool)
+    with engine.begin() as connection:
+        for statement in (
+            "CREATE TABLE users (id INTEGER PRIMARY KEY)",
+            "CREATE TABLE program_revisions (id INTEGER PRIMARY KEY)",
+            "CREATE TABLE user_programs (id INTEGER PRIMARY KEY)",
+            "CREATE TABLE nutrition_targets (id INTEGER PRIMARY KEY, calories INTEGER, target_scope TEXT)",
+            "INSERT INTO users VALUES (1)",
+            "INSERT INTO program_revisions VALUES (1)",
+            "INSERT INTO nutrition_targets VALUES (1, 2000, NULL)",
+        ):
+            connection.execute(text(statement))
+        migration.op = Operations(MigrationContext.configure(connection))
+        migration.upgrade()
+        connection.execute(
+            text(
+                "INSERT INTO nutrition_schedule_bindings (user_id, program_revision_id, effective_from, idempotency_key, request_hash) VALUES (1, 1, '2026-01-01', 'binding-key', 'hash')"
+            )
+        )
+        with pytest.raises(RuntimeError, match="Cannot discard nutrition schedule bindings"):
+            migration.downgrade()
+        connection.execute(text("DELETE FROM nutrition_schedule_bindings"))
+        connection.execute(
+            text(
+                "INSERT INTO nutrition_target_schedule_rules (user_id, target_id, scope, day_type, effective_from, idempotency_key, request_hash) VALUES (1, 1, 'recovery', 'recovery', '2026-01-01', 'rule-key', 'hash')"
+            )
+        )
+        with pytest.raises(RuntimeError, match="Cannot discard nutrition schedule rules"):
+            migration.downgrade()
+        connection.execute(text("DELETE FROM nutrition_target_schedule_rules"))
+        connection.execute(text("UPDATE nutrition_targets SET target_scope = 'schedule'"))
+        with pytest.raises(RuntimeError, match="Cannot discard scheduled nutrition targets"):
+            migration.downgrade()
+        connection.execute(text("UPDATE nutrition_targets SET target_scope = NULL"))
+        migration.downgrade()
+        assert (
+            connection.execute(text("SELECT calories FROM nutrition_targets")).scalar_one() == 2000
+        )

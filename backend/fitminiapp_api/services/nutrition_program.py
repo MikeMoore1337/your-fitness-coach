@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.program import ProgramRevision, UserProgram
 from fitminiapp_api.services.program_versioning import (
+    _cycle_configurations,
     _cycle_occurrence_overrides,
     _cycle_plan_at,
     _cycle_type_for_date,
@@ -13,6 +14,68 @@ from fitminiapp_api.services.schedule_modes import calendar_active_on
 
 DayType = Literal["training", "rest"]
 WeekType = Literal["light", "medium", "heavy"]
+
+
+def program_week_types(
+    db: Session, program: UserProgram, revisions: list[ProgramRevision], revision_number: int
+) -> set[str]:
+    available = [
+        item
+        for item in revisions
+        if item.user_program_id == program.id and item.revision_number <= revision_number
+    ]
+    try:
+        boundaries = {1} | {
+            config["effective_from_week"]
+            for config in _cycle_configurations(db, program, revisions=available)
+        }
+        result = {
+            item
+            for week in boundaries
+            if (plan := _cycle_plan_at(db, program, week, revisions=available)) is not None
+            for item in (plan[0].get("week_types") or [])
+            if item in {"light", "medium", "heavy"}
+        }
+        result.update(
+            override["week_type"]
+            for override in _cycle_occurrence_overrides(db, program.id, revisions=available)
+            if override.get("week_type") in {"light", "medium", "heavy"}
+        )
+        return result
+    except AttributeError, KeyError, TypeError, ValueError:
+        return set()
+
+
+def program_cycle_identity(
+    db: Session,
+    program: UserProgram,
+    revisions: list[ProgramRevision],
+    revision_number: int,
+    day: date,
+) -> tuple[int | None, int | None]:
+    available = sorted(
+        (
+            item
+            for item in revisions
+            if item.user_program_id == program.id and item.revision_number <= revision_number
+        ),
+        key=lambda item: item.revision_number,
+    )
+    if not available or available[-1].revision_number != revision_number:
+        return None, None
+    try:
+        start = date.fromisoformat(available[-1].snapshot["program"]["start_date"])
+        week = (day - start).days // 7 + 1
+        config = _cycle_plan_at(db, program, week, revisions=available)
+        if config is None:
+            return None, None
+        cycle, _, boundary = config
+        length = cycle["length_weeks"]
+        if type(length) is not int or length < 1 or week < boundary:
+            return None, None
+        return (week - boundary) % length + 1, boundary
+    except AttributeError, KeyError, OverflowError, TypeError, ValueError, ZeroDivisionError:
+        return None, None
 
 
 def program_nutrition_day(

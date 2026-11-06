@@ -100,6 +100,32 @@ class NutritionDateOverrideSave(NutritionManualTargetSave):
     effective_from: date
 
 
+class NutritionScheduleRuleSave(NutritionManualTargetSave):
+    effective_from: date
+    program_id: int = Field(ge=1)
+    revision_number: int = Field(ge=1)
+    scope: Literal["template", "future", "recovery"]
+    day_type: Literal["training", "rest", "recovery"]
+    week_type: Literal["light", "medium", "heavy"] | None = None
+
+
+class NutritionScheduleBindingRequest(BaseModel):
+    target_telegram_user_id: int | None = Field(default=None, ge=1)
+    program_id: int = Field(ge=1)
+    revision_number: int = Field(ge=1)
+    effective_from: date
+    expected_binding_id: int | None = Field(default=None, ge=1)
+
+
+class NutritionScheduleBindingConfirm(NutritionScheduleBindingRequest):
+    confirm: Literal[True]
+
+
+class NutritionSchedulePreviewRequest(NutritionScheduleBindingRequest):
+    date_from: date
+    date_to: date
+
+
 class NutritionAssignedByResponse(BaseModel):
     id: int
     telegram_user_id: int | None = None
@@ -154,6 +180,55 @@ class NutritionTargetHistoryResponse(BaseModel):
 class NutritionDateOverrideResponse(BaseModel):
     date: date
     target: NutritionTargetResponse
+
+
+class NutritionScheduleRuleResponse(BaseModel):
+    id: int
+    scope: Literal["template", "future", "recovery"]
+    day_type: Literal["training", "rest", "recovery"]
+    week_type: Literal["light", "medium", "heavy"] | None
+    effective_from: date
+    program_id: int | None
+    source_cycle_week: int | None
+    cycle_boundary: int | None
+    weekday: int | None
+    target: NutritionTargetResponse
+
+
+class NutritionScheduleBindingResponse(BaseModel):
+    id: int
+    program_id: int
+    revision_number: int
+    effective_from: date
+
+
+class NutritionScheduleBindingStatus(NutritionScheduleBindingResponse):
+    current_revision_number: int
+    program_changed: bool
+
+
+class NutritionSchedulePreviewTarget(BaseModel):
+    id: int
+    calories: int
+    protein_g: int
+    fat_g: int
+    carbs_g: int
+
+
+class NutritionSchedulePreviewChange(BaseModel):
+    date: date
+    before: NutritionSchedulePreviewTarget | None
+    after: NutritionSchedulePreviewTarget | None
+
+
+class NutritionSchedulePreviewResponse(BaseModel):
+    expected_binding_id: int | None
+    program_id: int
+    revision_number: int
+    effective_from: date
+    date_from: date
+    date_to: date
+    changes: list[NutritionSchedulePreviewChange]
 
 
 class NutritionProgramDayResponse(BaseModel):

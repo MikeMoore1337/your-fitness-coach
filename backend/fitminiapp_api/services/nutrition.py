@@ -4,7 +4,7 @@ import math
 from datetime import date, timedelta
 from typing import Literal, TypedDict, cast
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import Date, Integer, and_, literal, or_
 from sqlalchemy.orm import Session, aliased, joinedload
 
@@ -14,6 +14,7 @@ from fitminiapp_api.core.timezone import (
 )
 from fitminiapp_api.models.food_diary import FoodDiaryDayStatus
 from fitminiapp_api.models.nutrition import (
+    NutritionScheduleBinding,
     NutritionTarget,
     NutritionTargetDateOverride,
     NutritionTargetDaySnapshot,
@@ -362,6 +363,23 @@ def _resolve_target_user(
     raise NutritionError("No permission to manage this user")
 
 
+def lock_nutrition_authorization(db: Session, actor: User, target_user: User) -> None:
+    if actor.id == target_user.id:
+        return
+    active = (
+        db.query(CoachClient.id)
+        .filter(
+            CoachClient.coach_user_id == actor.id,
+            CoachClient.client_user_id == target_user.id,
+            CoachClient.status == "active",
+        )
+        .with_for_update()
+        .first()
+    )
+    if active is None:
+        raise NutritionError("No permission to manage this user")
+
+
 def _assigned_by_response(user: User | None) -> NutritionAssignedByResponse | None:
     if not user:
         return None
@@ -477,6 +495,14 @@ def get_nutrition_target_for_date(
     base = aliased(NutritionTarget)
     frozen = aliased(NutritionTarget)
     overridden = aliased(NutritionTarget)
+    has_schedule = (
+        db.query(NutritionScheduleBinding.id)
+        .filter(
+            NutritionScheduleBinding.user_id == User.id,
+            NutritionScheduleBinding.effective_from <= target_date,
+        )
+        .exists()
+    )
     row = (
         db.query(
             NutritionTargetDaySnapshot.user_id,
@@ -484,6 +510,7 @@ def get_nutrition_target_for_date(
             NutritionTargetDateOverride.id,
             overridden,
             base,
+            has_schedule,
         )
         .select_from(User)
         .outerjoin(
@@ -531,7 +558,15 @@ def get_nutrition_target_for_date(
         return None
     if row[0] is not None:
         return cast(NutritionTarget | None, row[1])
-    return cast(NutritionTarget | None, row[3] if row[2] is not None else row[4])
+    if row[2] is not None:
+        return cast(NutritionTarget | None, row[3])
+    if row[5]:
+        from fitminiapp_api.services.nutrition_schedule import load_scheduled_nutrition_targets
+
+        scheduled = load_scheduled_nutrition_targets(db, {user_id}, target_date, target_date)
+        if (user_id, target_date) in scheduled:
+            return scheduled[(user_id, target_date)]
+    return cast(NutritionTarget | None, row[4])
 
 
 def capture_nutrition_target_snapshot(db: Session, user_id: int, target_date: date) -> None:
@@ -552,20 +587,22 @@ def capture_nutrition_target_snapshot(db: Session, user_id: int, target_date: da
 
 def load_nutrition_targets_and_date_overrides(
     db: Session, user_ids: set[int], start: date, end: date
-) -> tuple[list[NutritionTarget], dict[tuple[int, date], NutritionTarget | None]]:
+) -> tuple[list[NutritionTarget], dict[tuple[int, date], NutritionTarget | None], set[int]]:
     if not user_ids:
-        return [], {}
+        return [], {}, set()
     versions = db.query(
         NutritionTarget.id.label("target_id"),
         literal(None).cast(Integer).label("snapshot_user_id"),
         literal(None).cast(Date).label("snapshot_date"),
         literal(None).cast(Integer).label("override_id"),
+        literal(False).label("binding"),
     ).filter(NutritionTarget.user_id.in_(user_ids), NutritionTarget.target_scope.is_(None))
     frozen = db.query(
         NutritionTargetDaySnapshot.target_id.label("target_id"),
         NutritionTargetDaySnapshot.user_id.label("snapshot_user_id"),
         NutritionTargetDaySnapshot.diary_date.label("snapshot_date"),
         literal(None).cast(Integer).label("override_id"),
+        literal(False).label("binding"),
     ).filter(
         NutritionTargetDaySnapshot.user_id.in_(user_ids),
         NutritionTargetDaySnapshot.diary_date.between(start, end),
@@ -575,17 +612,29 @@ def load_nutrition_targets_and_date_overrides(
         NutritionTargetDateOverride.user_id.label("snapshot_user_id"),
         NutritionTargetDateOverride.target_date.label("snapshot_date"),
         NutritionTargetDateOverride.id.label("override_id"),
+        literal(False).label("binding"),
     ).filter(
         NutritionTargetDateOverride.user_id.in_(user_ids),
         NutritionTargetDateOverride.target_date.between(start, end),
     )
-    records = versions.union_all(frozen, overrides).subquery()
+    bindings = db.query(
+        literal(None).cast(Integer).label("target_id"),
+        NutritionScheduleBinding.user_id.label("snapshot_user_id"),
+        NutritionScheduleBinding.effective_from.label("snapshot_date"),
+        literal(None).cast(Integer).label("override_id"),
+        literal(True).label("binding"),
+    ).filter(
+        NutritionScheduleBinding.user_id.in_(user_ids),
+        NutritionScheduleBinding.effective_from <= end,
+    )
+    records = versions.union_all(frozen, overrides, bindings).subquery()
     rows = (
         db.query(
             NutritionTarget,
             records.c.snapshot_user_id,
             records.c.snapshot_date,
             records.c.override_id,
+            records.c.binding,
         )
         .select_from(records)
         .outerjoin(
@@ -603,7 +652,11 @@ def load_nutrition_targets_and_date_overrides(
     targets: list[NutritionTarget] = []
     snapshots: dict[tuple[int, date], NutritionTarget | None] = {}
     date_overrides: dict[tuple[int, date], tuple[int, NutritionTarget | None]] = {}
-    for target, snapshot_user_id, snapshot_date, override_id in rows:
+    scheduled_users: set[int] = set()
+    for target, snapshot_user_id, snapshot_date, override_id, binding in rows:
+        if binding:
+            scheduled_users.add(snapshot_user_id)
+            continue
         if snapshot_user_id is None and target is not None:
             targets.append(target)
         elif snapshot_user_id is not None and override_id is None:
@@ -612,7 +665,11 @@ def load_nutrition_targets_and_date_overrides(
             key = (snapshot_user_id, snapshot_date)
             if key not in date_overrides or override_id > date_overrides[key][0]:
                 date_overrides[key] = (override_id, target)
-    return targets, {**{key: value[1] for key, value in date_overrides.items()}, **snapshots}
+    return (
+        targets,
+        {**{key: value[1] for key, value in date_overrides.items()}, **snapshots},
+        scheduled_users,
+    )
 
 
 def build_nutrition_target_response_for_user(
@@ -731,6 +788,7 @@ def create_nutrition_target_version(
 ) -> tuple[NutritionTarget, bool]:
     """Create one canonical half-open target period while serializing per user."""
     db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
+    lock_nutrition_authorization(db, changed_by, target_user)
     current = get_current_nutrition_target(db, target_user.id, for_update=True)
     current_day = today_for_user(target_user)
     if effective_from > current_day:
@@ -1008,13 +1066,9 @@ def save_manual_nutrition_target(
     return response
 
 
-def save_nutrition_date_override(
-    db: Session,
-    current_user: User,
-    payload: NutritionDateOverrideSave,
-    idempotency_key: str,
-) -> NutritionDateOverrideResponse:
-    target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+def nutrition_request_identity(
+    current_user: User, payload: BaseModel, idempotency_key: str
+) -> tuple[str, str]:
     key = idempotency_key.strip()
     if not 8 <= len(key) <= 128:
         raise NutritionError("Некорректный ключ повтора запроса")
@@ -1026,7 +1080,19 @@ def save_nutrition_date_override(
             separators=(",", ":"),
         ).encode()
     ).hexdigest()
+    return key, fingerprint
+
+
+def save_nutrition_date_override(
+    db: Session,
+    current_user: User,
+    payload: NutritionDateOverrideSave,
+    idempotency_key: str,
+) -> NutritionDateOverrideResponse:
+    target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    key, fingerprint = nutrition_request_identity(current_user, payload, idempotency_key)
     db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
+    lock_nutrition_authorization(db, current_user, target_user)
     existing = (
         db.query(NutritionTargetDateOverride)
         .filter_by(user_id=target_user.id, idempotency_key=key)

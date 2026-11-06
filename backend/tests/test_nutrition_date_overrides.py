@@ -3,7 +3,7 @@ import io
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from decimal import Decimal
-from threading import Barrier
+from threading import Barrier, Event
 
 import pytest
 
@@ -292,3 +292,54 @@ def test_concurrent_date_override_retry_creates_one_version(client) -> None:
     with get_session_context() as db:
         user_id = db.query(User.id).filter_by(telegram_user_id=952305).scalar()
         assert db.query(NutritionTargetDateOverride).filter_by(user_id=user_id).count() == 1
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_revoked_trainer_cannot_finish_a_write_started_before_revocation(
+    client, monkeypatch
+) -> None:
+    _auth(client, 952308)
+    coach = _auth(client, 952309, coach=True)
+    with get_session_context() as db:
+        athlete_id = db.query(User.id).filter_by(telegram_user_id=952308).scalar()
+        coach_id = db.query(User.id).filter_by(telegram_user_id=952309).scalar()
+        db.add(CoachClient(coach_user_id=coach_id, client_user_id=athlete_id, status="active"))
+    authorized_read = Event()
+    original = nutrition_service._resolve_target_user
+
+    def signal_after_initial_check(*args, **kwargs):
+        result = original(*args, **kwargs)
+        authorized_read.set()
+        return result
+
+    monkeypatch.setattr(nutrition_service, "_resolve_target_user", signal_after_initial_check)
+    payload = {
+        "target_telegram_user_id": 952308,
+        "calories": 2000,
+        "protein_g": 150,
+        "fat_g": 70,
+        "carbs_g": 180,
+        "effective_from": today_msk().isoformat(),
+    }
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with get_session_context() as db:
+            relation = (
+                db.query(CoachClient)
+                .filter_by(coach_user_id=coach_id, client_user_id=athlete_id)
+                .with_for_update()
+                .one()
+            )
+            relation.status = "ended"
+            db.flush()
+            request = pool.submit(
+                client.post,
+                "/api/v1/nutrition/targets/dates",
+                json=payload,
+                headers={**coach, "Idempotency-Key": "revoked-date-write"},
+            )
+            assert authorized_read.wait(timeout=5)
+            assert not request.done()
+        response = request.result(timeout=10)
+    assert response.status_code == 403
+    with get_session_context() as db:
+        assert db.query(NutritionTargetDateOverride).filter_by(user_id=athlete_id).count() == 0
