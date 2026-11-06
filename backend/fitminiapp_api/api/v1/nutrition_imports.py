@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -19,6 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from fitminiapp_api.api.dependencies.auth import require_user
 from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.db.session import get_db
+from fitminiapp_api.models.token import RefreshToken
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import_engine import (
     ImportCancelRequest,
@@ -29,6 +32,7 @@ from fitminiapp_api.schemas.nutrition_import_engine import (
 )
 from fitminiapp_api.services.nutrition_import_drafts import (
     NutritionDraftError,
+    _lock_user,
     cancel_nutrition_import_draft,
     confirm_nutrition_import_draft,
     create_nutrition_import_draft,
@@ -67,6 +71,7 @@ def _error(exc: NutritionDraftError | NutritionImportValidationError) -> HTTPExc
         status = 400
     messages = {
         "not_found": "Черновик не найден",
+        "access_revoked": "Сессия недействительна или истекла",
         "draft_unavailable": "Черновик больше недоступен",
         "draft_changed": "Черновик изменился. Загрузите файл снова",
         "stale_revision": "Черновик изменился. Обновите предпросмотр",
@@ -204,14 +209,36 @@ def resolve(
         raise _storage_error() from None
 
 
+def _lock_active_session(db: Session, user: User, family_id: str | None) -> None:
+    _lock_user(db, user)
+    if not family_id:
+        raise NutritionDraftError("access_revoked", 401)
+    active = (
+        db.query(RefreshToken.id)
+        .filter(
+            RefreshToken.user_id == user.id,
+            RefreshToken.family_id == family_id,
+            RefreshToken.is_revoked.is_(False),
+            RefreshToken.is_used.is_(False),
+            RefreshToken.expires_at >= datetime.now(UTC).replace(tzinfo=None),
+        )
+        .with_for_update()
+        .first()
+    )
+    if active is None:
+        raise NutritionDraftError("access_revoked", 401)
+
+
 @router.post("/{draft_id}/confirm", response_model=ImportReceipt)
 def confirm(
     draft_id: str,
     payload: ImportConfirmRequest,
+    request: Request,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
     try:
+        _lock_active_session(db, current_user, getattr(request.state, "session_family_id", None))
         result = ImportReceipt.model_validate(
             confirm_nutrition_import_draft(
                 db,

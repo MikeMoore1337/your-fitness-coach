@@ -360,3 +360,26 @@ def test_resolutions_keep_distinct_food_snapshots(client):
         assert [
             db.get(FoodDiaryEntry, entry_id).food_name for entry_id in receipt["entry_ids"]
         ] == ["Synthetic A", "Synthetic B"]
+
+
+def test_confirm_rechecks_account_after_authentication(client):
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL transaction isolation")
+    from fitminiapp_api.db.session import SessionLocal
+
+    _auth(client, 982_013)
+    owner_id = _user_id(982_013)
+    with get_session_context() as setup:
+        owner = setup.get(User, owner_id)
+        draft_id, _, preview = _prepared(setup, owner)
+        setup.commit()
+    with SessionLocal() as stale, SessionLocal() as revoker:
+        stale_owner = stale.get(User, owner_id)
+        assert stale_owner.is_active
+        revoker.get(User, owner_id).is_active = False
+        revoker.commit()
+        with pytest.raises(NutritionDraftError, match="access_revoked"):
+            _confirm(stale, stale_owner, draft_id, preview)
+        stale.rollback()
+    with get_session_context() as db:
+        assert db.query(FoodDiaryEntry).filter_by(user_id=owner_id).count() == 0

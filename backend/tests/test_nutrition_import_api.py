@@ -228,3 +228,22 @@ def test_expired_upload_attempts_are_cleaned_without_touching_recent(client, pos
         assert expire_upload_attempts(db, now=now) == 1
         db.flush()
         assert db.query(NutritionImportUploadAttempt).filter_by(owner_user_id=owner_id).count() == 1
+
+
+def test_confirm_rechecks_revoked_session_family(client, postgres):
+    from fitminiapp_api.api.v1.nutrition_imports import _lock_active_session
+    from fitminiapp_api.db.session import SessionLocal
+    from fitminiapp_api.services.jwt import decode_token
+    from fitminiapp_api.services.token_service import revoke_refresh_token_family
+
+    headers = _auth(client, 983_014)
+    owner_id = _user_id(983_014)
+    family_id = decode_token(
+        headers["Authorization"].removeprefix("Bearer "), expected_type="access"
+    )["sid"]
+    with SessionLocal() as stale, SessionLocal() as revoker:
+        user = stale.get(User, owner_id)
+        revoke_refresh_token_family(revoker, owner_id, family_id)
+        with pytest.raises(NutritionDraftError, match="access_revoked"):
+            _lock_active_session(stale, user, family_id)
+        stale.rollback()

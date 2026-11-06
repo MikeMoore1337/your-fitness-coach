@@ -68,7 +68,9 @@ def _digest(value: bytes) -> str:
 
 
 def _lock_user(db: Session, user: User) -> None:
-    db.query(User.id).filter(User.id == user.id).with_for_update().one()
+    row = db.query(User.is_active).filter(User.id == user.id).with_for_update().first()
+    if row is None or not row.is_active:
+        raise NutritionDraftError("access_revoked", 401)
 
 
 def get_nutrition_import_draft(
