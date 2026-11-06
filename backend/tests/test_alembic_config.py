@@ -121,7 +121,11 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
     assert auth_families is not None
     assert relocated_marker is not None
     assert auth_families.down_revision == legacy_support.revision
-    assert revisions.get_heads() == ["0148_import_self_assignment"]
+    assert revisions.get_heads() == ["0149_nutrition_target_snapshots"]
+    assert (
+        revisions.get_revision("0149_nutrition_target_snapshots").down_revision
+        == "0148_import_self_assignment"
+    )
     assert (
         revisions.get_revision("0148_import_self_assignment").down_revision
         == "0147_session_rotation"

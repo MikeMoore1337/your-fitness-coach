@@ -17,12 +17,19 @@ online_rollout_notes = "Add an empty completed-day target reference table withou
 def upgrade() -> None:
     op.create_table(
         "nutrition_target_day_snapshots",
-        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ),
         sa.Column("diary_date", sa.Date(), nullable=False),
-        sa.Column("target_id", sa.Integer(), nullable=True),
-        sa.Column("captured_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["target_id"], ["nutrition_targets.id"], ondelete="RESTRICT"),
+        sa.Column(
+            "target_id",
+            sa.Integer(),
+            sa.ForeignKey("nutrition_targets.id", ondelete="RESTRICT"),
+            nullable=True,
+        ),
+        sa.Column(
+            "captured_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+        ),
         sa.PrimaryKeyConstraint("user_id", "diary_date"),
     )
 

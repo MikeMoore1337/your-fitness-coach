@@ -13,7 +13,6 @@ from sqlalchemy import (
     Numeric,
     String,
     event,
-    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -133,7 +132,7 @@ class NutritionTargetDaySnapshot(Base):
         ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=True
     )
     captured_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=now_msk_naive, server_default=func.now()
+        DateTime, nullable=False, default=now_msk_naive, server_default=text("CURRENT_TIMESTAMP")
     )
 
 
