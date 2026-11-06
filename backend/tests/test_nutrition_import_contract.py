@@ -71,6 +71,29 @@ def test_synthetic_csv_shapes_are_inputs_not_an_adapter_test():
         list(csv.reader(handle, strict=True))
 
 
+def test_synthetic_summary_and_detail_headers_have_distinct_shapes():
+    fixture = FIXTURES / "synthetic-summary-ru.csv"
+    raw = fixture.read_bytes()
+    assert raw.startswith(bytes.fromhex("efbbbf"))
+    assert raw.count(bytes([10])) == raw.count(bytes([13, 10]))
+    with fixture.open(encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.reader(handle, strict=True))
+
+    assert rows[0] == ["# Period Summary"]
+    assert [len(row) for row in rows[1:4]] == [5, 5, 5]
+    assert rows[1][0] == "Суточная норма (пример)"
+    assert rows[4] == ["# Report Details"]
+    assert len(rows[5]) == 11
+    assert rows[5][3] == "Н/жир (г)"
+
+
+@pytest.mark.parametrize("aggregation", ["daily_average", "daily_reference", "unknown"])
+def test_v1_rejects_an_explicit_summary_aggregation(payload, aggregation):
+    payload["original_totals"][1]["aggregation"] = aggregation
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        NutritionImportV1.model_validate(payload)
+
+
 def test_report_preserves_a_reported_total_mismatch_without_rewriting_it(payload):
     payload["rows"] = payload["rows"][:1]
     payload["original_totals"] = payload["original_totals"][:1]
