@@ -54,6 +54,8 @@ from fitminiapp_api.services.notifications import (
     sync_workout_reminders,
     validate_notification_destination,
 )
+from fitminiapp_api.services.nutrition_import_drafts import expire_nutrition_import_drafts
+from fitminiapp_api.services.nutrition_import_limits import expire_upload_attempts
 from fitminiapp_api.services.program_imports import expire_program_imports
 from fitminiapp_api.services.reminder_templates import sync_contextual_reminders
 from fitminiapp_api.services.telegram_transport import (
@@ -679,6 +681,8 @@ async def run_once(*, sync_reminders: bool = True) -> None:
         prune_account_exports(db)
         expire_program_imports(db)
         expire_history_import_drafts(db)
+        expire_nutrition_import_drafts(db)
+        expire_upload_attempts(db)
         if sync_reminders:
             prune_audit_events(db, retention_days=settings.audit_event_retention_days)
             prune_lifecycle_milestones(
