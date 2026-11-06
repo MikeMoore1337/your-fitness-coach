@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    UniqueConstraint,
     event,
     text,
 )
@@ -98,6 +99,7 @@ class NutritionTarget(Base):
 
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    target_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="calculated")
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     superseded_by_id: Mapped[int | None] = mapped_column(
@@ -119,6 +121,110 @@ class NutritionTarget(Base):
     def created_at(self) -> datetime:
         """Canonical creation timestamp backed by the legacy saved-at column."""
         return self.saved_at
+
+
+class NutritionTargetDaySnapshot(Base):
+    __tablename__ = "nutrition_target_day_snapshots"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    diary_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    target_id: Mapped[int | None] = mapped_column(
+        ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=True
+    )
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_msk_naive, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class NutritionTargetDateOverride(Base):
+    __tablename__ = "nutrition_target_date_overrides"
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_nutrition_date_override_request"),
+        Index("ix_nutrition_date_overrides_user_date", "user_id", "target_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    target_id: Mapped[int] = mapped_column(
+        ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=False
+    )
+    target_date: Mapped[date] = mapped_column(Date, nullable=False)
+    day_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_msk_naive, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class NutritionScheduleBinding(Base):
+    __tablename__ = "nutrition_schedule_bindings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_nutrition_binding_request"),
+        Index("ix_nutrition_bindings_user_date", "user_id", "effective_from"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    program_revision_id: Mapped[int] = mapped_column(
+        ForeignKey("program_revisions.id", ondelete="RESTRICT"), nullable=False
+    )
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_msk_naive, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class NutritionTargetScheduleRule(Base):
+    __tablename__ = "nutrition_target_schedule_rules"
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_nutrition_schedule_rule_request"),
+        CheckConstraint(
+            "scope IN ('template', 'future', 'recovery')", name="ck_nutrition_schedule_rule_scope"
+        ),
+        CheckConstraint(
+            "day_type IN ('training', 'rest', 'recovery')", name="ck_nutrition_schedule_day_type"
+        ),
+        CheckConstraint(
+            "week_type IS NULL OR week_type IN ('light', 'medium', 'heavy')",
+            name="ck_nutrition_schedule_week_type",
+        ),
+        Index("ix_nutrition_schedule_rules_user_date", "user_id", "effective_from"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    target_id: Mapped[int] = mapped_column(
+        ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=False
+    )
+    program_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_programs.id", ondelete="RESTRICT"), nullable=True
+    )
+    scope: Mapped[str] = mapped_column(String(16), nullable=False)
+    day_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    week_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    source_cycle_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cycle_boundary: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weekday: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_msk_naive, server_default=text("CURRENT_TIMESTAMP")
+    )
 
 
 @event.listens_for(NutritionTarget, "before_insert")

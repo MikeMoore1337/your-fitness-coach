@@ -59,7 +59,10 @@ from fitminiapp_api.services.foods import (
     get_visible_food,
 )
 from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
-from fitminiapp_api.services.nutrition import get_nutrition_target_for_user
+from fitminiapp_api.services.nutrition import (
+    capture_nutrition_target_snapshot,
+    get_nutrition_target_for_date,
+)
 from fitminiapp_api.services.progress_weekly_action import (
     record_progress_weekly_action_completion,
 )
@@ -787,7 +790,7 @@ def get_food_diary_day(
         else ("incomplete" if serialized else "unlogged")
     )
 
-    nutrition_target = get_nutrition_target_for_user(db, user)
+    nutrition_target = get_nutrition_target_for_date(db, user.id, selected_date)
     targets = None
     remaining = None
     if nutrition_target is not None:
@@ -848,6 +851,8 @@ def set_food_diary_day_status(
         raise FoodDiaryConflictError("a day with food entries cannot be marked as fasted")
     if payload.status == "complete" and not has_entries:
         raise FoodDiaryError("an empty day must be marked as fasted instead of complete")
+    if payload.status in {"complete", "fasted"}:
+        capture_nutrition_target_snapshot(db, user.id, payload.diary_date)
     if payload.status == "unlogged":
         if stored is not None:
             db.delete(stored)

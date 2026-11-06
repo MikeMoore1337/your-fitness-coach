@@ -52,7 +52,14 @@ from fitminiapp_api.models.notification import (
     NotificationSetting,
     WebPushSubscription,
 )
-from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition import (
+    EnergyCalibration,
+    NutritionScheduleBinding,
+    NutritionTarget,
+    NutritionTargetDateOverride,
+    NutritionTargetDaySnapshot,
+    NutritionTargetScheduleRule,
+)
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.nutrition_plan import NutritionPlan
 from fitminiapp_api.models.nutrition_power import (
@@ -93,7 +100,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 26
+ACCOUNT_EXPORT_SCHEMA_VERSION = 29
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -110,6 +117,10 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "body_measurement_custom_values": "measurements",
     "cardio_sessions": "cardio_sessions",
     "nutrition_targets": "nutrition",
+    "nutrition_schedule_bindings": "nutrition",
+    "nutrition_target_date_overrides": "nutrition",
+    "nutrition_target_day_snapshots": "nutrition",
+    "nutrition_target_schedule_rules": "nutrition",
     "hydration_goals": "hydration",
     "hydration_entries": "hydration",
     "hydration_presets": "hydration",
@@ -385,6 +396,7 @@ NUTRITION_FIELDS = (
     "id",
     "effective_from",
     "effective_to",
+    "target_scope",
     "source",
     "created_by_user_id",
     "created_at",
@@ -928,6 +940,32 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .all()
     )
     nutrition = next((row for row in nutrition_history if row.effective_to is None), None)
+    nutrition_snapshots = (
+        db.query(NutritionTargetDaySnapshot)
+        .filter(NutritionTargetDaySnapshot.user_id == user.id)
+        .order_by(NutritionTargetDaySnapshot.diary_date.asc())
+        .all()
+    )
+    nutrition_overrides = (
+        db.query(NutritionTargetDateOverride)
+        .filter(NutritionTargetDateOverride.user_id == user.id)
+        .order_by(
+            NutritionTargetDateOverride.target_date.asc(), NutritionTargetDateOverride.id.asc()
+        )
+        .all()
+    )
+    nutrition_bindings = (
+        db.query(NutritionScheduleBinding)
+        .filter(NutritionScheduleBinding.user_id == user.id)
+        .order_by(NutritionScheduleBinding.effective_from, NutritionScheduleBinding.id)
+        .all()
+    )
+    nutrition_schedule_rules = (
+        db.query(NutritionTargetScheduleRule)
+        .filter(NutritionTargetScheduleRule.user_id == user.id)
+        .order_by(NutritionTargetScheduleRule.effective_from, NutritionTargetScheduleRule.id)
+        .all()
+    )
     hydration_goals = (
         db.query(HydrationGoal)
         .filter(HydrationGoal.user_id == user.id)
@@ -1408,6 +1446,44 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "nutrition": (_fields(nutrition, NUTRITION_FIELDS) if nutrition else None),
         "nutrition_target_history": [
             _fields(target, NUTRITION_FIELDS) for target in nutrition_history
+        ],
+        "nutrition_target_day_snapshots": [
+            _fields(snapshot, ("diary_date", "target_id", "captured_at"))
+            for snapshot in nutrition_snapshots
+        ],
+        "nutrition_target_date_overrides": [
+            _fields(
+                override,
+                ("id", "target_date", "day_type", "target_id", "created_by_user_id", "created_at"),
+            )
+            for override in nutrition_overrides
+        ],
+        "nutrition_schedule_bindings": [
+            _fields(
+                item,
+                ("id", "program_revision_id", "effective_from", "created_by_user_id", "created_at"),
+            )
+            for item in nutrition_bindings
+        ],
+        "nutrition_target_schedule_rules": [
+            _fields(
+                item,
+                (
+                    "id",
+                    "target_id",
+                    "program_id",
+                    "scope",
+                    "day_type",
+                    "week_type",
+                    "effective_from",
+                    "source_cycle_week",
+                    "cycle_boundary",
+                    "weekday",
+                    "created_by_user_id",
+                    "created_at",
+                ),
+            )
+            for item in nutrition_schedule_rules
         ],
         "hydration": {
             "goals": [

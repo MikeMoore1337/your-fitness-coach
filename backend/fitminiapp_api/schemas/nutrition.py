@@ -96,6 +96,46 @@ class NutritionManualTargetSave(BaseModel):
     confirm_energy_mismatch: bool = False
 
 
+class NutritionDateOverrideSave(NutritionManualTargetSave):
+    effective_from: date
+    day_type: Literal["training", "rest", "recovery"] | None = None
+    expected_target_id: int | None = Field(default=None, ge=1)
+
+
+class NutritionScheduleRuleSave(NutritionManualTargetSave):
+    effective_from: date
+    program_id: int = Field(ge=1)
+    revision_number: int = Field(ge=1)
+    scope: Literal["template", "future", "recovery"]
+    day_type: Literal["training", "rest", "recovery"]
+    week_type: Literal["light", "medium", "heavy"] | None = None
+    expected_binding_id: int | None = Field(default=None, ge=1)
+    expected_target_version: int | None = Field(default=None, ge=1)
+
+
+class NutritionScheduleRulePreviewRequest(NutritionScheduleRuleSave):
+    date_from: date
+    date_to: date
+
+
+class NutritionScheduleBindingRequest(BaseModel):
+    target_telegram_user_id: int | None = Field(default=None, ge=1)
+    program_id: int = Field(ge=1)
+    revision_number: int = Field(ge=1)
+    effective_from: date
+    expected_binding_id: int | None = Field(default=None, ge=1)
+    expected_target_version: int | None = Field(default=None, ge=1)
+
+
+class NutritionScheduleBindingConfirm(NutritionScheduleBindingRequest):
+    confirm: Literal[True]
+
+
+class NutritionSchedulePreviewRequest(NutritionScheduleBindingRequest):
+    date_from: date
+    date_to: date
+
+
 class NutritionAssignedByResponse(BaseModel):
     id: int
     telegram_user_id: int | None = None
@@ -145,6 +185,89 @@ class NutritionTargetResponse(BaseModel):
 
 class NutritionTargetHistoryResponse(BaseModel):
     items: list[NutritionTargetResponse]
+
+
+class NutritionDateOverrideResponse(BaseModel):
+    date: date
+    day_type: Literal["training", "rest", "recovery"] | None = None
+    target: NutritionTargetResponse
+
+
+class NutritionResolvedTargetResponse(BaseModel):
+    date: date
+    target: NutritionTargetResponse | None
+    origin: Literal["base", "schedule", "date", "none"]
+    day_type: Literal["training", "rest", "recovery"] | None
+    week_type: Literal["light", "medium", "heavy"] | None
+    frozen: bool
+
+
+class NutritionScheduleRuleResponse(BaseModel):
+    id: int
+    scope: Literal["template", "future", "recovery"]
+    day_type: Literal["training", "rest", "recovery"]
+    week_type: Literal["light", "medium", "heavy"] | None
+    effective_from: date
+    program_id: int | None
+    source_cycle_week: int | None
+    cycle_boundary: int | None
+    weekday: int | None
+    target: NutritionTargetResponse
+
+
+class NutritionScheduleBindingResponse(BaseModel):
+    id: int
+    program_id: int
+    revision_number: int
+    effective_from: date
+
+
+class NutritionScheduleBindingStatus(NutritionScheduleBindingResponse):
+    current_revision_number: int
+    program_changed: bool
+
+
+class NutritionScheduleProgramContext(BaseModel):
+    program_id: int
+    revision_number: int
+    title: str
+    start_date: date
+    duration_weeks: int
+    schedule_mode: Literal["calendar", "rotation"]
+    week_types: list[Literal["light", "medium", "heavy"]]
+
+
+class NutritionSchedulePreviewTarget(BaseModel):
+    id: int
+    calories: int
+    protein_g: int
+    fat_g: int
+    carbs_g: int
+
+
+class NutritionSchedulePreviewChange(BaseModel):
+    date: date
+    before: NutritionSchedulePreviewTarget | None
+    after: NutritionSchedulePreviewTarget | None
+
+
+class NutritionSchedulePreviewResponse(BaseModel):
+    expected_binding_id: int | None
+    expected_target_version: int | None
+    program_id: int
+    revision_number: int
+    effective_from: date
+    date_from: date
+    date_to: date
+    changes: list[NutritionSchedulePreviewChange]
+
+
+class NutritionProgramDayResponse(BaseModel):
+    date: date
+    program_id: int
+    revision_number: int
+    day_type: Literal["training", "rest"] | None
+    week_type: Literal["light", "medium", "heavy"] | None
 
 
 EnergyCalibrationStatus = Literal[
