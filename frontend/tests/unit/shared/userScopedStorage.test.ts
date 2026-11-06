@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   HYDRATION_PENDING_SESSION_PREFIX,
+  HYDRATION_PENDING_STORAGE_PREFIX,
   USER_SCOPED_PERSISTENT_STORAGE_REGISTRY,
   activeWorkoutPointerStorageKey,
   activeWorkoutQueueStorageKey,
@@ -111,10 +112,17 @@ describe('user-scoped browser storage registry', () => {
     const other = `${HYDRATION_PENDING_SESSION_PREFIX}8`;
     sessionStorage.setItem(same, 'pending');
     sessionStorage.setItem(other, 'other account');
+    const shared = `${HYDRATION_PENDING_STORAGE_PREFIX}user_7`;
+    const sharedOther = `${HYDRATION_PENDING_STORAGE_PREFIX}user_8`;
+    localStorage.setItem(shared, 'pending');
+    localStorage.setItem(sharedOther, 'other account');
     clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
     expect(sessionStorage.getItem(same)).toBe('pending');
     expect(sessionStorage.getItem(other)).toBeNull();
+    expect(localStorage.getItem(shared)).toBe('pending');
+    expect(localStorage.getItem(sharedOther)).toBeNull();
     clearSensitiveUserScopedStorage();
     expect(sessionStorage.getItem(same)).toBeNull();
+    expect(localStorage.getItem(shared)).toBeNull();
   });
 });

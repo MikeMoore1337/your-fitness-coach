@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../shared/api/client';
+import { api, authDiscardChanged, authDiscardSnapshot } from '../../shared/api/client';
 import type { HydrationDay, HydrationEntry, HydrationPreset, User } from '../../shared/api/types';
 import { queryKeys } from '../../shared/queryKeys';
 import { haptic } from '../../shared/telegram/useTelegram';
@@ -17,11 +17,18 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Icon } from '../../shared/ui/Icon';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
-import { useRuntime, type ApiRuntime } from '../../shared/runtime/runtime';
+import { getApiRuntime, useRuntime } from '../../shared/runtime/runtime';
+import { AUTHENTICATED_USER_ID_STORAGE_KEY } from '../../shared/userScopedStorage';
 import {
-  AUTHENTICATED_USER_ID_STORAGE_KEY,
-  HYDRATION_PENDING_SESSION_PREFIX,
-} from '../../shared/userScopedStorage';
+  HYDRATION_PENDING_EVENT,
+  demoHydrationScope,
+  pendingStorageKey,
+  readPendingHydration,
+  withPendingHydration,
+  writePendingHydration,
+  type HydrationAddRequest as AddRequest,
+  type PendingHydration,
+} from './hydrationPending';
 
 // Inter has no Unicode subscript ₂; its ordinary 2 is rendered below the baseline.
 const waterFormula = 'H₂O';
@@ -35,56 +42,12 @@ const beverageLabels: Record<string, string> = {
   other: 'Другой напиток',
 };
 
-type AddRequest = {
-  volume: number;
-  kind: string;
-  source: 'quick_preset' | 'manual';
-  date: string;
-  key: string;
-  uncertain: boolean;
-};
-type PendingAdds = Record<string, AddRequest>;
+type AuthDiscard = ReturnType<typeof authDiscardSnapshot> & { userId?: number };
 
-function hydrationScope(runtime: ApiRuntime): string {
-  if (runtime.kind === 'demo') return `demo:${runtime.sessionToken}`;
+function accountHydrationScope(): string | null {
   try {
     const id = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
-    return Number.isSafeInteger(id) && id > 0 ? `user:${id}` : 'anonymous';
-  } catch {
-    return 'anonymous';
-  }
-}
-
-function pendingStorageKey(scope: string): string | null {
-  return scope.startsWith('user:') ? `${HYDRATION_PENDING_SESSION_PREFIX}${scope.slice(5)}` : null;
-}
-
-function loadPending(scope: string): PendingAdds | null {
-  const key = pendingStorageKey(scope);
-  if (!key) return null;
-  try {
-    const value: unknown = JSON.parse(sessionStorage.getItem(key) ?? '{}');
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-    const pending: PendingAdds = {};
-    for (const [date, raw] of Object.entries(value)) {
-      if (!raw || typeof raw !== 'object') continue;
-      const item = raw as AddRequest;
-      if (
-        /^\d{4}-\d{2}-\d{2}$/.test(date) &&
-        item.date === date &&
-        Number.isInteger(item.volume) &&
-        item.volume >= 1 &&
-        item.volume <= 5000 &&
-        Object.hasOwn(beverageLabels, item.kind) &&
-        (item.source === 'quick_preset' || item.source === 'manual') &&
-        typeof item.key === 'string' &&
-        item.key.length > 0 &&
-        item.key.length <= 128
-      ) {
-        pending[date] = { ...item, uncertain: true };
-      }
-    }
-    return pending;
+    return Number.isSafeInteger(id) && id > 0 ? `user_${id}` : null;
   } catch {
     return null;
   }
@@ -248,49 +211,101 @@ export function HydrationTracker({
   const queryClient = useQueryClient();
   const { toast, confirm } = useFeedback();
   const runtime = useRuntime();
-  const scope = hydrationScope(runtime);
+  const demoToken = runtime.kind === 'demo' ? runtime.sessionToken : null;
+  const [demoScope, setDemoScope] = useState<{ token: string; scope: string } | null>(null);
+  useEffect(() => {
+    if (!demoToken) return;
+    let active = true;
+    void demoHydrationScope(demoToken)
+      .then((scope) => {
+        if (active) setDemoScope({ token: demoToken, scope });
+      })
+      .catch(() => {
+        if (active) toast('Не удалось безопасно подготовить запись напитка.', 'error');
+      });
+    return () => {
+      active = false;
+    };
+  }, [demoToken, toast]);
+  const scope = demoToken
+    ? demoScope?.token === demoToken
+      ? demoScope.scope
+      : null
+    : accountHydrationScope();
   const scopeRef = useRef(scope);
   const dateRef = useRef(diaryDate);
   useLayoutEffect(() => {
     scopeRef.current = scope;
     dateRef.current = diaryDate;
   }, [scope, diaryDate]);
-  const [pendingState, setPendingState] = useState(() => ({
-    scope,
-    entries: loadPending(scope) ?? {},
-  }));
+  const [pendingState, setPendingState] = useState<{
+    scope: string | null;
+    entries: PendingHydration;
+  }>({ scope: null, entries: {} });
   const pendingRef = useRef(pendingState);
-  const storageUnavailableRef = useRef(false);
+  const observedDemoGenerationRef = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (pendingRef.current.scope !== scope) {
-      const next = { scope, entries: loadPending(scope) ?? {} };
-      storageUnavailableRef.current = false;
-      pendingRef.current = next;
-      setPendingState(next);
-    }
-  }, [scope]);
-  const updatePending = (requestScope: string, update: (entries: PendingAdds) => PendingAdds) => {
-    if (
-      requestScope !== scopeRef.current ||
-      requestScope !== hydrationScope(runtime) ||
-      requestScope !== pendingRef.current.scope
-    )
-      return;
-    const stored = storageUnavailableRef.current ? null : loadPending(requestScope);
-    const next = { scope: requestScope, entries: update(stored ?? pendingRef.current.entries) };
-    pendingRef.current = next;
-    setPendingState(next);
-    const key = pendingStorageKey(requestScope);
-    if (key) {
+    if (!scope) return;
+    let active = true;
+    const sync = (otherTab = false) => {
       try {
-        if (Object.keys(next.entries).length)
-          sessionStorage.setItem(key, JSON.stringify(next.entries));
-        else sessionStorage.removeItem(key);
+        const store = readPendingHydration(scope);
+        const previous = pendingRef.current.scope === scope ? pendingRef.current.entries : {};
+        const confirmedElsewhere =
+          otherTab &&
+          Object.values(previous)
+            .flat()
+            .some((item) => store.confirmed.includes(item.key));
+        if (active) {
+          const next = { scope, entries: store.entries };
+          pendingRef.current = next;
+          setPendingState(next);
+          if (confirmedElsewhere) {
+            toast('Запись сохранена в другой вкладке.');
+          }
+          if (
+            confirmedElsewhere ||
+            (otherTab &&
+              demoToken &&
+              store.demoGeneration !== undefined &&
+              store.demoGeneration !== observedDemoGenerationRef.current)
+          ) {
+            void queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.hydration });
+          }
+        }
       } catch {
-        // shortcut: recovery is in-memory when session storage is unavailable; use durable storage if required.
-        storageUnavailableRef.current = true;
+        // Submitting reports storage failures without sending an unsafe request.
       }
-    }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === pendingStorageKey(scope)) sync(true);
+    };
+    const onLocal = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === pendingStorageKey(scope)) sync();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(HYDRATION_PENDING_EVENT, onLocal);
+    void withPendingHydration(scope, (store) => {
+      if (active) {
+        const next = { scope, entries: store.entries };
+        pendingRef.current = next;
+        setPendingState(next);
+      }
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(HYDRATION_PENDING_EVENT, onLocal);
+    };
+  }, [scope, demoToken, toast, queryClient]);
+  const isCurrentScope = (requestScope: string, boundary?: AuthDiscard) => {
+    const current = getApiRuntime();
+    if (requestScope !== scopeRef.current) return false;
+    return demoToken
+      ? current.kind === 'demo' && current.sessionToken === demoToken
+      : current.kind === 'production' &&
+          accountHydrationScope() === requestScope &&
+          (boundary === undefined || !authDiscardChanged(boundary));
   };
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const quickAddRef = useRef<HTMLDivElement>(null);
@@ -307,23 +322,62 @@ export function HydrationTracker({
   const [presetVolume, setPresetVolume] = useState('');
   const hydration = useQuery({
     queryKey: queryKeys.nutrition.hydrationDate(diaryDate),
-    queryFn: () => api<HydrationDay>(`/api/v1/nutrition/hydration?diary_date=${diaryDate}`),
+    queryFn: () =>
+      api<HydrationDay & { demo_generation?: number }>(
+        `/api/v1/nutrition/hydration?diary_date=${diaryDate}`,
+      ),
   });
   const profile = useQuery({
     queryKey: ['me'],
     queryFn: () => api<User>('/api/v1/me'),
   });
+  const demoGeneration = hydration.data?.demo_generation;
+  useLayoutEffect(() => {
+    observedDemoGenerationRef.current = demoGeneration;
+  }, [demoToken, demoGeneration]);
+  const lastDemoGenerationRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!demoToken || demoGeneration === undefined) return;
+    if (
+      lastDemoGenerationRef.current !== undefined &&
+      lastDemoGenerationRef.current !== demoGeneration
+    )
+      setUndoEntry(null);
+    lastDemoGenerationRef.current = demoGeneration;
+  }, [demoToken, demoGeneration]);
+  useEffect(() => {
+    if (!scope || !demoToken || !Number.isSafeInteger(demoGeneration)) return;
+    void withPendingHydration(scope, (store) => {
+      if (store.demoGeneration !== undefined && (demoGeneration ?? -1) < store.demoGeneration)
+        return;
+      let changed = store.demoGeneration !== demoGeneration;
+      if (store.demoGeneration !== undefined && store.demoGeneration !== demoGeneration)
+        store.confirmed = [];
+      store.demoGeneration = demoGeneration;
+      for (const [date, items] of Object.entries(store.entries)) {
+        const current = items.filter((item) => item.demoGeneration === demoGeneration);
+        if (current.length !== items.length) {
+          store.entries[date] = current;
+          changed = true;
+        }
+      }
+      if (changed) writePendingHydration(scope, store);
+    }).catch(() => undefined);
+  }, [scope, demoToken, demoGeneration]);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (
       !initialExpanded ||
+      !scope ||
       !hydration.data ||
       !quickAddRef.current ||
       url.searchParams.get('hydration') !== 'quick'
     ) {
       return;
     }
-    quickAddRef.current.querySelector('button')?.focus({ preventScroll: true });
+    const button = quickAddRef.current.querySelector<HTMLButtonElement>('button:not(:disabled)');
+    if (!button) return;
+    button.focus({ preventScroll: true });
     quickAddRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
     url.searchParams.delete('hydration');
     window.history.replaceState(
@@ -332,7 +386,7 @@ export function HydrationTracker({
       `${url.pathname}${url.search}${url.hash}`,
     );
     window.dispatchEvent(new PopStateEvent('popstate'));
-  }, [initialExpanded, hydration.data]);
+  }, [initialExpanded, hydration.data, scope]);
   const loadedGoal = hydration.data?.goal;
   const loadedGoalIsReference = loadedGoal?.source === 'national_academies_beverages';
   const goalMode = goalModeDraft ?? (loadedGoal && !loadedGoalIsReference ? 'manual' : 'reference');
@@ -353,7 +407,15 @@ export function HydrationTracker({
     ]);
   };
   const add = useMutation({
-    mutationFn: ({ request, demo }: { request: AddRequest; scope: string; demo: boolean }) =>
+    mutationFn: ({
+      request,
+      demo,
+    }: {
+      request: AddRequest;
+      scope: string;
+      demo: boolean;
+      boundary?: AuthDiscard;
+    }) =>
       api<HydrationEntry>('/api/v1/nutrition/hydration/entries', {
         method: 'POST',
         headers: { 'Idempotency-Key': request.key },
@@ -362,17 +424,35 @@ export function HydrationTracker({
           beverage_type: request.kind,
           diary_date: request.date,
           source: request.source,
-          ...(demo ? { _hydration_retry_key: request.key } : {}),
+          ...(demo
+            ? { _hydration_retry_key: request.key, _hydration_generation: request.demoGeneration }
+            : {}),
         },
       }),
-    onSuccess: async (entry, { request, scope: requestScope }) => {
-      if (requestScope !== scopeRef.current || requestScope !== hydrationScope(runtime)) return;
-      updatePending(requestScope, (entries) => {
-        if (entries[request.date]?.key !== request.key) return entries;
-        const next = { ...entries };
-        delete next[request.date];
-        return next;
-      });
+    onSuccess: async (entry, { request, scope: requestScope, boundary }) => {
+      if (!isCurrentScope(requestScope, boundary)) return;
+      let removed = false;
+      try {
+        await withPendingHydration(requestScope, (store) => {
+          if (!isCurrentScope(requestScope, boundary)) return;
+          if (demoToken && store.demoGeneration !== request.demoGeneration) return;
+          const items = store.entries[request.date] ?? [];
+          store.entries[request.date] = items.filter((item) => item.key !== request.key);
+          store.confirmed = [
+            ...store.confirmed.filter((key) => key !== request.key),
+            request.key,
+          ].slice(-100);
+          writePendingHydration(requestScope, store);
+          removed = true;
+        });
+      } catch {
+        toast('Запись сохранена, но не удалось обновить состояние повтора.', 'error');
+      }
+      if (!isCurrentScope(requestScope, boundary)) return;
+      if (!removed) {
+        await refresh();
+        return;
+      }
       setUndoEntry(entry);
       setCustomVolume('');
       await refresh();
@@ -382,17 +462,41 @@ export function HydrationTracker({
       );
       haptic('success');
     },
-    onError: (reason, { request, scope: requestScope }) => {
-      if (requestScope !== scopeRef.current || requestScope !== hydrationScope(runtime)) return;
+    onError: async (reason, { request, scope: requestScope, boundary }) => {
+      if (!isCurrentScope(requestScope, boundary)) return;
       const status = (reason as { status?: number }).status;
-      updatePending(requestScope, (entries) => {
-        if (entries[request.date]?.key !== request.key) return entries;
-        const next = { ...entries };
-        if (!request.uncertain && [400, 403, 404, 422].includes(status ?? 0))
-          delete next[request.date];
-        else next[request.date] = { ...request, uncertain: true };
-        return next;
-      });
+      let confirmed = false;
+      try {
+        await withPendingHydration(requestScope, (store) => {
+          if (!isCurrentScope(requestScope, boundary)) return;
+          if (demoToken && store.demoGeneration !== request.demoGeneration) return;
+          if (store.confirmed.includes(request.key)) {
+            confirmed = true;
+            return;
+          }
+          const items = store.entries[request.date] ?? [];
+          const current = items.find((item) => item.key === request.key);
+          if (
+            !request.uncertain &&
+            !current?.uncertain &&
+            [400, 403, 404, 422].includes(status ?? 0)
+          ) {
+            store.entries[request.date] = items.filter((item) => item.key !== request.key);
+            writePendingHydration(requestScope, store);
+          } else if (!items.some((item) => item.key === request.key)) {
+            store.entries[request.date] = [...items, { ...request, uncertain: true }];
+            writePendingHydration(requestScope, store);
+          }
+        });
+      } catch {
+        /* Keep the saved request when its state cannot be updated. */
+      }
+      if (confirmed) {
+        await refresh();
+        toast('Запись уже сохранена.');
+        return;
+      }
+      if (demoToken && status === 409) await refresh();
       toast((reason as Error).message, 'error');
     },
     onSettled: () => {
@@ -403,42 +507,102 @@ export function HydrationTracker({
     if (
       addInFlightRef.current ||
       add.isPending ||
-      pendingRef.current.scope !== scope ||
-      scopeRef.current !== scope ||
-      hydrationScope(runtime) !== scope ||
+      !scope ||
+      !isCurrentScope(scope) ||
       dateRef.current !== diaryDate
     )
       return;
-    addInFlightRef.current = true;
-    const existing = pendingRef.current.entries[diaryDate];
-    const same =
-      existing &&
-      existing.volume === payload.volume &&
-      existing.kind === payload.kind &&
-      existing.source === payload.source;
-    if (existing && !same) {
-      const approved = await confirm({
-        title: 'Добавить другую запись?',
-        message:
-          'Предыдущая запись могла сохраниться. Проверьте историю перед добавлением нового напитка.',
-        confirmText: 'Добавить новый',
-        danger: false,
-      });
-      if (
-        !approved ||
-        scopeRef.current !== scope ||
-        dateRef.current !== diaryDate ||
-        hydrationScope(runtime) !== scope
-      ) {
-        addInFlightRef.current = false;
-        return;
-      }
+    if (!Number.isInteger(payload.volume) || payload.volume < 1 || payload.volume > 5000) {
+      toast('Укажите объём от 1 до 5000 мл.', 'error');
+      return;
     }
-    const request = same
-      ? existing
-      : { ...payload, date: diaryDate, key: requestKey('hydration-entry'), uncertain: false };
-    updatePending(scope, (entries) => ({ ...entries, [diaryDate]: request }));
-    add.mutate({ request, scope, demo: runtime.kind === 'demo' });
+    if (demoToken && (!Number.isSafeInteger(demoGeneration) || (demoGeneration ?? -1) < 0)) {
+      toast('Не удалось безопасно подготовить запись напитка. Обновите демо.', 'error');
+      return;
+    }
+    addInFlightRef.current = true;
+    const boundary = demoToken
+      ? undefined
+      : { ...authDiscardSnapshot(), userId: Number(scope.slice(5)) };
+    let approvedKeys = '';
+    try {
+      while (isCurrentScope(scope, boundary)) {
+        const result = await withPendingHydration(scope, (store) => {
+          if (!isCurrentScope(scope, boundary)) return null;
+          if (
+            demoToken &&
+            store.demoGeneration !== undefined &&
+            store.demoGeneration > (demoGeneration ?? -1)
+          )
+            return { stale: true };
+          if (demoToken && store.demoGeneration !== demoGeneration) {
+            store.entries = {};
+            store.confirmed = [];
+            store.demoGeneration = demoGeneration;
+          }
+          const entries = store.entries;
+          const previous = entries[diaryDate] ?? [];
+          const items = demoToken
+            ? previous.filter((item) => item.demoGeneration === demoGeneration)
+            : previous;
+          if (items.length !== previous.length) {
+            entries[diaryDate] = items;
+            writePendingHydration(scope, store);
+          }
+          const same = items.find(
+            (item) =>
+              item.volume === payload.volume &&
+              item.kind === payload.kind &&
+              item.source === payload.source,
+          );
+          if (same) {
+            same.uncertain = true;
+            writePendingHydration(scope, store);
+            return { request: same };
+          }
+          const keys = items
+            .map((item) => item.key)
+            .sort()
+            .join('|');
+          if (keys && keys !== approvedKeys) return { confirmKeys: keys };
+          const request: AddRequest = {
+            ...payload,
+            date: diaryDate,
+            key: requestKey('hydration-entry'),
+            uncertain: false,
+            ...(demoToken ? { demoGeneration } : {}),
+          };
+          entries[diaryDate] = [...items, request];
+          writePendingHydration(scope, store);
+          return { request };
+        });
+        if (!result) break;
+        if ('stale' in result && result.stale) {
+          await refresh();
+          toast('Демо изменилось. Повторите добавление.', 'error');
+          break;
+        }
+        if ('request' in result && result.request) {
+          add.mutate({ request: result.request, scope, demo: Boolean(demoToken), boundary });
+          return;
+        }
+        const approved = await confirm({
+          title: 'Добавить другую запись?',
+          message:
+            'Предыдущая запись могла сохраниться. Проверьте историю перед добавлением нового напитка.',
+          confirmText: 'Добавить новый',
+          danger: false,
+        });
+        if (!approved || dateRef.current !== diaryDate) break;
+        approvedKeys = result.confirmKeys ?? '';
+      }
+    } catch {
+      toast(
+        'Не удалось безопасно сохранить напиток. Проверьте доступ к хранилищу браузера.',
+        'error',
+      );
+    }
+    addInFlightRef.current = false;
   };
   const undo = useMutation({
     mutationFn: (entryId: number) =>
@@ -532,7 +696,8 @@ export function HydrationTracker({
   }
 
   const data = hydration.data;
-  const pending = pendingState.scope === scope ? pendingState.entries[diaryDate] : undefined;
+  const pendingItems = pendingState.scope === scope ? (pendingState.entries[diaryDate] ?? []) : [];
+  const pending = pendingItems[0];
   const target = data.goal?.enabled ? data.goal.target_ml : null;
   const progress = Math.min(data.progress_percent ?? 0, 100);
   const hasFullHistory = data.entries.length > 3;
@@ -583,7 +748,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
-            disabled={add.isPending}
+            disabled={add.isPending || !scope}
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
@@ -609,9 +774,13 @@ export function HydrationTracker({
           </Button>
         </div>
       )}
-      {pending?.uncertain && (
+      {pending && !add.isPending && (
         <div className="hydration-mutation-error" role="alert">
-          <span>Не удалось проверить, сохранилась ли запись. Повторите её без дубля.</span>
+          <span>
+            Не удалось проверить запись: {beverageLabels[pending.kind]}, {pending.volume} мл.
+            Повторите её без дубля.
+            {pendingItems.length > 1 && ` Ожидают проверки: ${pendingItems.length}.`}
+          </span>
           <Button
             variant="secondary"
             type="button"
@@ -650,7 +819,7 @@ export function HydrationTracker({
             </Select>
           </Field>
           <Button
-            disabled={add.isPending || !customVolume}
+            disabled={add.isPending || !scope || !customVolume}
             type="button"
             onClick={() =>
               void submitAdd({

@@ -25,6 +25,7 @@ interface CoordinatorOptions {
   leaseMs?: number;
   timeoutMs?: number;
   pollMs?: number;
+  requireSharedLock?: boolean;
 }
 
 function createOwnerId(): string {
@@ -89,7 +90,10 @@ export function createCrossContextCoordinator(
   const localTails = new Map<string, Promise<void>>();
 
   async function runStorageLock<T>(name: string, task: () => T | Promise<T>): Promise<T> {
-    if (!storage) return task();
+    if (!storage) {
+      if (options.requireSharedLock) throw new Error('Общее хранилище недоступно');
+      return task();
+    }
 
     const encodedName = encodeURIComponent(name);
     const choosingPrefix = `${LOCK_STORAGE_PREFIX}${encodedName}_choosing_`;
@@ -211,7 +215,7 @@ export function createCrossContextCoordinator(
         window.clearInterval(heartbeat);
       }
     } catch (error) {
-      if (!acquired && error instanceof DOMException) return task();
+      if (!acquired && error instanceof DOMException && !options.requireSharedLock) return task();
       throw error;
     } finally {
       try {
