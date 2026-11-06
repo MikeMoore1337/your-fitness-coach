@@ -476,7 +476,12 @@ function MealSection({
   const headingId = `nutrition-meal-${meal.meal_type}`;
 
   return (
-    <section className="nutrition-meal" aria-labelledby={headingId} data-expanded={expanded}>
+    <section
+      className="nutrition-meal"
+      aria-labelledby={headingId}
+      data-expanded={expanded}
+      data-has-entries={hasEntries}
+    >
       <header className="nutrition-meal__header">
         <div>
           <h2 id={headingId}>
@@ -493,7 +498,7 @@ function MealSection({
           </h2>
           <span>
             {hasEntries
-              ? `${formatNumber(meal.totals.energy_kcal)} ккал · ${meal.entries.length} ${plural(meal.entries.length, 'запись', 'записи', 'записей')}`
+              ? `${formatNumber(meal.totals.energy_kcal)}\u00a0ккал · Б\u00a0${formatNumber(meal.totals.protein_g, 1)} · Ж\u00a0${formatNumber(meal.totals.fat_g, 1)} · У\u00a0${formatNumber(meal.totals.carbs_g, 1)}\u00a0г · ${meal.entries.length}\u00a0${plural(meal.entries.length, 'запись', 'записи', 'записей')}`
               : 'Пока без записей'}
           </span>
         </div>

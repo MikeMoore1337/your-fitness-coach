@@ -9150,11 +9150,16 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 .nutrition-meal__header h2 {
   font-size: 1.05rem;
 }
+.nutrition-meal__header > div:first-child {
+  min-width: 0;
+}
 .nutrition-meal__header > div > span {
   display: block;
   margin-top: 3px;
   color: var(--muted);
   font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .nutrition-meal__header .ui-button {
   min-height: 38px;
@@ -9164,6 +9169,7 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 .nutrition-meal__actions {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 6px;
 }
 .nutrition-meal__secondary-actions {
@@ -11512,6 +11518,25 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 @media (max-width: 380px) {
   .nutrition-meal__header {
     padding-inline: 11px;
+  }
+  .nutrition-meal[data-has-entries='true'] .nutrition-meal__header {
+    flex-wrap: wrap;
+    gap: 0 12px;
+  }
+  .nutrition-meal[data-has-entries='true'] .nutrition-meal__header > div:first-child {
+    display: contents;
+  }
+  .nutrition-meal[data-has-entries='true'] .nutrition-meal__header h2 {
+    flex: 1 1 auto;
+  }
+  .nutrition-meal[data-has-entries='true'] .nutrition-meal__header > div:first-child > span {
+    order: 2;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .nutrition-meal[data-has-entries='true'] .nutrition-meal__actions {
+    order: 1;
+    margin-left: auto;
   }
   .nutrition-meal__header .ui-button {
     padding-inline: 8px;
