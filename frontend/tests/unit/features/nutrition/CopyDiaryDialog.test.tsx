@@ -284,6 +284,63 @@ describe('CopyDiaryDialog day dates', () => {
     });
   });
 
+  it('discards an in-flight attempt if the source changes away and back', async () => {
+    let token = 0;
+    let rejectFirst!: (reason: unknown) => void;
+    let commits = 0;
+    apiMock.mockImplementation((path: string) => {
+      if (path.endsWith('/preview')) return Promise.resolve(preview(`preview-${++token}`));
+      commits += 1;
+      return commits === 1
+        ? new Promise((_, reject) => {
+            rejectFirst = reject;
+          })
+        : Promise.resolve(result);
+    });
+    const { changeSource } = renderDialog('2026-11-03');
+    await screen.findByText('Овсяная каша');
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить' }));
+    await waitFor(() => expect(commits).toBe(1));
+    const first = apiMock.mock.calls[1]![1];
+    changeSource('2026-11-02');
+    await waitFor(() => expect(token).toBe(2));
+    changeSource('2026-11-03');
+    await waitFor(() => expect(token).toBe(3));
+    await act(async () => rejectFirst(error(0)));
+    expect(
+      await screen.findByText(
+        'Не удалось узнать результат копирования. Проверьте дату назначения в дневнике.',
+      ),
+    ).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить' }));
+    await waitFor(() => expect(commits).toBe(2));
+    const second = apiMock.mock.calls[4]![1];
+    expect(second.headers['Idempotency-Key']).not.toBe(first.headers['Idempotency-Key']);
+    expect(second.body.preview_token).toBe('preview-3');
+  });
+
+  it('does not close the new source after an older confirmation succeeds', async () => {
+    let finish!: () => void;
+    let token = 0;
+    apiMock.mockImplementation((path: string) =>
+      path.endsWith('/preview')
+        ? Promise.resolve(preview(`preview-${++token}`))
+        : new Promise((resolve) => {
+            finish = () => resolve(result);
+          }),
+    );
+    const { changeSource, onClose } = renderDialog('2026-11-03');
+    await screen.findByText('Овсяная каша');
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить' }));
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    changeSource('2026-11-02');
+    await waitFor(() => expect(token).toBe(2));
+    await act(async () => finish());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled());
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('blocks double confirmation and closing while the request is pending', async () => {
     let finish!: () => void;
     apiMock.mockImplementation((path: string) =>

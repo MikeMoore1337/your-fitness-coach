@@ -1,5 +1,5 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -116,7 +116,7 @@ export function CopyDiaryDialog({
   const [targetMeal, setTargetMeal] = useState<MealType>(
     subject.scope === 'day' ? 'breakfast' : subject.sourceMeal,
   );
-  const confirmationKeyRef = useRef<{ token: string; key: string } | null>(null);
+  const confirmationKeyRef = useRef<{ token: string; key: string; revision: number } | null>(null);
   const submittingRef = useRef(false);
   const closeDialog = () => {
     if (!submittingRef.current) onClose();
@@ -162,6 +162,17 @@ export function CopyDiaryDialog({
             target_meal_type: targetMeal,
           };
   }, [subject, targetDate, targetMeal]);
+  const requestIdentity = JSON.stringify([subject.scope, previewBody]);
+  const currentIdentityRef = useRef(requestIdentity);
+  const revisionRef = useRef(0);
+  const settledRevisionRef = useRef(0);
+  useLayoutEffect(() => {
+    if (currentIdentityRef.current !== requestIdentity) {
+      currentIdentityRef.current = requestIdentity;
+      revisionRef.current += 1;
+      confirmationKeyRef.current = null;
+    }
+  }, [requestIdentity]);
 
   const preview = useQuery({
     queryKey: ['nutrition', 'copy-preview', subject.scope, previewBody],
@@ -180,13 +191,13 @@ export function CopyDiaryDialog({
   });
 
   const confirmation = useMutation({
-    mutationFn: ({ key, token }: { key: string; token: string }) =>
+    mutationFn: ({ key, token }: { key: string; token: string; revision: number }) =>
       api<FoodDiaryCopyResponse>(`/api/v1/nutrition/diary/copy/${subject.scope}`, {
         method: 'POST',
         headers: { 'Idempotency-Key': key },
         body: { ...previewBody, preview_token: token },
       }),
-    onSuccess: async (result) => {
+    onSuccess: async (result, variables) => {
       trackProductEvent({
         name: 'nutrition_food_repeat_used',
         surface: productEventSurface(),
@@ -204,20 +215,27 @@ export function CopyDiaryDialog({
           : `Добавлено записей: ${result.entries.length}`,
       );
       submittingRef.current = false;
-      onClose();
+      if (variables.revision === revisionRef.current) onClose();
     },
-    onError: () => {
+    onError: (error, variables) => {
       submittingRef.current = false;
+      if (variables.revision !== revisionRef.current && canRetry(error)) {
+        toast(
+          'Не удалось узнать результат копирования. Проверьте дату назначения в дневнике.',
+          'error',
+        );
+      }
     },
   });
 
   const resetConfirmation = confirmation.reset;
   useEffect(() => {
-    if (!submittingRef.current) {
+    if (settledRevisionRef.current !== revisionRef.current && !submittingRef.current) {
+      settledRevisionRef.current = revisionRef.current;
       confirmationKeyRef.current = null;
       resetConfirmation();
     }
-  }, [subject.scope, subject.sourceDate, resetConfirmation]);
+  }, [requestIdentity, confirmation.isPending, resetConfirmation]);
 
   const scopeLabel =
     subject.scope === 'product'
@@ -226,9 +244,13 @@ export function CopyDiaryDialog({
         ? 'Повторить приём пищи'
         : 'Повторить день';
   const submit = () => {
+    const previousAttempt =
+      confirmationKeyRef.current?.revision === revisionRef.current
+        ? confirmationKeyRef.current
+        : null;
     const token =
-      confirmation.error && canRetry(confirmation.error) && confirmationKeyRef.current
-        ? confirmationKeyRef.current.token
+      confirmation.error && canRetry(confirmation.error) && previousAttempt
+        ? previousAttempt.token
         : preview.data?.preview_token;
     if (
       !targetDateValid ||
@@ -242,12 +264,9 @@ export function CopyDiaryDialog({
     )
       return;
     submittingRef.current = true;
-    const key =
-      confirmationKeyRef.current?.token === token
-        ? confirmationKeyRef.current.key
-        : idempotencyKey();
-    confirmationKeyRef.current = { key, token };
-    confirmation.mutate({ key, token });
+    const key = previousAttempt?.token === token ? previousAttempt.key : idempotencyKey();
+    confirmationKeyRef.current = { key, token, revision: revisionRef.current };
+    confirmation.mutate({ key, token, revision: revisionRef.current });
   };
   const sourceLabel = subject.label;
 
