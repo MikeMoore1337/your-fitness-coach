@@ -39,6 +39,38 @@ function idempotencyKey(): string {
   );
 }
 
+function errorStatus(error: unknown): unknown {
+  return error && typeof error === 'object' && 'status' in error ? error.status : undefined;
+}
+
+function copyErrorMessage(error: unknown): string {
+  const status = errorStatus(error);
+  const body = error && typeof error === 'object' && 'body' in error ? error.body : null;
+  const detail = body && typeof body === 'object' && 'detail' in body ? body.detail : null;
+  if (status === 422 && (detail === 'source day is empty' || detail === 'source meal is empty'))
+    return 'В источнике нет записей для копирования.';
+  if (
+    status === 409 &&
+    detail === 'day is marked as fasted; change completeness before adding food'
+  )
+    return 'В дне назначения отмечено отсутствие питания. Выберите другую дату или измените статус дня.';
+  if (status === 401) return 'Сессия истекла. Войдите снова.';
+  if (status === 403) return 'Недостаточно прав для копирования.';
+  if (status === 422) return 'Проверьте выбранные данные и попробуйте снова.';
+  if (status === 0) return 'Нет соединения с сервером. Проверьте интернет.';
+  return 'Не удалось выполнить запрос. Попробуйте позже.';
+}
+
+function canRetry(error: unknown): boolean {
+  const status = errorStatus(error);
+  return (
+    status === undefined ||
+    status === 0 ||
+    status === 429 ||
+    (typeof status === 'number' && status >= 500)
+  );
+}
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('ru-RU', {
     day: 'numeric',
@@ -77,13 +109,31 @@ export function CopyDiaryDialog({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
-  const panelRef = useModalA11y<HTMLDivElement>(true, onClose, '#nutrition-copy-target-date');
-  const [targetDate, setTargetDate] = useState(subject.initialTargetDate ?? today);
+  const initialTargetDate = subject.initialTargetDate ?? today;
+  const [targetDate, setTargetDate] = useState(
+    subject.scope === 'day' && initialTargetDate === subject.sourceDate ? '' : initialTargetDate,
+  );
   const [targetMeal, setTargetMeal] = useState<MealType>(
     subject.scope === 'day' ? 'breakfast' : subject.sourceMeal,
   );
-  const confirmationKeyRef = useRef<string | null>(null);
+  const confirmationKeyRef = useRef<{ token: string; key: string } | null>(null);
   const submittingRef = useRef(false);
+  const closeDialog = () => {
+    if (!submittingRef.current) onClose();
+  };
+  const panelRef = useModalA11y<HTMLDivElement>(true, closeDialog, '#nutrition-copy-target-date');
+  const targetDateValid = Boolean(
+    targetDate &&
+    targetDate <= today &&
+    (subject.scope !== 'day' || targetDate !== subject.sourceDate),
+  );
+  const targetDateHint = targetDateValid
+    ? undefined
+    : targetDate && targetDate > today
+      ? 'Выберите дату не позже сегодняшней.'
+      : subject.scope === 'day'
+        ? 'Выберите дату, которая отличается от исходной.'
+        : 'Выберите дату назначения.';
 
   useEffect(() => {
     trackProductEvent({
@@ -115,14 +165,18 @@ export function CopyDiaryDialog({
 
   const preview = useQuery({
     queryKey: ['nutrition', 'copy-preview', subject.scope, previewBody],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api<FoodDiaryCopyPreviewResponse>(`/api/v1/nutrition/diary/copy/${subject.scope}/preview`, {
         method: 'POST',
         body: previewBody,
+        signal,
       }),
-    enabled: Boolean(targetDate),
+    enabled: targetDateValid,
     retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const confirmation = useMutation({
@@ -157,6 +211,14 @@ export function CopyDiaryDialog({
     },
   });
 
+  const resetConfirmation = confirmation.reset;
+  useEffect(() => {
+    if (!submittingRef.current) {
+      confirmationKeyRef.current = null;
+      resetConfirmation();
+    }
+  }, [subject.scope, subject.sourceDate, resetConfirmation]);
+
   const scopeLabel =
     subject.scope === 'product'
       ? 'Повторить продукт'
@@ -164,11 +226,27 @@ export function CopyDiaryDialog({
         ? 'Повторить приём пищи'
         : 'Повторить день';
   const submit = () => {
-    const token = preview.data?.preview_token;
-    if (!token || confirmation.isPending || submittingRef.current) return;
+    const token =
+      confirmation.error && canRetry(confirmation.error) && confirmationKeyRef.current
+        ? confirmationKeyRef.current.token
+        : preview.data?.preview_token;
+    if (
+      !targetDateValid ||
+      !preview.isSuccess ||
+      preview.isFetching ||
+      !preview.data?.entries.length ||
+      !token ||
+      (confirmation.error && !canRetry(confirmation.error)) ||
+      confirmation.isPending ||
+      submittingRef.current
+    )
+      return;
     submittingRef.current = true;
-    const key = confirmationKeyRef.current ?? idempotencyKey();
-    confirmationKeyRef.current = key;
+    const key =
+      confirmationKeyRef.current?.token === token
+        ? confirmationKeyRef.current.key
+        : idempotencyKey();
+    confirmationKeyRef.current = { key, token };
     confirmation.mutate({ key, token });
   };
   const sourceLabel = subject.label;
@@ -180,14 +258,20 @@ export function CopyDiaryDialog({
       aria-modal="true"
       aria-labelledby="nutrition-copy-title"
     >
-      <div className="modal__backdrop" aria-hidden="true" onClick={onClose} />
+      <div className="modal__backdrop" aria-hidden="true" onClick={closeDialog} />
       <div className="modal__panel nutrition-copy__panel" ref={panelRef} tabIndex={-1}>
         <header data-glass="" data-glass-variant="regular" className="nutrition-picker__header">
           <div>
             <span className="eyebrow">Сначала проверьте записи</span>
             <h2 id="nutrition-copy-title">{scopeLabel}</h2>
           </div>
-          <Button variant="ghost" type="button" aria-label="Закрыть копирование" onClick={onClose}>
+          <Button
+            variant="ghost"
+            type="button"
+            aria-label="Закрыть копирование"
+            disabled={confirmation.isPending}
+            onClick={closeDialog}
+          >
             <CloseIcon />
           </Button>
         </header>
@@ -216,26 +300,32 @@ export function CopyDiaryDialog({
               <DateInput
                 className="ui-input"
                 id="nutrition-copy-target-date"
-
                 max={today}
                 required
+                disabled={confirmation.isPending}
+                aria-invalid={targetDate ? !targetDateValid : undefined}
+                aria-describedby={targetDateHint ? 'nutrition-copy-date-hint' : undefined}
                 value={targetDate}
                 onChange={(event) => {
                   confirmation.reset();
-                  submittingRef.current = false;
                   confirmationKeyRef.current = null;
                   setTargetDate(event.target.value);
                 }}
               />
+              {targetDateHint && (
+                <span className="ui-field__hint" id="nutrition-copy-date-hint">
+                  {targetDateHint}
+                </span>
+              )}
             </Field>
             {subject.scope !== 'day' && (
               <Field label="Приём пищи" labelFor="nutrition-copy-target-meal">
                 <Select
                   id="nutrition-copy-target-meal"
                   value={targetMeal}
+                  disabled={confirmation.isPending}
                   onChange={(event) => {
                     confirmation.reset();
-                    submittingRef.current = false;
                     confirmationKeyRef.current = null;
                     setTargetMeal(event.target.value as MealType);
                   }}
@@ -258,16 +348,24 @@ export function CopyDiaryDialog({
                 <span className="eyebrow">Проверка</span>
                 <h3 id="nutrition-copy-preview-title">Что будет добавлено</h3>
               </div>
-              {preview.data && <span>{preview.data.entries.length} записей</span>}
+              {targetDateValid && preview.isSuccess && !preview.isFetching && (
+                <span>{preview.data.entries.length} записей</span>
+              )}
             </div>
-            {preview.isLoading ? (
+            {!targetDateValid ? (
+              <p className="nutrition-copy__preview-state">
+                Выберите дату назначения, чтобы увидеть записи.
+              </p>
+            ) : preview.isFetching ? (
               <p className="nutrition-copy__preview-state">Проверяем записи…</p>
             ) : preview.error ? (
               <div className="nutrition-inline-error" role="alert">
-                <span>Не удалось подготовить предварительный просмотр.</span>
-                <button type="button" onClick={() => void preview.refetch()}>
-                  Повторить
-                </button>
+                <span>{copyErrorMessage(preview.error)}</span>
+                {canRetry(preview.error) && (
+                  <button type="button" onClick={() => void preview.refetch()}>
+                    Повторить
+                  </button>
+                )}
               </div>
             ) : preview.data?.entries.length ? (
               <ul className="nutrition-copy__preview-list">
@@ -287,17 +385,43 @@ export function CopyDiaryDialog({
           </p>
           {confirmation.error && (
             <div className="nutrition-inline-error" role="alert">
-              <span>Не удалось добавить записи. Предварительный просмотр мог устареть.</span>
-              <button type="button" disabled={confirmation.isPending} onClick={submit}>
-                Повторить
-              </button>
+              <span>
+                {errorStatus(confirmation.error) === 409
+                  ? 'Предварительный просмотр устарел. Обновите его перед копированием.'
+                  : errorStatus(confirmation.error) === 0
+                    ? 'Нет соединения. Записи могли добавиться — повторите запрос или проверьте дневник.'
+                    : copyErrorMessage(confirmation.error)}
+              </span>
+              {errorStatus(confirmation.error) === 409 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    confirmationKeyRef.current = null;
+                    confirmation.reset();
+                    void preview.refetch();
+                  }}
+                >
+                  Обновить просмотр
+                </button>
+              ) : (
+                canRetry(confirmation.error) && (
+                  <button type="button" disabled={confirmation.isPending} onClick={submit}>
+                    Повторить
+                  </button>
+                )
+              )}
             </div>
           )}
           <div className="nutrition-editor__actions app-action-group">
             <Button
               type="submit"
               disabled={
-                confirmation.isPending || preview.isLoading || !preview.data?.entries.length
+                !targetDateValid ||
+                confirmation.isPending ||
+                (Boolean(confirmation.error) && !canRetry(confirmation.error)) ||
+                preview.isFetching ||
+                !preview.isSuccess ||
+                !preview.data?.entries.length
               }
             >
               {confirmation.isPending ? 'Добавляем…' : 'Подтвердить'}
@@ -306,7 +430,7 @@ export function CopyDiaryDialog({
               type="button"
               variant="ghost"
               disabled={confirmation.isPending}
-              onClick={onClose}
+              onClick={closeDialog}
             >
               Отмена
             </Button>
