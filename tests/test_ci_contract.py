@@ -416,12 +416,13 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
     assert "        lane: [checks, unit]" in workflow
     assert "run-group frontend-checks" in workflow
     assert "run-group frontend-unit" in workflow
-    assert workflow.count("          path: ~/.cache/ms-playwright") == 5
+    # Chromium is baked into the pinned smoke container: no redundant cache.
+    assert workflow.count("          path: ~/.cache/ms-playwright") == 4
     assert (
         workflow.count(
             "          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
         )
-        == 2
+        == 1
     )
     assert (
         "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/5)\n    needs: scope-router\n    if:"
@@ -441,6 +442,30 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
         "playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
         in workflow
     )
+
+
+def test_frontend_smoke_uses_existing_pinned_browser_container_without_apt() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(
+        encoding="utf-8"
+    )
+    smoke = workflow.split("  frontend-smoke:\n", 1)[1].split(
+        "  frontend-mobile-regression:\n", 1
+    )[0]
+    mobile = workflow.split("  frontend-mobile-regression:\n", 1)[1].split(
+        "  frontend-mobile-regression-extended:\n", 1
+    )[0]
+
+    image_line = next(
+        line.strip() for line in mobile.splitlines() if "mcr.microsoft.com/playwright:" in line
+    )
+    assert "@sha256:" in image_line
+    assert image_line in smoke
+    assert "npx playwright install --with-deps" not in smoke
+    assert "Cache Playwright browsers" not in smoke
+    assert "test -d /ms-playwright" in smoke
+    assert "run-group frontend-e2e" in smoke
+    assert "python-version: \"3.14\"" in smoke
+    assert "run_scheduled_report == 'true'\n        with:\n          python-version" not in smoke
 
 
 def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None:
