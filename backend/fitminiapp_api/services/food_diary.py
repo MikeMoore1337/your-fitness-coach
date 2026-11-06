@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Literal, cast
 
@@ -323,7 +323,7 @@ def _repeat_candidate(
     db: Session,
     user: User,
     target_date: date,
-    preferred_meals: list[MealType],
+    filled_meals: list[MealType],
 ) -> FoodDiaryRepeatCandidate | None:
     latest_source_date = (
         db.query(func.max(FoodDiaryEntry.diary_date))
@@ -347,8 +347,9 @@ def _repeat_candidate(
     by_meal: dict[str, list[FoodDiaryEntry]] = {}
     for entry in source_entries:
         by_meal.setdefault(entry.meal_type, []).append(entry)
-    meal_order = [*preferred_meals, *(meal for meal in MEAL_TYPES if meal not in preferred_meals)]
-    source_meal = next((meal for meal in meal_order if by_meal.get(meal)), None)
+    source_meal = next(
+        (meal for meal in MEAL_TYPES if meal not in filled_meals and by_meal.get(meal)), None
+    )
     if source_meal is None:
         return None
     return FoodDiaryRepeatCandidate(
@@ -699,6 +700,7 @@ def update_food_diary_entry(
     entry.amount_unit = amount_unit
     entry.weight_g = calculation.weight_g
     _set_nutrition_amount(entry, calculation)
+    entry.updated_at = max(now_msk_naive(), entry.updated_at + timedelta(microseconds=1))
     record_lifecycle_milestone(
         db,
         user,
@@ -711,7 +713,9 @@ def update_food_diary_entry(
     return _serialize_entry(entry)
 
 
-def delete_food_diary_entry(db: Session, user: User, entry_id: int) -> None:
+def delete_food_diary_entry(
+    db: Session, user: User, entry_id: int, expected_version: datetime | None = None
+) -> None:
     _lock_diary_user(db, user)
     entry = (
         db.query(FoodDiaryEntry)
@@ -720,6 +724,8 @@ def delete_food_diary_entry(db: Session, user: User, entry_id: int) -> None:
     )
     if entry is None:
         raise FoodDiaryNotFoundError("diary entry not found")
+    if expected_version is not None and entry.updated_at != expected_version:
+        raise FoodDiaryConflictError("diary entry was changed")
     status = _stored_day_status(db, user, entry.diary_date)
     db.query(NutritionPlanItem).filter(NutritionPlanItem.diary_entry_id == entry.id).update(
         {NutritionPlanItem.diary_entry_id: None}, synchronize_session=False
@@ -1052,11 +1058,14 @@ def _clone_entry(
     target_meal_type: MealType,
     operation_id: int,
 ) -> FoodDiaryEntry:
+    created_at = now_msk_naive()
     return FoodDiaryEntry(
         user_id=source.user_id,
         food_id=source.food_id,
         recipe_id=source.recipe_id,
         copy_operation_id=operation_id,
+        created_at=created_at,
+        updated_at=created_at,
         copied_from_entry_id=source.id,
         diary_date=target_date,
         meal_type=target_meal_type,
@@ -1190,6 +1199,7 @@ def _perform_copy(
     source_meal_type: MealType | None,
     target_date: date,
     target_meal_type: MealType | None,
+    require_empty_meal: bool = False,
 ) -> FoodDiaryCopyResponse:
     _lock_diary_user(db, user)
     key = _normalize_idempotency_key(idempotency_key)
@@ -1197,6 +1207,18 @@ def _perform_copy(
     replay = _existing_copy_operation(db, user, key, fingerprint, record_replay=True)
     if replay is not None:
         return replay
+
+    if (
+        require_empty_meal
+        and db.query(FoodDiaryEntry.id)
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.diary_date == target_date,
+            FoodDiaryEntry.meal_type == target_meal_type,
+        )
+        .first()
+    ):
+        raise FoodDiaryConflictError("target meal is not empty")
 
     preview = (
         db.query(FoodDiaryRepeatPreview)
@@ -1365,6 +1387,7 @@ def copy_diary_meal(
     user: User,
     payload: FoodDiaryCopyMeal,
     idempotency_key: str,
+    require_empty_meal: bool = False,
 ) -> FoodDiaryCopyResponse:
     return _perform_copy(
         db,
@@ -1377,6 +1400,7 @@ def copy_diary_meal(
         source_meal_type=payload.source_meal_type,
         target_date=payload.target_date,
         target_meal_type=payload.target_meal_type,
+        require_empty_meal=require_empty_meal,
     )
 
 

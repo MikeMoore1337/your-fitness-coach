@@ -31685,9 +31685,11 @@ export interface operations {
     delete_diary_entry_api_v1_nutrition_diary_entries__entry_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Diary-Entry-Version"?: string | null;
+            };
             path: {
-                entry_id: number;
+                entry_id: number | string;
             };
             cookie?: never;
         };
@@ -31885,6 +31887,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Require-Empty-Meal"?: boolean;
             };
             path?: never;
             cookie?: never;

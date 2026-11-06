@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HydrationTracker } from '../../../../src/features/nutrition/HydrationTracker';
@@ -222,6 +222,68 @@ describe('HydrationTracker', () => {
     expect(events.map((event) => event.name)).toContain('hydration_logged');
     window.removeEventListener(PRODUCT_EVENT_NAME, listener);
   });
+
+  it.each([false, true])(
+    'keeps water undo on the entry date when the response is delayed: %s',
+    async (delayed) => {
+      const firstEntry = day.entries[0];
+      if (!firstEntry) throw new Error('Missing hydration entry fixture');
+      const added = { ...firstEntry, id: 11, volume_ml: 250 };
+      let resolveAdd: (entry: HydrationEntry) => void = () => {};
+      const response = new Promise<HydrationEntry>((resolve) => {
+        resolveAdd = resolve;
+      });
+      apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+        if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+        if (path.startsWith('/api/v1/nutrition/hydration?')) {
+          return Promise.resolve(
+            path.includes('2026-08-31')
+              ? { ...day, diary_date: '2026-08-31', total_ml: 0, entries: [] }
+              : day,
+          );
+        }
+        if (options?.method === 'DELETE') return Promise.resolve();
+        return delayed ? response : Promise.resolve(added);
+      });
+
+      const { rerender, queryClient } = renderTracker();
+      const showDate = (diaryDate: string) =>
+        rerender(
+          <QueryClientProvider client={queryClient}>
+            <FeedbackProvider>
+              <HydrationTracker diaryDate={diaryDate} />
+            </FeedbackProvider>
+          </QueryClientProvider>,
+        );
+
+      fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+      if (!delayed) expect(await screen.findByText('Добавлено 250 мл')).toBeVisible();
+
+      showDate('2026-08-31');
+      expect(await screen.findByText('0 из 2200 мл')).toBeVisible();
+      if (delayed) {
+        await act(async () => resolveAdd(added));
+        await waitFor(() =>
+          expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeEnabled(),
+        );
+      }
+      expect(screen.queryByText('Добавлено 250 мл')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Отменить' })).not.toBeInTheDocument();
+      expect(apiMock).not.toHaveBeenCalledWith(
+        '/api/v1/nutrition/hydration/entries/11',
+        expect.objectContaining({ method: 'DELETE' }),
+      );
+
+      showDate('2026-09-01');
+      expect(await screen.findByText('Добавлено 250 мл')).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: 'Отменить' }));
+      await waitFor(() =>
+        expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/hydration/entries/11', {
+          method: 'DELETE',
+        }),
+      );
+    },
+  );
 
   it('reveals adult/reference boundaries and history without hiding edit actions', async () => {
     renderTracker();
