@@ -221,10 +221,12 @@ export function NutritionTargets({
     );
     setPreview({
       kind,
-      body:
-        kind === 'binding'
-          ? { ...body, expected_binding_id: result.expected_binding_id, confirm: true }
-          : body,
+      body: {
+        ...body,
+        expected_binding_id: result.expected_binding_id,
+        expected_target_version: result.expected_target_version,
+        ...(kind === 'binding' ? { confirm: true } : {}),
+      },
       changes: result.changes,
       key: existingKey ?? keyForChange(),
       from,
@@ -248,6 +250,7 @@ export function NutritionTargets({
           ...values,
           effective_from: selectedDate,
           day_type: dayType,
+          expected_target_id: resolved.data.target?.id ?? null,
           confirm_energy_mismatch: confirmMismatch,
         };
         setPreview({

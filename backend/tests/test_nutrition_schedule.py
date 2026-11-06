@@ -88,6 +88,10 @@ def test_schedule_resolves_cycle_types_future_repeats_and_date_priority(client) 
             with get_session_context() as db:
                 assert db.query(NutritionTargetScheduleRule).filter_by(user_id=user_id).count() == 0
                 assert db.query(NutritionScheduleBinding).filter_by(user_id=user_id).count() == 0
+            rule_payload.update(
+                expected_binding_id=preview.json()["expected_binding_id"],
+                expected_target_version=preview.json()["expected_target_version"],
+            )
         response = client.post(
             "/api/v1/nutrition/targets/schedule",
             json=rule_payload,
@@ -248,12 +252,32 @@ def test_schedule_resolves_cycle_types_future_repeats_and_date_priority(client) 
     assert preview.status_code == 200
     confirm_payload["revision_number"] = 3
     confirm_payload["expected_binding_id"] = preview.json()["expected_binding_id"]
+    confirm_payload["expected_target_version"] = preview.json()["expected_target_version"]
     stale = client.post(
         "/api/v1/nutrition/targets/schedule/binding/confirm",
         json={**confirm_payload, "expected_binding_id": 999999},
         headers={**headers, "Idempotency-Key": "stale-binding-952"},
     )
     assert stale.status_code == 409
+    concurrent = client.post(
+        "/api/v1/nutrition/targets/dates",
+        json={**base, "effective_from": (start + timedelta(weeks=3, days=2)).isoformat()},
+        headers={**headers, "Idempotency-Key": "concurrent-binding-preview-952"},
+    )
+    assert concurrent.status_code == 200
+    stale_targets = client.post(
+        "/api/v1/nutrition/targets/schedule/binding/confirm",
+        json=confirm_payload,
+        headers={**headers, "Idempotency-Key": "stale-targets-binding-952"},
+    )
+    assert stale_targets.status_code == 409
+    preview = client.post(
+        "/api/v1/nutrition/targets/schedule/binding/preview",
+        json={**preview_request, "revision_number": 3},
+        headers=headers,
+    )
+    assert preview.status_code == 200
+    confirm_payload["expected_target_version"] = preview.json()["expected_target_version"]
     confirmed = client.post(
         "/api/v1/nutrition/targets/schedule/binding/confirm",
         json=confirm_payload,
@@ -534,6 +558,60 @@ def test_schedule_requires_active_trainer_and_rejects_invalid_scope(client) -> N
         ).status_code
         == 403
     )
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_schedule_rules_reject_stale_preview(client) -> None:
+    headers = _auth(client, 952703)
+    payload = _payload(client, headers)
+    payload["week_cycle"] = {"length_weeks": 1, "repeat": True}
+    created = client.post("/api/v1/programs/templates", headers=headers, json=payload)
+    assigned = client.post(
+        f"/api/v1/programs/templates/{created.json()['template']['id']}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 8},
+    )
+    start = (today_msk() + timedelta(days=1)).isoformat()
+    rule = {
+        "calories": 2200,
+        "protein_g": 150,
+        "fat_g": 70,
+        "carbs_g": 242,
+        "program_id": assigned.json()["user_program_id"],
+        "revision_number": 1,
+        "effective_from": start,
+        "scope": "template",
+        "day_type": "training",
+        "week_type": None,
+    }
+    preview = client.post(
+        "/api/v1/nutrition/targets/schedule/preview",
+        headers=headers,
+        json={**rule, "date_from": start, "date_to": start},
+    )
+    assert preview.status_code == 200, preview.text
+    rule.update(
+        expected_binding_id=preview.json()["expected_binding_id"],
+        expected_target_version=preview.json()["expected_target_version"],
+    )
+    barrier = Barrier(2)
+
+    def save(index: int):
+        barrier.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/targets/schedule",
+            json=rule,
+            headers={**headers, "Idempotency-Key": f"schedule-stale-{index}"},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first, second = pool.submit(save, 1), pool.submit(save, 2)
+        first, second = first.result(), second.result()
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    with get_session_context() as db:
+        user_id = db.query(User.id).filter_by(telegram_user_id=952703).scalar()
+        assert db.query(NutritionTargetScheduleRule).filter_by(user_id=user_id).count() == 1
+        assert db.query(NutritionScheduleBinding).filter_by(user_id=user_id).count() == 1
 
 
 @pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")

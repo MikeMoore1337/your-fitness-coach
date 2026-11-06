@@ -13960,6 +13960,8 @@ export interface components {
             confirm_energy_mismatch: boolean;
             /** Day Type */
             day_type?: ("training" | "rest" | "recovery") | null;
+            /** Expected Target Id */
+            expected_target_id?: number | null;
         };
         /** NutritionLabelConfirmRequest */
         NutritionLabelConfirmRequest: {
@@ -14740,6 +14742,8 @@ export interface components {
             effective_from: string;
             /** Expected Binding Id */
             expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
             /**
              * Confirm
              * @constant
@@ -14803,6 +14807,8 @@ export interface components {
             effective_from: string;
             /** Expected Binding Id */
             expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
             /**
              * Date From
              * Format: date
@@ -14818,6 +14824,8 @@ export interface components {
         NutritionSchedulePreviewResponse: {
             /** Expected Binding Id */
             expected_binding_id: number | null;
+            /** Expected Target Version */
+            expected_target_version: number | null;
             /** Program Id */
             program_id: number;
             /** Revision Number */
@@ -14916,6 +14924,10 @@ export interface components {
             day_type: "training" | "rest" | "recovery";
             /** Week Type */
             week_type?: ("light" | "medium" | "heavy") | null;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
             /**
              * Date From
              * Format: date
@@ -14998,6 +15010,10 @@ export interface components {
             day_type: "training" | "rest" | "recovery";
             /** Week Type */
             week_type?: ("light" | "medium" | "heavy") | null;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
         };
         /** NutritionSuggestionCandidate */
         NutritionSuggestionCandidate: {

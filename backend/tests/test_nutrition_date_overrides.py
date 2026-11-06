@@ -117,6 +117,39 @@ def test_date_override_is_idempotent_and_used_consistently(client) -> None:
     assert Decimal(after.json()["targets"]["energy_kcal"]) == 2300
 
 
+def test_date_override_rejects_stale_empty_preview_but_allows_retry(client) -> None:
+    headers = _auth(client, 952311)
+    payload = {
+        "calories": 2000,
+        "protein_g": 150,
+        "fat_g": 70,
+        "carbs_g": 180,
+        "effective_from": today_msk().isoformat(),
+        "expected_target_id": None,
+    }
+    first_headers = {**headers, "Idempotency-Key": "empty-preview-first"}
+    first = client.post("/api/v1/nutrition/targets/dates", json=payload, headers=first_headers)
+    assert first.status_code == 200
+    stale = client.post(
+        "/api/v1/nutrition/targets/dates",
+        json=payload,
+        headers={**headers, "Idempotency-Key": "empty-preview-stale"},
+    )
+    assert stale.status_code == 409
+    retry = client.post("/api/v1/nutrition/targets/dates", json=payload, headers=first_headers)
+    assert retry.status_code == 200
+    assert retry.json()["target"]["id"] == first.json()["target"]["id"]
+    without_expectation = {
+        key: value for key, value in payload.items() if key != "expected_target_id"
+    }
+    assert (
+        client.post(
+            "/api/v1/nutrition/targets/dates", json=without_expectation, headers=first_headers
+        ).status_code
+        == 409
+    )
+
+
 def test_date_override_rejects_past_and_revoked_trainer(client) -> None:
     athlete = _auth(client, 952301)
     coach = _auth(client, 952302, coach=True)
@@ -282,6 +315,36 @@ def test_date_override_report_marks_start_and_return_to_baseline(client, monkeyp
         (yesterday.isoformat(), 2300),
         (today.isoformat(), 2000),
     ]
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_date_changes_reject_stale_preview(client) -> None:
+    headers = _auth(client, 952310)
+    base = {"calories": 2000, "protein_g": 150, "fat_g": 70, "carbs_g": 180}
+    saved = client.post("/api/v1/nutrition/targets/manual", json=base, headers=headers)
+    assert saved.status_code == 200
+    payload = {
+        **base,
+        "effective_from": today_msk().isoformat(),
+        "expected_target_id": saved.json()["id"],
+    }
+    barrier = Barrier(2)
+
+    def save(index: int):
+        barrier.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/targets/dates",
+            json=payload,
+            headers={**headers, "Idempotency-Key": f"different-preview-{index}"},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first, second = pool.submit(save, 1), pool.submit(save, 2)
+        first, second = first.result(), second.result()
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    with get_session_context() as db:
+        user_id = db.query(User.id).filter_by(telegram_user_id=952310).scalar()
+        assert db.query(NutritionTargetDateOverride).filter_by(user_id=user_id).count() == 1
 
 
 @pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")

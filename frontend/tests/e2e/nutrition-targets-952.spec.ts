@@ -128,6 +128,7 @@ for (const width of [320, 390, 1280]) {
         route.fulfill({
           json: {
             expected_binding_id: 4,
+            expected_target_version: saved ? 3 : 2,
             program_id: 8,
             revision_number: 2,
             effective_from: selected,
@@ -141,6 +142,7 @@ for (const width of [320, 390, 1280]) {
         route.fulfill({
           json: {
             expected_binding_id: 4,
+            expected_target_version: saved ? 3 : 2,
             program_id: 8,
             revision_number: 2,
             effective_from: selected,
@@ -157,6 +159,7 @@ for (const width of [320, 390, 1280]) {
           effective_from: selected,
           day_type: 'recovery',
           calories: 2250,
+          expected_target_id: 2,
         });
         expect(route.request().headers()['idempotency-key']).toBeTruthy();
         saved = true;

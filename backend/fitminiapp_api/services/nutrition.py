@@ -28,6 +28,8 @@ from fitminiapp_api.schemas.nutrition import (
     NutritionDateOverrideSave,
     NutritionManualTargetSave,
     NutritionProgramDayResponse,
+    NutritionScheduleBindingConfirm,
+    NutritionScheduleRuleSave,
     NutritionTargetResponse,
     NutritionTargetSave,
 )
@@ -1072,9 +1074,24 @@ def nutrition_request_identity(
     key = idempotency_key.strip()
     if not 8 <= len(key) <= 128:
         raise NutritionError("Некорректный ключ повтора запроса")
+    request_payload = payload.model_dump(mode="json")
+    if (
+        isinstance(payload, NutritionDateOverrideSave)
+        and "expected_target_id" not in payload.model_fields_set
+    ):
+        request_payload.pop("expected_target_id")
+    if isinstance(payload, NutritionScheduleRuleSave):
+        for field in ("expected_binding_id", "expected_target_version"):
+            if field not in payload.model_fields_set:
+                request_payload.pop(field)
+    if (
+        isinstance(payload, NutritionScheduleBindingConfirm)
+        and "expected_target_version" not in payload.model_fields_set
+    ):
+        request_payload.pop("expected_target_version")
     fingerprint = hashlib.sha256(
         json.dumps(
-            {"actor_id": current_user.id, "payload": payload.model_dump(mode="json")},
+            {"actor_id": current_user.id, "payload": request_payload},
             sort_keys=True,
             ensure_ascii=True,
             separators=(",", ":"),
@@ -1115,6 +1132,10 @@ def save_nutrition_date_override(
             NutritionTargetDaySnapshot, (target_user.id, payload.effective_from)
         ) is not None or (status is not None and status.status in {"complete", "fasted"}):
             raise NutritionConflictError("Завершённый день сохраняет исходную цель")
+        if "expected_target_id" in payload.model_fields_set:
+            current = get_nutrition_target_for_date(db, target_user.id, payload.effective_from)
+            if (current.id if current else None) != payload.expected_target_id:
+                raise NutritionConflictError("Цель изменилась; обновите просмотр")
         target = NutritionTarget(
             user_id=target_user.id,
             assigned_by_user_id=current_user.id,

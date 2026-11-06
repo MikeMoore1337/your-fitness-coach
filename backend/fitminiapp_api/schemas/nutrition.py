@@ -99,6 +99,7 @@ class NutritionManualTargetSave(BaseModel):
 class NutritionDateOverrideSave(NutritionManualTargetSave):
     effective_from: date
     day_type: Literal["training", "rest", "recovery"] | None = None
+    expected_target_id: int | None = Field(default=None, ge=1)
 
 
 class NutritionScheduleRuleSave(NutritionManualTargetSave):
@@ -108,6 +109,8 @@ class NutritionScheduleRuleSave(NutritionManualTargetSave):
     scope: Literal["template", "future", "recovery"]
     day_type: Literal["training", "rest", "recovery"]
     week_type: Literal["light", "medium", "heavy"] | None = None
+    expected_binding_id: int | None = Field(default=None, ge=1)
+    expected_target_version: int | None = Field(default=None, ge=1)
 
 
 class NutritionScheduleRulePreviewRequest(NutritionScheduleRuleSave):
@@ -121,6 +124,7 @@ class NutritionScheduleBindingRequest(BaseModel):
     revision_number: int = Field(ge=1)
     effective_from: date
     expected_binding_id: int | None = Field(default=None, ge=1)
+    expected_target_version: int | None = Field(default=None, ge=1)
 
 
 class NutritionScheduleBindingConfirm(NutritionScheduleBindingRequest):
@@ -249,6 +253,7 @@ class NutritionSchedulePreviewChange(BaseModel):
 
 class NutritionSchedulePreviewResponse(BaseModel):
     expected_binding_id: int | None
+    expected_target_version: int | None
     program_id: int
     revision_number: int
     effective_from: date

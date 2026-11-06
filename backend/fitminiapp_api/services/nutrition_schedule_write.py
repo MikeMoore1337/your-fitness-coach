@@ -87,6 +87,28 @@ def _binding_at(db: Session, user_id: int, day: date) -> NutritionScheduleBindin
     )
 
 
+def _target_version(db: Session, user_id: int) -> int | None:
+    return (
+        db.query(func.max(NutritionTarget.id)).filter(NutritionTarget.user_id == user_id).scalar()
+    )
+
+
+def _check_target_version(
+    db: Session,
+    user_id: int,
+    payload: NutritionScheduleRuleSave
+    | NutritionScheduleBindingConfirm
+    | NutritionSchedulePreviewRequest,
+) -> int | None:
+    current = _target_version(db, user_id)
+    if (
+        "expected_target_version" in payload.model_fields_set
+        and payload.expected_target_version != current
+    ):
+        raise NutritionConflictError("Цели изменились; обновите просмотр")
+    return current
+
+
 def _rule_response(
     db: Session,
     rule: NutritionTargetScheduleRule,
@@ -135,6 +157,15 @@ def _prepare_rule(
     )
     revision = revisions[-1]
     binding = _binding_at(db, target_user.id, payload.effective_from)
+    if "expected_binding_id" in payload.model_fields_set and payload.expected_binding_id != (
+        binding.id if binding else None
+    ):
+        raise NutritionConflictError("Назначение изменилось; обновите просмотр")
+    if (
+        "expected_target_version" in payload.model_fields_set
+        and program.current_revision_number != payload.revision_number
+    ):
+        raise NutritionConflictError("Программа изменилась; обновите просмотр")
     if binding is None:
         if program.current_revision_number != payload.revision_number:
             raise NutritionConflictError("Программа изменилась; сначала проверьте расписание")
@@ -192,6 +223,7 @@ def save_nutrition_schedule_rule(
         )
         return _rule_response(db, existing, target, target_user)
 
+    _check_target_version(db, target_user.id, payload)
     program, revision, binding, source_week, boundary, weekday = _prepare_rule(
         db, target_user, payload, lock=True
     )
@@ -249,6 +281,7 @@ def preview_nutrition_schedule_rule(
     db: Session, current_user: User, payload: NutritionScheduleRulePreviewRequest
 ) -> NutritionSchedulePreviewResponse:
     user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    version = _check_target_version(db, user.id, payload)
     if (
         payload.date_from < payload.effective_from
         or payload.date_to < payload.date_from
@@ -258,6 +291,8 @@ def preview_nutrition_schedule_rule(
     program, revision, binding, source_week, boundary, weekday = _prepare_rule(
         db, user, payload, lock=False
     )
+    if program.current_revision_number != payload.revision_number:
+        raise NutritionConflictError("Программа изменилась; обновите просмотр")
     preview_id = 2**63 - 1
     target = NutritionTarget(
         id=preview_id,
@@ -321,8 +356,17 @@ def preview_nutrition_schedule_rule(
                 else None,
             )
         )
+    latest_binding = _binding_at(db, user.id, payload.effective_from)
+    db.refresh(program, ["current_revision_number"])
+    if program.current_revision_number != payload.revision_number:
+        raise NutritionConflictError("Программа изменилась; обновите просмотр")
+    if _target_version(db, user.id) != version or (
+        latest_binding.id if latest_binding else None
+    ) != (binding.id if binding else None):
+        raise NutritionConflictError("Цели изменились; обновите просмотр")
     return NutritionSchedulePreviewResponse(
         expected_binding_id=binding.id if binding else None,
+        expected_target_version=version,
         program_id=program.id,
         revision_number=payload.revision_number,
         effective_from=payload.effective_from,
@@ -336,6 +380,7 @@ def preview_nutrition_schedule_binding(
     db: Session, current_user: User, payload: NutritionSchedulePreviewRequest
 ) -> NutritionSchedulePreviewResponse:
     user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    version = _check_target_version(db, user.id, payload)
     if payload.effective_from <= today_for_user(user):
         raise NutritionConflictError("Новую программу можно применить только к будущим датам")
     if (
@@ -351,7 +396,10 @@ def preview_nutrition_schedule_binding(
         raise NutritionConflictError("Программа изменилась; обновите просмотр")
     binding = _binding_at(db, user.id, payload.effective_from)
     binding_id = binding.id if binding else None
-    if payload.expected_binding_id is not None and payload.expected_binding_id != binding_id:
+    if (
+        "expected_binding_id" in payload.model_fields_set
+        and payload.expected_binding_id != binding_id
+    ):
         raise NutritionConflictError("Назначение изменилось; обновите просмотр")
     history, overrides, scheduled_users = load_nutrition_targets_and_date_overrides(
         db, {user.id}, payload.date_from, payload.date_to
@@ -393,8 +441,18 @@ def preview_nutrition_schedule_binding(
                 else None,
             )
         )
+    latest_binding = _binding_at(db, user.id, payload.effective_from)
+    db.refresh(program, ["current_revision_number"])
+    if program.current_revision_number != payload.revision_number:
+        raise NutritionConflictError("Программа изменилась; обновите просмотр")
+    if (
+        _target_version(db, user.id) != version
+        or (latest_binding.id if latest_binding else None) != binding_id
+    ):
+        raise NutritionConflictError("Цели изменились; обновите просмотр")
     return NutritionSchedulePreviewResponse(
         expected_binding_id=binding_id,
+        expected_target_version=version,
         program_id=program.id,
         revision_number=payload.revision_number,
         effective_from=payload.effective_from,
@@ -427,6 +485,7 @@ def confirm_nutrition_schedule_binding(
             revision_number=revision.revision_number,
             effective_from=existing.effective_from,
         )
+    _check_target_version(db, user.id, payload)
     if payload.effective_from <= today_for_user(user):
         raise NutritionConflictError("Новую программу можно применить только к будущим датам")
     program, revisions = _program_and_revisions(

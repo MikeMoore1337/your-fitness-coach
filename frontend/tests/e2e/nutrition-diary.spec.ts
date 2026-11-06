@@ -608,6 +608,18 @@ async function mockNutritionApi(
     if (path.startsWith('/api/v1/nutrition/hydration/presets/') && request.method() === 'DELETE') {
       return route.fulfill({ status: 204, body: '' });
     }
+    if (path === '/api/v1/nutrition/targets/for-date' && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          date: url.searchParams.get('target_date'),
+          origin: 'base',
+          day_type: null,
+          week_type: null,
+          frozen: dayStatus === 'complete',
+          target: { id: 1, calories: 2000, protein_g: 140, fat_g: 70, carbs_g: 220 },
+        },
+      });
+    }
     if (path === '/api/v1/nutrition/diary' && request.method() === 'GET') {
       return route.fulfill({
         json: {

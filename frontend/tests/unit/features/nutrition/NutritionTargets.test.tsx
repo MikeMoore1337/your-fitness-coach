@@ -62,6 +62,7 @@ describe('NutritionTargets', () => {
             },
           ],
           expected_binding_id: null,
+          expected_target_version: 1,
         });
       if (path.endsWith('/dates') || path.endsWith('/schedule')) return Promise.resolve({});
       throw new Error(`Unexpected API call: ${path}`);
@@ -90,13 +91,14 @@ describe('NutritionTargets', () => {
       ...values,
       effective_from: later,
       day_type: 'recovery',
+      expected_target_id: 1,
     });
     expect(call?.[1].body).not.toHaveProperty('user_id');
     expect(call?.[1].headers['Idempotency-Key']).toBeTruthy();
   });
 
   it('requests a server preview before applying a day template', async () => {
-    renderTargets('settings');
+    const { onClose } = renderTargets('settings');
     const buttons = await screen.findAllByRole('button', { name: 'Изменить' });
     await waitFor(() => expect(buttons[1]).toBeEnabled());
     fireEvent.click(buttons[1]!);
@@ -115,5 +117,14 @@ describe('NutritionTargets', () => {
         ([path, options]) => path.endsWith('/schedule') && options?.method === 'POST',
       ),
     ).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Применить к будущим датам' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const saved = apiMock.mock.calls.find(
+      ([path, options]) => path.endsWith('/schedule') && options?.method === 'POST',
+    );
+    expect(saved?.[1].body).toMatchObject({
+      expected_binding_id: null,
+      expected_target_version: 1,
+    });
   });
 });
