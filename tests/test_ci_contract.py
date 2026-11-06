@@ -445,12 +445,9 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
 
 
 def test_frontend_smoke_uses_existing_pinned_browser_container_without_apt() -> None:
-    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(
-        encoding="utf-8"
-    )
-    smoke = workflow.split("  frontend-smoke:\n", 1)[1].split(
-        "  frontend-mobile-regression:\n", 1
-    )[0]
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    smoke = workflow.split("  frontend-smoke:\n", 1)[1]
+    smoke = smoke.split("  frontend-mobile-regression:\n", 1)[0]
     mobile = workflow.split("  frontend-mobile-regression:\n", 1)[1].split(
         "  frontend-mobile-regression-extended:\n", 1
     )[0]
@@ -464,17 +461,14 @@ def test_frontend_smoke_uses_existing_pinned_browser_container_without_apt() -> 
     assert "Cache Playwright browsers" not in smoke
     assert "test -d /ms-playwright" in smoke
     assert "run-group frontend-e2e" in smoke
-    assert "python-version: \"3.14\"" in smoke
+    assert 'python-version: "3.14"' in smoke
     assert "run_scheduled_report == 'true'\n        with:\n          python-version" not in smoke
 
 
 def test_migrated_postgres_stack_uses_prebuilt_chromium_and_service_dns() -> None:
-    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(
-        encoding="utf-8"
-    )
-    migrated = workflow.split("  migrated-stack:\n", 1)[1].split(
-        "  dependency-audit:\n", 1
-    )[0]
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    migrated = workflow.split("  migrated-stack:\n", 1)[1]
+    migrated = migrated.split("  dependency-audit:\n", 1)[0]
     mobile = workflow.split("  frontend-mobile-regression:\n", 1)[1].split(
         "  frontend-mobile-regression-extended:\n", 1
     )[0]
@@ -715,7 +709,8 @@ def test_scope_router_preserves_dot_prefixed_workflow_paths() -> None:
     decision = ci_contract.classify_scope(["./.github/workflows/ci.yml"])
 
     assert decision["paths"] == [".github/workflows/ci.yml"]
-    assert decision["profile"] == "workflow-platform"
+    assert decision["profile"] == "cross-stack"
+    assert "frontend-e2e" in decision["required_groups"]
 
 
 def test_skill_change_adds_skillspector_policy_group_only_when_needed() -> None:
