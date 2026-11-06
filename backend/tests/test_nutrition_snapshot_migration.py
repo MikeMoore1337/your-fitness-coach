@@ -1,8 +1,12 @@
+import importlib.util
 from pathlib import Path
 
 import pytest
 from alembic.config import Config
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.pool import NullPool
 
 from alembic import command
 
@@ -83,3 +87,50 @@ def test_snapshot_migration_preserves_targets_and_refuses_lossy_downgrade(
             connection.execute(text("SELECT calories FROM nutrition_targets")).scalar_one() == 2000
         )
     engine.dispose()
+
+
+def test_date_override_migration_preserves_data_and_blocks_lossy_downgrade(tmp_path: Path) -> None:
+    path = Path(__file__).resolve().parents[1] / "alembic/versions/0150_nutrition_date_overrides.py"
+    spec = importlib.util.spec_from_file_location("nutrition_date_override_migration", path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    engine = create_engine(
+        f"sqlite:///{(tmp_path / 'date-overrides.db').as_posix()}", poolclass=NullPool
+    )
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY)"))
+        connection.execute(
+            text("CREATE TABLE nutrition_targets (id INTEGER PRIMARY KEY, calories INTEGER)")
+        )
+        connection.execute(text("INSERT INTO users VALUES (1)"))
+        connection.execute(text("INSERT INTO nutrition_targets VALUES (1, 2000)"))
+        migration.op = Operations(MigrationContext.configure(connection))
+        migration.upgrade()
+        assert connection.execute(
+            text("SELECT calories, target_scope FROM nutrition_targets")
+        ).one() == (2000, None)
+        connection.execute(text("UPDATE nutrition_targets SET target_scope = 'date' WHERE id = 1"))
+        connection.execute(
+            text(
+                "INSERT INTO nutrition_target_date_overrides "
+                "(user_id, target_id, target_date, idempotency_key, request_hash) "
+                "VALUES (1, 1, '2026-01-01', 'migration-test', 'hash')"
+            )
+        )
+        with pytest.raises(RuntimeError, match="Cannot discard nutrition date overrides"):
+            migration.downgrade()
+        assert (
+            connection.execute(
+                text("SELECT count(*) FROM nutrition_target_date_overrides")
+            ).scalar_one()
+            == 1
+        )
+        connection.execute(text("DELETE FROM nutrition_target_date_overrides"))
+        with pytest.raises(RuntimeError, match="Cannot discard scoped nutrition targets"):
+            migration.downgrade()
+        connection.execute(text("UPDATE nutrition_targets SET target_scope = NULL"))
+        migration.downgrade()
+        assert (
+            connection.execute(text("SELECT calories FROM nutrition_targets")).scalar_one() == 2000
+        )

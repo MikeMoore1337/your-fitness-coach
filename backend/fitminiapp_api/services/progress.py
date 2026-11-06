@@ -45,7 +45,7 @@ from fitminiapp_api.services.data_quality import (
     collect_training_data_counts,
 )
 from fitminiapp_api.services.diary_nutrition import DiaryDayNutrition, aggregate_diary_entries
-from fitminiapp_api.services.nutrition import load_nutrition_targets_and_snapshots
+from fitminiapp_api.services.nutrition import load_nutrition_targets_and_date_overrides
 from fitminiapp_api.services.period_bounds import (
     MAX_REPORT_DAYS,
     resolve_progress_bounds,
@@ -711,12 +711,13 @@ def build_progress_summaries(
         }
 
     visible_nutrition_ids = set(user_ids) & nutrition_visible_user_ids
-    targets, snapshots = load_nutrition_targets_and_snapshots(
+    targets, snapshots = load_nutrition_targets_and_date_overrides(
         db, visible_nutrition_ids, min(start_by_user.values()), max(today_by_user.values())
     )
     target_history_by_user: dict[int, list[NutritionTarget]] = defaultdict(list)
     for target_row in sorted(targets, key=lambda row: (row.effective_from, row.id), reverse=True):
-        target_history_by_user[target_row.user_id].append(target_row)
+        if target_row.target_scope is None:
+            target_history_by_user[target_row.user_id].append(target_row)
 
     def nutrition_target_for_day(user_id: int, target_date: date) -> NutritionTarget | None:
         key = (user_id, target_date)

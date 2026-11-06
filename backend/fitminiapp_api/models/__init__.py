@@ -83,6 +83,7 @@ from fitminiapp_api.models.notification import (
 from fitminiapp_api.models.nutrition import (
     EnergyCalibration,
     NutritionTarget,
+    NutritionTargetDateOverride,
     NutritionTargetDaySnapshot,
 )
 from fitminiapp_api.models.nutrition_label import (
@@ -235,6 +236,7 @@ __all__ = [
     "NutritionPlanItem",
     "NutritionPlanOperation",
     "NutritionTarget",
+    "NutritionTargetDateOverride",
     "NutritionTargetDaySnapshot",
     "OAuthTransaction",
     "Payment",

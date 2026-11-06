@@ -96,6 +96,10 @@ class NutritionManualTargetSave(BaseModel):
     confirm_energy_mismatch: bool = False
 
 
+class NutritionDateOverrideSave(NutritionManualTargetSave):
+    effective_from: date
+
+
 class NutritionAssignedByResponse(BaseModel):
     id: int
     telegram_user_id: int | None = None
@@ -145,6 +149,19 @@ class NutritionTargetResponse(BaseModel):
 
 class NutritionTargetHistoryResponse(BaseModel):
     items: list[NutritionTargetResponse]
+
+
+class NutritionDateOverrideResponse(BaseModel):
+    date: date
+    target: NutritionTargetResponse
+
+
+class NutritionProgramDayResponse(BaseModel):
+    date: date
+    program_id: int
+    revision_number: int
+    day_type: Literal["training", "rest"] | None
+    week_type: Literal["light", "medium", "heavy"] | None
 
 
 EnergyCalibrationStatus = Literal[

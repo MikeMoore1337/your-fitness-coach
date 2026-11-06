@@ -55,6 +55,7 @@ from fitminiapp_api.models.notification import (
 from fitminiapp_api.models.nutrition import (
     EnergyCalibration,
     NutritionTarget,
+    NutritionTargetDateOverride,
     NutritionTargetDaySnapshot,
 )
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
@@ -97,7 +98,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 27
+ACCOUNT_EXPORT_SCHEMA_VERSION = 28
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -114,6 +115,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "body_measurement_custom_values": "measurements",
     "cardio_sessions": "cardio_sessions",
     "nutrition_targets": "nutrition",
+    "nutrition_target_date_overrides": "nutrition",
     "nutrition_target_day_snapshots": "nutrition",
     "hydration_goals": "hydration",
     "hydration_entries": "hydration",
@@ -390,6 +392,7 @@ NUTRITION_FIELDS = (
     "id",
     "effective_from",
     "effective_to",
+    "target_scope",
     "source",
     "created_by_user_id",
     "created_at",
@@ -939,6 +942,14 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(NutritionTargetDaySnapshot.diary_date.asc())
         .all()
     )
+    nutrition_overrides = (
+        db.query(NutritionTargetDateOverride)
+        .filter(NutritionTargetDateOverride.user_id == user.id)
+        .order_by(
+            NutritionTargetDateOverride.target_date.asc(), NutritionTargetDateOverride.id.asc()
+        )
+        .all()
+    )
     hydration_goals = (
         db.query(HydrationGoal)
         .filter(HydrationGoal.user_id == user.id)
@@ -1423,6 +1434,13 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "nutrition_target_day_snapshots": [
             _fields(snapshot, ("diary_date", "target_id", "captured_at"))
             for snapshot in nutrition_snapshots
+        ],
+        "nutrition_target_date_overrides": [
+            _fields(
+                override,
+                ("id", "target_date", "target_id", "created_by_user_id", "created_at"),
+            )
+            for override in nutrition_overrides
         ],
         "hydration": {
             "goals": [

@@ -66,7 +66,10 @@ from fitminiapp_api.schemas.nutrition import (
     EnergyCalibrationDecision,
     EnergyCalibrationHistoryResponse,
     EnergyCalibrationResponse,
+    NutritionDateOverrideResponse,
+    NutritionDateOverrideSave,
     NutritionManualTargetSave,
+    NutritionProgramDayResponse,
     NutritionTargetHistoryResponse,
     NutritionTargetResponse,
     NutritionTargetSave,
@@ -186,8 +189,11 @@ from fitminiapp_api.services.nutrition import (
     NutritionError,
     build_nutrition_target_response_for_user,
     get_current_nutrition_target,
+    list_nutrition_date_overrides,
     list_nutrition_target_history,
+    read_nutrition_program_day,
     save_manual_nutrition_target,
+    save_nutrition_date_override,
     save_nutrition_target,
 )
 from fitminiapp_api.services.nutrition_label import (
@@ -1502,6 +1508,73 @@ def save_manual_target(
         if isinstance(exc, NutritionConflictError):
             raise HTTPException(status_code=409, detail=detail)
         raise HTTPException(status_code=400, detail=detail)
+
+
+@router.post("/targets/dates", response_model=NutritionDateOverrideResponse)
+def save_date_override(
+    payload: NutritionDateOverrideSave,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return save_nutrition_date_override(db, current_user, payload, idempotency_key)
+    except NutritionError as exc:
+        detail = str(exc)
+        if detail == "Target user not found":
+            raise HTTPException(status_code=404, detail=detail)
+        if detail == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=detail)
+        if isinstance(exc, NutritionEnergyMismatchError):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "nutrition_energy_mismatch",
+                    "message": detail,
+                    "implied_energy_kcal": exc.implied_energy_kcal,
+                    "difference_kcal": exc.difference_kcal,
+                },
+            )
+        if isinstance(exc, NutritionConflictError):
+            raise HTTPException(status_code=409, detail=detail)
+        raise HTTPException(status_code=400, detail=detail)
+
+
+@router.get("/targets/dates", response_model=list[NutritionDateOverrideResponse])
+def date_override_history(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return list_nutrition_date_overrides(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        if str(exc) == "Target user not found":
+            raise HTTPException(status_code=404, detail=str(exc))
+        if str(exc) == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/targets/program-day", response_model=NutritionProgramDayResponse)
+def nutrition_program_day(
+    program_id: int = Query(ge=1),
+    revision_number: int = Query(ge=1),
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_program_day(
+            db, current_user, target_telegram_user_id, program_id, revision_number, target_date
+        )
+    except NutritionError as exc:
+        if str(exc) in {"Target user not found", "Program not found", "Program revision not found"}:
+            raise HTTPException(status_code=404, detail=str(exc))
+        if str(exc) == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/targets/current", response_model=NutritionTargetResponse | None)

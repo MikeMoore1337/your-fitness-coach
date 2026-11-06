@@ -38,16 +38,18 @@ def test_utc_completion_migration_preserves_existing_and_blocks_data_loss():
 @pytest.mark.parametrize(
     "starting_revision", ["0134_workout_completed_at_utc", "0136_program_week_unbounded"]
 )
-def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting_revision):
+def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting_revision, request):
     config = Config()
     config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))
     engine = sa.create_engine("sqlite:///:memory:")
+    request.addfinalizer(engine.dispose)
     with engine.connect() as connection:
         for statement in (
             "CREATE TABLE program_templates (id INTEGER PRIMARY KEY, default_duration_weeks INTEGER)",
             "CREATE TABLE program_imports (id VARCHAR(36) PRIMARY KEY, status VARCHAR(16) NOT NULL)",
             "CREATE TABLE program_template_exercise_weeks (id INTEGER PRIMARY KEY, week_number INTEGER CONSTRAINT ck_program_template_exercise_weeks_number CHECK (week_number >= 1 AND week_number <= 24))",
             "CREATE TABLE user_programs (id INTEGER PRIMARY KEY)",
+            "CREATE TABLE nutrition_targets (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL)",
             "CREATE TABLE user_workouts (id INTEGER PRIMARY KEY, user_program_id INTEGER NOT NULL, week_number INTEGER NOT NULL, day_number INTEGER NOT NULL, status TEXT, completed_at TEXT)",
             "CREATE TABLE user_workout_exercises (id INTEGER PRIMARY KEY, prescribed_sets INTEGER NOT NULL, prescribed_reps VARCHAR(32) NOT NULL, rest_seconds INTEGER NOT NULL)",
             "CREATE TABLE users (id INTEGER PRIMARY KEY)",
@@ -82,7 +84,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0149_nutrition_target_snapshots",)
+            ("0150_nutrition_date_overrides",)
         ]
         assert connection.exec_driver_sql(
             "SELECT status, self_assigned_program_id, self_assignment_request_hash FROM program_imports"
@@ -110,4 +112,3 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         assert (
             connection.exec_driver_sql("SELECT COUNT(*) FROM user_workout_set_sides").scalar() == 0
         )
-    engine.dispose()

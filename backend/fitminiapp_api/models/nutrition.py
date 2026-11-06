@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    UniqueConstraint,
     event,
     text,
 )
@@ -98,6 +99,7 @@ class NutritionTarget(Base):
 
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    target_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="calculated")
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     superseded_by_id: Mapped[int | None] = mapped_column(
@@ -132,6 +134,29 @@ class NutritionTargetDaySnapshot(Base):
         ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=True
     )
     captured_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_msk_naive, server_default=text("CURRENT_TIMESTAMP")
+    )
+
+
+class NutritionTargetDateOverride(Base):
+    __tablename__ = "nutrition_target_date_overrides"
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="uq_nutrition_date_override_request"),
+        Index("ix_nutrition_date_overrides_user_date", "user_id", "target_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    target_id: Mapped[int] = mapped_column(
+        ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=False
+    )
+    target_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=now_msk_naive, server_default=text("CURRENT_TIMESTAMP")
     )
 
