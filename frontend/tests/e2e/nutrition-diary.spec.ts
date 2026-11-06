@@ -1317,9 +1317,9 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
 
   const cardTitles = [
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
-    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
     page.locator('.nutrition-food-card__header h2'),
     page.getByText('Мои кружки и бутылки', { exact: true }),
+    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
   ];
   const titlePositions: number[] = [];
   for (const heading of cardTitles) {
@@ -1350,9 +1350,9 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   const mobileCards = [
     page.getByRole('navigation', { name: 'Неделя дневника' }),
     nutritionDaySummary(page),
-    page.locator('.nutrition-completeness'),
     page.locator('.nutrition-food-card'),
     page.locator('.hydration-card'),
+    page.locator('.nutrition-completeness'),
   ];
   const mobileCardPositions: number[] = [];
   for (const card of mobileCards) {
