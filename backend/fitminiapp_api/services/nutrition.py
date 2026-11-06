@@ -1136,6 +1136,7 @@ def save_nutrition_date_override(
                 user_id=target_user.id,
                 target_id=target.id,
                 target_date=payload.effective_from,
+                day_type=payload.day_type,
                 created_by_user_id=current_user.id,
                 idempotency_key=key,
                 request_hash=fingerprint,
@@ -1146,7 +1147,11 @@ def save_nutrition_date_override(
     response = build_nutrition_target_response_for_user(db, target, target_user)
     if response is None:
         raise NutritionError("Цель питания не найдена")
-    return NutritionDateOverrideResponse(date=payload.effective_from, target=response)
+    return NutritionDateOverrideResponse(
+        date=payload.effective_from,
+        day_type=payload.day_type,
+        target=response,
+    )
 
 
 def list_nutrition_date_overrides(
@@ -1181,6 +1186,7 @@ def list_nutrition_date_overrides(
     return [
         NutritionDateOverrideResponse(
             date=override.target_date,
+            day_type=cast(Literal["training", "rest", "recovery"] | None, override.day_type),
             target=build_nutrition_target_response_from_users(
                 target, target_user, authors.get(target.assigned_by_user_id)
             ),

@@ -20,6 +20,7 @@ def load_scheduled_nutrition_targets(
     end: date,
     *,
     preview_binding: tuple[int, UserProgram, ProgramRevision, date] | None = None,
+    preview_rule: tuple[NutritionTargetScheduleRule, NutritionTarget] | None = None,
 ) -> dict[tuple[int, date], NutritionTarget]:
     if not user_ids or end < start:
         return {}
@@ -88,6 +89,9 @@ def load_scheduled_nutrition_targets(
         defaultdict(list)
     )
     for rule, target in rules:
+        rules_by_user[rule.user_id].append((rule, target))
+    if preview_rule is not None:
+        rule, target = preview_rule
         rules_by_user[rule.user_id].append((rule, target))
 
     result: dict[tuple[int, date], NutritionTarget] = {}

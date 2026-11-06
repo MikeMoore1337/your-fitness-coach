@@ -602,6 +602,22 @@ async function mockApi(
         json: emptyHydrationDay(url.searchParams.get('diary_date') || '2030-01-10'),
       });
     }
+    if (
+      path.endsWith('/nutrition/targets/schedule/program') ||
+      path.endsWith('/nutrition/targets/schedule/binding')
+    )
+      return route.fulfill({ json: null });
+    if (path.endsWith('/nutrition/targets/for-date'))
+      return route.fulfill({
+        json: {
+          date: url.searchParams.get('target_date'),
+          target: null,
+          origin: 'none',
+          day_type: null,
+          week_type: null,
+          frozen: false,
+        },
+      });
     if (path.endsWith('/nutrition/diary'))
       return route.fulfill({
         json: {
@@ -2787,27 +2803,12 @@ test('поля профиля и питания выровнены на деск
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAppDestination(page, 'Питание');
-  const nutritionSettings = page.locator('details.nutrition-target-settings');
-  await expect(nutritionSettings).toHaveCount(1);
-  await expect(nutritionSettings.locator(':scope > summary')).toHaveText('Настройки КБЖУ');
-  const nutritionSectionOrder = await page
-    .locator('.nutrition-experience > *')
-    .evaluateAll((nodes) => nodes.map((node) => String(node.className)));
-  const settingsIndex = nutritionSectionOrder.findIndex((name) =>
-    name.includes('nutrition-target-settings'),
-  );
-  const mealPlannerIndex = nutritionSectionOrder.findIndex((name) => name.includes('meal-planner'));
-  const groceryListIndex = nutritionSectionOrder.findIndex((name) => name.includes('grocery-list'));
-  expect(settingsIndex).toBeGreaterThanOrEqual(0);
-  expect(settingsIndex).toBeLessThan(mealPlannerIndex);
-  expect(settingsIndex).toBeLessThan(groceryListIndex);
-  await nutritionSettings.locator(':scope > summary').click();
-  await expect(nutritionSettings).toHaveAttribute('open', '');
-  await expect(nutritionSettings.locator(':scope > summary')).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
-  await expect(nutritionSettings.locator('details.card-disclosure')).toHaveCount(0);
+  await expect(page.locator('.meal-planner')).toBeVisible();
+  await expect(page.locator('.grocery-list')).toBeVisible();
+  await page.getByRole('button', { name: 'Настройки КБЖУ' }).click();
+  const nutritionSettings = page.locator('#nutrition-target-settings');
+  await expect(nutritionSettings.getByRole('heading', { name: 'Цели по дням' })).toBeVisible();
+  await nutritionSettings.getByRole('button', { name: 'Изменить', exact: true }).first().click();
   await expect(
     nutritionSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
   ).toBeVisible();

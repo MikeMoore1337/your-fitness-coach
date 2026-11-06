@@ -136,6 +136,47 @@ def test_date_override_migration_preserves_data_and_blocks_lossy_downgrade(tmp_p
         )
 
 
+def test_override_day_type_migration_preserves_rows_and_refuses_data_loss(tmp_path: Path) -> None:
+    path = (
+        Path(__file__).resolve().parents[1] / "alembic/versions/0152_nutrition_override_day_type.py"
+    )
+    spec = importlib.util.spec_from_file_location("nutrition_override_day_type", path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    engine = create_engine(f"sqlite:///{(tmp_path / 'override-day-type.db').as_posix()}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE nutrition_target_date_overrides (id INTEGER PRIMARY KEY, target_id INTEGER)"
+            )
+        )
+        connection.execute(text("INSERT INTO nutrition_target_date_overrides VALUES (1, 42)"))
+        migration.op = Operations(MigrationContext.configure(connection))
+        migration.upgrade()
+        assert connection.execute(
+            text("SELECT target_id, day_type FROM nutrition_target_date_overrides")
+        ).one() == (42, None)
+        connection.execute(text("UPDATE nutrition_target_date_overrides SET day_type = 'recovery'"))
+        with pytest.raises(RuntimeError, match="Cannot discard explicit nutrition day types"):
+            migration.downgrade()
+        assert (
+            connection.execute(
+                text("SELECT day_type FROM nutrition_target_date_overrides")
+            ).scalar_one()
+            == "recovery"
+        )
+        connection.execute(text("UPDATE nutrition_target_date_overrides SET day_type = NULL"))
+        migration.downgrade()
+        assert (
+            connection.execute(
+                text("SELECT target_id FROM nutrition_target_date_overrides")
+            ).scalar_one()
+            == 42
+        )
+    engine.dispose()
+
+
 def test_schedule_migration_blocks_loss_of_bindings_rules_and_targets(tmp_path: Path) -> None:
     path = Path(__file__).resolve().parents[1] / "alembic/versions/0151_nutrition_schedule_rules.py"
     spec = importlib.util.spec_from_file_location("nutrition_schedule_migration", path)

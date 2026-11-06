@@ -151,6 +151,7 @@ class NutritionTargetDateOverride(Base):
         ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=False
     )
     target_date: Mapped[date] = mapped_column(Date, nullable=False)
+    day_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

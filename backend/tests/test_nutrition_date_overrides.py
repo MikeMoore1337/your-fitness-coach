@@ -30,7 +30,13 @@ def test_date_override_is_idempotent_and_used_consistently(client) -> None:
         client.post("/api/v1/nutrition/targets/manual", json=base, headers=headers).status_code
         == 200
     )
-    override = {**base, "calories": 2300, "carbs_g": 270, "effective_from": today.isoformat()}
+    override = {
+        **base,
+        "calories": 2300,
+        "carbs_g": 270,
+        "effective_from": today.isoformat(),
+        "day_type": "recovery",
+    }
     key_headers = {**headers, "Idempotency-Key": "date-override-952"}
     first = client.post("/api/v1/nutrition/targets/dates", json=override, headers=key_headers)
     retry = client.post("/api/v1/nutrition/targets/dates", json=override, headers=key_headers)
@@ -81,6 +87,14 @@ def test_date_override_is_idempotent_and_used_consistently(client) -> None:
         headers=headers,
     )
     assert completed.status_code == 200
+    resolved = client.get(
+        "/api/v1/nutrition/targets/for-date",
+        params={"target_date": today.isoformat()},
+        headers=headers,
+    )
+    assert resolved.status_code == 200
+    assert resolved.json()["day_type"] == "recovery"
+    assert resolved.json()["frozen"] is True
     denied = client.post(
         "/api/v1/nutrition/targets/dates",
         json={**base, "effective_from": today.isoformat()},
@@ -159,6 +173,7 @@ def test_override_history_export_and_account_deletion(client) -> None:
         "fat_g": 70,
         "carbs_g": 180,
         "effective_from": tomorrow.isoformat(),
+        "day_type": "recovery",
     }
     first = client.post(
         "/api/v1/nutrition/targets/dates",
@@ -178,6 +193,7 @@ def test_override_history_export_and_account_deletion(client) -> None:
     assert client.get("/api/v1/nutrition/targets/history", headers=headers).json()["items"] == []
     history = client.get("/api/v1/nutrition/targets/dates", headers=headers)
     assert history.status_code == 200
+    assert [row["day_type"] for row in history.json()] == ["recovery", "recovery"]
     assert [row["target"]["id"] for row in history.json()] == [
         second.json()["target"]["id"],
         first.json()["target"]["id"],

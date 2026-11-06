@@ -1,17 +1,22 @@
 import hashlib
 from datetime import date, timedelta
+from typing import Literal, cast
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.core.timezone import now_for_user_naive, today_for_user
 from fitminiapp_api.models.nutrition import (
     NutritionScheduleBinding,
     NutritionTarget,
+    NutritionTargetDateOverride,
+    NutritionTargetDaySnapshot,
     NutritionTargetScheduleRule,
 )
 from fitminiapp_api.models.program import ProgramRevision, UserProgram
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition import (
+    NutritionResolvedTargetResponse,
     NutritionScheduleBindingConfirm,
     NutritionScheduleBindingResponse,
     NutritionScheduleBindingStatus,
@@ -19,6 +24,8 @@ from fitminiapp_api.schemas.nutrition import (
     NutritionSchedulePreviewRequest,
     NutritionSchedulePreviewResponse,
     NutritionSchedulePreviewTarget,
+    NutritionScheduleProgramContext,
+    NutritionScheduleRulePreviewRequest,
     NutritionScheduleRuleResponse,
     NutritionScheduleRuleSave,
 )
@@ -30,6 +37,7 @@ from fitminiapp_api.services.nutrition import (
     _validate_manual_target_energy,
     build_nutrition_target_response_for_user,
     build_nutrition_target_response_from_users,
+    get_nutrition_target_for_date,
     load_nutrition_targets_and_date_overrides,
     lock_nutrition_authorization,
     nutrition_request_identity,
@@ -109,34 +117,21 @@ def _rule_response(
     )
 
 
-def save_nutrition_schedule_rule(
-    db: Session,
-    current_user: User,
-    payload: NutritionScheduleRuleSave,
-    idempotency_key: str,
-) -> NutritionScheduleRuleResponse:
-    target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
-    key, fingerprint = nutrition_request_identity(current_user, payload, idempotency_key)
-    db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
-    lock_nutrition_authorization(db, current_user, target_user)
-    existing = (
-        db.query(NutritionTargetScheduleRule)
-        .filter_by(user_id=target_user.id, idempotency_key=key)
-        .first()
-    )
-    if existing is not None:
-        if existing.request_hash != fingerprint:
-            raise NutritionConflictError("Ключ повтора уже использован для другого изменения")
-        target = (
-            db.query(NutritionTarget).filter_by(id=existing.target_id, user_id=target_user.id).one()
-        )
-        return _rule_response(db, existing, target, target_user)
-
+def _prepare_rule(
+    db: Session, target_user: User, payload: NutritionScheduleRuleSave, *, lock: bool
+) -> tuple[
+    UserProgram,
+    ProgramRevision,
+    NutritionScheduleBinding | None,
+    int | None,
+    int | None,
+    int | None,
+]:
     _validate_manual_target_energy(payload)
     if payload.effective_from <= today_for_user(target_user):
         raise NutritionConflictError("Правило можно применить только к будущим датам")
     program, revisions = _program_and_revisions(
-        db, target_user, payload.program_id, payload.revision_number, lock=True
+        db, target_user, payload.program_id, payload.revision_number, lock=lock
     )
     revision = revisions[-1]
     binding = _binding_at(db, target_user.id, payload.effective_from)
@@ -170,6 +165,36 @@ def save_nutrition_schedule_rule(
         )
         if payload.day_type == "recovery":
             weekday = payload.effective_from.weekday()
+
+    return program, revision, binding, source_week, boundary, weekday
+
+
+def save_nutrition_schedule_rule(
+    db: Session,
+    current_user: User,
+    payload: NutritionScheduleRuleSave,
+    idempotency_key: str,
+) -> NutritionScheduleRuleResponse:
+    target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    key, fingerprint = nutrition_request_identity(current_user, payload, idempotency_key)
+    db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
+    lock_nutrition_authorization(db, current_user, target_user)
+    existing = (
+        db.query(NutritionTargetScheduleRule)
+        .filter_by(user_id=target_user.id, idempotency_key=key)
+        .first()
+    )
+    if existing is not None:
+        if existing.request_hash != fingerprint:
+            raise NutritionConflictError("Ключ повтора уже использован для другого изменения")
+        target = (
+            db.query(NutritionTarget).filter_by(id=existing.target_id, user_id=target_user.id).one()
+        )
+        return _rule_response(db, existing, target, target_user)
+
+    program, revision, binding, source_week, boundary, weekday = _prepare_rule(
+        db, target_user, payload, lock=True
+    )
 
     if binding is None:
         db.add(
@@ -218,6 +243,93 @@ def save_nutrition_schedule_rule(
     db.refresh(rule)
     db.refresh(target)
     return _rule_response(db, rule, target, target_user)
+
+
+def preview_nutrition_schedule_rule(
+    db: Session, current_user: User, payload: NutritionScheduleRulePreviewRequest
+) -> NutritionSchedulePreviewResponse:
+    user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    if (
+        payload.date_from < payload.effective_from
+        or payload.date_to < payload.date_from
+        or (payload.date_to - payload.date_from).days > 92
+    ):
+        raise NutritionError("Диапазон просмотра должен содержать не более 93 будущих дней")
+    program, revision, binding, source_week, boundary, weekday = _prepare_rule(
+        db, user, payload, lock=False
+    )
+    preview_id = 2**63 - 1
+    target = NutritionTarget(
+        id=preview_id,
+        calories=payload.calories,
+        protein_g=payload.protein_g,
+        fat_g=payload.fat_g,
+        carbs_g=payload.carbs_g,
+    )
+    rule = NutritionTargetScheduleRule(
+        id=preview_id,
+        user_id=user.id,
+        scope=payload.scope,
+        day_type=payload.day_type,
+        week_type=payload.week_type,
+        effective_from=payload.effective_from,
+        program_id=program.id if payload.scope in {"future", "recovery"} else None,
+        source_cycle_week=source_week,
+        cycle_boundary=boundary,
+        weekday=weekday,
+    )
+    history, overrides, scheduled_users = load_nutrition_targets_and_date_overrides(
+        db, {user.id}, payload.date_from, payload.date_to
+    )
+    old = load_scheduled_nutrition_targets(db, scheduled_users, payload.date_from, payload.date_to)
+    new = load_scheduled_nutrition_targets(
+        db,
+        {user.id},
+        payload.date_from,
+        payload.date_to,
+        preview_binding=(user.id, program, revision, payload.effective_from)
+        if binding is None
+        else None,
+        preview_rule=(rule, target),
+    )
+    history.sort(key=lambda row: (row.effective_from, row.id), reverse=True)
+    changes = []
+    for offset in range((payload.date_to - payload.date_from).days + 1):
+        day = payload.date_from + timedelta(days=offset)
+        key = (user.id, day)
+        baseline = next(
+            (
+                item
+                for item in history
+                if item.effective_from <= day
+                and (item.effective_to is None or day < item.effective_to)
+            ),
+            None,
+        )
+        before = overrides[key] if key in overrides else old.get(key, baseline)
+        after = overrides[key] if key in overrides else new.get(key, baseline)
+        if (before.id if before else None) == (after.id if after else None):
+            continue
+        changes.append(
+            NutritionSchedulePreviewChange(
+                date=day,
+                before=NutritionSchedulePreviewTarget.model_validate(before, from_attributes=True)
+                if before
+                else None,
+                after=NutritionSchedulePreviewTarget.model_validate(after, from_attributes=True)
+                if after
+                else None,
+            )
+        )
+    return NutritionSchedulePreviewResponse(
+        expected_binding_id=binding.id if binding else None,
+        program_id=program.id,
+        revision_number=payload.revision_number,
+        effective_from=payload.effective_from,
+        date_from=payload.date_from,
+        date_to=payload.date_to,
+        changes=changes,
+    )
 
 
 def preview_nutrition_schedule_binding(
@@ -360,6 +472,43 @@ def list_nutrition_schedule_rules(
         .limit(100)
         .all()
     )
+    if len(rows) == 100:
+        ranked = (
+            db.query(
+                NutritionTargetScheduleRule.id.label("id"),
+                func.row_number()
+                .over(
+                    partition_by=(
+                        NutritionTargetScheduleRule.day_type,
+                        NutritionTargetScheduleRule.week_type,
+                    ),
+                    order_by=(
+                        NutritionTargetScheduleRule.effective_from.desc(),
+                        NutritionTargetScheduleRule.id.desc(),
+                    ),
+                )
+                .label("rank"),
+            )
+            .filter_by(user_id=user.id, scope="template")
+            .subquery()
+        )
+        latest_ids = {row.id for row in db.query(ranked.c.id).filter(ranked.c.rank == 1)}
+        missing = latest_ids - {rule.id for rule, _ in rows}
+        if missing:
+            rows.extend(
+                db.query(NutritionTargetScheduleRule, NutritionTarget)
+                .join(
+                    NutritionTarget,
+                    (NutritionTarget.id == NutritionTargetScheduleRule.target_id)
+                    & (NutritionTarget.user_id == NutritionTargetScheduleRule.user_id),
+                )
+                .filter(
+                    NutritionTargetScheduleRule.user_id == user.id,
+                    NutritionTargetScheduleRule.id.in_(missing),
+                )
+                .all()
+            )
+            rows.sort(key=lambda row: row[0].id, reverse=True)
     author_ids = {target.assigned_by_user_id for _, target in rows if target.assigned_by_user_id}
     authors = (
         {
@@ -402,4 +551,94 @@ def read_nutrition_schedule_binding(
             or active_program[0] != program.id
             or revision.revision_number != program.current_revision_number
         ),
+    )
+
+
+def read_resolved_nutrition_target(
+    db: Session, current_user: User, target_telegram_user_id: int | None, day: date
+) -> NutritionResolvedTargetResponse:
+    user = _resolve_target_user(db, current_user, target_telegram_user_id)
+    target = get_nutrition_target_for_date(db, user.id, day)
+    frozen = db.get(NutritionTargetDaySnapshot, (user.id, day)) is not None
+    origin = "none" if target is None else target.target_scope or "base"
+    day_type: str | None = None
+    week_type: str | None = None
+    binding = _binding_at(db, user.id, day)
+    if binding is not None:
+        revision = db.get(ProgramRevision, binding.program_revision_id)
+        program = (
+            db.query(UserProgram).filter_by(id=revision.user_program_id, user_id=user.id).first()
+            if revision
+            else None
+        )
+        if program is not None and revision is not None:
+            revisions = (
+                db.query(ProgramRevision)
+                .filter(
+                    ProgramRevision.user_program_id == program.id,
+                    ProgramRevision.revision_number <= revision.revision_number,
+                )
+                .order_by(ProgramRevision.revision_number)
+                .all()
+            )
+            day_type, week_type = program_nutrition_day(
+                db, program, revisions, revision.revision_number, day
+            )
+    if target is not None and origin == "date":
+        override = (
+            db.query(NutritionTargetDateOverride)
+            .filter_by(user_id=user.id, target_id=target.id, target_date=day)
+            .first()
+        )
+        if override is not None and override.day_type is not None:
+            day_type = override.day_type
+    if target is not None and origin == "schedule":
+        rule = (
+            db.query(NutritionTargetScheduleRule)
+            .filter_by(user_id=user.id, target_id=target.id)
+            .first()
+        )
+        if rule is not None:
+            day_type = rule.day_type
+    return NutritionResolvedTargetResponse(
+        date=day,
+        target=build_nutrition_target_response_for_user(db, target, user),
+        origin=cast(Literal["base", "schedule", "date", "none"], origin),
+        day_type=cast(Literal["training", "rest", "recovery"] | None, day_type),
+        week_type=cast(Literal["light", "medium", "heavy"] | None, week_type),
+        frozen=frozen,
+    )
+
+
+def read_nutrition_schedule_program(
+    db: Session, current_user: User, target_telegram_user_id: int | None
+) -> NutritionScheduleProgramContext | None:
+    user = _resolve_target_user(db, current_user, target_telegram_user_id)
+    program = (
+        db.query(UserProgram)
+        .options(joinedload(UserProgram.template))
+        .filter(
+            UserProgram.user_id == user.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_(["active", "scheduled"]),
+        )
+        .first()
+    )
+    if program is None:
+        return None
+    revisions = (
+        db.query(ProgramRevision)
+        .filter(ProgramRevision.user_program_id == program.id)
+        .order_by(ProgramRevision.revision_number)
+        .all()
+    )
+    types = program_week_types(db, program, revisions, program.current_revision_number)
+    return NutritionScheduleProgramContext(
+        program_id=program.id,
+        revision_number=program.current_revision_number,
+        title=program.template.title if program.template else "Программа тренировок",
+        start_date=program.start_date,
+        duration_weeks=program.duration_weeks,
+        schedule_mode=program.schedule_mode,
+        week_types=[value for value in ("light", "medium", "heavy") if value in types],
     )

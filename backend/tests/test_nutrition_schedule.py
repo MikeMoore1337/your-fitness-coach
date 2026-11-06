@@ -39,6 +39,11 @@ def test_schedule_resolves_cycle_types_future_repeats_and_date_priority(client) 
     )
     assert assigned.status_code == 200, assigned.text
     program_id = assigned.json()["user_program_id"]
+    context = client.get("/api/v1/nutrition/targets/schedule/program", headers=headers)
+    assert context.status_code == 200
+    assert context.json()["program_id"] == program_id
+    assert context.json()["revision_number"] == 1
+    assert context.json()["week_types"] == ["light", "medium", "heavy"]
     base = {"calories": 2000, "protein_g": 150, "fat_g": 70, "carbs_g": 180}
     assert (
         client.post("/api/v1/nutrition/targets/manual", json=base, headers=headers).status_code
@@ -68,6 +73,21 @@ def test_schedule_resolves_cycle_types_future_repeats_and_date_priority(client) 
             "day_type": day_type,
             "week_type": week_type,
         }
+        if index == 0:
+            preview = client.post(
+                "/api/v1/nutrition/targets/schedule/preview",
+                json={
+                    **rule_payload,
+                    "date_from": first_day.isoformat(),
+                    "date_to": (first_day + timedelta(days=20)).isoformat(),
+                },
+                headers=headers,
+            )
+            assert preview.status_code == 200, preview.text
+            assert preview.json()["changes"]
+            with get_session_context() as db:
+                assert db.query(NutritionTargetScheduleRule).filter_by(user_id=user_id).count() == 0
+                assert db.query(NutritionScheduleBinding).filter_by(user_id=user_id).count() == 0
         response = client.post(
             "/api/v1/nutrition/targets/schedule",
             json=rule_payload,
@@ -75,6 +95,14 @@ def test_schedule_resolves_cycle_types_future_repeats_and_date_priority(client) 
         )
         assert response.status_code == 200, response.text
         if index == 0:
+            with get_session_context() as db:
+                for change in preview.json()["changes"]:
+                    from datetime import date
+
+                    target = get_nutrition_target_for_date(
+                        db, user_id, date.fromisoformat(change["date"])
+                    )
+                    assert target.calories == change["after"]["calories"]
             retry = client.post(
                 "/api/v1/nutrition/targets/schedule",
                 json=rule_payload,
@@ -113,6 +141,14 @@ def test_schedule_resolves_cycle_types_future_repeats_and_date_priority(client) 
         headers={**headers, "Idempotency-Key": "schedule-date-override"},
     )
     assert override.status_code == 200, override.text
+    resolved = client.get(
+        "/api/v1/nutrition/targets/for-date",
+        params={"target_date": selected.isoformat()},
+        headers=headers,
+    )
+    assert resolved.status_code == 200
+    assert resolved.json()["origin"] == "date"
+    assert resolved.json()["target"]["calories"] == 2700
     plan = client.get(
         "/api/v1/nutrition/plans/day", params={"plan_date": selected.isoformat()}, headers=headers
     )
@@ -487,6 +523,13 @@ def test_schedule_requires_active_trainer_and_rejects_invalid_scope(client) -> N
     )
     assert (
         client.get(
+            "/api/v1/nutrition/targets/schedule/program?target_telegram_user_id=952700",
+            headers=coach,
+        ).status_code
+        == 403
+    )
+    assert (
+        client.get(
             "/api/v1/nutrition/targets/schedule?target_telegram_user_id=952700", headers=coach
         ).status_code
         == 403
@@ -635,6 +678,36 @@ def test_schedule_queries_do_not_grow_with_client_count() -> None:
                 reset_sql_metrics(token)
             assert {user_id for user_id, _day in result} == selected
         assert counts == [3, 3]
+
+
+def test_rule_list_retains_latest_templates_after_many_repeats(client) -> None:
+    headers = _auth(client, 952899)
+    saved = client.post(
+        "/api/v1/nutrition/targets/manual",
+        json={"calories": 2000, "protein_g": 150, "fat_g": 70, "carbs_g": 180},
+        headers=headers,
+    )
+    assert saved.status_code == 200
+    with get_session_context() as db:
+        user = db.query(User).filter_by(telegram_user_id=952899).one()
+        for index in range(102):
+            db.add(
+                NutritionTargetScheduleRule(
+                    user_id=user.id,
+                    target_id=saved.json()["id"],
+                    scope="template" if index == 0 else "future",
+                    day_type="rest" if index == 0 else "training",
+                    effective_from=today_msk() + timedelta(days=1),
+                    idempotency_key=f"list-retention-{index}",
+                    request_hash="hash",
+                )
+            )
+    response = client.get("/api/v1/nutrition/targets/schedule", headers=headers)
+    assert response.status_code == 200
+    assert len(response.json()) == 101
+    assert any(
+        item["scope"] == "template" and item["day_type"] == "rest" for item in response.json()
+    )
 
 
 def test_scheduled_target_survives_dst_and_timezone_change(client, monkeypatch) -> None:

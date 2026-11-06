@@ -15,6 +15,7 @@ import type {
   FoodDiaryMeal,
   FoodDiaryNutrition,
 } from '../../shared/api/types';
+import type { components } from '../../shared/api/schema';
 import {
   Badge,
   Button,
@@ -177,8 +178,48 @@ function MacroProgress({
   );
 }
 
-function DaySummary({ day }: { day: FoodDiaryDay }) {
+function DaySummary({
+  day,
+  selectedDate,
+  today,
+  onOpenSettings,
+  onOverride,
+  readOnlyTargets,
+}: {
+  day: FoodDiaryDay;
+  selectedDate: string;
+  today: string;
+  onOpenSettings?: () => void;
+  onOverride?: (
+    date: string,
+    target: components['schemas']['NutritionTargetResponse'] | null,
+    dayType: components['schemas']['NutritionResolvedTargetResponse']['day_type'],
+  ) => void;
+  readOnlyTargets: boolean;
+}) {
   const { totals, targets, remaining } = day;
+  const resolved = useQuery({
+    queryKey: ['nutrition', 'targets', 'resolved', selectedDate],
+    queryFn: () =>
+      api<components['schemas']['NutritionResolvedTargetResponse']>(
+        `/api/v1/nutrition/targets/for-date?target_date=${selectedDate}`,
+      ),
+    enabled: Boolean(onOpenSettings),
+  });
+  const source =
+    resolved.data?.origin === 'schedule'
+      ? 'По программе'
+      : resolved.data?.origin === 'date'
+        ? 'Изменено вручную'
+        : resolved.data?.origin === 'base'
+          ? 'Базовая цель'
+          : null;
+  const dayNames = {
+    training: 'Тренировочный день',
+    recovery: 'Восстановительный день',
+    rest: 'День отдыха',
+  };
+  const weekNames = { light: 'Лёгкая неделя', medium: 'Средняя неделя', heavy: 'Тяжёлая неделя' };
   const motion = useSemanticMotion<HTMLElement>(JSON.stringify([totals, targets, remaining]), {
     animateInitial: false,
   });
@@ -198,8 +239,30 @@ function DaySummary({ day }: { day: FoodDiaryDay }) {
           <span className="eyebrow">Ориентиры дня</span>
           <h2 id="nutrition-summary-title">КБЖУ</h2>
         </div>
-        {day.targets ? <Badge tone="success">Цель КБЖУ настроена</Badge> : <Badge>Без цели</Badge>}
+        {day.targets ? (
+          <Badge tone="success">{source ?? 'Цель КБЖУ настроена'}</Badge>
+        ) : (
+          <Badge>Без цели</Badge>
+        )}
       </div>
+      {resolved.data &&
+        (resolved.data.day_type || resolved.data.week_type || resolved.data.frozen) && (
+          <p className="nutrition-goal-day-meta">
+            {[
+              resolved.data.day_type && dayNames[resolved.data.day_type],
+              resolved.data.week_type && weekNames[resolved.data.week_type],
+              resolved.data.frozen && 'Цель сохранена',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        )}
+      {resolved.error && (
+        <ErrorState
+          message="Не удалось узнать источник цели."
+          retry={() => void resolved.refetch()}
+        />
+      )}
       {targets && remaining ? (
         <div className="nutrition-targets">
           <MacroProgress
@@ -237,7 +300,13 @@ function DaySummary({ day }: { day: FoodDiaryDay }) {
         <div className="nutrition-targets nutrition-targets--unset">
           <strong>{formatNumber(totals.energy_kcal)} ккал записано</strong>
           <p>Настройте ориентиры КБЖУ, чтобы видеть остаток на день.</p>
-          <a href="#nutrition-target-settings">Настроить цель</a>
+          {onOpenSettings ? (
+            <Button type="button" variant="secondary" onClick={onOpenSettings}>
+              Настроить цель
+            </Button>
+          ) : (
+            <a href="#nutrition-target-settings">Настроить цель</a>
+          )}
         </div>
       )}
       <dl className="nutrition-day-summary__totals" aria-label="Сумма макронутриентов">
@@ -254,6 +323,40 @@ function DaySummary({ day }: { day: FoodDiaryDay }) {
           <dd>{formatNumber(totals.carbs_g, 1)} г</dd>
         </div>
       </dl>
+      {onOpenSettings && (
+        <div className="nutrition-goal-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            data-nutrition-focus="settings"
+            onClick={onOpenSettings}
+          >
+            Настройки КБЖУ
+          </Button>
+          {onOverride &&
+            !readOnlyTargets &&
+            selectedDate >= today &&
+            !resolved.data?.frozen &&
+            day.status !== 'complete' &&
+            day.status !== 'fasted' && (
+              <Button
+                type="button"
+                variant="ghost"
+                data-nutrition-focus="override"
+                disabled={!resolved.isSuccess}
+                onClick={() =>
+                  onOverride(
+                    selectedDate,
+                    resolved.data?.target ?? null,
+                    resolved.data?.day_type ?? null,
+                  )
+                }
+              >
+                Изменить на эту дату
+              </Button>
+            )}
+        </div>
+      )}
     </aside>
   );
 }
@@ -786,6 +889,11 @@ export function NutritionDiary({
   initialHydrationOpen = false,
   readOnlyEntries = false,
   demoSafeMode = false,
+  readOnlyTargets = false,
+  onOpenSettings,
+  onOverride,
+  onDateChange,
+  selectedDate: controlledDate,
 }: {
   timeZone?: string | null;
   initialDate?: string;
@@ -794,9 +902,19 @@ export function NutritionDiary({
   initialHydrationOpen?: boolean;
   readOnlyEntries?: boolean;
   demoSafeMode?: boolean;
+  readOnlyTargets?: boolean;
+  onOpenSettings?: () => void;
+  onOverride?: (
+    date: string,
+    target: components['schemas']['NutritionTargetResponse'] | null,
+    dayType: components['schemas']['NutritionResolvedTargetResponse']['day_type'],
+  ) => void;
+  onDateChange?: (date: string) => void;
+  selectedDate?: string;
 }) {
   const today = dateInputValue(new Date(), timeZone || undefined);
-  const [selectedDate, setSelectedDate] = useState(initialDate || today);
+  const [uncontrolledDate, setUncontrolledDate] = useState(initialDate || today);
+  const selectedDate = controlledDate ?? uncontrolledDate;
   const [addingTo, setAddingTo] = useState<{
     mealType: MealType;
     initialView?: 'browse' | 'quick-add';
@@ -1015,7 +1133,8 @@ export function NutritionDiary({
         onSelect={(date) => {
           setLastAddedEntryId(null);
           setMealExpansion({});
-          setSelectedDate(date);
+          if (controlledDate === undefined) setUncontrolledDate(date);
+          onDateChange?.(date);
         }}
       />
 
@@ -1085,7 +1204,14 @@ export function NutritionDiary({
                 )}
             </div>
           )}
-          <DaySummary day={diary.data} />
+          <DaySummary
+            day={diary.data}
+            selectedDate={selectedDate}
+            today={today}
+            onOpenSettings={onOpenSettings}
+            onOverride={onOverride}
+            readOnlyTargets={readOnlyTargets}
+          />
           <section
             className="nutrition-section-card nutrition-food-card"
             aria-labelledby="nutrition-food-title"

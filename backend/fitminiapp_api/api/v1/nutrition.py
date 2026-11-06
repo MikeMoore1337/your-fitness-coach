@@ -70,11 +70,14 @@ from fitminiapp_api.schemas.nutrition import (
     NutritionDateOverrideSave,
     NutritionManualTargetSave,
     NutritionProgramDayResponse,
+    NutritionResolvedTargetResponse,
     NutritionScheduleBindingConfirm,
     NutritionScheduleBindingResponse,
     NutritionScheduleBindingStatus,
     NutritionSchedulePreviewRequest,
     NutritionSchedulePreviewResponse,
+    NutritionScheduleProgramContext,
+    NutritionScheduleRulePreviewRequest,
     NutritionScheduleRuleResponse,
     NutritionScheduleRuleSave,
     NutritionTargetHistoryResponse,
@@ -246,7 +249,10 @@ from fitminiapp_api.services.nutrition_schedule_write import (
     confirm_nutrition_schedule_binding,
     list_nutrition_schedule_rules,
     preview_nutrition_schedule_binding,
+    preview_nutrition_schedule_rule,
     read_nutrition_schedule_binding,
+    read_nutrition_schedule_program,
+    read_resolved_nutrition_target,
     save_nutrition_schedule_rule,
 )
 from fitminiapp_api.services.nutrition_suggestions import (
@@ -1604,6 +1610,18 @@ def save_schedule_rule(
         _raise_schedule_http_error(exc)
 
 
+@router.post("/targets/schedule/preview", response_model=NutritionSchedulePreviewResponse)
+def preview_schedule_rule(
+    payload: NutritionScheduleRulePreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_nutrition_schedule_rule(db, current_user, payload)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
 @router.get("/targets/schedule", response_model=list[NutritionScheduleRuleResponse])
 def schedule_rule_history(
     target_telegram_user_id: int | None = Query(default=None, ge=1),
@@ -1612,6 +1630,33 @@ def schedule_rule_history(
 ):
     try:
         return list_nutrition_schedule_rules(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/schedule/program", response_model=NutritionScheduleProgramContext | None)
+def nutrition_schedule_program(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_schedule_program(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/for-date", response_model=NutritionResolvedTargetResponse)
+def resolved_nutrition_target(
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_resolved_nutrition_target(
+            db, current_user, target_telegram_user_id, target_date
+        )
     except NutritionError as exc:
         _raise_schedule_http_error(exc)
 

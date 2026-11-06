@@ -1454,7 +1454,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "nutrition_target_date_overrides": [
             _fields(
                 override,
-                ("id", "target_date", "target_id", "created_by_user_id", "created_at"),
+                ("id", "target_date", "day_type", "target_id", "created_by_user_id", "created_at"),
             )
             for override in nutrition_overrides
         ],

@@ -98,6 +98,7 @@ class NutritionManualTargetSave(BaseModel):
 
 class NutritionDateOverrideSave(NutritionManualTargetSave):
     effective_from: date
+    day_type: Literal["training", "rest", "recovery"] | None = None
 
 
 class NutritionScheduleRuleSave(NutritionManualTargetSave):
@@ -107,6 +108,11 @@ class NutritionScheduleRuleSave(NutritionManualTargetSave):
     scope: Literal["template", "future", "recovery"]
     day_type: Literal["training", "rest", "recovery"]
     week_type: Literal["light", "medium", "heavy"] | None = None
+
+
+class NutritionScheduleRulePreviewRequest(NutritionScheduleRuleSave):
+    date_from: date
+    date_to: date
 
 
 class NutritionScheduleBindingRequest(BaseModel):
@@ -179,7 +185,17 @@ class NutritionTargetHistoryResponse(BaseModel):
 
 class NutritionDateOverrideResponse(BaseModel):
     date: date
+    day_type: Literal["training", "rest", "recovery"] | None = None
     target: NutritionTargetResponse
+
+
+class NutritionResolvedTargetResponse(BaseModel):
+    date: date
+    target: NutritionTargetResponse | None
+    origin: Literal["base", "schedule", "date", "none"]
+    day_type: Literal["training", "rest", "recovery"] | None
+    week_type: Literal["light", "medium", "heavy"] | None
+    frozen: bool
 
 
 class NutritionScheduleRuleResponse(BaseModel):
@@ -205,6 +221,16 @@ class NutritionScheduleBindingResponse(BaseModel):
 class NutritionScheduleBindingStatus(NutritionScheduleBindingResponse):
     current_revision_number: int
     program_changed: bool
+
+
+class NutritionScheduleProgramContext(BaseModel):
+    program_id: int
+    revision_number: int
+    title: str
+    start_date: date
+    duration_weeks: int
+    schedule_mode: Literal["calendar", "rotation"]
+    week_types: list[Literal["light", "medium", "heavy"]]
 
 
 class NutritionSchedulePreviewTarget(BaseModel):
