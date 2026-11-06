@@ -1,21 +1,35 @@
+import hashlib
+import json
 import math
-from datetime import date
+from datetime import date, timedelta
 from typing import Literal, TypedDict, cast
 
-from pydantic import ValidationError
-from sqlalchemy.orm import Session, joinedload
+from pydantic import BaseModel, ValidationError
+from sqlalchemy import Date, Integer, and_, literal, or_
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from fitminiapp_api.core.timezone import (
     now_for_user_naive,
     today_for_user,
 )
-from fitminiapp_api.models.nutrition import NutritionTarget
+from fitminiapp_api.models.food_diary import FoodDiaryDayStatus
+from fitminiapp_api.models.nutrition import (
+    NutritionScheduleBinding,
+    NutritionTarget,
+    NutritionTargetDateOverride,
+    NutritionTargetDaySnapshot,
+)
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.nutrition import (
     CardioIntensity,
     CardioTraining,
     NutritionAssignedByResponse,
+    NutritionDateOverrideResponse,
+    NutritionDateOverrideSave,
     NutritionManualTargetSave,
+    NutritionProgramDayResponse,
+    NutritionScheduleBindingConfirm,
+    NutritionScheduleRuleSave,
     NutritionTargetResponse,
     NutritionTargetSave,
 )
@@ -351,6 +365,23 @@ def _resolve_target_user(
     raise NutritionError("No permission to manage this user")
 
 
+def lock_nutrition_authorization(db: Session, actor: User, target_user: User) -> None:
+    if actor.id == target_user.id:
+        return
+    active = (
+        db.query(CoachClient.id)
+        .filter(
+            CoachClient.coach_user_id == actor.id,
+            CoachClient.client_user_id == target_user.id,
+            CoachClient.status == "active",
+        )
+        .with_for_update()
+        .first()
+    )
+    if active is None:
+        raise NutritionError("No permission to manage this user")
+
+
 def _assigned_by_response(user: User | None) -> NutritionAssignedByResponse | None:
     if not user:
         return None
@@ -463,15 +494,183 @@ def get_nutrition_target_for_date(
     user_id: int,
     target_date: date,
 ) -> NutritionTarget | None:
-    return (
-        db.query(NutritionTarget)
+    base = aliased(NutritionTarget)
+    frozen = aliased(NutritionTarget)
+    overridden = aliased(NutritionTarget)
+    has_schedule = (
+        db.query(NutritionScheduleBinding.id)
         .filter(
-            NutritionTarget.user_id == user_id,
-            NutritionTarget.effective_from <= target_date,
-            (NutritionTarget.effective_to.is_(None)) | (NutritionTarget.effective_to > target_date),
+            NutritionScheduleBinding.user_id == User.id,
+            NutritionScheduleBinding.effective_from <= target_date,
         )
-        .order_by(NutritionTarget.effective_from.desc(), NutritionTarget.id.desc())
+        .exists()
+    )
+    row = (
+        db.query(
+            NutritionTargetDaySnapshot.user_id,
+            frozen,
+            NutritionTargetDateOverride.id,
+            overridden,
+            base,
+            has_schedule,
+        )
+        .select_from(User)
+        .outerjoin(
+            NutritionTargetDaySnapshot,
+            and_(
+                NutritionTargetDaySnapshot.user_id == User.id,
+                NutritionTargetDaySnapshot.diary_date == target_date,
+            ),
+        )
+        .outerjoin(
+            frozen,
+            and_(
+                frozen.id == NutritionTargetDaySnapshot.target_id,
+                frozen.user_id == User.id,
+            ),
+        )
+        .outerjoin(
+            NutritionTargetDateOverride,
+            and_(
+                NutritionTargetDateOverride.user_id == User.id,
+                NutritionTargetDateOverride.target_date == target_date,
+            ),
+        )
+        .outerjoin(
+            overridden,
+            and_(
+                overridden.id == NutritionTargetDateOverride.target_id,
+                overridden.user_id == User.id,
+            ),
+        )
+        .outerjoin(
+            base,
+            and_(
+                base.user_id == User.id,
+                base.target_scope.is_(None),
+                base.effective_from <= target_date,
+                base.effective_to.is_(None) | (base.effective_to > target_date),
+            ),
+        )
+        .filter(User.id == user_id)
+        .order_by(NutritionTargetDateOverride.id.desc(), base.effective_from.desc(), base.id.desc())
         .first()
+    )
+    if row is None:
+        return None
+    if row[0] is not None:
+        return cast(NutritionTarget | None, row[1])
+    if row[2] is not None:
+        return cast(NutritionTarget | None, row[3])
+    if row[5]:
+        from fitminiapp_api.services.nutrition_schedule import load_scheduled_nutrition_targets
+
+        scheduled = load_scheduled_nutrition_targets(db, {user_id}, target_date, target_date)
+        if (user_id, target_date) in scheduled:
+            return scheduled[(user_id, target_date)]
+    return cast(NutritionTarget | None, row[4])
+
+
+def capture_nutrition_target_snapshot(db: Session, user_id: int, target_date: date) -> None:
+    """Serialize capture with changes to the user's targets."""
+    db.query(User.id).filter(User.id == user_id).with_for_update().one()
+    if db.get(NutritionTargetDaySnapshot, (user_id, target_date)) is not None:
+        return
+    target = get_nutrition_target_for_date(db, user_id, target_date)
+    db.add(
+        NutritionTargetDaySnapshot(
+            user_id=user_id,
+            diary_date=target_date,
+            target_id=target.id if target is not None else None,
+        )
+    )
+    db.flush()
+
+
+def load_nutrition_targets_and_date_overrides(
+    db: Session, user_ids: set[int], start: date, end: date
+) -> tuple[list[NutritionTarget], dict[tuple[int, date], NutritionTarget | None], set[int]]:
+    if not user_ids:
+        return [], {}, set()
+    versions = db.query(
+        NutritionTarget.id.label("target_id"),
+        literal(None).cast(Integer).label("snapshot_user_id"),
+        literal(None).cast(Date).label("snapshot_date"),
+        literal(None).cast(Integer).label("override_id"),
+        literal(False).label("binding"),
+    ).filter(NutritionTarget.user_id.in_(user_ids), NutritionTarget.target_scope.is_(None))
+    frozen = db.query(
+        NutritionTargetDaySnapshot.target_id.label("target_id"),
+        NutritionTargetDaySnapshot.user_id.label("snapshot_user_id"),
+        NutritionTargetDaySnapshot.diary_date.label("snapshot_date"),
+        literal(None).cast(Integer).label("override_id"),
+        literal(False).label("binding"),
+    ).filter(
+        NutritionTargetDaySnapshot.user_id.in_(user_ids),
+        NutritionTargetDaySnapshot.diary_date.between(start, end),
+    )
+    overrides = db.query(
+        NutritionTargetDateOverride.target_id.label("target_id"),
+        NutritionTargetDateOverride.user_id.label("snapshot_user_id"),
+        NutritionTargetDateOverride.target_date.label("snapshot_date"),
+        NutritionTargetDateOverride.id.label("override_id"),
+        literal(False).label("binding"),
+    ).filter(
+        NutritionTargetDateOverride.user_id.in_(user_ids),
+        NutritionTargetDateOverride.target_date.between(start, end),
+    )
+    bindings = db.query(
+        literal(None).cast(Integer).label("target_id"),
+        NutritionScheduleBinding.user_id.label("snapshot_user_id"),
+        NutritionScheduleBinding.effective_from.label("snapshot_date"),
+        literal(None).cast(Integer).label("override_id"),
+        literal(True).label("binding"),
+    ).filter(
+        NutritionScheduleBinding.user_id.in_(user_ids),
+        NutritionScheduleBinding.effective_from <= end,
+    )
+    records = versions.union_all(frozen, overrides, bindings).subquery()
+    rows = (
+        db.query(
+            NutritionTarget,
+            records.c.snapshot_user_id,
+            records.c.snapshot_date,
+            records.c.override_id,
+            records.c.binding,
+        )
+        .select_from(records)
+        .outerjoin(
+            NutritionTarget,
+            and_(
+                NutritionTarget.id == records.c.target_id,
+                or_(
+                    records.c.snapshot_user_id.is_(None),
+                    NutritionTarget.user_id == records.c.snapshot_user_id,
+                ),
+            ),
+        )
+        .all()
+    )
+    targets: list[NutritionTarget] = []
+    snapshots: dict[tuple[int, date], NutritionTarget | None] = {}
+    date_overrides: dict[tuple[int, date], tuple[int, NutritionTarget | None]] = {}
+    scheduled_users: set[int] = set()
+    for target, snapshot_user_id, snapshot_date, override_id, binding in rows:
+        if binding:
+            scheduled_users.add(snapshot_user_id)
+            continue
+        if snapshot_user_id is None and target is not None:
+            targets.append(target)
+        elif snapshot_user_id is not None and override_id is None:
+            snapshots[(snapshot_user_id, snapshot_date)] = target
+        elif snapshot_user_id is not None:
+            key = (snapshot_user_id, snapshot_date)
+            if key not in date_overrides or override_id > date_overrides[key][0]:
+                date_overrides[key] = (override_id, target)
+    return (
+        targets,
+        {**{key: value[1] for key, value in date_overrides.items()}, **snapshots},
+        scheduled_users,
     )
 
 
@@ -591,6 +790,7 @@ def create_nutrition_target_version(
 ) -> tuple[NutritionTarget, bool]:
     """Create one canonical half-open target period while serializing per user."""
     db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
+    lock_nutrition_authorization(db, changed_by, target_user)
     current = get_current_nutrition_target(db, target_user.id, for_update=True)
     current_day = today_for_user(target_user)
     if effective_from > current_day:
@@ -611,6 +811,12 @@ def create_nutrition_target_version(
         values=values,
     ):
         return current, False
+    if effective_from < current_day:
+        raise NutritionConflictError("Нельзя изменять цель задним числом")
+
+    completed = db.get(FoodDiaryDayStatus, (target_user.id, current_day))
+    if completed is not None and completed.status in {"complete", "fasted"}:
+        capture_nutrition_target_snapshot(db, target_user.id, current_day)
 
     target = NutritionTarget(
         user_id=target_user.id,
@@ -802,12 +1008,7 @@ def save_nutrition_target(
     return response
 
 
-def save_manual_nutrition_target(
-    db: Session,
-    current_user: User,
-    payload: NutritionManualTargetSave,
-) -> NutritionTargetResponse:
-    target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+def _validate_manual_target_energy(payload: NutritionManualTargetSave) -> None:
     implied_energy = payload.protein_g * 4 + payload.fat_g * 9 + payload.carbs_g * 4
     difference = abs(implied_energy - payload.calories)
     allowed_difference = max(
@@ -820,6 +1021,14 @@ def save_manual_nutrition_target(
             difference_kcal=difference,
         )
 
+
+def save_manual_nutrition_target(
+    db: Session,
+    current_user: User,
+    payload: NutritionManualTargetSave,
+) -> NutritionTargetResponse:
+    target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    _validate_manual_target_energy(payload)
     ensure_profile(db, target_user)
     # Build the retry snapshot under the same per-user lock used for versioning.
     # Otherwise a concurrent request can commit between this read and
@@ -859,6 +1068,192 @@ def save_manual_nutrition_target(
     return response
 
 
+def nutrition_request_identity(
+    current_user: User, payload: BaseModel, idempotency_key: str
+) -> tuple[str, str]:
+    key = idempotency_key.strip()
+    if not 8 <= len(key) <= 128:
+        raise NutritionError("Некорректный ключ повтора запроса")
+    request_payload = payload.model_dump(mode="json")
+    if (
+        isinstance(payload, NutritionDateOverrideSave)
+        and "expected_target_id" not in payload.model_fields_set
+    ):
+        request_payload.pop("expected_target_id")
+    if isinstance(payload, NutritionScheduleRuleSave):
+        for field in ("expected_binding_id", "expected_target_version"):
+            if field not in payload.model_fields_set:
+                request_payload.pop(field)
+    if (
+        isinstance(payload, NutritionScheduleBindingConfirm)
+        and "expected_target_version" not in payload.model_fields_set
+    ):
+        request_payload.pop("expected_target_version")
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            {"actor_id": current_user.id, "payload": request_payload},
+            sort_keys=True,
+            ensure_ascii=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    return key, fingerprint
+
+
+def save_nutrition_date_override(
+    db: Session,
+    current_user: User,
+    payload: NutritionDateOverrideSave,
+    idempotency_key: str,
+) -> NutritionDateOverrideResponse:
+    target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    key, fingerprint = nutrition_request_identity(current_user, payload, idempotency_key)
+    db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
+    lock_nutrition_authorization(db, current_user, target_user)
+    existing = (
+        db.query(NutritionTargetDateOverride)
+        .filter_by(user_id=target_user.id, idempotency_key=key)
+        .first()
+    )
+    if existing is not None:
+        if existing.request_hash != fingerprint:
+            raise NutritionConflictError("Ключ повтора уже использован для другого изменения")
+        target = (
+            db.query(NutritionTarget).filter_by(id=existing.target_id, user_id=target_user.id).one()
+        )
+    else:
+        _validate_manual_target_energy(payload)
+        if payload.effective_from < today_for_user(target_user):
+            raise NutritionConflictError("Нельзя изменять цель задним числом")
+        if payload.effective_from == date.max:
+            raise NutritionError("Дата назначения выходит за поддерживаемый диапазон")
+        status = db.get(FoodDiaryDayStatus, (target_user.id, payload.effective_from))
+        if db.get(
+            NutritionTargetDaySnapshot, (target_user.id, payload.effective_from)
+        ) is not None or (status is not None and status.status in {"complete", "fasted"}):
+            raise NutritionConflictError("Завершённый день сохраняет исходную цель")
+        if "expected_target_id" in payload.model_fields_set:
+            current = get_nutrition_target_for_date(db, target_user.id, payload.effective_from)
+            if (current.id if current else None) != payload.expected_target_id:
+                raise NutritionConflictError("Цель изменилась; обновите просмотр")
+        target = NutritionTarget(
+            user_id=target_user.id,
+            assigned_by_user_id=current_user.id,
+            source="manual" if current_user.id == target_user.id else "trainer",
+            target_scope="date",
+            effective_from=payload.effective_from,
+            effective_to=payload.effective_from + timedelta(days=1),
+            note=_normalized_note(payload.note),
+            calories=payload.calories,
+            protein_g=payload.protein_g,
+            fat_g=payload.fat_g,
+            carbs_g=payload.carbs_g,
+            saved_at=now_for_user_naive(target_user),
+        )
+        db.add(target)
+        db.flush()
+        db.add(
+            NutritionTargetDateOverride(
+                user_id=target_user.id,
+                target_id=target.id,
+                target_date=payload.effective_from,
+                day_type=payload.day_type,
+                created_by_user_id=current_user.id,
+                idempotency_key=key,
+                request_hash=fingerprint,
+            )
+        )
+        db.commit()
+        db.refresh(target)
+    response = build_nutrition_target_response_for_user(db, target, target_user)
+    if response is None:
+        raise NutritionError("Цель питания не найдена")
+    return NutritionDateOverrideResponse(
+        date=payload.effective_from,
+        day_type=payload.day_type,
+        target=response,
+    )
+
+
+def list_nutrition_date_overrides(
+    db: Session, current_user: User, target_telegram_user_id: int | None = None
+) -> list[NutritionDateOverrideResponse]:
+    target_user = _resolve_target_user(db, current_user, target_telegram_user_id)
+    rows = (
+        db.query(NutritionTargetDateOverride, NutritionTarget)
+        .join(
+            NutritionTarget,
+            and_(
+                NutritionTarget.id == NutritionTargetDateOverride.target_id,
+                NutritionTarget.user_id == NutritionTargetDateOverride.user_id,
+            ),
+        )
+        .filter(NutritionTargetDateOverride.user_id == target_user.id)
+        .order_by(NutritionTargetDateOverride.id.desc())
+        .limit(100)
+        .all()
+    )
+    author_ids = {target.assigned_by_user_id for _, target in rows if target.assigned_by_user_id}
+    authors = (
+        {
+            user.id: user
+            for user in db.query(User)
+            .options(joinedload(User.profile))
+            .filter(User.id.in_(author_ids))
+        }
+        if author_ids
+        else {}
+    )
+    return [
+        NutritionDateOverrideResponse(
+            date=override.target_date,
+            day_type=cast(Literal["training", "rest", "recovery"] | None, override.day_type),
+            target=build_nutrition_target_response_from_users(
+                target, target_user, authors.get(target.assigned_by_user_id)
+            ),
+        )
+        for override, target in rows
+    ]
+
+
+def read_nutrition_program_day(
+    db: Session,
+    current_user: User,
+    target_telegram_user_id: int | None,
+    program_id: int,
+    revision_number: int,
+    target_date: date,
+) -> NutritionProgramDayResponse:
+    from fitminiapp_api.models.program import ProgramRevision, UserProgram
+    from fitminiapp_api.services.nutrition_program import program_nutrition_day
+
+    target_user = _resolve_target_user(db, current_user, target_telegram_user_id)
+    program = db.query(UserProgram).filter_by(id=program_id, user_id=target_user.id).first()
+    if program is None:
+        raise NutritionError("Program not found")
+    revisions = (
+        db.query(ProgramRevision)
+        .filter(
+            ProgramRevision.user_program_id == program.id,
+            ProgramRevision.revision_number <= revision_number,
+        )
+        .order_by(ProgramRevision.revision_number)
+        .all()
+    )
+    if not revisions or revisions[-1].revision_number != revision_number:
+        raise NutritionError("Program revision not found")
+    day_type, week_type = program_nutrition_day(
+        db, program, revisions, revision_number, target_date
+    )
+    return NutritionProgramDayResponse(
+        date=target_date,
+        program_id=program.id,
+        revision_number=revision_number,
+        day_type=day_type,
+        week_type=week_type,
+    )
+
+
 def list_nutrition_target_history(
     db: Session,
     current_user: User,
@@ -867,7 +1262,7 @@ def list_nutrition_target_history(
     target_user = _resolve_target_user(db, current_user, target_telegram_user_id)
     rows = (
         db.query(NutritionTarget)
-        .filter(NutritionTarget.user_id == target_user.id)
+        .filter(NutritionTarget.user_id == target_user.id, NutritionTarget.target_scope.is_(None))
         .order_by(NutritionTarget.effective_from.desc(), NutritionTarget.id.desc())
         .limit(100)
         .all()

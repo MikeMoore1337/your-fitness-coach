@@ -66,7 +66,20 @@ from fitminiapp_api.schemas.nutrition import (
     EnergyCalibrationDecision,
     EnergyCalibrationHistoryResponse,
     EnergyCalibrationResponse,
+    NutritionDateOverrideResponse,
+    NutritionDateOverrideSave,
     NutritionManualTargetSave,
+    NutritionProgramDayResponse,
+    NutritionResolvedTargetResponse,
+    NutritionScheduleBindingConfirm,
+    NutritionScheduleBindingResponse,
+    NutritionScheduleBindingStatus,
+    NutritionSchedulePreviewRequest,
+    NutritionSchedulePreviewResponse,
+    NutritionScheduleProgramContext,
+    NutritionScheduleRulePreviewRequest,
+    NutritionScheduleRuleResponse,
+    NutritionScheduleRuleSave,
     NutritionTargetHistoryResponse,
     NutritionTargetResponse,
     NutritionTargetSave,
@@ -186,8 +199,11 @@ from fitminiapp_api.services.nutrition import (
     NutritionError,
     build_nutrition_target_response_for_user,
     get_current_nutrition_target,
+    list_nutrition_date_overrides,
     list_nutrition_target_history,
+    read_nutrition_program_day,
     save_manual_nutrition_target,
+    save_nutrition_date_override,
     save_nutrition_target,
 )
 from fitminiapp_api.services.nutrition_label import (
@@ -228,6 +244,16 @@ from fitminiapp_api.services.nutrition_power import (
     preview_selected_foods,
     update_food_search_alias,
     update_meal_template,
+)
+from fitminiapp_api.services.nutrition_schedule_write import (
+    confirm_nutrition_schedule_binding,
+    list_nutrition_schedule_rules,
+    preview_nutrition_schedule_binding,
+    preview_nutrition_schedule_rule,
+    read_nutrition_schedule_binding,
+    read_nutrition_schedule_program,
+    read_resolved_nutrition_target,
+    save_nutrition_schedule_rule,
 )
 from fitminiapp_api.services.nutrition_suggestions import (
     commit_nutrition_suggestion,
@@ -1502,6 +1528,198 @@ def save_manual_target(
         if isinstance(exc, NutritionConflictError):
             raise HTTPException(status_code=409, detail=detail)
         raise HTTPException(status_code=400, detail=detail)
+
+
+@router.post("/targets/dates", response_model=NutritionDateOverrideResponse)
+def save_date_override(
+    payload: NutritionDateOverrideSave,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return save_nutrition_date_override(db, current_user, payload, idempotency_key)
+    except NutritionError as exc:
+        detail = str(exc)
+        if detail == "Target user not found":
+            raise HTTPException(status_code=404, detail=detail)
+        if detail == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=detail)
+        if isinstance(exc, NutritionEnergyMismatchError):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "nutrition_energy_mismatch",
+                    "message": detail,
+                    "implied_energy_kcal": exc.implied_energy_kcal,
+                    "difference_kcal": exc.difference_kcal,
+                },
+            )
+        if isinstance(exc, NutritionConflictError):
+            raise HTTPException(status_code=409, detail=detail)
+        raise HTTPException(status_code=400, detail=detail)
+
+
+@router.get("/targets/dates", response_model=list[NutritionDateOverrideResponse])
+def date_override_history(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return list_nutrition_date_overrides(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        if str(exc) == "Target user not found":
+            raise HTTPException(status_code=404, detail=str(exc))
+        if str(exc) == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+def _raise_schedule_http_error(exc: NutritionError) -> None:
+    detail = str(exc)
+    if detail in {"Target user not found", "Program not found", "Program revision not found"}:
+        raise HTTPException(status_code=404, detail=detail)
+    if detail == "No permission to manage this user":
+        raise HTTPException(status_code=403, detail=detail)
+    if isinstance(exc, NutritionEnergyMismatchError):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "nutrition_energy_mismatch",
+                "message": detail,
+                "implied_energy_kcal": exc.implied_energy_kcal,
+                "difference_kcal": exc.difference_kcal,
+            },
+        )
+    if isinstance(exc, NutritionConflictError):
+        raise HTTPException(status_code=409, detail=detail)
+    raise HTTPException(status_code=400, detail=detail)
+
+
+@router.post("/targets/schedule", response_model=NutritionScheduleRuleResponse)
+def save_schedule_rule(
+    payload: NutritionScheduleRuleSave,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return save_nutrition_schedule_rule(db, current_user, payload, idempotency_key)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.post("/targets/schedule/preview", response_model=NutritionSchedulePreviewResponse)
+def preview_schedule_rule(
+    payload: NutritionScheduleRulePreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_nutrition_schedule_rule(db, current_user, payload)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/schedule", response_model=list[NutritionScheduleRuleResponse])
+def schedule_rule_history(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return list_nutrition_schedule_rules(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/schedule/program", response_model=NutritionScheduleProgramContext | None)
+def nutrition_schedule_program(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_schedule_program(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/for-date", response_model=NutritionResolvedTargetResponse)
+def resolved_nutrition_target(
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_resolved_nutrition_target(
+            db, current_user, target_telegram_user_id, target_date
+        )
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/schedule/binding", response_model=NutritionScheduleBindingStatus | None)
+def schedule_binding_status(
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_schedule_binding(
+            db, current_user, target_telegram_user_id, target_date
+        )
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.post("/targets/schedule/binding/preview", response_model=NutritionSchedulePreviewResponse)
+def preview_schedule_binding(
+    payload: NutritionSchedulePreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_nutrition_schedule_binding(db, current_user, payload)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.post("/targets/schedule/binding/confirm", response_model=NutritionScheduleBindingResponse)
+def confirm_schedule_binding(
+    payload: NutritionScheduleBindingConfirm,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return confirm_nutrition_schedule_binding(db, current_user, payload, idempotency_key)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/program-day", response_model=NutritionProgramDayResponse)
+def nutrition_program_day(
+    program_id: int = Query(ge=1),
+    revision_number: int = Query(ge=1),
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_program_day(
+            db, current_user, target_telegram_user_id, program_id, revision_number, target_date
+        )
+    except NutritionError as exc:
+        if str(exc) in {"Target user not found", "Program not found", "Program revision not found"}:
+            raise HTTPException(status_code=404, detail=str(exc))
+        if str(exc) == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/targets/current", response_model=NutritionTargetResponse | None)

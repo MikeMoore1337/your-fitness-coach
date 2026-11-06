@@ -703,6 +703,65 @@ test('migrated PostgreSQL serves a real browser nutrition transaction and idempo
   expect(apiRequests).toContain('POST /api/v1/nutrition/diary/entries');
 });
 
+test('#952 real browser saves a dated goal on migrated PostgreSQL', async ({ page }) => {
+  const userId = Date.now() * 10 + 952;
+  const login = await page.request.post('/api/v1/auth/dev-login', {
+    data: { telegram_user_id: userId, full_name: 'Синтетическая проверка питания' },
+  });
+  expect(login.status()).toBe(200);
+  const token = (await login.json()).access_token as string;
+  const headers = { Authorization: `Bearer ${token}` };
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date());
+  const base = { calories: 2000, protein_g: 150, fat_g: 70, carbs_g: 180 };
+  const created = await page.request.post('/api/v1/nutrition/targets/manual', {
+    headers,
+    data: base,
+  });
+  expect(created.status()).toBe(200);
+  await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+  await page.goto(`/app?section=nutrition&date=${date}`);
+  await page.getByRole('button', { name: 'Изменить на эту дату' }).click();
+  await page.getByLabel('Тип дня').selectOption('recovery');
+  await page.getByLabel('Калории, ккал').fill('2250');
+  await page.getByLabel('Углеводы, г').fill('240');
+  await page.getByRole('button', { name: 'Проверить изменения' }).click();
+  await expect(page.getByRole('heading', { name: 'Цель на выбранную дату' })).toBeVisible();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/nutrition/targets/dates',
+  );
+  await page.getByRole('button', { name: 'Применить к этой дате' }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByText('Изменено вручную')).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Изменено вручную')).toBeVisible();
+  const resolved = await page.request.get(
+    `/api/v1/nutrition/targets/for-date?target_date=${date}`,
+    { headers },
+  );
+  expect(await resolved.json()).toMatchObject({
+    origin: 'date',
+    day_type: 'recovery',
+    target: { calories: 2250 },
+  });
+  const report = await page.request.get(
+    `/api/v1/workouts/progress/nutrition-report?period=custom&date_from=${date}&date_to=${date}`,
+    { headers },
+  );
+  expect((await report.json()).daily[0].target_calories).toBe(2250);
+  const completed = await page.request.put('/api/v1/nutrition/diary/status', {
+    headers,
+    data: { diary_date: date, status: 'fasted' },
+  });
+  expect(completed.status()).toBe(200);
+  const denied = await page.request.post('/api/v1/nutrition/targets/dates', {
+    headers: { ...headers, 'Idempotency-Key': 'completed-date-952' },
+    data: { ...base, effective_from: date },
+  });
+  expect(denied.status()).toBe(409);
+});
+
 const importColumns = [
   'program_title',
   'goal',

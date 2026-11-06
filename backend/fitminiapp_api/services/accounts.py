@@ -45,7 +45,14 @@ from fitminiapp_api.models.notification import (
     NotificationSetting,
     WebPushSubscription,
 )
-from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition import (
+    EnergyCalibration,
+    NutritionScheduleBinding,
+    NutritionTarget,
+    NutritionTargetDateOverride,
+    NutritionTargetDaySnapshot,
+    NutritionTargetScheduleRule,
+)
 from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
     NutritionLabelDraft,
@@ -263,6 +270,18 @@ def delete_user_cascade(db: Session, user: User) -> None:
         delete_template_cascade(db, template)
         db.flush()
 
+    db.query(NutritionTargetScheduleRule).filter(
+        NutritionTargetScheduleRule.user_id == user.id
+    ).delete(synchronize_session=False)
+    db.query(NutritionScheduleBinding).filter(NutritionScheduleBinding.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(NutritionTargetScheduleRule).filter(
+        NutritionTargetScheduleRule.created_by_user_id == user.id
+    ).update({"created_by_user_id": None}, synchronize_session=False)
+    db.query(NutritionScheduleBinding).filter(
+        NutritionScheduleBinding.created_by_user_id == user.id
+    ).update({"created_by_user_id": None}, synchronize_session=False)
     own_program_ids = [
         row.id for row in db.query(UserProgram.id).filter(UserProgram.user_id == user.id).all()
     ]
@@ -381,6 +400,15 @@ def delete_user_cascade(db: Session, user: User) -> None:
     db.query(DailyWellbeingCheckIn).filter(DailyWellbeingCheckIn.user_id == user.id).delete(
         synchronize_session=False
     )
+    db.query(NutritionTargetDateOverride).filter(
+        NutritionTargetDateOverride.user_id == user.id
+    ).delete(synchronize_session=False)
+    db.query(NutritionTargetDateOverride).filter(
+        NutritionTargetDateOverride.created_by_user_id == user.id
+    ).update({"created_by_user_id": None}, synchronize_session=False)
+    db.query(NutritionTargetDaySnapshot).filter(
+        NutritionTargetDaySnapshot.user_id == user.id
+    ).delete(synchronize_session=False)
     db.query(NutritionTarget).filter(NutritionTarget.user_id == user.id).delete(
         synchronize_session=False
     )
