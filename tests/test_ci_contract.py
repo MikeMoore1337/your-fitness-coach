@@ -482,6 +482,12 @@ def test_migrated_postgres_stack_uses_prebuilt_chromium_and_service_dns() -> Non
     assert "test -d /ms-playwright" in migrated
     assert migrated.count("postgresql+psycopg://fitminiapp:test-password@db:5432/") == 2
     assert "run-group migrated-stack" in migrated
+    assert 'UV_SYSTEM_PYTHON: "0"' in migrated
+    assert 'UV_MANAGED_PYTHON: "1"' in migrated
+    assert "uv python install 3.14" in migrated
+    assert "uv python find --managed-python 3.14" in migrated
+    assert "import ssl, psycopg" in migrated
+    assert "uses: actions/setup-python@v5" not in migrated
 
 
 def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None:
