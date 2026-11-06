@@ -248,6 +248,137 @@ class OriginalTotal(ImportModel):
         return self
 
 
+class SummaryAggregation(ImportModel):
+    kind: Literal["unknown", "total", "daily_average", "target"]
+    evidence: Literal["unknown", "source_label", "source_profile", "provider_documentation"]
+    denominator: Literal["unknown", "calendar_days", "logged_days"] | None = None
+    denominator_days: int | None = Field(default=None, ge=0, strict=True, repr=False)
+
+    @model_validator(mode="after")
+    def validate_aggregation(self) -> SummaryAggregation:
+        if (self.kind == "unknown") != (self.evidence == "unknown"):
+            raise ValueError("known aggregation requires evidence; unknown aggregation has none")
+        if self.kind == "daily_average":
+            if self.denominator is None:
+                raise ValueError("daily average requires a denominator or unknown")
+        elif self.denominator is not None or self.denominator_days is not None:
+            raise ValueError("only a daily average can have a denominator")
+        return self
+
+
+class OriginalSummaryValue(ImportModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
+    source_column: int | None = Field(default=None, ge=1, strict=True)
+    source_header: str | None = Field(default=None, max_length=256, strict=True, repr=False)
+    source_value: str | None = Field(default=None, max_length=128, strict=True, repr=False)
+    nutrient_field: Identifier | None = None
+    mapping_evidence: Literal[
+        "unknown", "source_label", "source_profile", "provider_documentation"
+    ] = "unknown"
+    fact: NutrientFact = Field(repr=False)
+
+    @field_validator("nutrient_field")
+    @classmethod
+    def validate_nutrient_field(cls, value: str | None) -> str | None:
+        if value is not None and value not in SourceNutrients.model_fields:
+            raise ValueError("unsupported nutrient field")
+        return value
+
+    @model_validator(mode="after")
+    def require_original_fact(self) -> OriginalSummaryValue:
+        if (self.nutrient_field is None) != (self.mapping_evidence == "unknown"):
+            raise ValueError("known nutrient mapping requires evidence; unknown mapping has none")
+        if self.mapping_evidence == "source_label" and (
+            self.source_header is None or not self.source_header.strip()
+        ):
+            raise ValueError("source-label mapping evidence requires a source header")
+        if self.fact.evidence == "derived":
+            raise ValueError("original summary facts cannot be derived")
+        if self.fact.evidence == "read" and (
+            self.source_value is None or not self.source_value.strip()
+        ):
+            raise ValueError("read summary facts require a source value")
+        return self
+
+
+class OriginalSummaryRow(ImportModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
+    coordinates: SourceCoordinates = Field(repr=False)
+    source_label: str | None = Field(default=None, max_length=256, strict=True, repr=False)
+    scope: Literal["meal", "overall", "unknown"]
+    meal_type: MealType | None = Field(default=None, repr=False)
+    values: list[OriginalSummaryValue] = Field(max_length=128, repr=False)
+
+    @model_validator(mode="after")
+    def validate_row(self) -> OriginalSummaryRow:
+        if self.scope == "overall" and self.meal_type is not None:
+            raise ValueError("an overall summary cannot name a meal")
+        columns = [value.source_column for value in self.values if value.source_column is not None]
+        if len(columns) != len(set(columns)):
+            raise ValueError("summary source columns must be unique within a row")
+        return self
+
+
+class OriginalSummary(ImportModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
+    header_coordinates: SourceCoordinates = Field(repr=False)
+    header_label: str | None = Field(default=None, max_length=256, strict=True, repr=False)
+    aggregation: SummaryAggregation
+    period_label: str | None = Field(default=None, max_length=256, strict=True, repr=False)
+    period_start: DiaryDate | None = Field(default=None, repr=False)
+    period_end: DiaryDate | None = Field(default=None, repr=False)
+    period_coordinates: SourceCoordinates | None = Field(default=None, repr=False)
+    timezone: str | None = Field(default=None, min_length=1, max_length=64, repr=False)
+    rows: list[OriginalSummaryRow] = Field(repr=False)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str | None) -> str | None:
+        if value is not None and not is_valid_timezone(value):
+            raise ValueError("timezone must be a known IANA timezone")
+        return value
+
+    @model_validator(mode="after")
+    def validate_period(self) -> OriginalSummary:
+        if self.aggregation.evidence == "source_label" and (
+            self.header_label is None or not self.header_label.strip()
+        ):
+            raise ValueError("source-label aggregation evidence requires a header label")
+        if (
+            self.period_start is not None
+            and self.period_end is not None
+            and self.period_start > self.period_end
+        ):
+            raise ValueError("summary period start must not be after end")
+        return self
+
+
+def _validate_import_coordinates(
+    source: ImportSource,
+    rows: list[ImportFoodRow],
+    totals: list[OriginalTotal],
+    extra: tuple[SourceCoordinates, ...] = (),
+) -> None:
+    coordinates = [row.coordinates for row in rows]
+    coordinates.extend(coord for row in rows for coord in row.quantity_coordinates)
+    coordinates.extend(total.coordinates for total in totals)
+    coordinates.extend(
+        reference.coordinates
+        for row in rows
+        for fact in row.nutrition.facts.__dict__.values()
+        if fact is not None
+        for reference in fact.derived_from
+    )
+    coordinates.extend(extra)
+    if source.source_format == "csv" and any(coord.row is None for coord in coordinates):
+        raise ValueError("CSV source coordinates require a row")
+    if source.source_format == "pdf" and any(coord.page is None for coord in coordinates):
+        raise ValueError("PDF source coordinates require a page")
+
+
 class NutritionImportV1(ImportModel):
     schema_version: Literal["nutrition-import-v1"]
     source: ImportSource
@@ -258,18 +389,39 @@ class NutritionImportV1(ImportModel):
 
     @model_validator(mode="after")
     def validate_format_coordinates(self) -> NutritionImportV1:
-        coordinates = [row.coordinates for row in self.rows]
-        coordinates.extend(coord for row in self.rows for coord in row.quantity_coordinates)
-        coordinates.extend(total.coordinates for total in self.original_totals)
+        _validate_import_coordinates(self.source, self.rows, self.original_totals)
+        return self
+
+
+class NutritionImportV2(ImportModel):
+    schema_version: Literal["nutrition-import-v2"]
+    source: ImportSource
+    completeness: Literal["complete", "partial", "unknown"]
+    rows: list[ImportFoodRow] = Field(repr=False)
+    original_totals: list[OriginalTotal] = Field(repr=False)
+    original_summaries: list[OriginalSummary] = Field(repr=False)
+    diagnostics: list[ImportDiagnostic] = Field(repr=False)
+
+    @model_validator(mode="after")
+    def validate_format_coordinates(self) -> NutritionImportV2:
+        coordinates: list[SourceCoordinates] = []
+        for summary in self.original_summaries:
+            coordinates.append(summary.header_coordinates)
+            if summary.period_coordinates is not None:
+                coordinates.append(summary.period_coordinates)
+            coordinates.extend(row.coordinates for row in summary.rows)
         coordinates.extend(
-            reference.coordinates
-            for row in self.rows
-            for fact in row.nutrition.facts.__dict__.values()
-            if fact is not None
-            for reference in fact.derived_from
+            diagnostic.coordinates
+            for diagnostic in self.diagnostics
+            if diagnostic.coordinates is not None
         )
-        if self.source.source_format == "csv" and any(coord.row is None for coord in coordinates):
-            raise ValueError("CSV source coordinates require a row")
-        if self.source.source_format == "pdf" and any(coord.page is None for coord in coordinates):
-            raise ValueError("PDF source coordinates require a page")
+        coordinates.extend(
+            diagnostic.coordinates
+            for row in self.rows
+            for diagnostic in row.diagnostics
+            if diagnostic.coordinates is not None
+        )
+        _validate_import_coordinates(
+            self.source, self.rows, self.original_totals, tuple(coordinates)
+        )
         return self
