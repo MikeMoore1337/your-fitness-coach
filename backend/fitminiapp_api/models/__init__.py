@@ -88,6 +88,10 @@ from fitminiapp_api.models.nutrition import (
     NutritionTargetDaySnapshot,
     NutritionTargetScheduleRule,
 )
+from fitminiapp_api.models.nutrition_import import (
+    NutritionImportDraft,
+    NutritionImportUploadAttempt,
+)
 from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
     NutritionLabelDraft,
@@ -231,6 +235,8 @@ __all__ = [
     "NotificationDelivery",
     "NotificationSetting",
     "NutritionCatalogContribution",
+    "NutritionImportDraft",
+    "NutritionImportUploadAttempt",
     "NutritionLabelDraft",
     "NutritionMealTemplate",
     "NutritionMealTemplateItem",

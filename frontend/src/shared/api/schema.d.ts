@@ -5342,6 +5342,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_v1_nutrition_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview */
+        get: operations["preview_api_v1_nutrition_imports__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve */
+        post: operations["resolve_api_v1_nutrition_imports__draft_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm */
+        post: operations["confirm_api_v1_nutrition_imports__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_api_v1_nutrition_imports__draft_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications/web-push/config": {
         parameters: {
             query?: never;
@@ -8125,6 +8210,13 @@ export interface components {
         Body_replace_avatar_api_v1_me_avatar_put: {
             /** File */
             file: string;
+        };
+        /** Body_upload_api_v1_nutrition_imports_post */
+        Body_upload_api_v1_nutrition_imports_post: {
+            /** File */
+            file: string;
+            /** Adapter Id */
+            adapter_id: string;
         };
         /** Body_upload_history_api_v1_workout_history_imports_post */
         Body_upload_history_api_v1_workout_history_imports_post: {
@@ -13530,6 +13622,200 @@ export interface components {
             /** Trend Ml */
             trend_ml?: number | null;
         };
+        /** ImportCancelRequest */
+        ImportCancelRequest: {
+            /** Revision */
+            revision: number;
+        };
+        /** ImportConfirmRequest */
+        ImportConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /** Confirm Key */
+            confirm_key: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** ImportDiagnostic */
+        ImportDiagnostic: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "warning" | "error";
+            coordinates?: components["schemas"]["SourceCoordinates"] | null;
+            /** Field */
+            field?: string | null;
+        };
+        /** ImportFoodIdentity */
+        ImportFoodIdentity: {
+            /** Name */
+            name: string;
+            /** Brand */
+            brand?: string | null;
+            /** Variant */
+            variant?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard_food" | "branded_food" | "personal_recipe" | "arbitrary" | "unknown";
+            /** Identity Source */
+            identity_source?: string | null;
+            /** Source Id */
+            source_id?: string | null;
+            /** Gtin */
+            gtin?: string | null;
+        };
+        /** ImportFoodRow */
+        ImportFoodRow: {
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Quantity Coordinates */
+            quantity_coordinates?: components["schemas"]["SourceCoordinates"][];
+            /** Diary Date */
+            diary_date: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            /** Meal Type */
+            meal_type: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            food: components["schemas"]["ImportFoodIdentity"];
+            /** Quantity */
+            quantity: string | null;
+            /** Amount Unit */
+            amount_unit: ("g" | "ml" | "piece" | "serving") | null;
+            /** Source Unit */
+            source_unit?: string | null;
+            /** Serving Label */
+            serving_label?: string | null;
+            serving_measure?: components["schemas"]["ServingMeasure"] | null;
+            nutrition: components["schemas"]["ImportNutrition"];
+            /** Diagnostics */
+            diagnostics?: components["schemas"]["ImportDiagnostic"][];
+        };
+        /** ImportNutrients */
+        ImportNutrients: {
+            energy_kcal?: components["schemas"]["NutrientFact"] | null;
+            energy_kj?: components["schemas"]["NutrientFact"] | null;
+            protein_g?: components["schemas"]["NutrientFact"] | null;
+            fat_g?: components["schemas"]["NutrientFact"] | null;
+            saturated_fat_g?: components["schemas"]["NutrientFact"] | null;
+            trans_fat_g?: components["schemas"]["NutrientFact"] | null;
+            carbohydrate_g?: components["schemas"]["NutrientFact"] | null;
+            sugars_g?: components["schemas"]["NutrientFact"] | null;
+            added_sugars_g?: components["schemas"]["NutrientFact"] | null;
+            fiber_g?: components["schemas"]["NutrientFact"] | null;
+            salt_g?: components["schemas"]["NutrientFact"] | null;
+            sodium_mg?: components["schemas"]["NutrientFact"] | null;
+            cholesterol_mg?: components["schemas"]["NutrientFact"] | null;
+            potassium_mg?: components["schemas"]["NutrientFact"] | null;
+        };
+        /** ImportNutrition */
+        ImportNutrition: {
+            /** Basis */
+            basis: ("per_100_g" | "per_100_ml" | "per_serving") | null;
+            facts: components["schemas"]["ImportNutrients"];
+        };
+        /** ImportPreview */
+        ImportPreview: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Schema Version
+             * @enum {string}
+             */
+            schema_version: "nutrition-import-v1" | "nutrition-import-v2";
+            /** Parser Version */
+            parser_version: string;
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Completeness
+             * @enum {string}
+             */
+            completeness: "complete" | "partial" | "unknown";
+            source: components["schemas"]["ImportSource"];
+            /** Rows */
+            rows: components["schemas"]["ImportPreviewRow"][];
+            /** Original Totals */
+            original_totals: components["schemas"]["OriginalTotal"][];
+            /** Original Summaries */
+            original_summaries: components["schemas"]["OriginalSummary"][];
+            /** Diagnostics */
+            diagnostics: components["schemas"]["ImportDiagnostic"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** ImportPreviewRow */
+        ImportPreviewRow: {
+            /** Index */
+            index: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "new" | "ambiguous" | "invalid" | "skipped" | "manual_resolution_required";
+            source: components["schemas"]["ImportFoodRow"];
+            /** Action */
+            action: {
+                [key: string]: unknown;
+            } | null;
+            /** Issues */
+            issues: string[];
+        };
+        /** ImportReceipt */
+        ImportReceipt: {
+            /** Entry Ids */
+            entry_ids: number[];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** ImportResolveRequest */
+        ImportResolveRequest: {
+            /** Revision */
+            revision: number;
+            /** Matches */
+            matches: components["schemas"]["RowResolution"][];
+            /** Skipped Rows */
+            skipped_rows: number[];
+        };
+        /** ImportSource */
+        ImportSource: {
+            /** Provider */
+            provider: string;
+            /** Source */
+            source: string;
+            /** Source Version */
+            source_version?: string | null;
+            /** Adapter Version */
+            adapter_version: string;
+            /** Source Format */
+            source_format: string;
+            /**
+             * Transport
+             * @enum {string}
+             */
+            transport: "upload" | "url";
+            /**
+             * Publication Rights
+             * @default unknown
+             * @enum {string}
+             */
+            publication_rights: "unknown" | "owner_reported" | "verified" | "prohibited";
+        };
         /** LatestBodyMeasurement */
         LatestBodyMeasurement: {
             /**
@@ -13895,6 +14181,24 @@ export interface components {
             quiet_hours_start?: string | null;
             /** Quiet Hours End */
             quiet_hours_end?: string | null;
+        };
+        /** NutrientFact */
+        NutrientFact: {
+            /** Value */
+            value: string | null;
+            /** Unit */
+            unit: ("g" | "mg" | "kcal" | "kJ") | null;
+            /** Source Unit */
+            source_unit?: string | null;
+            /**
+             * Evidence
+             * @enum {string}
+             */
+            evidence: "read" | "derived" | "absent" | "ambiguous" | "unreadable";
+            /** Derivation */
+            derivation?: string | null;
+            /** Derived From */
+            derived_from?: components["schemas"]["SourceFieldReference"][];
         };
         /** NutrientFacts */
         NutrientFacts: {
@@ -15358,6 +15662,71 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** OriginalSummary */
+        OriginalSummary: {
+            header_coordinates: components["schemas"]["SourceCoordinates"];
+            /** Header Label */
+            header_label?: string | null;
+            aggregation: components["schemas"]["SummaryAggregation"];
+            /** Period Label */
+            period_label?: string | null;
+            /** Period Start */
+            period_start?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            period_coordinates?: components["schemas"]["SourceCoordinates"] | null;
+            /** Timezone */
+            timezone?: string | null;
+            /** Rows */
+            rows: components["schemas"]["OriginalSummaryRow"][];
+        };
+        /** OriginalSummaryRow */
+        OriginalSummaryRow: {
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Source Label */
+            source_label?: string | null;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "meal" | "overall" | "unknown";
+            /** Meal Type */
+            meal_type?: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /** Values */
+            values: components["schemas"]["OriginalSummaryValue"][];
+        };
+        /** OriginalSummaryValue */
+        OriginalSummaryValue: {
+            /** Source Column */
+            source_column?: number | null;
+            /** Source Header */
+            source_header?: string | null;
+            /** Source Value */
+            source_value?: string | null;
+            /** Nutrient Field */
+            nutrient_field?: string | null;
+            /**
+             * Mapping Evidence
+             * @default unknown
+             * @enum {string}
+             */
+            mapping_evidence: "unknown" | "source_label" | "source_profile" | "provider_documentation";
+            fact: components["schemas"]["NutrientFact"];
+        };
+        /** OriginalTotal */
+        OriginalTotal: {
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "entry" | "meal" | "day" | "period" | "unknown";
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Diary Date */
+            diary_date?: string | null;
+            /** Meal Type */
+            meal_type?: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            facts: components["schemas"]["SourceNutrients"];
         };
         /**
          * OwnerArticleReviewDetail
@@ -18556,6 +18925,23 @@ export interface components {
             /** Distribution */
             distribution: components["schemas"]["RirDistributionBucket"][];
         };
+        /** RowResolution */
+        RowResolution: {
+            /** Index */
+            index: number;
+            /** Food Id */
+            food_id: number;
+        };
+        /** ServingMeasure */
+        ServingMeasure: {
+            /** Amount */
+            amount: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
         /** ServingSize */
         "ServingSize-Input": {
             /** Amount */
@@ -18841,6 +19227,20 @@ export interface components {
             left: components["schemas"]["SideProgressionGuidance"];
             right: components["schemas"]["SideProgressionGuidance"];
         };
+        /** SourceCoordinates */
+        SourceCoordinates: {
+            /** Section */
+            section: string;
+            /**
+             * Section Kind
+             * @enum {string}
+             */
+            section_kind: "detail" | "summary" | "unknown";
+            /** Page */
+            page?: number | null;
+            /** Row */
+            row?: number | null;
+        };
         /** SourceFact */
         SourceFact: {
             /** Value */
@@ -18862,6 +19262,12 @@ export interface components {
              * @enum {string}
              */
             evidence: "read" | "ambiguous" | "unreadable";
+        };
+        /** SourceFieldReference */
+        SourceFieldReference: {
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Field */
+            field: string;
         };
         /** SourceNutrientFacts */
         SourceNutrientFacts: {
@@ -18891,6 +19297,40 @@ export interface components {
             sodium_mg?: components["schemas"]["SourceFact"][] | null;
             /** Cholesterol Mg */
             cholesterol_mg?: components["schemas"]["SourceFact"][] | null;
+        };
+        /** SourceNutrients */
+        SourceNutrients: {
+            energy_kcal?: components["schemas"]["NutrientFact"] | null;
+            energy_kj?: components["schemas"]["NutrientFact"] | null;
+            protein_g?: components["schemas"]["NutrientFact"] | null;
+            fat_g?: components["schemas"]["NutrientFact"] | null;
+            saturated_fat_g?: components["schemas"]["NutrientFact"] | null;
+            trans_fat_g?: components["schemas"]["NutrientFact"] | null;
+            carbohydrate_g?: components["schemas"]["NutrientFact"] | null;
+            sugars_g?: components["schemas"]["NutrientFact"] | null;
+            added_sugars_g?: components["schemas"]["NutrientFact"] | null;
+            fiber_g?: components["schemas"]["NutrientFact"] | null;
+            salt_g?: components["schemas"]["NutrientFact"] | null;
+            sodium_mg?: components["schemas"]["NutrientFact"] | null;
+            cholesterol_mg?: components["schemas"]["NutrientFact"] | null;
+            potassium_mg?: components["schemas"]["NutrientFact"] | null;
+        };
+        /** SummaryAggregation */
+        SummaryAggregation: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "unknown" | "total" | "daily_average" | "target";
+            /**
+             * Evidence
+             * @enum {string}
+             */
+            evidence: "unknown" | "source_label" | "source_profile" | "provider_documentation";
+            /** Denominator */
+            denominator?: ("unknown" | "calendar_days" | "logged_days") | null;
+            /** Denominator Days */
+            denominator_days?: number | null;
         };
         /** TelegramInitRequest */
         TelegramInitRequest: {
@@ -32939,6 +33379,175 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NutritionTargetHistoryResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_v1_nutrition_imports_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_v1_nutrition_imports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_v1_nutrition_imports__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_api_v1_nutrition_imports__draft_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_api_v1_nutrition_imports__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_v1_nutrition_imports__draft_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

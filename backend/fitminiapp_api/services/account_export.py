@@ -60,6 +60,10 @@ from fitminiapp_api.models.nutrition import (
     NutritionTargetDaySnapshot,
     NutritionTargetScheduleRule,
 )
+from fitminiapp_api.models.nutrition_import import (
+    NutritionImportDraft,
+    NutritionImportUploadAttempt,
+)
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.nutrition_plan import NutritionPlan
 from fitminiapp_api.models.nutrition_power import (
@@ -100,7 +104,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 29
+ACCOUNT_EXPORT_SCHEMA_VERSION = 30
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -140,6 +144,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "grocery_list_items": "grocery_lists",
     "grocery_list_item_sources": "grocery_lists",
     "food_search_aliases": "food_search_aliases",
+    "nutrition_import_drafts": "nutrition_import_drafts",
+    "nutrition_import_upload_attempts": "nutrition_import_upload_attempts",
     "food_diary_entries": "food_diary_entries",
     "food_diary_day_statuses": "food_diary_day_statuses",
     "food_diary_copy_operations": "food_diary_copy_operations",
@@ -1075,6 +1081,23 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(FoodSearchAlias.created_at.asc(), FoodSearchAlias.id.asc())
         .all()
     )
+    nutrition_import_drafts = (
+        db.query(NutritionImportDraft)
+        .filter(
+            NutritionImportDraft.owner_user_id == user.id,
+            NutritionImportDraft.expires_at > datetime.now(UTC).replace(tzinfo=None),
+        )
+        .order_by(NutritionImportDraft.created_at.asc(), NutritionImportDraft.id.asc())
+        .all()
+    )
+    nutrition_import_upload_attempts = (
+        db.query(NutritionImportUploadAttempt)
+        .filter(NutritionImportUploadAttempt.owner_user_id == user.id)
+        .order_by(
+            NutritionImportUploadAttempt.created_at.asc(), NutritionImportUploadAttempt.id.asc()
+        )
+        .all()
+    )
     diary_entries = (
         db.query(FoodDiaryEntry)
         .filter(FoodDiaryEntry.user_id == user.id)
@@ -1644,6 +1667,30 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ("id", "alias", "normalized_alias", "food_id", "created_at", "updated_at"),
             )
             for row in food_search_aliases
+        ],
+        "nutrition_import_drafts": [
+            _fields(
+                row,
+                (
+                    "id",
+                    "provider",
+                    "source",
+                    "parser_version",
+                    "schema_version",
+                    "status",
+                    "revision",
+                    "document",
+                    "skipped_rows",
+                    "resolutions",
+                    "receipt",
+                    "created_at",
+                    "expires_at",
+                ),
+            )
+            for row in nutrition_import_drafts
+        ],
+        "nutrition_import_upload_attempts": [
+            _fields(row, ("created_at",)) for row in nutrition_import_upload_attempts
         ],
         "food_diary_entries": [
             {
