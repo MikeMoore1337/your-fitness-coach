@@ -2912,6 +2912,330 @@ async function capture1429(page: Page, name: string, fullPage = true) {
   });
 }
 
+for (const width of [320, 360, 393, 430, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`#1430 meal totals ${width} ${theme}`, async ({ page }, testInfo) => {
+      await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+      await mockNutritionApi(page);
+      const partial: FoodDiaryEntry = {
+        ...yogurtEntry,
+        id: 22,
+        meal_type: 'lunch',
+        entry_kind: 'quick_add',
+        food_id: null,
+        food_name: 'Обед вне дома',
+        nutrition: { ...zeroNutrition, energy_kcal: '207', protein_g: null, carbs_g: null },
+      };
+      const dinner: FoodDiaryEntry = {
+        ...yogurtEntry,
+        id: 24,
+        meal_type: 'dinner',
+        food_name: 'Рыба с овощами',
+        nutrition: {
+          ...zeroNutrition,
+          energy_kcal: '501',
+          protein_g: '24.5',
+          fat_g: '18.2',
+          carbs_g: '40.9',
+        },
+      };
+      const snack: FoodDiaryEntry = {
+        ...yogurtEntry,
+        id: 23,
+        meal_type: 'snacks',
+        food_name: 'Фрукты',
+        nutrition: { ...zeroNutrition, energy_kcal: '224', protein_g: '6.05', carbs_g: '12.34' },
+      };
+      await page.route('**/api/v1/nutrition/diary?*', (route) =>
+        route.fulfill({
+          json: {
+            diary_date: '2026-08-19',
+            timezone: 'Europe/Moscow',
+            meals: [
+              { meal_type: 'breakfast', entries: [yogurtEntry], totals: yogurtEntry.nutrition },
+              { meal_type: 'lunch', entries: [partial], totals: partial.nutrition },
+              { meal_type: 'dinner', entries: [dinner], totals: dinner.nutrition },
+              { meal_type: 'snacks', entries: [snack], totals: snack.nutrition },
+            ],
+            totals: {
+              ...zeroNutrition,
+              energy_kcal: '1085',
+              protein_g: null,
+              fat_g: '21.8',
+              carbs_g: null,
+            },
+            targets: null,
+            remaining: null,
+            status: 'incomplete',
+            status_is_explicit: false,
+          },
+        }),
+      );
+      await page.goto('/app?section=nutrition');
+      for (const name of ['Завтрак', 'Обед', 'Ужин', 'Перекусы']) {
+        const toggle = page
+          .getByRole('region', { name })
+          .getByRole('button', { name, exact: true });
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        await toggle.click();
+      }
+
+      const card = page.locator('.nutrition-food-card');
+      await card.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+      if (process.env.CAPTURE_1430_DIR) {
+        await mkdir(process.env.CAPTURE_1430_DIR, { recursive: true });
+        const name = `${testInfo.project.name}-${theme}-${width}`;
+        await card.screenshot({ path: resolve(process.env.CAPTURE_1430_DIR, `${name}-meals.png`) });
+        if (width === 393) {
+          await page.screenshot({
+            path: resolve(process.env.CAPTURE_1430_DIR, `${name}-viewport.png`),
+          });
+        }
+      }
+
+      const summaries = card.locator('.nutrition-meal__header > div:first-child > span');
+      expect(
+        (await summaries.allTextContents()).map((text) => text.replace(/\u00a0/g, ' ')),
+      ).toEqual([
+        '153 ккал · Б 17,1 · Ж 3,6 · У 10,8 г · 1 запись',
+        '207 ккал · Б — · Ж 0 · У — г · 1 запись',
+        '501 ккал · Б 24,5 · Ж 18,2 · У 40,9 г · 1 запись',
+        '224 ккал · Б 6,1 · Ж 0 · У 12,3 г · 1 запись',
+      ]);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width + 1,
+      );
+      const geometry = await card.locator('.nutrition-meal__header').evaluateAll((headers) =>
+        headers.map((header) => {
+          const summary = header.querySelector<HTMLElement>(':scope > div:first-child > span')!;
+          const button = header.querySelector<HTMLElement>('.nutrition-meal__actions button')!;
+          const summaryRect = summary.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
+          return {
+            summaryRight: summaryRect.right,
+            summaryTop: summaryRect.top,
+            summaryScroll: summary.scrollWidth,
+            summaryWidth: summary.clientWidth,
+            buttonLeft: buttonRect.left,
+            buttonBottom: buttonRect.bottom,
+            buttonRight: buttonRect.right,
+            buttonHeight: buttonRect.height,
+          };
+        }),
+      );
+      for (const row of geometry) {
+        expect(
+          row.summaryRight <= row.buttonLeft + 1 || row.summaryTop >= row.buttonBottom - 1,
+        ).toBe(true);
+        expect(row.summaryScroll).toBeLessThanOrEqual(row.summaryWidth + 1);
+        expect(row.buttonHeight).toBeGreaterThanOrEqual(44);
+        expect(Math.abs(row.buttonRight - geometry[0]!.buttonRight)).toBeLessThanOrEqual(1);
+      }
+      if (width < 500) {
+        const [cardBox, dockBox] = await Promise.all([
+          card.boundingBox(),
+          page.locator('#appBottomNav').boundingBox(),
+        ]);
+        expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(dockBox!.y);
+      }
+      const breakfast = page.getByRole('region', { name: 'Завтрак' });
+      const toggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+      await toggle.focus();
+      await expect(toggle).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(breakfast.getByText('Греческий йогурт')).toBeVisible();
+      await expect(breakfast.locator('.nutrition-meal__header')).toContainText('Б 17,1');
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1430 totals refresh after add, edit and delete ${theme}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+    await mockNutritionApi(page);
+    let current: FoodDiaryEntry | null = null;
+    await page.route('**/api/v1/nutrition/diary?*', (route) =>
+      route.fulfill({
+        json: {
+          diary_date: '2026-08-19',
+          timezone: 'Europe/Moscow',
+          meals: [
+            {
+              meal_type: 'breakfast',
+              entries: current ? [current] : [],
+              totals: current?.nutrition ?? zeroNutrition,
+            },
+            ...(['lunch', 'dinner', 'snacks'] as const).map((meal_type) => ({
+              meal_type,
+              entries: [],
+              totals: zeroNutrition,
+            })),
+          ],
+          totals: current?.nutrition ?? zeroNutrition,
+          targets: null,
+          remaining: null,
+          status: current ? 'incomplete' : 'unlogged',
+          status_is_explicit: false,
+        },
+      }),
+    );
+    await page.route('**/api/v1/nutrition/diary/entries', (route) => {
+      expect(route.request().method()).toBe('POST');
+      expect(route.request().postDataJSON().meal_type).toBe('breakfast');
+      current = {
+        ...yogurtEntry,
+        food_name: 'Овсяная каша',
+        nutrition: {
+          ...zeroNutrition,
+          energy_kcal: '180',
+          protein_g: '6',
+          fat_g: '3',
+          carbs_g: '31',
+        },
+      };
+      return route.fulfill({ status: 201, json: current });
+    });
+    await page.route('**/api/v1/nutrition/diary/entries/*', (route) => {
+      if (route.request().method() === 'PATCH') {
+        expect(route.request().postDataJSON().amount).toBe(150);
+        current = {
+          ...current!,
+          amount: '150',
+          nutrition: { ...current!.nutrition, energy_kcal: '270', protein_g: '9.25' },
+        };
+        return route.fulfill({ json: current });
+      }
+      expect(route.request().method()).toBe('DELETE');
+      current = null;
+      return route.fulfill({ status: 204, body: '' });
+    });
+
+    await page.goto('/app?section=nutrition');
+    const breakfast = page.getByRole('region', { name: 'Завтрак' });
+    const summary = breakfast.locator('.nutrition-meal__header > div:first-child > span');
+    const capture = async (state: string) => {
+      if (!process.env.CAPTURE_1430_DIR) return;
+      await mkdir(process.env.CAPTURE_1430_DIR, { recursive: true });
+      await page.locator('.nutrition-food-card').screenshot({
+        path: resolve(
+          process.env.CAPTURE_1430_DIR,
+          `${testInfo.project.name}-${theme}-393-${state}.png`,
+        ),
+      });
+    };
+    await expect(summary).toHaveText('Пока без записей');
+    await breakfast.getByRole('button', { name: /Добавить/ }).click();
+    await page.getByRole('button', { name: 'Выбрать Овсяная каша', exact: true }).click();
+    await page.getByRole('button', { name: 'Добавить в дневник' }).click();
+    await expect(summary).toHaveText('180 ккал · Б 6 · Ж 3 · У 31 г · 1 запись');
+    await capture('added');
+
+    const toggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+    if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+    await breakfast.getByRole('button', { name: 'Изменить Овсяная каша' }).click();
+    await breakfast.getByRole('spinbutton', { name: 'Количество' }).fill('150');
+    await breakfast.getByRole('button', { name: 'Сохранить' }).click();
+    await expect(summary).toHaveText('270 ккал · Б 9,3 · Ж 3 · У 31 г · 1 запись');
+    await capture('edited');
+
+    await breakfast.getByRole('button', { name: 'Удалить Овсяная каша' }).click();
+    await page
+      .getByRole('dialog', { name: 'Удалить запись?' })
+      .getByRole('button', { name: 'Удалить' })
+      .click();
+    await expect(summary).toHaveText('Пока без записей');
+    await capture('deleted');
+  });
+
+  test(`#1430 long values with enlarged text ${theme}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+    await mockNutritionApi(page);
+    const totals = {
+      ...zeroNutrition,
+      energy_kcal: '12345678.9',
+      protein_g: '123456.78',
+      fat_g: '0',
+      carbs_g: '98765.4',
+    };
+    await page.route('**/api/v1/nutrition/diary?*', (route) =>
+      route.fulfill({
+        json: {
+          diary_date: '2026-08-19',
+          timezone: 'Europe/Moscow',
+          meals: [
+            { meal_type: 'breakfast', entries: [yogurtEntry], totals },
+            ...(['lunch', 'dinner', 'snacks'] as const).map((meal_type) => ({
+              meal_type,
+              entries: [],
+              totals: zeroNutrition,
+            })),
+          ],
+          totals,
+          targets: null,
+          remaining: null,
+          status: 'incomplete',
+          status_is_explicit: false,
+        },
+      }),
+    );
+    await page.goto('/app?section=nutrition');
+    const breakfast = page.getByRole('region', { name: 'Завтрак' });
+    const toggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+    await toggle.click();
+    const summary = breakfast.locator('.nutrition-meal__header > div:first-child > span');
+    await expect(summary).toContainText('12 345 679 ккал');
+    await expect(summary).toContainText('Б 123 456,8');
+    await page.addStyleTag({
+      content:
+        '.nutrition-meal__header h2 { font-size: 2.1rem !important; } .nutrition-meal__header > div > span { font-size: 1.52rem !important; }',
+    });
+    const titleLines = await toggle
+      .locator('span')
+      .first()
+      .evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return range.getClientRects().length;
+      });
+    expect(titleLines).toBe(1);
+    const dimensions = await summary.evaluate((element) => ({
+      scroll: element.scrollWidth,
+      client: element.clientWidth,
+    }));
+    expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      321,
+    );
+    const action = breakfast.getByRole('button', { name: /Добавить/ });
+    const [textBox, actionBox] = await Promise.all([summary.boundingBox(), action.boundingBox()]);
+    expect(
+      textBox!.x + textBox!.width <= actionBox!.x + 1 ||
+        textBox!.y >= actionBox!.y + actionBox!.height - 1,
+    ).toBe(true);
+    if (process.env.CAPTURE_1430_DIR) {
+      await mkdir(process.env.CAPTURE_1430_DIR, { recursive: true });
+      await breakfast.screenshot({
+        path: resolve(
+          process.env.CAPTURE_1430_DIR,
+          `${testInfo.project.name}-${theme}-320-text-200.png`,
+        ),
+      });
+    }
+  });
+}
+
 for (const width of [320, 360, 393, 430, 1280, 1440]) {
   for (const theme of ['light', 'dark'] as const) {
     test(`#1429 diary priority ${width} ${theme}`, async ({ page }, testInfo) => {

@@ -413,6 +413,45 @@ describe('NutritionDiary', () => {
     expect(within(breakfast).queryByText('Овсяная каша')).not.toBeVisible();
   });
 
+  it('shows each meal’s server totals, preserving unknown values and fractional grams', async () => {
+    const day = makeDay([]);
+    day.meals = [
+      {
+        meal_type: 'breakfast',
+        entries: [entry],
+        totals: { ...nutrition, energy_kcal: '153', protein_g: '17.14', fat_g: '3.56' },
+      },
+      {
+        meal_type: 'lunch',
+        entries: [{ ...entry, id: 42, meal_type: 'lunch', entry_kind: 'quick_add' }],
+        totals: { ...nutrition, energy_kcal: '207', protein_g: null, fat_g: '0', carbs_g: null },
+      },
+      {
+        meal_type: 'dinner',
+        entries: [{ ...entry, id: 44, meal_type: 'dinner' }],
+        totals: { ...nutrition, energy_kcal: '501', protein_g: '24.5' },
+      },
+      {
+        meal_type: 'snacks',
+        entries: [{ ...entry, id: 43, meal_type: 'snacks' }],
+        totals: { ...nutrition, energy_kcal: '0', protein_g: '0', fat_g: '0', carbs_g: '0' },
+      },
+    ];
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = (name: string) =>
+      screen.getByRole('region', { name }).querySelector('.nutrition-meal__header > div > span');
+    await screen.findByRole('region', { name: 'Завтрак' });
+    expect(summary('Завтрак')).toHaveTextContent('153 ккал · Б 17,1 · Ж 3,6 · У 54 г · 1 запись');
+    expect(summary('Обед')).toHaveTextContent('207 ккал · Б — · Ж 0 · У — г · 1 запись');
+    expect(summary('Ужин')).toHaveTextContent('501 ккал · Б 24,5 · Ж 12 · У 54 г · 1 запись');
+    expect(summary('Перекусы')).toHaveTextContent('0 ккал · Б 0 · Ж 0 · У 0 г · 1 запись');
+
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
+    expect(summary('Завтрак')).toHaveTextContent('Б 17,1');
+  });
+
   it('uses Russian plural forms in compact meal summaries', async () => {
     const entries = (count: number, mealType: FoodDiaryEntry['meal_type'], idOffset: number) =>
       Array.from({ length: count }, (_, index) => ({
@@ -492,6 +531,9 @@ describe('NutritionDiary', () => {
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(await screen.findByText('Овсяная каша')).toBeVisible();
+    expect(
+      breakfastSection().querySelector('.nutrition-meal__header > div > span'),
+    ).toHaveTextContent('420 ккал · Б 18,5 · Ж 12 · У 54 г · 1 запись');
     expect(localStorage.getItem('fit_food_draft_10_2026-08-19_breakfast')).toBeNull();
   });
 
@@ -776,10 +818,19 @@ describe('NutritionDiary', () => {
     let currentEntries = [entry];
     apiMock.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
       if (path.startsWith('/api/v1/nutrition/diary?')) {
-        return Promise.resolve(makeDay(currentEntries));
+        const day = makeDay(currentEntries);
+        day.meals[0]!.totals = currentEntries[0]?.nutrition ?? zeroNutrition;
+        return Promise.resolve(day);
       }
       if (path.endsWith('/entries/41') && options?.method === 'PATCH') {
-        currentEntries = [{ ...entry, amount: '150.000', weight_g: '150.000' }];
+        currentEntries = [
+          {
+            ...entry,
+            amount: '150.000',
+            weight_g: '150.000',
+            nutrition: { ...nutrition, energy_kcal: '630', protein_g: '27.75' },
+          },
+        ];
         return Promise.resolve(currentEntries[0]);
       }
       if (path.endsWith('/entries/41') && options?.method === 'DELETE') {
@@ -802,6 +853,11 @@ describe('NutritionDiary', () => {
         expect.objectContaining({ method: 'PATCH', body: { amount: 150, amount_unit: 'g' } }),
       ),
     );
+    await waitFor(() =>
+      expect(
+        breakfastSection().querySelector('.nutrition-meal__header > div > span'),
+      ).toHaveTextContent('630 ккал · Б 27,8 · Ж 12 · У 54 г · 1 запись'),
+    );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Удалить Овсяная каша' }));
     const confirmDialog = await screen.findByRole('dialog', { name: 'Удалить запись?' });
@@ -812,6 +868,9 @@ describe('NutritionDiary', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByText('Овсяная каша')).not.toBeInTheDocument());
+    expect(
+      breakfastSection().querySelector('.nutrition-meal__header > div > span'),
+    ).toHaveTextContent('Пока без записей');
   });
 
   it('retries the day and keeps favorites usable when recent products fail', async () => {
