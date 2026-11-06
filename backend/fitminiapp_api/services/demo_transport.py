@@ -630,6 +630,7 @@ def _hydration_day(session: _DemoSession, diary_date: str | None = None) -> dict
         "diary_date": selected,
         "timezone": "Europe/Moscow",
         "total_ml": total_ml,
+        "demo_generation": session.hydration_generation,
         "goal": goal,
         "progress_percent": round(total_ml / target_ml * 100, 1) if goal_enabled else None,
         "entries": entries,
@@ -693,6 +694,12 @@ def _validate_hydration_payload(payload: dict[str, Any], *, update: bool = False
 def _add_hydration_entry(session: _DemoSession, payload: dict[str, Any]) -> dict[str, Any]:
     payload = dict(payload)
     retry_key = payload.pop("_hydration_retry_key", None)
+    generation = payload.pop("_hydration_generation", None)
+    if generation is not None:
+        if isinstance(generation, bool) or not isinstance(generation, int) or generation < 0:
+            raise DemoActionForbiddenError
+        if generation != session.hydration_generation:
+            raise DemoTransitionError
     if retry_key is not None and (
         not isinstance(retry_key, str) or not retry_key or len(retry_key) > 128
     ):

@@ -75,6 +75,35 @@ def test_hydration_quick_add_is_idempotent_and_isolated(client) -> None:
     )
 
 
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL concurrency")
+def test_concurrent_hydration_entry_retries_create_one_record(client) -> None:
+    headers = {**_auth(client, 81_010), "Idempotency-Key": "concurrent-water"}
+    start = Barrier(2)
+
+    def save(_index: int):
+        start.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/hydration/entries",
+            headers=headers,
+            json={"volume_ml": 250, "beverage_type": "water", "source": "quick_preset"},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(save, range(2)))
+
+    assert [response.status_code for response in responses] == [201, 201]
+    assert responses[0].json()["id"] == responses[1].json()["id"]
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 81_010).one()
+        entries = (
+            db.query(HydrationEntry)
+            .filter_by(user_id=user.id, request_key="concurrent-water")
+            .all()
+        )
+        assert len(entries) == 1
+        assert entries[0].volume_ml == 250
+
+
 @pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
 def test_concurrent_hydration_preset_upserts_keep_one_label(client) -> None:
     headers = _auth(client, 81_009)
