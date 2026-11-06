@@ -701,7 +701,7 @@ jobs:
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/migrated-stack', github.workspace) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     services:
-      postgres:
+      db:
         image: postgres:16-alpine
         env:
           POSTGRES_DB: fitminiapp_test
@@ -765,8 +765,8 @@ jobs:
           APP_DEBUG: "false"
           ACCESS_TOKEN_EXPIRE_MINUTES: "60"
           REFRESH_TOKEN_EXPIRE_DAYS: "30"
-          DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@postgres:5432/fitminiapp_test
-          TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@postgres:5432/fitminiapp_test
+          DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@db:5432/fitminiapp_test
+          TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@db:5432/fitminiapp_test
           ENABLE_DEV_AUTH: "true"
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token
