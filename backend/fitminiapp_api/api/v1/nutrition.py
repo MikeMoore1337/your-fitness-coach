@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 
 from fastapi import (
@@ -12,6 +12,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from pydantic import StringConstraints
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_nutrition_label_scan, require_user
@@ -1334,12 +1335,18 @@ def update_diary_entry(
 
 @router.delete("/diary/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_diary_entry(
-    entry_id: int,
+    entry_id: int | Annotated[str, StringConstraints(pattern=r"^[1-9][0-9]*~undo$")],
+    expected_version: Annotated[datetime | None, Header(alias="X-Diary-Entry-Version")] = None,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # The suffix makes older servers reject guarded deletes instead of ignoring the version.
+    if isinstance(entry_id, str):
+        if expected_version is None:
+            raise HTTPException(status_code=422, detail="entry version is required")
+        entry_id = int(entry_id.removesuffix("~undo"))
     try:
-        delete_food_diary_entry(db, current_user, entry_id)
+        delete_food_diary_entry(db, current_user, entry_id, expected_version)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -1415,11 +1422,19 @@ def copy_product(
 def copy_meal(
     payload: FoodDiaryCopyMeal,
     idempotency_key: IdempotencyKey,
+    require_empty_meal: Annotated[bool, Header(alias="X-Require-Empty-Meal")] = False,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # Older servers cannot accept the suffixed preview token and therefore cannot duplicate a meal.
+    if require_empty_meal:
+        if not payload.preview_token.endswith("~quick"):
+            raise HTTPException(status_code=422, detail="guarded preview token is required")
+        payload = payload.model_copy(
+            update={"preview_token": payload.preview_token.removesuffix("~quick")}
+        )
     try:
-        return copy_diary_meal(db, current_user, payload, idempotency_key)
+        return copy_diary_meal(db, current_user, payload, idempotency_key, require_empty_meal)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
 

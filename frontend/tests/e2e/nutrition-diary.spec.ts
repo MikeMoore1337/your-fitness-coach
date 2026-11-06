@@ -279,6 +279,8 @@ async function mockNutritionApi(
   profileSex: 'female' | null = 'female',
   hydrationPercent?: number,
   hydrationGoalEnabled = true,
+  repeatCandidate?: { source_date: string; source_meal_type: 'lunch'; entry_count: number },
+  filterHydrationByDate = false,
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
@@ -481,9 +483,14 @@ async function mockNutritionApi(
         return route.fulfill({ status: 503, json: { detail: 'Гидратация временно недоступна' } });
       }
       const targetMl = hydrationPercent == null ? 2200 : 1000;
+      const dayEntries = filterHydrationByDate
+        ? hydrationEntries.filter(
+            (entry) => entry.diary_date === url.searchParams.get('diary_date'),
+          )
+        : hydrationEntries;
       const totalMl =
         hydrationPercent == null
-          ? hydrationEntries.reduce((sum, entry) => sum + entry.volume_ml, 0)
+          ? dayEntries.reduce((sum, entry) => sum + entry.volume_ml, 0)
           : Math.round((targetMl * hydrationPercent) / 100);
       return route.fulfill({
         json: {
@@ -510,7 +517,7 @@ async function mockNutritionApi(
             hydrationState === 'empty' || !hydrationGoalEnabled
               ? null
               : (hydrationPercent ?? Math.round((totalMl * 1000) / targetMl) / 10),
-          entries: hydrationPercent == null ? hydrationEntries : [],
+          entries: hydrationPercent == null ? dayEntries : [],
           presets: [
             { id: null, label: 'Стакан', volume_ml: 250, beverage_type: 'water', is_default: true },
             {
@@ -535,10 +542,8 @@ async function mockNutritionApi(
               is_default: false,
             },
           ],
-          last_logged_at: hydrationEntries[0]?.occurred_at ?? null,
-          reminder_suppression_key: hydrationEntries.length
-            ? 'hydration-logged:1:2026-08-19'
-            : null,
+          last_logged_at: dayEntries[0]?.occurred_at ?? null,
+          reminder_suppression_key: dayEntries.length ? 'hydration-logged:1:2026-08-19' : null,
           action_url: '/app?section=nutrition&date=2026-08-19&hydration=quick',
         },
       });
@@ -568,6 +573,14 @@ async function mockNutritionApi(
       const id = Number(path.split('/').at(-1));
       hydrationEntries = hydrationEntries.filter((entry) => entry.id !== id);
       return route.fulfill({ status: 204, body: '' });
+    }
+    if (path.startsWith('/api/v1/nutrition/hydration/entries/') && request.method() === 'PATCH') {
+      const id = Number(path.split('/').at(-1));
+      const body = request.postDataJSON() as Partial<HydrationEntry>;
+      hydrationEntries = hydrationEntries.map((entry) =>
+        entry.id === id ? { ...entry, ...body } : entry,
+      );
+      return route.fulfill({ json: hydrationEntries.find((entry) => entry.id === id) });
     }
     if (path === '/api/v1/nutrition/hydration/goal' && request.method() === 'POST') {
       return route.fulfill({
@@ -610,27 +623,37 @@ async function mockNutritionApi(
             { meal_type: 'dinner', entries: [], totals: zeroNutrition },
             { meal_type: 'snacks', entries: [], totals: zeroNutrition },
           ],
-          totals: {
-            energy_kcal: '2020.00',
-            protein_g: '141.000',
-            fat_g: '69.000',
-            carbs_g: '221.000',
-            fiber_g: null,
-          },
+          totals: repeatCandidate
+            ? yogurtEntry.nutrition
+            : {
+                energy_kcal: '2020.00',
+                protein_g: '141.000',
+                fat_g: '69.000',
+                carbs_g: '221.000',
+                fiber_g: null,
+              },
           targets: {
             energy_kcal: '2000.00',
             protein_g: '140.000',
             fat_g: '70.000',
             carbs_g: '220.000',
           },
-          remaining: {
-            energy_kcal: '-20.00',
-            protein_g: '-1.000',
-            fat_g: '1.000',
-            carbs_g: '-1.000',
-          },
+          remaining: repeatCandidate
+            ? {
+                energy_kcal: '1847.00',
+                protein_g: '122.900',
+                fat_g: '66.400',
+                carbs_g: '209.200',
+              }
+            : {
+                energy_kcal: '-20.00',
+                protein_g: '-1.000',
+                fat_g: '1.000',
+                carbs_g: '-1.000',
+              },
           status: entries.length ? dayStatus : 'unlogged',
           status_is_explicit: dayStatus === 'complete',
+          repeat_candidate: repeatCandidate ?? null,
         },
       });
     }
@@ -2840,6 +2863,13 @@ for (const width of [360, 393, 430]) {
         const dockBox = await dock.boundingBox();
         if (dockBox) expect(presetBox!.y + presetBox!.height).toBeLessThan(dockBox.y);
         await page.screenshot({ path: testInfo.outputPath('water-intent-visible.png') });
+        if (width === 360) {
+          await capture1429(
+            page,
+            `${testInfo.project.name}-${theme}-${width}-${runtime}-water-intent.png`,
+            false,
+          );
+        }
         await preset.click();
         await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
         await expect(hydration.getByText('1100 из 2200 мл', { exact: true })).toBeVisible();
@@ -2870,4 +2900,510 @@ for (const width of [360, 393, 430]) {
       });
     }
   }
+}
+
+async function capture1429(page: Page, name: string, fullPage = true) {
+  if (!process.env.CAPTURE_1429_AFTER_DIR) return;
+  await mkdir(process.env.CAPTURE_1429_AFTER_DIR, { recursive: true });
+  await page.screenshot({
+    path: resolve(process.env.CAPTURE_1429_AFTER_DIR, name),
+    fullPage,
+    ...(name.endsWith('.jpg') ? { type: 'jpeg', quality: 65 } : {}),
+  });
+}
+
+for (const width of [320, 360, 393, 430, 1280, 1440]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`#1429 diary priority ${width} ${theme}`, async ({ page }, testInfo) => {
+      await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+      await mockNutritionApi(page, 'data', 'female', undefined, true, {
+        source_date: '2026-08-18',
+        source_meal_type: 'lunch',
+        entry_count: 1,
+      });
+      await page.goto('/app?section=nutrition');
+
+      const selectors = [
+        '.nutrition-repeat-default',
+        '.nutrition-day-summary',
+        '.nutrition-food-card',
+        '.hydration-card',
+        '.nutrition-completeness',
+        '.nutrition-suggestions',
+      ];
+      for (const selector of selectors) await expect(page.locator(selector)).toBeVisible();
+      const positions = await page.evaluate(
+        (items) =>
+          items.map((selector) => {
+            const element = document.querySelector(selector)!;
+            return {
+              top: element.getBoundingClientRect().top,
+              index: [...element.parentElement!.children].indexOf(element),
+            };
+          }),
+        selectors,
+      );
+      expect(positions.map((position) => position.index)).toEqual(
+        [...positions.map((position) => position.index)].sort((a, b) => a - b),
+      );
+      expect(positions.map((position) => position.top)).toEqual(
+        [...positions.map((position) => position.top)].sort((a, b) => a - b),
+      );
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width + 1,
+      );
+      const actions = page.locator('.nutrition-diary__intro-actions button');
+      for (const action of await actions.all()) {
+        const dimensions = await action.evaluate((button) => ({
+          scroll: button.scrollWidth,
+          client: button.clientWidth,
+        }));
+        expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
+        if (width <= 375) {
+          const button = await action.boundingBox();
+          const intro = await page.locator('.nutrition-diary__intro').boundingBox();
+          expect(Math.abs(button!.width - intro!.width)).toBeLessThanOrEqual(1);
+        }
+      }
+      if (width < 500) {
+        const presets = page.locator('.hydration-presets .ui-button');
+        const firstRow = await Promise.all(
+          [0, 1, 2].map((index) => presets.nth(index).boundingBox()),
+        );
+        expect(firstRow[0]?.y).toBe(firstRow[1]?.y);
+        expect(firstRow[0]?.y).toBe(firstRow[2]?.y);
+      }
+      const extension =
+        testInfo.project.name === 'webkit' && theme === 'dark' && width >= 1280 ? 'jpg' : 'png';
+      await capture1429(page, `${testInfo.project.name}-${theme}-${width}-partial.${extension}`);
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1429 one-click repeat advances and undo preserves keyboard access ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+    await mockNutritionApi(page);
+    let copiedEntries: FoodDiaryEntry[] = [];
+    let undoAttempts = 0;
+    let copyKey = '';
+    const copied = {
+      ...yogurtEntry,
+      id: 91,
+      created_at: '2026-08-19T10:00:00',
+      updated_at: '2026-08-19T10:00:00',
+    };
+    const second = {
+      ...copied,
+      id: 92,
+      food_id: 7,
+      food_name: 'Овсяная каша',
+      food_brand: null,
+      amount: '100.000',
+      weight_g: '100.000',
+      nutrition: {
+        energy_kcal: '360.00',
+        protein_g: '12.000',
+        fat_g: '6.000',
+        carbs_g: '62.000',
+        fiber_g: '8.000',
+      },
+    };
+    const combined = {
+      energy_kcal: '513.00',
+      protein_g: '29.100',
+      fat_g: '9.600',
+      carbs_g: '72.800',
+      fiber_g: '8.000',
+    };
+    await page.route('**/api/v1/nutrition/diary?*', async (route) => {
+      await route.fulfill({
+        json: {
+          diary_date: '2026-08-19',
+          timezone: 'Europe/Moscow',
+          meals: [
+            {
+              meal_type: 'breakfast',
+              entries: copiedEntries,
+              totals:
+                copiedEntries.length === 2
+                  ? combined
+                  : (copiedEntries[0]?.nutrition ?? zeroNutrition),
+            },
+            ...['lunch', 'dinner', 'snacks'].map((meal_type) => ({
+              meal_type,
+              entries: [],
+              totals: zeroNutrition,
+            })),
+          ],
+          totals:
+            copiedEntries.length === 2 ? combined : (copiedEntries[0]?.nutrition ?? zeroNutrition),
+          targets: {
+            energy_kcal: '2000.00',
+            protein_g: '140.000',
+            fat_g: '70.000',
+            carbs_g: '220.000',
+          },
+          remaining:
+            copiedEntries.length === 2
+              ? {
+                  energy_kcal: '1487.00',
+                  protein_g: '110.900',
+                  fat_g: '60.400',
+                  carbs_g: '147.200',
+                }
+              : copiedEntries.length === 1
+                ? {
+                    energy_kcal: '1640.00',
+                    protein_g: '128.000',
+                    fat_g: '64.000',
+                    carbs_g: '158.000',
+                  }
+                : {
+                    energy_kcal: '2000.00',
+                    protein_g: '140.000',
+                    fat_g: '70.000',
+                    carbs_g: '220.000',
+                  },
+          status: copiedEntries.length ? 'incomplete' : 'unlogged',
+          status_is_explicit: false,
+          repeat_candidate: {
+            source_date: '2026-08-18',
+            source_meal_type: copiedEntries.length ? 'lunch' : 'breakfast',
+            entry_count: copiedEntries.length ? 1 : 2,
+          },
+        },
+      });
+    });
+    await page.route('**/api/v1/nutrition/diary/copy/meal/preview', (route) =>
+      route.fulfill({
+        json: {
+          copy_scope: 'meal',
+          source_date: '2026-08-18',
+          source_meal_type: 'breakfast',
+          target_date: '2026-08-19',
+          target_meal_type: 'breakfast',
+          entries: [copied, second],
+          preview_token: 'preview-token-1234567890',
+          previewed_at: '2026-08-19T08:00:00',
+        },
+      }),
+    );
+    await page.route('**/api/v1/nutrition/diary/copy/meal', async (route) => {
+      expect(route.request().headers()['x-require-empty-meal']).toBe('true');
+      expect(route.request().postDataJSON().preview_token).toBe('preview-token-1234567890~quick');
+      const key = route.request().headers()['idempotency-key'];
+      if (!key) throw new Error('Missing repeat idempotency key');
+      if (!copyKey) {
+        copyKey = key;
+        return route.fulfill({ status: 503, json: { detail: 'temporary failure' } });
+      }
+      expect(key).toBe(copyKey);
+      copiedEntries = [copied, second];
+      await route.fulfill({ status: 201, json: { entries: copiedEntries, replayed: false } });
+    });
+    await page.route('**/api/v1/nutrition/diary/entries/*', async (route) => {
+      expect(route.request().headers()['x-diary-entry-version']).toBe(copied.created_at);
+      expect(new URL(route.request().url()).pathname).toMatch(/~undo$/);
+      const id = Number(
+        new URL(route.request().url()).pathname.split('/').at(-1)?.replace('~undo', ''),
+      );
+      if (!copiedEntries.some((item) => item.id === id)) return route.fulfill({ status: 404 });
+      if (id === second.id && ++undoAttempts === 1)
+        return route.fulfill({ status: 409, json: { detail: 'entry changed' } });
+      copiedEntries = copiedEntries.filter((item) => item.id !== id);
+      await route.fulfill({ status: 204 });
+    });
+    await page.goto('/app?section=nutrition');
+    const repeat = page.getByTestId('nutrition-repeat-default');
+    await expect(page.getByText('Повторить вчерашний завтрак')).toBeVisible();
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-empty.png`);
+    await repeat.focus();
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByText('Не удалось проверить, добавлен ли завтрак. Попробуйте ещё раз.'),
+    ).toBeVisible();
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-repeat-error.png`);
+    await repeat.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Завтрак добавлен')).toBeVisible();
+    await expect(page.getByText('Повторить вчерашний обед')).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(
+      Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore),
+    ).toBeLessThanOrEqual(1);
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-added.png`);
+    const undo = page.getByRole('button', { name: 'Отменить повтор завтрака' });
+    await undo.focus();
+    await page.keyboard.press('Enter');
+    const retryUndo = page.getByRole('button', { name: 'Повторить отмену завтрака' });
+    await expect(retryUndo).toBeVisible();
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-undo-error.png`);
+    await retryUndo.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Повтор завтрака отменён')).toBeVisible();
+    await expect(page.getByText('Повторить вчерашний завтрак')).toBeVisible();
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-undone.png`);
+    const breakfast = page.getByRole('region', { name: 'Завтрак' });
+    await breakfast.getByRole('button', { name: 'Завтрак' }).click();
+    await breakfast.getByRole('button', { name: 'Повторить вчера' }).click();
+    await expect(page.getByRole('dialog', { name: 'Повторить приём пищи' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Подтвердить' })).toBeEnabled();
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-manual.png`);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1429 full diary keeps four meals above hydration ${theme}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+    await mockNutritionApi(page);
+    await page.route('**/api/v1/nutrition/diary?*', (route) =>
+      route.fulfill({
+        json: {
+          diary_date: '2026-08-19',
+          timezone: 'Europe/Moscow',
+          meals: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type, index) => ({
+            meal_type,
+            entries: [{ ...yogurtEntry, id: 100 + index, meal_type }],
+            totals: yogurtEntry.nutrition,
+          })),
+          totals: {
+            energy_kcal: '612.00',
+            protein_g: '68.400',
+            fat_g: '14.400',
+            carbs_g: '43.200',
+            fiber_g: null,
+          },
+          targets: {
+            energy_kcal: '2000.00',
+            protein_g: '140.000',
+            fat_g: '70.000',
+            carbs_g: '220.000',
+          },
+          remaining: {
+            energy_kcal: '1388.00',
+            protein_g: '71.600',
+            fat_g: '55.600',
+            carbs_g: '176.800',
+          },
+          status: 'complete',
+          status_is_explicit: true,
+          repeat_candidate: null,
+        },
+      }),
+    );
+    await page.goto('/app?section=nutrition');
+    await expect(page.getByRole('region', { name: 'Перекусы' })).toBeVisible();
+    await expect(page.getByTestId('nutrition-repeat-default')).toHaveCount(0);
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-full.png`);
+  });
+
+  test(`#1429 undo remains available after the final repeat ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+    await mockNutritionApi(page);
+    let completed = false;
+    const copied = {
+      ...yogurtEntry,
+      id: 110,
+      meal_type: 'snacks',
+      created_at: '2026-08-19T10:00:00',
+      updated_at: '2026-08-19T10:00:00',
+    };
+    await page.route('**/api/v1/nutrition/diary?*', (route) =>
+      route.fulfill({
+        json: {
+          diary_date: '2026-08-19',
+          timezone: 'Europe/Moscow',
+          meals: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type, index) => ({
+            meal_type,
+            entries:
+              meal_type === 'snacks'
+                ? completed
+                  ? [copied]
+                  : []
+                : [{ ...yogurtEntry, id: 111 + index, meal_type }],
+            totals: meal_type === 'snacks' && !completed ? zeroNutrition : yogurtEntry.nutrition,
+          })),
+          totals: yogurtEntry.nutrition,
+          targets: null,
+          remaining: null,
+          status: 'incomplete',
+          status_is_explicit: false,
+          repeat_candidate: completed
+            ? null
+            : { source_date: '2026-08-18', source_meal_type: 'snacks', entry_count: 1 },
+        },
+      }),
+    );
+    await page.route('**/api/v1/nutrition/diary/copy/meal/preview', (route) =>
+      route.fulfill({ json: { preview_token: 'preview-token-1234567890' } }),
+    );
+    await page.route('**/api/v1/nutrition/diary/copy/meal', async (route) => {
+      completed = true;
+      await route.fulfill({ status: 201, json: { entries: [copied], replayed: false } });
+    });
+    await page.goto('/app?section=nutrition');
+    await page.getByTestId('nutrition-repeat-default').click();
+    await expect(page.getByRole('button', { name: 'Отменить повтор перекусов' })).toBeVisible();
+    await expect(page.getByTestId('nutrition-repeat-default')).toHaveCount(0);
+    await capture1429(page, `${testInfo.project.name}-${theme}-393-last.png`);
+  });
+
+  test(`#1429 hydration stays usable when the food diary fails ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+    await mockNutritionApi(page);
+    await page.route('**/api/v1/nutrition/diary?*', (route) =>
+      route.fulfill({ status: 503, json: { detail: 'Дневник временно недоступен' } }),
+    );
+    await page.goto('/app?section=nutrition');
+    const hydration = page.getByRole('region', { name: 'Гидратация' });
+    const preset = hydration.getByRole('button', { name: /Стакан.*250 мл/ });
+    await expect(preset).toBeVisible();
+    await capture1429(page, `${testInfo.project.name}-${theme}-320-diary-error.png`);
+    await preset.click();
+    await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
+  });
+}
+
+test('#1429 PWA standalone keeps the global water action reachable', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.addInitScript(() => {
+    const match = window.matchMedia.bind(window);
+    window.matchMedia = (query) => {
+      const result = match(query);
+      if (query === '(display-mode: standalone)')
+        Object.defineProperty(result, 'matches', { value: true });
+      return result;
+    };
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+  });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=today');
+  expect(await page.evaluate(() => matchMedia('(display-mode: standalone)').matches)).toBe(true);
+  await page.getByRole('button', { name: 'Быстро добавить', exact: true }).click();
+  await page.getByRole('link', { name: 'Вода', exact: true }).click();
+  const preset = page
+    .getByRole('region', { name: 'Гидратация' })
+    .getByRole('button', { name: /Стакан.*250 мл/ });
+  await expect(preset).toBeInViewport({ ratio: 1 });
+  await expect(preset).toBeFocused();
+  await expect(page).not.toHaveURL(/hydration=quick/);
+  const dock = page.locator('#appBottomNav');
+  const presetBox = await preset.boundingBox();
+  const dockBox = await dock.boundingBox();
+  if (dockBox) expect(presetBox!.y + presetBox!.height).toBeLessThan(dockBox.y);
+});
+
+test('#1429 water add edit delete and selected dates stay in sync', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+  await page.setViewportSize({ width: 360, height: 844 });
+  await mockNutritionApi(page, 'data', 'female', undefined, true, undefined, true);
+  await page.goto('/app?section=nutrition');
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  await expect(hydration.getByText('850 из 2200 мл')).toBeVisible();
+  const row = hydration.locator('.hydration-entry').filter({ hasText: '350 мл' });
+  await row.getByRole('button', { name: 'Изменить' }).click();
+  const editor = hydration.locator('.hydration-entry__editor');
+  await editor.getByLabel('Объём, мл').fill('450');
+  await editor.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(hydration.getByText('950 из 2200 мл')).toBeVisible();
+  const updated = hydration.locator('.hydration-entry').filter({ hasText: '450 мл' });
+  await updated.getByRole('button', { name: 'Удалить' }).click();
+  await page
+    .getByRole('dialog', { name: 'Удалить напиток?' })
+    .getByRole('button', { name: 'Удалить' })
+    .click();
+  await expect(hydration.getByText('500 из 2200 мл')).toBeVisible();
+  await hydration.getByRole('button', { name: /Стакан.*250 мл/ }).click();
+  await expect(hydration.getByText('750 из 2200 мл')).toBeVisible();
+  await page.getByRole('button', { name: /18 августа/i }).click();
+  await expect(hydration.getByText('0 из 2200 мл')).toBeVisible();
+  await page.getByRole('button', { name: /19 августа/i }).click();
+  await expect(hydration.getByText('750 из 2200 мл')).toBeVisible();
+});
+
+test('#1429 primary actions remain reachable with 200% text scaling', async ({
+  page,
+}, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+  await page.setViewportSize({ width: 320, height: 844 });
+  await mockNutritionApi(page, 'data', 'female', undefined, true, {
+    source_date: '2026-08-18',
+    source_meal_type: 'lunch',
+    entry_count: 1,
+  });
+  await page.goto('/app?section=nutrition');
+  await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
+  const repeat = page.getByTestId('nutrition-repeat-default');
+  const addFood = page.getByTestId('nutrition-add-product');
+  const water = page
+    .getByRole('region', { name: 'Гидратация' })
+    .getByRole('button', { name: /Стакан.*250 мл/ });
+  await expect(repeat).toBeVisible();
+  await expect(addFood).toBeVisible();
+  await expect(water).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(321);
+  for (const button of [repeat, addFood, water]) {
+    const size = await button.evaluate((element) => ({
+      width: element.clientWidth,
+      content: element.scrollWidth,
+    }));
+    expect(size.content, (await button.textContent()) ?? '').toBeLessThanOrEqual(size.width + 1);
+  }
+  await capture1429(page, `${testInfo.project.name}-light-320-text-200.png`);
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1429 water remains available while the diary loads ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+    await mockNutritionApi(page);
+    let release = () => {};
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/api/v1/nutrition/diary?*', async (route) => {
+      await pending;
+      await route.fulfill({ status: 503, json: { detail: 'Дневник временно недоступен' } });
+    });
+    try {
+      await page.goto('/app?section=nutrition');
+      await expect(page.getByText('Загружаем дневник…')).toBeVisible();
+      await expect(
+        page
+          .getByRole('region', { name: 'Гидратация' })
+          .getByRole('button', { name: /Стакан.*250 мл/ }),
+      ).toBeVisible();
+      await capture1429(page, `${testInfo.project.name}-${theme}-393-diary-loading.png`);
+    } finally {
+      release();
+    }
+  });
 }
