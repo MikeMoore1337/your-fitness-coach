@@ -3339,10 +3339,15 @@ test('#1429 water add edit delete and selected dates stay in sync', async ({ pag
   await expect(hydration.getByText('500 из 2200 мл')).toBeVisible();
   await hydration.getByRole('button', { name: /Стакан.*250 мл/ }).click();
   await expect(hydration.getByText('750 из 2200 мл')).toBeVisible();
+  await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
   await page.getByRole('button', { name: /18 августа/i }).click();
   await expect(hydration.getByText('0 из 2200 мл')).toBeVisible();
+  await expect(hydration.getByText('Добавлено 250 мл')).toHaveCount(0);
+  await expect(hydration.getByRole('button', { name: 'Отменить', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /19 августа/i }).click();
   await expect(hydration.getByText('750 из 2200 мл')).toBeVisible();
+  await hydration.getByRole('button', { name: 'Отменить', exact: true }).click();
+  await expect(hydration.getByText('500 из 2200 мл')).toBeVisible();
 });
 
 test('#1429 primary actions remain reachable with 200% text scaling', async ({
