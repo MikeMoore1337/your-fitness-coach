@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import { queryKeys, invalidateNutritionSummaries } from '../../shared/queryKeys';
@@ -14,6 +14,7 @@ import type {
 import {
   Badge,
   Button,
+  DisclosureIcon,
   EmptyState,
   ErrorState,
   Field,
@@ -23,6 +24,7 @@ import {
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import type { MealType } from './FoodPickerDialog';
+import styles from './NutritionSuggestions.module.css';
 
 const mealLabels: Record<MealType, string> = {
   breakfast: 'Завтрак',
@@ -126,14 +128,52 @@ function planReviewItemPayload(item: ReviewItem): NutritionPlanFillRequest['item
 
 function CandidateCard({
   candidate,
+  compact = false,
   onSelect,
 }: {
   candidate: NutritionSuggestion;
+  compact?: boolean;
   onSelect: (candidate: NutritionSuggestion) => void;
 }) {
+  const nameId = useId();
   const tags = [...candidate.reasons, ...candidate.sources]
     .filter((value, index, values) => values.indexOf(value) === index)
     .map(tagLabel);
+  if (compact) {
+    const facts = tags.filter(
+      (tag) =>
+        candidate.nutrition_confidence !== 'partial' || tag !== reasonLabels.partial_nutrition,
+    );
+    return (
+      <li className={`nutrition-suggestion-card ${styles.compactCard}`}>
+        <strong id={nameId}>{candidate.name}</strong>
+        <span className={styles.facts}>
+          {formatNumber(candidate.nutrition.energy_kcal, 0)} ккал · {macroLine(candidate.nutrition)}
+        </span>
+        <span className={styles.facts}>
+          <span>{confidenceLabel(candidate.nutrition_confidence)}</span>
+          {facts.slice(0, 2).map((fact) => ` · ${fact}`)}
+        </span>
+        {facts.length > 2 && (
+          <details className={styles.details}>
+            <summary className="yfc-disclosure-summary">
+              <span>Другие основания: {candidate.name}</span>
+              <DisclosureIcon />
+            </summary>
+            <p>{facts.slice(2).join(' · ')}</p>
+          </details>
+        )}
+        <Button
+          type="button"
+          variant="secondary"
+          aria-describedby={nameId}
+          onClick={() => onSelect(candidate)}
+        >
+          Проверить вариант
+        </Button>
+      </li>
+    );
+  }
   return (
     <li className="nutrition-suggestion-card">
       <div className="nutrition-suggestion-card__head">
@@ -162,6 +202,52 @@ function CandidateCard({
         Проверить вариант
       </Button>
     </li>
+  );
+}
+
+function DiaryCandidateList({
+  candidates,
+  onSelect,
+}: {
+  candidates: NutritionSuggestion[];
+  onSelect: (candidate: NutritionSuggestion) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const additionalId = useId();
+  const plural = new Intl.PluralRules('ru').select(candidates.length);
+  const word = plural === 'one' ? 'вариант' : plural === 'few' ? 'варианта' : 'вариантов';
+  const renderCards = (items: NutritionSuggestion[]) =>
+    items.map((candidate) => (
+      <CandidateCard
+        candidate={candidate}
+        compact
+        key={candidate.candidate_id}
+        onSelect={onSelect}
+      />
+    ));
+
+  return (
+    <>
+      <p className={styles.note}>Варианты из сохранённых данных, не предписание.</p>
+      <ul className="nutrition-suggestions__list">{renderCards(candidates.slice(0, 2))}</ul>
+      {candidates.length > 2 && (
+        <>
+          <Button
+            className={styles.toggle}
+            type="button"
+            variant="secondary"
+            aria-expanded={expanded}
+            aria-controls={additionalId}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? 'Свернуть' : `Показать все ${candidates.length} ${word}`}
+          </Button>
+          <div id={additionalId} hidden={!expanded}>
+            <ul className="nutrition-suggestions__list">{renderCards(candidates.slice(2))}</ul>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -418,7 +504,10 @@ export function NutritionSuggestions({
   }
 
   return (
-    <section className="nutrition-section-card nutrition-suggestions" aria-labelledby={titleId}>
+    <section
+      className={`nutrition-section-card nutrition-suggestions ${mode === 'diary' ? styles.diarySection : ''}`}
+      aria-labelledby={titleId}
+    >
       <header className="nutrition-section-card__header">
         <div>
           <span className="eyebrow">
@@ -453,7 +542,16 @@ export function NutritionSuggestions({
               <p key={limitation}>{limitation}</p>
             ))}
           </div>
-          {suggestions.data.candidates?.length ? (
+          {suggestions.data.candidates?.length && mode === 'diary' ? (
+            <DiaryCandidateList
+              key={JSON.stringify([diaryDate, suggestions.data.candidates])}
+              candidates={suggestions.data.candidates}
+              onSelect={(nextCandidate) => {
+                idempotencyKey.current = null;
+                setSelectedCandidate(nextCandidate);
+              }}
+            />
+          ) : suggestions.data.candidates?.length ? (
             <ul className="nutrition-suggestions__list">
               {suggestions.data.candidates.map((candidate) => (
                 <CandidateCard

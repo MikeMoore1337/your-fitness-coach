@@ -1,0 +1,8 @@
+{
+  "browser": "chromium",
+  "width": 320,
+  "theme": "dark",
+  "phase": "before",
+  "height": 2048.6875,
+  "reviewActions": 6
+}
