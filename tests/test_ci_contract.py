@@ -600,20 +600,19 @@ def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
         ),
         (
             [".github/workflows/ci.yml"],
-            "workflow-platform",
+            "cross-stack",
             {
                 "policy",
                 "workflow-config",
                 "image-contract",
                 "deployment-contract",
                 "dependency-audit",
-            },
-            {
                 "frontend-e2e",
                 "python-tests",
                 "migrated-stack",
                 "container-contract",
             },
+            set(),
         ),
         (
             ["bot/.dockerignore"],
