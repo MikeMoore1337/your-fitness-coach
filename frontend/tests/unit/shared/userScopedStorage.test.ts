@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
+  HYDRATION_PENDING_SESSION_PREFIX,
   USER_SCOPED_PERSISTENT_STORAGE_REGISTRY,
   activeWorkoutPointerStorageKey,
   activeWorkoutQueueStorageKey,
@@ -103,5 +104,17 @@ describe('user-scoped browser storage registry', () => {
       expect(localStorage.getItem(key)).toBeNull();
     }
     expect(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)).toBeNull();
+  });
+
+  it('retains pending hydration for the same account on expiry and clears it on logout', () => {
+    const same = `${HYDRATION_PENDING_SESSION_PREFIX}7`;
+    const other = `${HYDRATION_PENDING_SESSION_PREFIX}8`;
+    sessionStorage.setItem(same, 'pending');
+    sessionStorage.setItem(other, 'other account');
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+    expect(sessionStorage.getItem(same)).toBe('pending');
+    expect(sessionStorage.getItem(other)).toBeNull();
+    clearSensitiveUserScopedStorage();
+    expect(sessionStorage.getItem(same)).toBeNull();
   });
 });
