@@ -173,14 +173,15 @@ def test_diary_api_crud_aggregates_and_uses_existing_target_service(client, monk
     from fitminiapp_api.services import food_diary as diary_service
 
     target_calls = 0
-    real_target_service = diary_service.get_nutrition_target_for_user
+    real_target_service = diary_service.get_nutrition_target_for_date
 
-    def tracked_target_service(db, user):
+    def tracked_target_service(db, user_id, target_date):
         nonlocal target_calls
         target_calls += 1
-        return real_target_service(db, user)
+        assert target_date == selected_date
+        return real_target_service(db, user_id, target_date)
 
-    monkeypatch.setattr(diary_service, "get_nutrition_target_for_user", tracked_target_service)
+    monkeypatch.setattr(diary_service, "get_nutrition_target_for_date", tracked_target_service)
     day = client.get(
         "/api/v1/nutrition/diary",
         headers=headers,
