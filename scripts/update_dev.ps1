@@ -163,9 +163,16 @@ function Invoke-Git {
         [switch]$AllowFailure
     )
     $safeDirectory = 'safe.directory={0}' -f $script:RepoRoot.Replace('\', '/')
-    $output = @(& git -c $safeDirectory -C $script:RepoRoot @Arguments 2>$null)
+    # Windows PowerShell can treat redirected native stderr as a terminating error.
+    $ErrorActionPreference = 'Continue'
+    $global:LASTEXITCODE = $null
+    try {
+        $output = @(& git -c $safeDirectory -C $script:RepoRoot @Arguments 2>$null)
+    } catch {
+        Stop-Update -Code 'GIT_COMMAND_FAILED' -Summary 'Git-команда завершилась ошибкой.'
+    }
     $exitCode = $LASTEXITCODE
-    if (-not $AllowFailure -and $exitCode -ne 0) {
+    if ($null -eq $exitCode -or (-not $AllowFailure -and $exitCode -ne 0)) {
         Stop-Update -Code 'GIT_COMMAND_FAILED' -Summary 'Git-команда завершилась ошибкой.'
     }
     [pscustomobject]@{
