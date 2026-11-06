@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { HydrationDay, HydrationEntry, HydrationPreset, User } from '../../shared/api/types';
@@ -17,6 +17,11 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Icon } from '../../shared/ui/Icon';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
+import { useRuntime, type ApiRuntime } from '../../shared/runtime/runtime';
+import {
+  AUTHENTICATED_USER_ID_STORAGE_KEY,
+  HYDRATION_PENDING_SESSION_PREFIX,
+} from '../../shared/userScopedStorage';
 
 // Inter has no Unicode subscript ₂; its ordinary 2 is rendered below the baseline.
 const waterFormula = 'H₂O';
@@ -29,6 +34,61 @@ const beverageLabels: Record<string, string> = {
   juice: 'Сок',
   other: 'Другой напиток',
 };
+
+type AddRequest = {
+  volume: number;
+  kind: string;
+  source: 'quick_preset' | 'manual';
+  date: string;
+  key: string;
+  uncertain: boolean;
+};
+type PendingAdds = Record<string, AddRequest>;
+
+function hydrationScope(runtime: ApiRuntime): string {
+  if (runtime.kind === 'demo') return `demo:${runtime.sessionToken}`;
+  try {
+    const id = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
+    return Number.isSafeInteger(id) && id > 0 ? `user:${id}` : 'anonymous';
+  } catch {
+    return 'anonymous';
+  }
+}
+
+function pendingStorageKey(scope: string): string | null {
+  return scope.startsWith('user:') ? `${HYDRATION_PENDING_SESSION_PREFIX}${scope.slice(5)}` : null;
+}
+
+function loadPending(scope: string): PendingAdds | null {
+  const key = pendingStorageKey(scope);
+  if (!key) return null;
+  try {
+    const value: unknown = JSON.parse(sessionStorage.getItem(key) ?? '{}');
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const pending: PendingAdds = {};
+    for (const [date, raw] of Object.entries(value)) {
+      if (!raw || typeof raw !== 'object') continue;
+      const item = raw as AddRequest;
+      if (
+        /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+        item.date === date &&
+        Number.isInteger(item.volume) &&
+        item.volume >= 1 &&
+        item.volume <= 5000 &&
+        Object.hasOwn(beverageLabels, item.kind) &&
+        (item.source === 'quick_preset' || item.source === 'manual') &&
+        typeof item.key === 'string' &&
+        item.key.length > 0 &&
+        item.key.length <= 128
+      ) {
+        pending[date] = { ...item, uncertain: true };
+      }
+    }
+    return pending;
+  } catch {
+    return null;
+  }
+}
 
 function requestKey(prefix: string): string {
   const suffix = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -186,7 +246,52 @@ export function HydrationTracker({
   initialExpanded?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const { toast } = useFeedback();
+  const { toast, confirm } = useFeedback();
+  const runtime = useRuntime();
+  const scope = hydrationScope(runtime);
+  const scopeRef = useRef(scope);
+  const dateRef = useRef(diaryDate);
+  useLayoutEffect(() => {
+    scopeRef.current = scope;
+    dateRef.current = diaryDate;
+  }, [scope, diaryDate]);
+  const [pendingState, setPendingState] = useState(() => ({
+    scope,
+    entries: loadPending(scope) ?? {},
+  }));
+  const pendingRef = useRef(pendingState);
+  const storageUnavailableRef = useRef(false);
+  useEffect(() => {
+    if (pendingRef.current.scope !== scope) {
+      const next = { scope, entries: loadPending(scope) ?? {} };
+      storageUnavailableRef.current = false;
+      pendingRef.current = next;
+      setPendingState(next);
+    }
+  }, [scope]);
+  const updatePending = (requestScope: string, update: (entries: PendingAdds) => PendingAdds) => {
+    if (
+      requestScope !== scopeRef.current ||
+      requestScope !== hydrationScope(runtime) ||
+      requestScope !== pendingRef.current.scope
+    )
+      return;
+    const stored = storageUnavailableRef.current ? null : loadPending(requestScope);
+    const next = { scope: requestScope, entries: update(stored ?? pendingRef.current.entries) };
+    pendingRef.current = next;
+    setPendingState(next);
+    const key = pendingStorageKey(requestScope);
+    if (key) {
+      try {
+        if (Object.keys(next.entries).length)
+          sessionStorage.setItem(key, JSON.stringify(next.entries));
+        else sessionStorage.removeItem(key);
+      } catch {
+        // shortcut: recovery is in-memory when session storage is unavailable; use durable storage if required.
+        storageUnavailableRef.current = true;
+      }
+    }
+  };
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const quickAddRef = useRef<HTMLDivElement>(null);
   const addInFlightRef = useRef(false);
@@ -248,28 +353,26 @@ export function HydrationTracker({
     ]);
   };
   const add = useMutation({
-    mutationFn: ({
-      volume,
-      kind,
-      source,
-      key,
-    }: {
-      volume: number;
-      kind: string;
-      source: string;
-      key: string;
-    }) =>
+    mutationFn: ({ request, demo }: { request: AddRequest; scope: string; demo: boolean }) =>
       api<HydrationEntry>('/api/v1/nutrition/hydration/entries', {
         method: 'POST',
-        headers: { 'Idempotency-Key': key },
+        headers: { 'Idempotency-Key': request.key },
         body: {
-          volume_ml: volume,
-          beverage_type: kind,
-          diary_date: diaryDate,
-          source,
+          volume_ml: request.volume,
+          beverage_type: request.kind,
+          diary_date: request.date,
+          source: request.source,
+          ...(demo ? { _hydration_retry_key: request.key } : {}),
         },
       }),
-    onSuccess: async (entry) => {
+    onSuccess: async (entry, { request, scope: requestScope }) => {
+      if (requestScope !== scopeRef.current || requestScope !== hydrationScope(runtime)) return;
+      updatePending(requestScope, (entries) => {
+        if (entries[request.date]?.key !== request.key) return entries;
+        const next = { ...entries };
+        delete next[request.date];
+        return next;
+      });
       setUndoEntry(entry);
       setCustomVolume('');
       await refresh();
@@ -279,15 +382,63 @@ export function HydrationTracker({
       );
       haptic('success');
     },
-    onError: (reason) => toast((reason as Error).message, 'error'),
+    onError: (reason, { request, scope: requestScope }) => {
+      if (requestScope !== scopeRef.current || requestScope !== hydrationScope(runtime)) return;
+      const status = (reason as { status?: number }).status;
+      updatePending(requestScope, (entries) => {
+        if (entries[request.date]?.key !== request.key) return entries;
+        const next = { ...entries };
+        if (!request.uncertain && [400, 403, 404, 422].includes(status ?? 0))
+          delete next[request.date];
+        else next[request.date] = { ...request, uncertain: true };
+        return next;
+      });
+      toast((reason as Error).message, 'error');
+    },
     onSettled: () => {
       addInFlightRef.current = false;
     },
   });
-  const submitAdd = (payload: Parameters<typeof add.mutate>[0]) => {
-    if (addInFlightRef.current || add.isPending) return;
+  const submitAdd = async (payload: Pick<AddRequest, 'volume' | 'kind' | 'source'>) => {
+    if (
+      addInFlightRef.current ||
+      add.isPending ||
+      pendingRef.current.scope !== scope ||
+      scopeRef.current !== scope ||
+      hydrationScope(runtime) !== scope ||
+      dateRef.current !== diaryDate
+    )
+      return;
     addInFlightRef.current = true;
-    add.mutate(payload);
+    const existing = pendingRef.current.entries[diaryDate];
+    const same =
+      existing &&
+      existing.volume === payload.volume &&
+      existing.kind === payload.kind &&
+      existing.source === payload.source;
+    if (existing && !same) {
+      const approved = await confirm({
+        title: 'Добавить другую запись?',
+        message:
+          'Предыдущая запись могла сохраниться. Проверьте историю перед добавлением нового напитка.',
+        confirmText: 'Добавить новый',
+        danger: false,
+      });
+      if (
+        !approved ||
+        scopeRef.current !== scope ||
+        dateRef.current !== diaryDate ||
+        hydrationScope(runtime) !== scope
+      ) {
+        addInFlightRef.current = false;
+        return;
+      }
+    }
+    const request = same
+      ? existing
+      : { ...payload, date: diaryDate, key: requestKey('hydration-entry'), uncertain: false };
+    updatePending(scope, (entries) => ({ ...entries, [diaryDate]: request }));
+    add.mutate({ request, scope, demo: runtime.kind === 'demo' });
   };
   const undo = useMutation({
     mutationFn: (entryId: number) =>
@@ -381,6 +532,7 @@ export function HydrationTracker({
   }
 
   const data = hydration.data;
+  const pending = pendingState.scope === scope ? pendingState.entries[diaryDate] : undefined;
   const target = data.goal?.enabled ? data.goal.target_ml : null;
   const progress = Math.min(data.progress_percent ?? 0, 100);
   const hasFullHistory = data.entries.length > 3;
@@ -435,11 +587,10 @@ export function HydrationTracker({
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
-              submitAdd({
+              void submitAdd({
                 volume: preset.volume_ml,
                 kind: preset.beverage_type,
                 source: 'quick_preset',
-                key: requestKey('hydration-entry'),
               })
             }
           >
@@ -450,7 +601,7 @@ export function HydrationTracker({
           </Button>
         ))}
       </div>
-      {undoEntry && (
+      {undoEntry?.diary_date === diaryDate && (
         <div className="hydration-undo" role="status">
           <span>Добавлено {undoEntry.volume_ml} мл</span>
           <Button variant="secondary" type="button" onClick={() => undo.mutate(undoEntry.id)}>
@@ -458,10 +609,15 @@ export function HydrationTracker({
           </Button>
         </div>
       )}
-      {add.isError && add.variables && (
+      {pending?.uncertain && (
         <div className="hydration-mutation-error" role="alert">
-          <span>{add.error.message}</span>
-          <Button variant="secondary" type="button" onClick={() => submitAdd(add.variables)}>
+          <span>Не удалось проверить, сохранилась ли запись. Повторите её без дубля.</span>
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={add.isPending}
+            onClick={() => void submitAdd(pending)}
+          >
             Повторить без дубля
           </Button>
         </div>
@@ -497,11 +653,10 @@ export function HydrationTracker({
             disabled={add.isPending || !customVolume}
             type="button"
             onClick={() =>
-              submitAdd({
+              void submitAdd({
                 volume: Number(customVolume),
                 kind: beverageType,
                 source: 'manual',
-                key: requestKey('hydration-entry'),
               })
             }
           >

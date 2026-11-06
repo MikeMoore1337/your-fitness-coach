@@ -5,6 +5,7 @@ import {
 
 export { AUTHENTICATED_USER_ID_STORAGE_KEY } from './auth/legacySessionKeys';
 const LAST_AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_last_authenticated_user_id_v1';
+export const HYDRATION_PENDING_SESSION_PREFIX = 'fit_hydration_pending_v1_';
 
 export const ACTIVE_WORKOUT_STORAGE_PREFIXES = {
   queue: 'fit_active_workout_v1_',
@@ -281,6 +282,21 @@ export function clearSensitiveUserScopedStorage(
   }
 
   try {
+    const pendingUserId =
+      typeof preserveActiveWorkoutForUserId === 'object'
+        ? preserveActiveWorkoutForUserId.userId
+        : preserveId;
+    const retainedKey = pendingUserId
+      ? `${HYDRATION_PENDING_SESSION_PREFIX}${pendingUserId}`
+      : null;
+    const keys = Array.from({ length: sessionStorage.length }, (_, index) =>
+      sessionStorage.key(index),
+    );
+    for (const key of keys) {
+      if (key?.startsWith(HYDRATION_PENDING_SESSION_PREFIX) && key !== retainedKey) {
+        sessionStorage.removeItem(key);
+      }
+    }
     sessionStorage.removeItem(AUTHENTICATED_USER_ID_STORAGE_KEY);
   } catch {
     // Storage is optional in restrictive webviews.

@@ -7350,7 +7350,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     margin-inline: 14px;
   }
   .hydration-presets {
-    grid-template-columns: repeat(3, minmax(86px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(5rem, 25%)), 1fr));
     overflow-x: auto;
     padding-inline: 14px;
     scrollbar-width: none;
@@ -8867,6 +8867,17 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   justify-content: flex-end;
   gap: 8px;
 }
+
+@media (max-width: 375px) {
+  .nutrition-diary .nutrition-diary__intro {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nutrition-diary .nutrition-diary__intro-actions {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .nutrition-repeat-default {
   display: flex;
   align-items: center;
@@ -8889,6 +8900,10 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 .nutrition-repeat-default > div > span:last-child {
   color: var(--muted);
   font-size: 0.75rem;
+}
+.nutrition-repeat-feedback {
+  flex-wrap: wrap;
+  margin: 0;
 }
 .nutrition-picker__back {
   min-height: 36px;
