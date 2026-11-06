@@ -45,6 +45,7 @@ from fitminiapp_api.services.data_quality import (
     collect_training_data_counts,
 )
 from fitminiapp_api.services.diary_nutrition import DiaryDayNutrition, aggregate_diary_entries
+from fitminiapp_api.services.nutrition import load_nutrition_targets_and_snapshots
 from fitminiapp_api.services.period_bounds import (
     MAX_REPORT_DAYS,
     resolve_progress_bounds,
@@ -710,18 +711,19 @@ def build_progress_summaries(
         }
 
     visible_nutrition_ids = set(user_ids) & nutrition_visible_user_ids
-    targets = (
-        db.query(NutritionTarget).filter(NutritionTarget.user_id.in_(visible_nutrition_ids)).all()
-        if visible_nutrition_ids
-        else []
+    targets, snapshots = load_nutrition_targets_and_snapshots(
+        db, visible_nutrition_ids, min(start_by_user.values()), max(today_by_user.values())
     )
     target_history_by_user: dict[int, list[NutritionTarget]] = defaultdict(list)
     for target_row in sorted(targets, key=lambda row: (row.effective_from, row.id), reverse=True):
         target_history_by_user[target_row.user_id].append(target_row)
-    targets_by_user = {
-        user_id: next((row for row in rows if row.effective_to is None), None)
-        for user_id, rows in target_history_by_user.items()
-    }
+
+    def nutrition_target_for_day(user_id: int, target_date: date) -> NutritionTarget | None:
+        key = (user_id, target_date)
+        if key in snapshots:
+            return snapshots[key]
+        return _effective_nutrition_target(target_history_by_user[user_id], target_date)
+
     nutrition_end_by_user = {
         user_id: min(current_day, actual_today_by_user[user_id] - timedelta(days=1))
         for user_id, current_day in today_by_user.items()
@@ -915,7 +917,7 @@ def build_progress_summaries(
         )
 
         nutrition_visible = user.id in visible_nutrition_ids
-        target = targets_by_user.get(user.id)
+        target = nutrition_target_for_day(user.id, current_day)
         diary_days = diary_by_user[user.id]
         complete_diary_days = [
             row
@@ -925,13 +927,7 @@ def build_progress_summaries(
         adherence_target_days = [
             (row, effective_target)
             for row in complete_diary_days
-            if (
-                effective_target := _effective_nutrition_target(
-                    target_history_by_user[user.id],
-                    row.diary_date,
-                )
-            )
-            is not None
+            if (effective_target := nutrition_target_for_day(user.id, row.diary_date)) is not None
         ]
         protein_adherence_days = [
             (row, effective_target)

@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     event,
+    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -119,6 +120,21 @@ class NutritionTarget(Base):
     def created_at(self) -> datetime:
         """Canonical creation timestamp backed by the legacy saved-at column."""
         return self.saved_at
+
+
+class NutritionTargetDaySnapshot(Base):
+    __tablename__ = "nutrition_target_day_snapshots"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    diary_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    target_id: Mapped[int | None] = mapped_column(
+        ForeignKey("nutrition_targets.id", ondelete="RESTRICT"), nullable=True
+    )
+    captured_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_msk_naive, server_default=func.now()
+    )
 
 
 @event.listens_for(NutritionTarget, "before_insert")

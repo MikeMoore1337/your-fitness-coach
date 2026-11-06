@@ -45,7 +45,11 @@ from fitminiapp_api.models.notification import (
     NotificationSetting,
     WebPushSubscription,
 )
-from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition import (
+    EnergyCalibration,
+    NutritionTarget,
+    NutritionTargetDaySnapshot,
+)
 from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
     NutritionLabelDraft,
@@ -381,6 +385,9 @@ def delete_user_cascade(db: Session, user: User) -> None:
     db.query(DailyWellbeingCheckIn).filter(DailyWellbeingCheckIn.user_id == user.id).delete(
         synchronize_session=False
     )
+    db.query(NutritionTargetDaySnapshot).filter(
+        NutritionTargetDaySnapshot.user_id == user.id
+    ).delete(synchronize_session=False)
     db.query(NutritionTarget).filter(NutritionTarget.user_id == user.id).delete(
         synchronize_session=False
     )

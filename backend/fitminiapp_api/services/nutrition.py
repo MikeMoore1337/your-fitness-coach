@@ -3,13 +3,15 @@ from datetime import date
 from typing import Literal, TypedDict, cast
 
 from pydantic import ValidationError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import Date, Integer, and_, literal, or_
+from sqlalchemy.orm import Session, aliased, joinedload
 
 from fitminiapp_api.core.timezone import (
     now_for_user_naive,
     today_for_user,
 )
-from fitminiapp_api.models.nutrition import NutritionTarget
+from fitminiapp_api.models.food_diary import FoodDiaryDayStatus
+from fitminiapp_api.models.nutrition import NutritionTarget, NutritionTargetDaySnapshot
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.nutrition import (
     CardioIntensity,
@@ -463,16 +465,127 @@ def get_nutrition_target_for_date(
     user_id: int,
     target_date: date,
 ) -> NutritionTarget | None:
-    return (
-        db.query(NutritionTarget)
-        .filter(
-            NutritionTarget.user_id == user_id,
-            NutritionTarget.effective_from <= target_date,
-            (NutritionTarget.effective_to.is_(None)) | (NutritionTarget.effective_to > target_date),
+    base = aliased(NutritionTarget)
+    frozen = aliased(NutritionTarget)
+    row = (
+        db.query(NutritionTargetDaySnapshot.user_id, frozen, base)
+        .select_from(User)
+        .outerjoin(
+            NutritionTargetDaySnapshot,
+            and_(
+                NutritionTargetDaySnapshot.user_id == User.id,
+                NutritionTargetDaySnapshot.diary_date == target_date,
+            ),
         )
-        .order_by(NutritionTarget.effective_from.desc(), NutritionTarget.id.desc())
+        .outerjoin(
+            frozen,
+            and_(
+                frozen.id == NutritionTargetDaySnapshot.target_id,
+                frozen.user_id == User.id,
+            ),
+        )
+        .outerjoin(
+            base,
+            and_(
+                base.user_id == User.id,
+                base.effective_from <= target_date,
+                base.effective_to.is_(None) | (base.effective_to > target_date),
+            ),
+        )
+        .filter(User.id == user_id)
+        .order_by(base.effective_from.desc(), base.id.desc())
         .first()
     )
+    if row is None:
+        return None
+    return cast(NutritionTarget | None, row[1] if row[0] is not None else row[2])
+
+
+def capture_nutrition_target_snapshot(db: Session, user_id: int, target_date: date) -> None:
+    """Serialize capture with changes to the user's targets."""
+    db.query(User.id).filter(User.id == user_id).with_for_update().one()
+    if db.get(NutritionTargetDaySnapshot, (user_id, target_date)) is not None:
+        return
+    target = get_nutrition_target_for_date(db, user_id, target_date)
+    db.add(
+        NutritionTargetDaySnapshot(
+            user_id=user_id,
+            diary_date=target_date,
+            target_id=target.id if target is not None else None,
+        )
+    )
+    db.flush()
+
+
+def load_nutrition_target_snapshots(
+    db: Session, user_ids: set[int], start: date, end: date
+) -> dict[tuple[int, date], NutritionTarget | None]:
+    if not user_ids:
+        return {}
+    rows = (
+        db.query(
+            NutritionTargetDaySnapshot.user_id,
+            NutritionTargetDaySnapshot.diary_date,
+            NutritionTarget,
+        )
+        .outerjoin(
+            NutritionTarget,
+            and_(
+                NutritionTarget.id == NutritionTargetDaySnapshot.target_id,
+                NutritionTarget.user_id == NutritionTargetDaySnapshot.user_id,
+            ),
+        )
+        .filter(
+            NutritionTargetDaySnapshot.user_id.in_(user_ids),
+            NutritionTargetDaySnapshot.diary_date.between(start, end),
+        )
+        .all()
+    )
+    return {(user_id, diary_date): target for user_id, diary_date, target in rows}
+
+
+def load_nutrition_targets_and_snapshots(
+    db: Session, user_ids: set[int], start: date, end: date
+) -> tuple[list[NutritionTarget], dict[tuple[int, date], NutritionTarget | None]]:
+    if not user_ids:
+        return [], {}
+    versions = db.query(
+        NutritionTarget.id.label("target_id"),
+        literal(None).cast(Integer).label("snapshot_user_id"),
+        literal(None).cast(Date).label("snapshot_date"),
+    ).filter(NutritionTarget.user_id.in_(user_ids))
+    frozen = db.query(
+        NutritionTargetDaySnapshot.target_id.label("target_id"),
+        NutritionTargetDaySnapshot.user_id.label("snapshot_user_id"),
+        NutritionTargetDaySnapshot.diary_date.label("snapshot_date"),
+    ).filter(
+        NutritionTargetDaySnapshot.user_id.in_(user_ids),
+        NutritionTargetDaySnapshot.diary_date.between(start, end),
+    )
+    records = versions.union_all(frozen).subquery()
+    rows = (
+        db.query(NutritionTarget, records.c.snapshot_user_id, records.c.snapshot_date)
+        .select_from(records)
+        .outerjoin(
+            NutritionTarget,
+            and_(
+                NutritionTarget.id == records.c.target_id,
+                or_(
+                    records.c.snapshot_user_id.is_(None),
+                    NutritionTarget.user_id == records.c.snapshot_user_id,
+                ),
+            ),
+        )
+        .all()
+    )
+    targets: list[NutritionTarget] = []
+    snapshots: dict[tuple[int, date], NutritionTarget | None] = {}
+    for target, snapshot_user_id, snapshot_date in rows:
+        if snapshot_user_id is None and target is not None:
+            targets.append(target)
+        elif snapshot_user_id is not None:
+            snapshots[(snapshot_user_id, snapshot_date)] = target
+    return targets, snapshots
 
 
 def build_nutrition_target_response_for_user(
@@ -611,6 +724,12 @@ def create_nutrition_target_version(
         values=values,
     ):
         return current, False
+    if effective_from < current_day:
+        raise NutritionConflictError("Нельзя изменять цель задним числом")
+
+    completed = db.get(FoodDiaryDayStatus, (target_user.id, current_day))
+    if completed is not None and completed.status in {"complete", "fasted"}:
+        capture_nutrition_target_snapshot(db, target_user.id, current_day)
 
     target = NutritionTarget(
         user_id=target_user.id,

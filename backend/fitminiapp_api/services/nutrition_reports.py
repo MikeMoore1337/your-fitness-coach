@@ -16,6 +16,7 @@ from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries
+from fitminiapp_api.services.nutrition import load_nutrition_target_snapshots
 from fitminiapp_api.services.period_bounds import (
     PeriodBoundsError,
     ReportBounds,
@@ -269,11 +270,16 @@ def build_nutrition_report(
         .order_by(HydrationGoal.effective_from.desc(), HydrationGoal.id.desc())
         .all()
     )
+    snapshots = load_nutrition_target_snapshots(db, {user.id}, bounds.start, bounds.end)
     effective_change_dates = {
         target.effective_from
         for target in targets
         if bounds.start <= target.effective_from <= bounds.end
         and (target.effective_to is None or target.effective_to > target.effective_from)
+        and (
+            (user.id, target.effective_from) not in snapshots
+            or snapshots[(user.id, target.effective_from)] is target
+        )
     }
 
     daily: list[dict] = []
@@ -293,7 +299,12 @@ def build_nutrition_report(
                 fiber_g=Decimal(0),
                 has_entries=False,
             )
-        target = _effective_target(targets, diary_date)
+        snapshot_key = (user.id, diary_date)
+        target = (
+            snapshots[snapshot_key]
+            if snapshot_key in snapshots
+            else _effective_target(targets, diary_date)
+        )
         hydration_goal = _effective_hydration_goal(hydration_goals, diary_date)
         hydration_target_ml = (
             hydration_goal.target_ml
