@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from threading import Barrier
 
+import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import Column, Integer, MetaData, Table, create_engine, inspect
 
 from fitminiapp_api import main as main_module
 from fitminiapp_api.core import timezone as timezone_module
-from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food import Food
-from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.food_diary import FoodDiaryBatchOperation, FoodDiaryEntry
 from fitminiapp_api.models.user import User
 from fitminiapp_api.services.nutrition_power import parse_natural_food_input
 
@@ -57,6 +60,155 @@ def _store_food(name: str, *, owner_id: int | None = None) -> int:
 
 def _today() -> date:
     return timezone_module.today_in_timezone("Europe/Moscow")
+
+
+def test_batch_with_unknown_energy_rolls_back_before_response(client) -> None:
+    headers = _auth(client, 28_099)
+    first_id = _store_food("Рис для подборки")
+    unknown_id = _store_food("Продукт без калорийности")
+    with get_session_context() as db:
+        food = db.get(Food, unknown_id)
+        assert food is not None
+        food.energy_kcal_per_100g = None
+
+    response = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit",
+        headers={**headers, "Idempotency-Key": "batch-unknown-energy"},
+        json={
+            "diary_date": _today().isoformat(),
+            "meal_type": "breakfast",
+            "items": [
+                {"row_id": "first", "food_id": first_id, "amount": "100", "amount_unit": "g"},
+                {"row_id": "unknown", "food_id": unknown_id, "amount": "100", "amount_unit": "g"},
+            ],
+        },
+    )
+    assert response.status_code == 422
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 28_099).one()
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == 0
+
+
+def test_selected_food_preview_uses_food_ids_and_preserves_unknown_values(client) -> None:
+    headers = _auth(client, 28_097)
+    other_headers = _auth(client, 28_098)
+    first_id = _store_food("Йогурт")
+    second_id = _store_food("Йогурт")
+    with get_session_context() as db:
+        food = db.get(Food, second_id)
+        assert food is not None
+        food.protein_g_per_100g = None
+        food.fiber_g_per_100g = None
+
+    payload = {
+        "diary_date": _today().isoformat(),
+        "meal_type": "breakfast",
+        "items": [
+            {"row_id": "first", "food_id": first_id, "amount": "100", "amount_unit": "g"},
+            {"row_id": "second", "food_id": second_id, "amount": "50", "amount_unit": "g"},
+        ],
+    }
+    response = client.post("/api/v1/nutrition/diary/batch/preview", headers=headers, json=payload)
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "energy_kcal": "180.00",
+        "protein_g": None,
+        "fat_g": "6.000",
+        "carbs_g": "12.000",
+        "fiber_g": None,
+    }
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 28_097).one()
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == 0
+        other = db.query(User).filter(User.telegram_user_id == 28_098).one()
+        other_id = other.id
+    private_id = _store_food("Личный продукт", owner_id=other_id)
+    foreign = {**payload, "items": [{**payload["items"][0], "food_id": private_id}]}
+    assert (
+        client.post(
+            "/api/v1/nutrition/diary/batch/preview", headers=headers, json=foreign
+        ).status_code
+        == 404
+    )
+    assert client.post("/api/v1/nutrition/diary/batch/preview", json=payload).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/nutrition/diary/batch/preview", headers=other_headers, json=foreign
+        ).status_code
+        == 200
+    )
+
+
+@pytest.mark.parametrize("count", [1, 3, 6])
+def test_selected_food_batch_sizes_commit_once(client, count: int) -> None:
+    telegram_id = 28_200 + count
+    headers = _auth(client, telegram_id)
+    food_ids = [_store_food(f"Продукт {index}") for index in range(count)]
+    payload = {
+        "diary_date": _today().isoformat(),
+        "meal_type": "breakfast",
+        "items": [
+            {"row_id": f"row-{index}", "food_id": food_id, "amount": "100", "amount_unit": "g"}
+            for index, food_id in enumerate(food_ids)
+        ],
+    }
+    preview = client.post("/api/v1/nutrition/diary/batch/preview", headers=headers, json=payload)
+    assert preview.status_code == 200, preview.text
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_id).one()
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == 0
+    commit_headers = {**headers, "Idempotency-Key": f"batch-count-{count}-951"}
+    first = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit", headers=commit_headers, json=payload
+    )
+    replay = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit", headers=commit_headers, json=payload
+    )
+    assert first.status_code == replay.status_code == 201
+    assert first.json()["replayed"] is False and replay.json()["replayed"] is True
+    assert [item["food_id"] for item in first.json()["entries"]] == food_ids
+    assert [item["id"] for item in first.json()["entries"]] == [
+        item["id"] for item in replay.json()["entries"]
+    ]
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_id).one()
+        assert db.query(FoodDiaryBatchOperation).filter_by(user_id=user.id).count() == 1
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == count
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_batch_confirmation_with_same_key_is_replayed(client) -> None:
+    headers = _auth(client, 28_096)
+    food_ids = [_store_food("Рис"), _store_food("Гречка")]
+    payload = {
+        "diary_date": _today().isoformat(),
+        "meal_type": "breakfast",
+        "items": [
+            {"row_id": f"row-{index}", "food_id": food_id, "amount": "100", "amount_unit": "g"}
+            for index, food_id in enumerate(food_ids)
+        ],
+    }
+    barrier = Barrier(2)
+
+    def confirm(_index: int):
+        barrier.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/diary/natural-input/commit",
+            headers={**headers, "Idempotency-Key": "batch-concurrent-951"},
+            json=payload,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(confirm, range(2)))
+    assert [response.status_code for response in responses] == [201, 201]
+    assert sorted(response.json()["replayed"] for response in responses) == [False, True]
+    assert [item["id"] for item in responses[0].json()["entries"]] == [
+        item["id"] for item in responses[1].json()["entries"]
+    ]
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 28_096).one()
+        assert db.query(FoodDiaryBatchOperation).filter_by(user_id=user.id).count() == 1
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == 2
 
 
 def test_natural_parser_supports_newlines_spaces_decimal_comma_and_excludes_water() -> None:

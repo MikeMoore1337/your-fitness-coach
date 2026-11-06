@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { installPlatformApi } from './fixtures/platform-api';
@@ -41,6 +41,7 @@ async function installSyntheticNutrition(page: Page) {
   await installPlatformApi(page, { browserSession: true, fixedDate: date });
   const entries: Record<string, unknown>[] = [];
   const postedIds: number[] = [];
+  const batchRequests: Array<{ key: string | undefined; ids: number[] }> = [];
   await page.route('**/api/v1/nutrition/foods/search*', async (route) => {
     const url = new URL(route.request().url());
     const query = (url.searchParams.get('q') ?? '').toLocaleLowerCase('ru');
@@ -69,6 +70,68 @@ async function installSyntheticNutrition(page: Page) {
       carbs_g: '15.000',
       fiber_g: null,
     };
+    if (path.endsWith('/diary/batch/preview') && request.method() === 'POST') {
+      const body = request.postDataJSON() as { items: Array<{ amount: string }> };
+      const factor = body.items.reduce((sum, item) => sum + Number(item.amount) / 100, 0);
+      return route.fulfill({
+        json: {
+          energy_kcal: String(factor * 100),
+          protein_g: String(factor * 5),
+          fat_g: String(factor * 2),
+          carbs_g: String(factor * 15),
+          fiber_g: null,
+        },
+      });
+    }
+    if (path.endsWith('/diary/natural-input/commit') && request.method() === 'POST') {
+      const body = request.postDataJSON() as {
+        diary_date: string;
+        meal_type: string;
+        items: Array<{ food_id: number; amount: string; amount_unit: string }>;
+      };
+      if (body.items.some((item) => !foods.some((food) => food.id === item.food_id)))
+        return route.fulfill({ status: 404, json: { detail: 'Synthetic food not found' } });
+      batchRequests.push({
+        key: request.headers()['idempotency-key'],
+        ids: body.items.map((item) => item.food_id),
+      });
+      const added = body.items.map((item) => {
+        const food = foods.find((candidate) => candidate.id === item.food_id)!;
+        postedIds.push(food.id);
+        const entry = {
+          id: 1000 + entries.length,
+          diary_date: body.diary_date,
+          meal_type: body.meal_type,
+          food_id: food.id,
+          recipe_id: null,
+          entry_kind: 'food',
+          logged_at: null,
+          food_name: food.name,
+          food_brand: food.brand,
+          amount: String(item.amount),
+          amount_unit: item.amount_unit,
+          weight_g: String(item.amount),
+          serving_amount: null,
+          serving_unit: null,
+          serving_weight_g: null,
+          nutrition,
+          created_at: `${date}T08:00:00Z`,
+          updated_at: `${date}T08:00:00Z`,
+        };
+        entries.push(entry);
+        return entry;
+      });
+      return route.fulfill({
+        status: 201,
+        json: {
+          operation_kind: 'natural_input',
+          diary_date: body.diary_date,
+          meal_type: body.meal_type,
+          entries: added,
+          replayed: false,
+        },
+      });
+    }
     if (path.endsWith('/diary/entries') && request.method() === 'POST') {
       const body = request.postDataJSON() as {
         food_id: number;
@@ -141,7 +204,259 @@ async function installSyntheticNutrition(page: Page) {
     }
     return route.fallback();
   });
-  return { postedIds, entries };
+  return { postedIds, entries, batchRequests };
+}
+
+for (const count of [1, 3, 6]) {
+  for (let repetition = 1; repetition <= 3; repetition += 1) {
+    test(`951 batch ${count} foods run ${repetition}`, async ({ page }, info) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+      const { postedIds, batchRequests } = await installSyntheticNutrition(page);
+      await page.goto('/app?section=nutrition');
+      const breakfast = page.getByRole('region', { name: 'Завтрак' });
+      const add = breakfast.getByRole('button', { name: /Добавить/ });
+      await expect(add).toBeVisible();
+      let actions = 0;
+      const start = performance.now();
+      await add.click();
+      actions += 1;
+      for (const food of foods.slice(0, count)) {
+        await page.getByRole('searchbox', { name: 'Найти продукт' }).fill(food.name);
+        actions += 1;
+        await page
+          .getByRole('button', { name: `Выбрать ${food.name} в подборку`, exact: true })
+          .click();
+        actions += 1;
+      }
+      expect(batchRequests).toHaveLength(0);
+      const confirm = page.getByRole('button', { name: 'Добавить в дневник', exact: true });
+      await expect(confirm).toBeEnabled();
+      await expect(confirm).toBeInViewport({ ratio: 1 });
+      await confirm.click();
+      actions += 1;
+      await expect(page.getByRole('dialog')).not.toBeAttached();
+      const last = foods[count - 1];
+      if (!last) throw new Error('Synthetic food fixture is incomplete');
+      await expect(breakfast.getByText(last.name, { exact: true })).toBeVisible();
+      const elapsedMs = Math.round(performance.now() - start);
+      expect(actions).toBe(2 * count + 2);
+      expect(batchRequests).toHaveLength(1);
+      expect(batchRequests[0]?.key).toBeTruthy();
+      expect(postedIds).toEqual(foods.slice(0, count).map((food) => food.id));
+      await page.reload();
+      for (const food of foods.slice(0, count))
+        await expect(breakfast.getByText(food.name, { exact: true })).toBeVisible();
+      console.log(
+        `V13_951 ${JSON.stringify({ engine: info.project.name, count, repetition, actions, elapsedMs })}`,
+      );
+    });
+  }
+}
+
+for (const width of [320, 360, 390, 430, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`951 capture ${width} ${theme}`, async ({ page }, info) => {
+      const height =
+        width === 1280
+          ? 900
+          : width === 320
+            ? 720
+            : width === 360
+              ? 800
+              : width === 390
+                ? 844
+                : 932;
+      await page.setViewportSize({ width, height });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await installSyntheticNutrition(page);
+      const examples = [
+        { ...foods[0], id: 201, name: 'Йогурт натуральный', brand: 'Марка А' },
+        { ...foods[1], id: 202, name: 'Йогурт натуральный', brand: 'Марка Б' },
+      ];
+      await page.route('**/api/v1/nutrition/foods/search*', (route) =>
+        route.fulfill({
+          json: {
+            items: examples,
+            external_items: [],
+            total: 2,
+            limit: 20,
+            offset: 0,
+            provider_status: 'not_requested',
+          },
+        }),
+      );
+      await page.goto('/app?section=nutrition');
+      await page
+        .getByRole('region', { name: 'Завтрак' })
+        .getByRole('button', { name: /Добавить/ })
+        .click();
+      await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('йогурт');
+      await page
+        .getByRole('button', { name: 'Выбрать Йогурт натуральный, Марка А в подборку' })
+        .click();
+      await page
+        .getByRole('button', { name: 'Выбрать Йогурт натуральный, Марка Б в подборку' })
+        .click();
+      const confirm = page.getByRole('button', { name: 'Добавить в дневник', exact: true });
+      await expect(confirm).toBeEnabled();
+      await expect(confirm).toBeInViewport({ ratio: 1 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      const dir = resolve('..', 'docs', 'ux-proposals', 'issue-951', 'after');
+      await mkdir(dir, { recursive: true });
+      await page.screenshot({
+        path: resolve(dir, `${info.project.name}-${width}x${height}-${theme}-selected.png`),
+      });
+      await page.getByText('Подборка · 2').click();
+      await expect(
+        page.getByRole('spinbutton', {
+          name: 'Количество: Йогурт натуральный, Марка А, Проверено YFC',
+        }),
+      ).toBeVisible();
+      await page.screenshot({
+        path: resolve(dir, `${info.project.name}-${width}x${height}-${theme}-editing.png`),
+      });
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`951 capture interaction states ${theme}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    const { postedIds } = await installSyntheticNutrition(page);
+    const dir = resolve('..', 'docs', 'ux-proposals', 'issue-951', 'after');
+    await mkdir(dir, { recursive: true });
+    const capture = (state: string) =>
+      page.screenshot({ path: resolve(dir, `${info.project.name}-390x844-${theme}-${state}.png`) });
+    await page.goto('/app?section=nutrition');
+    await page
+      .getByRole('region', { name: 'Завтрак' })
+      .getByRole('button', { name: /Добавить/ })
+      .click();
+    await expect(page.getByRole('searchbox', { name: 'Найти продукт' })).toBeFocused();
+    await page.getByRole('button', { name: 'Закрыть добавление' }).focus();
+    await expect(page.getByText('Подборка · 0')).toBeVisible();
+    await capture('empty');
+
+    let completeSearch = () => {};
+    const pendingSearch = new Promise<void>((resolve) => {
+      completeSearch = resolve;
+    });
+    const failSearch = async (route: Route) => {
+      await pendingSearch;
+      await route.fulfill({ status: 503, json: { detail: 'Unavailable' } });
+    };
+    await page.route('**/api/v1/nutrition/foods/search*', failSearch);
+    await page.getByRole('searchbox', { name: 'Найти продукт' }).fill(firstFood.name);
+    await expect(page.getByText('Ищем продукты…')).toBeVisible();
+    await capture('loading');
+    completeSearch();
+    await expect(
+      page.getByText('Локальный каталог сейчас не ответил. Попробуйте снова.'),
+    ).toBeVisible();
+    await capture('search-error');
+    await page.unroute('**/api/v1/nutrition/foods/search*', failSearch);
+    await page.getByRole('button', { name: 'Повторить', exact: true }).click();
+    await page.getByRole('button', { name: `Выбрать ${firstFood.name}`, exact: true }).click();
+    await expect(page.getByRole('spinbutton', { name: /Количество/ })).toBeVisible();
+    await capture('single');
+    await page.getByRole('button', { name: 'Выбрать другое' }).click();
+
+    const failPreview = (route: Route) =>
+      route.fulfill({ status: 503, json: { detail: 'Unavailable' } });
+    await page.route('**/api/v1/nutrition/diary/batch/preview', failPreview);
+    await page.getByRole('button', { name: `Выбрать ${firstFood.name} в подборку` }).click();
+    await expect(page.getByRole('button', { name: 'Повторить расчёт' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Добавить в дневник', exact: true }),
+    ).toBeDisabled();
+    await capture('preview-error');
+    await page.unroute('**/api/v1/nutrition/diary/batch/preview', failPreview);
+    await page.getByRole('button', { name: 'Повторить расчёт' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Добавить в дневник', exact: true }),
+    ).toBeEnabled();
+    await page.getByText('Подборка · 1').click();
+    const amount = page.getByRole('spinbutton', {
+      name: `Количество: ${firstFood.name}, Проверено YFC`,
+    });
+    await amount.fill('0');
+    await expect(page.getByText('Введите количество больше нуля.')).toBeVisible();
+    await capture('invalid');
+    await amount.fill('100');
+    const confirm = page.getByRole('button', { name: 'Добавить в дневник', exact: true });
+    await expect(confirm).toBeEnabled();
+    await page.route('**/api/v1/nutrition/diary/natural-input/commit', (route) =>
+      route.fulfill({ status: 503, json: { detail: 'Unavailable' } }),
+    );
+    await confirm.click();
+    await expect(page.getByText(/Не удалось узнать результат/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Повторить подтверждение' })).toBeVisible();
+    expect(postedIds).toEqual([]);
+    await capture('network-error');
+  });
+
+  test(`951 keyboard selection and selected text contrast ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await installSyntheticNutrition(page);
+    await page.goto('/app?section=nutrition');
+    const add = page
+      .getByRole('region', { name: 'Завтрак' })
+      .getByRole('button', { name: /Добавить/ });
+    await add.focus();
+    await page.keyboard.press('Enter');
+    const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+    await expect(search).toBeFocused();
+    await search.fill(firstFood.name);
+    const card = page.getByRole('button', { name: `Выбрать ${firstFood.name}`, exact: true });
+    await card.focus();
+    await page.keyboard.press('Tab');
+    await expect(
+      page.getByRole('button', { name: `Добавить ${firstFood.name} в избранное` }),
+    ).toBeFocused();
+    await page.keyboard.press('Tab');
+    const choose = page.getByRole('button', { name: `Выбрать ${firstFood.name} в подборку` });
+    await expect(choose).toBeFocused();
+    await page.keyboard.press('Space');
+    const selected = page.getByRole('button', { name: `Убрать ${firstFood.name} из подборки` });
+    await expect(selected).toHaveAttribute('aria-pressed', 'true');
+    await expect(selected).toBeFocused();
+    const contrast = await selected.evaluate((element) => {
+      const rgba = (value: string) => {
+        const parts = value.match(/[\d.]+/g)?.map(Number) ?? [];
+        return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0, parts[3] ?? 1];
+      };
+      const over = (front: number[], back: number[]) =>
+        front
+          .slice(0, 3)
+          .map((channel, index) => channel * front[3]! + back[index]! * (1 - front[3]!));
+      const layers: number[][] = [];
+      for (let node: Element | null = element; node; node = node.parentElement)
+        layers.push(rgba(getComputedStyle(node).backgroundColor));
+      const background = layers
+        .reverse()
+        .reduce((back, front) => over(front, back), [255, 255, 255]);
+      const foreground = over(rgba(getComputedStyle(element).color), background);
+      const luminance = (color: number[]) =>
+        color
+          .map((value) => {
+            const channel = value / 255;
+            return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          })
+          .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0);
+      const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+      return (values[0]! + 0.05) / (values[1]! + 0.05);
+    });
+    console.log(`V13_951_CONTRAST ${theme} ${contrast.toFixed(2)}`);
+    expect(contrast).toBeGreaterThanOrEqual(4.5);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).not.toBeAttached();
+    await expect(add).toBeFocused();
+  });
 }
 
 for (const count of [1, 3, 6]) {
