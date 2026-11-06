@@ -698,6 +698,10 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
     timeout-minutes: 20
     env:
+      # setup-python's Ubuntu 26.04 toolcache links to OpenSSL 3.3, unavailable
+      # in this pinned Ubuntu 24.04 image. Use uv's portable Python instead.
+      UV_SYSTEM_PYTHON: "0"
+      UV_MANAGED_PYTHON: "1"
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/migrated-stack', github.workspace) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     services:
@@ -726,9 +730,6 @@ jobs:
         run: |
           echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
           echo "CI_CACHE package=npm path=$(npm config get cache)"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.11.32"
@@ -736,9 +737,14 @@ jobs:
           cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: migrated-stack
+      - name: Install container-compatible Python 3.14
+        run: |
+          uv python install 3.14
+          "$(uv python find --managed-python 3.14)" -c 'import ssl; print(ssl.OPENSSL_VERSION)'
       - name: Sync stack dependencies
         run: |
           uv sync --locked --no-default-groups --extra backend --group dev
+          .venv/bin/python -c 'import ssl, psycopg; print(ssl.OPENSSL_VERSION, psycopg.__version__)'
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
           npm --prefix frontend ci
       - name: Sync scheduled Pytest Allure adapter
