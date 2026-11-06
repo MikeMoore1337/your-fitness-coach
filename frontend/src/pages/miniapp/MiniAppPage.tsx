@@ -576,12 +576,7 @@ export default function MiniAppPage({
           )}
           {section === 'nutrition' && (
             <NutritionPage
-              key={JSON.stringify([
-                user?.profile?.kbju ?? null,
-                nutritionDate,
-                nutritionMeal,
-                nutritionQuickAdd,
-              ])}
+              key={JSON.stringify([nutritionDate, nutritionMeal, nutritionQuickAdd])}
               initial={user?.profile?.kbju}
               initialDate={nutritionDate}
               initialFoodQuickAdd={nutritionQuickAdd}

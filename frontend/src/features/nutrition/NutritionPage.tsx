@@ -61,7 +61,7 @@ export function NutritionPage({
           </AppLink>
         </nav>
       )}
-      <div ref={dayView} hidden={view !== 'day'}>
+      <div className="nutrition-day-content" ref={dayView} hidden={view !== 'day'}>
         <NutritionDiary
           initialDate={initialDate}
           selectedDate={selectedDate}

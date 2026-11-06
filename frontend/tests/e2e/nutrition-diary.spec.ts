@@ -2456,7 +2456,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
     const selectedDay = week.locator('button[aria-pressed="true"]');
     expect((await selectedDay.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     const summary = nutritionDaySummary(page);
-    const targetBadge = summary.getByText('Цель КБЖУ настроена', { exact: true });
+    const targetBadge = summary.getByText('Базовая цель', { exact: true });
     const [weekBox, summaryBox, targetBadgeBox] = await Promise.all([
       week.boundingBox(),
       summary.boundingBox(),
@@ -2764,7 +2764,7 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app?section=nutrition');
 
-  const status = page.getByText('Цель КБЖУ настроена');
+  const status = page.getByText('Базовая цель', { exact: true });
   await expect(status).toHaveCSS('background-color', 'rgb(34, 34, 34)');
   await expect(status).toHaveCSS('border-color', 'rgb(89, 111, 56)');
   await expect(status).toHaveCSS('color', 'rgb(185, 234, 114)');

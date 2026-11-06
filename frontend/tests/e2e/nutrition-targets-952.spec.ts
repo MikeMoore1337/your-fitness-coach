@@ -41,7 +41,11 @@ for (const width of [320, 390, 1280]) {
       await page.clock.setFixedTime(new Date('2026-11-06T12:00:00Z'));
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
-      await installPlatformApi(page, { browserSession: true, fixedDate: today });
+      await installPlatformApi(page, {
+        browserSession: true,
+        fixedDate: today,
+        nutritionSuggestions: 'empty',
+      });
       let saved = false;
       let changedProgram = false;
       let empty = false;
@@ -186,6 +190,7 @@ for (const width of [320, 390, 1280]) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
       await page.goto(`/app?section=nutrition&date=${selected}`);
       await expect(page.getByText('По программе', { exact: true })).toBeVisible();
+      await expect(page.getByText('Пока нет готовых вариантов')).toBeVisible();
       await noOverflow();
       await capture('day');
       await page.getByRole('button', { name: 'Настройки КБЖУ' }).click();
@@ -254,6 +259,7 @@ for (const width of [320, 390, 1280]) {
       empty = true;
       await page.goto(`/app?section=nutrition&date=${selected}`);
       await expect(page.getByText('Без цели', { exact: true })).toBeVisible();
+      await expect(page.getByText('Пока нет готовых вариантов')).toBeVisible();
       await capture('empty');
       await noOverflow();
     });

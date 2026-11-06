@@ -533,6 +533,7 @@ export function NutritionTargets({
             )}
             {editBase && (
               <NutritionForm
+                key={JSON.stringify(initial ?? null)}
                 embedded
                 initial={initial}
                 readOnly={readOnly}

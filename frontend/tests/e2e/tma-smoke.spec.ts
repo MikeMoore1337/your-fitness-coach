@@ -2890,12 +2890,10 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   ]);
 
   for (const currentPage of [tmaPage, mobilePage]) {
-    await currentPage.locator('details.nutrition-target-settings > summary').click();
-    const targetSettings = currentPage.locator('details.nutrition-target-settings');
-    await expect(targetSettings.locator(':scope > summary')).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    await currentPage.getByRole('button', { name: 'Настройки КБЖУ' }).click();
+    const targetSettings = currentPage.locator('#nutrition-target-settings');
+    await expect(targetSettings.getByRole('heading', { name: 'Цели по дням' })).toBeVisible();
+    await targetSettings.getByRole('button', { name: 'Изменить', exact: true }).first().click();
     await expect(targetSettings.locator('details.card-disclosure')).toHaveCount(0);
     await expect(
       targetSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
@@ -2980,14 +2978,12 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   expect(api.manualTargetSaves()).toBe(2);
   expect(api.targetHistoryLength()).toBe(3);
 
-  const targetCard = tmaPage.locator('details.nutrition-target-settings');
-  if ((await targetCard.getAttribute('open')) === null) {
-    await targetCard.locator(':scope > summary').click();
-  }
-  await targetCard.locator(':scope > summary').click();
-  await expect(targetCard).not.toHaveAttribute('open', '');
-  await targetCard.locator(':scope > summary').click();
-  await expect(targetCard).toHaveAttribute('open', '');
+  const targetCard = tmaPage.locator('#nutrition-target-settings');
+  await targetCard.getByRole('button', { name: 'Закрыть', exact: true }).first().click();
+  await expect(targetCard.getByRole('button', { name: 'Сохранить ручные ориентиры' })).toHaveCount(
+    0,
+  );
+  await targetCard.getByRole('button', { name: 'Изменить', exact: true }).first().click();
   await expect(targetCard.getByRole('button', { name: 'Указать вручную' })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -2996,10 +2992,7 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   for (const viewport of Object.values(MOBILE_CONTEXTS)) {
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
-    if ((await targetCard.getAttribute('open')) === null) {
-      await targetCard.locator(':scope > summary').click();
-    }
-    await expect(targetCard).toHaveAttribute('open', '');
+    await expect(targetCard.getByRole('heading', { name: 'Цели по дням' })).toBeVisible();
     await expect(targetCard.locator('details.card-disclosure')).toHaveCount(0);
     await expectNoHorizontalOverflow(tmaPage);
     await expectTouchTargets(targetCard.locator('.nutrition-target-mode > button'));
@@ -3054,13 +3047,10 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
     }
 
     await page.goto('/app?section=nutrition');
-    await page.locator('details.nutrition-target-settings > summary').click();
-    const targetSettings = page.locator('details.nutrition-target-settings');
-    await expect(targetSettings.locator(':scope > summary')).toHaveText('Настройки КБЖУ');
-    await expect(targetSettings.locator(':scope > summary')).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    await page.getByRole('button', { name: 'Настройки КБЖУ' }).click();
+    const targetSettings = page.locator('#nutrition-target-settings');
+    await expect(targetSettings.getByRole('heading', { name: 'Цели по дням' })).toBeVisible();
+    await targetSettings.getByRole('button', { name: 'Изменить', exact: true }).first().click();
     await expect(targetSettings.locator('details.card-disclosure')).toHaveCount(0);
     await expect(
       targetSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
@@ -3156,9 +3146,14 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await expect(rirDetails).not.toHaveAttribute('open', '');
 
   await tmaPage.getByRole('link', { name: 'Питание', exact: true }).click();
-  await tmaPage.locator('details.nutrition-target-settings > summary').click();
+  await tmaPage.getByRole('button', { name: 'Настройки КБЖУ' }).click();
+  await tmaPage
+    .locator('#nutrition-target-settings')
+    .getByRole('button', { name: 'Изменить', exact: true })
+    .first()
+    .click();
   await expect(
-    tmaPage.locator('details.nutrition-target-settings').locator('details.card-disclosure'),
+    tmaPage.locator('#nutrition-target-settings').locator('details.card-disclosure'),
   ).toHaveCount(0);
   await tmaPage.getByRole('button', { name: 'Рассчитать ориентиры' }).click();
   const nutritionHelp = tmaPage.locator('.contextual-help').getByText('Что это?', { exact: true });

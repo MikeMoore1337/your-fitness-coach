@@ -8827,10 +8827,14 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 
 /* Nutrition diary */
 .nutrition-experience,
+.nutrition-day-content,
 .nutrition-diary {
   display: grid;
   min-width: 0;
   gap: 16px;
+}
+.nutrition-day-content[hidden] {
+  display: none;
 }
 .nutrition-diary {
   padding: clamp(16px, 2.4vw, 26px);
