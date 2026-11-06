@@ -401,6 +401,32 @@ def test_demo_transport_exposes_owned_fixture_history_and_denies_unknown_exercis
     )
 
 
+def test_demo_hydration_retry_reuses_entry_and_rejects_key_conflicts(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    other_token, _ = _create_session(client, "nutrition")
+    path = "/api/v1/nutrition/hydration/entries"
+    body = {
+        "volume_ml": 250,
+        "beverage_type": "water",
+        "source": "quick_preset",
+        "diary_date": "2026-09-01",
+        "_hydration_retry_key": "synthetic-key",
+    }
+
+    first = _transport(client, token, path, "POST", body)
+    retry = _transport(client, token, path, "POST", body)
+    assert first.status_code == retry.status_code == 200
+    assert retry.json() == first.json()
+    assert "_hydration_retry_key" not in first.json()
+    assert _transport(client, token, path, "POST", {**body, "volume_ml": 500}).status_code == 409
+    assert (
+        _transport(client, other_token, path, "POST", {**body, "volume_ml": 500}).status_code == 200
+    )
+    another = _transport(client, token, path, "POST", {**body, "_hydration_retry_key": "new-key"})
+    assert another.status_code == 200
+    assert another.json()["id"] != first.json()["id"]
+
+
 def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_writes(
     client,
 ) -> None:
