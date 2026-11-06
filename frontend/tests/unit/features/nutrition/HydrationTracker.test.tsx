@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HydrationTracker } from '../../../../src/features/nutrition/HydrationTracker';
 import type { HydrationDay, HydrationEntry } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
+import { AUTHENTICATED_USER_ID_STORAGE_KEY } from '../../../../src/shared/userScopedStorage';
+import { DemoRuntimeProvider } from '../../../../src/shared/runtime/runtime';
 import {
   PRODUCT_EVENT_NAME,
   type ProductEventEnvelope,
@@ -70,6 +72,8 @@ function renderTracker(initialExpanded = false) {
 describe('HydrationTracker', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/app?section=nutrition');
+    sessionStorage.clear();
+    sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '7');
     apiMock.mockReset();
     apiMock.mockImplementation((path: string) => {
       if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
@@ -221,6 +225,317 @@ describe('HydrationTracker', () => {
     expect(screen.getByRole('button', { name: 'Отменить' })).toBeVisible();
     expect(events.map((event) => event.name)).toContain('hydration_logged');
     window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+  });
+
+  it('reuses the saved request after a lost response, then accepts a new entry', async () => {
+    const saved = new Map<string, HydrationEntry>();
+    const requests: Array<{ key: string; body: unknown }> = [];
+    let loseResponse = true;
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { method?: string; headers?: Record<string, string>; body?: unknown },
+      ) => {
+        if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+        if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+        if (path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST') {
+          const key = options.headers?.['Idempotency-Key'];
+          if (!key) throw new Error('Missing idempotency key');
+          requests.push({ key, body: options.body });
+          if (!saved.has(key)) {
+            const firstEntry = day.entries[0];
+            if (!firstEntry) throw new Error('Missing hydration fixture');
+            saved.set(key, { ...firstEntry, id: 10 + saved.size + 1, volume_ml: 250 });
+          }
+          if (loseResponse) {
+            loseResponse = false;
+            return Promise.reject(new Error('Нет соединения'));
+          }
+          return Promise.resolve(saved.get(key));
+        }
+        return Promise.resolve();
+      },
+    );
+
+    renderTracker();
+    const preset = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    fireEvent.click(preset);
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    fireEvent.click(preset);
+    await screen.findByText('Добавлено 250 мл');
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual(requests[0]);
+    expect(saved.size).toBe(1);
+
+    fireEvent.click(preset);
+    await waitFor(() => expect(requests).toHaveLength(3));
+    expect(requests[2]?.key).not.toBe(requests[0]?.key);
+    expect(saved.size).toBe(2);
+  });
+
+  it('keeps an uncertain request through remount and retries it for the original date', async () => {
+    const requests: Array<{ key: string; body: { diary_date: string } }> = [];
+    let loseResponse = true;
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: {
+          method?: string;
+          headers?: Record<string, string>;
+          body?: { diary_date: string };
+        },
+      ) => {
+        if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+        if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+        if (path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST') {
+          const key = options.headers?.['Idempotency-Key'];
+          if (!key || !options.body) throw new Error('Missing hydration request');
+          requests.push({ key, body: options.body });
+          if (loseResponse) {
+            loseResponse = false;
+            return Promise.reject(new Error('Нет соединения'));
+          }
+          return Promise.resolve({ ...day.entries[0], id: 11, volume_ml: 250 });
+        }
+        return Promise.resolve();
+      },
+    );
+
+    const first = renderTracker();
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    first.unmount();
+
+    const { rerender, queryClient } = renderTracker();
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <HydrationTracker diaryDate="2026-08-31" />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('button', { name: /Стакан.*250 мл/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument();
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <HydrationTracker diaryDate="2026-09-01" />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]).toEqual(requests[0]);
+    expect(requests[1]?.body.diary_date).toBe('2026-09-01');
+  });
+
+  it('asks before replacing an unresolved request with a different drink', async () => {
+    let posts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'POST') {
+        posts += 1;
+        return posts === 1
+          ? Promise.reject(new Error('Нет соединения'))
+          : Promise.resolve({ ...day.entries[0], id: 12, volume_ml: 500 });
+      }
+      return Promise.resolve();
+    });
+    renderTracker();
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    fireEvent.click(screen.getByRole('button', { name: /Бутылка.*500 мл/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Добавить другую запись?' });
+    expect(within(dialog).getByText(/Предыдущая запись могла сохраниться/)).toBeVisible();
+    expect(posts).toBe(1);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Бутылка.*500 мл/ }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Добавить новый' }),
+    );
+    await screen.findByText('Добавлено 500 мл');
+    expect(posts).toBe(2);
+  });
+
+  it('keeps separate unresolved requests for different dates', async () => {
+    const requests: Array<{ date: string; key: string }> = [];
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: {
+          method?: string;
+          headers?: Record<string, string>;
+          body?: { diary_date: string };
+        },
+      ) => {
+        if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+        if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+        if (options?.method === 'POST' && options.body && options.headers) {
+          const date = options.body.diary_date;
+          const key = options.headers['Idempotency-Key'];
+          if (!key) throw new Error('Missing idempotency key');
+          requests.push({ date, key });
+          if (requests.filter((request) => request.date === date).length === 1)
+            return Promise.reject(new Error('Нет соединения'));
+          return Promise.resolve({ ...day.entries[0], id: 11, diary_date: date, volume_ml: 250 });
+        }
+        return Promise.resolve();
+      },
+    );
+    const { rerender, queryClient } = renderTracker();
+    const showDate = (date: string) =>
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <FeedbackProvider>
+            <HydrationTracker diaryDate={date} />
+          </FeedbackProvider>
+        </QueryClientProvider>,
+      );
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    showDate('2026-08-31');
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    showDate('2026-09-01');
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    await screen.findByText('Добавлено 250 мл');
+    showDate('2026-08-31');
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    await waitFor(() => expect(requests).toHaveLength(4));
+    expect(requests[2]).toEqual(requests[0]);
+    expect(requests[3]).toEqual(requests[1]);
+    expect(requests[0]?.key).not.toBe(requests[1]?.key);
+  });
+
+  it('does not lose a newer pending date when an unmounted request fails late', async () => {
+    let rejectFirst: (reason: Error) => void = () => {};
+    let posts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'POST') {
+        posts += 1;
+        if (posts === 1)
+          return new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          });
+        return Promise.reject(new Error('Нет соединения'));
+      }
+      return Promise.resolve();
+    });
+    const first = renderTracker();
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await waitFor(() => expect(posts).toBe(1));
+    first.unmount();
+    const second = renderTracker();
+    second.rerender(
+      <QueryClientProvider client={second.queryClient}>
+        <FeedbackProvider>
+          <HydrationTracker diaryDate="2026-08-31" />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    await act(async () => rejectFirst(new Error('Нет соединения')));
+    second.unmount();
+    const third = renderTracker();
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    third.rerender(
+      <QueryClientProvider client={third.queryClient}>
+        <FeedbackProvider>
+          <HydrationTracker diaryDate="2026-08-31" />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  });
+
+  it('preserves the same retry key through the demo transport body', async () => {
+    const requests: Array<{ headers: Record<string, string>; body: Record<string, unknown> }> = [];
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: {
+          method?: string;
+          headers: Record<string, string>;
+          body: Record<string, unknown>;
+        },
+      ) => {
+        if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+        if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+        if (options?.method === 'POST') {
+          requests.push({ headers: options.headers, body: options.body });
+          return requests.length === 1
+            ? Promise.reject(new Error('Нет соединения'))
+            : Promise.resolve({ ...day.entries[0], id: 11, volume_ml: 250 });
+        }
+        return Promise.resolve();
+      },
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <DemoRuntimeProvider sessionToken="synthetic-session" mapNavigationPath={(path) => path}>
+        <QueryClientProvider client={queryClient}>
+          <FeedbackProvider>
+            <HydrationTracker diaryDate="2026-09-01" />
+          </FeedbackProvider>
+        </QueryClientProvider>
+      </DemoRuntimeProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    await screen.findByText('Добавлено 250 мл');
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual(requests[0]);
+    expect(requests[0]?.body._hydration_retry_key).toBe(requests[0]?.headers['Idempotency-Key']);
+  });
+
+  it('allows correcting a rejected volume and isolates unresolved requests by account', async () => {
+    let posts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'POST') {
+        posts += 1;
+        if (posts === 1)
+          return Promise.reject(Object.assign(new Error('Проверьте объём'), { status: 422 }));
+        if (posts === 2) return Promise.reject(new Error('Нет соединения'));
+        return Promise.resolve({ ...day.entries[0], id: 12, volume_ml: 250 });
+      }
+      return Promise.resolve();
+    });
+    const { rerender, queryClient } = renderTracker();
+    const preset = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    fireEvent.click(preset);
+    await screen.findByText('Проверьте объём');
+    expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument();
+    fireEvent.click(preset);
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+
+    sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '8');
+    await waitFor(() => expect(preset).toBeEnabled());
+    fireEvent.click(preset);
+    expect(posts).toBe(2);
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <HydrationTracker diaryDate="2026-09-01" />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Стакан.*250 мл/ }));
+    await screen.findByText('Добавлено 250 мл');
+    expect(posts).toBe(3);
   });
 
   it.each([false, true])(

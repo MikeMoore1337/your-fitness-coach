@@ -691,7 +691,26 @@ def _validate_hydration_payload(payload: dict[str, Any], *, update: bool = False
 
 
 def _add_hydration_entry(session: _DemoSession, payload: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(payload)
+    retry_key = payload.pop("_hydration_retry_key", None)
+    if retry_key is not None and (
+        not isinstance(retry_key, str) or not retry_key or len(retry_key) > 128
+    ):
+        raise DemoActionForbiddenError
     _validate_hydration_payload(payload)
+    if retry_key is not None:
+        previous = next(
+            (
+                item
+                for item in session.state.setdefault("hydration_entries", [])
+                if item.get("_hydration_retry_key") == retry_key
+            ),
+            None,
+        )
+        if previous is not None:
+            if previous.get("_hydration_retry_payload") != payload:
+                raise DemoTransitionError
+            return _hydration_entry(session, previous)
     occurred_at = payload.get("occurred_at") or _iso(_now(session))
     if not isinstance(occurred_at, str):
         raise DemoActionForbiddenError
@@ -714,6 +733,9 @@ def _add_hydration_entry(session: _DemoSession, payload: dict[str, Any]) -> dict
         "created_at": _iso(_now(session)),
         "updated_at": _iso(_now(session)),
     }
+    if retry_key is not None:
+        stored["_hydration_retry_key"] = retry_key
+        stored["_hydration_retry_payload"] = payload
     session.state["hydration_entries"].append(stored)
     session.revision += 1
     return _hydration_entry(session, stored)
