@@ -10,6 +10,8 @@ from threading import Barrier
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import (
     CheckConstraint,
     Column,
@@ -723,6 +725,264 @@ def test_diary_exposes_one_deterministic_prior_meal_repeat_candidate(client) -> 
         "source_meal_type": "breakfast",
         "entry_count": 1,
     }
+
+
+def test_repeat_candidate_advances_through_unfilled_meals(client) -> None:
+    headers = _auth(client, 16_144)
+    food_id = _store_food()
+    today = timezone_module.today_in_timezone("Europe/Moscow")
+    yesterday = today - timedelta(days=1)
+    meals = ("breakfast", "lunch", "dinner", "snacks")
+    for meal in meals:
+        response = client.post(
+            "/api/v1/nutrition/diary/entries",
+            headers=headers,
+            json={
+                "food_id": food_id,
+                "diary_date": yesterday.isoformat(),
+                "meal_type": meal,
+                "amount": "100",
+                "amount_unit": "g",
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    for meal in meals:
+        day = client.get(
+            "/api/v1/nutrition/diary", headers=headers, params={"diary_date": today.isoformat()}
+        ).json()
+        assert day["repeat_candidate"]["source_meal_type"] == meal
+        response = client.post(
+            "/api/v1/nutrition/diary/entries",
+            headers=headers,
+            json={
+                "food_id": food_id,
+                "diary_date": today.isoformat(),
+                "meal_type": meal,
+                "amount": "100",
+                "amount_unit": "g",
+            },
+        )
+        assert response.status_code == 201, response.text
+    assert (
+        client.get(
+            "/api/v1/nutrition/diary", headers=headers, params={"diary_date": today.isoformat()}
+        ).json()["repeat_candidate"]
+        is None
+    )
+
+
+def test_quick_repeat_replay_empty_target_and_conditional_undo(client) -> None:
+    headers = _auth(client, 16_145)
+    other_headers = _auth(client, 16_146)
+    food_id = _store_food()
+    today = timezone_module.today_in_timezone("Europe/Moscow")
+    yesterday = today - timedelta(days=1)
+    for amount in ("100", "200"):
+        response = client.post(
+            "/api/v1/nutrition/diary/entries",
+            headers=headers,
+            json={
+                "food_id": food_id,
+                "diary_date": yesterday.isoformat(),
+                "meal_type": "breakfast",
+                "amount": amount,
+                "amount_unit": "g",
+            },
+        )
+        assert response.status_code == 201, response.text
+    body = {
+        "source_date": yesterday.isoformat(),
+        "source_meal_type": "breakfast",
+        "target_date": today.isoformat(),
+        "target_meal_type": "breakfast",
+    }
+    preview = client.post("/api/v1/nutrition/diary/copy/meal/preview", headers=headers, json=body)
+    assert preview.status_code == 200, preview.text
+    body["preview_token"] = preview.json()["preview_token"] + "~quick"
+    quick_headers = {
+        **headers,
+        "Idempotency-Key": "quick-repeat-16145",
+        "X-Require-Empty-Meal": "true",
+    }
+    legacy_copy = client.post(
+        "/api/v1/nutrition/diary/copy/meal",
+        headers={**headers, "Idempotency-Key": "old-server-repeat-16145"},
+        json=body,
+    )
+    assert legacy_copy.status_code == 409
+    missing_marker = client.post(
+        "/api/v1/nutrition/diary/copy/meal",
+        headers={**quick_headers, "Idempotency-Key": "quick-missing-marker"},
+        json={**body, "preview_token": preview.json()["preview_token"]},
+    )
+    assert missing_marker.status_code == 422
+    copy = client.post("/api/v1/nutrition/diary/copy/meal", headers=quick_headers, json=body)
+    assert copy.status_code == 201, copy.text
+    entries = copy.json()["entries"]
+    assert len(entries) == 2
+    assert all(entry["created_at"] == entry["updated_at"] for entry in entries)
+    replay = client.post("/api/v1/nutrition/diary/copy/meal", headers=quick_headers, json=body)
+    assert replay.status_code == 201 and replay.json()["replayed"] is True
+    assert [entry["id"] for entry in replay.json()["entries"]] == [entry["id"] for entry in entries]
+    conflict = client.post(
+        "/api/v1/nutrition/diary/copy/meal",
+        headers={**quick_headers, "Idempotency-Key": "another-repeat"},
+        json=body,
+    )
+    assert conflict.status_code == 409
+
+    first, second = entries
+    assert (
+        client.delete(
+            f"/api/v1/nutrition/diary/entries/{second['id']}~undo", headers=headers
+        ).status_code
+        == 422
+    )
+    updated = client.patch(
+        f"/api/v1/nutrition/diary/entries/{first['id']}", headers=headers, json={"amount": "150"}
+    )
+    assert updated.status_code == 200, updated.text
+    first_version = {**headers, "X-Diary-Entry-Version": first["created_at"]}
+    assert (
+        client.delete(
+            f"/api/v1/nutrition/diary/entries/{first['id']}~undo", headers=first_version
+        ).status_code
+        == 409
+    )
+    assert (
+        client.delete(
+            f"/api/v1/nutrition/diary/entries/{second['id']}~undo",
+            headers={**other_headers, "X-Diary-Entry-Version": second["created_at"]},
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/nutrition/diary/entries/{second['id']}~undo",
+            headers={**headers, "X-Diary-Entry-Version": second["created_at"]},
+        ).status_code
+        == 204
+    )
+    day = client.get(
+        "/api/v1/nutrition/diary", headers=headers, params={"diary_date": today.isoformat()}
+    ).json()
+    assert [entry["id"] for entry in day["meals"][0]["entries"]] == [first["id"]]
+
+
+def test_old_integer_delete_contract_rejects_guarded_entry_path() -> None:
+    app = FastAPI()
+    deleted: list[int] = []
+
+    @app.delete("/diary/entries/{entry_id}")
+    def old_delete(entry_id: int):
+        deleted.append(entry_id)
+
+    with TestClient(app) as old_client:
+        assert old_client.delete("/diary/entries/41~undo").status_code == 422
+    assert deleted == []
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_quick_repeats_only_fill_an_empty_meal_once(client) -> None:
+    headers = _auth(client, 16_147)
+    food_id = _store_food()
+    today = timezone_module.today_in_timezone("Europe/Moscow")
+    yesterday = today - timedelta(days=1)
+    source = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": yesterday.isoformat(),
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert source.status_code == 201, source.text
+    body = {
+        "source_date": yesterday.isoformat(),
+        "source_meal_type": "breakfast",
+        "target_date": today.isoformat(),
+        "target_meal_type": "breakfast",
+    }
+    previews = [
+        client.post("/api/v1/nutrition/diary/copy/meal/preview", headers=headers, json=body)
+        for _ in range(2)
+    ]
+    assert all(preview.status_code == 200 for preview in previews)
+    barrier = Barrier(2)
+
+    def confirm(index: int):
+        barrier.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/diary/copy/meal",
+            headers={
+                **headers,
+                "Idempotency-Key": f"quick-race-{index}",
+                "X-Require-Empty-Meal": "true",
+            },
+            json={**body, "preview_token": previews[index].json()["preview_token"] + "~quick"},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(confirm, range(2)))
+    assert sorted(response.status_code for response in responses) == [201, 409]
+    day = client.get(
+        "/api/v1/nutrition/diary", headers=headers, params={"diary_date": today.isoformat()}
+    ).json()
+    assert len(day["meals"][0]["entries"]) == 1
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_edit_and_conditional_undo_cannot_delete_an_edit(client) -> None:
+    headers = _auth(client, 16_148)
+    food_id = _store_food()
+    today = timezone_module.today_in_timezone("Europe/Moscow")
+    source = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": today.isoformat(),
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert source.status_code == 201, source.text
+    entry = source.json()
+    barrier = Barrier(2)
+
+    def edit():
+        barrier.wait(timeout=5)
+        return client.patch(
+            f"/api/v1/nutrition/diary/entries/{entry['id']}",
+            headers=headers,
+            json={"amount": "150"},
+        )
+
+    def undo():
+        barrier.wait(timeout=5)
+        return client.delete(
+            f"/api/v1/nutrition/diary/entries/{entry['id']}~undo",
+            headers={**headers, "X-Diary-Entry-Version": entry["updated_at"]},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        edit_future = executor.submit(edit)
+        undo_future = executor.submit(undo)
+        edit_status, undo_status = (
+            edit_future.result().status_code,
+            undo_future.result().status_code,
+        )
+    assert (edit_status, undo_status) in {(200, 409), (404, 204)}
+    if edit_status == 200:
+        day = client.get(
+            "/api/v1/nutrition/diary", headers=headers, params={"diary_date": today.isoformat()}
+        ).json()
+        assert day["meals"][0]["entries"][0]["amount"] == "150.000"
 
 
 def test_diary_day_query_count_is_constant() -> None:

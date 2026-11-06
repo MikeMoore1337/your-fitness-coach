@@ -450,7 +450,7 @@ export function HydrationTracker({
           </Button>
         ))}
       </div>
-      {undoEntry && (
+      {undoEntry?.diary_date === diaryDate && (
         <div className="hydration-undo" role="status">
           <span>Добавлено {undoEntry.volume_ml} мл</span>
           <Button variant="secondary" type="button" onClick={() => undo.mutate(undoEntry.id)}>
