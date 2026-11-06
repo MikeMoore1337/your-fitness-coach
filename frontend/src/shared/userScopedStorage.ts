@@ -6,6 +6,7 @@ import {
 export { AUTHENTICATED_USER_ID_STORAGE_KEY } from './auth/legacySessionKeys';
 const LAST_AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_last_authenticated_user_id_v1';
 export const HYDRATION_PENDING_SESSION_PREFIX = 'fit_hydration_pending_v1_';
+export const HYDRATION_PENDING_STORAGE_PREFIX = 'fit_hydration_pending_v2_';
 
 export const ACTIVE_WORKOUT_STORAGE_PREFIXES = {
   queue: 'fit_active_workout_v1_',
@@ -34,6 +35,7 @@ export const USER_SCOPED_PERSISTENT_STORAGE_REGISTRY = [
     ],
   },
   { domain: 'food_draft', prefixes: ['fit_food_draft_'] },
+  { domain: 'hydration_pending', prefixes: [HYDRATION_PENDING_STORAGE_PREFIX] },
   { domain: 'nutrition_label_draft', prefixes: ['fit_nutrition_label_draft_v1_'] },
   { domain: 'nutrition_natural_input', prefixes: ['fit_nutrition_natural_input_v1_'] },
   { domain: 'measurement_draft', prefixes: ['fit_measurement_draft_'] },
@@ -196,6 +198,14 @@ export function clearSensitiveUserScopedStorage(
     preserveActiveWorkoutForUserId > 0
       ? preserveActiveWorkoutForUserId
       : undefined;
+  const pendingUserId =
+    typeof preserveActiveWorkoutForUserId === 'object'
+      ? preserveActiveWorkoutForUserId.userId
+      : preserveId;
+  const retainedHydrationKey =
+    pendingUserId && Number.isSafeInteger(pendingUserId) && pendingUserId > 0
+      ? `${HYDRATION_PENDING_STORAGE_PREFIX}user_${pendingUserId}`
+      : null;
   const preservedPrefixes = preserveId
     ? [
         `${ACTIVE_WORKOUT_STORAGE_PREFIXES.queue}user_${preserveId}_workout_`,
@@ -268,6 +278,7 @@ export function clearSensitiveUserScopedStorage(
         key &&
         !pendingKeys.has(key) &&
         key !== LEGACY_AUTH_CANARY_KEY &&
+        key !== retainedHydrationKey &&
         key !== (preserveId ? activeWorkoutPointerStorageKey(preserveId) : null) &&
         key !== (preserveId ? protectedWorkoutPointerStorageKey(preserveId) : null) &&
         !preservedPrefixes.some((prefix) => key.startsWith(prefix)) &&
@@ -282,10 +293,6 @@ export function clearSensitiveUserScopedStorage(
   }
 
   try {
-    const pendingUserId =
-      typeof preserveActiveWorkoutForUserId === 'object'
-        ? preserveActiveWorkoutForUserId.userId
-        : preserveId;
     const retainedKey = pendingUserId
       ? `${HYDRATION_PENDING_SESSION_PREFIX}${pendingUserId}`
       : null;

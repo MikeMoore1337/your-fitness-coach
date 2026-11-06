@@ -487,6 +487,7 @@ function hydrationDay(snapshot: DemoSessionSnapshot) {
     diary_date: today(),
     timezone: 'Europe/Moscow',
     total_ml: 1350 + entries.reduce((sum, item) => sum + Number(item.volume_ml ?? 0), 0),
+    demo_generation: 0,
     goal: {
       id: 90001,
       enabled: true,
@@ -1300,6 +1301,149 @@ test('the public trainer entry opens the existing isolated trainer cabinet', asy
   }
 
   expect(directMutationRequests).toEqual([]);
+});
+
+test('demo water retry survives reload without copying the demo token to shared storage', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  const saved = new Map<string, Record<string, unknown>>();
+  const keys: string[] = [];
+  await page.route('**/api/v1/demo/sessions/current/transport', async (route) => {
+    const payload = route.request().postDataJSON() as {
+      path: string;
+      method: string;
+      body: Record<string, unknown>;
+    };
+    if (payload.path.startsWith('/api/v1/nutrition/hydration?') && payload.method === 'GET') {
+      const date =
+        new URL(payload.path, 'http://localhost').searchParams.get('diary_date') ?? today();
+      return route.fulfill({
+        json: {
+          ...hydrationDay(demoFixture('nutrition')),
+          diary_date: date,
+          entries: Array.from(saved.values()),
+          total_ml: 1350 + saved.size * 250,
+        },
+      });
+    }
+    if (payload.path === '/api/v1/nutrition/hydration/entries' && payload.method === 'POST') {
+      const key = payload.body._hydration_retry_key;
+      if (typeof key !== 'string') throw new Error('Missing demo retry key');
+      expect(payload.body._hydration_generation).toBe(0);
+      keys.push(key);
+      if (!saved.has(key))
+        saved.set(key, {
+          id: 90200 + saved.size,
+          volume_ml: payload.body.volume_ml,
+          beverage_type: payload.body.beverage_type,
+          diary_date: payload.body.diary_date,
+          source: payload.body.source,
+          occurred_at: '2026-09-15T10:00:00Z',
+          timezone: 'Europe/Moscow',
+          created_at: '2026-09-15T10:00:00Z',
+          updated_at: '2026-09-15T10:00:00Z',
+        });
+      if (keys.length === 1) return route.abort('connectionreset');
+      return route.fulfill({ json: saved.get(key) });
+    }
+    return route.fallback();
+  });
+  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  const glass = hydration.getByRole('button', { name: /Стакан, добавить 250 мл/ });
+  await glass.click();
+  await expect(hydration.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const sessions = JSON.parse(sessionStorage.getItem('fit_demo_sessions_v1') ?? '{}') as {
+        nutrition?: string;
+      };
+      const value = Object.entries(localStorage).filter(([key]) =>
+        key.startsWith('fit_hydration_pending_v2_'),
+      );
+      return Boolean(sessions.nutrition && JSON.stringify(value).includes(sessions.nutrition));
+    }),
+  ).toBe(false);
+  await page.reload();
+  await expect(hydration.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  await glass.click();
+  await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
+  expect(keys[1]).toBe(keys[0]);
+  expect(saved.size).toBe(1);
+  await glass.click();
+  await expect.poll(() => saved.size).toBe(2);
+  expect(keys[2]).not.toBe(keys[0]);
+});
+
+test('tabs sharing a demo session retry the same water entry', async ({ page, context }) => {
+  const other = await context.newPage();
+  const saved = new Map<string, Record<string, unknown>>();
+  const keys: string[] = [];
+  for (const current of [page, other]) {
+    await installDemoTransport(current);
+    await current.route('**/api/v1/demo/sessions/current/transport', async (route) => {
+      const payload = route.request().postDataJSON() as {
+        path: string;
+        method: string;
+        body: Record<string, unknown>;
+      };
+      if (payload.path.startsWith('/api/v1/nutrition/hydration?') && payload.method === 'GET') {
+        const date =
+          new URL(payload.path, 'http://localhost').searchParams.get('diary_date') ?? today();
+        return route.fulfill({
+          json: {
+            ...hydrationDay(demoFixture('nutrition')),
+            diary_date: date,
+            entries: Array.from(saved.values()),
+            total_ml: 1350 + saved.size * 250,
+          },
+        });
+      }
+      if (payload.path === '/api/v1/nutrition/hydration/entries' && payload.method === 'POST') {
+        const key = payload.body._hydration_retry_key;
+        if (typeof key !== 'string') throw new Error('Missing demo retry key');
+        keys.push(key);
+        if (!saved.has(key))
+          saved.set(key, {
+            id: 90200 + saved.size,
+            volume_ml: payload.body.volume_ml,
+            beverage_type: payload.body.beverage_type,
+            diary_date: payload.body.diary_date,
+            source: payload.body.source,
+            occurred_at: '2026-09-15T10:00:00Z',
+            timezone: 'Europe/Moscow',
+            created_at: '2026-09-15T10:00:00Z',
+            updated_at: '2026-09-15T10:00:00Z',
+          });
+        if (keys.length === 1) return route.abort('connectionreset');
+        return route.fulfill({ json: saved.get(key) });
+      }
+      return route.fallback();
+    });
+    await current.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    await expect(current.getByRole('region', { name: 'Гидратация' })).toBeVisible();
+  }
+  const token = (current: typeof page) =>
+    current.evaluate(
+      () =>
+        (
+          JSON.parse(sessionStorage.getItem('fit_demo_sessions_v1') ?? '{}') as {
+            nutrition?: string;
+          }
+        ).nutrition,
+    );
+  expect(await token(page)).toBe(await token(other));
+  const glass = (current: typeof page) =>
+    current
+      .getByRole('region', { name: 'Гидратация' })
+      .getByRole('button', { name: /Стакан, добавить 250 мл/ });
+  await glass(page).click();
+  await expect(page.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  await glass(other).click();
+  await expect(other.getByText('Добавлено 250 мл')).toBeVisible();
+  expect(keys[1]).toBe(keys[0]);
+  expect(saved.size).toBe(1);
 });
 
 test('nutrition and coach scenarios render shared production surfaces with local mutations', async ({

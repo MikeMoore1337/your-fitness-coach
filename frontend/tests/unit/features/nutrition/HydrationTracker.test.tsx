@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { webcrypto } from 'node:crypto';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HydrationTracker } from '../../../../src/features/nutrition/HydrationTracker';
@@ -12,7 +13,12 @@ import {
 } from '../../../../src/shared/analytics/productEvents';
 
 const apiMock = vi.hoisted(() => vi.fn());
-vi.mock('../../../../src/shared/api/client', () => ({ api: apiMock }));
+const discardChanged = vi.hoisted(() => vi.fn(() => false));
+vi.mock('../../../../src/shared/api/client', () => ({
+  api: apiMock,
+  authDiscardSnapshot: () => ({ generation: null, revision: 0, verifiedLogin: null }),
+  authDiscardChanged: discardChanged,
+}));
 vi.mock('../../../../src/shared/telegram/useTelegram', () => ({ haptic: vi.fn() }));
 
 const day: HydrationDay = {
@@ -73,6 +79,8 @@ describe('HydrationTracker', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/app?section=nutrition');
     sessionStorage.clear();
+    localStorage.clear();
+    discardChanged.mockReturnValue(false);
     sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '7');
     apiMock.mockReset();
     apiMock.mockImplementation((path: string) => {
@@ -455,7 +463,11 @@ describe('HydrationTracker', () => {
     expect(await screen.findByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
   });
 
-  it('preserves the same retry key through the demo transport body', async () => {
+  it('preserves the same demo retry key through reload and transport body', async () => {
+    Object.defineProperty(globalThis.crypto, 'subtle', {
+      configurable: true,
+      value: webcrypto.subtle,
+    });
     const requests: Array<{ headers: Record<string, string>; body: Record<string, unknown> }> = [];
     apiMock.mockImplementation(
       (
@@ -467,12 +479,103 @@ describe('HydrationTracker', () => {
         },
       ) => {
         if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
-        if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+        if (path.startsWith('/api/v1/nutrition/hydration?'))
+          return Promise.resolve({ ...day, demo_generation: 0 });
         if (options?.method === 'POST') {
           requests.push({ headers: options.headers, body: options.body });
           return requests.length === 1
             ? Promise.reject(new Error('Нет соединения'))
             : Promise.resolve({ ...day.entries[0], id: 11, volume_ml: 250 });
+        }
+        return Promise.resolve();
+      },
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const demo = (
+      <DemoRuntimeProvider sessionToken="synthetic-session" mapNavigationPath={(path) => path}>
+        <QueryClientProvider client={queryClient}>
+          <FeedbackProvider>
+            <HydrationTracker diaryDate="2026-09-01" />
+          </FeedbackProvider>
+        </QueryClientProvider>
+      </DemoRuntimeProvider>
+    );
+    const first = render(demo);
+    const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(glass).toBeEnabled());
+    fireEvent.click(glass);
+    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    expect(JSON.stringify(localStorage)).not.toContain('synthetic-session');
+    first.unmount();
+    render(demo);
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    await screen.findByText('Добавлено 250 мл');
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual(requests[0]);
+    expect(requests[0]?.body._hydration_retry_key).toBe(requests[0]?.headers['Idempotency-Key']);
+  });
+
+  it('waits for demo scope before consuming and focusing the water shortcut', async () => {
+    Object.defineProperty(globalThis.crypto, 'subtle', {
+      configurable: true,
+      value: webcrypto.subtle,
+    });
+    const scroll = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scroll,
+    });
+    window.history.replaceState({}, '', '/demo?scenario=nutrition&hydration=quick');
+    apiMock.mockImplementation((path: string) =>
+      path === '/api/v1/me'
+        ? Promise.resolve({ profile: { sex: 'female' } })
+        : Promise.resolve({ ...day, demo_generation: 0 }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <DemoRuntimeProvider sessionToken="synthetic-session" mapNavigationPath={(path) => path}>
+        <QueryClientProvider client={queryClient}>
+          <FeedbackProvider>
+            <HydrationTracker diaryDate="2026-09-01" initialExpanded />
+          </FeedbackProvider>
+        </QueryClientProvider>
+      </DemoRuntimeProvider>,
+    );
+    const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(glass).toHaveFocus());
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(window.location.search).not.toContain('hydration=quick');
+  });
+
+  it('discards old demo pending state and delayed success after reset', async () => {
+    Object.defineProperty(globalThis.crypto, 'subtle', {
+      configurable: true,
+      value: webcrypto.subtle,
+    });
+    let generation = 0;
+    let resolveFirst: (entry: HydrationEntry) => void = () => {};
+    const requests: Array<{ body: Record<string, unknown>; headers: Record<string, string> }> = [];
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: {
+          method?: string;
+          body: Record<string, unknown>;
+          headers: Record<string, string>;
+        },
+      ) => {
+        if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+        if (path.startsWith('/api/v1/nutrition/hydration?'))
+          return Promise.resolve({ ...day, demo_generation: generation });
+        if (options?.method === 'POST') {
+          requests.push({ body: options.body, headers: options.headers });
+          if (requests.length === 1)
+            return new Promise((resolve) => {
+              resolveFirst = resolve;
+            });
+          return Promise.resolve({ ...day.entries[0], id: 12, volume_ml: 250 });
         }
         return Promise.resolve();
       },
@@ -489,12 +592,33 @@ describe('HydrationTracker', () => {
         </QueryClientProvider>
       </DemoRuntimeProvider>,
     );
-    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(glass).toBeEnabled());
+    fireEvent.click(glass);
+    await waitFor(() => expect(requests).toHaveLength(1));
+    generation = 1;
+    await act(async () => {
+      await queryClient.invalidateQueries();
+    });
+    await waitFor(() =>
+      expect(
+        Object.values(localStorage).some((value) => value.includes('"demoGeneration":1')),
+      ).toBe(true),
+    );
+    const firstEntry = day.entries[0];
+    if (!firstEntry) throw new Error('Missing hydration fixture');
+    await act(async () => resolveFirst({ ...firstEntry, id: 11, volume_ml: 250 }));
+    await waitFor(() => expect(glass).toBeEnabled());
+    expect(screen.queryByText('Добавлено 250 мл')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument();
+    fireEvent.click(glass);
     await screen.findByText('Добавлено 250 мл');
     expect(requests).toHaveLength(2);
-    expect(requests[1]).toEqual(requests[0]);
-    expect(requests[0]?.body._hydration_retry_key).toBe(requests[0]?.headers['Idempotency-Key']);
+    expect(requests[0]?.body._hydration_generation).toBe(0);
+    expect(requests[1]?.body._hydration_generation).toBe(1);
+    expect(requests[1]?.headers['Idempotency-Key']).not.toBe(
+      requests[0]?.headers['Idempotency-Key'],
+    );
   });
 
   it('allows correcting a rejected volume and isolates unresolved requests by account', async () => {
@@ -519,8 +643,8 @@ describe('HydrationTracker', () => {
     fireEvent.click(preset);
     await screen.findByRole('button', { name: 'Повторить без дубля' });
 
-    sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '8');
     await waitFor(() => expect(preset).toBeEnabled());
+    sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '8');
     fireEvent.click(preset);
     expect(posts).toBe(2);
     rerender(
@@ -536,6 +660,117 @@ describe('HydrationTracker', () => {
     fireEvent.click(screen.getByRole('button', { name: /Стакан.*250 мл/ }));
     await screen.findByText('Добавлено 250 мл');
     expect(posts).toBe(3);
+  });
+
+  it('does not send a water request when shared storage cannot be written', async () => {
+    const original = Storage.prototype.setItem;
+    const broken = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      key,
+      value,
+    ) {
+      if (key.startsWith('fit_cross_context_lock_') || key.startsWith('fit_hydration_pending_v2_'))
+        throw new DOMException('full', 'QuotaExceededError');
+      original.call(this, key, value);
+    });
+    try {
+      renderTracker();
+      fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+      expect(await screen.findByText(/Не удалось безопасно сохранить напиток/)).toBeVisible();
+      expect(
+        apiMock.mock.calls.filter(
+          ([path, options]) =>
+            path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST',
+        ),
+      ).toHaveLength(0);
+    } finally {
+      broken.mockRestore();
+    }
+  });
+
+  it('keeps a shared retry when one tab is rejected while another is still saving', async () => {
+    let rejectFirst: (reason: Error) => void = () => {};
+    let resolveSecond: (entry: HydrationEntry) => void = () => {};
+    const keys: string[] = [];
+    apiMock.mockImplementation(
+      (path: string, options?: { method?: string; headers?: Record<string, string> }) => {
+        if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+        if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+        if (options?.method === 'POST') {
+          const key = options.headers?.['Idempotency-Key'];
+          if (!key) throw new Error('Missing key');
+          keys.push(key);
+          if (keys.length === 1)
+            return new Promise((_resolve, reject) => {
+              rejectFirst = reject;
+            });
+          if (keys.length === 2)
+            return new Promise((resolve) => {
+              resolveSecond = resolve;
+            });
+          return Promise.resolve({ ...day.entries[0], id: 12, volume_ml: 250 });
+        }
+        return Promise.resolve();
+      },
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <HydrationTracker diaryDate="2026-09-01" />
+          <HydrationTracker diaryDate="2026-09-01" />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+    const regions = await screen.findAllByRole('region', { name: 'Гидратация' });
+    const first = within(regions[0]!);
+    const second = within(regions[1]!);
+    fireEvent.click(first.getByRole('button', { name: /Стакан.*250 мл/ }));
+    await waitFor(() => expect(keys).toHaveLength(1));
+    fireEvent.click(second.getByRole('button', { name: /Стакан.*250 мл/ }));
+    await waitFor(() => expect(keys).toHaveLength(2));
+    expect(keys[1]).toBe(keys[0]);
+    await act(async () => rejectFirst(Object.assign(new Error('Нет доступа'), { status: 403 })));
+    expect(await first.findByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+    const entry = day.entries[0];
+    if (!entry) throw new Error('Missing hydration fixture');
+    await act(async () => resolveSecond({ ...entry, id: 11, volume_ml: 250 }));
+    await second.findByText('Добавлено 250 мл');
+    await waitFor(() =>
+      expect(first.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument(),
+    );
+    fireEvent.click(first.getByRole('button', { name: /Стакан.*250 мл/ }));
+    await waitFor(() => expect(keys).toHaveLength(3));
+    expect(keys[2]).not.toBe(keys[0]);
+  });
+
+  it('does not restore a late failed request after logout and same-account login', async () => {
+    let rejectRequest: (reason: Error) => void = () => {};
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'POST')
+        return new Promise((_resolve, reject) => {
+          rejectRequest = reject;
+        });
+      return Promise.resolve();
+    });
+    renderTracker();
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/hydration/entries',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    localStorage.clear();
+    discardChanged.mockReturnValue(true);
+    await act(async () => rejectRequest(new Error('Нет соединения')));
+    expect(
+      Object.keys(localStorage).filter((key) => key.startsWith('fit_hydration_pending_v2_')),
+    ).toHaveLength(0);
   });
 
   it.each([false, true])(
@@ -573,6 +808,13 @@ describe('HydrationTracker', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
       if (!delayed) expect(await screen.findByText('Добавлено 250 мл')).toBeVisible();
+      if (delayed)
+        await waitFor(() =>
+          expect(apiMock).toHaveBeenCalledWith(
+            '/api/v1/nutrition/hydration/entries',
+            expect.objectContaining({ method: 'POST' }),
+          ),
+        );
 
       showDate('2026-08-31');
       expect(await screen.findByText('0 из 2200 мл')).toBeVisible();
