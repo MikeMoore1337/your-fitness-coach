@@ -1,0 +1,54 @@
+{
+  "before": {
+    ".nutrition-day-summary": {
+      "top": 411,
+      "bottom": 793
+    },
+    ".nutrition-suggestions": {
+      "top": 811,
+      "bottom": 1265
+    },
+    ".nutrition-completeness": {
+      "top": 1283,
+      "bottom": 1520
+    },
+    ".nutrition-food-card": {
+      "top": 1538,
+      "bottom": 1905
+    },
+    ".hydration-card": {
+      "top": 1923,
+      "bottom": 2782
+    },
+    ".hydration-presets": {
+      "top": 2045,
+      "bottom": 2213
+    }
+  },
+  "proposal": {
+    ".nutrition-day-summary": {
+      "top": 411,
+      "bottom": 793
+    },
+    ".nutrition-suggestions": {
+      "top": 2327,
+      "bottom": 2782
+    },
+    ".nutrition-completeness": {
+      "top": 2073,
+      "bottom": 2309
+    },
+    ".nutrition-food-card": {
+      "top": 811,
+      "bottom": 1177
+    },
+    ".hydration-card": {
+      "top": 1195,
+      "bottom": 2055
+    },
+    ".hydration-presets": {
+      "top": 1317,
+      "bottom": 1485
+    }
+  }
+}
