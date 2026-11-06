@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+import pytest
+
 from fitminiapp_api.core.timezone import today_in_timezone
 
 
@@ -26,10 +28,14 @@ def test_copy_day_same_date_keeps_server_validation(client) -> None:
     assert response.json() == {"detail": "source and target day must differ"}
 
 
-def test_copy_day_preserves_source_nutrition_and_replays_once(client) -> None:
+@pytest.mark.parametrize(("source_days_ago", "target_days_ago"), [(0, 1), (1, 0)])
+def test_copy_day_preserves_source_nutrition_and_replays_once(
+    client, source_days_ago: int, target_days_ago: int
+) -> None:
     headers = _auth(client)
-    target = today_in_timezone("Europe/Moscow")
-    source = target - timedelta(days=1)
+    today = today_in_timezone("Europe/Moscow")
+    source = today - timedelta(days=source_days_ago)
+    target = today - timedelta(days=target_days_ago)
     for meal, calories in (("breakfast", "320"), ("dinner", "520")):
         response = client.post(
             "/api/v1/nutrition/diary/entries",
