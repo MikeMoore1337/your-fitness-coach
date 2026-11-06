@@ -102,13 +102,18 @@ class ImportDiagnostic(ImportModel):
     field: Identifier | None = None
 
 
+class SourceFieldReference(ImportModel):
+    coordinates: SourceCoordinates
+    field: Identifier
+
+
 class NutrientFact(ImportModel):
     value: NonnegativeDecimal | None
     unit: Literal["g", "mg", "kcal", "kJ"] | None
     source_unit: str | None = Field(default=None, min_length=1, max_length=32)
     evidence: Literal["read", "derived", "absent", "ambiguous", "unreadable"]
     derivation: Identifier | None = None
-    derived_from: list[Identifier] = Field(default_factory=list, max_length=16)
+    derived_from: list[SourceFieldReference] = Field(default_factory=list, max_length=16)
 
     @model_validator(mode="after")
     def validate_evidence(self) -> NutrientFact:
@@ -256,6 +261,13 @@ class NutritionImportV1(ImportModel):
         coordinates = [row.coordinates for row in self.rows]
         coordinates.extend(coord for row in self.rows for coord in row.quantity_coordinates)
         coordinates.extend(total.coordinates for total in self.original_totals)
+        coordinates.extend(
+            reference.coordinates
+            for row in self.rows
+            for fact in row.nutrition.facts.__dict__.values()
+            if fact is not None
+            for reference in fact.derived_from
+        )
         if self.source.source_format == "csv" and any(coord.row is None for coord in coordinates):
             raise ValueError("CSV source coordinates require a row")
         if self.source.source_format == "pdf" and any(coord.page is None for coord in coordinates):

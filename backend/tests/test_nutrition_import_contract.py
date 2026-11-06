@@ -207,12 +207,27 @@ def test_contract_rejects_unsafe_or_inconsistent_rows(payload, mutate, message):
 def test_derived_facts_need_provenance_and_cannot_replace_original_totals(payload):
     fact = payload["rows"][0]["nutrition"]["facts"]["energy_kcal"]
     fact.update(
-        evidence="derived", derivation="scale_by_weight", derived_from=["entry_total", "quantity"]
+        evidence="derived",
+        derivation="scale_by_weight",
+        derived_from=[
+            {
+                "coordinates": {"section": "report_details", "section_kind": "detail", "row": 7},
+                "field": "energy_kcal",
+            },
+            {
+                "coordinates": {"section": "report_details", "section_kind": "detail", "row": 8},
+                "field": "quantity",
+            },
+        ],
     )
     assert (
         NutritionImportV1.model_validate(payload).rows[0].nutrition.facts.energy_kcal.evidence
         == "derived"
     )
+    fact["derived_from"][1]["coordinates"].update(row=None, page=1)
+    with pytest.raises(ValidationError, match="CSV source coordinates require a row"):
+        NutritionImportV1.model_validate(payload)
+    fact["derived_from"][1]["coordinates"].update(row=8, page=None)
     payload["original_totals"][0]["facts"]["energy_kcal"] = deepcopy(fact)
     with pytest.raises(ValidationError, match="original totals"):
         NutritionImportV1.model_validate(payload)
