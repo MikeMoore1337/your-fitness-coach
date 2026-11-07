@@ -7,17 +7,16 @@ description: >
 
 # allure-reporting
 
-Allure - evidence layer, а не замена assertions.
+Allure is an evidence/reporting layer, not a replacement for assertions.
 
 ## Report quality
 
-- title/step должны отражать user/business behavior;
-- attachment добавляй только когда он помогает диагностике;
-- сохраняй traceback/request/response/trace/screenshot по существующей YFC policy;
-- не дублируй гигантские payload без диагностической ценности;
-- redact secrets, tokens, personal/health data;
-- distinguish product failure, test failure и infrastructure failure;
-- retry history не должен скрывать исходное первое падение.
+- Titles and steps must describe user/business behavior.
+- Attach evidence only when it helps diagnosis.
+- Preserve tracebacks, requests/responses, traces and screenshots according to YFC policy.
+- Do not duplicate huge payloads without diagnostic value.
+- Redact secrets, tokens, personal data and health information.
+- Distinguish product, test and infrastructure failures.
+- Do not let retry history conceal the first failure.
 
-Используй существующий YFC publication pipeline и artifact paths.
-Не создавай второй Allure publishing mechanism.
+Reuse the existing YFC publishing pipeline and artifact paths; never create a second Allure publishing mechanism.

@@ -416,12 +416,13 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
     assert "        lane: [checks, unit]" in workflow
     assert "run-group frontend-checks" in workflow
     assert "run-group frontend-unit" in workflow
-    assert workflow.count("          path: ~/.cache/ms-playwright") == 5
+    # Chromium is baked into the pinned smoke container: no redundant cache.
+    assert workflow.count("          path: ~/.cache/ms-playwright") == 3
     assert (
         workflow.count(
             "          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
         )
-        == 2
+        == 0
     )
     assert (
         "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/5)\n    needs: scope-router\n    if:"
@@ -441,6 +442,52 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
         "playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
         in workflow
     )
+
+
+def test_frontend_smoke_uses_existing_pinned_browser_container_without_apt() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    smoke = workflow.split("  frontend-smoke:\n", 1)[1]
+    smoke = smoke.split("  frontend-mobile-regression:\n", 1)[0]
+    mobile = workflow.split("  frontend-mobile-regression:\n", 1)[1].split(
+        "  frontend-mobile-regression-extended:\n", 1
+    )[0]
+
+    image_line = next(
+        line.strip() for line in mobile.splitlines() if "mcr.microsoft.com/playwright:" in line
+    )
+    assert "@sha256:" in image_line
+    assert image_line in smoke
+    assert "npx playwright install --with-deps" not in smoke
+    assert "Cache Playwright browsers" not in smoke
+    assert "test -d /ms-playwright" in smoke
+    assert "run-group frontend-e2e" in smoke
+    assert 'python-version: "3.14"' in smoke
+    assert "run_scheduled_report == 'true'\n        with:\n          python-version" not in smoke
+
+
+def test_migrated_postgres_stack_uses_prebuilt_chromium_and_service_dns() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    migrated = workflow.split("  migrated-stack:\n", 1)[1]
+    migrated = migrated.split("  dependency-audit:\n", 1)[0]
+    mobile = workflow.split("  frontend-mobile-regression:\n", 1)[1].split(
+        "  frontend-mobile-regression-extended:\n", 1
+    )[0]
+    image_line = next(
+        line.strip() for line in mobile.splitlines() if "mcr.microsoft.com/playwright:" in line
+    )
+
+    assert image_line in migrated
+    assert "npx playwright install --with-deps chromium" not in migrated
+    assert "Cache Playwright browsers" not in migrated
+    assert "test -d /ms-playwright" in migrated
+    assert migrated.count("postgresql+psycopg://fitminiapp:test-password@db:5432/") == 2
+    assert "run-group migrated-stack" in migrated
+    assert 'UV_SYSTEM_PYTHON: "0"' in migrated
+    assert 'UV_MANAGED_PYTHON: "1"' in migrated
+    assert "uv python install 3.14" in migrated
+    assert "uv python find --managed-python 3.14" in migrated
+    assert "import ssl, psycopg" in migrated
+    assert "uses: actions/setup-python@v5" not in migrated
 
 
 def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None:
@@ -575,20 +622,19 @@ def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
         ),
         (
             [".github/workflows/ci.yml"],
-            "workflow-platform",
+            "cross-stack",
             {
                 "policy",
                 "workflow-config",
                 "image-contract",
                 "deployment-contract",
                 "dependency-audit",
-            },
-            {
                 "frontend-e2e",
                 "python-tests",
                 "migrated-stack",
                 "container-contract",
             },
+            set(),
         ),
         (
             ["bot/.dockerignore"],
@@ -669,7 +715,8 @@ def test_scope_router_preserves_dot_prefixed_workflow_paths() -> None:
     decision = ci_contract.classify_scope(["./.github/workflows/ci.yml"])
 
     assert decision["paths"] == [".github/workflows/ci.yml"]
-    assert decision["profile"] == "workflow-platform"
+    assert decision["profile"] == "cross-stack"
+    assert "frontend-e2e" in decision["required_groups"]
 
 
 def test_skill_change_adds_skillspector_policy_group_only_when_needed() -> None:

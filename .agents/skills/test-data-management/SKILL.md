@@ -9,23 +9,15 @@ description: >
 
 ## Goals
 
-Тестовые данные должны быть:
-
-- deterministic по shape;
-- unique там, где возможны collisions;
-- минимальными для нужного behavior;
-- явно связанными с test intent;
-- изолированными между workers;
-- очищаемыми или disposable;
-- не содержащими production secrets/PII.
+Test data must be deterministic in shape, unique when collisions are possible, minimal for the behavior, explicitly connected to test intent, isolated between workers, disposable or cleanable, and free of production secrets or personal data.
 
 ## Rules
 
-- не полагайся на порядок запуска;
-- не используй общий mutable counter между parallel workers;
-- seed должен проходить реальные render/domain guards проверяемой surface;
-- timestamps/timezones фиксируй, когда они влияют на outcome;
-- random/faker допустим только если randomness не делает assertion неопределённым;
-- shared fixtures должны иметь понятный owner и lifecycle.
+- Do not depend on test execution order.
+- Do not share a mutable counter between parallel workers.
+- Seeds must pass actual render/domain guards of the surface being tested.
+- Fix timestamps/timezones whenever they affect outcomes.
+- Random/faker data is acceptable only when randomness cannot make assertions nondeterministic.
+- Shared fixtures need a clear owner and lifecycle.
 
-Для сложного setup сначала ищи существующие YFC factories/fixtures/helpers.
+For complex setup, first look for existing YFC factories, fixtures and helpers.

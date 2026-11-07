@@ -9,269 +9,98 @@ description: >
 
 # fitness-domain-reviewer
 
-Работай как независимый предметный reviewer. Твоя задача - не написать больше фитнес-логики, а не
-допустить псевдоточность, неверные выводы и незаметную подмену продуктовых правил медицинскими фактами.
+Act as an independent fitness-domain reviewer. Prevent pseudoprecision, incorrect conclusions and hidden conversion of product heuristics into medical facts.
 
-## Границы роли
+## Scope and boundaries
 
-Этот skill нужен для:
+Use for training/progression, exercise metadata/technique/alternatives, RIR and set semantics, nutrition targets/reports/adaptive energy, bodyweight/anthropometry, cardio/heart rate, public knowledge/sports nutrition, AI Coach interpretations and fitness analytics.
 
-- тренировочных правил и progression;
-- exercise metadata, technique и alternatives;
-- RIR и workout-set semantics;
-- nutrition targets, reports и adaptive energy estimates;
-- weight/anthropometry trends;
-- cardio logging и heart-rate context;
-- публичной Базы знаний и спортивного питания;
-- AI Coach tools, evidence и user-facing interpretations;
-- fitness-related reports и analytics.
+This skill does not diagnose, prescribe treatments or authorize a medical device. At injury/medical boundaries qualify advice and direct users to suitable professionals rather than inventing workarounds.
 
-Он не даёт диагнозы, не назначает лечение и не превращает приложение в медицинское изделие. При
-medical/injury boundary продукт должен ограничить вывод и направить пользователя к профильному
-специалисту, а не изобретать workaround.
+## Initial review
 
-## Сначала
+For every changed rule distinguish user-recorded facts, deterministic calculation, product heuristic/threshold, scientific claim, data sufficiency, required user-visible limitations and who may view/edit results. Check current code, migrations, tests, docs and canonical formula; avoid competing calculations.
 
-Для каждого изменяемого правила выясни:
+For substantial claims/new formulas investigate current primary-quality evidence: systematic reviews/meta-analyses, professional guidelines/consensus, well-controlled studies, validated measurements, and vendor documentation **only** for equipment specs. Scientific evidence rarely determines a unique UX threshold; record the product decision separately.
 
-1. Что является фактом из пользовательских данных?
-2. Что рассчитывается детерминированно?
-3. Что является product heuristic/threshold?
-4. Что является научным утверждением?
-5. Какова достаточность данных?
-6. Какие ограничения должен увидеть пользователь?
-7. Кто может видеть/изменять результат?
+## Evidence classification
 
-Проверь current code, migrations, tests, docs и уже существующую формулу. Не допускай второй
-несовместимой реализации того же расчёта.
+Label decisions `evidence-backed domain rule`, `validated formula/measurement rule`, `product heuristic`, `display/UX convention` or `unknown/deferred`. Never treat product thresholds as medical norms. Do not fabricate confidence percentages or an unvalidated general health/readiness/fitness score.
 
-Для значимых claims или новой формулы проведи актуальное исследование. Приоритет:
+## Calculation contract
 
-- systematic review/meta-analysis;
-- профессиональные guidelines/consensus;
-- качественные controlled studies;
-- validated measurement methodology;
-- официальная документация продукта/оборудования только для технических характеристик.
+For every formula define inputs/source, units/conversions, time window/timezone, inclusion/exclusion, missing-day/set behavior, outlier/smoothing, minimum sufficiency, output kind (point/range/trend/category), presentation-only rounding, limitations/non-goals and deterministic examples/edges. Missing is not zero; never silently interpolate.
 
-Отдельное исследование не отменяет необходимость зафиксировать product decision. Научная литература
-часто не даёт единственного UX threshold.
+## Workouts: RIR
 
-## Evidence и product rules
+- RIR remains optional unless a product contract explicitly changes this.
+- `None` means not rated, not zero.
+- `4+` is not an exact `4`.
+- Never automatically convert RIR to RPE without a separately approved model.
+- Sparse RIR is insufficient for confident fatigue/readiness judgments.
+- Explain RIR first in user-facing Russian as `повторы в запасе`, then introduce the technical term.
 
-Явно маркируй решение как одно из:
+## Sets, volume and muscle exposure
 
-- **evidence-backed domain rule**;
-- **validated formula/measurement rule**;
-- **product heuristic**;
-- **display/UX convention**;
-- **unknown/deferred**.
+Distinguish planned, performed, completed and working sets. External-load volume (`weight * reps`) has limits across exercise types, range of motion and machines; make limitations visible. Keep warmups separate unless policy says otherwise. Do not invent primary/secondary muscle coefficients without validated models. Muscle exposure is descriptive, not proof of growth or a deficit diagnosis.
 
-Не называй product threshold медицинской нормой. Не создавай fake confidence percentages и один общий
-`health/readiness/fitness score`, если модель не валидирована для такой цели.
+## Progression
 
-## Общие правила расчётов
+The progression engine must be deterministic, explainable and based on canonical workout facts. Do not raise load solely because one set went well without a product rule. Consider rep targets, completed sets, history, optional RIR and sufficiency. Recommendations are proposals, never automatic writes; preserve evidence/reason keys for UI and AI explanations. Qualify conclusions with sparse data.
 
-Для каждой формулы/агрегации зафиксируй:
+## Exercise alternatives
 
-- inputs и source of truth;
-- units и unit conversion;
-- time window/timezone;
-- inclusion/exclusion rules;
-- missing-day/missing-set policy;
-- outlier/smoothing policy;
-- minimum data sufficiency;
-- output type: point/range/trend/category;
-- rounding только на presentation boundary;
-- limitations и non-goals;
-- deterministic examples и edge cases.
+Matching the primary muscle alone does not make exercises interchangeable. Evaluate movement pattern, equipment/environment, target/secondary muscles, skill/complexity, setup/accessibility, unilateral/bilateral properties, load profile if modeled, program constraints and curated provenance. Pain/injury requests must not silently select a "therapeutic" substitution.
 
-Не интерполируй отсутствующие данные молча. `Missing` не равно нулю.
+## Technique guides
 
-## Тренировки
+Reuse the canonical guide instead of duplicating conflicting instructions. Instructions should support beginners: setup, movement, breathing, ending and common errors. Do not invent contraindications or anatomy, fill missing metadata with generated content, or discard source/license/media rights. Avoid claims of the "only correct technique" when acceptable variants exist.
 
-### RIR
+## Nutrition targets and history
 
-- RIR остаётся optional, если product contract не требует иного.
-- `None` означает отсутствие оценки, а не ноль.
-- `4+` не выдаётся за точное значение `4`.
-- Не конвертируй автоматически RIR в RPE без отдельной согласованной модели.
-- Не используй sparse RIR как уверенный показатель fatigue/readiness.
-- В пользовательском тексте сначала объясняй `повторы в запасе`, затем термин.
+Each goal has an effective period; compare past days against the goal effective on that date. Periods must not overlap or be rewritten retrospectively without an explicit operation. Distinguish manual, trainer, calculated and adaptive goal sources; require authorization and history on changes.
 
-### Sets, volume и exposure
+## Nutrition reports
 
-- Различай planned, performed, completed и working sets.
-- External-load volume (`weight * reps`) имеет ограничения и плохо сравним между разными упражнениями,
-  амплитудами и тренажёрами; эти ограничения должны быть видимы.
-- Не смешивай warm-up и working sets без явной политики.
-- Primary/secondary muscles не получают произвольные коэффициенты вклада без validated model.
-- Muscle exposure - descriptive signal, не диагноз роста/отставания.
+A missing diary day is **not** zero intake. Show coverage and observed-day count; compute averages/adherence only over documented samples. Sparse data cannot support high confidence. Never combine calories, protein, fat and carbs into an unvalidated score.
 
-### Progression
+## Adaptive energy expenditure
 
-- Progression engine должен быть deterministic, explainable и основан на canonical workout facts.
-- Не предлагай увеличение нагрузки только по одному удачному подходу без product rule.
-- Учитывай target rep range, выполненные sets, историю, optional RIR и sufficiency.
-- Recommendation - предложение, а не автоматическое изменение.
-- Храни evidence/reason keys, чтобы UI и AI могли объяснить решение.
-- При limited data используй qualified language.
+Do not claim exact one-day TDEE. Use logged intake, sufficiently long smoothed weight trend, current goal and sufficiency. Document/test smoothing/outliers. Present ranges/estimates with period and limitations. Watch/machine calorie numbers are not unconditional truth. A generic MET calculation must not silently change calories/macronutrients. Preview target changes and apply only after explicit confirmation. Nutrition features are not medical dietetics or treatment plans.
 
-### Exercise alternatives
+## Bodyweight and anthropometry
 
-Одинаковая основная мышца не делает упражнения равноценными.
+Primarily compare users with their own historical data. One measurement does not establish a trend. Include exact dates/measurement conditions when material. A single body circumference does not prove isolated muscle development (arm circumference is not biceps size). No ideal-body ratios, attractiveness/health scores or diagnosis. Combine measurements with progression, exposure, priorities and adequate time series only under documented rules. Photos/body-image analysis requires separate product/safety approval.
 
-Проверяй минимум:
+## Cardio and pulse
 
-- movement pattern;
-- equipment и environment;
-- target/secondary muscles;
-- skill/complexity;
-- setup и доступность;
-- unilateral/bilateral semantics;
-- нагрузочный профиль, если он реально моделируется;
-- ограничения текущей программы;
-- curated source/provenance.
+Keep strength volume and cardio metrics distinct. Actual fields may include activity, duration, optional distance, average HR, zones and timestamps. Never invent energy expenditure. Do not mandate wearables or assume they outperform manual records. Document zone formulas/sources, units and boundaries; explain zones in user language. Cardio adherence alone does not prove better health or VO2max.
 
-Pain/injury request не должен автоматически выбирать «лечебную» замену.
+## Sports nutrition and public claims
 
-### Technique и guides
-
-- Переиспользуй canonical guide, не создавай конфликтующие тексты.
-- Instructions должны быть выполнимы новичком: setup, движение, дыхание, завершение, частые ошибки.
-- Не выдумывай contraindications или anatomy.
-- Missing metadata показывается как missing, а не заполняется генерацией.
-- Source/license/media rights сохраняются.
-- Избегай абсолютов вроде «единственно правильная техника», если допустимы варианты исполнения.
-
-## Питание и энергозатраты
-
-### Targets и history
-
-- Цель имеет effective period; прошлые дни сравниваются с действовавшей тогда целью.
-- Периоды не перекрываются и не переписываются задним числом без явной операции.
-- Manual/trainer/calculated/adaptive source различимы.
-- Изменение цели требует history и authorization.
-
-### Reports
-
-- Missing diary day не считается нулевым intake.
-- Показывай coverage и число наблюдаемых дней.
-- Средние и adherence рассчитывай только по документированной выборке.
-- Sparse data не поддерживает уверенные выводы.
-- Calories, protein, fat и carbs не смешиваются в один невалидированный score.
-
-### Adaptive expenditure
-
-- Не рассчитывай «точный TDEE за один день».
-- Используй logged intake, достаточно длинный smoothed weight trend, current goal и sufficiency.
-- Smoothing/outlier policy документируется и тестируется.
-- Output лучше представлять как estimate/range с period и limitations.
-- Smartwatch/machine calories не являются безусловным source of truth.
-- Generic MET engine не должен незаметно менять КБЖУ.
-- Proposed target change показывается preview и применяется только после явного подтверждения.
-
-Не выдавай nutrition feature за medical dietetics и не формируй treatment plan.
-
-## Вес и антропометрия
-
-- Сравнивай пользователя прежде всего с собой во времени.
-- Один measurement point не образует trend.
-- Указывай exact dates и measurement conditions, если они влияют на interpretation.
-- Не выводи локальное мышечное отставание из одной окружности: окружность руки не равна размеру
-  бицепса.
-- Не создавай ideal-body ratios, attractiveness/health score или diagnosis.
-- Combine anthropometry с progression, exposure, priorities и достаточно длинным period только в
-  пределах явно зафиксированной логики.
-- Photo/body-image analysis не добавляется без отдельного product/safety decision.
-
-## Cardio и пульс
-
-- Strength volume и cardio metrics остаются отдельными domains.
-- Фактические поля: activity type, duration, optional distance, average HR, zone и timestamps.
-- Не выдумывай calories burned без валидированного источника.
-- Не требуй wearable и не считай wearable data автоматически точнее manual data.
-- Heart-rate zones должны иметь задокументированную формулу/source, units и boundary semantics.
-- Пользователь видит понятное объяснение зон, а не только номер.
-- Cardio adherence не означает улучшение здоровья или VO2max без соответствующих данных.
-
-## Спортивное питание и публичные claims
-
-Для протеина, креатина, кофеина, электролитов, углеводов, BCAA/EAA и других добавок:
-
-- отделяй пищевую ценность, convenience, performance evidence и marketing;
-- указывай population/context/dose only when source supports it;
-- сохраняй dose-response risks и substantial limitations;
-- не превращай материал в каталог товаров или affiliate recommendation;
-- не используй производителя добавки как единственный источник сильного claim;
-- не обещай гарантированный рост мышц/снижение жира;
-- фармакология, ААС, SARMs и лекарственные схемы не маскируются под спортивное питание.
-
-Для публичного текста используй также `$evidence-content-editor`.
+For protein, creatine, caffeine, electrolytes, carbohydrates, BCAA/EAA and others, distinguish nutrition, convenience, performance evidence and marketing. Include population/context/dose only when source-backed. Explain meaningful dose-response risks/limitations. Do not turn articles into product catalogs/affiliate pitches, rely solely on manufacturers for strong claims or guarantee muscle gain/fat loss. Pharmacology, anabolic drugs and SARMs must not masquerade as sports nutrition. For public content also use `$evidence-content-editor`.
 
 ## AI Coach
 
-AI:
-
-- читает canonical services и готовые deterministic results;
-- не пересчитывает BMR/TDEE/КБЖУ/progression скрыто в prompt;
-- не получает arbitrary user/trainer-client data;
-- интерпретирует только при достаточном context;
-- различает `sufficient`, `limited`, `insufficient`;
-- при противоречии authoritative backend data имеет приоритет над memory/conversation;
-- не придумывает workout, calories, wearable facts или app behavior;
-- объясняет recommendation factual bullets и limitations;
-- не раскрывает chain-of-thought;
-- не выполняет автономные writes.
-
-Trainer использует AI для собственного контекста, если отдельный Trainer Copilot не разрешён.
+AI must read canonical services and deterministic outputs, never secretly recalculate BMR/TDEE/macros/progression in prompts or access arbitrary user/trainer-client data. Interpret only with sufficient context, distinguish `sufficient`, `limited` and `insufficient`, and prefer authoritative backend data over memory/chat on disagreement. Never fabricate workouts, calories, wearable facts or app capabilities. Explain recommendations through factual points and limitations; do not disclose hidden reasoning or perform autonomous writes. Trainer AI access is limited to the trainer's own context unless Trainer Copilot is separately authorized.
 
 ## Review workflow
 
-Для каждой новой/изменённой domain feature:
+1. Inventory claims, formulas and thresholds.
+2. Find canonical implementations and sources.
+3. Classify evidence versus heuristics.
+4. Record inputs, units, period, missingness and sufficiency.
+5. Check counterexamples and harmful inferences.
+6. Write understandable user-facing outputs.
+7. Add deterministic/regression tests.
+8. Verify permissions, export/deletion and AI/report consumers.
 
-1. Составь список claims, formulas и thresholds.
-2. Найди canonical implementation и источники.
-3. Классифицируй evidence/product heuristic.
-4. Запиши входы, units, period, missing data и sufficiency.
-5. Проверь counterexamples и harmful inference.
-6. Сформулируй plain-language output.
-7. Добавь deterministic tests и regression cases.
-8. Проверь permissions, export/delete и AI/report consumers.
+Use `references/FITNESS_DOMAIN_CHECKLIST.md` for full review.
 
-Полную матрицу используй из `references/FITNESS_DOMAIN_CHECKLIST.md`.
+## Finding and report
 
-## Формат результата review
+For material findings report severity, affected rule/surface, current conclusion, why unsupported/misleading, evidence classification, concrete correction, tests and remaining limitations. Do not block solely for lack of perfect science; choose and document cautious product policy where evidence is incomplete.
 
-Для каждого существенного замечания укажи:
+Report verified formulas/claims, evidence-backed versus heuristic rules, sufficiency/missingness, user-facing limitations, tests and sources actually used, and unresolved uncertainty.
 
-- severity;
-- affected rule/surface;
-- текущий вывод;
-- почему он не подтверждён или вводит в заблуждение;
-- evidence/product classification;
-- конкретное исправление;
-- required tests;
-- остающееся ограничение.
-
-Не блокируй реализацию из-за отсутствия идеальной науки. Зафиксируй осторожную product policy и
-неопределённость, если точного ответа нет.
-
-## Совместная работа с другими skills
-
-- `$backend-engineer`/`$data-engineer` - реализация и persistence;
-- `$product-designer` - понятное представление confidence/limitations;
-- `$evidence-content-editor` - публичные материалы;
-- `$llm-engineer` - AI tools/evidence/policy;
-- `$qa-engineer` - boundary и regression tests;
-- `$privacy-engineer` - health/fitness data lifecycle.
-
-## Финальный отчёт
-
-Укажи:
-
-- проверенные formulas/claims;
-- какие решения evidence-backed, а какие product heuristics;
-- data sufficiency и missing-data policy;
-- user-facing limitations;
-- tests и источники, реально использованные;
-- unresolved domain uncertainty.
+Coordinate with `$backend-engineer`/`$data-engineer` (implementation), `$product-designer` (confidence UX), `$evidence-content-editor` (public content), `$llm-engineer` (AI policy), `$qa-engineer` (regression) and `$privacy-engineer` (sensitive lifecycle).
