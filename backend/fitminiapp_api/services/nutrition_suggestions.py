@@ -360,9 +360,11 @@ def _candidate_sort_key(candidate: NutritionSuggestionCandidate, day: FoodDiaryD
     )
 
 
-def _remaining_confidence(day: FoodDiaryDayResponse) -> SuggestionConfidence:
+def _remaining_confidence(
+    day: FoodDiaryDayResponse, *, include_diary_entries: bool = True
+) -> SuggestionConfidence:
     confidences: list[SuggestionConfidence] = []
-    for meal in day.meals:
+    for meal in day.meals if include_diary_entries else []:
         for entry in meal.entries:
             if entry.nutrition_confidence is not None:
                 confidences.append(entry.nutrition_confidence)
@@ -440,7 +442,11 @@ def get_nutrition_suggestions(
                 else day.remaining,
             }
         )
-    confidence = _remaining_confidence(day) if day.remaining is not None else None
+    confidence = (
+        _remaining_confidence(day, include_diary_entries=not force_context)
+        if day.remaining is not None
+        else None
+    )
     if day.targets is None or day.remaining is None:
         return NutritionSuggestionsResponse(
             diary_date=day.diary_date,

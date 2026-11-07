@@ -185,6 +185,37 @@ def test_plan_suggestions_support_a_future_date_without_allowing_future_diary(cl
     assert future_diary.status_code == 422
 
 
+def test_plan_suggestion_confidence_uses_the_plan_not_partial_diary_entries(client) -> None:
+    headers = _auth(client, 74_608)
+    _add_target(74_608)
+    food_id = _store_food("Продукт для полного плана")
+    selected_date = _today().isoformat()
+    for payload in (
+        {"food_id": food_id, "amount": "100", "amount_unit": "g"},
+        {"quick_add": {"energy_kcal": "100"}, "amount": "1", "amount_unit": "serving"},
+    ):
+        entry = client.post(
+            "/api/v1/nutrition/diary/entries",
+            headers=headers,
+            json={**payload, "diary_date": selected_date, "meal_type": "breakfast"},
+        )
+        assert entry.status_code == 201, entry.text
+    diary = client.get(
+        "/api/v1/nutrition/diary/suggestions",
+        headers=headers,
+        params={"diary_date": selected_date},
+    )
+    plan = client.get(
+        "/api/v1/nutrition/plans/suggestions",
+        headers=headers,
+        params={"plan_date": selected_date},
+    )
+    assert diary.status_code == plan.status_code == 200
+    assert diary.json()["remaining_confidence"] == "partial"
+    assert plan.json()["remaining_confidence"] == "exact"
+    assert plan.json()["remaining"]["protein_g"] == "150"
+
+
 def test_plan_suggestion_retry_does_not_change_completed_past_day(client, monkeypatch) -> None:
     headers = _auth(client, 74_606)
     _add_target(74_606)
