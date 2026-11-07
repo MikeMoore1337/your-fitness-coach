@@ -319,17 +319,24 @@ worker, release gate or replacement for human DoR/DoD review. The GitHub Actions
 alone does not authorize reading the user's private Project; do not introduce or copy personal
 tokens into CI to pretend otherwise.
 
-## Локально закреплённые внешние UI/React-справочники
+## Locally pinned external UI/React references
 
-Для релевантных frontend/UI задач существующие профильные YFC skills могут использовать
-1-2 справки из [optional UI quality](docs/development/external-ui-quality-skills.md).
-Это рекомендации, не новые роли или CI gate. Не запускать внешние инструменты и не менять
-визуальный контракт из-за стороннего текста. Owner-gated visual, русский UI, TMA,
-security и GitHub Flow остаются главнее.
+For relevant frontend/UI tasks, existing YFC profile skills may use one or two references
+from [optional UI quality](docs/development/external-ui-quality-skills.md).
+These are recommendations, not new roles or CI gates. Do not run external tools or change
+the approved visual contract solely because of third-party guidance. Owner-gated visual
+approval, the Russian-language UI, TMA, security and GitHub Flow remain authoritative.
 
-## Impeccable: основной UX/UI review skill (2026-10-21)
+## Impeccable: primary UX/UI review skill (2026-10-21)
 
-Для UI/UX, полировки, редизайна и анализа «нейрослопа» используй `$impeccable` из `.agents/skills/impeccable/SKILL.md` **до** генерации дизайна. Оригинальный Impeccable 4.7.0 закреплён в `.impeccable/` (git submodule); его нужно инициализировать по `docs/development/impeccable-adoption.md`. Затем применяй `$ui-audit` и браузерные тесты для проверки реализации. Не подменяй дизайнерским «вкусом» утверждённые палитры, шрифты, TMA-механики, визуальное одобрение или PR/релизные требования. Установка не включает upstream hooks, бинарники, runtime или платные API.
+For UI/UX work, polish, redesign and identifying generic AI-generated design patterns,
+use `$impeccable` from `.agents/skills/impeccable/SKILL.md` **before** generating a design.
+The original Impeccable 4.7.0 is pinned in the `.impeccable/` Git submodule; initialize
+it according to `docs/development/impeccable-adoption.md`. Then use `$ui-audit` and
+real-browser tests to verify implementation. Do not replace approved color palettes,
+typography, TMA behavior, visual acceptance or PR/release gates with subjective design
+preferences. Installation does not include upstream hooks, executables, runtime or
+paid APIs.
 
 
 ## UX/UI Design Orchestra - visual design preflight (2026-10-21)
