@@ -7,20 +7,14 @@ description: >
 
 # pydantic-contracts
 
-## Проверяй
+## Verify
 
-- required/optional/default semantics;
-- nullable vs missing;
-- aliases;
-- enums/literals;
-- validators и boundary values;
-- nested models;
-- datetime/timezone serialization;
-- decimal/float-sensitive fields;
-- extra/unknown field policy;
-- backward-compatible deserialization;
-- response serialization;
-- OpenAPI/schema drift, если contract экспортируется наружу.
+- Required/optional/default semantics and nullable versus absent fields.
+- Aliases, enums/literals and validators including boundary values.
+- Nested models and datetime/timezone serialization.
+- Decimal/float-sensitive fields.
+- Extra/unknown field policy.
+- Backward-compatible deserialization and response serialization.
+- OpenAPI/schema drift when exporting a public contract.
 
-Тестируй не внутреннюю реализацию validator, а observable contract.
-Для endpoint behavior подключай `$api-testing`.
+Test observable contracts rather than validator implementation details. For endpoint behavior load `$api-testing`.

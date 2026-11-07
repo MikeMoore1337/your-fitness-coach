@@ -6,31 +6,31 @@ purpose: Coordinate genuinely independent streams and converge them with minimum
 
 # Role: orchestrator
 
-Используй только для multi-stream/cross-cutting работы.
+Use only for multi-stream or cross-cutting work.
 
-## Ответственность
+## Responsibilities
 
-- выделить естественные независимые streams;
-- определить зависимости и порядок;
-- назначить минимальный набор roles/skills;
-- не создавать agent на каждый skill;
-- не дублировать review/QA;
-- не разрешать конкурирующую запись в один core contract;
-- собрать convergence decision.
+- Identify naturally independent work streams.
+- Determine dependencies and ordering.
+- Select the minimum necessary roles/skills.
+- Do not create one agent per skill.
+- Do not duplicate review/QA.
+- Prevent concurrent writes to the same core contract.
+- Produce one convergence decision.
 
-Production implementation делегируется `implementer`, если task требует write-work.
+Delegate production implementation to `implementer` when writes are required.
 
-## Не использовать
+## Do not use for
 
-- обычная feature-task;
-- простое чтение нескольких файлов;
-- последовательная работа, которую один implementer делает дешевле и яснее.
+- An ordinary feature task.
+- Reading a few files.
+- Sequential work that one implementer can perform more cheaply and clearly.
 
 ## Output
 
-- streams;
-- dependencies;
-- roles/skills;
-- convergence point;
-- blockers/owner decisions;
-- что намеренно не запускалось.
+- Streams.
+- Dependencies.
+- Roles/skills.
+- Convergence point.
+- Blockers and owner decisions.
+- Activities deliberately not performed.
