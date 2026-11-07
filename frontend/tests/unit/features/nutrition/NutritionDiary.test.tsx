@@ -196,11 +196,17 @@ describe('NutritionDiary', () => {
     expect(screen.getByRole('progressbar', { name: /Калории: 420 из 2.+000 ккал/ })).toBeVisible();
     expect(screen.getByText('Б 18,5')).toBeVisible();
 
+    const breakfastToggle = within(breakfastSection()).getByRole('button', { name: 'Завтрак' });
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(breakfastToggle);
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
+
     expect(screen.queryByRole('navigation', { name: 'Дата дневника' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /18 августа/i }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2026-08-18'),
     );
+    await waitFor(() => expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false'));
   });
 
   it('repeats one meal in one press, offers the next meal and can undo it', async () => {
@@ -388,7 +394,7 @@ describe('NutritionDiary', () => {
     expect(secondAttempts).toBe(2);
   });
 
-  it('keeps empty meals compact and lets every meal be expanded or collapsed', async () => {
+  it('starts all meals collapsed and preserves manual expand/collapse', async () => {
     apiMock.mockResolvedValue(makeDay());
     renderDiary();
 
@@ -398,11 +404,16 @@ describe('NutritionDiary', () => {
     const breakfastToggle = within(breakfast).getByRole('button', { name: 'Завтрак' });
     const lunchToggle = within(lunch).getByRole('button', { name: 'Обед' });
 
-    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
     expect(lunchToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(breakfast).getByText('Овсяная каша')).not.toBeVisible();
     expect(
       within(lunch).queryByText('Добавьте продукт — недавние будут под рукой.'),
     ).not.toBeVisible();
+
+    fireEvent.click(breakfastToggle);
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(breakfast).getByText('Овсяная каша')).toBeVisible();
 
     fireEvent.click(lunchToggle);
     expect(lunchToggle).toHaveAttribute('aria-expanded', 'true');
@@ -410,7 +421,7 @@ describe('NutritionDiary', () => {
 
     fireEvent.click(breakfastToggle);
     expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(within(breakfast).queryByText('Овсяная каша')).not.toBeVisible();
+    expect(within(breakfast).getByText('Овсяная каша')).not.toBeVisible();
   });
 
   it('shows each meal’s server totals, preserving unknown values and fractional grams', async () => {
@@ -559,6 +570,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findByText('Овсяная каша');
 
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Изменить Овсяная каша' }));
     const breakfast = breakfastSection();
     const draftAmount = within(breakfast).getByRole('spinbutton', { name: 'Количество' });
@@ -842,6 +854,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findByText('Овсяная каша');
 
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Изменить Овсяная каша' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Количество' }), {
       target: { value: '150' },
@@ -1367,6 +1380,7 @@ describe('NutritionDiary', () => {
     );
     renderDiary();
     await screen.findByText('Овсяная каша');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
     expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
     const submit = await screen.findByRole('button', { name: 'Подтвердить' });
@@ -1445,6 +1459,7 @@ describe('NutritionDiary', () => {
 
     renderDiary();
     await screen.findByText('Овсяная каша');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
     expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
     fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
