@@ -1470,9 +1470,7 @@ test('nutrition and coach scenarios render shared production surfaces with local
   if ((await breakfastToggle.getAttribute('aria-expanded')) === 'false') {
     await breakfastToggle.click();
   }
-  await expect(
-    breakfast.getByText('Овсяная каша с бананом и греческим йогуртом'),
-  ).toBeVisible();
+  await expect(breakfast.getByText('Овсяная каша с бананом и греческим йогуртом')).toBeVisible();
   await nutritionPage.getByRole('button', { name: 'Продолжить' }).click();
   await expect(nutritionPage).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=progress');
   await expect(nutritionPage.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
