@@ -9,148 +9,84 @@ description: >
 
 # accessibility-engineer
 
-Работай как профильный инженер по доступности продукта. Твоя задача - встроить доступность в фактический UX и код, а не добавить несколько `aria-*` атрибутов перед релизом.
+Act as the product accessibility engineer. Integrate accessibility into actual UX and code rather than adding a few `aria-*` attributes just before release.
 
-## Когда подключать
+## Activation
 
-Skill обязателен, если задача затрагивает хотя бы одно из следующего:
+This skill is required for changes to pages, forms, navigation, interactive flows, modals/dialogs/drawers/sheets/popovers/dropdowns/tooltips, keyboard/focus/tab/Escape/Back behavior, charts/tables/progress/statuses, errors/validation/loading/empty/partial/disabled states, responsive mobile/TMA layouts and keyboard, animations/flashing/scroll/reduced motion, public content/heading structure/landmarks/links, uploads/auth/destructive actions and WCAG/accessibility readiness claims.
 
-- новую страницу, форму, навигацию или интерактивный сценарий;
-- modal, dialog, drawer, sheet, popover, dropdown или tooltip;
-- клавиатуру, focus, tab order, escape/back behavior;
-- график, таблицу, прогресс, цветовую индикацию или статус;
-- ошибки, валидацию, loading/empty/partial/disabled states;
-- responsive/mobile/TMA layout, safe areas или экранную клавиатуру;
-- анимацию, мигание, auto-scroll или reduced motion;
-- публичный контент, heading hierarchy, landmarks или ссылки;
-- upload, auth, destructive action или другой high-risk flow;
-- утверждение о WCAG/accessibility readiness.
+Skip for a pure backend refactor with no user-facing API/error contract changes.
 
-Не подключай skill к чистому backend-refactor без пользовательского контракта, если API и ошибки не меняются.
+## Baseline and evidence
 
-## Базовый стандарт
+Aim for practical WCAG 2.2 AA coverage of relevant surfaces, but distinguish automated checks, manual keyboard checks, assistive-technology checks, source-only review and unverified environments. Never claim full WCAG conformance from Lighthouse, axe or unit tests alone.
 
-Цель - практическое соответствие WCAG 2.2 AA для релевантных поверхностей, но итоговый отчёт должен различать:
+## First steps
 
-- проверено автоматически;
-- проверено вручную клавиатурой;
-- проверено с assistive technology;
-- проверено только по коду;
-- не проверено из-за ограничений среды.
+1. Identify the main user journey and critical actions.
+2. Find existing Design V2 primitives and accessibility contracts.
+3. Inspect DOM/semantic tree, not only screenshots.
+4. Define keyboard and focus lifecycle before implementation.
+5. List default, hover, focus-visible, active, disabled, loading, error, success, empty and partial states.
+6. Provide text alternatives for visual information.
+7. Verify touch targets, zoom, safe areas, viewport and keyboard separately in mobile/TMA.
 
-Не заявляй полное соответствие на основании Lighthouse/axe или unit-тестов.
+## Semantics and structure
 
-## Сначала
+- Prefer native `button`, `a`, `input`, `select`, `dialog`, `table`, `details`.
+- Avoid making a `div` into a button without necessity.
+- Use one logical `h1`; heading levels should not be chosen for font size.
+- Landmarks and accessible names should aid navigation without redundant noise.
+- Links must be understandable out of context; avoid many indistinguishable "Подробнее" links without unique accessible names.
+- Name meaningful icon-only actions; hide decorative icons.
+- Do not redundantly announce the same screen-reader text through nested elements.
 
-1. Определи основной пользовательский сценарий и его критические действия.
-2. Найди существующие Design V2 primitives и accessibility contracts.
-3. Проверь DOM/semantic tree, а не только визуальный снимок.
-4. Определи keyboard и focus lifecycle до реализации.
-5. Зафиксируй состояния: default, hover, focus-visible, active, disabled, loading, error, success, empty, partial.
-6. Определи текстовую альтернативу всем визуальным данным.
-7. Проверь mobile/TMA отдельно: touch targets, zoom, safe areas, viewport и keyboard.
+## Keyboard and focus
 
-## Семантика и структура
+For each interactive flow, specify and verify tab order, visible `focus-visible`, keyboard activation, Escape/Back, initial focus in dialogs/sheets, modal-only focus traps, focus restoration to the trigger, absence of traps, stability after async update/delete/reorder, and avoidance of unexpected mobile autofocus.
 
-- Используй нативный элемент, когда он существует: `button`, `a`, `input`, `select`, `dialog`, `table`, `details`.
-- Не превращай `div` в кнопку без крайней необходимости.
-- Один логичный `h1`; уровни заголовков не выбираются ради размера шрифта.
-- Landmarks и доступные имена должны помогать навигации, а не дублировать шум.
-- Ссылки описывают назначение вне контекста; не использовать десятки одинаковых «Подробнее» без доступного имени.
-- Иконка без текста получает точное accessible name; декоративная иконка скрывается.
-- Не дублируй одинаковый текст для screen reader через несколько вложенных элементов.
+Drag-and-drop must have an accessible alternative.
 
-## Keyboard и focus
+## Forms and errors
 
-Для каждого интерактивного сценария опиши и проверь:
+- Associate labels programmatically; placeholders are not labels.
+- State required fields, hints, units and errors unambiguously.
+- Explain error correction and connect errors to fields.
+- After submit, show an error summary/focus the first error without losing entered data.
+- Do not rely on color alone.
+- Keep date/time/weight/reps/calorie-macronutrient formats understandable.
+- Destructive actions need explicit object identification and predictable confirmation.
+- A disabled control alone cannot explain why an action is unavailable.
 
-- ожидаемый tab order;
-- видимый `focus-visible`;
-- открытие с клавиатуры;
-- Escape/Back behavior;
-- начальный focus при открытии dialog/sheet;
-- focus trap только там, где это действительно modal;
-- возврат focus инициатору после закрытия;
-- отсутствие keyboard trap;
-- сохранение focus после async update/delete/reorder;
-- отсутствие неожиданного auto-focus на mobile.
+## Responsive, touch and reflow
 
-Drag-and-drop не может быть единственным способом перестановки. Нужна доступная альтернатива.
+Test at least 1440, 1280, 768, 430, 390 and 360 px with touch/`hover: none`, enlarged text and browser zoom.
 
-## Формы и ошибки
+- Avoid mandatory horizontal scrolling except justified specialized areas with an alternative.
+- Make touch targets usable during workouts; aim for at least 44x44 px for primary controls.
+- Fixed/sticky UI must not cover content, focus, safe areas or the on-screen keyboard.
+- Preserve core journeys at 200% and 400% zoom.
+- Long exercise/product/client names and localized text must not break layouts.
 
-- Label должен быть программно связан с полем.
-- Placeholder не заменяет label.
-- Required, hint, unit и error объявляются однозначно.
-- Ошибка сообщает, что исправить, и связывается с полем.
-- После submit пользователь получает summary/focus на первую ошибку без потери введённых данных.
-- Цвет не является единственным носителем ошибки или успеха.
-- Формат даты, времени, веса, повторов и КБЖУ должен быть понятен.
-- Destructive action требует ясного имени объекта и предсказуемого подтверждения.
-- Disabled control не должен быть единственным способом объяснить, почему действие недоступно.
+## Color, data and motion
 
-## Responsive, touch и reflow
+- Check text/control/focus/meaningful-graphic contrast in both themes.
+- Do not convey chart, status, RIR, progress or calendar meaning through color alone.
+- Charts need descriptions, units, time periods and access to values/table data.
+- Avoid endless announced or flashing loading skeletons.
+- Honor `prefers-reduced-motion`; critical actions must not depend on animations.
+- Avoid flashing, heavy parallax or uncontrolled auto-carousels.
 
-Проверяй минимум 1440, 1280, 768, 430, 390 и 360 px, touch/`hover: none`, а также увеличение текста/масштаб браузера.
+## TMA and mobile
 
-- Никакого обязательного горизонтального scroll, кроме оправданной специализированной области с альтернативой.
-- Touch targets должны быть практически удобны, особенно во время тренировки; для primary controls ориентир не меньше 44x44 px.
-- Fixed/sticky UI не перекрывает content, focus, safe areas и экранную клавиатуру.
-- На 200%/400% zoom основной сценарий остаётся выполнимым.
-- Длинные имена упражнений, продуктов, клиентов и локализованный текст не ломают композицию.
+Use `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md` and check safe/content-safe areas, Telegram BackButton/browser history, current/stable viewport, keyboard/focus, background restore, theme changes, platform/shared controls, touch-only and external-keyboard access. Telegram's theme cannot justify lower contrast or a separate inconsistent palette.
 
-## Цвет, визуальные данные и motion
+## Verification
 
-- Проверяй contrast текста, controls, focus indicator и meaningful graphics в обеих темах.
-- Не полагайся на цвет для статусов, графиков, RIR, прогресса или календаря.
-- График получает текстовое описание, units, period и доступ к точкам/таблице.
-- Skeleton/loading не мигает и не объявляется бесконечно.
-- Respect `prefers-reduced-motion`; критическое действие не зависит от анимации.
-- Избегай flashing, сильного parallax и автоматической карусели без управления.
+Select scope-appropriate semantic/component tests, axe-like smoke checks, manual keyboard pass, focus order/restoration, assistive-technology spot checks when available, both themes, 360/390/768/desktop, zoom/reflow, errors/loading/empty/partial, reduced motion, touch targets and mocked/real TMA with honest evidence labeling.
 
-## TMA и mobile
+## Deliverable
 
-Для Telegram Mini App дополнительно используй `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md` и проверь:
+Report tested journeys, barriers fixed, actual automated/manual evidence, limitations, remaining reproducible issues with severity, and why changes have not degraded core UX.
 
-- safe areas и content safe areas;
-- Telegram BackButton и browser history;
-- current/stable viewport resize, keyboard и focus visibility;
-- foreground/background restore без потери accessible state;
-- theme change без потери focus/state;
-- отсутствие конфликта platform controls с shared controls;
-- доступность при использовании только touch и только внешней клавиатуры, где применимо.
-
-Telegram theme не оправдывает снижение контраста или отдельную несогласованную palette.
-
-## Проверки
-
-Минимальный набор в зависимости от scope:
-
-- semantic/component tests;
-- automated axe/аналог как smoke, не как доказательство полного соответствия;
-- ручной keyboard pass;
-- focus order и focus restoration;
-- screen-reader spot checks для критичных сценариев, если среда доступна;
-- light/dark;
-- 360/390/768/desktop;
-- zoom/reflow;
-- errors/loading/empty/partial;
-- reduced motion;
-- touch target review;
-- TMA mock или реальный client с честной фиксацией уровня проверки.
-
-## Результат
-
-В отчёте укажи:
-
-- какие сценарии проверены;
-- какие barriers исправлены;
-- какие проверки выполнены автоматически и вручную;
-- известные ограничения;
-- remaining issues с severity и воспроизводимостью;
-- почему сделанные изменения не ухудшили основной UX.
-
-## Внешний чек-лист
-
-При необходимости используй `../../references/external-quality/ui-skills/fixing-accessibility.md`
-для точечного поиска проблем; не приравнивай его выполнение к доказательству WCAG.
+Optional targeted checklist: `../../references/external-quality/ui-skills/fixing-accessibility.md`. Using a checklist alone is not proof of WCAG compliance.
