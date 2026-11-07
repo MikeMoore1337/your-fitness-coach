@@ -9,224 +9,98 @@ description: >
 
 # telegram-engineer
 
-Работай с Telegram как с отдельной платформой, но не создавай отдельный продукт без необходимости.
-Бот, Telegram Mini App и канал могут использовать общий backend и общие доменные сервисы, однако у
-каждой поверхности есть собственные trust boundaries, ограничения и failure modes.
+Treat Telegram as a distinct platform without creating a separate product. Bot, Mini App and channel may share backend/domain services but have separate trust boundaries, limits and failure modes.
 
-## Сначала
+## First
 
-Перед изменением кода:
+Before changes read `AGENTS.md`, relevant documentation, task and configuration. Establish actual Bot API/Aiogram/Mini App versions, runtime, Router/Dispatcher/FSM storage, polling/webhooks, jobs/tests, login/linking, notifications, timezones, proxy and deep-link contracts, and the process owning the bot token.
 
-- прочитай корневой `AGENTS.md`, релевантные `docs/`, task и текущую конфигурацию;
-- определи фактические версии Telegram Bot API, Aiogram и Mini App API;
-- проверь текущий runtime, routers, Dispatcher, FSM storage, polling/webhook, jobs и tests;
-- найди существующие auth/linking, notification, timezone, proxy и deep-link contracts;
-- проверь, какой процесс владеет bot token и кто запускает polling/webhook;
-- сверяй изменяемые Telegram API, лимиты и BotFather-процедуры с актуальной официальной
-  документацией на момент реализации;
-- не меняй token, production channel, BotFather или реальные права администратора без явного
-  запроса владельца.
+Verify affected Bot API limits and BotFather procedures against current official documentation. Never change production bot token, channel, BotFather or real admin rights without explicit owner authorization. Do not create a parallel bot runtime/token/TMA for a new support/news/moderation feature.
 
-Не создавай второй bot runtime, token или дублирующую TMA только потому, что новая функция связана
-с поддержкой, новостями или модерацией.
+## Platform surfaces
 
-## Границы платформы
+1. **Private bot chat**: commands, support/feedback, preferences, notifications and moderation.
+2. **Telegram Mini App**: shared web UI with its own platform adapter.
+3. **Channel**: publication only to configured allowlisted channels with verified permissions.
 
-Разделяй минимум три поверхности:
+Bot polling and browser Telegram OAuth/login are separate network flows; do not combine them into implicit proxy/TLS configuration or break one to repair the other.
 
-1. **Личный чат с ботом** - команды, support/feedback, настройки, уведомления, moderation.
-2. **Telegram Mini App** - общий Web-интерфейс внутри Telegram с отдельным platform adapter.
-3. **Канал** - публикация только в заранее настроенные каналы с проверенными правами.
+## Bot runtime and Aiogram
 
-Bot API polling и browser Telegram OAuth/login - разные сетевые сценарии. Не объединяй их в
-неявную proxy/TLS-конфигурацию и не ломай один поток ради другого.
+One bot token must have exactly one long-polling owner. For scale, assess whether webhook transport is justified and plan migration separately. Use `Dispatcher` for orchestration and small `Router` modules; keep business logic, SQL and integrations outside handlers. Use explicit services and testable Bot API adapters.
 
-## Bot runtime и Aiogram
+Startup metadata synchronization, registration and health checks must be idempotent and avoid endless restarts during temporary Telegram failures. Preserve existing polling locks, bounded retries/backoff, graceful shutdown and allowed-updates rules. Do not remove the legacy runtime before functions/tests are migrated and shutdown is controlled.
 
-- Один bot token имеет одного владельца long polling. Несколько polling-процессов для одного token
-  недопустимы.
-- Если требуется горизонтальное масштабирование, сначала проверь, оправдан ли webhook; не меняй
-  transport без отдельной причины и migration plan.
-- Делай `Dispatcher` корневым orchestration layer, а функции разделяй на небольшие `Router`.
-- Не размещай доменную логику, SQL и внешние интеграции прямо в handlers.
-- Используй явные dependencies/services и тестируемые adapters для Bot API.
-- Startup metadata sync, health checks и registration должны быть идемпотентными и не создавать
-  бесконечный restart loop при временной ошибке Telegram.
-- Сохраняй существующие polling lock, retry/backoff, graceful shutdown и allowed-updates policy.
-- Не удаляй legacy runtime до переноса функций, тестов и контролируемого отключения.
+## Commands, menus and `/start`
 
-## Команды, меню и `/start`
+Keep canonical commands in one place, reused by `setMyCommands`, `/help`, BotFather owner checklist and tests. Observe scopes/languages; visible commands are not authorization. Backend must recheck roles and rights.
 
-Храни canonical command definitions в одном месте и переиспользуй их для:
+Order `/start` payload handlers explicitly: sensitive/specific payloads (account linking) before generic menu fallbacks. Unknown payloads should fail safely with understandable state; unknown commands must not auto-forward to admins. Keep admin commands out of default public scope. Read Mini App/privacy URLs and public links from verified shared configuration, never production staging tunnels.
 
-- runtime `setMyCommands`;
-- `/help`;
-- BotFather owner checklist;
-- tests.
+## FSM and multi-step flows
 
-Учитывай command scopes и language variants, но не считай видимость команды authorization boundary.
-Backend всегда повторно проверяет роль и разрешение пользователя.
-
-Для `/start` зафиксируй явный порядок payload handlers. Более специфичные и security-sensitive
-payloads, например account linking, должны обрабатываться раньше generic menu handler.
-
-Требования:
-
-- неизвестный payload безопасно приводит к понятному состоянию, а не к raw error;
-- unknown command не пересылается автоматически администратору;
-- admin-only команды не попадают в default public scope;
-- Mini App URL, privacy URL и public deep links берутся из общей проверенной конфигурации;
-- menu button и команды не должны указывать на временный tunnel или staging в production.
-
-## FSM и многошаговые сценарии
-
-Для support, редактирования, moderation и других многошаговых потоков:
-
-- зафиксируй состояния и допустимые переходы;
-- поддержи `/cancel`, timeout/TTL и понятный restart policy;
-- не считай in-memory FSM достаточным, если потеря состояния после restart нарушает критический
-  сценарий;
-- свободный текст вне активного flow не должен неожиданно становиться обращением или admin action;
-- поддерживаемые media types должны иметь allowlist, ограничения и безопасный fallback;
-- не загружай файл на сервер, если достаточно безопасного Bot API copy/forward contract;
-- исключи cross-user state mix-up и повторное применение stale state.
+For support/editing/moderation, define states/transitions, `/cancel`, TTL/timeouts and restart policy. In-memory FSM alone is insufficient when restart loss breaks critical flows. Free text outside an active flow must not silently become a support ticket/admin action. Allowlist media with limits/fallback; use safe Bot API copy/forward instead of downloading files unnecessarily. Prevent cross-user state mixing and stale-state replay.
 
 ## Telegram Mini App
 
-TMA должна переиспользовать общий frontend, API, auth model и design system. Делай отдельный
-platform adapter, а не второй frontend tree.
+Reuse the shared frontend, APIs, authorization model and design system; implement a platform adapter rather than a second UI tree.
 
-### Per-feature mobile/TMA gate
+### Per-feature mobile gate
 
-Для client-facing feature task Telegram review не откладывается до финальной TMA-hardening задачи.
-Текущая task обязана расширить shared smoke и исправить созданную ею TMA regression в пределах scope.
-Финальный hardening проверяет интеграцию целиком, но не является первым mobile pass.
+Every client-facing change must extend applicable shared TMA smoke tests and fix introduced TMA regressions **in its own scope**. Final platform hardening is not a substitute for per-feature verification.
 
-Используй вместе с `$mobile-engineer` и `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md`:
+Use `$mobile-engineer` for keyboard, safe areas, lifecycle, touch and performance; use `$telegram-engineer` for Bot/Mini App API, initData trust, BackButton, links and compatibility, guided by `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md`.
 
-- `$mobile-engineer` отвечает за smartphone interaction, keyboard, safe area, lifecycle, touch и performance;
-- `$telegram-engineer` отвечает за Telegram API, initData trust boundary, BackButton, deep links и client compatibility.
+Required:
 
-Обязательно:
+- Pass only raw `initData` to the trusted backend and verify signature, freshness and bot binding server-side.
+- Never trust `initDataUnsafe`, query parameters, frontend `user_id` or `language_code` as identity.
+- Never log/transmit raw `initData` to analytics, errors or external telemetry.
+- Preserve account linking and allow valid TMA launches without inappropriate browser login.
+- Handle `isActive`, `BackButton`, themes, `viewportHeight`/`viewportStableHeight`, keyboard and `safeAreaInset`/`contentSafeAreaInset`.
+- Handle `viewportChanged`, `safeAreaChanged`, `contentSafeAreaChanged` without losing route/form/dialog state.
+- Degrade gracefully on older/unsupported clients.
+- Never use Telegram theme colors as the sole carrier of contrast/semantics.
+- Preserve unfinished state across Web/TMA context switches when reasonable.
+- Deep links must target permitted app context, never arbitrary URLs/paths.
 
-- передавай на backend только raw `initData` и валидируй подпись, freshness и bot binding на
-  доверенной стороне;
-- не доверяй `initDataUnsafe`, query params, frontend `user_id` или `language_code` как identity;
-- не отправляй raw `initData` в logs, analytics, errors или third-party telemetry;
-- сохраняй auth/account-linking invariants и не заставляй valid TMA launch проходить browser login;
-- учитывай `isActive`, `BackButton`, theme changes, `viewportHeight`/`viewportStableHeight`, keyboard, `safeAreaInset` и `contentSafeAreaInset`;
-- обрабатывай применимые `viewportChanged`, `safeAreaChanged` и `contentSafeAreaChanged` без сброса route/form/dialog state;
-- проверяй unsupported/older client behavior и graceful degradation;
-- не используй Telegram theme colors как единственный источник контраста или semantic meaning;
-- при смене Web/TMA context не теряй незавершённое пользовательское состояние без причины;
-- deep links должны открывать разрешённый внутренний контекст, а не arbitrary URL/path.
+## Callback queries and admin actions
 
-## Callback queries и admin actions
+Bind sensitive callbacks to actor, resource/draft/user scope, immutable revision/version, concrete action and relevant expiry/staleness checks. Validate all server-side because callback data is untrusted.
 
-Каждый security-sensitive callback связывай минимум с:
+Idempotency must prevent duplicate replies, subscriptions, publications or mutations from retries/double taps. Stale callbacks must report that the original revision was replaced, not apply the action to a new version.
 
-- actor;
-- resource/draft/user scope;
-- immutable revision/version;
-- конкретным action;
-- сроком действия или stale-state check, если это нужно.
+## Channel, moderation and publishing
 
-Проверяй всё server-side. Callback data - недоверенный ввод.
+- Channel IDs/usernames come from server allowlists, never arbitrary callbacks/commands/frontend.
+- Verify membership and minimum admin rights before publishing; lack of rights is not an indefinitely retriable transient error.
+- AI-generated material requires explicit moderation when the task specifies it.
+- Bind approval to exact immutable revision and media hash. Regeneration invalidates the old approval.
+- Retry publishing the **approved** revision only, not a newer draft.
+- Keep idempotency key, resulting content hash, channel/message IDs and audit fields.
+- Escape untrusted HTML; use safe entities/formatting.
+- Verify active Bot API text/caption/media limits, never guess.
+- When over limits use a defined concise/text-only fallback, not an unexpected multi-message thread.
+- Images are optional; image-provider errors must not block the entire editorial flow.
 
-Actions должны быть идемпотентными. Повторный callback, Telegram retry или двойное нажатие не должны
-создавать двойную публикацию, ответ, подписку или изменение. Stale callback должен объяснять, что
-revision уже заменена, а не применять действие к новому состоянию.
+## Broadcasts and anti-spam
 
-## Канал, moderation и публикация
+Optional news/marketing digest defaults OFF and requires explicit opt-in; distinguish product notifications from optional digests. Unsubscribe must be immediate/idempotent without mandatory confirmation. Recheck opt-in directly before sending queued messages. Rate-limit below current free limits; honor `429`/`retry_after`, bound attempts and disable optional delivery to blocked/deactivated chats under policy. Never silently re-enable subscriptions. Bots cannot assume they can message accounts that have never interacted.
 
-- Channel id/username берётся только из server-side allowlist/configuration.
-- Не принимай arbitrary chat id из callback, command или frontend.
-- Проверяй membership и минимально необходимые admin rights до публикации.
-- Не выдавай отсутствие прав за transient retry навсегда.
-- Generated content не публикуется автоматически, если task требует owner moderation.
-- Approval привязывается к точной immutable revision и exact media hash.
-- Regeneration создаёт новую revision и отменяет старое approval.
-- Retry публикует только ранее approved revision, а не самый новый draft.
-- Храни idempotency key, итоговый content hash, channel id, message id и audit metadata.
-- Форматируй через безопасные entities/HTML; не вставляй недоверенный HTML без escaping.
-- Текущие text/caption/media limits проверяй по используемой версии Bot API, не по памяти.
-- Если content не помещается, используй заранее определённую concise/text-only strategy. Не дроби
-  один пост в неожиданную серию сообщений.
-- Изображение является optional: provider failure не должен блокировать весь editorial flow.
+## Security and privacy
 
-## Рассылки и anti-spam
+Never log bot/provider secrets, raw TMA initData, private support messages, subscriber/admin/member lists, user documents/photos or unnecessary Telegram IDs. Keep admin IDs in secure server config, not UI authorization. Make source fetch SSRF-safe with redirect/DNS/type/size/timeout bounds, clean up temporary media, preserve TLS verification and hide raw API errors from users. Also use `$security-engineer` and `$privacy-engineer` for sensitive changes.
 
-- News/marketing digest выключен по умолчанию и требует явного opt-in.
-- Product notifications и optional digest имеют разные preferences.
-- Отписка должна быть мгновенной, идемпотентной и без обязательного подтверждения.
-- Перепроверяй subscription непосредственно перед send, включая queued delivery.
-- Используй bounded rate ниже актуального бесплатного лимита, обрабатывай `429` и `retry_after`.
-- Ограничивай retries и provider attempts; blocked/deactivated chat отключает будущую optional
-  доставку по зафиксированной policy.
-- Никогда не включай подписку повторно молча.
-- Bots не могут рассчитывать на доставку пользователю, который не начал взаимодействие с ботом;
-  проектируй opt-in flow соответственно.
+## Tests
 
-## Security и privacy
+Select proportionate handler/service unit tests, `Dispatcher` routing without live polling, mocked Bot API adapters, FSM/jobs/subscription/idempotency integration, Web/TMA adapter browser tests, reusable TMA mock with version/platform/theme/viewport/safe-area/BackButton events, separate real Telegram Android/iOS smoke plus optional Desktop, explicitly configured test bot/channel manual smoke and owner-operated BotFather/channel checklist.
 
-Не логируй и не включай в ошибки:
+Use relevant portions of `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md` and existing bot tests. Never silently change production BotFather/channel settings.
 
-- bot tokens и provider secrets;
-- raw TMA `initData`;
-- тексты private support requests;
-- subscriber lists;
-- admin/member lists;
-- документы и фотографии пользователя;
-- лишние Telegram/user identifiers.
+## Collaboration and report
 
-Дополнительно:
+`$backend-engineer`: APIs/transactions; `$frontend-engineer`: shared UI; `$localization-engineer`: locale/bot messages; `$evidence-content-editor`: publishing; `$llm-engineer`: AI generation; `$platform-engineer`: runtime/deployment; `$observability-engineer`: safe metrics; `$qa-engineer`: regressions.
 
-- admin ids хранятся в безопасной server-side конфигурации;
-- role visibility в Telegram UI не заменяет authorization;
-- external source fetch должен быть SSRF-safe и ограничен по redirect, DNS, content type, size и
-  timeout;
-- временные media/source artifacts имеют retention и cleanup;
-- не ослабляй TLS verification;
-- не раскрывай raw Telegram/API errors пользователю.
+Do not substitute `$mobile-engineer` for Telegram API/security expertise merely because the flow runs on a phone; both often apply to TMA flows.
 
-Для security-sensitive потока используй также `$security-engineer` и `$privacy-engineer`.
-
-## Проверки
-
-Выбирай уровень проверки по риску:
-
-- чистые handler/service unit tests;
-- routing tests через `Dispatcher` без реального polling;
-- mocked/fake Bot API adapter;
-- persistence/integration tests для FSM, jobs, subscriptions и idempotency;
-- Web/TMA browser tests для platform adapter;
-- reusable TMA mock с version/platform/theme/viewport/safe-area/BackButton events;
-- реальные Telegram Android и iOS smoke отдельно от mock, Telegram Desktop дополнительно;
-- opt-in manual smoke с test bot/channel только при явной конфигурации;
-- production owner checklist без автоматического изменения BotFather/channel.
-
-Для TMA-проверок прочитай `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md` и используй только применимые разделы. Для Bot/channel flow следуй матрице рисков этой task и существующим bot tests.
-
-## Совместная работа с другими skills
-
-- `$backend-engineer` - API, services, transactions и integrations;
-- `$frontend-engineer` - общий Web/TMA UI;
-- `$localization-engineer` - locale preference и localized bot product messages;
-- `$evidence-content-editor` - новости, дайджесты и editorial revisions;
-- `$llm-engineer` - provider-neutral generation, если Telegram использует LLM;
-- `$platform-engineer` - runtime, jobs, secrets и deployment;
-- `$observability-engineer` - safe metrics, stuck jobs и outage diagnosis;
-- `$qa-engineer` - regression strategy.
-
-Не используй `$mobile-engineer` вместо этого skill только потому, что Telegram открыт на телефоне. Для client-facing TMA flow обычно нужны оба: `$mobile-engineer` закрывает smartphone UX/runtime, `$telegram-engineer` - Telegram-specific API и trust boundaries.
-
-## Финальный отчёт
-
-Укажи:
-
-- какие Telegram surfaces изменены;
-- сохранён ли один polling/webhook owner;
-- какие commands/deep links/auth contracts затронуты;
-- какие BotFather/channel действия остаются ручными;
-- какие tests и smoke checks реально выполнены;
-- ограничения, rate-limit и deployment implications.
+Final report: changed Telegram surfaces, polling/webhook ownership, commands/links/auth contracts, manual BotFather/channel actions, actual checks and smoke evidence, limits, rate limits and deployment implications.
