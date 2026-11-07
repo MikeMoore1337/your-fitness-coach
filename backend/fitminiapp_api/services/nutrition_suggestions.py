@@ -218,17 +218,11 @@ def _reasons(
     if (
         day.remaining is not None
         and day.remaining.protein_g is not None
+        and day.remaining.protein_g > ZERO
         and nutrition.protein_g is not None
-        and nutrition.protein_g <= max(day.remaining.protein_g, ZERO)
+        and ZERO < nutrition.protein_g <= day.remaining.protein_g
     ):
         result.append("protein_fit")
-    if (
-        day.remaining is not None
-        and day.remaining.fat_g is not None
-        and nutrition.fat_g is not None
-        and nutrition.fat_g <= max(day.remaining.fat_g, ZERO)
-    ):
-        result.append("lower_known_fat")
     if _confidence(nutrition) == "partial":
         result.append("partial_nutrition")
     return result or ["used"]
@@ -400,8 +394,12 @@ def _limitations(day: FoodDiaryDayResponse, confidence: SuggestionConfidence | N
         "Это варианты из уже сохранённых продуктов, рецептов и шаблонов, а не предписание.",
         "Проверьте состав и количество перед добавлением.",
     ]
-    if day.targets is None or day.remaining is None:
+    if day.targets is None:
         limitations.insert(0, "Настройте цель КБЖУ, чтобы рассчитывать остаток на день.")
+    elif day.remaining is None:
+        limitations.insert(
+            0, "Не удалось рассчитать остаток: проверьте доступность продуктов в плане."
+        )
     elif any(
         value is None
         for value in (day.remaining.protein_g, day.remaining.fat_g, day.remaining.carbs_g)
@@ -428,13 +426,17 @@ def get_nutrition_suggestions(
     remaining_override: FoodDiaryTargets | None = None,
     force_context: bool = False,
 ) -> NutritionSuggestionsResponse:
-    day = get_food_diary_day(db, user, diary_date)
+    day = get_food_diary_day(db, user, diary_date, allow_future=force_context)
     if force_context or targets_override is not None or remaining_override is not None:
         day = day.model_copy(
             update={
-                "targets": targets_override if targets_override is not None else day.targets,
+                "targets": (
+                    targets_override
+                    if force_context or targets_override is not None
+                    else day.targets
+                ),
                 "remaining": remaining_override
-                if remaining_override is not None
+                if force_context or remaining_override is not None
                 else day.remaining,
             }
         )

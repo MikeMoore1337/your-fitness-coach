@@ -33,7 +33,11 @@ from fitminiapp_api.schemas.nutrition_plan import (
     NutritionPlanWeekResponse,
 )
 from fitminiapp_api.schemas.nutrition_power import FoodDiaryBatchItem, NutritionSuggestionsResponse
-from fitminiapp_api.services.food_diary import FoodDiaryError, create_food_diary_batch
+from fitminiapp_api.services.food_diary import (
+    FoodDiaryError,
+    create_food_diary_batch,
+    ensure_suggestion_day_is_mutable,
+)
 from fitminiapp_api.services.foods import (
     FoodError,
     FoodNutrition,
@@ -599,6 +603,7 @@ def fill_plan_from_suggestion(
         if replayed:
             return _build_day(db, user, operation.target_date, replayed=True)
 
+        ensure_suggestion_day_is_mutable(db, user, payload.plan_date)
         plan = _plan_for_write(db, user, payload.plan_date)
         _check_revision(plan, payload.expected_revision)
         suggestions = get_plan_fill_suggestions(db, user, payload.plan_date)

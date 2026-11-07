@@ -104,6 +104,161 @@ def _add_target(telegram_user_id: int) -> None:
         )
 
 
+def test_plan_suggestions_do_not_use_diary_remaining_when_plan_is_incomplete(client) -> None:
+    headers = _auth(client, 74_605)
+    _add_target(74_605)
+    diary_food = _store_food("Продукт из дневника")
+    planned_food = _store_food("Недоступный продукт плана")
+    selected_date = _today().isoformat()
+
+    diary = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": diary_food,
+            "diary_date": selected_date,
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert diary.status_code == 201
+    plan = client.post(
+        "/api/v1/nutrition/plans/items",
+        headers={**headers, "Idempotency-Key": "plan-incomplete-74605"},
+        params={"plan_date": selected_date, "meal_type": "lunch", "expected_revision": 0},
+        json={"food_id": planned_food, "amount": "100", "amount_unit": "g"},
+    )
+    assert plan.status_code == 201, plan.text
+    with get_session_context() as db:
+        db.get(Food, planned_food).status = "disabled"
+
+    day = client.get(
+        "/api/v1/nutrition/plans/day", headers=headers, params={"plan_date": selected_date}
+    )
+    assert day.status_code == 200
+    assert day.json()["nutrition_complete"] is False
+    assert day.json()["remaining"] is None
+    suggestions = client.get(
+        "/api/v1/nutrition/plans/suggestions", headers=headers, params={"plan_date": selected_date}
+    )
+    assert suggestions.status_code == 200
+    assert suggestions.json()["targets"] == day.json()["targets"]
+    assert suggestions.json()["remaining"] is None
+    assert suggestions.json()["candidates"] == []
+    assert any("доступность продуктов" in text for text in suggestions.json()["limitations"])
+    assert not any("Настройте цель" in text for text in suggestions.json()["limitations"])
+
+
+def test_plan_suggestions_support_a_future_date_without_allowing_future_diary(client) -> None:
+    headers = _auth(client, 74_607)
+    _add_target(74_607)
+    food_id = _store_food("Продукт для будущего плана")
+    today = _today()
+    entry = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": today.isoformat(),
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert entry.status_code == 201
+    future = (today + timedelta(days=1)).isoformat()
+    day = client.get("/api/v1/nutrition/plans/day", headers=headers, params={"plan_date": future})
+    assert day.status_code == 200
+    suggestions = client.get(
+        "/api/v1/nutrition/plans/suggestions", headers=headers, params={"plan_date": future}
+    )
+    assert suggestions.status_code == 200, suggestions.text
+    assert suggestions.json()["diary_date"] == future
+    assert suggestions.json()["remaining"] == day.json()["remaining"]
+    assert any(
+        item["candidate_id"] == f"food:{food_id}" for item in suggestions.json()["candidates"]
+    )
+    future_diary = client.get(
+        "/api/v1/nutrition/diary", headers=headers, params={"diary_date": future}
+    )
+    assert future_diary.status_code == 422
+
+
+def test_plan_suggestion_retry_does_not_change_completed_past_day(client, monkeypatch) -> None:
+    headers = _auth(client, 74_606)
+    _add_target(74_606)
+    food_id = _store_food("План для завершённого дня")
+    selected_date = _today()
+    diary = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": selected_date.isoformat(),
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert diary.status_code == 201
+    suggestions = client.get(
+        "/api/v1/nutrition/plans/suggestions",
+        headers=headers,
+        params={"plan_date": selected_date.isoformat()},
+    )
+    assert suggestions.status_code == 200
+    candidate = next(
+        item
+        for item in suggestions.json()["candidates"]
+        if item["candidate_id"] == f"food:{food_id}"
+    )
+    payload = {
+        "plan_date": selected_date.isoformat(),
+        "meal_type": "lunch",
+        "candidate_id": candidate["candidate_id"],
+        "items": [{"position": 0, "food_id": food_id, "amount": "100", "amount_unit": "g"}],
+        "expected_revision": 0,
+    }
+    first = client.post(
+        "/api/v1/nutrition/plans/fill",
+        headers={**headers, "Idempotency-Key": "plan-past-74606"},
+        json=payload,
+    )
+    assert first.status_code == 201, first.text
+    completed = client.put(
+        "/api/v1/nutrition/diary/status",
+        headers=headers,
+        json={"diary_date": selected_date.isoformat(), "status": "complete"},
+    )
+    assert completed.status_code == 200
+    monkeypatch.setattr(
+        timezone_module, "today_in_timezone", lambda _timezone: selected_date + timedelta(days=1)
+    )
+
+    retry = client.post(
+        "/api/v1/nutrition/plans/fill",
+        headers={**headers, "Idempotency-Key": "plan-past-74606"},
+        json=payload,
+    )
+    assert retry.status_code == 201
+    assert retry.json()["replayed"] is True
+    changed = client.post(
+        "/api/v1/nutrition/plans/fill",
+        headers={**headers, "Idempotency-Key": "plan-past-74606-new"},
+        json={**payload, "expected_revision": 1},
+    )
+    assert changed.status_code == 409
+    day = client.get(
+        "/api/v1/nutrition/plans/day",
+        headers=headers,
+        params={"plan_date": selected_date.isoformat()},
+    )
+    assert day.status_code == 200
+    assert day.json()["revision"] == 1
+    assert len(_items(day.json())) == 1
+
+
 def test_plan_day_week_crud_replay_stale_write_and_diary_isolation(client) -> None:
     headers = _auth(client, 74_601)
     other_headers = _auth(client, 74_602)

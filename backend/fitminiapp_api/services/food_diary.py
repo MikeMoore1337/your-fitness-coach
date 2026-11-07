@@ -21,6 +21,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryEntry,
     FoodDiaryRepeatPreview,
 )
+from fitminiapp_api.models.nutrition import NutritionTargetDaySnapshot
 from fitminiapp_api.models.nutrition_plan import NutritionPlanItem
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.user import User
@@ -111,6 +112,16 @@ def _ensure_day_accepts_entries(db: Session, user: User, diary_date: date) -> No
         raise FoodDiaryConflictError(
             "day is marked as fasted; change completeness before adding food"
         )
+
+
+def ensure_suggestion_day_is_mutable(db: Session, user: User, diary_date: date) -> None:
+    if diary_date < today_for_user(user):
+        status = _stored_day_status(db, user, diary_date)
+        snapshot = db.get(NutritionTargetDaySnapshot, (user.id, diary_date))
+        if snapshot is not None or (status is not None and status.status in {"complete", "fasted"}):
+            raise FoodDiaryConflictError(
+                "Завершённый прошедший день нельзя изменить с помощью рекомендаций."
+            )
 
 
 def _visible_food(db: Session, user: User, food_id: int) -> Food:
@@ -576,6 +587,8 @@ def create_food_diary_batch(
         return replay
 
     _validate_diary_date(user, diary_date)
+    if operation_kind == "suggestion":
+        ensure_suggestion_day_is_mutable(db, user, diary_date)
     _ensure_day_accepts_entries(db, user, diary_date)
     operation = FoodDiaryBatchOperation(
         user_id=user.id,
@@ -767,9 +780,12 @@ def get_food_diary_day(
     db: Session,
     user: User,
     diary_date: date | None,
+    *,
+    allow_future: bool = False,
 ) -> FoodDiaryDayResponse:
     selected_date = diary_date or today_for_user(user)
-    _validate_diary_date(user, selected_date)
+    if not allow_future:
+        _validate_diary_date(user, selected_date)
     entries = (
         db.query(FoodDiaryEntry)
         .filter(
