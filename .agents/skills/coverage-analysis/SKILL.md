@@ -7,38 +7,19 @@ description: >
 
 # coverage-analysis
 
-Code coverage - вспомогательный сигнал. Главный объект - behavior/risk coverage.
+Code coverage is supplementary; behavior/risk coverage is the main objective.
 
 ## Build a matrix
 
-Для feature/flow перечисли:
+For every feature/flow list critical happy, negative/error, boundary, authorization, persistence, recovery/retry, concurrency, mobile/TMA, accessibility, privacy/security, migration/backward-compatibility and external-dependency-failure paths.
 
-- critical happy path;
-- negative/error;
-- boundary;
-- auth/authz;
-- persistence;
-- recovery/retry;
-- concurrency;
-- mobile/TMA;
-- accessibility;
-- privacy/security;
-- migration/backward compatibility;
-- external dependency failure.
-
-Для каждого риска укажи:
-
-- existing test/evidence;
-- test layer;
-- доверие к доказательству;
-- gap;
-- recommended cheapest layer.
+For each risk record existing test/evidence, test layer, evidence reliability, remaining gap and cheapest recommended verification layer.
 
 ## Rules
 
-- не предлагай E2E, если unit/API/integration дешевле и достаточно надёжны;
-- не считай число tests метрикой качества;
-- duplicate coverage допустим только для разных failure modes или release-critical defense in depth;
-- критичный gap важнее косметического процента code coverage.
+- Do not recommend E2E when unit/API/integration tests can prove the behavior more cheaply and reliably.
+- Test counts are not quality metrics.
+- Duplicate coverage is acceptable only for different failure modes or release-critical defense in depth.
+- A critical untested risk matters more than a cosmetic code-coverage percentage.
 
-Output должен объяснять, какие риски реально не доказаны и почему.
+The output must explain which risks remain unproven and why.
