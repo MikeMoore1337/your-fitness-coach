@@ -1,0 +1,49 @@
+.compactCard {
+  gap: 6px;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  overflow-wrap: anywhere;
+}
+
+.facts,
+.note,
+.details {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.note {
+  margin: 14px 0 0;
+}
+
+.details summary {
+  min-height: 44px;
+  padding: 12px 0;
+  cursor: pointer;
+}
+
+.details summary > span:first-child {
+  min-width: 0;
+}
+
+.details p {
+  margin: 4px 0 0;
+}
+
+.toggle {
+  margin-top: 10px;
+}
+
+@media (max-width: 640px) {
+  .diarySection {
+    /* shortcut: caps this section while the diary grid can overflow; remove when that grid shrinks. */
+    max-width: calc(
+      100vw - max(var(--v2-space-3), env(safe-area-inset-left, 0px)) -
+        max(var(--v2-space-3), env(safe-area-inset-right, 0px))
+    );
+  }
+}

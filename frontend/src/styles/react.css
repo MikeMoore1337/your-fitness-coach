@@ -9183,6 +9183,7 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 }
 .nutrition-completeness {
   display: grid;
+  min-width: 0;
   gap: 10px;
   padding: 14px;
   border: 1px solid var(--border);
@@ -9192,9 +9193,19 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 }
 .nutrition-completeness__copy {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+.nutrition-completeness__copy > div,
+.nutrition-completeness > fieldset {
+  min-width: 0;
+}
+.nutrition-completeness__copy .ui-badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .nutrition-completeness__copy h2 {
   margin-top: 3px;
@@ -9212,6 +9223,12 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+}
+.nutrition-completeness__actions .ui-button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .nutrition-completeness__actions .ui-button[aria-pressed='true'] {
   border-color: var(--accent-line);
@@ -11421,6 +11438,18 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   .nutrition-diary__intro-actions .ui-button {
     min-width: 0;
     padding-inline: 8px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .nutrition-diary__intro-actions .nutrition-diary__primary-action {
+    gap: 2px !important;
+    min-height: 44px;
+    padding-inline: 4px;
+  }
+  .nutrition-diary__intro-actions .ui-button > span {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .nutrition-repeat-default {
     align-items: stretch;
