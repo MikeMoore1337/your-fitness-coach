@@ -246,4 +246,19 @@ describe('shared hydration pending requests', () => {
     const recovered = await withPendingHydration('user_7', (store) => store);
     expect(recovered.entries[date]?.[0]?.key).toBe(request.key);
   });
+
+  it('does not prepare another request in the context where invalidation failed', async () => {
+    await withPendingHydration('user_7', (store) => store);
+    const put = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementationOnce(() => {
+      throw new DOMException('Storage failed', 'UnknownError');
+    });
+    try {
+      await expect(resetHydrationFences(null)).rejects.toThrow();
+      const task = vi.fn();
+      await expect(withPendingHydration('user_7', task)).rejects.toThrow();
+      expect(task).not.toHaveBeenCalled();
+    } finally {
+      put.mockRestore();
+    }
+  });
 });

@@ -51,21 +51,38 @@ export function hydrationRevision(raw: string | null): string | null {
 async function resetDatabase(retainKey: string | null): Promise<void> {
   if (typeof indexedDB === 'undefined') return;
   const database = await openDatabase();
+  const metadata = { epoch: randomId(), allowLegacy: false, retainKey };
   try {
+    // Publish the invalidation before attempting to remove account metadata.
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE, 'readwrite');
+      transaction.objectStore(STORE).put(metadata, EPOCH_KEY);
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error);
+    });
     await new Promise<void>((resolve, reject) => {
       const transaction = database.transaction(STORE, 'readwrite');
       const store = transaction.objectStore(STORE);
-      const reset = (retained?: unknown) => {
-        store.clear();
-        store.put({ epoch: randomId(), allowLegacy: false }, EPOCH_KEY);
-        if (retainKey) store.put(retained ?? { legacyRetained: true }, retainKey);
+      let failure: unknown;
+      const current = store.get(EPOCH_KEY);
+      const retained = retainKey ? store.get(retainKey) : null;
+      current.onsuccess = () => {
+        if (current.result?.epoch !== metadata.epoch) return;
+        const removeOld = () => {
+          try {
+            store.clear();
+            store.put(metadata, EPOCH_KEY);
+            if (retainKey) store.put(retained?.result ?? { legacyRetained: true }, retainKey);
+          } catch (error) {
+            failure = error;
+            transaction.abort();
+          }
+        };
+        if (retained) retained.onsuccess = removeOld;
+        else removeOld();
       };
-      if (retainKey) {
-        const request = store.get(retainKey);
-        request.onsuccess = () => reset(request.result);
-      } else reset();
       transaction.oncomplete = () => resolve();
-      transaction.onabort = () => reject(transaction.error);
+      transaction.onabort = () => reject(failure ?? transaction.error);
     });
   } finally {
     database.close();
@@ -102,10 +119,10 @@ export async function withHydrationFence<T>(key: string, task: () => T): Promise
           request.onsuccess = () => {
             try {
               const before = localStorage.getItem(key);
-              const expected = request.result as
-                { revision?: string | null; legacyRetained?: boolean } | undefined;
+              const stored = request.result as
+                { revision?: string | null; epoch?: string; legacyRetained?: boolean } | undefined;
               const metadata = (epochRequest.result as
-                { epoch: string; allowLegacy: boolean } | undefined) ?? {
+                { epoch: string; allowLegacy: boolean; retainKey?: string | null } | undefined) ?? {
                 epoch: randomId(),
                 allowLegacy: true,
               };
@@ -113,6 +130,13 @@ export async function withHydrationFence<T>(key: string, task: () => T): Promise
               const currentRevision = hydrationRevision(before);
               const dataEpoch = before === null ? undefined : JSON.parse(before)[EPOCH];
               const previous = before === null ? undefined : JSON.parse(before)[PREVIOUS_REVISION];
+              const expected =
+                stored &&
+                (stored.epoch === metadata.epoch ||
+                  dataEpoch === metadata.epoch ||
+                  metadata.retainKey === key)
+                  ? stored
+                  : undefined;
               const retained =
                 expected &&
                 ((currentRevision &&
@@ -137,7 +161,7 @@ export async function withHydrationFence<T>(key: string, task: () => T): Promise
                   return;
                 }
                 // A local write can survive an aborted IndexedDB transaction.
-                store.put({ revision: currentRevision }, key);
+                store.put({ revision: currentRevision, epoch: metadata.epoch }, key);
               }
               const value = task();
               if (value && typeof (value as { then?: unknown }).then === 'function')
@@ -155,7 +179,7 @@ export async function withHydrationFence<T>(key: string, task: () => T): Promise
                     [EPOCH]: metadata.epoch,
                   }),
                 );
-                store.put({ revision }, key);
+                store.put({ revision, epoch: metadata.epoch }, key);
               }
               result = { stale: false, value };
             } catch (error) {
