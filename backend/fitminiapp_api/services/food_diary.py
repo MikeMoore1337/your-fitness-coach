@@ -367,6 +367,8 @@ def create_food_diary_entry(
     user: User,
     payload: FoodDiaryEntryCreate,
     idempotency_key: str | None = None,
+    *,
+    commit: bool = True,
 ) -> FoodDiaryEntryResponse:
     _lock_diary_user(db, user)
     _validate_diary_date(user, payload.diary_date)
@@ -420,15 +422,16 @@ def create_food_diary_entry(
         entry.nutrition_source = quick_add.nutrition_source
         entry.food_name = quick_add.name or "Быстрый ввод"
         entry.food_brand = None
-        entry.weight_g = Decimal("1")
-        entry.energy_kcal_per_100g = ZERO
-        entry.protein_g_per_100g = ZERO
-        entry.fat_g_per_100g = ZERO
-        entry.carbs_g_per_100g = ZERO
+        photo_quick_add = quick_add.nutrition_source == "photo"
+        entry.weight_g = None if photo_quick_add else Decimal("1")
+        entry.energy_kcal_per_100g = None if photo_quick_add else ZERO
+        entry.protein_g_per_100g = None if photo_quick_add else ZERO
+        entry.fat_g_per_100g = None if photo_quick_add else ZERO
+        entry.carbs_g_per_100g = None if photo_quick_add else ZERO
         entry.fiber_g_per_100g = None
         entry.serving_amount = Decimal("1")
         entry.serving_unit = "serving"
-        entry.serving_weight_g = Decimal("1")
+        entry.serving_weight_g = None if photo_quick_add else Decimal("1")
         entry.nutrition_basis_kind = "per_serving"
         entry.nutrition_basis_amount = Decimal("1")
         entry.nutrition_basis_unit = "serving"
@@ -453,9 +456,14 @@ def create_food_diary_entry(
     )
     record_progress_weekly_action_completion(db, user, "nutrition")
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except IntegrityError:
         db.rollback()
+        if not commit:
+            raise
         if key is None:
             raise
         existing = (
@@ -678,6 +686,7 @@ def update_food_diary_entry(
         recipe is not None or (food is None and entry.recipe_id is not None)
     ) and amount_unit != "g":
         raise FoodDiaryError("recipe diary entries must use grams")
+    photo_quick_add = entry.entry_kind == "quick_add" and entry.nutrition_source == "photo"
     if food is not None:
         calculation_food = food
     elif recipe is not None:
@@ -686,9 +695,10 @@ def update_food_diary_entry(
         except RecipeError as exc:
             raise FoodDiaryError(str(exc)) from exc
         calculation_food = _recipe_as_food(recipe_calculation)
-    else:
+    elif not photo_quick_add:
         calculation_food = _entry_snapshot_as_food(entry)
-    calculation = _calculate_amount(calculation_food, amount, amount_unit)
+    if not photo_quick_add:
+        calculation = _calculate_amount(calculation_food, amount, amount_unit)
 
     if food is not None:
         _copy_food_snapshot(entry, food)
@@ -701,8 +711,12 @@ def update_food_diary_entry(
         entry.logged_at = payload.logged_at
     entry.amount = amount
     entry.amount_unit = amount_unit
-    entry.weight_g = calculation.weight_g
-    _set_nutrition_amount(entry, calculation)
+    if photo_quick_add:
+        entry.weight_g = None
+        entry.serving_weight_g = None
+    else:
+        entry.weight_g = calculation.weight_g
+        _set_nutrition_amount(entry, calculation)
     entry.updated_at = max(now_msk_naive(), entry.updated_at + timedelta(microseconds=1))
     record_lifecycle_milestone(
         db,
