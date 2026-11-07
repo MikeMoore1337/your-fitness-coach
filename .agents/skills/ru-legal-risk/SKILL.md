@@ -1,3 +1,12 @@
+---
+name: ru-legal-risk
+description: >-
+  Review and classify Russian Federation legal and regulatory risks for Your Fitness Coach;
+  verify current primary sources, personal data law, health/AI/recommender obligations,
+  user agreements, advertising, IP, minors, payments and cross-border processing.
+  Propose SAFE/BALANCED/ACCEPT_RISK choices without deciding for the owner or fabricating compliance.
+---
+
 # ru-legal-risk
 
 ## Purpose
