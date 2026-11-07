@@ -5,6 +5,12 @@ is React/TypeScript/Vite, `backend/` is Python/FastAPI/SQLAlchemy/Alembic, `bot/
 and PostgreSQL is the shared database. Preserve the current modular architecture unless the
 current change has a concrete, owner-approved reason to change it.
 
+## Agent instruction language
+
+Write new or revised `AGENTS.md`, repository-owned `SKILL.md`, agent role definitions and machine-directed prompts in **English**. Preserve Russian quotations, trigger examples, legal identifiers, locale resources and other literal text when its exact language is part of the functional contract. Never machine-translate pinned upstream/third-party skills solely to satisfy language consistency.
+
+Human-facing documentation and user-facing UI follow the repository's existing Russian-language policy. Do not translate README, guides, public articles, app copy or user content as part of agent-instruction maintenance. Communicate with the owner in Russian unless requested otherwise.
+
 ## Source of truth and scope
 
 Use this order for the current work:
