@@ -181,7 +181,7 @@ class NaturalInputCommitItem(BaseModel):
     row_id: str = Field(min_length=1, max_length=32)
     food_id: int = Field(gt=0)
     amount: Decimal = Field(gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False)
-    amount_unit: DiaryAmountUnit = "g"
+    amount_unit: DiaryAmountUnit
 
 
 class NaturalInputCommitRequest(BaseModel):

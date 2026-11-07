@@ -301,6 +301,45 @@ describe('nutrition power features', () => {
     expect(screen.getByLabelText('Название *')).toHaveValue('неизвестный продукт');
   });
 
+  it('asks for a missing unit before a natural-input row can be recorded', async () => {
+    const preview: NaturalInputPreview = {
+      rows: [
+        {
+          ...naturalPreview.rows[0]!,
+          raw_text: 'творог 180',
+          amount_unit: null,
+          status: 'unresolved',
+          selected_food_id: null,
+          selected_food: null,
+          nutrition: null,
+          candidates: [],
+          message: 'Укажите единицу измерения.',
+        },
+      ],
+    };
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/nutrition/food-aliases') return Promise.resolve(emptyAliases);
+      if (path === '/api/v1/nutrition/diary/natural-input/preview') return Promise.resolve(preview);
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderWithProviders(
+      <NaturalFoodInput
+        diaryDate="2026-08-19"
+        mealType="breakfast"
+        userId={10}
+        onCompleted={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Список продуктов'), {
+      target: { value: 'творог 180' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить список' }));
+    expect(await screen.findByText('Уточните количество')).toBeVisible();
+    expect(screen.getByText('Укажите единицу измерения.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Записать проверенные продукты' })).toBeDisabled();
+  });
+
   it('inserts a selected meal template with a stable batch boundary', async () => {
     const template = templateResponse();
     const list: NutritionMealTemplateList = { items: [template], total: 1, limit: 50, offset: 0 };
