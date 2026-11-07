@@ -11441,6 +11441,11 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .nutrition-diary__intro-actions .nutrition-diary__primary-action {
+    gap: 2px !important;
+    min-height: 44px;
+    padding-inline: 4px;
+  }
   .nutrition-diary__intro-actions .ui-button > span {
     min-width: 0;
     white-space: normal;
