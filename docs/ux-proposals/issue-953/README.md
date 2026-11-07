@@ -9,10 +9,11 @@
 - Отчёт называет период и покрытие: в примере 4 из 5 завершённых дней ниже действовавших тогда целей; незавершённые и пропущенные дни не входят в сравнение.
 - В дневнике по-прежнему видны два варианта и доступно раскрытие остальных. В плане показан весь список, как в действующем режиме.
 - Перед подтверждением таблица показывает итог до выбора, вклад выбранного количества и итог после него. Неизвестная клетчатка остаётся `—`; цель, её версия и источник показаны отдельно.
-- Заданный пользователем предел демонстрируется отдельно: при превышении кнопка подтверждения недоступна, количество можно изменить. Если сведений о предпочтениях и ограничениях нет, макет этого не скрывает.
+- В разделе «Предпочтения и ограничения» можно явно выбрать продукты и ввести верхние пределы КБЖУ на эту проверку. Пустое поле означает неизвестный предел; введённые значения автоматически не сохраняются. Исключённый продукт и превышение заданного предела блокируют подтверждение.
+- Запланированное, но не съеденное показано отдельно от дневника; пределы сравниваются с прогнозом дня, учитывающим оба источника. В режиме плана таблица показывает изменение плана, а съеденное остаётся отдельной строкой.
 - Изменение данных после проверки требует обновить расчёт. Добавление в план не означает, что еда съедена; незавершённый день не входит в сравнение завершённых дней отчёта.
 
-Показанные числа — только пример: 1 200 + 180 = 1 380 ккал, белок 85 + 18 = 103 г, жиры 45 + 6 = 51 г, углеводы 110 + 12 = 122 г. Для клетчатки итог неизвестен, так как значение продукта неизвестно.
+Показанные числа — только пример: дневник 1 200 + вариант 180 = 1 380 ккал; ещё 120 ккал запланировано, прогноз дня — 1 500 ккал. Жиры: 45 + 6 + 4 = 55 г. Для клетчатки итог неизвестен, так как значение продукта неизвестно.
 
 ## Галерея
 
@@ -26,7 +27,12 @@ Chromium, окно **393 × 844** и **1280 × 900 CSS px**; снимки пок
 | Варианты плана | [открыть](evidence/chromium-393-dark-choices-plan.png) | [открыть](evidence/chromium-393-light-choices-plan.png) | [открыть](evidence/chromium-1280-dark-choices-plan.png) | [открыть](evidence/chromium-1280-light-choices-plan.png) |
 | Проверка дневника | [открыть](evidence/chromium-393-dark-preview-diary.png) | [открыть](evidence/chromium-393-light-preview-diary.png) | [открыть](evidence/chromium-1280-dark-preview-diary.png) | [открыть](evidence/chromium-1280-light-preview-diary.png) |
 | Проверка плана | [открыть](evidence/chromium-393-dark-preview-plan.png) | [открыть](evidence/chromium-393-light-preview-plan.png) | [открыть](evidence/chromium-1280-dark-preview-plan.png) | [открыть](evidence/chromium-1280-light-preview-plan.png) |
+| Явные предпочтения и пределы — дневник | [открыть](evidence/chromium-393-dark-constraints-diary.png) | [открыть](evidence/chromium-393-light-constraints-diary.png) | [открыть](evidence/chromium-1280-dark-constraints-diary.png) | [открыть](evidence/chromium-1280-light-constraints-diary.png) |
+| Явные предпочтения и пределы — план | [открыть](evidence/chromium-393-dark-constraints-plan.png) | [открыть](evidence/chromium-393-light-constraints-plan.png) | [открыть](evidence/chromium-1280-dark-constraints-plan.png) | [открыть](evidence/chromium-1280-light-constraints-plan.png) |
 | Превышен заданный предел | [открыть](evidence/chromium-393-dark-limit-diary.png) | [открыть](evidence/chromium-393-light-limit-diary.png) | [открыть](evidence/chromium-1280-dark-limit-diary.png) | [открыть](evidence/chromium-1280-light-limit-diary.png) |
+| Превышен заданный предел — план | [открыть](evidence/chromium-393-dark-limit-plan.png) | [открыть](evidence/chromium-393-light-limit-plan.png) | [открыть](evidence/chromium-1280-dark-limit-plan.png) | [открыть](evidence/chromium-1280-light-limit-plan.png) |
+| Исключённый продукт — дневник | [открыть](evidence/chromium-393-dark-excluded-diary.png) | [открыть](evidence/chromium-393-light-excluded-diary.png) | [открыть](evidence/chromium-1280-dark-excluded-diary.png) | [открыть](evidence/chromium-1280-light-excluded-diary.png) |
+| Исключённый продукт — план | [открыть](evidence/chromium-393-dark-excluded-plan.png) | [открыть](evidence/chromium-393-light-excluded-plan.png) | [открыть](evidence/chromium-1280-dark-excluded-plan.png) | [открыть](evidence/chromium-1280-light-excluded-plan.png) |
 | Данные изменились | [открыть](evidence/chromium-393-dark-stale-diary.png) | [открыть](evidence/chromium-393-light-stale-diary.png) | [открыть](evidence/chromium-1280-dark-stale-diary.png) | [открыть](evidence/chromium-1280-light-stale-diary.png) |
 | Нет подходящих вариантов | [открыть](evidence/chromium-393-dark-empty-diary.png) | [открыть](evidence/chromium-393-light-empty-diary.png) | [открыть](evidence/chromium-1280-dark-empty-diary.png) | [открыть](evidence/chromium-1280-light-empty-diary.png) |
 | Нет цели | [открыть](evidence/chromium-393-dark-no-target-diary.png) | [открыть](evidence/chromium-393-light-no-target-diary.png) | [открыть](evidence/chromium-1280-dark-no-target-diary.png) | [открыть](evidence/chromium-1280-light-no-target-diary.png) |
@@ -37,7 +43,7 @@ Chromium, окно **393 × 844** и **1280 × 900 CSS px**; снимки пок
 
 ## Проверки и ограничения
 
-Локальный Chromium сделал 50 снимков. Автоматически проверены отсутствие горизонтального переполнения на 320/393/1280 px, пересчёт примера при изменении количества, раскрытие дневниковых вариантов, полный список плана и блокировка/разблокировка кнопки при изменении количества относительно заданного предела. Это проверки макета, не API и не базы данных.
+Локальный Chromium сделал 70 снимков. Автоматически проверены отсутствие горизонтального переполнения на 320/393/1280 px, пересчёт примера при изменении количества, раскрытие дневниковых вариантов, полный список плана, раздельный расчёт плана и прогноза дня, блокировка и разблокировка при превышении предела и исключении продукта. Это проверки макета, не API и не базы данных.
 
 WebKit, реальный Telegram WebView, физические устройства, экранные дикторы и системный zoom 200% для макета не проверялись. Состояния загрузки, ошибок сервера и реальной записи будут проверяться при реализации. Наличие известного источника данных не означает подтверждённой персональной или медицинской точности.
 

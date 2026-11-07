@@ -28,6 +28,14 @@
     .nutrition-suggestion-review__item > div:first-child { grid-column: 1 / -1; }
     .field { display: grid; gap: 6px; font-weight: 700; font-size: .875rem; }
     .field input, .field select { width: 100%; min-height: 46px; padding: 10px; border: 1px solid var(--v2-border-strong); border-radius: 14px; background-color: var(--v2-surface); color: var(--v2-text-primary); font: inherit; }
+    .constraints { padding: 12px; border: 1px solid var(--v2-border); border-radius: 14px; }
+    .constraints summary { cursor: pointer; font-weight: 700; }
+    .constraint-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .constraint-grid .field { min-width: 0; }
+    .choice-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+    .selected-food { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+    .constraints h4 { margin: 16px 0 8px; }
+    .constraints p { margin: 8px 0; }
     .candidate { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--v2-border); }
     #choices[data-mode="plan"] .candidate { padding: 13px; border: 1px solid var(--v2-border); border-radius: 14px; background: var(--v2-surface-secondary); }
     .candidate p { margin: 5px 0; font-size: .82rem; }
@@ -52,7 +60,9 @@
     <button type="button" data-screen="report">Отчёт</button>
     <button type="button" data-screen="choices">Варианты</button>
     <button type="button" data-screen="preview">Проверка</button>
+    <button type="button" data-screen="constraints">Предпочтения и пределы</button>
     <button type="button" data-screen="limit">Превышен предел</button>
+    <button type="button" data-screen="excluded">Исключённый продукт</button>
     <button type="button" data-screen="stale">Данные изменились</button>
     <button type="button" data-screen="empty">Нет вариантов</button>
     <button type="button" data-screen="no-target">Нет цели</button>
@@ -97,15 +107,37 @@
         <table class="preview-table">
           <thead><tr><th scope="col">Показатель</th><th scope="col">Было</th><th scope="col">Вариант</th><th scope="col">Станет</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Ккал</th><td>1 200</td><td data-add="120"></td><td data-total="1200" data-rate="120"></td></tr>
-            <tr><th scope="row">Белки, г</th><td>85</td><td data-add="12"></td><td data-total="85" data-rate="12"></td></tr>
-            <tr><th scope="row">Жиры, г</th><td>45</td><td data-add="4"></td><td data-total="45" data-rate="4"></td></tr>
-            <tr><th scope="row">Углеводы, г</th><td>110</td><td data-add="8"></td><td data-total="110" data-rate="8"></td></tr>
-            <tr><th scope="row">Клетчатка, г</th><td>8</td><td>—</td><td>—</td></tr>
+            <tr><th scope="row">Ккал</th><td data-before="1200" data-plan-before="120"></td><td data-add="120"></td><td data-total="1200" data-plan-total="120" data-rate="120"></td></tr>
+            <tr><th scope="row">Белки, г</th><td data-before="85" data-plan-before="12"></td><td data-add="12"></td><td data-total="85" data-plan-total="12" data-rate="12"></td></tr>
+            <tr><th scope="row">Жиры, г</th><td data-before="45" data-plan-before="4"></td><td data-add="4"></td><td data-total="45" data-plan-total="4" data-rate="4"></td></tr>
+            <tr><th scope="row">Углеводы, г</th><td data-before="110" data-plan-before="8"></td><td data-add="8"></td><td data-total="110" data-plan-total="8" data-rate="8"></td></tr>
+            <tr><th scope="row">Клетчатка, г</th><td id="fiber-before">8</td><td>—</td><td>—</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="preview-note" id="uncertainty-note">Клетчатка в продукте неизвестна, поэтому итог тоже неизвестен. Нет сведений о предпочтениях и ограничениях.</p>
+      <p class="preview-note" id="pending-note">Ещё запланировано, но не съедено: 120 ккал · Б 12 г · Ж 4 г · У 8 г.</p>
+      <p class="preview-note" id="projected-note"></p>
+      <p class="preview-note">Клетчатка в продукте неизвестна, поэтому итог тоже неизвестен.</p>
+      <details class="constraints" id="constraints">
+        <summary>Предпочтения и ограничения</summary>
+        <p class="preview-note">Необязательно. Действуют только при этой проверке и не сохраняются в профиле. Пустое поле означает, что предел неизвестен.</p>
+        <h4>Верхние пределы на день с учётом плана</h4>
+        <div class="constraint-grid">
+          <label class="field">Ккал<input id="max-energy" type="number" min="0" step="1" placeholder="Не задан"></label>
+          <label class="field">Белки, г<input id="max-protein" type="number" min="0" step="0.1" placeholder="Не задан"></label>
+          <label class="field">Жиры, г<input id="max-fat" type="number" min="0" step="0.1" placeholder="Не задан"></label>
+          <label class="field">Углеводы, г<input id="max-carbs" type="number" min="0" step="0.1" placeholder="Не задан"></label>
+        </div>
+        <h4>Предпочитаю продукты</h4>
+        <p class="preview-note">Выберите сохранённый продукт, чтобы проверить его наличие в варианте.</p>
+        <div class="choice-row"><label class="field">Продукт<select id="preferred-select"><option value="">Выберите продукт</option><option>Творог</option><option>Яблоко</option></select></label><button class="ui-button ui-button--secondary" id="prefer-add" type="button">Добавить</button></div>
+        <div id="preferred-items"></div>
+        <h4>Исключить продукты</h4>
+        <p class="preview-note">Проверяются продукты и известные ингредиенты рецептов.</p>
+        <div class="choice-row"><label class="field">Продукт<select id="excluded-select"><option value="">Выберите продукт</option><option>Творог</option><option>Яблоко</option></select></label><button class="ui-button ui-button--secondary" id="exclude-add" type="button">Добавить</button></div>
+        <div id="excluded-items"></div>
+        <p id="choice-status" class="preview-note" role="status">Предпочтения и исключения не заданы.</p>
+      </details>
       <p class="notice" id="limit-notice" role="status" hidden></p>
       <div class="nutrition-suggestion-review__actions"><button class="ui-button" type="submit" id="confirm">Добавить выбранное</button><button class="ui-button ui-button--ghost" type="button" data-screen="choices">Вернуться к вариантам</button></div>
     </form>
@@ -135,20 +167,27 @@
   const params = new URLSearchParams(location.search);
   const mode = document.querySelector('#mode');
   const amount = document.querySelector('#amount');
-  let limitMode = false;
+  const selected = { preferred: [], excluded: [] };
   const format = (n) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(n);
   function updateAmount() {
     const quantity = Number(amount.value);
     const valid = amount.checkValidity() && quantity > 0;
-    const overLimit = limitMode && valid && 45 + 4 * quantity / 100 > 50;
-    document.querySelector('#confirm').disabled = !valid || overLimit;
+    const projected = [1320 + 120 * quantity / 100, 97 + 12 * quantity / 100, 49 + 4 * quantity / 100, 118 + 8 * quantity / 100];
+    const fields = ['max-energy', 'max-protein', 'max-fat', 'max-carbs'].map((id) => document.querySelector('#' + id));
+    const overLimit = valid && fields.some((field, index) => field.value !== '' && projected[index] > Number(field.value));
+    const excluded = selected.excluded.includes('Творог');
+    document.querySelector('#confirm').disabled = !valid || overLimit || excluded;
     const notice = document.querySelector('#limit-notice');
-    notice.hidden = !limitMode;
-    notice.textContent = overLimit ? 'Заданный предел жиров — 50 г. После добавления: ' + format(45 + 4 * quantity / 100) + ' г. Уменьшите количество.' : 'Заданный предел жиров — 50 г. Выбранное количество укладывается в него.';
-    document.querySelector('#uncertainty-note').textContent = limitMode ? 'Клетчатка в продукте неизвестна, поэтому итог тоже неизвестен. Нет сведений о предпочтениях.' : 'Клетчатка в продукте неизвестна, поэтому итог тоже неизвестен. Нет сведений о предпочтениях и ограничениях.';
+    notice.hidden = !overLimit && !excluded && !fields.some((field) => field.value !== '');
+    notice.textContent = excluded ? 'Творог указан среди исключённых продуктов. Выберите другой вариант или измените ограничение.' : overLimit ? 'Прогноз дня с учётом плана превышает заданный предел. Измените количество или предел.' : 'Прогноз дня с учётом плана не превышает заданные пределы.';
+    document.querySelector('#choice-status').textContent = selected.preferred.length ? (selected.preferred.includes('Творог') ? 'Творог есть среди выбранных предпочтений.' : 'Выбранный продукт отсутствует в варианте.') : (selected.excluded.length ? 'Исключения указаны для этой проверки.' : 'Предпочтения и исключения не заданы.');
+    document.querySelectorAll('[data-before]').forEach((cell) => { cell.textContent = format(Number(mode.value === 'plan' ? cell.dataset.planBefore : cell.dataset.before)); });
+    document.querySelector('#fiber-before').textContent = mode.value === 'plan' ? '—' : '8';
     document.querySelectorAll('[data-add]').forEach((cell) => { cell.textContent = valid ? '+' + format(Number(cell.dataset.add) * quantity / 100) : '—'; });
-    document.querySelectorAll('[data-total]').forEach((cell) => { cell.textContent = valid ? format(Number(cell.dataset.total) + Number(cell.dataset.rate) * quantity / 100) : '—'; });
-    document.querySelector('#result-copy').textContent = valid ? 'Итог: ' + format(1200 + 120 * quantity / 100) + ' ккал · Б ' + format(85 + 12 * quantity / 100) + ' г · Ж ' + format(45 + 4 * quantity / 100) + ' г · У ' + format(110 + 8 * quantity / 100) + ' г · клетчатка —.' : '';
+    document.querySelectorAll('[data-total]').forEach((cell) => { cell.textContent = valid ? format(Number(mode.value === 'plan' ? cell.dataset.planTotal : cell.dataset.total) + Number(cell.dataset.rate) * quantity / 100) : '—'; });
+    document.querySelector('#projected-note').textContent = valid ? 'Прогноз дня с учётом плана: ' + format(projected[0]) + ' ккал · Б ' + format(projected[1]) + ' г · Ж ' + format(projected[2]) + ' г · У ' + format(projected[3]) + ' г · клетчатка —.' : '';
+    const base = mode.value === 'plan' ? [120, 12, 4, 8] : [1200, 85, 45, 110];
+    document.querySelector('#result-copy').textContent = valid ? 'Итог: ' + format(base[0] + 120 * quantity / 100) + ' ккал · Б ' + format(base[1] + 12 * quantity / 100) + ' г · Ж ' + format(base[2] + 4 * quantity / 100) + ' г · У ' + format(base[3] + 8 * quantity / 100) + ' г · клетчатка —.' : '';
   }
   function updateMode() {
     const plan = mode.value === 'plan';
@@ -165,19 +204,49 @@
     document.querySelector('#review-title').textContent = plan ? 'Проверка перед планированием' : 'Проверка перед записью';
     document.querySelector('#review-help').textContent = plan ? 'Ничего не попадёт в план до подтверждения.' : 'Ничего не попадёт в дневник до подтверждения.';
     document.querySelector('#table-title').textContent = plan ? 'Как изменится план' : 'Как изменится день';
+    document.querySelector('#pending-note').textContent = plan ? 'Съедено в дневнике: 1 200 ккал · Б 85 г · Ж 45 г · У 110 г.' : 'Ещё запланировано, но не съедено: 120 ккал · Б 12 г · Ж 4 г · У 8 г.';
     document.querySelector('#confirm').textContent = plan ? 'Добавить в план' : 'Добавить выбранное';
     document.querySelector('#result-title').textContent = plan ? 'Добавлено в план' : 'Добавлено в дневник';
     document.querySelector('#result-note').textContent = plan ? 'Запланированная еда не считается съеденной и не добавлена в дневник.' : 'День ещё не завершён и не входит в сравнение завершённых дней отчёта.';
   }
-  function show(name) { limitMode = name === 'limit'; document.querySelectorAll('.screen').forEach((screen) => screen.classList.toggle('active', screen.id === (limitMode ? 'preview' : name))); updateAmount(); }
+  function show(name) {
+    const special = ['limit', 'excluded', 'constraints'].includes(name);
+    document.querySelectorAll('.screen').forEach((screen) => screen.classList.toggle('active', screen.id === (special ? 'preview' : name)));
+    document.querySelector('#constraints').open = special;
+    document.querySelector('#max-fat').value = name === 'limit' ? '50' : '';
+    selected.preferred = name === 'constraints' ? ['Творог'] : [];
+    selected.excluded = name === 'excluded' ? ['Творог'] : [];
+    renderChoices(); updateAmount();
+  }
+  function renderChoices() {
+    for (const kind of ['preferred', 'excluded']) {
+      const container = document.querySelector('#' + kind + '-items');
+      container.replaceChildren();
+      for (const value of selected[kind]) {
+        const row = document.createElement('div'); row.className = 'selected-food';
+        const label = document.createElement('span'); label.textContent = value;
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'ui-button ui-button--ghost'; button.textContent = 'Убрать'; button.setAttribute('aria-label', 'Убрать ' + value);
+        button.addEventListener('click', () => { selected[kind] = selected[kind].filter((item) => item !== value); renderChoices(); updateAmount(); });
+        row.append(label, button); container.append(row);
+      }
+    }
+  }
+  for (const [buttonId, kind] of [['prefer-add', 'preferred'], ['exclude-add', 'excluded']]) {
+    document.querySelector('#' + buttonId).addEventListener('click', () => {
+      const value = document.querySelector('#' + kind + '-select').value;
+      if (value && !selected[kind].includes(value) && !selected[kind === 'preferred' ? 'excluded' : 'preferred'].includes(value)) selected[kind].push(value);
+      renderChoices(); updateAmount();
+    });
+  }
   document.documentElement.dataset.colorScheme = params.get('theme') === 'light' ? 'light' : 'dark';
   document.documentElement.dataset.capture = params.get('capture') === '1' ? 'true' : 'false';
   mode.value = params.get('mode') === 'plan' ? 'plan' : 'diary';
   document.querySelectorAll('[data-screen]').forEach((button) => button.addEventListener('click', () => show(button.dataset.screen)));
   document.querySelector('#theme').addEventListener('click', () => { document.documentElement.dataset.colorScheme = document.documentElement.dataset.colorScheme === 'dark' ? 'light' : 'dark'; });
   document.querySelector('#expand').addEventListener('click', (event) => { const expanded = event.currentTarget.getAttribute('aria-expanded') !== 'true'; event.currentTarget.setAttribute('aria-expanded', String(expanded)); event.currentTarget.textContent = expanded ? 'Свернуть' : 'Показать все 3 варианта'; document.querySelector('#additional').hidden = !expanded; });
-  mode.addEventListener('change', updateMode);
+  mode.addEventListener('change', () => { updateMode(); updateAmount(); });
   amount.addEventListener('input', updateAmount);
+  document.querySelectorAll('.constraints input').forEach((field) => field.addEventListener('input', updateAmount));
   document.querySelector('#preview-form').addEventListener('submit', (event) => { event.preventDefault(); show('result'); });
   updateMode(); updateAmount(); show(params.get('state') || 'preview');
 </script>
