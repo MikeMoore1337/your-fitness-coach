@@ -254,6 +254,13 @@ for (const theme of ['dark', 'light'] as const) {
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
     await expect(region.getByRole('button', { name: /Показать все/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+    const dayStatus = page.locator('.nutrition-completeness');
+    const statusBox = await dayStatus.boundingBox();
+    expect(statusBox).not.toBeNull();
+    expect(statusBox!.x + statusBox!.width).toBeLessThanOrEqual(320);
+    expect(await dayStatus.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    );
     const bounds = await region.boundingBox();
     expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
     expect(await region.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
