@@ -263,7 +263,15 @@ def test_openapi_preserves_commit_names_and_describes_preview_conflicts(client) 
         assert "preview_token" not in commit["required"]
         assert "повтор прежней операции" in commit["properties"]["preview_token"]["description"]
     preview = schema["components"]["schemas"]["NutritionSuggestionPreviewResponse"]
-    for field in ("planned", "projected_after", "target_id", "target_weight_kg", "target_goal"):
+    for field in (
+        "planned",
+        "projected_after",
+        "target_id",
+        "target_weight_kg",
+        "target_goal",
+        "target_estimated_bmr_kcal",
+        "target_estimated_tdee_kcal",
+    ):
         assert any(option.get("type") == "null" for option in preview["properties"][field]["anyOf"])
 
 
@@ -696,6 +704,8 @@ def test_exact_preview_confirm_retry_and_unknown_nutrients(client) -> None:
     assert preview["after"]["fiber_g"] is None
     assert preview["remaining_after"]["fat_g"] is None
     assert preview["target_id"] is not None
+    assert preview["target_estimated_bmr_kcal"] == 1800
+    assert preview["target_estimated_tdee_kcal"] == 2400
     assert len(preview["preview_token"]) == 64
     assert (
         client.get(
@@ -932,6 +942,8 @@ def test_preview_uses_the_dated_override_for_each_day_type(client, day_type: str
     )
     assert preview.status_code == 200, preview.text
     assert preview.json()["target_id"] == override.json()["target"]["id"]
+    assert preview.json()["target_estimated_bmr_kcal"] is None
+    assert preview.json()["target_estimated_tdee_kcal"] is None
     assert Decimal(preview.json()["targets"]["energy_kcal"]) == 2300
     assert Decimal(preview.json()["remaining_after"]["energy_kcal"]) == 2180
     report = client.get(
@@ -940,6 +952,29 @@ def test_preview_uses_the_dated_override_for_each_day_type(client, day_type: str
     assert report.status_code == 200
     day = next(row for row in report.json()["daily"] if row["diary_date"] == selected_date)
     assert day["target_calories"] == 2300
+
+
+@pytest.mark.parametrize("field", ["bmr", "tdee"])
+def test_preview_rejects_changed_estimate_even_if_targets_are_unchanged(client, field: str) -> None:
+    headers = _auth(client, 52_330)
+    _add_target(52_330)
+    food_id = _store_food("Продукт для проверки расчётных величин")
+    payload = {
+        "diary_date": _today().isoformat(),
+        "meal_type": "snacks",
+        "items": [{"food_id": food_id, "amount": "100", "amount_unit": "g"}],
+    }
+    preview = _with_preview(client, headers, payload)
+    with get_session_context() as db:
+        user = db.query(User).filter_by(telegram_user_id=52_330).one()
+        target = db.query(NutritionTarget).filter_by(user_id=user.id).one()
+        setattr(target, field, getattr(target, field) + 1)
+    result = client.post(
+        "/api/v1/nutrition/diary/suggestions/commit",
+        headers={**headers, "Idempotency-Key": f"preview-estimate-52330-{field}"},
+        json=preview,
+    )
+    assert result.status_code == 409
 
 
 def test_plan_preview_resolves_saved_cycle_targets(client) -> None:

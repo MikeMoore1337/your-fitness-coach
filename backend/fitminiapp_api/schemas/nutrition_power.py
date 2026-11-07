@@ -326,6 +326,8 @@ class NutritionSuggestionPreviewResponse(BaseModel):
     target_effective_from: date | None
     target_weight_kg: Decimal | None
     target_goal: str | None
+    target_estimated_bmr_kcal: int | None = Field(description="Расчётный BMR сохранённой цели.")
+    target_estimated_tdee_kcal: int | None = Field(description="Расчётный TDEE сохранённой цели.")
     constraint_status: Literal["not_set", "satisfied", "violated", "unknown"]
     constraint_messages: list[str]
     preference_message: str | None
