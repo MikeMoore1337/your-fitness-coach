@@ -8,72 +8,46 @@ description: >
 
 # e2e-review
 
-Цель - ответить не "тест зелёный?", а "тест действительно доказывает заявленное поведение?".
+The question is not simply "is the test green?" but "does it actually prove the promised behavior?"
 
 ## Review contract
 
-Для каждого изменённого критичного E2E:
+For each changed, critical E2E scenario:
 
-1. прочитай название/intent;
-2. найди Given/When/Then;
-3. определи, какое сломанное поведение должно сделать тест красным;
-4. проверь, что assertions действительно ловят эту поломку;
-5. проверь isolation, auth, data и runtime assumptions;
-6. отдели introduced/worsened finding от pre-existing debt.
+1. Read the test name and declared intent.
+2. Identify Given, When and Then.
+3. Determine which broken behavior should cause failure.
+4. Verify assertions actually detect that break.
+5. Check isolation, authorization, data and runtime assumptions.
+6. Distinguish introduced/worsened findings from pre-existing debt.
 
-## P0 - false green / silent bypass
+## P0: false greens and silent bypasses
 
-Ищи:
+Look for:
 
-- название обещает результат, а assertion проверяет только видимость общего контейнера;
-- action есть, meaningful Then отсутствует;
-- swallowed errors;
-- committed focused test;
-- locator/Promise/boolean проверяется так, что assertion всегда или почти всегда true;
-- conditional branch позволяет пропустить обязательную часть сценария;
-- protected surface тестируется без гарантированного auth;
-- optimistic UI принимается за доказательство backend write;
-- critical check выполняется только внутри потенциально пустого цикла.
+- Names promising an outcome while assertions only check a generic container.
+- Actions without meaningful Then assertions.
+- Swallowed errors or committed focused tests.
+- Locator/Promise/boolean assertions that are almost always true.
+- Conditional branches skipping mandatory steps.
+- Protected-surface tests without guaranteed authentication.
+- Optimistic UI mistaken for proof of backend writes.
+- Critical checks placed only inside potentially empty loops.
 
-## P1 - надёжность и диагностика
+## P1: reliability and diagnosis
 
-Ищи:
+Look for missing await, fixed sleeps, unstable nth/substring selectors without justification, unnecessary serial/shared state, retries masking reproducible failures, stale manually captured authentication state, unjustified forced actions, direct selector APIs that bypass locator contracts and test data depending on shared persistent environments.
 
-- missing await;
-- hard sleeps;
-- unstable nth/substring selector без причины;
-- unnecessary serial/shared state;
-- retry скрывает воспроизводимую проблему;
-- stale manually captured auth state без programmatic regeneration;
-- force action без объяснения;
-- direct selector API вместо locator contract;
-- test data зависит от общего persistent environment.
+## P2: maintainability
 
-## P2 - maintainability
-
-Ищи:
-
-- zombie/duplicate tests;
-- unused helpers/POM methods;
-- unjustified skip без причины/revisit condition;
-- meaningless abstraction;
-- чрезмерное дублирование проверки одного риска на одном уровне.
+Look for zombie/duplicate tests, unused helpers/POM methods, unexplained skips with no revisit condition, meaningless abstraction and excessive duplicate testing of the same risk at one layer.
 
 ## Required evidence
 
-Finding должен содержать:
+Every finding must state severity, spec/test, promised intent, actual evidence, how the test can falsely pass and a concrete fix direction.
 
-- severity;
-- spec/test;
-- обещанный intent;
-- фактическое доказательство;
-- как тест может пройти ошибочно;
-- concrete fix direction.
-
-Не помечай pattern как defect автоматически. Контекст теста является источником истины.
+Do not automatically label a suspicious pattern as a defect; the actual test context is authoritative.
 
 ## Scope
 
-Этот skill проверяет качество E2E.
-UI aesthetics принадлежат `$ui-audit`.
-Playwright implementation patterns принадлежат `$playwright-testing`.
+This skill reviews E2E quality. UI aesthetics belong to `$ui-audit`; Playwright implementation patterns belong to `$playwright-testing`.
