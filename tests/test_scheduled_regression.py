@@ -134,7 +134,7 @@ def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
         "webkit",
     ]
     assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 5
-    assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 5
+    assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 10
 
 
 def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> None:
@@ -1020,12 +1020,12 @@ def test_aggregate_results_merges_current_run_and_adds_allowlisted_metadata(tmp_
     assert metadata["expected_bundles"] == expected_bundles
     assert metadata["present_bundles"] == expected_bundles
     assert metadata["counts"] == {
-        "passed": 13,
+        "passed": len(expected_bundles),
         "failed": 0,
         "broken": 0,
         "skipped": 0,
         "unknown": 0,
-        "total": 13,
+        "total": len(expected_bundles),
     }
     environment = (tmp_path / "merged" / "environment.properties").read_text(encoding="utf-8")
     assert "allure.report.kind=daily" in environment

@@ -17,9 +17,10 @@ def _invoke(value: str | None, nodeids: list[str]):
     return [item.nodeid for item in items], [item.nodeid for item in deselected]
 
 
-def test_every_test_is_selected_exactly_once_across_five_shards() -> None:
+@pytest.mark.parametrize("count", [5, 10])
+def test_every_test_is_selected_exactly_once_across_shards(count: int) -> None:
     nodes = [f"backend/tests/test_example.py::test_{number}" for number in range(102)]
-    selections = [_invoke(f"{index}/5", nodes) for index in range(1, 6)]
+    selections = [_invoke(f"{index}/{count}", nodes) for index in range(1, count + 1)]
     assert sorted(node for selected, _ in selections for node in selected) == sorted(nodes)
     assert all(len(selected) + len(skipped) == len(nodes) for selected, skipped in selections)
 

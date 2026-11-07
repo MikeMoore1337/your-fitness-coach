@@ -621,7 +621,7 @@ jobs:
           browser: webkit
 
   python-tests:
-    name: Python tests (${{ matrix.shard }}/5)
+    name: Python tests (${{ matrix.shard }}/10)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_python == 'true'
     runs-on: ubuntu-latest
@@ -631,7 +631,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     services:
       postgres:
@@ -673,7 +673,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-        run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/5"
+        run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/10"
       - name: Upload encrypted Allure results
         if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
         uses: ./.github/actions/upload-allure-results
