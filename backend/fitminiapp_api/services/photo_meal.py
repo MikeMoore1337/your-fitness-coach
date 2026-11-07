@@ -29,12 +29,18 @@ from fitminiapp_api.nutrition_label.vision import (
 from fitminiapp_api.schemas.food_diary import FoodDiaryEntryCreate, FoodDiaryQuickAdd
 from fitminiapp_api.schemas.photo_meal import (
     PhotoMealCandidate,
+    PhotoMealConfirmItem,
     PhotoMealConfirmRequest,
     PhotoMealConfirmResponse,
     PhotoMealDraftResponse,
     PhotoMealDraftStatus,
 )
-from fitminiapp_api.services.food_diary import FoodDiaryError, create_food_diary_entry
+from fitminiapp_api.services.food_diary import (
+    FoodDiaryError,
+    _lock_diary_user,
+    _serialize_entry,
+    create_food_diary_entry,
+)
 
 
 class PhotoMealError(ValueError):
@@ -165,6 +171,7 @@ def create_photo_meal_draft(
     existing = (
         db.query(PhotoMealDraft)
         .filter(PhotoMealDraft.user_id == user.id, PhotoMealDraft.idempotency_key == key)
+        .with_for_update()
         .first()
     )
     if existing is not None:
@@ -239,6 +246,7 @@ def create_photo_meal_draft(
         replay = (
             db.query(PhotoMealDraft)
             .filter(PhotoMealDraft.user_id == user.id, PhotoMealDraft.idempotency_key == key)
+            .with_for_update()
             .first()
         )
         if replay is not None and replay.status == "draft" and replay.expires_at > _now():
@@ -249,11 +257,11 @@ def create_photo_meal_draft(
 
 
 def get_photo_meal_draft(db: Session, user: User, draft_id: str) -> PhotoMealDraftResponse:
-    return _draft_response(_get_owned_draft(db, user, draft_id))
+    return _draft_response(_get_owned_draft(db, user, draft_id, lock_for_update=True))
 
 
 def cancel_photo_meal_draft(db: Session, user: User, draft_id: str, revision: int) -> None:
-    row = _get_owned_draft(db, user, draft_id)
+    row = _get_owned_draft(db, user, draft_id, lock_for_update=True)
     if row.status != "draft":
         raise PhotoMealConflictError("draft_not_active")
     if row.revision != revision:
@@ -274,7 +282,38 @@ def confirm_photo_meal_draft(
     draft_id: str,
     request: PhotoMealConfirmRequest,
 ) -> PhotoMealConfirmResponse:
+    _lock_diary_user(db, user)
     row = _get_owned_draft(db, user, draft_id, lock_for_update=True)
+    if row.status == "confirmed":
+        if row.revision != request.revision + 1:
+            raise PhotoMealConflictError("stale_draft_revision")
+        try:
+            confirmed_items = [
+                PhotoMealConfirmItem.model_validate(item)
+                for item in row.canonical_payload["confirmed_items"]
+            ]
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise PhotoMealError("invalid_persisted_draft", status_code=500) from exc
+        entry_row = (
+            db.query(FoodDiaryEntry)
+            .filter(
+                FoodDiaryEntry.id == row.confirmed_entry_id,
+                FoodDiaryEntry.user_id == user.id,
+                FoodDiaryEntry.idempotency_key == f"photo-meal-{draft_id}",
+            )
+            .first()
+        )
+        if (
+            confirmed_items != request.items
+            or entry_row is None
+            or entry_row.diary_date != request.diary_date
+            or entry_row.meal_type != request.meal_type
+            or entry_row.logged_at is not None
+        ):
+            raise PhotoMealConflictError("draft_not_active")
+        return PhotoMealConfirmResponse(
+            draft_id=draft_id, entry=_serialize_entry(entry_row), replayed=True
+        )
     if row.status != "draft":
         raise PhotoMealConflictError("draft_not_active")
     if row.revision != request.revision:
@@ -291,6 +330,16 @@ def confirm_photo_meal_draft(
     }
     if {item.candidate_id for item in request.items} != set(stored_candidates):
         raise PhotoMealError("unknown_candidate")
+    existing = (
+        db.query(FoodDiaryEntry.id)
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.idempotency_key == f"photo-meal-{draft_id}",
+        )
+        .first()
+    )
+    if existing is not None:
+        raise PhotoMealConflictError("draft_not_active")
 
     calories = sum((item.energy_kcal for item in request.items), start=Decimal("0"))
     quick_add = FoodDiaryQuickAdd(
@@ -314,27 +363,34 @@ def confirm_photo_meal_draft(
             user,
             payload,
             idempotency_key=f"photo-meal-{draft_id}",
+            commit=False,
         )
+        entry_row = db.get(FoodDiaryEntry, entry.id)
+        if entry_row is None:
+            raise PhotoMealError("diary_entry_not_found", status_code=500)
+        entry_row.nutrition_snapshot = {
+            "kind": "photo_meal",
+            "source_photo_retained": False,
+            "candidates": [item.model_dump(mode="json") for item in request.items],
+        }
+        row.status = "confirmed"
+        row.revision += 1
+        row.confirmed_entry_id = entry.id
+        row.canonical_payload = {
+            **row.canonical_payload,
+            "confirmed_items": [item.model_dump(mode="json") for item in request.items],
+        }
+        db.flush()
+        db.refresh(entry_row)
+        confirmed_entry = _serialize_entry(entry_row)
+        db.commit()
     except FoodDiaryError as exc:
+        db.rollback()
         raise PhotoMealError(str(exc), status_code=409 if "fasted" in str(exc) else 422) from exc
-
-    entry_row = db.get(FoodDiaryEntry, entry.id)
-    if entry_row is None:
-        raise PhotoMealError("diary_entry_not_found", status_code=500)
-    entry_row.nutrition_snapshot = {
-        "kind": "photo_meal",
-        "source_photo_retained": False,
-        "candidates": [item.model_dump(mode="json") for item in request.items],
-    }
-    row.status = "confirmed"
-    row.revision += 1
-    row.confirmed_entry_id = entry.id
-    row.canonical_payload = {
-        **row.canonical_payload,
-        "confirmed_items": [item.model_dump(mode="json") for item in request.items],
-    }
-    db.commit()
-    return PhotoMealConfirmResponse(draft_id=draft_id, entry=entry, replayed=False)
+    except Exception:
+        db.rollback()
+        raise
+    return PhotoMealConfirmResponse(draft_id=draft_id, entry=confirmed_entry, replayed=False)
 
 
 __all__ = [

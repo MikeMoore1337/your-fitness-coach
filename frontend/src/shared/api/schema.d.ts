@@ -15647,9 +15647,8 @@ export interface components {
             /**
              * Replayed
              * @default false
-             * @constant
              */
-            replayed: false;
+            replayed: boolean;
         };
         /** PhotoMealDraftResponse */
         PhotoMealDraftResponse: {

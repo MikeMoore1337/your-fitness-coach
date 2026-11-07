@@ -122,6 +122,44 @@ describe('PhotoMealScanner', () => {
     expect(onManualFallback).toHaveBeenCalledOnce();
   });
 
+  it('retries the same confirmation after losing the response', async () => {
+    const onCompleted = vi.fn();
+    const replayed = { ...confirmed, replayed: true };
+    let confirmAttempts = 0;
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/nutrition/photo-meals') return Promise.resolve(draft);
+      if (path.endsWith('/confirm')) {
+        confirmAttempts += 1;
+        return confirmAttempts === 1
+          ? Promise.reject(new ApiError('Нет связи', 0))
+          : Promise.resolve(replayed);
+      }
+      return Promise.resolve(undefined);
+    });
+    render(
+      <PhotoMealScanner
+        userId={10}
+        diaryDate="2026-10-01"
+        mealType="lunch"
+        onCancel={vi.fn()}
+        onCompleted={onCompleted}
+      />,
+    );
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File(['meal-photo'], 'meal.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    const button = await screen.findByRole('button', { name: 'Подтвердить и добавить в дневник' });
+    fireEvent.click(button);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Нет связи');
+    fireEvent.click(button);
+    await waitFor(() => expect(onCompleted).toHaveBeenCalledOnce());
+    expect(onCompleted).toHaveBeenCalledWith(replayed);
+    const confirmations = apiMock.mock.calls.filter(([path]) => path.endsWith('/confirm'));
+    expect(confirmations).toHaveLength(2);
+    expect(confirmations[0]?.[1].body).toEqual(confirmations[1]?.[1].body);
+  });
+
   it('reuses the request key for retries, but not for a different photo', async () => {
     apiMock
       .mockRejectedValueOnce(new ApiError('Network error', 0))
