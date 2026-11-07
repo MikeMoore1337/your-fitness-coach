@@ -2435,7 +2435,12 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await page.goto('/app?section=nutrition');
 
   await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
-  await expect(page.getByText('Греческий йогурт')).toBeVisible();
+  const initiallyCollapsedBreakfast = page.getByRole('region', { name: 'Завтрак' });
+  const breakfastToggle = initiallyCollapsedBreakfast.getByRole('button', { name: 'Завтрак' });
+  await expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(initiallyCollapsedBreakfast.getByText('Греческий йогурт')).not.toBeVisible();
+  await breakfastToggle.click();
+  await expect(initiallyCollapsedBreakfast.getByText('Греческий йогурт')).toBeVisible();
   await expect(nutritionDaySummary(page)).toHaveCount(1);
   await expect(nutritionDaySummary(page)).toBeVisible();
   await expect(page.getByText('Немного выше ориентира: 20 ккал')).toBeVisible();
@@ -2991,8 +2996,7 @@ for (const width of [320, 360, 393, 430, 1280]) {
         const toggle = page
           .getByRole('region', { name })
           .getByRole('button', { name, exact: true });
-        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
       }
 
       const card = page.locator('.nutrition-food-card');
