@@ -11438,6 +11438,13 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   .nutrition-diary__intro-actions .ui-button {
     min-width: 0;
     padding-inline: 8px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .nutrition-diary__intro-actions .ui-button > span {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   .nutrition-repeat-default {
     align-items: stretch;
