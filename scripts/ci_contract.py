@@ -626,7 +626,9 @@ _API_PREFIXES = (
     "backend/fitminiapp_api/schemas/",
 )
 _API_TOKENS = ("openapi", "auth", "session", "cookie", "telegram")
-_SHARED_CI_CONTRACT_PATHS = frozenset({"scripts/ci_contract.py"})
+# Workflow runtime edits can break jobs without modifying any application files.
+# Route them through the real E2E, Python, PostgreSQL and security gates.
+_SHARED_CI_CONTRACT_PATHS = frozenset({"scripts/ci_contract.py", ".github/workflows/ci.yml"})
 _CONTAINER_SECURITY_PATHS = frozenset({".trivyignore.yaml"})
 _SKILL_PREFIX = ".agents/skills/"
 _MIGRATION_PREFIXES = (
