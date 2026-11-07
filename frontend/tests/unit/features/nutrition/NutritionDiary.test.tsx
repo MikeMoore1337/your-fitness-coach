@@ -207,7 +207,12 @@ describe('NutritionDiary', () => {
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2026-08-18'),
     );
-    await waitFor(() => expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() =>
+      expect(within(breakfastSection()).getByRole('button', { name: 'Завтрак' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      ),
+    );
   });
 
   it('repeats one meal in one press, offers the next meal and can undo it', async () => {
