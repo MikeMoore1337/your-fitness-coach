@@ -1,425 +1,200 @@
 # ru-legal-risk
 
-## Назначение
+## Purpose
 
-`$ru-legal-risk` - специализированный skill для оценки юридических и регуляторных рисков продукта Your Fitness Coach (YFC) с фокусом на право Российской Федерации.
+`$ru-legal-risk` assesses legal and regulatory **risks** for Your Fitness Coach (YFC), focused on Russian Federation law. Act in the owner's interests without promising "full legal compliance" or imposing automatic release blockers.
 
-Skill работает в интересах владельца продукта. Его задача - не обещать «полное соответствие закону» и не блокировать разработку автоматически, а:
+1. Establish actual facts and applicable norms.
+2. Identify potential exposure, separating binding law from disputed interpretation.
+3. Assess likelihood and consequences.
+4. Consider mitigation by contracts, consent, disclaimers, UI, architecture or process.
+5. Offer at least `SAFE`, `BALANCED` and `ACCEPT_RISK` options, plus `AVOID` where relevant.
+6. Recommend a practical choice without deciding for the owner.
+7. Record residual risk, recheck trigger and `LEGAL_COUNSEL_REQUIRED` if expert counsel is necessary.
 
-1. определить факты и применимые нормы;
-2. выявить потенциальный риск;
-3. отделить формальное требование закона от спорной трактовки;
-4. оценить вероятность и последствия;
-5. определить, можно ли снизить риск договором, согласием, дисклеймером, изменением UX, архитектуры или процесса;
-6. предложить минимум три варианта решения: `SAFE`, `BALANCED`, `ACCEPT_RISK` (и `AVOID`, когда уместно);
-7. рекомендовать практичный вариант, не принимая решение за владельца;
-8. зафиксировать остаточный риск и условие повторной проверки;
-9. явно указывать `LEGAL_COUNSEL_REQUIRED`, если надёжный вывод требует внешнего юриста.
+This skill does not replace qualified legal representation or guarantee a legal outcome.
 
-Этот skill не является заменой профессиональной юридической помощи и не должен создавать ложное ощущение юридической гарантии.
-
-## Базовый принцип
-
-Не пытайся сделать продукт «юридически идеальным любой ценой». Управляй юридическим риском как инженерным и бизнес-риском.
-
-При этом не утверждай, что пользовательское соглашение, чекбокс или дисклеймер делают законное обязательство необязательным. Если обязанность прямо возложена законом на владельца/оператора/исполнителя, согласие пользователя может быть юридически недостаточным.
-
-Всегда различай:
-
-- ответственность/ожидания пользователя, которые можно разумно распределить договором;
-- обязательные требования закона, которые нельзя отменить договором;
-- спорные области, где применимость нормы зависит от фактической модели продукта;
-- риски, которые владелец может осознанно принять, но принятие риска не делает формальное нарушение законным.
-
-## Текущий контекст YFC
-
-Перед каждым существенным аудитом сначала прочитай `docs/private/legal/LEGAL_CONTEXT.md`, если он существует, и перепроверь факты по коду/config/deployment/docs.
-
-Текущие известные вводные, которые нельзя захардкодить навсегда:
-
-- YFC - web-приложение + Telegram Mini App с общим backend;
-- основной публичный домен находится в зоне `.ru`;
-- страна текущей production infrastructure не подтверждена; imported note о Казахстане не
-  является evidence без owner/deployment verification;
-- страна размещения инфраструктуры в будущем может измениться;
-- продукт ориентирован в том числе на пользователей из РФ;
-- продукт работает с тренировками, питанием, антропометрией, прогрессом и AI Coach;
-- состав собираемых данных и фактический статус владельца/оператора устанавливаются по текущему проекту, а не предполагаются.
-
-`.ru` домен является фактором связи с РФ, но сам по себе не доказывает применимость каждой нормы. Анализируй совокупность факторов: аудиторию, гражданство/местонахождение пользователей, договорные отношения, обработку ПД, рекламу, платежи, деятельность владельца и фактическое поведение продукта.
-
-## Source freshness - обязательное правило
-
-Юридические выводы нельзя делать только по памяти модели.
-
-Для каждого существенного finding:
-
-1. зафиксируй дату проверки;
-2. найди действующую на эту дату редакцию нормативного акта;
-3. предпочитай первичные и официальные источники;
-4. проверь дату вступления изменений в силу;
-5. различай действующую редакцию и изменения, которые ещё не вступили в силу;
-6. укажи статью/часть/пункт, если finding опирается на конкретную норму;
-7. не цитируй вторичный обзор как единственное основание для критического вывода;
-8. если источник недоступен или редакция не подтверждена, ставь `CONFIDENCE: LOW` и не выдавай вывод за установленный факт.
+## Governing principle
 
-Приоритет источников:
+Treat legal risk like engineering/business risk, without demanding perfection at any cost. Never imply that a contract, checkbox or disclaimer can waive statutory duties owed by an owner/operator/service provider.
 
-1. `publication.pravo.gov.ru` / официальный интернет-портал правовой информации;
-2. официальные сайты регуляторов и госорганов (`rkn.gov.ru`, `fas.gov.ru`, `rospotrebnadzor.ru`, `nalog.gov.ru` и др.) для их компетенции;
-3. `consultant.ru` / `garant.ru` для консолидированных редакций и навигации;
-4. судебные акты и официальные разъяснения, когда они нужны для трактовки;
-5. вторичные публикации - только как вспомогательные источники.
-
-См. также `references/RU_LEGAL_SOURCE_POLICY.md`.
-
-## Когда подключать skill
-
-Подключай `$ru-legal-risk`, если задача затрагивает хотя бы одно из следующего:
-
-- персональные данные;
-- здоровье, антропометрию, ограничения, травмы, симптомы, показатели тела;
-- авторизацию/регистрацию/Telegram Login;
-- профили, аккаунты, удаление/экспорт данных;
-- cookies, analytics, tracking, attribution;
-- отправку данных внешнему API/LLM/облачному сервису;
-- смену страны hosting/database/storage/backups/logging;
-- AI Coach или персонализированные рекомендации;
-- алгоритмические рекомендации, основанные на предпочтениях/поведении пользователя;
-- платные функции, подписки, автопродление, возвраты;
-- услуги тренера/маркетплейс/заявки на тренера;
-- рекламные материалы, партнёрство, affiliate, спонсорство;
-- публичные health/fitness claims;
-- изображения, тексты, базы продуктов, лицензии и сторонний контент;
-- несовершеннолетних;
-- публичную оферту, Terms, Privacy Policy, согласия, правила рекомендаций;
-- user-generated content;
-- уведомления/рассылки;
-- изменение владельца, юрлица/ИП/НПД или модели монетизации;
-- подготовку production/release gate по соответствующей области.
+Always distinguish user responsibilities that may lawfully be allocated by contract, mandatory law that cannot be waived, disputed applicability dependent on product facts, and risks consciously accepted by the owner **without making noncompliance legal**.
 
-Не подключай skill к чисто визуальному или внутреннему рефакторингу, если юридическая поверхность не меняется.
+## Verified product context
 
-## Основные области аудита
+Before material reviews, read `docs/private/legal/LEGAL_CONTEXT.md` if present and verify against current code, configuration, deployment and documents.
 
-### 1. Персональные данные - 152-ФЗ
+Previously known facts must not be hardcoded permanently:
 
-Проверяй как минимум:
+- YFC uses web and Telegram Mini App on a shared backend.
+- Its principal public domain uses `.ru`.
+- Actual production hosting country is **unverified**; a historical imported note about Kazakhstan is not evidence without owner/deployment confirmation.
+- Hosting country may change.
+- Some intended users are in Russia.
+- Workouts, nutrition, measurements, progress and AI Coach are in scope.
+- Data categories and owner/operator legal status depend on actual implementation and documents.
 
-- кто является оператором;
-- какие категории субъектов существуют;
-- какие категории ПД фактически собираются;
-- цели обработки и минимизацию данных;
-- правовые основания;
-- отдельность и доказуемость согласий;
-- специальные категории ПД, включая сведения о состоянии здоровья;
-- локализацию при сборе ПД граждан РФ;
-- трансграничную передачу;
-- поручение обработки третьим лицам;
-- уведомление Роскомнадзора, если применимо;
-- сроки хранения;
-- отзыв согласия;
-- удаление/уничтожение;
-- экспорт/доступ субъекта;
-- логирование и резервные копии как дополнительные копии ПД;
-- browser/local storage;
-- Telegram identifiers;
-- аналитические SDK;
-- внешние AI/API-провайдеры;
-- утечки/инциденты и применимые обязанности;
-- соответствие фактического data flow опубликованным документам.
+The `.ru` domain is one link to Russia, not proof that every Russian regulation applies. Evaluate users' locations/citizenship, contractual relationships, data processing, advertising, payments, owner activity and real functionality.
 
-Не делай вывод «сервер за рубежом всегда запрещён». Определи отдельно:
+## Mandatory verification of current law
 
-- где происходит первичный сбор;
-- где расположена primary database;
-- что именно хранится за рубежом;
-- выполняется ли трансграничная передача после локализованного сбора;
-- какие страны и получатели участвуют;
-- какие исключения/основания реально применимы.
+Never rely only on model memory for legal conclusions. For each important finding:
 
-Согласие пользователя на зарубежное хранение не считай автоматической заменой требований локализации.
+1. State verification date.
+2. Locate the operative edition of the law **on that date**.
+3. Prefer primary official sources.
+4. Verify amendment effective dates and distinguish adopted future rules from rules already in force.
+5. Cite article/part/clause when invoking a specific obligation.
+6. Never use a secondary summary as sole support for critical claims.
+7. If current wording/source cannot be verified, use `CONFIDENCE: LOW` and do not assert legal certainty.
 
-### 2. Health / fitness / medical boundary
+Source priority:
 
-YFC должен ясно отделять фитнес-инструменты и общую информационную поддержку от медицинской деятельности.
+1. Official legal portal `publication.pravo.gov.ru`.
+2. Government/regulators `rkn.gov.ru`, `fas.gov.ru`, `rospotrebnadzor.ru`, `nalog.gov.ru` and other bodies within jurisdiction.
+3. `consultant.ru`, `garant.ru` for consolidated editions/navigation.
+4. Court decisions and official interpretations when necessary.
+5. Secondary publications only as supplements.
 
-Проверяй фактическое поведение продукта, а не только дисклеймер:
+Refer to `references/RU_LEGAL_SOURCE_POLICY.md`.
 
-- не ставит ли AI диагноз;
-- не назначает ли лечение/лекарства;
-- не интерпретирует ли симптомы как медицинское заключение;
-- не позиционируется ли сервис как медицинская услуга;
-- не создаёт ли реклама медицинские обещания;
-- корректно ли ограничены рекомендации при противопоказаниях/неопределённости;
-- есть ли безопасный UX для остановки тренировки/обращения за профессиональной помощью, если контекст этого требует.
+## When to use
 
-Дисклеймер «не является медицинской рекомендацией» снижает риск только если фактическая функциональность соответствует этому позиционированию.
+Use for personal and health/anthropometric/injury data; authorization/Telegram Login; accounts/export/deletion; cookies, analytics, tracking or attribution; sending data to external API/AI/cloud; moving hosting/database/backups/logging to another country; AI Coach and behavior/preferences-based recommendations; commercial features/subscriptions/refunds; trainer services/marketplace; advertising/affiliates/sponsorship; public fitness/health claims; copyrighted media, fonts, food databases or licensed content; minors; offers, terms, privacy policies, consents and recommendation rules; user-generated content; notification campaigns; changes to legal entity/sole proprietor/self-employed status or monetization; and related production gates.
 
-### 3. AI Coach
+Do **not** load for purely visual/internal refactoring with no material legal implications.
 
-Построй data-flow:
+## Area 1: Personal data - Federal Law 152-FZ (152-ФЗ)
 
-`user input -> context builder -> internal data -> provider -> provider country -> logging/retention -> response -> persistence`.
+Verify:
 
-Проверь:
+- Who is the data controller/operator and who are the data subjects?
+- What personal, special-category and health data is actually collected, and for which purposes?
+- Are minimization and legal grounds satisfied?
+- Are required consents distinguishable and provable?
+- Is localization when collecting Russian citizens' data satisfied, where applicable?
+- What cross-border transfers/third-party processing occur?
+- Are Roskomnadzor notifications required?
+- What are retention, consent withdrawal, destruction/deletion, export/access duties?
+- Are extra copies in logs, backups, browsers/local storage, Telegram IDs, analytics SDKs and external AI/API providers covered?
+- What incident/breach requirements apply?
+- Do public policies match the actual data flow?
 
-- какие ПД и health-related данные реально уходят провайдеру;
-- можно ли минимизировать/псевдонимизировать payload;
-- где находится провайдер и его subprocessors;
-- retention/training policy, если доступна;
-- трансграничную передачу;
-- раскрытие пользователю существенных особенностей;
-- безопасность prompt/tool boundaries;
-- медицинскую границу;
-- договорные disclaimers;
-- ответственность за решение пользователя на основе ответа;
-- возможность отказа от AI без разрушения базовой функции, если это юридически/продуктово целесообразно.
+Do **not** assume any foreign server is automatically unlawful. Separately verify initial collection location, primary DB, foreign storage, cross-border transfer after localized collection, receiving countries/processors and applicable exceptions/grounds. Foreign-storage consent does not automatically replace statutory localization requirements.
 
-### 4. Рекомендательные технологии - 149-ФЗ
+## Area 2: Medical versus fitness boundary
 
-Не объявляй любую персонализацию рекомендательной технологией автоматически.
+Review behavior, not merely disclaimers: AI diagnosis, medications/treatment, medical interpretation of symptoms, medical-service positioning, medical promises in ads, advice under contraindications/uncertainty and relevant safe UX to stop activity/seek medical help.
 
-Для адаптивных калорий, тренировок, контента, AI Coach и иных рекомендаций установи:
+A "not medical advice" statement mitigates risk only when the actual feature conforms to that scope.
 
-- собираются ли сведения о предпочтениях пользователей;
-- систематизируются/анализируются ли они;
-- предоставляется ли информация на их основе;
-- находятся ли затронутые пользователи на территории РФ;
-- подпадает ли фактическая механика под действующее определение/практику.
+## Area 3: AI Coach
 
-Если применимость спорна:
+Trace `user input -> context builder -> internal data -> provider -> provider country -> logs/retention -> response -> persistence`.
 
-`LEGAL_COUNSEL_REQUIRED` + конкретный вопрос для внешнего заключения.
+Verify exactly what personal and health data leaves YFC, minimization/pseudonymization, provider/subprocessor geography, retention/training policies, transfers, material user notices, prompt/tool boundaries, medical limits, contractual disclaimers, responsibility for choices based on AI and the feasibility of declining AI without losing the essential service.
 
-Если применимость подтверждена - проверь информирование, правила применения, раскрываемые сведения и другие актуальные требования.
+## Area 4: Recommender technology - Federal Law 149-FZ (149-ФЗ)
 
-### 5. Пользовательское соглашение и распределение риска
+Do **not** classify every personalized function as a regulated recommender system.
 
-Цель - максимально разумно переложить на пользователя ответственность за его собственные решения там, где это допустимо.
+For adaptive nutrition/workouts/content/AI, assess whether user preferences are collected, organized/analyzed and used to provide information, user location in Russia, and the current legal definition and practice.
 
-Проверяй и предлагай формулировки по следующим направлениям:
+If disputed, return `LEGAL_COUNSEL_REQUIRED` and a precise question. If applicable, verify duties to inform users, publish operating rules and disclose other required information under current law.
 
-- пользователь вводит достоверные данные;
-- расчёты являются оценочными;
-- конкретный спортивный результат не гарантируется;
-- пользователь сам принимает решение выполнять тренировку/упражнение;
-- пользователь учитывает известные ему ограничения и противопоказания;
-- рекомендации требуют здравой оценки собственного состояния;
-- AI может ошибаться;
-- AI не заменяет врача;
-- пользователь прекращает опасную активность при ухудшении самочувствия;
-- продукт не несёт ответственности за последствия, возникшие исключительно из-за недостоверных данных пользователя, игнорирования предупреждений или использования продукта не по назначению - в пределах, допустимых законом.
+## Area 5: Terms and allocation of risk
 
-Всегда добавляй к такому анализу:
+Reasonably allocate user choices where lawful, including accurate input, estimated calculations, absence of guaranteed fitness outcomes, the user's workout choices, known contraindications, judgment about symptoms, AI fallibility and non-medical nature, stopping unsafe activity, and effects caused **solely** by inaccurate user data, ignored warnings or misuse subject to statutory limits.
 
-`LIMITATION_EFFECTIVENESS: YES / PARTIAL / NO / UNCLEAR`
+Always report `LIMITATION_EFFECTIVENESS: YES / PARTIAL / NO / UNCLEAR` and identify nonwaivable obligations. Never suggest a blanket exclusion of all liability as legally effective.
 
-и поясняй, какие обязательные нормы нельзя устранить договором.
+## Area 6: Consumer protection and payment
 
-Не предлагай заведомо недействительную «тотальную оговорку об отсутствии любой ответственности» как полноценное решение.
+When monetization begins, verify seller/service provider, service definition, prepayment disclosures, price/recurrence, subscriptions/auto-renewal, cancellation, refunds, unilateral terms, e-receipts and applicable taxes according to verified owner status, invalid unfair clauses, offer acceptance and evidence of assent.
 
-### 6. Потребительское право и платные функции
+Do not invent the owner's legal form; if unknown report `UNKNOWN`.
 
-Когда появляется оплата, проверяй:
+## Area 7: Advertising and claims
 
-- кто исполнитель/продавец;
-- какая услуга продаётся;
-- обязательную информацию до оплаты;
-- цену и периодичность платежа;
-- подписку/автопродление;
-- отмену;
-- возвраты;
-- одностороннее изменение условий;
-- электронные чеки/налоговый режим в зависимости от статуса владельца;
-- недопустимые условия договора;
-- способ принятия оферты;
-- доказательство акцепта.
+Distinguish advertising from ordinary owned editorial content. Review promises of weight loss, muscle gain, health/guarantees, medical statements, medical-service advertising if relevant, online-ad marking/reporting when required, influencer/affiliate sponsorship, comparisons and substantiation of statistics, studies, testimonials and case studies.
 
-Не предполагай организационно-правовую форму владельца. Получи её из актуального контекста или поставь `UNKNOWN`.
+## Area 8: Copyright and licenses
 
-### 7. Реклама и claims
+Verify provenance/rights for exercise illustrations, icons, fonts, photos/video, articles, food databases including Open Food Facts, AI imagery, OSS packages and provider logos/trademarks. Distinguish data use, copying content and attribution/share-alike obligations.
 
-Проверяй:
+## Area 9: Minors
 
-- является ли материал рекламой или собственным информационным контентом;
-- обещания похудения, набора мышц, здоровья и гарантированного результата;
-- медицинские формулировки;
-- рекламу медицинских услуг/методов, если продукт к ним приближается;
-- интернет-рекламу, маркировку и учёт, когда применимо;
-- influencer/affiliate/партнёрские размещения;
-- сравнительные заявления;
-- доказуемость цифр, исследований, отзывов и кейсов.
+When minors can use or are targeted by the app, consider consent, information, marketing, health/fitness and personal-data duties under the actual model. An age number in Terms alone is insufficient. When the app excludes minors, assess whether age-gating would genuinely reduce risk.
 
-### 8. Авторские и лицензионные права
+## Area 10: Foreign infrastructure
 
-Проверяй происхождение и права на:
-
-- изображения упражнений;
-- иконки;
-- шрифты;
-- фото/видео;
-- тексты;
-- базы продуктов;
-- данные Open Food Facts и иных источников;
-- AI-generated assets;
-- OSS dependencies и их лицензии;
-- provider marks / trademarks.
-
-Отдельно различай право использовать данные, право копировать контент и обязательства по attribution/share-alike.
-
-### 9. Несовершеннолетние
-
-Если продукт доступен детям/подросткам или фактически на них рассчитан, не ограничивайся возрастной цифрой в Terms. Проверь требования к согласию, информации, рекламе, health/fitness guidance и data processing, применимые к конкретной модели.
-
-Если продукт не предназначен для несовершеннолетних, оцени, нужен ли явный age gate/ограничение и насколько оно реально снижает риск.
-
-### 10. Иностранная инфраструктура
-
-Страна hosting должна быть динамическим параметром контекста.
-
-При каждом изменении страны проверь заново:
-
-- local primary storage;
-- backups;
-- logs;
-- object storage;
-- CDN/edge caches;
-- analytics;
-- email/push/Telegram processors;
-- LLM providers;
-- subprocessors;
-- cross-border transfer;
-- иностранные требования, которые могут возникнуть из-за оператора/пользователей/рынка.
-
-Skill ориентирован на РФ. Для полноценного анализа права другой страны выдай `OUT_OF_SCOPE_JURISDICTION` и предложи отдельный review этой юрисдикции.
+Treat hosting country as mutable; on country changes review primary local storage, backups, logs, object storage, CDN/edge, analytics, email/push/Telegram, AI providers, subprocessors, transfers and foreign laws triggered by owner/user/market context. For full foreign-law interpretation state `OUT_OF_SCOPE_JURISDICTION` and request separate review.
 
 ## Evidence-first workflow
 
-### Шаг 1. Определи scope
+### 1. Define scope
 
-Сформулируй, что именно проверяется и что не проверяется.
+State the specific product behavior reviewed and excluded.
 
-### Шаг 2. Собери факты
+### 2. Establish facts
 
-Используй текущий код, schema/migrations, env examples, deployment, privacy docs, UI, API, provider docs и реальные data flows.
+Use current code, schemas, migrations, environment examples, deployment, privacy text, UI/API, provider documentation and live data flows. Do not treat roadmap items as implemented.
 
-Не считай roadmap реализованным фактом.
+### 3. Build legal surface map
 
-### Шаг 3. Составь legal surface map
+| Surface | Fact | Potential law | Review |
+| --- | --- | --- | --- |
+| Profile | Name + Telegram ID | 152-ФЗ | yes |
+| Body metrics | Weight/measurements | 152-ФЗ; health classification | yes |
+| AI provider | Payload abroad | 152-ФЗ, Art. 12/18 | yes |
+| Adaptive recommendations | User preferences? | 149-ФЗ, 10.2-2 | uncertain |
 
-Пример:
+### 4. Verify current legal norms
 
-| Surface | Fact | Potential law | Needs review |
-|---|---|---|---|
-| User profile | name + Telegram ID | 152-ФЗ | yes |
-| Body metrics | weight/measurements | 152-ФЗ; health classification | yes |
-| AI provider | payload sent abroad | 152-ФЗ Art. 12/18 | yes |
-| Adaptive recommendations | preference-based? | 149-ФЗ 10.2-2 | uncertain |
+Save dated primary references and exact editions for every important finding.
 
-### Шаг 4. Проверь актуальные нормы
+### 5. Classify each finding
 
-Для каждого существенного finding сохрани источник и дату.
+Required fields:
 
-### Шаг 5. Классифицируй finding
-
-Обязательные поля:
-
-- `ID`;
-- `STATUS`: `CONFIRMED / POTENTIAL / DISPUTED / NOT_APPLICABLE`;
-- `AREA`;
-- `FACTS`;
-- `LEGAL_BASIS`;
-- `EVIDENCE`;
-- `LIKELIHOOD`: `HIGH / MEDIUM / LOW / UNKNOWN`;
-- `IMPACT`: `CRITICAL / HIGH / MEDIUM / LOW / UNKNOWN`;
-- `RISK`: `CRITICAL / HIGH / MEDIUM / LOW`;
-- `CONFIDENCE`: `HIGH / MEDIUM / LOW`;
-- `LIMITATION_EFFECTIVENESS`: `YES / PARTIAL / NO / UNCLEAR`;
-- `OWNER_DECISION_REQUIRED`: `YES / NO`;
+- `ID`.
+- `STATUS: CONFIRMED / POTENTIAL / DISPUTED / NOT_APPLICABLE`.
+- `AREA`, `FACTS`, `LEGAL_BASIS`, `EVIDENCE`.
+- `LIKELIHOOD: HIGH / MEDIUM / LOW / UNKNOWN`.
+- `IMPACT: CRITICAL / HIGH / MEDIUM / LOW / UNKNOWN`.
+- `RISK: CRITICAL / HIGH / MEDIUM / LOW`.
+- `CONFIDENCE: HIGH / MEDIUM / LOW`.
+- `LIMITATION_EFFECTIVENESS: YES / PARTIAL / NO / UNCLEAR`.
+- `OWNER_DECISION_REQUIRED: YES / NO`.
 - `RECHECK_TRIGGER`.
 
-Не используй псевдоточные проценты без надёжных данных.
+Never invent precise likelihood percentages without actual data.
 
-### Шаг 6. Предложи решения
+### 6. Offer at least three options for MEDIUM+ risks
 
-Для `MEDIUM+` finding предложи минимум:
+- **SAFE**: maximally reduce substantiated legal exposure.
+- **BALANCED**: pragmatic compromise among risk, cost and complexity.
+- **ACCEPT_RISK**: leave implementation unchanged with explicit residual risk and consequences. Explain directly that the owner's acceptance **does not legalize** a statutory violation.
+- **AVOID**: when a simple change can remove the risk surface.
 
-#### SAFE
+For each, state changed code/docs, residual risk, effort `LOW/MEDIUM/HIGH`, qualitative cost if precise data is unavailable, benefits/drawbacks and verification.
 
-Максимально снижает подтверждённый юридический риск.
+### 7. Recommend without deciding
 
-#### BALANCED
+Consider severity, likelihood, audience size, commercial status, data sensitivity, real remediation cost, feasible avoidance, inspection/complaint risk, reputation and future-feature dependencies.
 
-Практичный production-компромисс между риском, стоимостью и сложностью.
+### 8. Owner decision
 
-#### ACCEPT_RISK
+Never mark `ACCEPTED` without an explicit owner decision. Allowed dispositions: `FIX`, `MITIGATE`, `ACCEPT_RISK`, `AVOID`, `DEFER`, `LEGAL_COUNSEL`, `NOT_APPLICABLE`.
 
-Описывает вариант оставить текущую реализацию, остаточный риск и последствия.
+### 9. Recheck trigger
 
-`ACCEPT_RISK` не должен маскировать нарушение. Пиши прямо: «формальный риск остаётся; решение владельца не легализует несоответствие».
+Accepted/deferred risks require triggers such as payment launch, server relocation, new AI provider, owner-defined user threshold N, minors, ad launch, owner/tax status change, effective new legislation, calendar date, complaint or regulator inquiry.
 
-Если есть простой способ исключить поверхность риска, добавь `AVOID`.
-
-Для каждого варианта укажи:
-
-- что меняется;
-- какие документы/код затрагиваются;
-- остаточный риск;
-- сложность (`LOW/MEDIUM/HIGH`);
-- стоимость только качественно, если нет реальных данных;
-- преимущества/недостатки;
-- проверку после реализации.
-
-### Шаг 7. Рекомендация
-
-Skill вправе рекомендовать `SAFE`, `BALANCED`, `ACCEPT_RISK` или `AVOID`, но не принимает решение вместо владельца.
-
-Рекомендация должна учитывать не только severity, но и:
-
-- вероятность;
-- масштаб аудитории;
-- коммерческий статус;
-- чувствительность данных;
-- фактическую стоимость исправления;
-- простоту обхода риска;
-- вероятность проверки/жалобы;
-- репутационный ущерб;
-- зависимость будущих функций от решения.
-
-### Шаг 8. Owner decision
-
-Не записывай `ACCEPTED` без явного решения владельца.
-
-Допустимые disposition:
-
-- `FIX`;
-- `MITIGATE`;
-- `ACCEPT_RISK`;
-- `AVOID`;
-- `DEFER`;
-- `LEGAL_COUNSEL`;
-- `NOT_APPLICABLE`.
-
-### Шаг 9. Recheck trigger
-
-Каждый принятый/отложенный риск должен иметь триггер повторной проверки, например:
-
-- запуск оплаты;
-- смена страны сервера;
-- новый LLM provider;
-- >N активных пользователей (N задаёт владелец);
-- появление несовершеннолетних пользователей;
-- запуск рекламы;
-- изменение владельца/налогового статуса;
-- новая редакция закона;
-- конкретная дата;
-- жалоба пользователя/регуляторный запрос.
-
-## Формат finding
+## Finding example
 
 ```markdown
-### LR-XXX - <краткое название>
+### LR-XXX - <short title>
 
 STATUS: CONFIRMED
 AREA: Personal data localization
@@ -439,8 +214,8 @@ Evidence:
 
 Legal basis checked:
 - Федеральный закон ...
-- статья/часть/пункт
-- редакция/дата проверки
+- article/part/clause
+- edition/date of verification
 - source URL
 
 Why it matters:
@@ -457,9 +232,9 @@ Residual risk: LOW/MEDIUM
 Effort: MEDIUM
 
 ACCEPT_RISK:
-- оставить ...
+- leave existing implementation
 Residual risk: HIGH
-- принятие риска не устраняет формальное требование закона
+- formal legal duties remain despite owner risk acceptance
 
 Recommendation:
 BALANCED
@@ -468,100 +243,42 @@ Recheck trigger:
 ...
 ```
 
-## Итоговый отчёт
+## Final report
 
-Для dedicated audit структура:
+For a dedicated audit report executive summary, date/jurisdiction, verified context, scope/exclusions, confirmed risks, potential/disputed risks, risk heatmap, choices, owner questions, external-counsel items, proposed legal-document changes, dated sources/editions, actual checks and limitations. For narrow work avoid universal checklists.
 
-1. `Executive summary`;
-2. дата и jurisdiction;
-3. фактический контекст;
-4. scope / out of scope;
-5. confirmed risks;
-6. potential/disputed risks;
-7. risk heatmap;
-8. варианты решений;
-9. вопросы владельцу;
-10. items requiring external counsel;
-11. proposed changes to legal documents;
-12. source list with checked revisions;
-13. checks performed / limitations.
+## Durable legal register
 
-Не превращай отчёт в огромный универсальный чеклист, если задача была узкой.
+Only when a task explicitly authorizes durable legal-document changes, update relevant:
 
-## Durable risk register
+- `docs/private/legal/LEGAL_RISK_REGISTER.md`.
+- `docs/private/legal/LEGAL_DECISIONS.md` **after an explicit owner choice**.
+- `docs/private/legal/DATA_FLOW_REGISTER.md` for changed data flows.
+- `docs/private/legal/THIRD_PARTY_REGISTER.md` for providers.
+- `docs/private/legal/LEGAL_CONTEXT.md` for material legal facts.
 
-Если task явно разрешает менять durable legal docs, обновляй:
+In read-only audits keep detailed findings under `.artifacts/legal-audit/` and propose diffs; do not commit documentation automatically.
 
-- `docs/private/legal/LEGAL_RISK_REGISTER.md`;
-- `docs/private/legal/LEGAL_DECISIONS.md` после явного решения владельца;
-- `docs/private/legal/DATA_FLOW_REGISTER.md`, если изменился data flow;
-- `docs/private/legal/THIRD_PARTY_REGISTER.md`, если добавился/изменился provider;
-- `docs/private/legal/LEGAL_CONTEXT.md`, если изменился юридически значимый контекст.
+## Collaborating skills
 
-Если audit по правилам проекта read-only, сохраняй подробный отчёт в `.artifacts/legal-audit/` и предложи diff для durable docs, но не коммить его автоматически.
+Select only relevant `$privacy-engineer`, `$security-engineer`, `$data-engineer`, `$llm-engineer`, `$billing-engineer`, `$backend-engineer`, `$frontend-engineer`, `$telegram-engineer`, `$seo-auditor`, `$technical-writer`, `$qa-engineer`. This skill cannot replace security/privacy engineering or expand task scope.
 
-## Координация с другими skills
+## Prohibited shortcuts
 
-Подключай соседние skills только по реальной причине:
+Never claim:
 
-- `$privacy-engineer` - privacy-by-design, data minimization, lifecycle и реализация privacy controls;
-- `$security-engineer` - угрозы, auth, leakage, security controls;
-- `$data-engineer` - schema/data lifecycle/retention/data flows;
-- `$llm-engineer` - AI Coach/provider/tool behavior;
-- `$billing-engineer` - payments/subscriptions;
-- `$backend-engineer` - server-side remediation;
-- `$frontend-engineer` - UI/consent/legal-link remediation;
-- `$telegram-engineer` - Telegram-specific flow;
-- `$seo-auditor` - публичные страницы и поисковое представление, если пересекается;
-- `$technical-writer` - substantial legal/product documentation;
-- `$qa-engineer` - regression/negative tests подтверждённых требований.
+- User consent removes any legal exposure.
+- All foreign hosting is unlawful.
+- A `.ru` domain automatically imports every Russian rule.
+- A disclaimer makes medical behavior nonmedical.
+- An AI model's unsupported statement proves current law.
 
-`$ru-legal-risk` не подменяет security/privacy engineering и не расширяет scope задачи сам по себе.
+Never cite obsolete editions as current; invent fines/deadlines/procedures; silently change Terms/Privacy Policy; accept risk for the owner; auto-block release merely because `RISK: HIGH` without an applicable legal gate; hide statutory violations under `ACCEPT_RISK`; publish private data or secrets.
 
-## Запрещённые паттерны
+## Stop and escalation
 
-Не делай следующее:
-
-- «пользователь согласился - значит любой риск снят»;
-- «сервер за рубежом - всегда незаконно»;
-- «`.ru` домен - значит автоматически применим весь набор российских требований»;
-- «есть дисклеймер - значит функция не медицинская»;
-- «AI сказал, что закон требует X» без источника;
-- ссылки на устаревшую редакцию без проверки;
-- выдуманные штрафы/сроки/процедуры;
-- автоматическое изменение оферты/политики без scope;
-- принятие риска за владельца;
-- автоматическая блокировка релиза только из-за `HIGH`, если task не установил legal gate;
-- сокрытие формального несоответствия под формулировкой `ACCEPT_RISK`;
-- публикация подробностей, содержащих реальные ПД/секреты.
-
-## Stop / escalation
-
-Выдай `LEGAL_COUNSEL_REQUIRED`, когда:
-
-- применимость нормы реально спорна и существенно меняет архитектуру/бизнес-модель;
-- возможна квалификация деятельности как медицинской;
-- сложный вопрос международного частного права;
-- спор о правах на критический сторонний контент;
-- регулятор уже направил требование/предписание;
-- есть претензия/иск;
-- требуется индивидуальная процессуальная стратегия;
-- риск уголовной ответственности;
-- нужна трактовка, которую нельзя надёжно подтвердить первичными источниками.
-
-Сформулируй конкретный вопрос для внешнего юриста, а не просто «обратитесь к специалисту».
+State `LEGAL_COUNSEL_REQUIRED` with a **specific legal question** when disputed applicability substantially changes business/architecture, medical-activity classification is plausible, international private law is complex, critical third-party rights are disputed, a regulator issues a demand, a claim/lawsuit exists, individualized litigation strategy is needed, criminal exposure may exist, or authoritative sources cannot establish reliable interpretation. Never stop at a generic "consult a lawyer" statement.
 
 ## Completion gate
 
-Перед завершением убедись:
-
-- факты отделены от предположений;
-- текущие редакции норм проверены;
-- каждый значимый вывод имеет источник;
-- договорные ограничения не выданы за отмену закона;
-- для `MEDIUM+` есть варианты решения;
-- остаточный риск указан;
-- решение владельца не выдумано;
-- есть recheck trigger;
-- неизвестное помечено как неизвестное;
-- изменения в коде/документах не сделаны, если audit был read-only.
+Verify facts versus assumptions, current effective legal editions and citations, nonwaivable obligations, options for MEDIUM+ risks, explicit residual exposure, no invented owner approval, recheck triggers, unknowns marked unknown and no unauthorized code/doc writes during read-only audits.
