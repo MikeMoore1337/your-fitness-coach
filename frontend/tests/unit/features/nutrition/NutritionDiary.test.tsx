@@ -194,12 +194,13 @@ describe('NutritionDiary', () => {
       );
     expect(sectionOrder).toEqual(['КБЖУ', 'Еда', 'Напитки', 'Это всё за сегодня?']);
     expect(screen.getByRole('progressbar', { name: /Калории: 420 из 2.+000 ккал/ })).toBeVisible();
-    expect(screen.getByText('Б 18,5')).toBeVisible();
+    expect(screen.getByText('Б 18,5')).not.toBeVisible();
 
     const breakfastToggle = within(breakfastSection()).getByRole('button', { name: 'Завтрак' });
     expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(breakfastToggle);
     expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Б 18,5')).toBeVisible();
 
     expect(screen.queryByRole('navigation', { name: 'Дата дневника' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /18 августа/i }));
