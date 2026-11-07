@@ -219,8 +219,8 @@ def test_natural_parser_supports_newlines_spaces_decimal_comma_and_excludes_wate
     assert rows[0].amount_unit == "g"
     assert rows[0].unit_inferred is False
     assert rows[1].amount == Decimal("120.5")
-    assert rows[1].amount_unit == "g"
-    assert rows[1].unit_inferred is True
+    assert rows[1].amount_unit is None
+    assert rows[1].unit_inferred is False
     assert rows[2].status == "excluded"
 
 
@@ -235,6 +235,169 @@ def test_natural_parser_does_not_infer_grams_for_unsupported_units() -> None:
     assert "не поддерживается" in (rows[0].message or "")
     assert rows[1].amount == Decimal("100")
     assert rows[1].amount_unit == "g"
+
+
+@pytest.mark.parametrize(
+    ("text", "names"),
+    [
+        ("рис 100 г, банан", ["рис", "банан"]),
+        ("банан, рис 100 г", ["банан", "рис"]),
+        ("рис 100 г банан", ["рис", "банан"]),
+    ],
+)
+def test_natural_parser_preserves_unquantified_fragments(text: str, names: list[str]) -> None:
+    rows = parse_natural_food_input(text)
+
+    assert [row.name for row in rows] == names
+    missing = next(row for row in rows if row.name == "банан")
+    assert missing.amount is None
+    assert missing.status == "unresolved"
+
+
+def test_natural_input_requires_an_explicit_unit(client) -> None:
+    telegram_id = 28_095
+    headers = _auth(client, telegram_id)
+    food_id = _store_food("Рис")
+    preview = client.post(
+        "/api/v1/nutrition/diary/natural-input/preview",
+        headers=headers,
+        json={"text": "Рис 120,5"},
+    )
+    assert preview.status_code == 200
+    row = preview.json()["rows"][0]
+    assert row["amount"] == "120.5"
+    assert row["amount_unit"] is None
+    assert row["status"] == "unresolved"
+    assert row["nutrition"] is None
+
+    response = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit",
+        headers={**headers, "Idempotency-Key": "natural-missing-unit-955"},
+        json={
+            "diary_date": _today().isoformat(),
+            "meal_type": "breakfast",
+            "items": [{"row_id": "row-0", "food_id": food_id, "amount": "120.5"}],
+        },
+    )
+    assert response.status_code == 422
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_id).one()
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user.id).count() == 0
+
+
+def test_natural_input_synthetic_server_corpus(client) -> None:
+    headers = _auth(client, 28_094)
+    rice_id = _store_food("Рис тестовый")
+    banana_id = _store_food("Банан тестовый")
+    cases = [
+        "рис тестовый 100 г",
+        "рис тестовый 100 г, банан тестовый",
+        "рис тестовый 100",
+        "банан тестовый, рис тестовый 120,5 г",
+        "рис тестовый 100 г, банан тестовый 120,5 г",
+        "неизвестное блюдо 20 г",
+    ]
+    previews = [
+        client.post(
+            "/api/v1/nutrition/diary/natural-input/preview",
+            headers=headers,
+            json={"text": case},
+        )
+        for case in cases
+    ]
+    assert all(response.status_code == 200 for response in previews)
+    rows = [response.json()["rows"] for response in previews]
+    payload = {
+        "diary_date": _today().isoformat(),
+        "meal_type": "breakfast",
+        "items": [
+            {"row_id": "row-0", "food_id": rice_id, "amount": "100", "amount_unit": "g"},
+            {"row_id": "row-1", "food_id": banana_id, "amount": "120.5", "amount_unit": "g"},
+        ],
+    }
+    commit_headers = {**headers, "Idempotency-Key": "natural-corpus-955"}
+    first = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit", headers=commit_headers, json=payload
+    )
+    replay = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit", headers=commit_headers, json=payload
+    )
+    missing_unit = client.post(
+        "/api/v1/nutrition/diary/natural-input/commit",
+        headers={**headers, "Idempotency-Key": "natural-corpus-invalid-955"},
+        json={**payload, "items": [{"row_id": "row-0", "food_id": rice_id, "amount": "100"}]},
+    )
+    observed = [[(row["name"], row["status"], row["amount_unit"]) for row in case] for case in rows]
+    print(
+        f"CORPUS_955 rows={observed!r} errors={int(missing_unit.status_code >= 400)} "
+        f"replays={int(replay.json().get('replayed', False))}"
+    )
+    assert observed == [
+        [("рис тестовый", "matched", "g")],
+        [("рис тестовый", "matched", "g"), ("банан тестовый", "unresolved", None)],
+        [("рис тестовый", "unresolved", None)],
+        [("банан тестовый", "unresolved", None), ("рис тестовый", "matched", "g")],
+        [("рис тестовый", "matched", "g"), ("банан тестовый", "matched", "g")],
+        [("неизвестное блюдо", "unresolved", "g")],
+    ]
+    assert first.status_code == replay.status_code == 201
+    assert first.json()["replayed"] is False and replay.json()["replayed"] is True
+    assert missing_unit.status_code == 422
+
+
+def test_natural_input_does_not_guess_between_personal_and_shared_matches(client) -> None:
+    telegram_id = 28_093
+    headers = _auth(client, telegram_id)
+    with get_session_context() as db:
+        user_id = db.query(User).filter(User.telegram_user_id == telegram_id).one().id
+    shared_id = _store_food("Йогурт тестовый")
+    personal_id = _store_food("Йогурт тестовый", owner_id=user_id)
+    response = client.post(
+        "/api/v1/nutrition/diary/natural-input/preview",
+        headers=headers,
+        json={"text": "йогурт тестовый 100 г"},
+    )
+    assert response.status_code == 200
+    row = response.json()["rows"][0]
+    assert row["status"] == "ambiguous"
+    assert row["selected_food_id"] is None
+    assert {item["food"]["id"] for item in row["candidates"]} == {shared_id, personal_id}
+
+
+def test_natural_input_preview_preserves_unknown_macros(client) -> None:
+    headers = _auth(client, 28_092)
+    food_id = _store_food("Кефир тестовый")
+    with get_session_context() as db:
+        food = db.get(Food, food_id)
+        assert food is not None
+        food.protein_g_per_100g = None
+    response = client.post(
+        "/api/v1/nutrition/diary/natural-input/preview",
+        headers=headers,
+        json={"text": "кефир тестовый 100 г"},
+    )
+    assert response.status_code == 200
+    row = response.json()["rows"][0]
+    assert row["status"] == "matched"
+    assert row["nutrition"]["protein_g"] is None
+    assert row["nutrition"]["energy_kcal"] == "120.00"
+
+
+def test_natural_input_does_not_auto_match_truncated_search(client) -> None:
+    headers = _auth(client, 28_091)
+    exact_id = _store_food("Молоко тестовое")
+    for index in range(21):
+        _store_food(f"Молоко тестовое {index}")
+    response = client.post(
+        "/api/v1/nutrition/diary/natural-input/preview",
+        headers=headers,
+        json={"text": "молоко тестовое 100 г"},
+    )
+    assert response.status_code == 200
+    row = response.json()["rows"][0]
+    assert row["status"] == "unresolved"
+    assert row["selected_food_id"] is None
+    assert exact_id in {item["food"]["id"] for item in row["candidates"]}
 
 
 def test_natural_input_alias_review_commit_is_idempotent_and_private(client) -> None:
@@ -253,7 +416,7 @@ def test_natural_input_alias_review_commit_is_idempotent_and_private(client) -> 
     preview = client.post(
         "/api/v1/nutrition/diary/natural-input/preview",
         headers=headers,
-        json={"text": "теос 140\nвода 250"},
+        json={"text": "теос 140 г\nвода 250 мл"},
     )
     assert preview.status_code == 200
     rows = preview.json()["rows"]
@@ -294,7 +457,7 @@ def test_natural_input_alias_review_commit_is_idempotent_and_private(client) -> 
     foreign_preview = client.post(
         "/api/v1/nutrition/diary/natural-input/preview",
         headers=other_headers,
-        json={"text": "теос 140"},
+        json={"text": "теос 140 г"},
     )
     assert foreign_preview.status_code == 200
     assert foreign_preview.json()["rows"][0]["status"] != "matched"

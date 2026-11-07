@@ -13715,7 +13715,6 @@ export interface components {
             amount: number | string;
             /**
              * Amount Unit
-             * @default g
              * @enum {string}
              */
             amount_unit: "g" | "ml" | "serving";
@@ -15648,9 +15647,8 @@ export interface components {
             /**
              * Replayed
              * @default false
-             * @constant
              */
-            replayed: false;
+            replayed: boolean;
         };
         /** PhotoMealDraftResponse */
         PhotoMealDraftResponse: {

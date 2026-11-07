@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import uuid
+from contextlib import suppress
 from datetime import timedelta
 from decimal import Decimal
 from typing import cast
 
 from pydantic import ValidationError
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
@@ -29,12 +33,18 @@ from fitminiapp_api.nutrition_label.vision import (
 from fitminiapp_api.schemas.food_diary import FoodDiaryEntryCreate, FoodDiaryQuickAdd
 from fitminiapp_api.schemas.photo_meal import (
     PhotoMealCandidate,
+    PhotoMealConfirmItem,
     PhotoMealConfirmRequest,
     PhotoMealConfirmResponse,
     PhotoMealDraftResponse,
     PhotoMealDraftStatus,
 )
-from fitminiapp_api.services.food_diary import FoodDiaryError, create_food_diary_entry
+from fitminiapp_api.services.food_diary import (
+    FoodDiaryError,
+    _lock_diary_user,
+    _serialize_entry,
+    create_food_diary_entry,
+)
 
 
 class PhotoMealError(ValueError):
@@ -63,6 +73,39 @@ def _normalize_idempotency_key(value: str) -> str:
     if len(normalized) < 8 or len(normalized) > 128:
         raise PhotoMealError("invalid_idempotency_key")
     return normalized
+
+
+def _image_hmac(user_id: int, key: str, image: bytes, content_type: str | None) -> str:
+    digest = hmac.new(settings.secret_key.encode(), b"photo-meal-draft-v1", hashlib.sha256)
+    for value in (
+        str(user_id).encode(),
+        key.encode(),
+        (content_type or "").strip().lower().encode(),
+        image,
+    ):
+        digest.update(len(value).to_bytes(8, "big"))
+        digest.update(value)
+    return digest.hexdigest()
+
+
+def _lock_creation(db: Session, user_id: int, key: str) -> None:
+    if db.get_bind().dialect.name != "postgresql":
+        # shortcut: SQLite uploads are not serialized here; use PostgreSQL for concurrent uploads.
+        return
+    scope = f"photo-meal-create\0{user_id}\0{key}".encode()
+    lock_id = int.from_bytes(hashlib.sha256(scope).digest()[:8], "big", signed=True)
+    db.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": lock_id})
+
+
+def _replay_created_draft(row: PhotoMealDraft, fingerprint: str) -> PhotoMealDraftResponse:
+    stored = row.canonical_payload.get("image_hmac")
+    if (
+        not isinstance(stored, str)
+        or not stored.isascii()
+        or not hmac.compare_digest(stored, fingerprint)
+    ):
+        raise PhotoMealConflictError("idempotency_key_already_used")
+    return _draft_response(row)
 
 
 def _candidate_uncertainty(candidate: MealVisionCandidateExtraction) -> list[str]:
@@ -116,8 +159,27 @@ def _draft_response(row: PhotoMealDraft) -> PhotoMealDraftResponse:
         raise PhotoMealError("invalid_persisted_draft", status_code=500) from exc
 
 
-def _mark_expired(row: PhotoMealDraft) -> None:
-    row.status = "expired"
+def _discard_expired_payload(row: PhotoMealDraft) -> None:
+    if row.status == "draft":
+        row.status = "expired"
+    row.canonical_payload = {"retention_cleaned": True}
+
+
+def expire_photo_meal_drafts(db: Session, *, limit: int = 100) -> int:
+    rows = (
+        db.query(PhotoMealDraft)
+        .filter(
+            PhotoMealDraft.expires_at <= _now(),
+            PhotoMealDraft.canonical_payload["retention_cleaned"].as_string().is_(None),
+        )
+        .order_by(PhotoMealDraft.expires_at, PhotoMealDraft.id)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+        .all()
+    )
+    for row in rows:
+        _discard_expired_payload(row)
+    return len(rows)
 
 
 def _get_owned_draft(
@@ -136,8 +198,10 @@ def _get_owned_draft(
     row = query.first()
     if row is None:
         raise PhotoMealNotFoundError()
+    if row.canonical_payload.get("retention_cleaned") is True:
+        raise PhotoMealConflictError("draft_expired")
     if row.status == "draft" and row.expires_at <= _now():
-        _mark_expired(row)
+        _discard_expired_payload(row)
         db.commit()
         raise PhotoMealConflictError("draft_expired")
     return row
@@ -162,16 +226,19 @@ def create_photo_meal_draft(
     vision_adapter: VisionFallbackAdapter | None,
 ) -> PhotoMealDraftResponse:
     key = _normalize_idempotency_key(idempotency_key)
+    _lock_creation(db, user.id, key)
+    fingerprint = _image_hmac(user.id, key, image_bytes, content_type)
     existing = (
         db.query(PhotoMealDraft)
         .filter(PhotoMealDraft.user_id == user.id, PhotoMealDraft.idempotency_key == key)
+        .with_for_update()
         .first()
     )
     if existing is not None:
         if existing.status == "draft" and existing.expires_at > _now():
-            return _draft_response(existing)
+            return _replay_created_draft(existing, fingerprint)
         if existing.status == "draft":
-            _mark_expired(existing)
+            _discard_expired_payload(existing)
             db.commit()
         raise PhotoMealConflictError("idempotency_key_already_used")
     if vision_adapter is None:
@@ -224,6 +291,7 @@ def create_photo_meal_draft(
             "provider": vision_adapter.provider_class,
             "model": vision_adapter.model_class,
             "prompt_version": vision_adapter.prompt_version,
+            "image_hmac": fingerprint,
             "candidates": [candidate.model_dump(mode="json") for candidate in candidates],
             "warnings": warnings,
             "source_photo_retained": False,
@@ -234,26 +302,34 @@ def create_photo_meal_draft(
     db.add(row)
     try:
         db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        replay = (
-            db.query(PhotoMealDraft)
-            .filter(PhotoMealDraft.user_id == user.id, PhotoMealDraft.idempotency_key == key)
-            .first()
-        )
+    except IntegrityError:
+        try:
+            db.rollback()
+            replay = (
+                db.query(PhotoMealDraft)
+                .filter(PhotoMealDraft.user_id == user.id, PhotoMealDraft.idempotency_key == key)
+                .with_for_update()
+                .first()
+            )
+        except SQLAlchemyError:
+            raise PhotoMealError("draft_could_not_be_created", status_code=503) from None
         if replay is not None and replay.status == "draft" and replay.expires_at > _now():
-            return _draft_response(replay)
-        raise PhotoMealConflictError("draft_could_not_be_created") from exc
+            return _replay_created_draft(replay, fingerprint)
+        raise PhotoMealConflictError("draft_could_not_be_created") from None
+    except SQLAlchemyError:
+        with suppress(SQLAlchemyError):
+            db.rollback()
+        raise PhotoMealError("draft_could_not_be_created", status_code=503) from None
     db.refresh(row)
     return _draft_response(row)
 
 
 def get_photo_meal_draft(db: Session, user: User, draft_id: str) -> PhotoMealDraftResponse:
-    return _draft_response(_get_owned_draft(db, user, draft_id))
+    return _draft_response(_get_owned_draft(db, user, draft_id, lock_for_update=True))
 
 
 def cancel_photo_meal_draft(db: Session, user: User, draft_id: str, revision: int) -> None:
-    row = _get_owned_draft(db, user, draft_id)
+    row = _get_owned_draft(db, user, draft_id, lock_for_update=True)
     if row.status != "draft":
         raise PhotoMealConflictError("draft_not_active")
     if row.revision != revision:
@@ -274,7 +350,38 @@ def confirm_photo_meal_draft(
     draft_id: str,
     request: PhotoMealConfirmRequest,
 ) -> PhotoMealConfirmResponse:
+    _lock_diary_user(db, user)
     row = _get_owned_draft(db, user, draft_id, lock_for_update=True)
+    if row.status == "confirmed":
+        if row.revision != request.revision + 1:
+            raise PhotoMealConflictError("stale_draft_revision")
+        try:
+            confirmed_items = [
+                PhotoMealConfirmItem.model_validate(item)
+                for item in row.canonical_payload["confirmed_items"]
+            ]
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise PhotoMealError("invalid_persisted_draft", status_code=500) from exc
+        entry_row = (
+            db.query(FoodDiaryEntry)
+            .filter(
+                FoodDiaryEntry.id == row.confirmed_entry_id,
+                FoodDiaryEntry.user_id == user.id,
+                FoodDiaryEntry.idempotency_key == f"photo-meal-{draft_id}",
+            )
+            .first()
+        )
+        if (
+            confirmed_items != request.items
+            or entry_row is None
+            or entry_row.diary_date != request.diary_date
+            or entry_row.meal_type != request.meal_type
+            or entry_row.logged_at is not None
+        ):
+            raise PhotoMealConflictError("draft_not_active")
+        return PhotoMealConfirmResponse(
+            draft_id=draft_id, entry=_serialize_entry(entry_row), replayed=True
+        )
     if row.status != "draft":
         raise PhotoMealConflictError("draft_not_active")
     if row.revision != request.revision:
@@ -289,8 +396,18 @@ def confirm_photo_meal_draft(
             for item in row.canonical_payload.get("candidates", [])
         )
     }
-    if any(item.candidate_id not in stored_candidates for item in request.items):
+    if {item.candidate_id for item in request.items} != set(stored_candidates):
         raise PhotoMealError("unknown_candidate")
+    existing = (
+        db.query(FoodDiaryEntry.id)
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.idempotency_key == f"photo-meal-{draft_id}",
+        )
+        .first()
+    )
+    if existing is not None:
+        raise PhotoMealConflictError("draft_not_active")
 
     calories = sum((item.energy_kcal for item in request.items), start=Decimal("0"))
     quick_add = FoodDiaryQuickAdd(
@@ -314,27 +431,38 @@ def confirm_photo_meal_draft(
             user,
             payload,
             idempotency_key=f"photo-meal-{draft_id}",
+            commit=False,
         )
+        entry_row = db.get(FoodDiaryEntry, entry.id)
+        if entry_row is None:
+            raise PhotoMealError("diary_entry_not_found", status_code=500)
+        entry_row.nutrition_snapshot = {
+            "kind": "photo_meal",
+            "source_photo_retained": False,
+            "candidates": [item.model_dump(mode="json") for item in request.items],
+        }
+        row.status = "confirmed"
+        row.revision += 1
+        row.confirmed_entry_id = entry.id
+        row.canonical_payload = {
+            **row.canonical_payload,
+            "confirmed_items": [item.model_dump(mode="json") for item in request.items],
+        }
+        db.flush()
+        db.refresh(entry_row)
+        confirmed_entry = _serialize_entry(entry_row)
+        db.commit()
     except FoodDiaryError as exc:
+        db.rollback()
         raise PhotoMealError(str(exc), status_code=409 if "fasted" in str(exc) else 422) from exc
-
-    entry_row = db.get(FoodDiaryEntry, entry.id)
-    if entry_row is None:
-        raise PhotoMealError("diary_entry_not_found", status_code=500)
-    entry_row.nutrition_snapshot = {
-        "kind": "photo_meal",
-        "source_photo_retained": False,
-        "candidates": [item.model_dump(mode="json") for item in request.items],
-    }
-    row.status = "confirmed"
-    row.revision += 1
-    row.confirmed_entry_id = entry.id
-    row.canonical_payload = {
-        **row.canonical_payload,
-        "confirmed_items": [item.model_dump(mode="json") for item in request.items],
-    }
-    db.commit()
-    return PhotoMealConfirmResponse(draft_id=draft_id, entry=entry, replayed=False)
+    except SQLAlchemyError:
+        with suppress(SQLAlchemyError):
+            db.rollback()
+        raise PhotoMealError("draft_could_not_be_confirmed", status_code=503) from None
+    except Exception:
+        db.rollback()
+        raise
+    return PhotoMealConfirmResponse(draft_id=draft_id, entry=confirmed_entry, replayed=False)
 
 
 __all__ = [
@@ -344,5 +472,6 @@ __all__ = [
     "cancel_photo_meal_draft",
     "confirm_photo_meal_draft",
     "create_photo_meal_draft",
+    "expire_photo_meal_drafts",
     "get_photo_meal_draft",
 ]
