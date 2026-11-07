@@ -1136,7 +1136,11 @@ test('Task 746 meal planner stays separate from diary on mobile day and week vie
   await expect(
     planner.locator('.meal-planner__slots').getByText('Овсяная каша', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('Греческий йогурт', { exact: true })).toBeVisible();
+  const breakfast = page.getByRole('region', { name: 'Завтрак' });
+  const breakfastToggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+  await expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
+  await breakfastToggle.click();
+  await expect(breakfast.getByText('Греческий йогурт', { exact: true })).toBeVisible();
 
   await planner.getByRole('tab', { name: 'Неделя', exact: true }).click();
   await expect(planner.getByText('План недели', { exact: true })).toBeVisible();
@@ -2832,6 +2836,10 @@ test('Russian search supplements local food with USDA generic result and persist
   await expect(entry).toContainText('130');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.reload();
+  const breakfastAfterReload = page.getByRole('region', { name: 'Завтрак' });
+  const reloadedToggle = breakfastAfterReload.getByRole('button', { name: 'Завтрак', exact: true });
+  await expect(reloadedToggle).toHaveAttribute('aria-expanded', 'false');
+  await reloadedToggle.click();
   const reloadedEntry = page
     .locator('.nutrition-entry')
     .filter({ hasText: 'Рис белый приготовленный, без добавления масла' });
