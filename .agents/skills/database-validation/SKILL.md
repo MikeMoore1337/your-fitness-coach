@@ -7,23 +7,21 @@ description: >
 
 # database-validation
 
-## Проверяй
+## Verify
 
-- schema/migration upgrade path;
-- constraints/defaults/nullability;
-- transaction commit/rollback semantics;
-- write -> persisted read;
-- uniqueness/idempotency;
-- cascade/delete behavior;
-- timezone/date storage;
-- race/concurrency risk;
-- backward-compatible reads during rollout;
-- query behavior на пустых и больших наборах, если риск существенен.
+- Schema/migration upgrade paths.
+- Constraints, defaults and nullability.
+- Transaction commit/rollback semantics.
+- Writes followed by persisted reads.
+- Uniqueness/idempotency.
+- Cascade/delete behavior.
+- Timezone/date storage.
+- Concurrency/race conditions.
+- Backward-compatible reads during rollout.
+- Query behavior on empty/large datasets when risk is material.
 
 ## Isolation
 
-Предпочитай disposable/transactional/test-tenant state.
-Тест не должен зависеть от случайной строки shared database.
-Cleanup обязан быть детерминированным либо обеспечиваться rollback/isolated storage.
+Prefer disposable, transactional or dedicated test-tenant state. Tests must not depend on arbitrary rows in a shared database. Cleanup must be deterministic or guaranteed by rollback/isolated storage.
 
-Не делай прямую DB-проверку там, где публичный contract должен быть доказан API-level assertion; DB evidence добавляется, когда persistence itself является риском.
+Do not use direct DB checks in place of API-level assertions when a public API contract is under test. Add database evidence when persistence itself is the risk.
