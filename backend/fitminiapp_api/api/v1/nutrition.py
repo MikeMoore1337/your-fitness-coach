@@ -92,6 +92,7 @@ from fitminiapp_api.schemas.nutrition_label import (
 from fitminiapp_api.schemas.nutrition_plan import (
     NutritionPlanCopyRequest,
     NutritionPlanDayResponse,
+    NutritionPlanFillPreviewRequest,
     NutritionPlanFillRequest,
     NutritionPlanItemActionRequest,
     NutritionPlanItemActionResponse,
@@ -114,6 +115,8 @@ from fitminiapp_api.schemas.nutrition_power import (
     NutritionMealTemplateResponse,
     NutritionMealTemplateUpdate,
     NutritionSuggestionCommitRequest,
+    NutritionSuggestionPreviewRequest,
+    NutritionSuggestionPreviewResponse,
     NutritionSuggestionsResponse,
 )
 from fitminiapp_api.schemas.photo_meal import (
@@ -225,6 +228,7 @@ from fitminiapp_api.services.nutrition_plan import (
     get_plan_fill_suggestions,
     get_plan_week,
     perform_plan_item_action,
+    preview_plan_fill,
     update_plan_item,
 )
 from fitminiapp_api.services.nutrition_power import (
@@ -256,8 +260,9 @@ from fitminiapp_api.services.nutrition_schedule_write import (
     save_nutrition_schedule_rule,
 )
 from fitminiapp_api.services.nutrition_suggestions import (
-    commit_nutrition_suggestion,
+    confirm_nutrition_suggestion,
     get_nutrition_suggestions,
+    preview_nutrition_suggestion,
 )
 from fitminiapp_api.services.photo_meal import (
     PhotoMealError,
@@ -1128,9 +1133,31 @@ def get_plan_suggestions(
 
 
 @router.post(
+    "/plans/suggestions/preview",
+    response_model=NutritionSuggestionPreviewResponse,
+    responses={404: {"description": "Source not found"}, 409: {"description": "Stale plan or day"}},
+)
+def preview_nutrition_plan_fill(
+    payload: NutritionPlanFillPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_plan_fill(db, current_user, payload)
+    except NutritionPlanError as exc:
+        _raise_nutrition_plan_http_error(exc)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
     "/plans/fill",
     response_model=NutritionPlanDayResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        404: {"description": "Source not found"},
+        409: {"description": "Preview or request conflict"},
+    },
 )
 def fill_nutrition_plan(
     payload: NutritionPlanFillRequest,
@@ -1255,9 +1282,32 @@ def get_diary_suggestions(
 
 
 @router.post(
+    "/diary/suggestions/preview",
+    response_model=NutritionSuggestionPreviewResponse,
+    responses={
+        404: {"description": "Source not found"},
+        409: {"description": "Day is not editable"},
+    },
+)
+def preview_diary_suggestion(
+    payload: NutritionSuggestionPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_nutrition_suggestion(db, current_user, payload)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
     "/diary/suggestions/commit",
     response_model=FoodDiaryBatchResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        404: {"description": "Source not found"},
+        409: {"description": "Preview or request conflict"},
+    },
 )
 def commit_diary_suggestion(
     payload: NutritionSuggestionCommitRequest,
@@ -1266,7 +1316,7 @@ def commit_diary_suggestion(
     db: Session = Depends(get_db),
 ):
     try:
-        return commit_nutrition_suggestion(db, current_user, payload, idempotency_key)
+        return confirm_nutrition_suggestion(db, current_user, payload, idempotency_key)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
 

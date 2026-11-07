@@ -38,6 +38,27 @@
   margin-top: 10px;
 }
 
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  table-layout: fixed;
+  overflow-wrap: anywhere;
+}
+
+.previewTable th,
+.previewTable td {
+  padding: 9px 3px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.previewTable th:first-child {
+  width: 40%;
+  text-align: left;
+}
+
 @media (max-width: 640px) {
   .diarySection {
     /* shortcut: caps this section while the diary grid can overflow; remove when that grid shrinks. */

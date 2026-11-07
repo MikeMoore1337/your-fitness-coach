@@ -132,6 +132,47 @@ describe('MealPlanner', () => {
   beforeEach(() => {
     apiMock.mockReset();
     apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/nutrition/plans/suggestions/preview')
+        return Promise.resolve({
+          diary_date: '2026-08-19',
+          meal_type: 'breakfast',
+          items: [
+            {
+              position: 0,
+              item_kind: 'food',
+              food_id: 11,
+              recipe_id: null,
+              name: 'Овсянка',
+              brand: null,
+              amount: '100.000',
+              amount_unit: 'g',
+              nutrition,
+              nutrition_confidence: 'exact',
+            },
+          ],
+          before: nutrition,
+          addition: nutrition,
+          after: { energy_kcal: '240', protein_g: '24', fat_g: '8', carbs_g: '16', fiber_g: '4' },
+          diary: { energy_kcal: '0', protein_g: '0', fat_g: '0', carbs_g: '0', fiber_g: '0' },
+          planned: nutrition,
+          projected_after: {
+            energy_kcal: '240',
+            protein_g: '24',
+            fat_g: '8',
+            carbs_g: '16',
+            fiber_g: '4',
+          },
+          targets,
+          target_id: 1,
+          target_source: 'manual',
+          target_effective_from: '2026-08-19',
+          target_weight_kg: null,
+          target_goal: null,
+          constraint_status: 'not_set',
+          constraint_messages: [],
+          preference_message: null,
+          preview_token: 'd'.repeat(64),
+        });
       if (path.includes('/plans/suggestions'))
         return Promise.resolve({
           mode: 'deterministic',
@@ -249,6 +290,11 @@ describe('MealPlanner', () => {
     });
     fireEvent.click(verifyButton);
     expect(within(planSuggestions).getByRole('button', { name: 'Добавить в план' })).toBeVisible();
+    await waitFor(() =>
+      expect(
+        within(planSuggestions).getByRole('button', { name: 'Добавить в план' }),
+      ).toBeEnabled(),
+    );
     fireEvent.click(within(planSuggestions).getByRole('button', { name: 'Добавить в план' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -258,6 +304,7 @@ describe('MealPlanner', () => {
           body: expect.objectContaining({
             candidate_id: 'food:11',
             expected_revision: 1,
+            preview_token: 'd'.repeat(64),
             items: [{ position: 0, food_id: 11, amount: '100.000', amount_unit: 'g' }],
           }),
           headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),

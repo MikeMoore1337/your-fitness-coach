@@ -524,15 +524,19 @@ def _batch_request_fingerprint(
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
     template_id: int | None,
+    request_context: dict[str, object] | None = None,
 ) -> str:
+    body: dict[str, object] = {
+        "operation_kind": operation_kind,
+        "diary_date": diary_date.isoformat(),
+        "meal_type": meal_type,
+        "template_id": template_id,
+        "items": [item.model_dump(mode="json") for item in items],
+    }
+    if request_context is not None:
+        body["request_context"] = request_context
     canonical = json.dumps(
-        {
-            "operation_kind": operation_kind,
-            "diary_date": diary_date.isoformat(),
-            "meal_type": meal_type,
-            "template_id": template_id,
-            "items": [item.model_dump(mode="json") for item in items],
-        },
+        body,
         ensure_ascii=True,
         sort_keys=True,
         separators=(",", ":"),
@@ -572,6 +576,7 @@ def create_food_diary_batch(
     operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"],
     template_id: int | None = None,
     commit: bool = True,
+    request_context: dict[str, object] | None = None,
 ) -> FoodDiaryBatchResponse:
     _lock_diary_user(db, user)
     key = _normalize_idempotency_key(idempotency_key)
@@ -581,6 +586,7 @@ def create_food_diary_batch(
         meal_type,
         items,
         template_id,
+        request_context,
     )
     replay = _existing_batch_operation(db, user, key, fingerprint)
     if replay is not None:

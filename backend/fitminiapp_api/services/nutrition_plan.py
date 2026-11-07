@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from collections.abc import Iterable
 from datetime import date, timedelta
@@ -23,6 +24,7 @@ from fitminiapp_api.schemas.nutrition_plan import (
     NutritionPlanCopyRequest,
     NutritionPlanDayResponse,
     NutritionPlanFillItem,
+    NutritionPlanFillPreviewRequest,
     NutritionPlanFillRequest,
     NutritionPlanItemActionRequest,
     NutritionPlanItemActionResponse,
@@ -32,11 +34,17 @@ from fitminiapp_api.schemas.nutrition_plan import (
     NutritionPlanSlotResponse,
     NutritionPlanWeekResponse,
 )
-from fitminiapp_api.schemas.nutrition_power import FoodDiaryBatchItem, NutritionSuggestionsResponse
+from fitminiapp_api.schemas.nutrition_power import (
+    FoodDiaryBatchItem,
+    NutritionSuggestionPreviewRequest,
+    NutritionSuggestionPreviewResponse,
+    NutritionSuggestionsResponse,
+)
 from fitminiapp_api.services.food_diary import (
     FoodDiaryError,
     create_food_diary_batch,
     ensure_suggestion_day_is_mutable,
+    get_food_diary_day,
 )
 from fitminiapp_api.services.foods import (
     FoodError,
@@ -276,16 +284,27 @@ def get_plan_fill_suggestions(
     user: User,
     plan_date: date | None,
 ) -> NutritionSuggestionsResponse:
-    from fitminiapp_api.services.nutrition_suggestions import get_nutrition_suggestions
+    from fitminiapp_api.services.nutrition_suggestions import (
+        _pending_plan,
+        get_nutrition_suggestions,
+    )
 
     day = get_plan_day(db, user, plan_date)
+    diary = get_food_diary_day(db, user, day.plan_date, allow_future=True)
+    _, pending, planned = _pending_plan(db, user, day.plan_date)
+    remaining = (
+        _subtract_targets(diary.remaining, planned)
+        if diary.remaining is not None and planned is not None and day.nutrition_complete
+        else None
+    )
     return get_nutrition_suggestions(
         db,
         user,
         day.plan_date,
         targets_override=day.targets,
-        remaining_override=day.remaining,
+        remaining_override=remaining,
         force_context=True,
+        remaining_includes_plan=bool(pending),
     )
 
 
@@ -583,6 +602,65 @@ def _fill_item_matches_candidate(
     )
 
 
+def preview_plan_fill(
+    db: Session, user: User, payload: NutritionPlanFillPreviewRequest
+) -> NutritionSuggestionPreviewResponse:
+    from fitminiapp_api.services.nutrition_suggestions import preview_nutrition_suggestion
+
+    plan = get_plan_day(db, user, payload.plan_date)
+    if plan.revision != payload.expected_revision:
+        raise NutritionPlanConflictError(
+            "plan revision is stale; reload the plan and retry",
+            code="stale_plan",
+            details={
+                "expected_revision": payload.expected_revision,
+                "current_revision": plan.revision,
+            },
+        )
+    suggestions = get_plan_fill_suggestions(db, user, payload.plan_date)
+    candidate = next(
+        (item for item in suggestions.candidates if item.candidate_id == payload.candidate_id),
+        None,
+    )
+    candidate_items = {item.position: item for item in candidate.items} if candidate else {}
+    if candidate is None or any(
+        item.position not in candidate_items
+        or not _fill_item_matches_candidate(item, candidate_items[item.position])
+        for item in payload.items
+    ):
+        raise NutritionPlanConflictError(
+            "selected plan variant is stale; reload suggestions",
+            code="suggestion_stale",
+            details={"candidate_id": payload.candidate_id},
+        )
+    if sum(len(slot.items) for slot in plan.slots) + len(payload.items) > MAX_ITEMS_PER_DAY:
+        raise NutritionPlanError("daily plan item limit reached")
+    preview_request = NutritionSuggestionPreviewRequest(
+        diary_date=payload.plan_date,
+        meal_type=payload.meal_type,
+        items=[
+            FoodDiaryBatchItem(
+                food_id=item.food_id,
+                recipe_id=item.recipe_id,
+                amount=item.amount,
+                amount_unit=item.amount_unit,
+            )
+            for item in payload.items
+        ],
+        constraints=payload.constraints,
+    )
+    return preview_nutrition_suggestion(
+        db,
+        user,
+        preview_request,
+        plan_mode=True,
+        signed_context={
+            "request": payload.model_dump(mode="json", exclude={"preview_token"}),
+            "candidate": candidate.model_dump(mode="json"),
+        },
+    )
+
+
 def fill_plan_from_suggestion(
     db: Session,
     user: User,
@@ -590,7 +668,11 @@ def fill_plan_from_suggestion(
     idempotency_key: str,
 ) -> NutritionPlanDayResponse:
     try:
-        fingerprint = _fingerprint(payload.model_dump(mode="json"))
+        fingerprint = _fingerprint(
+            payload.model_dump(mode="json")
+            if payload.preview_token is not None
+            else payload.model_dump(mode="json", exclude={"preview_token", "constraints"})
+        )
         _lock_user(db, user)
         operation, replayed = _operation(
             db,
@@ -601,8 +683,31 @@ def fill_plan_from_suggestion(
             target_date=payload.plan_date,
         )
         if replayed:
+            if payload.preview_token is None and payload.constraints is not None:
+                raise NutritionPlanConflictError("Сначала проверьте расчёт варианта.")
             return _build_day(db, user, operation.target_date, replayed=True)
 
+        if payload.preview_token is None:
+            raise NutritionPlanConflictError("Сначала проверьте расчёт варианта.")
+        from fitminiapp_api.services.nutrition_suggestions import lock_suggestion_sources
+
+        lock_suggestion_sources(
+            db,
+            user,
+            payload.plan_date,
+            [FoodDiaryBatchItem(**item.model_dump(exclude={"position"})) for item in payload.items],
+            payload.constraints,
+            payload.candidate_id,
+        )
+        preview = preview_plan_fill(db, user, payload)
+        if not hmac.compare_digest(preview.preview_token, payload.preview_token):
+            raise NutritionPlanConflictError(
+                "Данные изменились. Обновите расчёт перед подтверждением."
+            )
+        if preview.constraint_status in {"violated", "unknown"}:
+            raise NutritionPlanConflictError(
+                "Ограничения не выполнены или не могут быть проверены."
+            )
         ensure_suggestion_day_is_mutable(db, user, payload.plan_date)
         plan = _plan_for_write(db, user, payload.plan_date)
         _check_revision(plan, payload.expected_revision)
@@ -650,8 +755,12 @@ def fill_plan_from_suggestion(
                 )
             )
         plan.revision += 1
+        db.flush()
+        result = _build_day(db, user, payload.plan_date)
+        if not result.nutrition_complete or result.planned != preview.after:
+            raise NutritionPlanConflictError("Состав продукта изменился. Обновите расчёт.")
         db.commit()
-        return _build_day(db, user, payload.plan_date)
+        return result
     except Exception:
         db.rollback()
         raise

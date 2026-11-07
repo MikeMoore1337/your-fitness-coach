@@ -252,15 +252,84 @@ class NutritionSuggestionsResponse(BaseModel):
     targets: FoodDiaryTargets | None
     remaining: FoodDiaryTargets | None
     remaining_confidence: Literal["exact", "approximate", "partial"] | None
+    remaining_includes_plan: bool = False
+    not_calculable: bool = False
     limitations: list[str] = Field(default_factory=list)
     candidates: list[NutritionSuggestionCandidate] = Field(default_factory=list)
     max_candidates: int = Field(ge=1)
 
 
-class NutritionSuggestionCommitRequest(BaseModel):
+class NutritionSuggestionBaseRequest(BaseModel):
     diary_date: date
     meal_type: MealType
     items: list[FoodDiaryBatchItem] = Field(min_length=1, max_length=100)
+
+
+class NutritionSuggestionConstraints(BaseModel):
+    max_energy_kcal: Decimal | None = Field(
+        default=None, ge=0, le=10000, max_digits=8, decimal_places=2, allow_inf_nan=False
+    )
+    max_protein_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=7, decimal_places=3, allow_inf_nan=False
+    )
+    max_fat_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=7, decimal_places=3, allow_inf_nan=False
+    )
+    max_carbs_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=7, decimal_places=3, allow_inf_nan=False
+    )
+    excluded_food_ids: list[int] = Field(default_factory=list, max_length=50)
+    preferred_food_ids: list[int] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def validate_food_choices(self) -> NutritionSuggestionConstraints:
+        excluded = set(self.excluded_food_ids)
+        preferred = set(self.preferred_food_ids)
+        if (
+            any(food_id <= 0 for food_id in excluded | preferred)
+            or len(excluded) != len(self.excluded_food_ids)
+            or len(preferred) != len(self.preferred_food_ids)
+            or excluded & preferred
+        ):
+            raise ValueError("food preferences must be positive, unique and non-conflicting")
+        return self
+
+
+class NutritionSuggestionPreviewRequest(NutritionSuggestionBaseRequest):
+    constraints: NutritionSuggestionConstraints | None = None
+
+
+class NutritionSuggestionCommitRequest(NutritionSuggestionPreviewRequest):
+    preview_token: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+        description="Нужен для новой записи; без него разрешён только повтор прежней операции.",
+    )
+
+
+class NutritionSuggestionPreviewResponse(BaseModel):
+    diary_date: date
+    meal_type: MealType
+    items: list[NutritionSuggestionItem]
+    before: FoodDiaryNutrition
+    addition: FoodDiaryNutrition
+    after: FoodDiaryNutrition
+    diary: FoodDiaryNutrition
+    planned: FoodDiaryNutrition | None
+    projected_after: FoodDiaryNutrition | None
+    targets: FoodDiaryTargets | None
+    remaining_after: FoodDiaryTargets | None
+    target_id: int | None
+    target_source: str | None
+    target_effective_from: date | None
+    target_weight_kg: Decimal | None
+    target_goal: str | None
+    constraint_status: Literal["not_set", "satisfied", "violated", "unknown"]
+    constraint_messages: list[str]
+    preference_message: str | None
+    preview_token: str
 
 
 class FoodSearchAliasCreate(BaseModel):
