@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import BytesIO
+from random import Random
 from threading import Barrier, Event
 from time import monotonic, sleep
 
 import pytest
 from PIL import Image
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.v1 import nutrition as nutrition_api
@@ -25,6 +29,7 @@ from fitminiapp_api.nutrition_label.meal_vision import (
 )
 from fitminiapp_api.services import food_diary as food_diary_service
 from fitminiapp_api.services import photo_meal as photo_meal_service
+from fitminiapp_api.services import worker
 from fitminiapp_api.services.accounts import delete_user_cascade
 
 
@@ -107,6 +112,25 @@ def _extraction(*, confidence: str = "high") -> MealVisionExtraction:
 def _enable_photo_meal(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "nutrition_label_scan_enabled", True)
     monkeypatch.setattr(settings, "nutrition_label_scan_kill_switch", False)
+
+
+def test_photo_meal_accepts_near_limit_image_through_real_api(client, monkeypatch) -> None:
+    headers = _auth(client, 516_024)
+    _enable_photo_meal(monkeypatch)
+    adapter = _FakeMealVisionAdapter(_extraction())
+    monkeypatch.setattr(nutrition_api, "build_meal_vision_adapter", lambda: adapter)
+    image = Image.frombytes("RGB", (576, 576), Random(955).randbytes(576 * 576 * 3))
+    output = BytesIO()
+    image.save(output, format="PNG")
+    data = output.getvalue()
+    assert 990_000 < len(data) <= 1_000_000
+    response = client.post(
+        "/api/v1/nutrition/photo-meals",
+        headers={**headers, "Idempotency-Key": "photo-limit-955"},
+        files={"image": ("meal-photo", data, "image/png")},
+    )
+    assert response.status_code == 201, response.text
+    assert adapter.calls == 1
 
 
 def _draft_and_confirmation(client, monkeypatch, telegram_user_id: int):
@@ -820,8 +844,21 @@ def test_photo_meal_creation_replay_and_cancel_do_not_write_diary(client, monkey
     replay = client.post("/api/v1/nutrition/photo-meals", **request)
     assert first.status_code == replay.status_code == 201
     assert first.json()["draft_id"] == replay.json()["draft_id"]
+    changed = BytesIO()
+    Image.new("RGB", (128, 128), "red").save(changed, format="PNG")
+    conflict = client.post(
+        "/api/v1/nutrition/photo-meals",
+        headers=request["headers"],
+        files={"image": ("other.png", changed.getvalue(), "image/png")},
+    )
+    assert conflict.status_code == 409
     assert adapter.calls == 1
     draft_id = first.json()["draft_id"]
+    with get_session_context() as db:
+        stored = db.get(PhotoMealDraft, draft_id).canonical_payload
+        fingerprint = stored["image_hmac"]
+        assert fingerprint != hashlib.sha256(_meal_image()).hexdigest()
+        assert fingerprint not in first.text
     cancelled = client.post(
         f"/api/v1/nutrition/photo-meals/{draft_id}/cancel?revision=1", headers=headers
     )
@@ -830,6 +867,193 @@ def test_photo_meal_creation_replay_and_cancel_do_not_write_diary(client, monkey
         user_id = _user_id(516_010)
         assert db.query(PhotoMealDraft).filter_by(user_id=user_id).one().status == "cancelled"
         assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
+
+
+def test_photo_meal_legacy_draft_without_fingerprint_fails_closed(client, monkeypatch) -> None:
+    headers, draft_id, _ = _draft_and_confirmation(client, monkeypatch, 516_025)
+    with get_session_context() as db:
+        row = db.get(PhotoMealDraft, draft_id)
+        row.canonical_payload = {
+            k: v for k, v in row.canonical_payload.items() if k != "image_hmac"
+        }
+    replay = client.post(
+        "/api/v1/nutrition/photo-meals",
+        headers={**headers, "Idempotency-Key": "photo-confirm-516025"},
+        files={"image": ("meal.png", _meal_image(), "image/png")},
+    )
+    assert replay.status_code == 409
+
+
+def test_photo_meal_fingerprints_are_scoped_to_owner_and_request(client, monkeypatch) -> None:
+    _enable_photo_meal(monkeypatch)
+    monkeypatch.setattr(
+        nutrition_api, "build_meal_vision_adapter", lambda: _FakeMealVisionAdapter(_extraction())
+    )
+    first_owner = _auth(client, 516_030)
+    second_owner = _auth(client, 516_031)
+    fingerprints = []
+    for headers, key in (
+        (first_owner, "photo-scope-one"),
+        (first_owner, "photo-scope-two"),
+        (second_owner, "photo-scope-one"),
+    ):
+        created = client.post(
+            "/api/v1/nutrition/photo-meals",
+            headers={**headers, "Idempotency-Key": key},
+            files={"image": ("meal.png", _meal_image(), "image/png")},
+        )
+        assert created.status_code == 201, created.text
+        with get_session_context() as db:
+            fingerprint = db.get(PhotoMealDraft, created.json()["draft_id"]).canonical_payload[
+                "image_hmac"
+            ]
+        assert fingerprint not in created.text
+        fingerprints.append(fingerprint)
+    assert len(set(fingerprints)) == 3
+
+
+def test_photo_meal_database_failure_does_not_log_fingerprint(client, monkeypatch, caplog) -> None:
+    headers = _auth(client, 516_036)
+    _enable_photo_meal(monkeypatch)
+    monkeypatch.setattr(
+        nutrition_api, "build_meal_vision_adapter", lambda: _FakeMealVisionAdapter(_extraction())
+    )
+    original_commit = Session.commit
+    fingerprints = []
+
+    def fail_on_create(session):
+        for row in session.new:
+            if isinstance(row, PhotoMealDraft):
+                fingerprints.append(row.canonical_payload["image_hmac"])
+                raise SQLAlchemyError(f"synthetic database error {fingerprints[-1]}")
+        return original_commit(session)
+
+    monkeypatch.setattr(Session, "commit", fail_on_create)
+    response = client.post(
+        "/api/v1/nutrition/photo-meals",
+        headers={**headers, "Idempotency-Key": "photo-db-error-955"},
+        files={"image": ("meal.png", _meal_image(), "image/png")},
+    )
+    assert response.status_code == 503
+    assert len(fingerprints) == 1
+    assert fingerprints[0] not in response.text
+    assert fingerprints[0] not in caplog.text
+
+
+def test_photo_confirm_database_failure_does_not_log_fingerprint(
+    client, monkeypatch, caplog
+) -> None:
+    headers, draft_id, payload = _draft_and_confirmation(client, monkeypatch, 516_037)
+    original_flush = Session.flush
+    fingerprints = []
+
+    def fail_confirmation(session, *args, **kwargs):
+        for row in session.dirty:
+            if isinstance(row, PhotoMealDraft) and row.status == "confirmed":
+                fingerprints.append(row.canonical_payload["image_hmac"])
+                raise SQLAlchemyError(f"synthetic database error {fingerprints[-1]}")
+        return original_flush(session, *args, **kwargs)
+
+    monkeypatch.setattr(Session, "flush", fail_confirmation)
+    response = client.post(
+        f"/api/v1/nutrition/photo-meals/{draft_id}/confirm", headers=headers, json=payload
+    )
+    assert response.status_code == 503
+    assert len(fingerprints) == 1
+    assert fingerprints[0] not in response.text
+    assert fingerprints[0] not in caplog.text
+    with get_session_context() as db:
+        assert db.get(PhotoMealDraft, draft_id).status == "draft"
+        assert db.query(FoodDiaryEntry).filter_by(user_id=_user_id(516_037)).count() == 0
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL locks")
+@pytest.mark.parametrize("same_image", [True, False])
+def test_concurrent_photo_creations_match_the_actual_image(client, monkeypatch, same_image) -> None:
+    headers = _auth(client, 516_026)
+    _enable_photo_meal(monkeypatch)
+    entered = Event()
+    release = Event()
+    adapter = _FakeMealVisionAdapter(_extraction())
+    recognize = adapter.recognize
+
+    def concurrent_recognize(*args, **kwargs):
+        entered.set()
+        assert release.wait(timeout=10)
+        return recognize(*args, **kwargs)
+
+    monkeypatch.setattr(adapter, "recognize", concurrent_recognize)
+    monkeypatch.setattr(nutrition_api, "build_meal_vision_adapter", lambda: adapter)
+    second = BytesIO()
+    Image.new("RGB", (128, 128), "red").save(second, format="PNG")
+    images = [_meal_image(), _meal_image() if same_image else second.getvalue()]
+
+    def create(image):
+        return client.post(
+            "/api/v1/nutrition/photo-meals",
+            headers={**headers, "Idempotency-Key": "photo-race-955"},
+            files={"image": ("meal.png", image, "image/png")},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(create, images[0])
+        assert entered.wait(timeout=5)
+        second_request = pool.submit(create, images[1])
+        try:
+            assert _wait_for_db_lock("pg_advisory_xact_lock")
+        finally:
+            release.set()
+        responses = [first.result(timeout=15), second_request.result(timeout=15)]
+    assert sorted(response.status_code for response in responses) == (
+        [201, 201] if same_image else [201, 409]
+    )
+    if same_image:
+        assert responses[0].json()["draft_id"] == responses[1].json()["draft_id"]
+    assert adapter.calls == 1
+    with get_session_context() as db:
+        assert db.query(PhotoMealDraft).filter_by(user_id=_user_id(516_026)).count() == 1
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL locks")
+@pytest.mark.parametrize("different_owner", [True, False])
+def test_photo_creation_lock_does_not_block_other_requests(
+    client, monkeypatch, different_owner
+) -> None:
+    first_headers = _auth(client, 516_034)
+    second_headers = _auth(client, 516_035) if different_owner else first_headers
+    _enable_photo_meal(monkeypatch)
+    entered = Event()
+    release = Event()
+    adapter = _FakeMealVisionAdapter(_extraction())
+    recognize = adapter.recognize
+
+    def block_first(*args, **kwargs):
+        if not entered.is_set():
+            entered.set()
+            assert release.wait(timeout=10)
+        return recognize(*args, **kwargs)
+
+    monkeypatch.setattr(adapter, "recognize", block_first)
+    monkeypatch.setattr(nutrition_api, "build_meal_vision_adapter", lambda: adapter)
+
+    def create(headers, key):
+        return client.post(
+            "/api/v1/nutrition/photo-meals",
+            headers={**headers, "Idempotency-Key": key},
+            files={"image": ("meal.png", _meal_image(), "image/png")},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(create, first_headers, "photo-distinct-one")
+        assert entered.wait(timeout=5)
+        second_key = "photo-distinct-one" if different_owner else "photo-distinct-two"
+        second = pool.submit(create, second_headers, second_key)
+        try:
+            assert second.result(timeout=5).status_code == 201
+        finally:
+            release.set()
+        assert first.result(timeout=15).status_code == 201
+    assert adapter.calls == 2
 
 
 def test_photo_meal_expired_draft_cannot_be_confirmed(client, monkeypatch) -> None:
@@ -861,8 +1085,80 @@ def test_photo_meal_expired_draft_cannot_be_confirmed(client, monkeypatch) -> No
     assert response.json()["detail"]["code"] == "draft_expired"
     with get_session_context() as db:
         user_id = _user_id(516_011)
-        assert db.query(PhotoMealDraft).filter_by(user_id=user_id).one().status == "expired"
+        expired = db.query(PhotoMealDraft).filter_by(user_id=user_id).one()
+        assert expired.status == "expired"
+        assert expired.canonical_payload == {"retention_cleaned": True}
         assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
+
+
+def test_photo_meal_worker_cleans_expired_drafts_but_keeps_diary(client, monkeypatch) -> None:
+    headers, confirmed_id, payload = _draft_and_confirmation(client, monkeypatch, 516_027)
+    confirmed = client.post(
+        f"/api/v1/nutrition/photo-meals/{confirmed_id}/confirm", headers=headers, json=payload
+    )
+    assert confirmed.status_code == 201, confirmed.text
+    entry_id = confirmed.json()["entry"]["id"]
+    _, expired_id, _ = _draft_and_confirmation(client, monkeypatch, 516_028)
+    _, fresh_id, _ = _draft_and_confirmation(client, monkeypatch, 516_029)
+    cancelled_headers, cancelled_id, _ = _draft_and_confirmation(client, monkeypatch, 516_032)
+    cancelled = client.post(
+        f"/api/v1/nutrition/photo-meals/{cancelled_id}/cancel?revision=1",
+        headers=cancelled_headers,
+    )
+    assert cancelled.status_code == 204
+    with get_session_context() as db:
+        for draft_id in (confirmed_id, expired_id, cancelled_id):
+            db.get(PhotoMealDraft, draft_id).expires_at = now_msk_naive() - timedelta(seconds=1)
+
+    asyncio.run(worker.run_once(sync_reminders=False))
+    with get_session_context() as db:
+        confirmed_row = db.get(PhotoMealDraft, confirmed_id)
+        expired_row = db.get(PhotoMealDraft, expired_id)
+        fresh_row = db.get(PhotoMealDraft, fresh_id)
+        assert confirmed_row.status == "confirmed" and confirmed_row.confirmed_entry_id == entry_id
+        assert confirmed_row.canonical_payload == {"retention_cleaned": True}
+        assert expired_row.status == "expired"
+        assert expired_row.canonical_payload == {"retention_cleaned": True}
+        cancelled_row = db.get(PhotoMealDraft, cancelled_id)
+        assert cancelled_row.status == "cancelled"
+        assert cancelled_row.canonical_payload == {"retention_cleaned": True}
+        assert "image_hmac" in fresh_row.canonical_payload
+        assert db.get(FoodDiaryEntry, entry_id).nutrition_snapshot["kind"] == "photo_meal"
+    replay = client.post(
+        f"/api/v1/nutrition/photo-meals/{confirmed_id}/confirm", headers=headers, json=payload
+    )
+    assert replay.status_code == 409
+    assert (
+        client.get(f"/api/v1/nutrition/photo-meals/{confirmed_id}", headers=headers).status_code
+        == 409
+    )
+    duplicate_create = client.post(
+        "/api/v1/nutrition/photo-meals",
+        headers={**headers, "Idempotency-Key": "photo-confirm-516027"},
+        files={"image": ("meal.png", _meal_image(), "image/png")},
+    )
+    assert duplicate_create.status_code == 409
+    asyncio.run(worker.run_once(sync_reminders=False))
+    with get_session_context() as db:
+        assert db.get(PhotoMealDraft, confirmed_id).canonical_payload == {"retention_cleaned": True}
+        assert db.get(FoodDiaryEntry, entry_id) is not None
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_photo_meal_cleanup_skips_locked_draft_then_cleans_it(client, monkeypatch) -> None:
+    _, draft_id, _ = _draft_and_confirmation(client, monkeypatch, 516_033)
+    with get_session_context() as db:
+        db.get(PhotoMealDraft, draft_id).expires_at = now_msk_naive() - timedelta(seconds=1)
+    with Session(engine) as lock_holder:
+        lock_holder.query(PhotoMealDraft).filter_by(id=draft_id).with_for_update().one()
+        with get_session_context() as db:
+            db.execute(text("SET LOCAL lock_timeout = '2s'"))
+            assert photo_meal_service.expire_photo_meal_drafts(db) == 0
+        lock_holder.rollback()
+    with get_session_context() as db:
+        assert photo_meal_service.expire_photo_meal_drafts(db) == 1
+    with get_session_context() as db:
+        assert db.get(PhotoMealDraft, draft_id).canonical_payload == {"retention_cleaned": True}
 
 
 def test_photo_meal_draft_is_deleted_with_account(client, monkeypatch) -> None:

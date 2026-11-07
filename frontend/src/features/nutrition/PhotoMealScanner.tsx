@@ -3,7 +3,7 @@ import { ApiError, api } from '../../shared/api/client';
 import type { PhotoMealConfirmResponse, PhotoMealDraft } from '../../shared/api/types';
 import { Button, Field, Input, Select } from '../../shared/ui/common';
 
-const MAX_IMAGE_BYTES = 8_388_608;
+const MAX_IMAGE_BYTES = 1_000_000;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -57,6 +57,8 @@ function errorMessage(error: unknown): string {
     decode_failed: 'Фото не удалось прочитать. Переснимите блюдо.',
     oversized_image: 'Фото слишком большое. Выберите снимок меньшего размера.',
     retake_required: 'Нужен более чёткий снимок блюда крупным планом.',
+    idempotency_key_already_used:
+      'Не удалось сверить повтор с исходной загрузкой. Выберите фото заново.',
     draft_expired: 'Черновик истёк. Начните распознавание заново.',
     draft_not_active: 'Черновик уже закрыт. Начните заново.',
     stale_draft_revision: 'Черновик устарел. Начните распознавание заново.',
@@ -65,6 +67,8 @@ function errorMessage(error: unknown): string {
   };
   if (code && messages[code]) return messages[code];
   if (error instanceof ApiError && error.status === 0) return error.message;
+  if (error instanceof ApiError && error.status === 413)
+    return 'Фото слишком большое. Выберите снимок меньшего размера.';
   if (error instanceof ApiError && error.status >= 500) {
     return 'Сервис временно недоступен. Можно добавить запись приблизительно.';
   }
@@ -198,7 +202,7 @@ export function PhotoMealScanner({
     if (candidate.size > MAX_IMAGE_BYTES) {
       setFile(null);
       setStatus('capture');
-      setError('Фото слишком большое. Выберите снимок меньшего размера.');
+      setError('Фото слишком большое. Выберите фото до 1 МБ.');
       return;
     }
     setFile(candidate);
@@ -214,7 +218,7 @@ export function PhotoMealScanner({
     const requestId = requestRef.current ?? randomRequestId();
     requestRef.current = requestId;
     const form = new FormData();
-    form.append('image', file, file.name || 'meal-photo');
+    form.append('image', file, 'meal-photo');
     try {
       const response = await api<PhotoMealDraft>('/api/v1/nutrition/photo-meals', {
         method: 'POST',

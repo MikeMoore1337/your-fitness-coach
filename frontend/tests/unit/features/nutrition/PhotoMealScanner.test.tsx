@@ -122,6 +122,82 @@ describe('PhotoMealScanner', () => {
     expect(onManualFallback).toHaveBeenCalledOnce();
   });
 
+  it('keeps the selected image within the existing request-body limit', async () => {
+    apiMock.mockResolvedValue(draft);
+    render(
+      <PhotoMealScanner
+        userId={10}
+        diaryDate="2026-10-01"
+        mealType="lunch"
+        onCancel={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+    const input = document.querySelector('input[type="file"]')!;
+    fireEvent.change(input, {
+      target: {
+        files: [new File([new Uint8Array(1_000_001)], 'large.png', { type: 'image/png' })],
+      },
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Выберите фото до 1 МБ');
+    expect(apiMock).not.toHaveBeenCalled();
+
+    fireEvent.change(input, {
+      target: {
+        files: [new File([new Uint8Array(1_000_000)], 'private-name.png', { type: 'image/png' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    await screen.findByRole('heading', { name: 'Проверьте оценку блюда' });
+    const uploaded = apiMock.mock.calls[0]?.[1].body.get('image') as File;
+    expect(uploaded.size).toBe(1_000_000);
+    expect(uploaded.name).toBe('meal-photo');
+  });
+
+  it('explains a server-side request size rejection', async () => {
+    apiMock.mockRejectedValue(new ApiError('Request body too large', 413));
+    render(
+      <PhotoMealScanner
+        diaryDate="2026-10-01"
+        mealType="lunch"
+        onCancel={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [new File(['photo'], 'meal.png', { type: 'image/png' })] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Фото слишком большое');
+  });
+
+  it('starts a new request when a photo creation replay cannot be verified', async () => {
+    apiMock
+      .mockRejectedValueOnce(
+        new ApiError('Conflict', 409, { detail: { code: 'idempotency_key_already_used' } }),
+      )
+      .mockResolvedValueOnce(draft);
+    render(
+      <PhotoMealScanner
+        diaryDate="2026-10-01"
+        mealType="lunch"
+        onCancel={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+    const input = document.querySelector('input[type="file"]')!;
+    const file = new File(['photo'], 'meal.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Выберите фото заново');
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Распознать приблизительно' }));
+    await screen.findByRole('heading', { name: 'Проверьте оценку блюда' });
+    expect(apiMock.mock.calls[0]?.[1].headers['Idempotency-Key']).not.toBe(
+      apiMock.mock.calls[1]?.[1].headers['Idempotency-Key'],
+    );
+  });
+
   it('retries the same confirmation after losing the response', async () => {
     const onCompleted = vi.fn();
     const replayed = { ...confirmed, replayed: true };
