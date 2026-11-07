@@ -77,6 +77,9 @@ def test_api_preview_confirm_and_ownership(client, postgres, synthetic_adapter):
     draft = uploaded.json()
     assert draft["schema_version"] == "nutrition-import-v1"
     assert draft["rows"][0]["status"] == "manual_resolution_required"
+    assert draft["rows"][2]["status"] == "invalid"
+    assert draft["rows"][2]["issues"] == ["unsupported_amount_unit"]
+    assert draft["rows"][2]["source"]["coordinates"]["row"] == 11
     assert client.get(f"{URL}/{draft['id']}", headers=other).status_code == 404
     assert (
         client.post(
@@ -99,13 +102,40 @@ def test_api_preview_confirm_and_ownership(client, postgres, synthetic_adapter):
         json={
             "revision": 1,
             "matches": [{"index": 0, "food_id": food_id}],
-            "skipped_rows": [1, 2, 3, 4],
+            "skipped_rows": [1, 3, 4],
         },
     )
     assert resolved.status_code == 200, resolved.text
     preview = resolved.json()
     assert preview["rows"][0]["status"] == "matched"
     assert preview["rows"][0]["action"]["nutrition_amount"]["protein_g"] is None
+    assert preview["rows"][2]["status"] == "invalid"
+    incomplete = client.post(
+        f"{URL}/{draft['id']}/confirm",
+        headers=headers,
+        json={
+            "revision": preview["revision"],
+            "preview_signature": preview["preview_signature"],
+            "confirm_key": "confirm-key-123",
+            "confirmed": True,
+        },
+    )
+    assert incomplete.status_code == 409
+    assert incomplete.json()["detail"]["code"] == "unresolved_rows"
+    with get_session_context() as db:
+        assert db.query(FoodDiaryEntry).filter_by(user_id=_user_id(983_003)).count() == 0
+    resolved = client.post(
+        f"{URL}/{draft['id']}/resolve",
+        headers=headers,
+        json={
+            "revision": preview["revision"],
+            "matches": [{"index": 0, "food_id": food_id}],
+            "skipped_rows": [1, 2, 3, 4],
+        },
+    )
+    assert resolved.status_code == 200, resolved.text
+    preview = resolved.json()
+    assert preview["rows"][2]["status"] == "skipped"
     confirm = {
         "revision": preview["revision"],
         "preview_signature": preview["preview_signature"],
