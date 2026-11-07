@@ -310,6 +310,7 @@ export function HydrationTracker({
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const quickAddRef = useRef<HTMLDivElement>(null);
   const addInFlightRef = useRef(false);
+  const [preparingAdd, setPreparingAdd] = useState(false);
   const [customVolume, setCustomVolume] = useState('');
   const [beverageType, setBeverageType] = useState('water');
   const [undoEntry, setUndoEntry] = useState<HydrationEntry | null>(null);
@@ -501,6 +502,7 @@ export function HydrationTracker({
     },
     onSettled: () => {
       addInFlightRef.current = false;
+      setPreparingAdd(false);
     },
   });
   const submitAdd = async (payload: Pick<AddRequest, 'volume' | 'kind' | 'source'>) => {
@@ -521,6 +523,7 @@ export function HydrationTracker({
       return;
     }
     addInFlightRef.current = true;
+    setPreparingAdd(true);
     const boundary = demoToken
       ? undefined
       : { ...authDiscardSnapshot(), userId: Number(scope.slice(5)) };
@@ -603,6 +606,7 @@ export function HydrationTracker({
       );
     }
     addInFlightRef.current = false;
+    setPreparingAdd(false);
   };
   const undo = useMutation({
     mutationFn: (entryId: number) =>
@@ -748,7 +752,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
-            disabled={add.isPending || !scope}
+            disabled={preparingAdd || add.isPending || !scope}
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
@@ -784,7 +788,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             type="button"
-            disabled={add.isPending}
+            disabled={preparingAdd || add.isPending}
             onClick={() => void submitAdd(pending)}
           >
             Повторить без дубля
@@ -819,7 +823,7 @@ export function HydrationTracker({
             </Select>
           </Field>
           <Button
-            disabled={add.isPending || !scope || !customVolume}
+            disabled={preparingAdd || add.isPending || !scope || !customVolume}
             type="button"
             onClick={() =>
               void submitAdd({
