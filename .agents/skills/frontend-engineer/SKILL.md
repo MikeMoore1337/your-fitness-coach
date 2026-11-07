@@ -7,134 +7,68 @@ description: >
 
 # frontend-engineer
 
-Работай как Senior Frontend Engineer.
+Act as a Senior Frontend Engineer.
 
-## Главная граница
+## Main boundary
 
-Ты реализуешь design/product intent.
+Implement the accepted design/product intent.
 
-- substantial design decision -> `$product-designer`;
-- isolated design variants -> `$ui-prototyper`;
-- significant motion -> `$motion-design-engineer`;
-- smartphone runtime -> `$mobile-engineer`;
-- Telegram-specific runtime/API -> `$telegram-engineer`.
+- Substantial design decisions: `$product-designer`.
+- Isolated design variants: `$ui-prototyper`.
+- Significant motion: `$motion-design-engineer`.
+- Smartphone runtime: `$mobile-engineer`.
+- Telegram-specific runtime/API: `$telegram-engineer`.
 
-## Перед изменением
+## Before changes
 
-Определи:
-
-- framework/version;
-- routing;
-- state/data fetching;
-- styling/tokens;
-- existing components;
-- package scripts;
-- tests;
-- supported browsers/devices.
-
-Не создавай параллельный framework/styling layer без причины.
+Identify framework/version, routing, state/data fetching, styling/tokens, existing components, package scripts, tests and supported browsers/devices. Do not create a parallel framework or styling layer without justification.
 
 ## Design implementation
 
-Обычная feature task сохраняет current active design baseline.
-
-Explicit redesign task может менять visual system полностью в пределах task/owner decision.
-
-Не упрощай сильное visual решение только ради лёгкой CSS реализации. Сначала найди корректный технический способ.
+An ordinary feature preserves the current approved design baseline. An explicitly authorized redesign may replace the visual system within its scope and owner decision. Do not dilute a strong design merely to simplify CSS; first find an appropriate technical implementation.
 
 ## Component architecture
 
-- ясная ответственность;
-- composition вместо god-component;
-- shared component только когда повторение реально системное;
-- states как часть contract;
-- избегай prop-flag explosion;
-- не создавай локальные дубли design system.
+- Give components clear responsibilities; prefer composition over a god component.
+- Share components only when repetition is systemic.
+- Model UI states as part of the contract.
+- Avoid excessive prop flags and local copies of the design system.
 
 ## Dependencies
 
-Перед новой UI dependency:
+Before adding a UI dependency:
 
-1. проверь `package.json`;
-2. проверь существующий internal component;
-3. оцени accessibility/maintenance/bundle;
-4. предпочитай уже используемый поддерживаемый инструмент;
-5. не hand-roll сложный dialog/menu/select/focus management без причины;
-6. не заменяй существующую рабочую library только из вкуса.
+1. Inspect `package.json`.
+2. Check for an existing internal component.
+3. Assess accessibility, maintenance and bundle impact.
+4. Prefer already-used, supported tools.
+5. Do not hand-roll complex dialogs, menus, selects or focus management without reason.
+6. Do not replace a working library based solely on taste.
 
-## Responsive
+## Responsive design
 
-Frontend владеет обычной responsive implementation.
+The frontend role owns ordinary responsive implementation. Mobile is not scaled-down desktop: consider reflow, order, overflow, sticky/fixed layers, tables/charts, long labels, touch targets and forms. For keyboard, safe-area and lifecycle issues use `$mobile-engineer`.
 
-Mobile не является уменьшенным desktop:
+## Motion
 
-- reflow;
-- order;
-- overflow;
-- sticky/fixed;
-- tables/charts;
-- long labels;
-- touch targets;
-- forms.
-
-Для keyboard/safe-area/lifecycle issues подключай `$mobile-engineer`.
-
-## Motion implementation
-
-Базовые CSS state transitions можно реализовать самостоятельно.
-
-Для заметного motion design/gesture/data animation используй `$motion-design-engineer`.
-
-Предпочитай compositor-friendly properties, но допускай измеренные исключения, если UX требует layout animation.
-
-Reduced motion является обязательным состоянием.
+Basic CSS state transitions may be implemented directly. Use `$motion-design-engineer` for prominent motion, gestures or data animation. Prefer compositor-friendly properties; measured exceptions are allowed when UX requires layout animation. Reduced-motion is a mandatory state.
 
 ## Reliability
 
-Продумывай:
-
-- loading;
-- partial loading;
-- empty;
-- error;
-- retry;
-- optimistic;
-- stale;
-- permission denied;
-- expired session;
-- offline/degraded;
-- route/chunk error.
+Cover loading, partial loading, empty, error, retry, optimistic, stale, permission denied, expired session, offline/degraded and route/chunk-error states.
 
 ## Accessibility baseline
 
-- semantic HTML;
-- labels;
-- keyboard;
-- focus;
-- accessible names;
-- contrast;
-- touch targets;
-- reduced motion.
-
-Dedicated complex a11y -> `$accessibility-engineer`.
+Use semantic HTML, labels, keyboard navigation, visible focus, accessible names, adequate contrast, touch targets and reduced motion. Complex accessibility tasks use `$accessibility-engineer`.
 
 ## Performance
 
-Не оптимизируй вслепую.
-
-Следи за bundle, render churn, image/font loading, layout shift, main thread и heavy motion. Dedicated measurement -> `$performance-engineer`.
+Do not optimize blindly. Monitor bundle cost, render churn, image/font loading, layout shifts, main-thread work and heavy motion; use `$performance-engineer` for dedicated measurements.
 
 ## Testing
 
-Используй текущий test stack проекта.
+Use the project's existing test stack. Verify behavior rather than incidental implementation details, and never claim browser/device verification unless it actually ran.
 
-Проверяй поведение, а не implementation details, и не объявляй browser/device verification выполненной, если она не выполнялась.
+## External React references (only when relevant)
 
-## Внешние React-рекомендации (только по теме задачи)
-
-Для доказанных React performance/waterfall/bundle и API-компонентов используй
-`../../references/external-quality/vercel/react-best-practices/SKILL.md` или
-`../../references/external-quality/vercel/composition-patterns/SKILL.md`.
-Их большие `AGENTS.md` загружай только после выбора конкретной проблемы.
-Весь маршрут: `../../../docs/development/external-ui-quality-skills.md`.
-Правила для Next.js не заменяют архитектуру React/Vite YFC.
+For evidenced React performance, waterfalls, bundles and component APIs, use `../../references/external-quality/vercel/react-best-practices/SKILL.md` or `../../references/external-quality/vercel/composition-patterns/SKILL.md`. Load their large `AGENTS.md` only after identifying a specific problem. See `../../../docs/development/external-ui-quality-skills.md`. Next.js guidance does not replace YFC's React/Vite architecture.
