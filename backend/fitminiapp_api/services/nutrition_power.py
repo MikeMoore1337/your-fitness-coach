@@ -523,98 +523,70 @@ def parse_natural_food_input(text: str) -> list[NaturalInputRowResponse]:
     source = text.strip()
     if not source:
         raise NutritionPowerError("natural input must not be blank")
-    matches = list(_NUMBER_RE.finditer(source))
-    if not matches:
-        chunks = [chunk.strip(" ,;\n\t") for chunk in re.split(r"[,;\n]+", source)]
-        return [
-            _row(
-                index,
-                chunk,
-                _normalized_name(chunk),
-                status=(
-                    "excluded" if normalize_food_search_query(chunk) == "вода" else "unresolved"
-                ),
-                message=(
-                    "Вода не добавляется в дневник питания."
-                    if normalize_food_search_query(chunk) == "вода"
-                    else "Укажите количество, например: 180 г"
-                ),
-            )
-            for index, chunk in enumerate(chunk for chunk in chunks if chunk)
-        ]
-
     rows: list[NaturalInputRowResponse] = []
-    cursor = 0
-    for index, match in enumerate(matches):
-        raw_name = _normalized_name(source[cursor : match.start()].strip(" ,;\n\t"))
-        amount_raw = match.group("amount")
-        amount = _parse_amount(amount_raw)
-        unit_match = _UNIT_RE.match(source[match.end() :])
-        token = normalize_food_search_query(unit_match.group("unit")) if unit_match else ""
-        amount_unit = _UNIT_ALIASES.get(token)
-        unsupported_unit = bool(
-            unit_match and amount_unit is None and token in _UNSUPPORTED_UNIT_TOKENS
-        )
-        consumed_end = match.end() + (
-            unit_match.end() if unit_match and (amount_unit or unsupported_unit) else 0
-        )
-        raw_text = source[cursor:consumed_end].strip(" ,;\n\t")
-        message: str | None = None
-        if not raw_name:
-            raw_name = "Неизвестный продукт"
-            message = "Укажите название продукта перед количеством."
-        if amount is None:
-            message = (
-                "Количество должно быть положительным числом с максимумом 3 знаков после запятой."
+    for chunk in re.split(r"(?<!\d),|,(?!\d)|[;\n]+", source):
+        chunk = chunk.strip(" \t")
+        if not chunk:
+            continue
+        cursor = 0
+        for match in _NUMBER_RE.finditer(chunk):
+            raw_name = _normalized_name(chunk[cursor : match.start()].strip())
+            amount = _parse_amount(match.group("amount"))
+            unit_match = _UNIT_RE.match(chunk[match.end() :])
+            token = normalize_food_search_query(unit_match.group("unit")) if unit_match else ""
+            amount_unit = _UNIT_ALIASES.get(token)
+            unsupported_unit = bool(
+                unit_match and amount_unit is None and token in _UNSUPPORTED_UNIT_TOKENS
             )
-        if unsupported_unit:
-            unknown = token
-            message = (
-                f"Единица «{unknown}» не поддерживается; выберите граммы, миллилитры или порции."
+            consumed_end = match.end() + (
+                unit_match.end() if unit_match and (amount_unit or unsupported_unit) else 0
             )
-            amount = None
-            amount_unit = None
-        next_number = matches[index + 1] if index + 1 < len(matches) else None
-        trailing = source[consumed_end : next_number.start() if next_number else len(source)]
-        trailing_clean = trailing.strip(" ,;\n\t")
-        if amount_unit is None and trailing_clean:
-            first_token_match = re.match(r"([A-Za-zА-Яа-яЁё]+)", trailing_clean)
-            first_token = (
-                normalize_food_search_query(first_token_match.group(1)) if first_token_match else ""
-            )
-            if first_token in _UNSUPPORTED_UNIT_TOKENS:
-                message = f"Единица «{first_token}» не поддерживается; выберите граммы, миллилитры или порции."
-            elif next_number is None:
-                message = "После количества укажите только единицу измерения."
+            raw_text = chunk[cursor:consumed_end].strip()
+            message: str | None = None
+            if not raw_name:
+                raw_name = "Неизвестный продукт"
+                message = "Укажите название продукта перед количеством."
+            if amount is None:
+                message = "Количество должно быть положительным числом с максимумом 3 знаков после запятой."
+            elif unsupported_unit:
+                message = (
+                    f"Единица «{token}» не поддерживается; выберите граммы, миллилитры или порции."
+                )
                 amount = None
-                amount_unit = None
-        normalized_name = normalize_food_search_query(raw_name)
-        if normalized_name == "вода":
+            elif amount_unit is None:
+                message = "Укажите единицу измерения."
+            is_water = normalize_food_search_query(raw_name) == "вода"
             rows.append(
                 _row(
-                    index,
+                    len(rows),
                     raw_text,
                     raw_name,
                     amount=amount,
                     amount_unit=amount_unit,
-                    unit_inferred=amount_unit is None,
-                    status="excluded",
-                    message="Вода не добавляется в дневник питания.",
+                    status="excluded" if is_water else "unresolved",
+                    message="Вода не добавляется в дневник питания." if is_water else message,
                 )
             )
-        else:
+            cursor = consumed_end
+
+        trailing = chunk[cursor:].strip()
+        if trailing:
+            is_water = normalize_food_search_query(trailing) == "вода"
             rows.append(
                 _row(
-                    index,
-                    raw_text,
-                    raw_name,
-                    amount=amount,
-                    amount_unit=amount_unit or "g" if amount is not None else None,
-                    unit_inferred=amount_unit is None and amount is not None,
-                    message=message,
+                    len(rows),
+                    trailing,
+                    _normalized_name(trailing),
+                    status="excluded" if is_water else "unresolved",
+                    message=(
+                        "Вода не добавляется в дневник питания."
+                        if is_water
+                        else "Укажите количество, например: 180 г"
+                    ),
                 )
             )
-        cursor = consumed_end
+    if not rows:
+        raise NutritionPowerError("natural input must contain a product")
     return rows
 
 
@@ -653,7 +625,7 @@ def _resolve_natural_row(
     user: User,
     row: NaturalInputRowResponse,
 ) -> NaturalInputRowResponse:
-    if row.status == "excluded" or row.amount is None:
+    if row.status == "excluded" or row.amount is None or row.amount_unit is None or row.message:
         return row
     normalized = normalize_food_search_query(row.name)
     alias = (
@@ -690,9 +662,18 @@ def _resolve_natural_row(
     ]
     if candidates:
         preferred = [item for item in candidates if item.food_type == "user"]
-        ordered = preferred or candidates
+        ordered = preferred + [item for item in candidates if item.food_type != "user"]
         if len(ordered) == 1:
             item = ordered[0]
+            if local is not None and local.total > len(local.items):
+                return row.model_copy(
+                    update={
+                        "candidates": [
+                            NaturalFoodCandidate(food=item, source=_candidate_source(item))
+                        ],
+                        "message": "Результаты поиска неполные; выберите продукт вручную.",
+                    }
+                )
             try:
                 nutrition = _natural_food_nutrition(db, user, row, item.id)
             except FoodError, NutritionPowerError:

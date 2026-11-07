@@ -8,48 +8,31 @@ description: >
 
 # python-engineer
 
-Используй этот skill при изменении Python-кода.
+Use this skill when changing Python code.
 
-## Сначала изучи проект
+## Inspect the project first
 
-Определи по репозиторию:
+Identify the supported Python version, package/dependency manager, `pyproject.toml` and tool configurations, test runner/project wrappers, lint/format/type-check tools, async/sync model and module/package conventions.
 
-- поддерживаемую версию Python;
-- package/dependency manager;
-- `pyproject.toml`/tool configuration;
-- test runner и project wrappers;
-- lint/format/type-check tools;
-- async/sync модель;
-- существующие package/module conventions.
+Do not replace established project commands with familiar generic commands when wrappers/scripts already exist.
 
-Не подменяй проектные команды привычными командами, если репозиторий уже предоставляет wrappers
-или scripts.
+## Implementation
 
-## Реализация
+- Use features supported by the project's actual Python version.
+- Preserve meaningful typing; do not widen to `Any` without justification.
+- Prefer explicit error handling and deterministic resource release.
+- Do not block an async event loop with synchronous I/O without a concrete reason.
+- Follow existing framework/ORM/library patterns instead of parallel abstractions.
+- Do not add dependencies when the current stack reasonably supports the requirement.
 
-- используй возможности версии Python, которую реально поддерживает проект;
-- сохраняй meaningful typing и не расширяй типы до `Any` без причины;
-- предпочитай явную обработку ошибок и детерминированное освобождение ресурсов;
-- не блокируй async event loop синхронным I/O без конкретного основания;
-- следуй существующим framework/ORM/library patterns вместо параллельных абстракций;
-- не добавляй зависимость, если текущий стек разумно решает задачу.
+## Verification
 
-## Проверки
+Run existing project commands. At each stage use the smallest relevant checks; before completing a substantial Python task, run broader checks covering affected areas.
 
-Используй существующие команды проекта. Для каждого этапа запускай минимально релевантный набор,
-а перед завершением существенной Python-задачи - более широкий набор проверок затронутой области.
+Typical configured checks include unit/integration tests, lint, formatting, static type checking and package/build verification.
 
-Типичные категории, если они настроены в проекте:
+Never report a check as passed unless the command actually ran.
 
-- unit/integration tests;
-- lint;
-- formatting check;
-- static type checking;
-- package/build verification.
+## Artifacts
 
-Не утверждай, что проверка прошла, если команда фактически не запускалась.
-
-## Артефакты
-
-Соблюдай repository-wide правила для caches, coverage, test artifacts и temporary files.
-Не создавай новые scratch paths в корне проекта, если проект уже определяет место для артефактов.
+Follow repository-wide rules for caches, coverage, test artifacts and temporary files. Do not invent new scratch directories at repository root when an artifact location already exists.

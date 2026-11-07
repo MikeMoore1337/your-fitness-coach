@@ -8,53 +8,39 @@ description: >
 
 # release-manager
 
-Перед релизом собери release checklist, соответствующий типу продукта.
+Before release, prepare a checklist appropriate to the product and change.
 
-Проверь:
+Verify:
 
-- build artifact воспроизводим;
-- нужные tests/checks green;
-- migrations проверены;
-- configuration/secrets готовы;
-- backward compatibility;
-- external dependencies;
-- feature flags, если есть;
-- rollback/forward-fix path;
-- backup, если изменение может повредить данные;
-- smoke tests;
-- monitoring/alerts готовы наблюдать изменение.
+- Reproducible build artifacts.
+- Green required tests and checks.
+- Validated migrations.
+- Prepared configuration/secrets.
+- Backward compatibility and external dependencies.
+- Feature flags, if present.
+- Rollback/forward-fix path.
+- Backups for changes that might corrupt data.
+- Smoke tests.
+- Monitoring/alerts capable of observing the change.
 
 ## Release success criteria
 
-До deployment определи несколько проверяемых сигналов успешного релиза, соответствующих изменению:
+Before deployment, define several observable success signals for the change:
 
-- критический user flow проходит;
-- error rate/latency не деградировали существенно;
-- migration/background processing завершены;
-- нет всплеска client/server exceptions;
-- product-critical success signal работает, если он инструментирован.
+- Critical user journey succeeds.
+- Error rate and latency have not materially degraded.
+- Migrations/background processing complete.
+- No spike in client/server exceptions.
+- Product-critical success signals work when instrumented.
 
-Не ограничивай success criteria фразой "deployment succeeded".
+Never reduce success criteria to “deployment succeeded”.
 
-После deployment:
+After deployment, verify health/readiness, errors, latency, critical journeys, background jobs/queues, migrations, new logs/metrics/traces and the defined product-specific success signals.
 
-- health/readiness;
-- error rate;
-- latency;
-- critical user flow;
-- background jobs/queues;
-- migration completion;
-- новые логи/метрики/traces;
-- release success criteria и product-critical signals, если они определены.
+Release notes should describe user-facing or operationally meaningful changes, not restate the Git diff.
 
-Release notes должны говорить о пользовательски/операционно значимых изменениях, а не переписывать Git diff.
-## Адаптация к проекту
+## Project adaptation
 
-Собирай порядок релиза из фактических компонентов проекта: services/apps, migrations, generated
-contracts, background jobs, feature flags и external dependencies. Не предполагай конкретную
-схему deployment. Авторизация production deployment определяется repository-wide правилами;
-подготовка и локальная проверка сами по себе её не создают. В этом репозитории новая production
-revision входит в remote `master` только через merged PR с green check `checks`. GitHub Actions
-проверяет merge SHA, определяет changed-path scope и запускает production workflow для application
-changes. Direct/force push, history rewrite и manual production actions вне этого normal path
-требуют отдельного owner approval, backup и preflight.
+Derive release order from actual services/apps, migrations, generated contracts, background jobs, feature flags and external dependencies. Never assume a deployment topology. Preparation/local verification does not authorize production actions.
+
+In this repository, a production revision reaches remote `master` only through a merged PR with a green `checks` status. GitHub Actions verifies merge SHA, determines the changed-path scope and runs the production workflow for application changes. Direct or forced pushes, history rewrites and manual production actions outside this standard path require separate owner approval, a backup and preflight.

@@ -6,23 +6,23 @@ purpose: Verify actual behavior and task-specific risks with the smallest useful
 
 # Role: qa-verifier
 
-QA проверяет фактическое поведение, а не повторяет code review.
+QA verifies observed behavior rather than repeating code review.
 
-## Ответственность
+## Responsibilities
 
-- использовать `$qa-engineer` как base strategy/router;
-- выбрать risk-based scenarios текущей task;
-- подключить обычно не более 1-2 QA/domain skills;
-- проверить happy/negative/boundary/recovery и специальные risks только если применимы;
-- для новых/изменённых критичных E2E при false-green risk использовать `$e2e-review`;
-- конкретные CI/test failures сначала классифицировать через `$failure-triage`;
-- intermittent/retry-only failures передавать `$flaky-analysis`;
-- честно разделять automated, emulated и real-device evidence;
-- вернуть reproduction и verification для findings;
-- не запускать полный продуктовый audit без scope.
+- Use `$qa-engineer` as the base strategy/router.
+- Select risk-based scenarios for the current task.
+- Usually add no more than 1-2 QA/domain skills.
+- Check happy, negative, boundary, recovery and special-risk paths only when applicable.
+- Use `$e2e-review` for new or changed critical E2E cases at risk of false-green results.
+- Classify specific CI/test failures with `$failure-triage` first.
+- Route intermittent or retry-only failures to `$flaky-analysis`.
+- Distinguish automated, emulated and real-device evidence accurately.
+- Return reproduction and verification evidence for findings.
+- Do not run an out-of-scope full-product audit.
 
-QA work profiles из `references/QA_AUTOMATION_ARCHITECTURE.md` являются режимами этой роли/implementer, а не отдельными lifecycle roles.
+The QA work profiles in `references/QA_AUTOMATION_ARCHITECTURE.md` are modes of this role/implementer, not separate lifecycle roles.
 
-Production code не менять. Blocking defect возвращается implementer.
+Never change production code. Return blocking defects to the implementer.
 
-Severity/recheck policy - из canonical lifecycle.
+Severity and recheck policies come from the canonical lifecycle.

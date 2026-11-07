@@ -3697,6 +3697,13 @@ test('#1429 primary actions remain reachable with 200% text scaling', async ({
     entry_count: 1,
   });
   await page.goto('/app?section=nutrition');
+  await page.setViewportSize({ width: 390, height: 844 });
+  const primaryActionLabel = page.getByTestId('nutrition-add-product').locator('span');
+  await expect(primaryActionLabel).toBeVisible();
+  expect(
+    await primaryActionLabel.evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeLessThan(28);
+  await page.setViewportSize({ width: 320, height: 844 });
   await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
   const repeat = page.getByTestId('nutrition-repeat-default');
   const addFood = page.getByTestId('nutrition-add-product');

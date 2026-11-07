@@ -33,8 +33,8 @@ const screenshotOptions = {
 
 const longSurfaceScreenshotOptions = {
   ...screenshotOptions,
-  // The dock is covered by dedicated visibility/geometry assertions below. Hiding the fixed
-  // chrome keeps its position from changing the clip of this intentionally tall component.
+  // The dock is covered by dedicated visibility/geometry assertions below. Hiding fixed
+  // chrome keeps its position from changing long profile and nutrition screenshots.
   stylePath: 'tests/e2e/fixtures/active-workout-screenshot.css',
 };
 
@@ -270,7 +270,7 @@ for (const theme of ['light', 'dark'] as const) {
       } else {
         await expect(page.locator(surface.locator)).toHaveScreenshot(
           `${surface.name}-390x844-${theme}.png`,
-          surface.name === 'profile'
+          surface.name === 'profile' || surface.name === 'nutrition'
             ? { ...longSurfaceScreenshotOptions, timeout: 15_000 }
             : screenshotOptions,
         );

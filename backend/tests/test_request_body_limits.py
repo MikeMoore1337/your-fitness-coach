@@ -99,6 +99,7 @@ def _response_json(messages: list[dict]) -> dict:
         ("/api/v1/auth/dev-login", AUTH_BODY_LIMIT_BYTES),
         ("/api/v1/me/avatar", AVATAR_BODY_LIMIT_BYTES),
         (PROGRAM_IMPORT_PATH_PREFIX, settings.program_import_max_request_bytes),
+        ("/api/v1/nutrition/photo-meals", DEFAULT_BODY_LIMIT_BYTES),
         ("/api/v1/workouts", DEFAULT_BODY_LIMIT_BYTES),
     ],
 )
@@ -119,6 +120,7 @@ def test_body_at_or_below_each_limit_passes(path: str, limit: int, offset: int) 
     ("path", "limit"),
     [
         ("/api/v1/auth/oauth/google/callback", AUTH_BODY_LIMIT_BYTES),
+        ("/api/v1/nutrition/photo-meals", DEFAULT_BODY_LIMIT_BYTES),
         ("/api/v1/profile", DEFAULT_BODY_LIMIT_BYTES),
     ],
 )
