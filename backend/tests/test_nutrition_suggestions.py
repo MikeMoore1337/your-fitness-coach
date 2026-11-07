@@ -13,6 +13,7 @@ from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import FoodDiaryBatchOperation
 from fitminiapp_api.models.nutrition import NutritionTarget
+from fitminiapp_api.models.program import UserProgram
 from fitminiapp_api.models.recipe import RecipeIngredient
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_power import FoodDiaryBatchItem
@@ -939,6 +940,104 @@ def test_preview_uses_the_dated_override_for_each_day_type(client, day_type: str
     assert report.status_code == 200
     day = next(row for row in report.json()["daily"] if row["diary_date"] == selected_date)
     assert day["target_calories"] == 2300
+
+
+def test_plan_preview_resolves_saved_cycle_targets(client) -> None:
+    from test_program_week_cycle import _payload
+
+    headers = _auth(client, 52_329)
+    program_payload = _payload(client, headers)
+    program_payload["week_cycle"] = {
+        "length_weeks": 3,
+        "repeat": True,
+        "week_types": ["light", "medium", "heavy"],
+    }
+    created = client.post("/api/v1/programs/templates", headers=headers, json=program_payload)
+    assert created.status_code == 200, created.text
+    assigned = client.post(
+        f"/api/v1/programs/templates/{created.json()['template']['id']}/assign-to-me",
+        headers=headers,
+        json={"duration_weeks": 12},
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["user_program_id"]
+    with get_session_context() as db:
+        start = db.get(UserProgram, program_id).start_date
+
+    base = {"calories": 2000, "protein_g": 150, "fat_g": 70, "carbs_g": 190}
+    assert (
+        client.post("/api/v1/nutrition/targets/manual", headers=headers, json=base).status_code
+        == 200
+    )
+    for index, (day_type, week_type, calories, carbs) in enumerate(
+        [
+            ("training", None, 2200, 242),
+            ("training", "medium", 2300, 270),
+            ("rest", None, 1900, 170),
+        ]
+    ):
+        rule = {
+            **base,
+            "calories": calories,
+            "carbs_g": carbs,
+            "program_id": program_id,
+            "revision_number": 1,
+            "effective_from": (start + timedelta(days=1)).isoformat(),
+            "scope": "template",
+            "day_type": day_type,
+            "week_type": week_type,
+        }
+        rule_preview = client.post(
+            "/api/v1/nutrition/targets/schedule/preview",
+            headers=headers,
+            json={
+                **rule,
+                "date_from": (start + timedelta(days=1)).isoformat(),
+                "date_to": (start + timedelta(days=21)).isoformat(),
+            },
+        )
+        assert rule_preview.status_code == 200, rule_preview.text
+        saved = client.post(
+            "/api/v1/nutrition/targets/schedule",
+            headers={**headers, "Idempotency-Key": f"suggestion-cycle-rule-52329-{index}"},
+            json={
+                **rule,
+                "expected_binding_id": rule_preview.json()["expected_binding_id"],
+                "expected_target_version": rule_preview.json()["expected_target_version"],
+            },
+        )
+        assert saved.status_code == 200, saved.text
+
+    food_id = _store_food("Продукт для цели по циклу")
+    assert (
+        client.put(f"/api/v1/nutrition/foods/{food_id}/favorite", headers=headers).status_code
+        == 200
+    )
+    for selected_date, calories in (
+        (start + timedelta(days=1), 1900),
+        (start + timedelta(weeks=1), 2300),
+        (start + timedelta(weeks=2), 2200),
+    ):
+        preview = client.post(
+            "/api/v1/nutrition/plans/suggestions/preview",
+            headers=headers,
+            json={
+                "plan_date": selected_date.isoformat(),
+                "meal_type": "lunch",
+                "candidate_id": f"food:{food_id}",
+                "items": [{"position": 0, "food_id": food_id, "amount": "100", "amount_unit": "g"}],
+                "expected_revision": 0,
+            },
+        )
+        assert preview.status_code == 200, preview.text
+        assert Decimal(preview.json()["targets"]["energy_kcal"]) == calories
+        resolved = client.get(
+            "/api/v1/nutrition/targets/for-date",
+            headers=headers,
+            params={"target_date": selected_date.isoformat()},
+        )
+        assert resolved.status_code == 200, resolved.text
+        assert preview.json()["target_id"] == resolved.json()["target"]["id"]
 
 
 def test_preview_checks_explicit_limits_against_pending_plan_without_saving_them(client) -> None:
