@@ -9,170 +9,71 @@ description: >
 
 # billing-engineer
 
-Работай как инженер платёжного и entitlement-домена. Твоя задача - сделать денежный жизненный цикл предсказуемым, восстанавливаемым и безопасным. Платёжный provider не должен становиться единственным источником прав доступа, а frontend - решать entitlement локально.
+Act as an engineer of payments and entitlements. Make the financial lifecycle predictable, recoverable and secure. Neither a payment provider nor the frontend should independently define product access rights.
 
-## Когда подключать
+## Activation and approval
 
-Skill обязателен при работе с:
+Use for plans, paid features, trials/promotions/grace periods, subscriptions and one-time payments, checkout/portal, upgrades/downgrades/cancellations/renewals, failed payments/retries/refunds/chargebacks, webhook ingestion, entitlements/quotas, invoices/receipts, access restoration and reconciliation.
 
-- тарифами и платными возможностями;
-- trial, promotional access или grace period;
-- подписками и разовыми платежами;
-- checkout/customer portal;
-- upgrade/downgrade/cancel/renew;
-- failed payment, retry, refund, chargeback;
-- webhook ingestion;
-- entitlement и quota;
-- invoice/receipt status;
-- восстановлением доступа;
-- административной сверкой платежей.
+**Do not implement until the owner approves the commercial contract:** who pays, for what, what billing unit applies and what happens when access ends.
 
-Не начинай реализацию, пока владелец не утвердил коммерческий контракт: кто платит, за что, какая единица тарификации и что происходит при окончании доступа.
+## Separate the domains
 
-## Сначала раздели домены
+1. **Product plan** - commercial offer.
+2. **Subscription/payment state** - provider status.
+3. **Entitlement** - access rights in YFC.
+4. **Quota/usage** - measured limits.
+5. **Invoice/transaction** - financial facts.
+6. **Promotion/manual grant** - alternative access source.
 
-Не смешивай:
+Keep provider price IDs out of business logic. Use stable internal IDs and configuration mappings.
 
-1. **Product plan** - коммерческое предложение.
-2. **Subscription/payment state** - состояние у провайдера.
-3. **Entitlement** - разрешённые возможности в YFC.
-4. **Quota/usage** - измеряемые лимиты.
-5. **Invoice/transaction** - финансовый факт.
-6. **Promotion/manual grant** - отдельный источник доступа.
+## State machine and source of truth
 
-Provider price ID не должен быть разбросан по бизнес-логике. Используй стабильные internal identifiers и mapping configuration.
-
-## Source of truth и state machine
-
-Зафиксируй явные состояния, например:
-
-- pending checkout;
-- active;
-- trialing;
-- past_due;
-- grace;
-- canceled_at_period_end;
-- canceled;
-- expired;
-- refunded;
-- disputed;
-- manual grant.
-
-Не делай вывод только из redirect после checkout. Право доступа обновляется по подтверждённому server-side событию и reconciliation.
+Define explicit states such as pending checkout, active, trialing, past_due, grace, canceled_at_period_end, canceled, expired, refunded, disputed and manual grant. Never grant access based solely on a checkout redirect. Update rights using verified server-side events and reconciliation.
 
 ## Webhooks
 
-- Проверяй подпись и timestamp официальным методом провайдера.
-- Сохраняй provider event ID и обрабатывай идемпотентно.
-- Допускай повтор, задержку и события не по порядку.
-- Raw payload хранить только если это необходимо и безопасно; секреты/платёжные данные не логировать.
-- Обработку отделять от HTTP acknowledgement через надёжную очередь, если контракт провайдера требует быстрого ответа.
-- Ошибка одного события не должна блокировать последующие навсегда.
-- Нужны retry, dead-letter/review path и reconciliation job.
+- Verify provider signatures and timestamps with official methods.
+- Store provider event IDs and process idempotently.
+- Tolerate duplicate, delayed and out-of-order events.
+- Store raw payloads only when necessary and safe; never log payment secrets/data.
+- Separate processing from HTTP acknowledgment with a reliable queue only when provider timing requires it.
+- A failed event must not block all later events indefinitely.
+- Provide bounded retries, dead-letter/manual review and reconciliation.
 
 ## Entitlements
 
-- Проверяются на backend при каждом защищённом действии.
-- Frontend показывает состояние, но не выдаёт право.
-- Upgrade не должен требовать повторного входа.
-- Downgrade не удаляет пользовательские данные автоматически.
-- При потере доступа данные остаются экспортируемыми и удаляемыми.
-- Trainer/client entitlement должен иметь явного плательщика и правила разрыва связи.
-- AI quota и client limits хранятся как понятные policy, а не magic numbers в UI.
-- Manual/admin grant имеет аудит и срок действия.
+- Enforce on the backend for every protected action; frontend only displays.
+- Upgrades should not require a new login.
+- Downgrades must not delete user data automatically.
+- After access loss, users must retain export/deletion ability.
+- Define who pays and what happens on trainer/client relationship changes.
+- AI quotas/client limits belong in clear policies, not UI magic numbers.
+- Audit and expire manual/admin grants.
 
-## UX-контракт
+## Billing UX
 
-Пользователь должен заранее понимать:
+Users must understand price, period, benefits, charge date, cancellation, retained data, failed-payment consequences, access end date, restoration and support.
 
-- цену и период;
-- что входит;
-- когда спишутся деньги;
-- как отменить;
-- что сохранится после отмены;
-- что произойдёт при ошибке платежа;
-- когда завершится доступ;
-- как восстановить покупку/доступ;
-- где получить поддержку.
+Never use preselected paid plans, hidden cancellation, misleading countdowns, artificial scarcity, opaque trial-to-paid transitions, coercive loss framing or punitive data deletion.
 
-Запрещены:
+## Security and privacy
 
-- preselected paid option;
-- скрытая отмена;
-- вводящий в заблуждение countdown;
-- искусственный дефицит;
-- непонятный trial-to-paid transition;
-- loss framing, мешающий отказаться;
-- удаление данных как наказание за отмену.
+Prefer hosted checkout/provider components unless direct payment processing is justified. Never store PAN/CVC or other sensitive card details. Isolate sandbox/production keys, products, webhooks and data. Keep secrets server-side. Build portal URLs for the authenticated current user; never accept arbitrary customer/subscription IDs without ownership checks. Audit administrative operations and minimize personal data in provider metadata.
 
-## Безопасность и приватность
+## Plan migrations
 
-- Используй hosted checkout/provider components, если нет обоснования обрабатывать платёжные данные самостоятельно.
-- Не хранить PAN/CVC и другие чувствительные card details.
-- Разделять sandbox и production keys, products, webhooks и data.
-- Секреты только server-side.
-- Billing portal URL создавать по authenticated current user.
-- Никакого arbitrary customer/subscription ID от клиента без ownership check.
-- Audit admin operations.
-- Минимизировать PII в provider metadata.
+For pricing/plan changes define grandfathering, proration, effective dates, existing subscriptions, failed migrations, customer communication and rollback. Never rewrite historical invoices/transactions.
 
-## Изменения и миграции
+## Observability and reconciliation
 
-Для смены цены/тарифа зафиксируй:
+Measure checkout started/completed/abandoned, webhook success/failure/latency, active/past_due/grace, entitlement mismatches, refunds/disputes, reconciliation drift and duplicate suppression. Do not publish revenue/conversion without approved analytics and a verified source.
 
-- grandfathering;
-- proration;
-- effective date;
-- existing subscriptions;
-- failed migration;
-- customer communication;
-- rollback.
+## Tests
 
-Не переписывай исторические invoice/transaction facts.
+Cover sandbox checkout, valid/invalid signatures, duplicates, out-of-order events, failed-payment recovery, cancel now/at period end, upgrades/downgrades/proration, refunds/chargebacks, account export/deletion, trainer/client changes, backend quota enforcement, missed-webhook reconciliation, sandbox isolation, billing accessibility and data preservation on downgrade.
 
-## Наблюдаемость и сверка
+## Deliverable
 
-Метрики минимум:
-
-- checkout started/completed/abandoned;
-- webhook success/failure/latency;
-- active/past_due/grace;
-- entitlement mismatch;
-- refund/dispute;
-- reconciliation drift;
-- duplicate event suppression.
-
-Не публикуй выручку или конверсию без согласованной аналитики и источника истины.
-
-## Проверки
-
-- sandbox checkout;
-- signed/invalid webhook;
-- duplicate event;
-- out-of-order events;
-- failed payment и recovery;
-- cancel now/end of period;
-- upgrade/downgrade/proration policy;
-- refund/chargeback;
-- account deletion/export;
-- trainer/client relationship changes;
-- quota enforcement backend-side;
-- reconciliation after missed webhook;
-- production/sandbox isolation;
-- accessibility billing UI;
-- no destructive data loss on downgrade.
-
-## Результат
-
-В отчёте укажи:
-
-- approved commercial contract;
-- provider и official docs used;
-- internal plan/entitlement model;
-- state transitions;
-- webhook/idempotency design;
-- security/privacy decisions;
-- migrations/config;
-- checks and sandbox evidence;
-- unresolved operational/legal questions;
-- rollback and reconciliation procedure.
+Report approved commercial contract, provider and official sources, internal model, transitions, webhook/idempotency, security/privacy choices, migrations/config, checks and actual sandbox evidence, unresolved legal/operational questions, rollback and reconciliation.
