@@ -9,142 +9,48 @@ description: >
 
 # privacy-engineer
 
-Privacy и security связаны, но решают разные задачи. Security защищает данные и действия от
-несанкционированного доступа; privacy определяет, какие данные вообще нужны продукту, зачем и как
-долго они должны существовать.
+Privacy and security are related but different: security prevents unauthorized access; privacy determines what data is needed, why and for how long.
 
-Не выступай как юрист и не придумывай применимое законодательство без подтверждённой юрисдикции.
-Формируй инженерные privacy requirements, а юридически значимые требования помечай как требующие
-проверки для реальной юрисдикции продукта.
+Do not impersonate legal counsel or invent legal obligations without verifying jurisdiction. Produce engineering privacy requirements and flag legal matters for jurisdiction-specific review.
 
-## Data inventory
+## Inventory
 
-Для затрагиваемого сценария определи:
+For each affected flow identify data collected/created, source, purpose, owner/subject, storage/transfers, accessible roles/services, sensitivity and any copies in logs, analytics, traces, backups, caches or external platforms.
 
-- какие данные собираются/создаются;
-- источник данных;
-- цель обработки;
-- owner/subject;
-- где данные хранятся и куда передаются;
-- кто и какой сервис имеет доступ;
-- являются ли данные персональными/чувствительными;
-- попадают ли они в logs, analytics, traces, backups, caches или third-party systems.
+## Minimization
 
-## Data minimization
+For each field/event ask whether the feature truly needs it, whether less detail or transient computation would suffice and whether collection can be deferred. Never collect speculative "future use" data.
 
-Для каждого нового поля или события спроси:
+## Purpose and access boundaries
 
-- нужна ли эта информация для заявленной функции;
-- можно ли выполнить функцию без неё;
-- нужна ли точность/детализация такого уровня;
-- можно ли вычислить значение временно вместо постоянного хранения;
-- можно ли отложить сбор до момента реальной необходимости.
+Define primary purpose, genuinely needed secondary uses, forbidden cross-context reuse, user/role/tenant boundaries, limited support/admin access and analytics eligibility. Do not repurpose sensitive data silently.
 
-Не собирай данные "на будущее" без конкретной продуктовой причины.
+## Retention and deletion
 
-## Purpose и boundaries
+Define duration/ending event, justified hard/soft deletion, dependent records, account deletion, cache/session cleanup, queues/jobs, backup lifecycle limits and separately retained security/audit records when required. Verify deletions and avoid orphan copies in the primary system.
 
-Не переиспользуй чувствительные данные для новой цели автоматически.
+## Export and control
 
-Определи:
+For meaningful stored user data assess view/correction/export, record deletion, account deletion and optional integration/permission revocation. UI controls must work across all dependent layers, not just look functional.
 
-- primary purpose;
-- secondary uses, если они действительно нужны;
-- запрет нежелательного cross-context reuse;
-- role/user/tenant boundaries;
-- какие данные допустимы для support/admin access;
-- какие данные допустимы для аналитики.
+## Telemetry, logs and analytics
 
-## Retention и deletion
-
-Для данных с жизненным циклом зафиксируй:
-
-- сколько они нужны продукту или какое событие завершает хранение;
-- hard delete vs justified soft delete;
-- поведение связанных объектов;
-- account deletion;
-- cache/session cleanup;
-- очереди и отложенные задачи;
-- backups и реалистичные ограничения их жизненного цикла;
-- audit/security records, если они должны жить отдельно.
-
-Deletion flow должен быть проверяемым и не оставлять очевидные orphaned copies в основной системе.
-
-## Export и user control
-
-Если продукт хранит существенные пользовательские данные, проверь необходимость:
-
-- просмотра сохранённых данных;
-- исправления;
-- экспорта в понятном формате;
-- удаления отдельных данных;
-- удаления аккаунта;
-- отзыва необязательных разрешений/интеграций.
-
-Не добавляй control, который визуально существует, но не выполняет действие во всех зависимых слоях.
-
-## Telemetry, logs и analytics
-
-По умолчанию минимизируй чувствительные данные в telemetry.
-
-Не отправляй без необходимости:
-
-- access/refresh tokens;
-- cookies/session secrets;
-- полные request/response bodies;
-- медицинские/финансовые подробности;
-- содержимое пользовательского текста;
-- фотографии/файлы;
-- точные identifiers, если достаточно pseudonymous/aggregate signal.
-
-Для продуктовой аналитики предпочитай события вроде `workout_saved`/`flow_completed` вместо
-копирования пользовательских данных в event properties.
+Minimize sensitive fields. Do not unnecessarily transmit credentials, tokens, session cookies, full request/response bodies, health/financial details, user-generated text, photos/files or precise identifiers when aggregate/pseudonymous signals suffice. Prefer event names like `workout_saved` and `flow_completed` to copying user data into properties.
 
 ## Third parties
 
-Для внешнего API/analytics/storage/AI сервиса определи:
+Document actual external payload, reduction/surrogates, retry duplication risk, local data cleanup on disconnection and adapter logging. Never assert contractual/legal guarantees about a provider without verifiable evidence.
 
-- какие данные реально уходят наружу;
-- можно ли сократить payload;
-- можно ли заменить чувствительное значение surrogate/identifier;
-- timeout/retry не создаёт ли нежелательное повторное распространение данных;
-- удаляются ли данные из локальной системы при разрыве интеграции;
-- не логирует ли integration adapter исходный payload.
+## Privacy UX
 
-Не утверждай contractual/legal guarantees third party без проверяемого источника.
+Explain why sensitive input/permission is needed, request it at the relevant moment, make destructive deletion clear and avoid deceptive defaults or mislabeling mandatory versus optional collection.
 
-## UX privacy
+## Verification and findings
 
-Privacy должна быть понятна в интерфейсе там, где решение пользователя существенно:
+For significant changes trace UI/API -> storage -> external services; verify authorization with `$security-engineer`, export/deletion, log/metric/trace leaks, migrations/backfills, backups and fixtures/debug artifacts.
 
-- объясняй, зачем нужен чувствительный ввод/permission;
-- спрашивай данные в контексте функции, а не заранее без причины;
-- опасные/необратимые удаления делай ясными;
-- не используй deceptive defaults;
-- не маскируй обязательный сбор под необязательный и наоборот.
+Findings must identify data/flow, privacy risk, source of unnecessary retention/sharing, minimal fix and verification.
 
-## Verification
+## Project adaptation
 
-Для значимого privacy change проверь:
-
-- data flow от UI/API до storage и third parties;
-- authorization вместе с `$security-engineer`;
-- deletion/export сценарий;
-- logs/analytics/traces на утечки;
-- migration/backfill;
-- backup implications;
-- test fixtures и debug artifacts.
-
-Finding должен содержать:
-
-- данные и affected flow;
-- privacy risk;
-- конкретный источник лишнего хранения/распространения;
-- минимальное исправление;
-- способ проверки.
-
-## Адаптация к проекту
-
-Сначала изучи фактическую data model, analytics/observability stack, backups, object storage,
-third-party integrations и существующие privacy rules. Не навязывай consent banners, retention
-periods или юридические тексты без подтверждённого требования.
+Inspect actual data models, observability/analytics, backups, object storage, integrations and privacy policies first. Do not impose consent banners, retention periods or legal text without a verified requirement.

@@ -8,165 +8,54 @@ description: >
 
 # ui-audit
 
-Работай как Senior Product Designer + UI QA Engineer.
-
-Проверяй реальный render.
+Act as Senior Product Designer and UI QA Engineer. Inspect the **actual rendered UI**.
 
 ## Design authority
 
-Перед аудитом определи режим task.
+Determine the task mode first.
 
 ### Ordinary implementation
 
-Current active design system является baseline consistency.
+The active design system is the consistency baseline.
 
-### Explicit redesign/exploration
+### Explicit redesign or exploration
 
-Исторический Design V2/V2.1 не является обязательной эстетикой. Проверяй результат по:
-
-- current task;
-- выбранному owner direction;
-- YFC brand anchors;
-- usability;
-- accessibility;
-- performance;
-- product truth.
-
-Прочитай `../../references/DESIGN_GUARDRAILS.md`.
+Historical Design V2/V2.1 is not a mandatory aesthetic. Judge against the current task, selected owner direction, YFC brand anchors, usability, accessibility, performance and product truth. Read `../../references/DESIGN_GUARDRAILS.md`.
 
 ## Quality dimensions
 
-Проверяй одновременно:
+Assess clarity, hierarchy, composition, typography, spacing, interaction, responsive behavior, accessibility, perceived performance, product consistency, memorability, delight/"wow" and distinct YFC character.
 
-- clarity;
-- hierarchy;
-- composition;
-- typography;
-- spacing;
-- interaction;
-- responsive behavior;
-- accessibility;
-- performance perception;
-- product consistency;
-- memorability;
-- delight / "wow";
-- YFC-specific character.
+An interface can be functional yet fail the quality bar if it feels anonymous and unappealing to use repeatedly.
 
-Интерфейс может быть практичным и всё равно провалить quality bar, если он безликий и не вызывает желания пользоваться им.
+## No automatic style policing
 
-## Нет автоматического style-police
-
-Не считать defect только потому, что присутствуют:
-
-- glow;
-- glass;
-- gradients;
-- 3D;
-- cards;
-- bento;
-- big type;
-- unusual composition;
-- strong motion.
-
-Finding возникает, если решение:
-
-- мешает пониманию;
-- выглядит случайным;
-- плохо исполнено;
-- не связано с YFC;
-- ломает mobile;
-- недоступно;
-- дорого по performance без ценности.
+Glow, glass, gradients, 3D, cards, bento layouts, large typography, unusual compositions and expressive motion are not automatically defects. Report problems only when they obstruct understanding, look accidental, are poorly executed, conflict with YFC, break mobile, harm accessibility or create disproportionate performance cost.
 
 ## Browser states
 
-По scope проверяй:
-
-- populated;
-- empty;
-- loading;
-- error;
-- long content;
-- validation;
-- disabled;
-- modal/sheet/dropdown;
-- hover/focus/active;
-- mobile keyboard;
-- narrow viewport;
-- light/dark;
-- reduced motion.
+When relevant check populated, empty, loading, error, long content, validation, disabled, modal/sheet/dropdown, hover/focus/active, mobile keyboard, narrow viewport, light/dark and reduced-motion states.
 
 ## Mobile
 
-Для client-facing продукта отдельно оцени:
-
-- one-hand flow;
-- content priority;
-- primary action;
-- bottom navigation/sticky layers;
-- keyboard;
-- safe areas;
-- touch;
-- 360/390 representative widths;
-- no horizontal overflow;
-- Mobile Web/TMA parity.
-
-Runtime-specific issue -> `$mobile-engineer`.
+Review one-hand flow, content priority, primary action, bottom navigation/sticky layers, keyboard, safe areas, touch, 360/390 px, horizontal overflow and Mobile Web/TMA parity. Use `$mobile-engineer` for runtime-specific issues.
 
 ## Motion audit
 
-Если motion является заметной частью UX, подключай `$motion-design-engineer`.
-
-Проверяй:
-
-- purpose;
-- responsiveness;
-- spatial continuity;
-- interruption;
-- enter/exit;
-- hierarchy;
-- data truth;
-- repeated-use feel;
-- reduced motion;
-- jank/layout shifts.
-
-Сильный motion не является defect из-за выразительности. Defect - motion, который чувствуется случайным, тормозит или искажает действие.
+When motion matters, load `$motion-design-engineer`. Check purpose, responsiveness, spatial continuity, interruption, enter/exit, hierarchy, data truth, repetition fatigue, reduced motion and jank/layout shifts. Expressiveness is not itself a defect; randomness, delays or distorted actions are.
 
 ## Automated detectors
 
-Если проект использует automated design detector/lint, его findings являются сигналами для проверки, а не абсолютным aesthetic source of truth.
-
-False-positive должен быть отклонён, если решение осознанное и проходит product/design evidence.
+Automated design lint/detectors provide review signals, not absolute aesthetic authority. Reject false positives when a deliberate choice is supported by product/design evidence.
 
 ## Finding format
 
-Для значимого finding укажи:
+Report severity, route/state, viewport, evidence, impact, probable root cause and recommended fix direction. Follow project lifecycle severity rules for backlog audits.
 
-- severity;
-- route/state;
-- viewport;
-- evidence;
-- impact;
-- root cause, если понятен;
-- рекомендуемый direction fix.
+## Final verdict
 
-Используй project lifecycle severity policy, если audit выполняется внутри backlog task.
+Ask whether users understand what to do, UI feels coherent and uniquely YFC, delight works without harming usability, mobile is good, accessibility is adequate and production quality is sufficient.
 
-## Финальный verdict
+## Evidence-based reference
 
-Спроси:
-
-1. Пользователь понимает, что делать?
-2. Интерфейс ощущается цельным?
-3. Он ощущается именно YFC?
-4. Есть ли удовольствие/вау без ущерба usability?
-5. Хорош ли mobile experience?
-6. Доступен ли UI?
-7. Достаточно ли это качественно для production?
-
-## Evidence-based дополнение
-
-Для узкой read-only проверки существующих экранов можно сверяться с
-`../../references/external-quality/ui-skills/improve-ui.md`; это не
-разрешение менять UI, цвета или одобренную композицию. См.
-`../../../docs/development/external-ui-quality-skills.md`.
+For a narrow read-only audit of existing screens, optionally consult `../../references/external-quality/ui-skills/improve-ui.md`; it grants no UI/color/composition change permission. See `../../../docs/development/external-ui-quality-skills.md`.

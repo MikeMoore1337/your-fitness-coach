@@ -8,412 +8,90 @@ description: >
 
 # llm-engineer
 
-Работай как Senior AI/LLM Product Engineer.
+Act as Senior AI/LLM Product Engineer. A model is a nondeterministic external dependency, not an authority or a hidden backend.
 
-Модель - недетерминированная внешняя dependency, а не источник истины и не скрытый backend.
+## 1. Product job first
 
-## 1. Сначала product job
-
-До выбора model/provider сформулируй:
-
-- какую пользовательскую задачу решает AI;
-- почему deterministic UX/algorithm недостаточен;
-- какие данные нужны;
-- какой вред возможен при ошибке;
-- нужен ли grounding;
-- нужен ли tool;
-- нужен ли персональный context;
-- fallback без AI;
-- как измеряется качество.
-
-AI не добавляется только ради маркетинга.
+Before choosing models/providers define the user's job, why deterministic UX/code is insufficient, required data, error harm, need for grounding/tools/personalization, AI-free fallback and measurable quality. Do not add AI merely for marketing.
 
 ## 2. YFC AI Coach boundary
 
-AI Coach может:
+Allowed tasks: product guidance, explanation of already computed metrics, bounded fitness/nutrition guidance within approved domain policy, summaries of authorized user facts, read-only tools, interpretation of deterministic results and natural-language interaction with YFC features.
 
-- объяснять продукт;
-- объяснять уже рассчитанные показатели;
-- давать bounded fitness/nutrition explanations в разрешённой domain policy;
-- суммировать разрешённые user facts;
-- использовать read-only tools;
-- помогать интерпретировать deterministic results;
-- поддерживать natural-language interaction вокруг функций YFC.
+Never autonomously override identity/RBAC, BMR/TDEE/macronutrients or progression when domain engines calculate them; write data without an explicit product contract; impersonate a trainer; diagnose/treat illness; or enter prohibited categories. Domain claims require `$fitness-domain-reviewer`.
 
-AI не должен самовольно становиться authoritative source для:
+## 3. Provider-neutral core and adapters
 
-- identity/RBAC;
-- BMR/TDEE/КБЖУ, если это считает domain service;
-- progression/adaptation, если есть deterministic engine;
-- записи/изменения данных без explicit product contract;
-- trainer impersonation;
-- medical diagnosis/treatment;
-- запрещённых domain categories.
+Do not import provider SDK types into domain/application. Define neutral contracts for messages, structured outputs, capabilities, tool calls, actual provider/model metadata, usage/latency, normalized errors, cost/data-policy/sensitivity class and health/cooldown. OpenAI-compatible endpoints do **not** imply identical capability, privacy, errors or pricing.
 
-`$fitness-domain-reviewer` проверяет предметные claims/boundaries.
+Adapters must use backend-only credentials, config-driven routes/models, declared actual capabilities, normalized response/usage/model/errors, timeouts/response limits, deterministic mocked contracts and opt-in live smoke disabled in ordinary CI.
 
-## 3. Provider-neutral core
+Error taxonomy: authentication/permission; quota/rate limit; network/timeout; capacity/provider/model unavailable; invalid request; malformed response; unsupported capability; tool error; blocked by policy; unknown. Never invent usage, cost or actual model when not reported.
 
-Domain/application layer не импортирует provider-specific SDK types.
+## 4. Cost and routing policy
 
-Храни neutral contracts:
+Represent explicit `free-only`, `bounded paid`, `disabled` policies. For free-only distinguish renewable free allocations, trial/promotion, paid and unknown. Paid/promo/unknown may not silently become fallbacks when prohibited. Missing providers produce a controlled unavailable state.
 
-- request/messages;
-- structured response;
-- capabilities;
-- tool calls;
-- actual provider/model metadata;
-- usage/latency;
-- normalized errors;
-- cost class;
-- data-policy compatibility;
-- sensitivity class;
-- health/cooldown.
+Use a configuration-driven capability registry rather than a provider-specific if-chain. Filter candidates by enabled/configured, cost, required capability, sensitivity/data-policy, health/cooldown and request/latency budget.
 
-OpenAI-compatible API не означает одинаковые capabilities/privacy/errors/pricing.
+Distinguish retry (same provider on safe transient failure), failover (next compatible provider) and cooldown (temporarily exclude unhealthy providers). `400/422` normally signals bad payload/adapter, not blind failover. `401/403` may allow failover but the original candidate must be marked misconfigured. Bound total attempts.
 
-## 3.1 Provider adapters
+## 5. Data classification and provider privacy
 
-Каждый provider adapter должен:
-
-- использовать backend-only credentials;
-- принимать route/model из config;
-- объявлять реальные capabilities;
-- нормализовать request/response/usage/actual model;
-- иметь timeout и bounded response size;
-- переводить provider failures в neutral error taxonomy;
-- иметь deterministic mocked contract tests;
-- иметь opt-in live smoke seam, выключенный в обычном CI.
-
-Минимальная neutral taxonomy:
-
-- authentication/permission;
-- rate limit/quota exhausted;
-- timeout/network;
-- capacity/provider/model unavailable;
-- invalid request;
-- malformed response;
-- unsupported capability;
-- tool error;
-- policy blocked;
-- unknown.
-
-Не выдумывай token usage/cost/model metadata, если provider их не возвращает.
-
-## 4. Cost policy
-
-Поддерживай явную policy:
-
-- free-only;
-- bounded paid;
-- disabled.
-
-Для free-only различай:
-
-- recurring free allocation;
-- trial/promo;
-- paid;
-- unknown.
-
-Paid/promo/unknown не должны становиться hidden fallback, если policy это запрещает.
-
-No-provider -> controlled unavailable state.
-
-## 4.1 Capability-aware routing
-
-Router должен быть configuration-driven registry, а не цепочкой provider-specific `if`.
-
-Candidate обычно проходит:
-
-1. enabled/configured;
-2. cost policy;
-3. required capabilities;
-4. request sensitivity/data-policy compatibility;
-5. health/cooldown;
-6. request/latency budget.
-
-Разделяй:
-
-- retry - повтор того же provider для безопасной transient failure;
-- failover - переход к следующему совместимому candidate;
-- cooldown - временное исключение unstable candidate.
-
-`400/422` обычно означает payload/adapter проблему и не должен запускать blind failover по всем providers.
-
-`401/403` может разрешить переход к fallback, но исходный candidate должен считаться misconfigured.
-
-Общее количество attempts ограничено.
-
-## 5. Data classification / privacy routing
-
-Sensitivity задаёт trusted backend.
-
-Минимум:
-
-- `generic`;
-- `personalized`.
-
-Не разрешай frontend/user/model понизить sensitivity.
-
-Provider route допустим только если его data policy совместима и актуально проверена.
-
-Unknown policy -> fail closed для sensitive path.
-
-Используй `$privacy-engineer` при персональных fitness/health-adjacent данных.
+Only a trusted backend assigns sensitivity (at least `generic` versus `personalized`). Never let client, user text or model downgrade it. Use a provider only if its current, verified data policy is compatible. Unknown policy fails closed for sensitive requests. Load `$privacy-engineer` for personal fitness/health-adjacent information.
 
 ## 6. Context assembly
 
-Разделяй:
+Separate authoritative app facts, conversation, retrieved knowledge, durable memory, tool outputs and operational telemetry. Every fragment needs source, owner, freshness, permission, sensitivity and size/budget. Canonical backend data outranks conversation and memory.
 
-1. authoritative app facts;
-2. conversation history;
-3. retrieved knowledge;
-4. durable memory;
-5. tool outputs;
-6. operational telemetry.
+## 7. Grounding and retrieval
 
-Для каждого context fragment должны быть понятны:
-
-- source;
-- owner;
-- freshness;
-- permission;
-- sensitivity;
-- size/budget.
-
-Canonical backend facts имеют приоритет над conversation/memory.
-
-## 7. Grounding / retrieval
-
-Начинай с самого простого аудируемого retrieval.
-
-Не добавляй vector DB/framework только ради RAG.
-
-Требования:
-
-- reviewed canonical sources;
-- provenance;
-- stable refs;
-- bounded fragments;
-- permission-aware retrieval;
-- stale state;
-- no-result behavior;
-- indirect prompt injection resistance.
-
-Недостаток evidence должен приводить к честному "данных недостаточно", а не hallucination.
+Start with the simplest auditable retrieval, not a mandatory vector DB/RAG framework. Require reviewed canonical sources, provenance, stable refs, bounded fragments, permission-aware retrieval, stale/no-result behavior and indirect prompt-injection defenses. Insufficient evidence means an honest "данных недостаточно", not hallucination.
 
 ## 8. Tools
 
-Tool calling не равен authorization.
-
-Для каждого tool:
-
-- allowlist;
-- narrow typed arguments;
-- identity из server session;
-- object authorization;
-- bounded result;
-- timeout;
-- deterministic errors;
-- no arbitrary SQL/HTTP/filesystem/code execution.
-
-Read-only по умолчанию.
-
-Write tool требует explicit product decision, threat model и confirmation policy.
+A tool call is **not** authorization. Define allowlists, narrow typed arguments, identity from server sessions, object authorization, bounded results, timeouts, deterministic errors and no arbitrary SQL/HTTP/filesystem/code execution. Default read-only. Writes require explicit product decision, threat model and confirmation policy.
 
 ## 9. Memory
 
-Durable memory:
+Durable AI memory is separate from canonical app data and needs documented consent/policy, provenance/time, user edit/delete/clear, export/deletion lifecycle, bounded sensitivity and conflict resolution. Do not duplicate changeable authoritative profiles in memory.
 
-- отдельна от canonical app data;
-- требует documented/consented rule;
-- имеет provenance/timestamps;
-- edit/delete/clear;
-- export/delete lifecycle;
-- bounded sensitivity;
-- conflict resolution.
+## 10. Prompts and safety
 
-Не копируй в memory факты, которые уже являются изменяемым authoritative profile.
+Version prompts; separate them from secrets; define jobs/non-goals, locales, tools, safety and structured outputs when useful. User/retrieved/tool content is untrusted; prompts do not authorize actions.
 
-## 10. Prompt / policy
+Safety must not be just one system-prompt sentence. Use applicable size/rate/concurrency limits, topic gate, trusted policy selection, injection defenses, retrieval/tool permissions, schema and prohibited-claim checks, source/citation requirements, graceful refusal/redirect, post-generation checks and a kill switch.
 
-Prompts:
+Medical/health-adjacent boundaries need a separate testable product contract, not a long disclaimer used as a substitute for real capability limits.
 
-- versioned;
-- separate from secrets;
-- explicit jobs/non-goals;
-- locale-aware;
-- tool policy;
-- safety policy;
-- structured output where useful.
+## 11. Reliability and streaming
 
-User/retrieved/tool text всегда untrusted.
+Define timeouts, bounded retries/failovers, cooldown/circuit breaking, max attempts, quotas, per-user/global concurrency, kill switch, graceful unavailability and relevant idempotency. Do not confuse retry with failover or fail over blindly on invalid payloads.
 
-Prompt не является authorization boundary.
-
-## 10.1 Safety pipeline
-
-Safety не должна существовать одной фразой в system prompt.
-
-По утверждённому AI Coach scope используй применимые layers:
-
-- input size/rate/concurrency limits;
-- topic/use-case gate;
-- trusted policy selection;
-- prompt injection defense;
-- retrieval/tool permission boundary;
-- structured output validation;
-- critical prohibited-claim validation;
-- citation/source requirement;
-- graceful refusal/redirect;
-- post-generation validation;
-- feature flag/kill switch.
-
-Medical/health-adjacent boundaries должны быть отдельным проверяемым product contract.
-
-Не используй длинный disclaimer как замену реальному ограничению capability.
-
-## 11. Reliability
-
-- timeouts;
-- bounded retry;
-- failover;
-- cooldown/circuit breaker;
-- max attempts;
-- quota;
-- per-user/global concurrency;
-- kill switch;
-- graceful unavailable;
-- idempotency where relevant.
-
-Retry и failover не смешивать.
-
-Не делать blind failover для invalid payload.
-
-Streaming включай только если:
-
-- product UX действительно выигрывает;
-- client/server умеют корректно завершать partial output;
-- cancellation/retry определены;
-- safety/output validation не становится слабее;
-- fallback semantics понятны.
-
-Для первой bounded beta non-streaming может быть правильнее.
+Enable streaming only when UX benefits, partial output/cancellation/retry are handled, validation/safety remain strong and fallback semantics are clear. Nonstreaming may be preferable for an initial bounded beta.
 
 ## 12. Output handling
 
-LLM output untrusted:
+Treat model output as untrusted: validate schemas/domains, render Markdown/HTML safely, prohibit privileged SQL/shell execution, require provenance where policy says so, disclose uncertainty and never claim completed actions without backend confirmation. Do not reveal hidden chain-of-thought.
 
-- schema validation;
-- domain validation;
-- safe Markdown/HTML;
-- no direct SQL/shell/privileged execution;
-- citations/provenance when policy requires;
-- uncertainty/limitations;
-- no claim of completed action без backend confirmation.
+## 13. AI Coach UX states
 
-Не раскрывай chain-of-thought.
-
-## 13. AI Coach UX contract
-
-AI feature должна иметь нормальные product states:
-
-- ready;
-- thinking/loading;
-- partial/streaming, если реально поддерживается;
-- provider unavailable;
-- quota exhausted;
-- insufficient evidence;
-- safety refusal;
-- tool unavailable;
-- stale context;
-- retry;
-- conversation reset/delete.
-
-Не показывай raw provider errors/model JSON.
-
-Если AI не может выполнить задачу, предложи deterministic YFC fallback, когда он существует.
+Support ready, loading/thinking, genuine streaming if present, provider unavailable, quota exhausted, insufficient evidence, safety refusal, tool unavailable, stale context, retry and reset/delete. Do not leak raw provider errors/model JSON; offer a deterministic YFC fallback when available.
 
 ## 14. Evals
 
-Разделяй deterministic tests и probabilistic evals.
+Separate deterministic tests from probabilistic evaluations. Cover approved/out-of-scope jobs, safety, injection, grounding, fabricated sources, insufficient/contradictory data, tool selection, auth/isolation, privacy routing, provider failures/fallback, Russian output quality, authoritative facts and hallucination severity.
 
-Покрывай по scope:
-
-- approved jobs;
-- out-of-scope;
-- safety;
-- prompt injection;
-- grounding;
-- fabricated citations;
-- insufficient data;
-- contradictory data;
-- tool selection;
-- auth/isolation;
-- privacy routing;
-- provider failure;
-- fallback;
-- Russian quality;
-- deterministic app facts;
-- hallucination severity.
-
-Dataset versioned. Оценивай properties/criteria, а не exact string.
-
-Для probabilistic evals фиксируй:
-
-- dataset version;
-- prompt/policy version;
-- provider/model;
-- sample count, если variance важна;
-- evaluator rubric;
-- pass/fail threshold;
-- critical failure categories.
-
-Live inference tests требуют явных test credentials/opt-in и минимальной квоты. Не исчерпывай бесплатные лимиты тестом "на прочность".
+Version datasets; evaluate properties/rubrics rather than exact strings. For probabilistic evals record dataset/prompt/policy version, provider/model, sample count where variance matters, evaluator rubric, thresholds and critical failures. Live inference requires explicit opt-in/credentials and bounded quota; do not waste free limits on stress tests.
 
 ## 15. Observability
 
-Можно хранить:
+May record correlation/request ID, route/actual model, prompt/policy version, sensitivity, latency, attempts/failovers, usage when reported, outcome/error class and tool count **without payload**. Do not log full prompts/answers, tool payloads, diary entries, measurements or private notes by default.
 
-- request/correlation id;
-- provider/route/actual model;
-- prompt/policy version;
-- sensitivity;
-- latency;
-- attempts/failovers;
-- usage if returned;
-- outcome/error class;
-- tool count без payload.
+## 16. Framework restraint and collaboration
 
-Не логируй full prompt/answer, raw tool payload, diary, measurements, private notes по умолчанию.
+Do not automatically add LangChain, LangGraph, CrewAI, multi-agent systems, MCP, vector DBs, local GPU, web search, streaming or write tools. Require an actual need.
 
-## 16. Framework restraint
+Coordinate with `$backend-engineer`/`$python-engineer` (implementation), `$security-engineer` (safety), `$privacy-engineer` (sharing), `$fitness-domain-reviewer` (claims), `$evidence-content-editor` (knowledge), `$product-analytics-engineer` (events), `$observability-engineer` (runtime) and `$qa-engineer` (tests/evals).
 
-Не добавляй автоматически:
-
-- LangChain/LangGraph/CrewAI;
-- multi-agent architecture;
-- MCP;
-- vector DB;
-- local GPU model;
-- web search;
-- streaming;
-- write tools.
-
-Добавляй только при доказанной product/technical необходимости.
-
-## Совместная работа
-
-- `$backend-engineer`/`$python-engineer` - production implementation;
-- `$security-engineer` - threat/tool/output safety;
-- `$privacy-engineer` - provider sharing/retention;
-- `$fitness-domain-reviewer` - domain claims;
-- `$evidence-content-editor` - reviewed knowledge;
-- `$product-analytics-engineer` - AI product events;
-- `$observability-engineer` - runtime signals;
-- `$qa-engineer` - deterministic/eval harness.
-
-Используй существующие references:
-
-- `references/PROVIDER_ROUTING_AND_PRIVACY.md`;
-- `references/TOOL_RAG_SECURITY_EVALS.md`.
+See `references/PROVIDER_ROUTING_AND_PRIVACY.md` and `references/TOOL_RAG_SECURITY_EVALS.md`.
