@@ -337,10 +337,10 @@ export function HydrationTracker({
     scope: string;
     generation: number;
   } | null>(null);
-  const demoStorageReady =
-    !demoToken ||
-    (readyDemoStore?.scope === scope &&
-      readyDemoStore.generation === demoGeneration);
+  const matchesDemoScope = Boolean(readyDemoStore && readyDemoStore.scope === scope);
+  const matchesDemoGeneration = readyDemoStore?.generation === demoGeneration;
+  const demoStoreReady = matchesDemoScope && matchesDemoGeneration;
+  const demoStorageReady = !demoToken || demoStoreReady;
   useLayoutEffect(() => {
     observedDemoGenerationRef.current = demoGeneration;
   }, [demoToken, demoGeneration]);
@@ -529,6 +529,7 @@ export function HydrationTracker({
       setPreparingAdd(false);
     },
   });
+  const addUnavailable = preparingAdd || add.isPending || !demoStorageReady;
   const submitAdd = async (payload: Pick<AddRequest, 'volume' | 'kind' | 'source'>) => {
     if (
       addInFlightRef.current ||
@@ -777,7 +778,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
-            disabled={preparingAdd || add.isPending || !scope || !demoStorageReady}
+            disabled={addUnavailable || !scope}
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
@@ -813,7 +814,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             type="button"
-            disabled={preparingAdd || add.isPending || !demoStorageReady}
+            disabled={addUnavailable}
             onClick={() => void submitAdd(pending)}
           >
             Повторить без дубля
@@ -848,13 +849,7 @@ export function HydrationTracker({
             </Select>
           </Field>
           <Button
-            disabled={
-              preparingAdd ||
-              add.isPending ||
-              !scope ||
-              !demoStorageReady ||
-              !customVolume
-            }
+            disabled={addUnavailable || !scope || !customVolume}
             type="button"
             onClick={() =>
               void submitAdd({
