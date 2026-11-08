@@ -4262,8 +4262,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Reject Legacy Hydration Entry
+         * @deprecated
+         */
+        post: operations["reject_legacy_hydration_entry_api_v1_nutrition_hydration_entries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/hydration/entries/v2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /** Add Hydration Entry */
-        post: operations["add_hydration_entry_api_v1_nutrition_hydration_entries_post"];
+        post: operations["add_hydration_entry_api_v1_nutrition_hydration_entries_v2_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -30938,7 +30958,27 @@ export interface operations {
             };
         };
     };
-    add_hydration_entry_api_v1_nutrition_hydration_entries_post: {
+    reject_legacy_hydration_entry_api_v1_nutrition_hydration_entries_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    add_hydration_entry_api_v1_nutrition_hydration_entries_v2_post: {
         parameters: {
             query?: never;
             header: {
