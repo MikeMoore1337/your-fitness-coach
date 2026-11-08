@@ -637,7 +637,7 @@ def _hydration_day(session: _DemoSession, diary_date: str | None = None) -> dict
         "presets": presets,
         "last_logged_at": last_logged_at or now,
         "reminder_suppression_key": None,
-        "action_url": "/api/v1/nutrition/hydration/entries",
+        "action_url": "/api/v1/nutrition/hydration/entries/v2",
         "original_estimated_minutes": 0,
         "adapted_estimated_minutes": 0,
         "time_budget_minutes": None,
@@ -2430,6 +2430,8 @@ def handle_demo_transport(
                 str(payload.get("meal_type") or "breakfast"),
             )
         if path == "/api/v1/nutrition/hydration/entries":
+            raise DemoTransitionError
+        if path == "/api/v1/nutrition/hydration/entries/v2":
             return _add_hydration_entry(session, _request_body(body))
         if path == "/api/v1/nutrition/hydration/goal":
             return _hydration_goal(session, _request_body(body))
