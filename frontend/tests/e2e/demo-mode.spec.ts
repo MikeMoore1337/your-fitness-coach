@@ -509,7 +509,7 @@ function hydrationDay(snapshot: DemoSessionSnapshot) {
     ],
     last_logged_at: '2026-09-15T09:00:00Z',
     reminder_suppression_key: null,
-    action_url: '/api/v1/nutrition/hydration/entries',
+    action_url: '/api/v1/nutrition/hydration/entries/v2',
     original_estimated_minutes: 0,
     adapted_estimated_minutes: 0,
     time_budget_minutes: null,
@@ -1054,7 +1054,7 @@ function transport(snapshot: DemoSessionSnapshot, path: string, method: string, 
     if (!breakfast?.entries[0]) throw new Error('Demo nutrition fixture did not create an entry');
     return breakfast.entries[0];
   }
-  if (path === '/api/v1/nutrition/hydration/entries' && method === 'POST') {
+  if (path === '/api/v1/nutrition/hydration/entries/v2' && method === 'POST') {
     const values = (body ?? {}) as { volume_ml?: number; beverage_type?: string };
     const entry = {
       id: 90200,
@@ -1327,7 +1327,7 @@ test('demo water retry survives reload without copying the demo token to shared 
         },
       });
     }
-    if (payload.path === '/api/v1/nutrition/hydration/entries' && payload.method === 'POST') {
+    if (payload.path === '/api/v1/nutrition/hydration/entries/v2' && payload.method === 'POST') {
       const key = payload.body._hydration_retry_key;
       if (typeof key !== 'string') throw new Error('Missing demo retry key');
       expect(payload.body._hydration_generation).toBe(0);
@@ -1400,7 +1400,7 @@ test('tabs sharing a demo session retry the same water entry', async ({ page, co
           },
         });
       }
-      if (payload.path === '/api/v1/nutrition/hydration/entries' && payload.method === 'POST') {
+      if (payload.path === '/api/v1/nutrition/hydration/entries/v2' && payload.method === 'POST') {
         const key = payload.body._hydration_retry_key;
         if (typeof key !== 'string') throw new Error('Missing demo retry key');
         keys.push(key);
