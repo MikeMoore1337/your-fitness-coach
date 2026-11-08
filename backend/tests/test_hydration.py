@@ -99,12 +99,8 @@ def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(cl
     assert "Обновите приложение" in old.json()["detail"]
 
     new_headers = {**headers, "Idempotency-Key": "new-water-0001"}
-    first = client.post(
-        "/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload
-    )
-    replay = client.post(
-        "/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload
-    )
+    first = client.post("/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload)
+    replay = client.post("/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload)
     assert first.status_code == replay.status_code == 201
     assert first.json()["id"] == replay.json()["id"]
 
@@ -135,9 +131,7 @@ def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(cl
     assert second.status_code == 201
     assert second.json()["id"] != first.json()["id"]
 
-    day = client.get(
-        "/api/v1/nutrition/hydration", headers=headers, params={"diary_date": date}
-    )
+    day = client.get("/api/v1/nutrition/hydration", headers=headers, params={"diary_date": date})
     assert day.status_code == 200
     assert len(day.json()["entries"]) == 2
     assert day.json()["total_ml"] == 500
