@@ -403,7 +403,7 @@ def test_demo_transport_exposes_owned_fixture_history_and_denies_unknown_exercis
 
 def test_demo_hydration_rejects_delayed_request_after_reset(client) -> None:
     token, _ = _create_session(client, "nutrition")
-    path = "/api/v1/nutrition/hydration/entries"
+    path = "/api/v1/nutrition/hydration/entries/v2"
     day = _transport(client, token, "/api/v1/nutrition/hydration").json()
     generation = day["demo_generation"]
     body = {
@@ -413,6 +413,11 @@ def test_demo_hydration_rejects_delayed_request_after_reset(client) -> None:
         "_hydration_retry_key": "before-reset",
         "_hydration_generation": generation,
     }
+    # An old tab still using the legacy transport path must be denied.
+    assert (
+        _transport(client, token, "/api/v1/nutrition/hydration/entries", "POST", body).status_code
+        == 409
+    )
     assert _transport(client, token, path, "POST", body).status_code == 200
     assert (
         client.post(
@@ -448,7 +453,7 @@ def test_demo_hydration_rejects_delayed_request_after_reset(client) -> None:
 def test_demo_hydration_retry_reuses_entry_and_rejects_key_conflicts(client) -> None:
     token, _ = _create_session(client, "nutrition")
     other_token, _ = _create_session(client, "nutrition")
-    path = "/api/v1/nutrition/hydration/entries"
+    path = "/api/v1/nutrition/hydration/entries/v2"
     body = {
         "volume_ml": 250,
         "beverage_type": "water",
@@ -479,7 +484,7 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
     added_water = _transport(
         client,
         nutrition_token,
-        "/api/v1/nutrition/hydration/entries",
+        "/api/v1/nutrition/hydration/entries/v2",
         "POST",
         {"volume_ml": 350, "beverage_type": "water", "source": "quick_preset"},
     )

@@ -8,6 +8,7 @@ from fastapi import (
     Header,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
     status,
@@ -554,15 +555,39 @@ def hydration_day(
 
 @router.post(
     "/hydration/entries",
+    status_code=status.HTTP_409_CONFLICT,
+    deprecated=True,
+)
+def reject_legacy_hydration_entry(
+    current_user: User = Depends(require_user),
+) -> None:
+    # The old browser cannot coordinate retries with a new tab. Never accept
+    # the legacy URL after the v2 backend becomes available.
+    raise HTTPException(
+        status_code=409,
+        detail="Обновите приложение для безопасной записи воды.",
+    )
+
+
+@router.post(
+    "/hydration/entries/v2",
     response_model=HydrationEntryResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def add_hydration_entry(
+    request: Request,
     payload: HydrationEntryCreate,
     idempotency_key: IdempotencyKey,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # This route does not exist on the previous backend. If the frontend is
+    # deployed first, the old backend fails closed rather than double-writing.
+    if request.headers.get("X-YFC-Hydration-Protocol") != "2":
+        raise HTTPException(
+            status_code=409,
+            detail="Обновите приложение для безопасной записи воды.",
+        )
     try:
         return create_hydration_entry(db, current_user, payload, idempotency_key)
     except HydrationError as exc:

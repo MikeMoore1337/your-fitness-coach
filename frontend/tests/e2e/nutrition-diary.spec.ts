@@ -549,7 +549,7 @@ async function mockNutritionApi(
         },
       });
     }
-    if (path === '/api/v1/nutrition/hydration/entries' && request.method() === 'POST') {
+    if (path === '/api/v1/nutrition/hydration/entries/v2' && request.method() === 'POST') {
       const body = request.postDataJSON() as {
         volume_ml: number;
         beverage_type: HydrationEntry['beverage_type'];
