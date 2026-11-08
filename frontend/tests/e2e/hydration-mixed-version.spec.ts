@@ -17,10 +17,12 @@ test('real legacy and v2 tabs cannot double-write, but distinct v2 drinks persis
   const date = '2026-10-10';
   const oldPage = await context.newPage();
   let legacyJavascriptLoaded = 0;
-  await oldPage.route((url) => url.pathname === '/app', async (route) => {
+  const matchesOldDocument = (url: URL) => url.pathname === '/app';
+  const matchesOldAsset = (url: URL) => url.pathname.startsWith('/assets/');
+  await oldPage.route(matchesOldDocument, async (route) => {
     await route.fulfill({ path: join(oldDist, 'index.html'), contentType: 'text/html' });
   });
-  await oldPage.route((url) => url.pathname.startsWith('/assets/'), async (route) => {
+  await oldPage.route(matchesOldAsset, async (route) => {
     const asset = new URL(route.request().url()).pathname.slice('/assets/'.length);
     if (!/^[a-zA-Z0-9._-]+$/.test(asset)) return route.abort();
     const oldAsset = join(oldDist, 'assets', asset);
