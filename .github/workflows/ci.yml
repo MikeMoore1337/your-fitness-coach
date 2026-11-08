@@ -314,6 +314,9 @@ jobs:
           ln -s "$GITHUB_WORKSPACE/frontend/node_modules" "$LEGACY_FRONTEND/node_modules"
           (cd "$LEGACY_FRONTEND" && "$GITHUB_WORKSPACE/frontend/node_modules/.bin/vite" build)
           test -f "$LEGACY_FRONTEND/dist/index.html"
+          # Browser preload/fetch requests can bypass Playwright's page route.
+          # Serve both hashed asset graphs from the same real preview origin.
+          cp -an "$LEGACY_FRONTEND/dist/assets/." "$GITHUB_WORKSPACE/frontend/dist/assets/"
       - name: Verify baked Playwright Chromium
         working-directory: frontend
         run: |
