@@ -46,10 +46,10 @@ def test_hydration_quick_add_is_idempotent_and_isolated(client) -> None:
     }
 
     first = client.post(
-        "/api/v1/nutrition/hydration/entries", headers=request_headers, json=payload
+        "/api/v1/nutrition/hydration/entries/v2", headers=request_headers, json=payload
     )
     replay = client.post(
-        "/api/v1/nutrition/hydration/entries", headers=request_headers, json=payload
+        "/api/v1/nutrition/hydration/entries/v2", headers=request_headers, json=payload
     )
     assert first.status_code == replay.status_code == 201
     assert first.json()["id"] == replay.json()["id"]
@@ -99,8 +99,8 @@ def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(cl
     assert "Обновите приложение" in old.json()["detail"]
 
     new_headers = {**headers, "Idempotency-Key": "new-water-0001"}
-    first = client.post("/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload)
-    replay = client.post("/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload)
+    first = client.post("/api/v1/nutrition/hydration/entries/v2", headers=new_headers, json=payload)
+    replay = client.post("/api/v1/nutrition/hydration/entries/v2", headers=new_headers, json=payload)
     assert first.status_code == replay.status_code == 201
     assert first.json()["id"] == replay.json()["id"]
 
@@ -124,7 +124,7 @@ def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(cl
 
     # Never collapse two explicit new intentions just because volume and time match.
     second = client.post(
-        "/api/v1/nutrition/hydration/entries",
+        "/api/v1/nutrition/hydration/entries/v2",
         headers={**headers, "Idempotency-Key": "new-water-0002"},
         json=payload,
     )
@@ -145,7 +145,7 @@ def test_concurrent_hydration_entry_retries_create_one_record(client) -> None:
     def save(_index: int):
         start.wait(timeout=5)
         return client.post(
-            "/api/v1/nutrition/hydration/entries",
+            "/api/v1/nutrition/hydration/entries/v2",
             headers=headers,
             json={"volume_ml": 250, "beverage_type": "water", "source": "quick_preset"},
         )
@@ -193,7 +193,7 @@ def test_concurrent_hydration_preset_upserts_keep_one_label(client) -> None:
 def test_hydration_entry_can_be_edited_backdated_and_deleted(client) -> None:
     headers = _auth(client, 81_003)
     created = client.post(
-        "/api/v1/nutrition/hydration/entries",
+        "/api/v1/nutrition/hydration/entries/v2",
         headers={**headers, "Idempotency-Key": "hydration-entry-0002"},
         json={"volume_ml": 250, "beverage_type": "water", "source": "manual"},
     )
@@ -278,19 +278,19 @@ def test_hydration_validates_future_and_idempotency_conflict(client) -> None:
     headers = _auth(client, 81_005)
     request_headers = {**headers, "Idempotency-Key": "hydration-entry-0003"}
     first = client.post(
-        "/api/v1/nutrition/hydration/entries",
+        "/api/v1/nutrition/hydration/entries/v2",
         headers=request_headers,
         json={"volume_ml": 250, "beverage_type": "water", "source": "manual"},
     )
     assert first.status_code == 201
     conflict = client.post(
-        "/api/v1/nutrition/hydration/entries",
+        "/api/v1/nutrition/hydration/entries/v2",
         headers=request_headers,
         json={"volume_ml": 500, "beverage_type": "water", "source": "manual"},
     )
     assert conflict.status_code == 409
     future = client.post(
-        "/api/v1/nutrition/hydration/entries",
+        "/api/v1/nutrition/hydration/entries/v2",
         headers={**headers, "Idempotency-Key": "hydration-entry-0004"},
         json={
             "volume_ml": 250,
@@ -387,7 +387,7 @@ def test_hydration_is_in_nutrition_report_without_invented_zero_days(client) -> 
     )
     assert (
         client.post(
-            "/api/v1/nutrition/hydration/entries",
+            "/api/v1/nutrition/hydration/entries/v2",
             headers={**headers, "Idempotency-Key": "hydration-entry-report"},
             json={"volume_ml": 750, "beverage_type": "water", "source": "manual"},
         ).status_code
@@ -418,7 +418,7 @@ def test_hydration_is_exported_and_removed_with_account(client) -> None:
     )
     assert (
         client.post(
-            "/api/v1/nutrition/hydration/entries",
+            "/api/v1/nutrition/hydration/entries/v2",
             headers={**headers, "Idempotency-Key": "hydration-entry-export"},
             json={"volume_ml": 420, "beverage_type": "tea", "source": "manual"},
         ).status_code
