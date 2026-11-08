@@ -29,6 +29,7 @@ RUN apt-get update \
         tesseract-ocr \
         tesseract-ocr-eng \
         tesseract-ocr-rus \
+        zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge "1.1.0-2+deb13u1" \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libexpat1)" ge "2.9.0-1~deb13u1" \
     && rm -rf /var/lib/apt/lists/*
