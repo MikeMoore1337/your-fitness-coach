@@ -357,7 +357,7 @@ export function HydrationTracker({
     if (!scope || !demoToken || typeof demoGeneration !== 'number' || !Number.isSafeInteger(demoGeneration)) return;
     const generation = demoGeneration;
     let active = true;
-    setReadyDemoStore(null);
+    // Readiness is keyed by scope and generation; an old key is never reusable.
     void withPendingHydration(scope, (store) => {
       if (store.demoGeneration !== undefined && (demoGeneration ?? -1) < store.demoGeneration)
         return;

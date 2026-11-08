@@ -523,7 +523,10 @@ describe('HydrationTracker', () => {
     expect(JSON.stringify(localStorage)).not.toContain('synthetic-session');
     first.unmount();
     render(demo);
-    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    const retry = await screen.findByRole('button', { name: 'Повторить без дубля' });
+    // The new demo context must persist its IndexedDB generation fence first.
+    await waitFor(() => expect(retry).toBeEnabled());
+    fireEvent.click(retry);
     await screen.findByText('Добавлено 250 мл');
     expect(requests).toHaveLength(2);
     expect(requests[1]).toEqual(requests[0]);
