@@ -339,7 +339,8 @@ export function HydrationTracker({
   } | null>(null);
   const demoStorageReady =
     !demoToken ||
-    (readyDemoStore?.scope === scope && readyDemoStore.generation === demoGeneration);
+    (readyDemoStore?.scope === scope &&
+      readyDemoStore.generation === demoGeneration);
   useLayoutEffect(() => {
     observedDemoGenerationRef.current = demoGeneration;
   }, [demoToken, demoGeneration]);
@@ -439,7 +440,10 @@ export function HydrationTracker({
     }) =>
       api<HydrationEntry>('/api/v1/nutrition/hydration/entries/v2', {
         method: 'POST',
-        headers: { 'Idempotency-Key': request.key, 'X-YFC-Hydration-Protocol': '2' },
+        headers: {
+          'Idempotency-Key': request.key,
+          'X-YFC-Hydration-Protocol': '2',
+        },
         body: {
           volume_ml: request.volume,
           beverage_type: request.kind,
@@ -844,7 +848,13 @@ export function HydrationTracker({
             </Select>
           </Field>
           <Button
-            disabled={preparingAdd || add.isPending || !scope || !demoStorageReady || !customVolume}
+            disabled={
+              preparingAdd ||
+              add.isPending ||
+              !scope ||
+              !demoStorageReady ||
+              !customVolume
+            }
             type="button"
             onClick={() =>
               void submitAdd({
