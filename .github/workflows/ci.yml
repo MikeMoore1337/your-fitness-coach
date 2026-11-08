@@ -297,6 +297,23 @@ jobs:
       - name: Build frontend for smoke tests
         working-directory: frontend
         run: npx vite build
+      # Exercise the actual pre-change JS and the v2 bundle on one origin.
+      # Use an immutable PR base SHA rather than a moving dev ref.
+      - name: Checkout pre-change hydration frontend
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 1459
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .artifacts/runtime/tests/legacy-hydration-source
+          persist-credentials: false
+      - name: Build pre-change hydration frontend
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 1459
+        env:
+          LEGACY_FRONTEND: ${{ github.workspace }}/.artifacts/runtime/tests/legacy-hydration-source/frontend
+        run: |
+          ln -s "$GITHUB_WORKSPACE/frontend/node_modules" "$LEGACY_FRONTEND/node_modules"
+          (cd "$LEGACY_FRONTEND" && "$GITHUB_WORKSPACE/frontend/node_modules/.bin/vite" build)
+          test -f "$LEGACY_FRONTEND/dist/index.html"
       - name: Verify baked Playwright Chromium
         working-directory: frontend
         run: |
@@ -304,6 +321,8 @@ jobs:
           npx playwright --version
           test -d /ms-playwright
       - name: Run shared frontend E2E group
+        env:
+          YFC_LEGACY_HYDRATION_DIST: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1459 && format('{0}/.artifacts/runtime/tests/legacy-hydration-source/frontend/dist', github.workspace) || '' }}
         run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/5"
       - name: Upload Playwright traces on failure
         if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
