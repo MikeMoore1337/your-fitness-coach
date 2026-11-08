@@ -354,7 +354,8 @@ export function HydrationTracker({
     lastDemoGenerationRef.current = demoGeneration;
   }, [demoToken, demoGeneration]);
   useEffect(() => {
-    if (!scope || !demoToken || !Number.isSafeInteger(demoGeneration)) return;
+    if (!scope || !demoToken || typeof demoGeneration !== 'number' || !Number.isSafeInteger(demoGeneration)) return;
+    const generation = demoGeneration;
     let active = true;
     setReadyDemoStore(null);
     void withPendingHydration(scope, (store) => {
@@ -375,7 +376,7 @@ export function HydrationTracker({
     })
       .then(() => {
         // Do not enable quick add until the generation fence commits in IDB.
-        if (active) setReadyDemoStore({ scope, generation: demoGeneration });
+        if (active) setReadyDemoStore({ scope, generation });
       })
       .catch(() => undefined);
     return () => {
