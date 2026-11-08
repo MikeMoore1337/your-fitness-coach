@@ -364,7 +364,7 @@ describe('HydrationTracker', () => {
     // The request and the pending-state update are async IndexedDB operations.
     // Assert the failed POST first so a missing retry button cannot hide a dropped click.
     await waitFor(() => expect(posts).toBe(1), { timeout: 5_000 });
-    await screen.findByRole('button', { name: 'Повторить без дубля' }, {}, { timeout: 5_000 });
+    await screen.findByRole('button', { name: 'Повторить без дубля' }, { timeout: 5_000 });
     const bottle = screen.getByRole('button', { name: /Бутылка.*500 мл/ });
     await waitFor(() => expect(bottle).toBeEnabled());
     fireEvent.click(bottle);
