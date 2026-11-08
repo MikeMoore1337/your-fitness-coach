@@ -389,6 +389,7 @@ export function HydrationTracker({
       !initialExpanded ||
       !scope ||
       !hydration.data ||
+      !demoStorageReady ||
       !quickAddRef.current ||
       url.searchParams.get('hydration') !== 'quick'
     ) {
@@ -405,7 +406,7 @@ export function HydrationTracker({
       `${url.pathname}${url.search}${url.hash}`,
     );
     window.dispatchEvent(new PopStateEvent('popstate'));
-  }, [initialExpanded, hydration.data, scope]);
+  }, [initialExpanded, hydration.data, scope, demoStorageReady]);
   const loadedGoal = hydration.data?.goal;
   const loadedGoalIsReference = loadedGoal?.source === 'national_academies_beverages';
   const goalMode = goalModeDraft ?? (loadedGoal && !loadedGoalIsReference ? 'manual' : 'reference');
