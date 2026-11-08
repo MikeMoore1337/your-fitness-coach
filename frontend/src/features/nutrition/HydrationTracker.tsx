@@ -354,7 +354,13 @@ export function HydrationTracker({
     lastDemoGenerationRef.current = demoGeneration;
   }, [demoToken, demoGeneration]);
   useEffect(() => {
-    if (!scope || !demoToken || typeof demoGeneration !== 'number' || !Number.isSafeInteger(demoGeneration)) return;
+    if (
+      !scope ||
+      !demoToken ||
+      typeof demoGeneration !== 'number' ||
+      !Number.isSafeInteger(demoGeneration)
+    )
+      return;
     const generation = demoGeneration;
     let active = true;
     // Readiness is keyed by scope and generation; an old key is never reusable.
