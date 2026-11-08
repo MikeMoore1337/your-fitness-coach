@@ -4777,6 +4777,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/plans/suggestions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Nutrition Plan Fill */
+        post: operations["preview_nutrition_plan_fill_api_v1_nutrition_plans_suggestions_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/plans/fill": {
         parameters: {
             query?: never;
@@ -4891,6 +4908,23 @@ export interface paths {
         get: operations["get_diary_suggestions_api_v1_nutrition_diary_suggestions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/suggestions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Diary Suggestion */
+        post: operations["preview_diary_suggestion_api_v1_nutrition_diary_suggestions_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14629,6 +14663,26 @@ export interface components {
              */
             amount_unit: "g" | "ml" | "serving";
         };
+        /** NutritionPlanFillPreviewRequest */
+        NutritionPlanFillPreviewRequest: {
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Candidate Id */
+            candidate_id: string;
+            /** Items */
+            items: components["schemas"]["NutritionPlanFillItem"][];
+            /** Expected Revision */
+            expected_revision: number;
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+        };
         /** NutritionPlanFillRequest */
         NutritionPlanFillRequest: {
             /**
@@ -14647,6 +14701,12 @@ export interface components {
             items: components["schemas"]["NutritionPlanFillItem"][];
             /** Expected Revision */
             expected_revision: number;
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+            /**
+             * Preview Token
+             * @description Нужен для нового заполнения; без него разрешён только повтор прежней операции.
+             */
+            preview_token?: string | null;
         };
         /** NutritionPlanItemActionRequest */
         NutritionPlanItemActionRequest: {
@@ -15358,6 +15418,27 @@ export interface components {
             meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
             /** Items */
             items: components["schemas"]["FoodDiaryBatchItem"][];
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+            /**
+             * Preview Token
+             * @description Нужен для новой записи; без него разрешён только повтор прежней операции.
+             */
+            preview_token?: string | null;
+        };
+        /** NutritionSuggestionConstraints */
+        NutritionSuggestionConstraints: {
+            /** Max Energy Kcal */
+            max_energy_kcal?: number | string | null;
+            /** Max Protein G */
+            max_protein_g?: number | string | null;
+            /** Max Fat G */
+            max_fat_g?: number | string | null;
+            /** Max Carbs G */
+            max_carbs_g?: number | string | null;
+            /** Excluded Food Ids */
+            excluded_food_ids?: number[];
+            /** Preferred Food Ids */
+            preferred_food_ids?: number[];
         };
         /** NutritionSuggestionItem */
         NutritionSuggestionItem: {
@@ -15390,6 +15471,76 @@ export interface components {
              */
             nutrition_confidence: "exact" | "approximate" | "partial";
         };
+        /** NutritionSuggestionPreviewRequest */
+        NutritionSuggestionPreviewRequest: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["FoodDiaryBatchItem"][];
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+        };
+        /** NutritionSuggestionPreviewResponse */
+        NutritionSuggestionPreviewResponse: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["NutritionSuggestionItem"][];
+            before: components["schemas"]["FoodDiaryNutrition"];
+            addition: components["schemas"]["FoodDiaryNutrition"];
+            after: components["schemas"]["FoodDiaryNutrition"];
+            diary: components["schemas"]["FoodDiaryNutrition"];
+            planned: components["schemas"]["FoodDiaryNutrition"] | null;
+            projected_after: components["schemas"]["FoodDiaryNutrition"] | null;
+            targets: components["schemas"]["FoodDiaryTargets"] | null;
+            remaining_after: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Target Id */
+            target_id: number | null;
+            /** Target Source */
+            target_source: string | null;
+            /** Target Effective From */
+            target_effective_from: string | null;
+            /** Target Weight Kg */
+            target_weight_kg: string | null;
+            /** Target Goal */
+            target_goal: string | null;
+            /**
+             * Target Estimated Bmr Kcal
+             * @description Расчётный BMR сохранённой цели.
+             */
+            target_estimated_bmr_kcal: number | null;
+            /**
+             * Target Estimated Tdee Kcal
+             * @description Расчётный TDEE сохранённой цели.
+             */
+            target_estimated_tdee_kcal: number | null;
+            /**
+             * Constraint Status
+             * @enum {string}
+             */
+            constraint_status: "not_set" | "satisfied" | "violated" | "unknown";
+            /** Constraint Messages */
+            constraint_messages: string[];
+            /** Preference Message */
+            preference_message: string | null;
+            /** Preview Token */
+            preview_token: string;
+        };
         /** NutritionSuggestionsResponse */
         NutritionSuggestionsResponse: {
             /**
@@ -15407,6 +15558,16 @@ export interface components {
             remaining: components["schemas"]["FoodDiaryTargets"] | null;
             /** Remaining Confidence */
             remaining_confidence: ("exact" | "approximate" | "partial") | null;
+            /**
+             * Remaining Includes Plan
+             * @default false
+             */
+            remaining_includes_plan: boolean;
+            /**
+             * Not Calculable
+             * @default false
+             */
+            not_calculable: boolean;
             /** Limitations */
             limitations?: string[];
             /** Candidates */
@@ -32159,6 +32320,53 @@ export interface operations {
             };
         };
     };
+    preview_nutrition_plan_fill_api_v1_nutrition_plans_suggestions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanFillPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionPreviewResponse"];
+                };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale plan or day */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fill_nutrition_plan_api_v1_nutrition_plans_fill_post: {
         parameters: {
             query?: never;
@@ -32182,6 +32390,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NutritionPlanDayResponse"];
                 };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview or request conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -32435,6 +32657,53 @@ export interface operations {
             };
         };
     };
+    preview_diary_suggestion_api_v1_nutrition_diary_suggestions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionSuggestionPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionPreviewResponse"];
+                };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Day is not editable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     commit_diary_suggestion_api_v1_nutrition_diary_suggestions_commit_post: {
         parameters: {
             query?: never;
@@ -32458,6 +32727,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FoodDiaryBatchResponse"];
                 };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview or request conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

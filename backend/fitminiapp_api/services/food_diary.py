@@ -21,6 +21,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryEntry,
     FoodDiaryRepeatPreview,
 )
+from fitminiapp_api.models.nutrition import NutritionTargetDaySnapshot
 from fitminiapp_api.models.nutrition_plan import NutritionPlanItem
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.user import User
@@ -111,6 +112,16 @@ def _ensure_day_accepts_entries(db: Session, user: User, diary_date: date) -> No
         raise FoodDiaryConflictError(
             "day is marked as fasted; change completeness before adding food"
         )
+
+
+def ensure_suggestion_day_is_mutable(db: Session, user: User, diary_date: date) -> None:
+    if diary_date < today_for_user(user):
+        status = _stored_day_status(db, user, diary_date)
+        snapshot = db.get(NutritionTargetDaySnapshot, (user.id, diary_date))
+        if snapshot is not None or (status is not None and status.status in {"complete", "fasted"}):
+            raise FoodDiaryConflictError(
+                "Завершённый прошедший день нельзя изменить с помощью рекомендаций."
+            )
 
 
 def _visible_food(db: Session, user: User, food_id: int) -> Food:
@@ -513,15 +524,19 @@ def _batch_request_fingerprint(
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
     template_id: int | None,
+    request_context: dict[str, object] | None = None,
 ) -> str:
+    body: dict[str, object] = {
+        "operation_kind": operation_kind,
+        "diary_date": diary_date.isoformat(),
+        "meal_type": meal_type,
+        "template_id": template_id,
+        "items": [item.model_dump(mode="json") for item in items],
+    }
+    if request_context is not None:
+        body["request_context"] = request_context
     canonical = json.dumps(
-        {
-            "operation_kind": operation_kind,
-            "diary_date": diary_date.isoformat(),
-            "meal_type": meal_type,
-            "template_id": template_id,
-            "items": [item.model_dump(mode="json") for item in items],
-        },
+        body,
         ensure_ascii=True,
         sort_keys=True,
         separators=(",", ":"),
@@ -561,6 +576,7 @@ def create_food_diary_batch(
     operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"],
     template_id: int | None = None,
     commit: bool = True,
+    request_context: dict[str, object] | None = None,
 ) -> FoodDiaryBatchResponse:
     _lock_diary_user(db, user)
     key = _normalize_idempotency_key(idempotency_key)
@@ -570,12 +586,15 @@ def create_food_diary_batch(
         meal_type,
         items,
         template_id,
+        request_context,
     )
     replay = _existing_batch_operation(db, user, key, fingerprint)
     if replay is not None:
         return replay
 
     _validate_diary_date(user, diary_date)
+    if operation_kind == "suggestion":
+        ensure_suggestion_day_is_mutable(db, user, diary_date)
     _ensure_day_accepts_entries(db, user, diary_date)
     operation = FoodDiaryBatchOperation(
         user_id=user.id,
@@ -767,9 +786,12 @@ def get_food_diary_day(
     db: Session,
     user: User,
     diary_date: date | None,
+    *,
+    allow_future: bool = False,
 ) -> FoodDiaryDayResponse:
     selected_date = diary_date or today_for_user(user)
-    _validate_diary_date(user, selected_date)
+    if not allow_future:
+        _validate_diary_date(user, selected_date)
     entries = (
         db.query(FoodDiaryEntry)
         .filter(

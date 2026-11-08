@@ -254,7 +254,7 @@ jobs:
           browser: node-unit
 
   frontend-smoke:
-    name: Frontend smoke (${{ matrix.shard }}/15)
+    name: Frontend smoke (${{ matrix.shard }}/8)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_smoke == 'true'
     runs-on: ubuntu-latest
@@ -267,11 +267,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     env:
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-e2e-shard-{1}', github.workspace, matrix.shard) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
-      YFC_E2E_SHARD: ${{ matrix.shard }}/15
+      YFC_E2E_SHARD: ${{ matrix.shard }}/8
       YFC_E2E_PLAN_DIR: ${{ github.workspace }}/.artifacts/runtime/tests/playwright-shard
 
     steps:
@@ -318,7 +318,7 @@ jobs:
         env:
           PW_TEST_REPORTER: ${{ github.workspace }}/scripts/playwright_ci_timing.cjs
           YFC_E2E_TEST_LIST: ${{ env.YFC_E2E_PLAN_DIR }}/tests.txt
-        run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/15"
+        run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/8"
       - name: Upload Playwright shard receipt
         uses: actions/upload-artifact@v4
         with:
@@ -643,7 +643,7 @@ jobs:
           browser: webkit
 
   python-tests:
-    name: Python tests (${{ matrix.shard }}/10)
+    name: Python tests (${{ matrix.shard }}/8)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_python == 'true'
     runs-on: ubuntu-latest
@@ -653,7 +653,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
 
     services:
       postgres:
@@ -696,7 +696,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-        run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/10"
+        run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/8"
       - name: Upload Python shard receipt
         uses: actions/upload-artifact@v4
         with:
