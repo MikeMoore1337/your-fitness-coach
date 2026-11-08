@@ -227,7 +227,7 @@ describe('HydrationTracker', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
-        '/api/v1/nutrition/hydration/entries',
+        '/api/v1/nutrition/hydration/entries/v2',
         expect.objectContaining({
           method: 'POST',
           body: expect.objectContaining({ volume_ml: 250, source: 'quick_preset' }),
@@ -251,7 +251,7 @@ describe('HydrationTracker', () => {
       ) => {
         if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
         if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
-        if (path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST') {
+        if (path === '/api/v1/nutrition/hydration/entries/v2' && options?.method === 'POST') {
           const key = options.headers?.['Idempotency-Key'];
           if (!key) throw new Error('Missing idempotency key');
           requests.push({ key, body: options.body });
@@ -301,7 +301,7 @@ describe('HydrationTracker', () => {
       ) => {
         if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
         if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
-        if (path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST') {
+        if (path === '/api/v1/nutrition/hydration/entries/v2' && options?.method === 'POST') {
           const key = options.headers?.['Idempotency-Key'];
           if (!key || !options.body) throw new Error('Missing hydration request');
           requests.push({ key, body: options.body });
@@ -693,7 +693,7 @@ describe('HydrationTracker', () => {
       expect(
         apiMock.mock.calls.filter(
           ([path, options]) =>
-            path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST',
+            path === '/api/v1/nutrition/hydration/entries/v2' && options?.method === 'POST',
         ),
       ).toHaveLength(0);
     } finally {
@@ -777,7 +777,7 @@ describe('HydrationTracker', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
-        '/api/v1/nutrition/hydration/entries',
+        '/api/v1/nutrition/hydration/entries/v2',
         expect.objectContaining({ method: 'POST' }),
       ),
     );
@@ -827,7 +827,7 @@ describe('HydrationTracker', () => {
       if (delayed)
         await waitFor(() =>
           expect(apiMock).toHaveBeenCalledWith(
-            '/api/v1/nutrition/hydration/entries',
+            '/api/v1/nutrition/hydration/entries/v2',
             expect.objectContaining({ method: 'POST' }),
           ),
         );
