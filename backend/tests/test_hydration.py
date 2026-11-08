@@ -100,7 +100,9 @@ def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(cl
 
     new_headers = {**headers, "Idempotency-Key": "new-water-0001"}
     first = client.post("/api/v1/nutrition/hydration/entries/v2", headers=new_headers, json=payload)
-    replay = client.post("/api/v1/nutrition/hydration/entries/v2", headers=new_headers, json=payload)
+    replay = client.post(
+        "/api/v1/nutrition/hydration/entries/v2", headers=new_headers, json=payload
+    )
     assert first.status_code == replay.status_code == 201
     assert first.json()["id"] == replay.json()["id"]
 
