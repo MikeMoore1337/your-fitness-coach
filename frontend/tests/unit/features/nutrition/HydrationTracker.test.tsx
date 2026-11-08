@@ -358,8 +358,13 @@ describe('HydrationTracker', () => {
       return Promise.resolve();
     });
     renderTracker();
-    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
-    await screen.findByRole('button', { name: 'Повторить без дубля' });
+    const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(glass).toBeEnabled());
+    fireEvent.click(glass);
+    // The request and the pending-state update are async IndexedDB operations.
+    // Assert the failed POST first so a missing retry button cannot hide a dropped click.
+    await waitFor(() => expect(posts).toBe(1), { timeout: 5_000 });
+    await screen.findByRole('button', { name: 'Повторить без дубля' }, {}, { timeout: 5_000 });
     const bottle = screen.getByRole('button', { name: /Бутылка.*500 мл/ });
     await waitFor(() => expect(bottle).toBeEnabled());
     fireEvent.click(bottle);
