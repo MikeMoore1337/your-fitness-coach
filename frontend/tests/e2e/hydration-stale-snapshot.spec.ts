@@ -29,6 +29,7 @@ test('a stale tab reuses the pending water request', async ({ page, context }) =
       const request = route.request();
       const key = request.headers()['idempotency-key'];
       if (!key) throw new Error('Missing idempotency key');
+      expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
       keys.push(key);
       if (!saved.has(key))
         saved.set(key, {
