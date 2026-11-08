@@ -8,6 +8,7 @@ from fastapi import (
     Header,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
     status,
@@ -558,11 +559,20 @@ def hydration_day(
     status_code=status.HTTP_201_CREATED,
 )
 def add_hydration_entry(
+    request: Request,
     payload: HydrationEntryCreate,
     idempotency_key: IdempotencyKey,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # Old tabs do not share the cross-tab protocol with refreshed tabs.
+    # Reject legacy writes rather than guessing whether two different keys
+    # represent one retry or two intentional drinks.
+    if request.headers.get("X-YFC-Hydration-Protocol") != "2":
+        raise HTTPException(
+            status_code=409,
+            detail="Обновите приложение для безопасной записи воды.",
+        )
     try:
         return create_hydration_entry(db, current_user, payload, idempotency_key)
     except HydrationError as exc:
