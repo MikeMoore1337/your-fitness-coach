@@ -29,6 +29,8 @@ const suggestions: NutritionSuggestionsResponse = {
     carbs_g: '60',
   },
   remaining_confidence: 'partial',
+    remaining_includes_plan: false,
+    not_calculable: false,
   limitations: ['Часть БЖУ неизвестна: неполные записи не превращаются в нули.'],
   max_candidates: 6,
   candidates: [
