@@ -93,6 +93,12 @@ type PreviewRequest = {
   diary_date: string;
   meal_type: string;
   items: { food_id?: number; recipe_id?: number; amount: string; amount_unit: string }[];
+  constraints?: {
+    max_protein_g?: string;
+    max_fat_g?: string;
+    preferred_food_ids: number[];
+    excluded_food_ids: number[];
+  };
 };
 
 const tokenFor = (body: PreviewRequest) => (body.items[0]?.amount === '150' ? 'b' : 'a').repeat(64);
@@ -153,6 +159,8 @@ function makePreview(body: PreviewRequest) {
     target_effective_from: '2026-08-19',
     target_weight_kg: null,
     target_goal: null,
+    target_estimated_bmr_kcal: 1800,
+    target_estimated_tdee_kcal: 2400,
     constraint_status: 'not_set',
     constraint_messages: [],
     preference_message: null,
@@ -234,7 +242,7 @@ describe('NutritionSuggestions', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled(),
     );
-    expect(screen.getByText('247,5')).toBeVisible();
+    expect(screen.getByText('+247,5')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Добавить выбранное' }));
     await waitFor(() =>
       expect(
@@ -291,9 +299,9 @@ describe('NutritionSuggestions', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled(),
     );
-    expect(screen.getByText('351,5')).toBeVisible();
+    expect(screen.getByText('+351,5')).toBeVisible();
     await act(async () => pending[0]!.resolve(makePreview(pending[0]!.body)));
-    expect(screen.getByText('351,5')).toBeVisible();
+    expect(screen.getByText('+351,5')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Добавить выбранное' }));
     await waitFor(() => {
       const call = apiMock.mock.calls.find(([path]) => path.endsWith('/commit'));
@@ -317,8 +325,8 @@ describe('NutritionSuggestions', () => {
     });
     renderSuggestions();
     fireEvent.click(await screen.findByRole('button', { name: 'Проверить вариант' }));
-    expect(await screen.findByText('247,58')).toBeVisible();
-    expect(screen.getByText('46,503')).toBeVisible();
+    expect(await screen.findByText('+247,58')).toBeVisible();
+    expect(screen.getByText('+46,503')).toBeVisible();
   });
 
   it('does not allow confirmation when the preview response is incomplete', async () => {
@@ -335,6 +343,146 @@ describe('NutritionSuggestions', () => {
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
     expect(apiMock.mock.calls.some(([path]) => path.endsWith('/commit'))).toBe(false);
+  });
+
+  it('rejects a preview that does not check the entered limit', async () => {
+    renderSuggestions();
+    fireEvent.click(await screen.findByRole('button', { name: 'Проверить вариант' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByText('Предпочтения и ограничения'));
+    fireEvent.change(screen.getByLabelText('Белки, г'), { target: { value: '100' } });
+    expect(
+      await screen.findByText('Не удалось получить точный расчёт. Повторите попытку.'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    expect(apiMock.mock.calls.some(([path]) => path.endsWith('/commit'))).toBe(false);
+  });
+
+  it('checks explicit limits and food choices in the preview without saving preferences', async () => {
+    apiMock.mockImplementation((path: string, options?: { body: PreviewRequest }) => {
+      if (path.startsWith('/api/v1/nutrition/diary/suggestions?'))
+        return Promise.resolve(suggestions);
+      if (path.startsWith('/api/v1/nutrition/foods/search?'))
+        return Promise.resolve({ items: [{ id: 11, name: 'Курица', brand: 'YFC' }] });
+      if (path.endsWith('/preview')) {
+        const body = options!.body;
+        const excluded = body.constraints?.excluded_food_ids.includes(11);
+        const exceeded = body.constraints?.max_protein_g === '70';
+        const unknown = body.constraints?.max_fat_g != null;
+        const preview = makePreview(body);
+        return Promise.resolve({
+          ...preview,
+          planned: body.constraints
+            ? { energy_kcal: '0', protein_g: '0', fat_g: '0', carbs_g: '0', fiber_g: '0' }
+            : null,
+          projected_after: body.constraints ? preview.after : null,
+          constraint_status: excluded || exceeded ? 'violated' : unknown ? 'unknown' : 'satisfied',
+          constraint_messages: excluded
+            ? ['Выбранный вариант содержит исключённый продукт.']
+            : exceeded
+              ? ['После добавления будет превышен заданный предел белка.']
+              : unknown
+                ? ['Нельзя проверить заданный предел жиров: данных недостаточно.']
+                : [],
+          preference_message: body.constraints?.preferred_food_ids.includes(11)
+            ? 'В варианте есть указанный предпочитаемый продукт.'
+            : null,
+          preview_token: (excluded
+            ? 'd'
+            : body.constraints?.preferred_food_ids.length
+              ? 'e'
+              : body.constraints
+                ? 'c'
+                : 'a'
+          ).repeat(64),
+        });
+      }
+      if (path.endsWith('/commit')) return Promise.resolve({ entries: [], replayed: false });
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderSuggestions();
+    fireEvent.click(await screen.findByRole('button', { name: 'Проверить вариант' }));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled(),
+    );
+    expect(screen.getByText(/Расчётный основной обмен:/)).toHaveTextContent(/1\s800/);
+    expect(screen.getByText(/Ещё запланировано, но не съедено:/)).toHaveTextContent('— ккал');
+    fireEvent.click(screen.getByText('Предпочтения и ограничения'));
+    const maxProtein = screen.getByLabelText('Белки, г');
+    fireEvent.change(maxProtein, { target: { value: '70' } });
+    expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    expect(
+      await screen.findByText('После добавления будет превышен заданный предел белка.'),
+    ).toBeVisible();
+    fireEvent.change(maxProtein, { target: { value: '1001' } });
+    expect(screen.getByText(/Проверьте пределы:/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    fireEvent.change(maxProtein, { target: { value: '100' } });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled(),
+    );
+    const maxFat = screen.getByLabelText('Жиры, г');
+    fireEvent.change(maxFat, { target: { value: '30' } });
+    expect(
+      await screen.findByText('Нельзя проверить заданный предел жиров: данных недостаточно.'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    fireEvent.change(maxFat, { target: { value: '' } });
+
+    const excluded = screen.getByLabelText('Найти исключаемый продукт');
+    fireEvent.change(excluded, { target: { value: 'Ку' } });
+    expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    expect(screen.getByText('Добавьте выбранный продукт или очистите поле поиска.')).toBeVisible();
+    await waitFor(() =>
+      expect(document.querySelector('option[value="Курица — YFC"]')).not.toBeNull(),
+    );
+    fireEvent.change(excluded, { target: { value: 'Курица — YFC' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить исключаемый продукт' }));
+    expect(
+      await screen.findByText('Выбранный вариант содержит исключённый продукт.'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    const preferred = screen.getByLabelText('Найти предпочитаемый продукт');
+    fireEvent.change(preferred, { target: { value: 'Ку' } });
+    await waitFor(() =>
+      expect(document.querySelector('option[value="Курица — YFC"]')).not.toBeNull(),
+    );
+    fireEvent.change(preferred, { target: { value: 'Курица — YFC' } });
+    expect(screen.getByText('Продукт указан в другом списке.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Добавить предпочитаемый продукт' })).toBeDisabled();
+    fireEvent.change(preferred, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Убрать Курица из исключений' }));
+
+    fireEvent.change(preferred, { target: { value: 'Ку' } });
+    await waitFor(() =>
+      expect(document.querySelector('option[value="Курица — YFC"]')).not.toBeNull(),
+    );
+    fireEvent.change(preferred, { target: { value: 'Курица — YFC' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить предпочитаемый продукт' }));
+    expect(
+      await screen.findByText('В варианте есть указанный предпочитаемый продукт.'),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить выбранное' }));
+    await waitFor(() => {
+      const call = apiMock.mock.calls.find(([path]) => path.endsWith('/commit'));
+      expect(call?.[1].body).toEqual(
+        expect.objectContaining({
+          constraints: { max_protein_g: '100', preferred_food_ids: [11], excluded_food_ids: [] },
+          preview_token: 'e'.repeat(64),
+        }),
+      );
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Проверить вариант' }));
+    fireEvent.click(screen.getByText('Предпочтения и ограничения'));
+    expect(screen.getByLabelText('Белки, г')).toHaveValue(null);
+    expect(
+      screen.queryByRole('button', { name: 'Убрать Курица из предпочтений' }),
+    ).not.toBeInTheDocument();
   });
 
   it('locks the reviewed inputs while saving and retries with the same idempotency key', async () => {

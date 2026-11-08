@@ -188,9 +188,22 @@ for (const width of [393, 1280]) {
       const region = page.getByRole('region', { name: 'Варианты из вашей еды' });
       const toggle = region.getByRole('button', { name: /Показать все 6 вариантов|Свернуть/ });
       await expect(toggle).toBeVisible();
+      const secondReview = region
+        .locator('.nutrition-suggestion-card')
+        .filter({ hasText: 'Овсяная каша' })
+        .getByRole('button', { name: 'Проверить вариант' });
+      const expectSeparated = async () => {
+        const reviewBox = await secondReview.boundingBox();
+        const toggleBox = await toggle.boundingBox();
+        expect(reviewBox).not.toBeNull();
+        expect(toggleBox).not.toBeNull();
+        expect(toggleBox!.y - reviewBox!.y - reviewBox!.height).toBeGreaterThanOrEqual(11);
+      };
+      await expectSeparated();
       await toggle.focus();
       await page.keyboard.press('Enter');
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expectSeparated();
       await expect(toggle).toBeFocused();
       const third = region.locator('li').filter({ hasText: 'Рис' });
       await page.keyboard.press('Tab');

@@ -114,12 +114,13 @@ describe('компактные рекомендации дневника', () =>
     setup();
     const card = (await screen.findByText('Продукт 1')).closest('li')!;
     expect(within(card).getByText(/165 ккал · Б 31 · Ж — · У 0/)).toBeVisible();
+    expect(card).toHaveTextContent('клетчатка — г');
     expect(within(card).getByText('Частичные БЖУ')).toBeVisible();
-    expect(card).toHaveTextContent('Недавнее · Укладывается в известный остаток белка');
+    expect(card).toHaveTextContent('Недавнее · 31 г белка в пределах известного остатка 50 г');
     expect(within(card).queryByText('Неполные БЖУ')).not.toBeInTheDocument();
     fireEvent.click(within(card).getByText('Другие основания: Продукт 1'));
     expect(within(card).getByText('Избранное')).toBeVisible();
-    expect(within(region()).getByText(/Остаток: 500 ккал · Б 50/)).toBeVisible();
+    expect(within(region()).getByText(/На 6 ноября осталось: 500 ккал · белки 50/)).toBeVisible();
     expect(within(region()).getByText('Часть БЖУ неизвестна.')).toBeVisible();
     expect(
       within(card).getByRole('button', { name: 'Проверить вариант' }),
@@ -141,6 +142,25 @@ describe('компактные рекомендации дневника', () =>
     await screen.findByText('Продукт 1');
     expect(within(region()).queryByText(/Остаток:/)).not.toBeInTheDocument();
     expect(within(region()).getByText('Приблизительные БЖУ')).toBeVisible();
+  });
+
+  it('сразу показывает все превышения и не утверждает ложное соответствие белку', async () => {
+    const data = response(1);
+    data.remaining = { energy_kcal: '100', protein_g: '10', fat_g: '1', carbs_g: '1' };
+    data.candidates![0] = {
+      ...data.candidates![0]!,
+      nutrition: { ...nutrition, fat_g: '3', carbs_g: '5' },
+      reasons: ['recent', 'protein_fit', 'lower_known_fat'],
+    };
+    apiMock.mockResolvedValue(data);
+    setup();
+    const card = (await screen.findByText('Продукт 1')).closest('li')!;
+    expect(card).toHaveTextContent('калории: 165 ккал при остатке 100 ккал');
+    expect(card).toHaveTextContent('белки: 31 г при остатке 10 г');
+    expect(card).toHaveTextContent('жиры: 3 г при остатке 1 г');
+    expect(card).toHaveTextContent('углеводы: 5 г при остатке 1 г');
+    expect(card).not.toHaveTextContent('в пределах известного остатка');
+    expect(card).not.toHaveTextContent('Меньше известных жиров');
   });
 
   it('объясняет отсутствие цели, если вариантов нет', async () => {

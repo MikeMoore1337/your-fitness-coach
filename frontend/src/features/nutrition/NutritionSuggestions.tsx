@@ -1,8 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
+import { formatCalendarDate } from '../../shared/dateTime';
 import { queryKeys, invalidateNutritionSummaries } from '../../shared/queryKeys';
 import type {
+  Food,
+  FoodSearch,
   FoodDiaryBatchResponse,
   FoodDiaryNutrition,
   NutritionSuggestion,
@@ -62,6 +65,18 @@ type ReviewItem = {
   amountUnit: NutritionSuggestion['items'][number]['amount_unit'];
 };
 type SuggestionMode = 'diary' | 'plan';
+const limitFields = [
+  { key: 'max_energy_kcal', label: 'Ккал', max: 10000, digits: 2 },
+  { key: 'max_protein_g', label: 'Белки, г', max: 1000, digits: 3 },
+  { key: 'max_fat_g', label: 'Жиры, г', max: 1000, digits: 3 },
+  { key: 'max_carbs_g', label: 'Углеводы, г', max: 1000, digits: 3 },
+] as const;
+type LimitKey = (typeof limitFields)[number]['key'];
+type SuggestionConstraints = Partial<Record<LimitKey, string>> & {
+  preferred_food_ids: number[];
+  excluded_food_ids: number[];
+};
+type FoodChoice = Pick<Food, 'id' | 'name' | 'brand'>;
 type SuggestionPreview = {
   diary_date: string;
   meal_type: MealType;
@@ -78,6 +93,8 @@ type SuggestionPreview = {
   target_effective_from: string | null;
   target_weight_kg: string | null;
   target_goal: string | null;
+  target_estimated_bmr_kcal?: number | null;
+  target_estimated_tdee_kcal?: number | null;
   constraint_status: 'not_set' | 'satisfied' | 'violated' | 'unknown';
   constraint_messages: string[];
   preference_message: string | null;
@@ -114,6 +131,10 @@ function formatNumber(value: string | number | null | undefined, fractionDigits 
 
 function macroLine(nutrition: FoodDiaryNutrition): string {
   return `Б ${formatNumber(nutrition.protein_g, 3)} · Ж ${formatNumber(nutrition.fat_g, 3)} · У ${formatNumber(nutrition.carbs_g, 3)}`;
+}
+
+function nutritionSummary(nutrition: FoodDiaryNutrition | null): string {
+  return `${formatNumber(nutrition?.energy_kcal, 2)} ккал · Б ${formatNumber(nutrition?.protein_g, 3)} г · Ж ${formatNumber(nutrition?.fat_g, 3)} г · У ${formatNumber(nutrition?.carbs_g, 3)} г · клетчатка ${formatNumber(nutrition?.fiber_g, 3)} г`;
 }
 
 function confidenceLabel(confidence: NutritionSuggestion['nutrition_confidence']): string {
@@ -180,9 +201,29 @@ function CandidateCard({
   onSelect: (candidate: NutritionSuggestion) => void;
 }) {
   const nameId = useId();
-  const tags = [...candidate.reasons, ...candidate.sources]
-    .filter((value, index, values) => values.indexOf(value) === index)
-    .map(tagLabel);
+  const values = [...candidate.sources, ...candidate.reasons].filter(
+    (value, index, all) => value !== 'lower_known_fat' && all.indexOf(value) === index,
+  );
+  const protein = candidate.nutrition.protein_g;
+  const proteinRemaining = remaining?.protein_g;
+  const proteinIndex = values.indexOf('protein_fit');
+  if (proteinIndex >= 0) {
+    values.splice(proteinIndex, 1);
+    if (
+      protein != null &&
+      proteinRemaining != null &&
+      Number(protein) > 0 &&
+      Number(protein) <= Number(proteinRemaining)
+    ) {
+      values.splice(Math.min(1, values.length), 0, 'protein_fit');
+    }
+  }
+  const tags = values.map((value) =>
+    value === 'protein_fit'
+      ? `${formatNumber(protein, 3)} г белка в пределах известного остатка ${formatNumber(proteinRemaining, 3)} г`
+      : tagLabel(value),
+  );
+  let overageCount = 0;
   if (remaining) {
     const metrics = [
       ['energy_kcal', 'калории', 'ккал'],
@@ -201,6 +242,7 @@ function CandidateCard({
         );
       }
     }
+    overageCount = overages.length;
     tags.unshift(...overages);
   }
   if (compact) {
@@ -208,23 +250,30 @@ function CandidateCard({
       (tag) =>
         candidate.nutrition_confidence !== 'partial' || tag !== reasonLabels.partial_nutrition,
     );
+    const visibleFactCount = Math.max(2, overageCount);
     return (
       <li className={`nutrition-suggestion-card ${styles.compactCard}`}>
         <strong id={nameId}>{candidate.name}</strong>
         <span className={styles.facts}>
-          {formatNumber(candidate.nutrition.energy_kcal, 2)} ккал · {macroLine(candidate.nutrition)}
+          {formatNumber(candidate.nutrition.energy_kcal, 2)} ккал · {macroLine(candidate.nutrition)}{' '}
+          · клетчатка {formatNumber(candidate.nutrition.fiber_g, 3)} г
         </span>
         <span className={styles.facts}>
-          <span>{confidenceLabel(candidate.nutrition_confidence)}</span>
-          {facts.slice(0, 2).map((fact) => ` · ${fact}`)}
+          {candidate.nutrition_confidence !== 'exact' && (
+            <>
+              <span>{confidenceLabel(candidate.nutrition_confidence)}</span>
+              {facts.length ? ' · ' : ''}
+            </>
+          )}
+          {facts.slice(0, visibleFactCount).join(' · ')}
         </span>
-        {facts.length > 2 && (
+        {facts.length > visibleFactCount && (
           <details className={styles.details}>
             <summary className="yfc-disclosure-summary">
               <span>Другие основания: {candidate.name}</span>
               <DisclosureIcon />
             </summary>
-            <p>{facts.slice(2).join(' · ')}</p>
+            <p>{facts.slice(visibleFactCount).join(' · ')}</p>
           </details>
         )}
         <Button
@@ -245,7 +294,8 @@ function CandidateCard({
           <strong>{candidate.name}</strong>
           <span>
             {formatNumber(candidate.nutrition.energy_kcal, 2)} ккал ·{' '}
-            {macroLine(candidate.nutrition)}
+            {macroLine(candidate.nutrition)} · клетчатка{' '}
+            {formatNumber(candidate.nutrition.fiber_g, 3)} г
           </span>
         </div>
         <Badge tone={candidate.nutrition_confidence === 'partial' ? 'warning' : 'neutral'}>
@@ -318,6 +368,178 @@ function DiaryCandidateList({
   );
 }
 
+function FoodChoiceEditor({
+  kind,
+  selected,
+  opposite,
+  disabled,
+  onChange,
+  onPendingChange,
+}: {
+  kind: 'preferred' | 'excluded';
+  selected: FoodChoice[];
+  opposite: FoodChoice[];
+  disabled: boolean;
+  onChange: (items: FoodChoice[]) => void;
+  onPendingChange: (pending: boolean) => void;
+}) {
+  const inputId = useId();
+  const listId = useId();
+  const [input, setInput] = useState('');
+  const [settled, setSettled] = useState('');
+  const [choice, setChoice] = useState<FoodChoice | null>(null);
+  const query = input.trim().replace(/\s+/g, ' ');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(query), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  const search = useQuery({
+    queryKey: ['nutrition', 'suggestion-food-search', settled],
+    queryFn: ({ signal }) =>
+      api<FoodSearch>(`/api/v1/nutrition/foods/search?q=${encodeURIComponent(settled)}&limit=20`, {
+        signal,
+      }),
+    enabled: !choice && query.length >= 2 && query === settled,
+    retry: false,
+  });
+  const foods = query === settled ? (search.data?.items ?? []) : [];
+  const labels = foods.map((food) => `${food.name}${food.brand ? ` — ${food.brand}` : ''}`);
+  const options = foods.map((food, index) => ({
+    food,
+    label:
+      labels.indexOf(labels[index]!) === labels.lastIndexOf(labels[index]!)
+        ? labels[index]!
+        : `${labels[index]} · №${food.id}`,
+  }));
+  const selectedChoice = choice ?? options.find((option) => option.label === input)?.food ?? null;
+  const alreadySelected = selectedChoice && selected.some((food) => food.id === selectedChoice.id);
+  const conflicts = selectedChoice && opposite.some((food) => food.id === selectedChoice.id);
+  const preferred = kind === 'preferred';
+  const heading = preferred ? 'Предпочитаю продукты' : 'Исключить продукты';
+  const inputLabel = preferred ? 'Найти предпочитаемый продукт' : 'Найти исключаемый продукт';
+
+  return (
+    <div className={styles.foodChoices}>
+      <h4>{heading}</h4>
+      <p className={styles.choiceHint}>
+        {preferred
+          ? 'Выберите продукт из каталога, чтобы проверить его наличие в варианте.'
+          : 'Проверяются продукты и известные ингредиенты рецептов.'}
+      </p>
+      <div className={styles.choiceRow}>
+        <Field label="Продукт" labelFor={inputId}>
+          <Input
+            id={inputId}
+            list={listId}
+            aria-label={inputLabel}
+            placeholder="Найти продукт"
+            value={input}
+            disabled={disabled}
+            autoComplete="off"
+            onChange={(event) => {
+              const value = event.target.value;
+              setInput(value);
+              onPendingChange(value.trim().length > 0);
+              setChoice(options.find((option) => option.label === value)?.food ?? null);
+            }}
+          />
+        </Field>
+        <datalist id={listId}>
+          {options.map((option) => (
+            <option key={option.food.id} value={option.label} />
+          ))}
+        </datalist>
+        <Button
+          type="button"
+          variant="secondary"
+          aria-label={
+            preferred ? 'Добавить предпочитаемый продукт' : 'Добавить исключаемый продукт'
+          }
+          disabled={
+            disabled ||
+            !selectedChoice ||
+            Boolean(alreadySelected || conflicts) ||
+            selected.length >= 50
+          }
+          onClick={() => {
+            if (!selectedChoice || alreadySelected || conflicts || selected.length >= 50) return;
+            onChange([...selected, selectedChoice]);
+            setChoice(null);
+            setInput('');
+            onPendingChange(false);
+          }}
+        >
+          Добавить
+        </Button>
+      </div>
+      {!choice && query.length > 0 && query.length < 2 && (
+        <p className={styles.choiceHint}>Введите не менее двух символов.</p>
+      )}
+      {search.isFetching && !choice && <p className={styles.choiceHint}>Ищем продукты…</p>}
+      {search.error && query === settled && !choice && (
+        <ErrorState
+          message="Не удалось найти продукты."
+          retry={() => void search.refetch()}
+          retryLabel="Повторить поиск"
+        />
+      )}
+      {search.isSuccess && !search.isFetching && query === settled && !choice && !foods.length && (
+        <p className={styles.choiceHint}>Продукты не найдены.</p>
+      )}
+      {alreadySelected && <p className={styles.choiceHint}>Этот продукт уже добавлен.</p>}
+      {conflicts && <p className={styles.choiceHint}>Продукт указан в другом списке.</p>}
+      {selected.length >= 50 && (
+        <p className={styles.choiceHint}>Можно добавить не более 50 продуктов.</p>
+      )}
+      {selected.length > 0 && (
+        <ul className={styles.selectedFoods}>
+          {selected.map((food) => (
+            <li key={food.id}>
+              <span>
+                {food.name}
+                {food.brand ? ` — ${food.brand}` : ''}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={disabled}
+                aria-label={`Убрать ${food.name} ${preferred ? 'из предпочтений' : 'из исключений'}`}
+                onClick={() => onChange(selected.filter((item) => item.id !== food.id))}
+              >
+                Убрать
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function TargetFacts({ preview }: { preview: SuggestionPreview }) {
+  const goal = preview.target_goal;
+  const goalLabel =
+    goal && Object.hasOwn(goalOptions, goal)
+      ? goalOptions[goal as keyof typeof goalOptions].label
+      : '—';
+  if (!preview.targets) return null;
+  return (
+    <p className={styles.note}>
+      Цель на{' '}
+      {formatCalendarDate(preview.diary_date, { day: 'numeric', month: 'long', year: 'numeric' })}:{' '}
+      {formatNumber(preview.targets.energy_kcal, 2)} ккал · Б{' '}
+      {formatNumber(preview.targets.protein_g, 3)} г · Ж {formatNumber(preview.targets.fat_g, 3)} г
+      · У {formatNumber(preview.targets.carbs_g, 3)} г. Запись цели №{' '}
+      {formatNumber(preview.target_id, 0)} ·{' '}
+      {targetSourceLabels[preview.target_source ?? ''] ?? 'источник не указан'} · действует с{' '}
+      {preview.target_effective_from ?? '—'} · вес: {formatNumber(preview.target_weight_kg, 2)} кг ·
+      цель расчёта: {goalLabel}. Расчётный основной обмен:{' '}
+      {formatNumber(preview.target_estimated_bmr_kcal, 0)} ккал · расчётный общий расход:{' '}
+      {formatNumber(preview.target_estimated_tdee_kcal, 0)} ккал.
+    </p>
+  );
+}
+
 function PreviewTable({ preview, mode }: { preview: SuggestionPreview; mode: SuggestionMode }) {
   const rows: { field: keyof FoodDiaryNutrition; label: string }[] = [
     { field: 'energy_kcal', label: 'Ккал' },
@@ -326,24 +548,8 @@ function PreviewTable({ preview, mode }: { preview: SuggestionPreview; mode: Sug
     { field: 'carbs_g', label: 'Углеводы, г' },
     { field: 'fiber_g', label: 'Клетчатка, г' },
   ];
-  const goal = preview.target_goal;
-  const goalLabel =
-    goal && Object.hasOwn(goalOptions, goal)
-      ? goalOptions[goal as keyof typeof goalOptions].label
-      : '—';
   return (
     <>
-      {preview.targets && (
-        <p className={styles.note}>
-          Цель: {formatNumber(preview.targets.energy_kcal, 0)} ккал · Б{' '}
-          {formatNumber(preview.targets.protein_g)} г · Ж {formatNumber(preview.targets.fat_g)} г ·
-          У {formatNumber(preview.targets.carbs_g)} г. Запись цели №{' '}
-          {formatNumber(preview.target_id, 0)} ·{' '}
-          {targetSourceLabels[preview.target_source ?? ''] ?? 'источник не указан'} · действует с{' '}
-          {preview.target_effective_from ?? '—'} · вес: {formatNumber(preview.target_weight_kg, 2)}{' '}
-          кг · цель расчёта: {goalLabel}.
-        </p>
-      )}
       <div>
         <strong>{mode === 'plan' ? 'Как изменится план' : 'Как изменится день'}</strong>
         <table className={styles.previewTable}>
@@ -360,13 +566,25 @@ function PreviewTable({ preview, mode }: { preview: SuggestionPreview; mode: Sug
               <tr key={field}>
                 <th scope="row">{label}</th>
                 <td>{formatNumber(preview.before[field], field === 'energy_kcal' ? 2 : 3)}</td>
-                <td>{formatNumber(preview.addition[field], field === 'energy_kcal' ? 2 : 3)}</td>
+                <td>
+                  {preview.addition[field] != null && Number(preview.addition[field]) > 0
+                    ? '+'
+                    : ''}
+                  {formatNumber(preview.addition[field], field === 'energy_kcal' ? 2 : 3)}
+                </td>
                 <td>{formatNumber(preview.after[field], field === 'energy_kcal' ? 2 : 3)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <p className={styles.note}>
+        {mode === 'plan' ? 'Записано в дневнике' : 'Ещё запланировано, но не съедено'}:{' '}
+        {nutritionSummary(mode === 'plan' ? preview.diary : preview.planned)}.
+      </p>
+      <p className={styles.note}>
+        Прогноз дня после добавления: {nutritionSummary(preview.projected_after)}.
+      </p>
       <p className={styles.note}>
         Неизвестные значения отмечены знаком «—». Полнота данных не гарантирует их точность.
       </p>
@@ -392,7 +610,12 @@ function SuggestionReview({
   planRevision?: number;
   disabled: boolean;
   onCancel: () => void;
-  onSubmit: (mealType: MealType, items: ReviewItem[], previewToken: string) => void;
+  onSubmit: (
+    mealType: MealType,
+    items: ReviewItem[],
+    previewToken: string,
+    constraints: SuggestionConstraints | undefined,
+  ) => void;
   pending: boolean;
 }) {
   const [mealType, setMealType] = useState<MealType>(initialMealType);
@@ -404,6 +627,39 @@ function SuggestionReview({
       amountUnit: item.amount_unit,
     })),
   );
+  const limitId = useId();
+  const [limits, setLimits] = useState<Record<LimitKey, string>>({
+    max_energy_kcal: '',
+    max_protein_g: '',
+    max_fat_g: '',
+    max_carbs_g: '',
+  });
+  const [preferredFoods, setPreferredFoods] = useState<FoodChoice[]>([]);
+  const [excludedFoods, setExcludedFoods] = useState<FoodChoice[]>([]);
+  const [preferredPending, setPreferredPending] = useState(false);
+  const [excludedPending, setExcludedPending] = useState(false);
+  const invalidLimits = limitFields.filter(({ key, max, digits }) => {
+    const value = limits[key].trim();
+    return (
+      value !== '' &&
+      (!new RegExp(`^\\d+(?:\\.\\d{1,${digits}})?$`).test(value) || Number(value) > max)
+    );
+  });
+  const hasConstraints =
+    limitFields.some(({ key }) => limits[key].trim() !== '') ||
+    preferredFoods.length > 0 ||
+    excludedFoods.length > 0;
+  const constraints: SuggestionConstraints | undefined = hasConstraints
+    ? {
+        ...Object.fromEntries(
+          limitFields
+            .filter(({ key }) => limits[key].trim() !== '')
+            .map(({ key }) => [key, limits[key].trim()]),
+        ),
+        preferred_food_ids: preferredFoods.map((food) => food.id),
+        excluded_food_ids: excludedFoods.map((food) => food.id),
+      }
+    : undefined;
   const body =
     mode === 'plan'
       ? {
@@ -412,8 +668,14 @@ function SuggestionReview({
           candidate_id: candidate.candidate_id,
           items: items.map(planReviewItemPayload),
           expected_revision: planRevision,
+          ...(constraints ? { constraints } : {}),
         }
-      : { diary_date: diaryDate, meal_type: mealType, items: items.map(reviewItemPayload) };
+      : {
+          diary_date: diaryDate,
+          meal_type: mealType,
+          items: items.map(reviewItemPayload),
+          ...(constraints ? { constraints } : {}),
+        };
   const request = JSON.stringify(body);
   const [settledRequest, setSettledRequest] = useState(request);
   useEffect(() => {
@@ -423,6 +685,7 @@ function SuggestionReview({
   const canPreview =
     items.length > 0 &&
     items.every((item) => Number.isFinite(Number(item.amount)) && Number(item.amount) > 0) &&
+    invalidLimits.length === 0 &&
     (mode !== 'plan' || planRevision != null);
   const preview = useQuery({
     queryKey: ['nutrition-suggestion-preview', mode, request],
@@ -463,6 +726,11 @@ function SuggestionReview({
         (result.target_id ?? 0) <= 0 ||
         typeof result.target_effective_from !== 'string' ||
         !Array.isArray(result.constraint_messages) ||
+        !result.constraint_messages.every((message) => typeof message === 'string') ||
+        (result.preference_message !== null && typeof result.preference_message !== 'string') ||
+        (preferredFoods.length > 0 && !result.preference_message) ||
+        ((limitFields.some(({ key }) => limits[key].trim() !== '') || excludedFoods.length > 0) &&
+          result.constraint_status === 'not_set') ||
         typeof result.preview_token !== 'string' ||
         !/^[0-9a-f]{64}$/.test(result.preview_token) ||
         !['not_set', 'satisfied', 'violated', 'unknown'].includes(result.constraint_status)
@@ -476,6 +744,8 @@ function SuggestionReview({
   });
   const previewReady =
     canPreview &&
+    !preferredPending &&
+    !excludedPending &&
     request === settledRequest &&
     !preview.isFetching &&
     !preview.error &&
@@ -488,7 +758,8 @@ function SuggestionReview({
       className="nutrition-suggestion-review"
       onSubmit={(event) => {
         event.preventDefault();
-        if (previewReady && preview.data) onSubmit(mealType, items, preview.data.preview_token);
+        if (previewReady && preview.data)
+          onSubmit(mealType, items, preview.data.preview_token, constraints);
       }}
     >
       <div className="nutrition-suggestion-review__head">
@@ -498,14 +769,15 @@ function SuggestionReview({
           </span>
           <h3>{candidate.name}</h3>
         </div>
-        <Badge>Можно изменить</Badge>
       </div>
       <p className="muted">
-        Измените количество или уберите ингредиент.{' '}
         {mode === 'plan'
-          ? 'В план ничего не попадёт до явного подтверждения.'
-          : 'В дневник ничего не попадёт до явного подтверждения.'}
+          ? 'Ничего не попадёт в план до подтверждения.'
+          : 'Ничего не попадёт в дневник до подтверждения.'}
       </p>
+      {request === settledRequest && !preview.isFetching && preview.data && (
+        <TargetFacts preview={preview.data} />
+      )}
       <Field label="Приём пищи" labelFor="nutrition-suggestion-meal-type">
         <Select
           id="nutrition-suggestion-meal-type"
@@ -610,6 +882,84 @@ function SuggestionReview({
       {request === settledRequest && !preview.isFetching && preview.data && (
         <PreviewTable preview={preview.data} mode={mode} />
       )}
+      <details className={styles.constraints}>
+        <summary className="yfc-disclosure-summary">
+          <span>Предпочтения и ограничения</span>
+          <DisclosureIcon />
+        </summary>
+        <p className={styles.choiceHint}>
+          Необязательно. Действуют только при этой проверке и не сохраняются в профиле. Пустое поле
+          означает, что предел неизвестен.
+        </p>
+        <h4>Верхние пределы на день с учётом плана</h4>
+        <div className={styles.limitGrid}>
+          {limitFields.map(({ key, label, max, digits }) => (
+            <Field key={key} label={label} labelFor={`${limitId}-${key}`}>
+              <Input
+                id={`${limitId}-${key}`}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                max={max}
+                step={digits === 2 ? '0.01' : '0.001'}
+                placeholder="Не задан"
+                value={limits[key]}
+                disabled={disabled}
+                aria-invalid={invalidLimits.some((field) => field.key === key) || undefined}
+                onChange={(event) =>
+                  setLimits((current) => ({ ...current, [key]: event.target.value }))
+                }
+              />
+            </Field>
+          ))}
+        </div>
+        <FoodChoiceEditor
+          kind="preferred"
+          selected={preferredFoods}
+          opposite={excludedFoods}
+          disabled={disabled}
+          onChange={setPreferredFoods}
+          onPendingChange={setPreferredPending}
+        />
+        <FoodChoiceEditor
+          kind="excluded"
+          selected={excludedFoods}
+          opposite={preferredFoods}
+          disabled={disabled}
+          onChange={setExcludedFoods}
+          onPendingChange={setExcludedPending}
+        />
+        {!hasConstraints && (
+          <p className={styles.choiceHint}>Предпочтения и ограничения не заданы.</p>
+        )}
+      </details>
+      {invalidLimits.length > 0 && (
+        <p className="nutrition-inline-error" role="alert">
+          Проверьте пределы: укажите неотрицательное число в допустимом диапазоне и с допустимой
+          точностью.
+        </p>
+      )}
+      {(preferredPending || excludedPending) && (
+        <p className={styles.choiceHint} role="status">
+          Добавьте выбранный продукт или очистите поле поиска.
+        </p>
+      )}
+      {request === settledRequest && !preview.isFetching && preview.data && (
+        <div
+          role="status"
+          className={
+            preview.data.constraint_status === 'violated' ||
+            preview.data.constraint_status === 'unknown'
+              ? 'nutrition-inline-error'
+              : styles.choiceHint
+          }
+        >
+          {preview.data.constraint_messages.map((message) => (
+            <p key={message}>{message}</p>
+          ))}
+          {preview.data.preference_message && <p>{preview.data.preference_message}</p>}
+        </div>
+      )}
       <div className="nutrition-suggestion-review__actions">
         <Button type="submit" disabled={disabled || pending || !previewReady}>
           {pending ? 'Добавляем…' : mode === 'plan' ? 'Добавить в план' : 'Добавить выбранное'}
@@ -651,7 +1001,12 @@ export function NutritionSuggestions({
         ? queryKeys.nutrition.planSuggestions(diaryDate)
         : queryKeys.nutrition.suggestions(diaryDate),
     queryFn: () =>
-      api<NutritionSuggestionsResponse & { not_calculable?: boolean }>(
+      api<
+        NutritionSuggestionsResponse & {
+          not_calculable?: boolean;
+          remaining_includes_plan?: boolean;
+        }
+      >(
         mode === 'plan'
           ? `/api/v1/nutrition/plans/suggestions?plan_date=${diaryDate}`
           : `/api/v1/nutrition/diary/suggestions?diary_date=${diaryDate}`,
@@ -661,9 +1016,14 @@ export function NutritionSuggestions({
   const commit = useMutation<
     FoodDiaryBatchResponse | NutritionPlanDay,
     Error,
-    { mealType: MealType; items: ReviewItem[]; previewToken: string }
+    {
+      mealType: MealType;
+      items: ReviewItem[];
+      previewToken: string;
+      constraints: SuggestionConstraints | undefined;
+    }
   >({
-    mutationFn: ({ mealType, items, previewToken }) => {
+    mutationFn: ({ mealType, items, previewToken, constraints }) => {
       if (submittedPreview.current !== previewToken) {
         idempotencyKey.current = null;
         submittedPreview.current = previewToken;
@@ -683,7 +1043,11 @@ export function NutritionSuggestions({
             items: items.map(planReviewItemPayload),
             expected_revision: planRevision,
             preview_token: previewToken,
-          } satisfies NutritionPlanFillRequest & { preview_token: string },
+            ...(constraints ? { constraints } : {}),
+          } satisfies NutritionPlanFillRequest & {
+            preview_token: string;
+            constraints?: SuggestionConstraints;
+          },
         });
       }
       return api<FoodDiaryBatchResponse>('/api/v1/nutrition/diary/suggestions/commit', {
@@ -694,7 +1058,11 @@ export function NutritionSuggestions({
           meal_type: mealType,
           items: items.map(reviewItemPayload),
           preview_token: previewToken,
-        } satisfies NutritionSuggestionCommitRequest & { preview_token: string },
+          ...(constraints ? { constraints } : {}),
+        } satisfies NutritionSuggestionCommitRequest & {
+          preview_token: string;
+          constraints?: SuggestionConstraints;
+        },
       });
     },
     onSuccess: async (result) => {
@@ -720,6 +1088,13 @@ export function NutritionSuggestions({
       setSelectedCandidate(null);
     },
   });
+
+  const limitations = (suggestions.data?.limitations ?? []).filter(
+    (message) =>
+      message !==
+        'Это варианты из уже сохранённых продуктов, рецептов и шаблонов, а не предписание.' &&
+      message !== 'Проверьте состав и количество перед добавлением.',
+  );
 
   if (demoSafeMode) {
     return (
@@ -751,18 +1126,23 @@ export function NutritionSuggestions({
           <p className="muted">
             {mode === 'plan'
               ? 'Выберите сохранённый вариант и проверьте его перед добавлением в план.'
-              : 'Что можно добавить дальше — проверьте состав и количество сами.'}
+              : 'Проверьте состав и количество перед добавлением.'}
           </p>
         </div>
-        {suggestions.data?.remaining && (
-          <Badge tone={suggestions.data.remaining_confidence === 'partial' ? 'warning' : 'neutral'}>
-            Остаток: {formatNumber(suggestions.data.remaining.energy_kcal, 2)} ккал · Б{' '}
-            {formatNumber(suggestions.data.remaining.protein_g, 3)} · Ж{' '}
-            {formatNumber(suggestions.data.remaining.fat_g, 3)} · У{' '}
-            {formatNumber(suggestions.data.remaining.carbs_g, 3)}
-          </Badge>
-        )}
       </header>
+      {suggestions.data?.remaining && !selectedCandidate && (
+        <p className={styles.context}>
+          На {formatCalendarDate(diaryDate, { day: 'numeric', month: 'long' })} осталось:{' '}
+          {formatNumber(suggestions.data.remaining.energy_kcal, 2)} ккал · белки{' '}
+          {formatNumber(suggestions.data.remaining.protein_g, 3)} г · жиры{' '}
+          {formatNumber(suggestions.data.remaining.fat_g, 3)} г · углеводы{' '}
+          {formatNumber(suggestions.data.remaining.carbs_g, 3)} г.
+          {suggestions.data.remaining_includes_plan && ' Учтён ещё не съеденный план.'}
+        </p>
+      )}
+      {suggestions.data && !selectedCandidate && (
+        <p className={styles.context}>Нет сведений о предпочтениях и ограничениях.</p>
+      )}
       {suggestions.isLoading && <LoadingState label="Подбираем варианты из сохранённых данных…" />}
       {suggestions.error && (
         <ErrorState
@@ -773,11 +1153,13 @@ export function NutritionSuggestions({
       )}
       {suggestions.data && !selectedCandidate && (
         <>
-          <div className="nutrition-suggestions__limitations" role="status">
-            {suggestions.data.limitations?.map((limitation) => (
-              <p key={limitation}>{limitation}</p>
-            ))}
-          </div>
+          {limitations.length > 0 && (
+            <div className="nutrition-suggestions__limitations" role="status">
+              {limitations.map((limitation) => (
+                <p key={limitation}>{limitation}</p>
+              ))}
+            </div>
+          )}
           {suggestions.data.candidates?.length && mode === 'diary' ? (
             <DiaryCandidateList
               key={JSON.stringify([diaryDate, suggestions.data.candidates])}
@@ -841,8 +1223,8 @@ export function NutritionSuggestions({
             submittedPreview.current = null;
             setSelectedCandidate(null);
           }}
-          onSubmit={(mealType, items, previewToken) =>
-            commit.mutate({ mealType, items, previewToken })
+          onSubmit={(mealType, items, previewToken, constraints) =>
+            commit.mutate({ mealType, items, previewToken, constraints })
           }
         />
       )}
