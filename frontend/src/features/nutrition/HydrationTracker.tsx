@@ -417,7 +417,7 @@ export function HydrationTracker({
       demo: boolean;
       boundary?: AuthDiscard;
     }) =>
-      api<HydrationEntry>('/api/v1/nutrition/hydration/entries', {
+      api<HydrationEntry>('/api/v1/nutrition/hydration/entries/v2', {
         method: 'POST',
         headers: { 'Idempotency-Key': request.key, 'X-YFC-Hydration-Protocol': '2' },
         body: {
