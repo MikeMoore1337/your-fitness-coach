@@ -121,6 +121,28 @@ def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(cl
         json=payload,
     )
     assert bad_version.status_code == 409
+    without_v2_header = client.post(
+        "/api/v1/nutrition/hydration/entries/v2",
+        headers={**legacy_headers, "Idempotency-Key": "legacy-water-0004"},
+        json=payload,
+    )
+    assert without_v2_header.status_code == 409
+    invalid_v2_header = client.post(
+        "/api/v1/nutrition/hydration/entries/v2",
+        headers={
+            **headers,
+            "Idempotency-Key": "legacy-water-0005",
+            "X-YFC-Hydration-Protocol": "1",
+        },
+        json=payload,
+    )
+    assert invalid_v2_header.status_code == 409
+    legacy_url_with_v2_header = client.post(
+        "/api/v1/nutrition/hydration/entries",
+        headers={**headers, "Idempotency-Key": "legacy-water-0006"},
+        json=payload,
+    )
+    assert legacy_url_with_v2_header.status_code == 409
 
     # Never collapse two explicit new intentions just because volume and time match.
     second = client.post(
