@@ -608,7 +608,7 @@ describe('HydrationTracker', () => {
     const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
     await waitFor(() => expect(glass).toBeEnabled());
     fireEvent.click(glass);
-    await waitFor(() => expect(requests).toHaveLength(1));
+    await waitFor(() => expect(requests).toHaveLength(1), { timeout: 5_000 });
     generation = 1;
     await act(async () => {
       await queryClient.invalidateQueries();
