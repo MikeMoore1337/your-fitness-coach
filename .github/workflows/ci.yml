@@ -304,6 +304,8 @@ jobs:
           npx playwright --version
           test -d /ms-playwright
       - name: Run shared frontend E2E group
+        env:
+          PW_TEST_REPORTER: ${{ github.event_name == 'pull_request' && format('{0}/scripts/playwright_ci_timing.cjs', github.workspace) || '' }}
         run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/5"
       - name: Upload Playwright traces on failure
         if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
