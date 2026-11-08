@@ -69,7 +69,7 @@ test('a second tab retries a lost response before adding a new glass', async ({
       const request = route.request();
       const key = request.headers()['idempotency-key'];
       if (!key) throw new Error('Missing idempotency key');
-    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
+      expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
       keys.push(key);
       if (!saved.has(key))
         saved.set(key, {
@@ -125,7 +125,7 @@ test('a late lost response cannot undo confirmation from another tab', async ({
       const request = route.request();
       const key = request.headers()['idempotency-key'];
       if (!key) throw new Error('Missing idempotency key');
-    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
+      expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
       keys.push(key);
       const first = keys.length === 1;
       if (!saved.has(key))
@@ -187,7 +187,7 @@ test('simultaneous tabs use one request key without Web Locks', async ({ page, c
       const request = route.request();
       const key = request.headers()['idempotency-key'];
       if (!key) throw new Error('Missing idempotency key');
-    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
+      expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
       keys.push(key);
       if (!saved.has(key))
         saved.set(key, {
