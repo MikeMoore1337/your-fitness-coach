@@ -1136,7 +1136,11 @@ test('Task 746 meal planner stays separate from diary on mobile day and week vie
   await expect(
     planner.locator('.meal-planner__slots').getByText('Овсяная каша', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('Греческий йогурт', { exact: true })).toBeVisible();
+  const breakfast = page.getByRole('region', { name: 'Завтрак' });
+  const breakfastToggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+  await expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
+  await breakfastToggle.click();
+  await expect(breakfast.getByText('Греческий йогурт', { exact: true })).toBeVisible();
 
   await planner.getByRole('tab', { name: 'Неделя', exact: true }).click();
   await expect(planner.getByText('План недели', { exact: true })).toBeVisible();
@@ -2435,7 +2439,12 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await page.goto('/app?section=nutrition');
 
   await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
-  await expect(page.getByText('Греческий йогурт')).toBeVisible();
+  const initiallyCollapsedBreakfast = page.getByRole('region', { name: 'Завтрак' });
+  const breakfastToggle = initiallyCollapsedBreakfast.getByRole('button', { name: 'Завтрак' });
+  await expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(initiallyCollapsedBreakfast.getByText('Греческий йогурт')).not.toBeVisible();
+  await breakfastToggle.click();
+  await expect(initiallyCollapsedBreakfast.getByText('Греческий йогурт')).toBeVisible();
   await expect(nutritionDaySummary(page)).toHaveCount(1);
   await expect(nutritionDaySummary(page)).toBeVisible();
   await expect(page.getByText('Немного выше ориентира: 20 ккал')).toBeVisible();
@@ -2827,6 +2836,10 @@ test('Russian search supplements local food with USDA generic result and persist
   await expect(entry).toContainText('130');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   await page.reload();
+  const breakfastAfterReload = page.getByRole('region', { name: 'Завтрак' });
+  const reloadedToggle = breakfastAfterReload.getByRole('button', { name: 'Завтрак', exact: true });
+  await expect(reloadedToggle).toHaveAttribute('aria-expanded', 'false');
+  await reloadedToggle.click();
   const reloadedEntry = page
     .locator('.nutrition-entry')
     .filter({ hasText: 'Рис белый приготовленный, без добавления масла' });
@@ -2991,8 +3004,7 @@ for (const width of [320, 360, 393, 430, 1280]) {
         const toggle = page
           .getByRole('region', { name })
           .getByRole('button', { name, exact: true });
-        await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false');
       }
 
       const card = page.locator('.nutrition-food-card');
@@ -3697,6 +3709,13 @@ test('#1429 primary actions remain reachable with 200% text scaling', async ({
     entry_count: 1,
   });
   await page.goto('/app?section=nutrition');
+  await page.setViewportSize({ width: 390, height: 844 });
+  const primaryActionLabel = page.getByTestId('nutrition-add-product').locator('span');
+  await expect(primaryActionLabel).toBeVisible();
+  expect(
+    await primaryActionLabel.evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeLessThan(28);
+  await page.setViewportSize({ width: 320, height: 844 });
   await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
   const repeat = page.getByTestId('nutrition-repeat-default');
   const addFood = page.getByTestId('nutrition-add-product');
