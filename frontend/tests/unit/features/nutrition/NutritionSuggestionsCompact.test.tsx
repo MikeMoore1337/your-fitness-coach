@@ -46,6 +46,8 @@ function response(count: number): Response {
     targets: { energy_kcal: '2000', protein_g: '150', fat_g: '70', carbs_g: '190' },
     remaining: { energy_kcal: '500', protein_g: '50', fat_g: null, carbs_g: '60' },
     remaining_confidence: 'partial',
+    remaining_includes_plan: false,
+    not_calculable: false,
     limitations: ['Часть БЖУ неизвестна.'],
     max_candidates: 6,
     candidates: Array.from({ length: count }, (_, index) => candidate(index + 1)),
