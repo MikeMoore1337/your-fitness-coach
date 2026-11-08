@@ -459,12 +459,11 @@ def test_workflow_keeps_frontend_and_python_shards_independent() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-    assert "name: Frontend smoke (${{ matrix.shard }}/8)" in workflow
-    assert "name: Python tests (${{ matrix.shard }}/8)" in workflow
-    assert "        shard: [1, 2, 3, 4, 5, 6, 7, 8]" in workflow
-    assert "        shard: [1, 2, 3, 4, 5, 6, 7, 8]" in workflow
-    assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/8"' in workflow
-    assert 'run-group python-tests --shard "${{ matrix.shard }}/8"' in workflow
+    assert "name: Frontend smoke (${{ matrix.shard }}/5)" in workflow
+    assert "name: Python tests (${{ matrix.shard }}/5)" in workflow
+    assert workflow.count("        shard: [1, 2, 3, 4, 5]") == 2
+    assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/5"' in workflow
+    assert 'run-group python-tests --shard "${{ matrix.shard }}/5"' in workflow
     assert "name: Frontend (${{ matrix.lane }})" in workflow
     assert "        lane: [checks, unit]" in workflow
     assert "run-group frontend-checks" in workflow
@@ -478,7 +477,7 @@ def test_workflow_keeps_frontend_and_python_shards_independent() -> None:
         == 0
     )
     assert (
-        "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/8)\n    needs: scope-router\n    if:"
+        "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/5)\n    needs: scope-router\n    if:"
         in workflow
     )
     assert (
@@ -601,8 +600,8 @@ def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None
         "count": ci_contract.PYTHON_TEST_SHARD_COUNT,
         "strategy": "pytest-node-round-robin",
     }
-    assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 8
-    assert ci_contract.PYTHON_TEST_SHARD_COUNT == 8
+    assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 5
+    assert ci_contract.PYTHON_TEST_SHARD_COUNT == 5
 
 
 def test_cross_stack_profile_includes_delivery_policy_gates() -> None:

@@ -133,8 +133,8 @@ def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
         "firefox",
         "webkit",
     ]
-    assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 8
-    assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 8
+    assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 5
+    assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 5
 
 
 def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> None:
