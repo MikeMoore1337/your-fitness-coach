@@ -1,9 +1,14 @@
 """Tests of single-collection Python CI sharding."""
 
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from scripts import pytest_shard
+from scripts import pytest_shard, verify_pytest_shards
 
 
 def _invoke(value: str | None, nodeids: list[str]):
@@ -44,3 +49,80 @@ def test_empty_shard_fails_closed() -> None:
 def test_duplicate_node_ids_fail_closed() -> None:
     with pytest.raises(pytest.UsageError, match="Duplicate pytest nodeids"):
         _invoke("1/2", ["a", "a"])
+
+
+def test_receipts_reject_missing_duplicate_or_inconsistent_shards(tmp_path) -> None:
+    nodes = [pytest_shard._digest(str(index)) for index in range(4)]
+    for index in (1, 2):
+        directory = tmp_path / str(index)
+        directory.mkdir()
+        (directory / "receipt.json").write_text(
+            json.dumps({"shard": f"{index}/2", "all": nodes, "selected": nodes[index - 1 :: 2]}),
+            encoding="utf-8",
+        )
+    verify_pytest_shards.verify(tmp_path, 2)
+    second = tmp_path / "2" / "receipt.json"
+    receipt = json.loads(second.read_text(encoding="utf-8"))
+    receipt["selected"] = [nodes[0], nodes[2]]
+    second.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(ValueError, match="selection differs"):
+        verify_pytest_shards.verify(tmp_path, 2)
+    receipt["selected"] = nodes[1::2]
+    receipt["all"] = list(reversed(nodes))
+    second.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(ValueError, match="collection or selection differs"):
+        verify_pytest_shards.verify(tmp_path, 2)
+    receipt["all"] = nodes
+    receipt["shard"] = "1/2"
+    second.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate shard"):
+        verify_pytest_shards.verify(tmp_path, 2)
+    second.unlink()
+    with pytest.raises(ValueError, match="Expected 2 receipts"):
+        verify_pytest_shards.verify(tmp_path, 2)
+
+
+def test_receipt_fails_when_execution_is_missing_or_duplicated(tmp_path) -> None:
+    receipt = pytest_shard.ShardReceipt(str(tmp_path / "receipt.json"))
+    receipt.collections = [{"shard": "1/1", "all": ["a"], "selected": ["a"]}]
+    for executed in ([], ["a", "a"]):
+        receipt.executed = executed
+        session = SimpleNamespace(exitstatus=0)
+        receipt.pytest_sessionfinish(session, 0)
+        assert session.exitstatus == 1
+        assert not receipt.path.exists()
+
+
+def test_receipts_cover_real_xdist_execution(tmp_path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    suite = tmp_path / "test_cases.py"
+    suite.write_text(
+        "import pytest\n@pytest.mark.parametrize('x', range(8))\ndef test_case(x):\n"
+        "    if x == 1: pytest.skip('expected')\n    assert x >= 0\n",
+        encoding="utf-8",
+    )
+    for index in (1, 2):
+        receipt = tmp_path / f"shard-{index}" / "receipt.json"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                str(suite),
+                "-p",
+                "scripts.pytest_shard",
+                f"--yfc-shard={index}/2",
+                "-n",
+                "2",
+                "-q",
+                "-o",
+                f"cache_dir={tmp_path / 'cache'}",
+                f"--basetemp={tmp_path / f'tmp-{index}'}",
+            ],
+            cwd=root,
+            env={**os.environ, "YFC_PYTEST_SHARD_RECEIPT": str(receipt)},
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+    verify_pytest_shards.verify(tmp_path, 2)

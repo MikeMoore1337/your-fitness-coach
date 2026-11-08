@@ -445,6 +445,26 @@ def test_workflow_keeps_frontend_and_python_shards_independent() -> None:
     )
 
 
+def test_required_checks_verify_current_attempt_python_receipts() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    python_job = workflow.split("  python-tests:\n", 1)[1].split("  migrated-stack:\n", 1)[0]
+    checks = workflow.split("  checks:\n", 1)[1]
+    assert "YFC_PYTEST_SHARD_RECEIPT:" in python_job
+    assert "if-no-files-found: error" in python_job
+    assert (
+        "pytest-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}"
+        in python_job
+    )
+    assert "pytest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*" in checks
+    assert "scripts/verify_pytest_shards.py" in checks
+    assert (
+        checks.count(
+            "needs.scope-router.outputs.run_python == 'true' && needs.python-tests.result == 'success'"
+        )
+        == 2
+    )
+
+
 def test_frontend_smoke_uses_existing_pinned_browser_container_without_apt() -> None:
     workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     smoke = workflow.split("  frontend-smoke:\n", 1)[1]

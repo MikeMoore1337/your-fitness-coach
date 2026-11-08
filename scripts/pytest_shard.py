@@ -7,11 +7,58 @@ Sharding happens during normal test collection, eliminating the separate
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import re
+import sys
+from collections import Counter
+from pathlib import Path
 
 import pytest
 
 _SHARD_RE = re.compile(r"([1-9][0-9]*)/([1-9][0-9]*)\Z")
+
+
+def _digest(nodeid: str) -> str:
+    return hashlib.sha256(nodeid.encode("utf-8")).hexdigest()
+
+
+class ShardReceipt:
+    def __init__(self, path: str) -> None:
+        self.path = Path(path)
+        self.collections: list[dict] = []
+        self.executed: list[str] = []
+
+    @pytest.hookimpl(optionalhook=True)
+    def pytest_testnodedown(self, node, error) -> None:
+        if not error and "yfc_shard_receipt" in node.workeroutput:
+            self.collections.append(node.workeroutput["yfc_shard_receipt"])
+
+    def pytest_runtest_logreport(self, report) -> None:
+        if report.when == "setup":
+            self.executed.append(_digest(report.nodeid))
+
+    def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
+        if exitstatus != 0:
+            return
+        if not self.collections or any(c != self.collections[0] for c in self.collections):
+            print("Python shard worker collections are missing or inconsistent", file=sys.stderr)
+            session.exitstatus = 1
+            return
+        receipt = self.collections[0]
+        if Counter(receipt["selected"]) != Counter(self.executed):
+            print("Python shard execution differs from selection", file=sys.stderr)
+            session.exitstatus = 1
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(receipt), encoding="utf-8")
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    path = os.environ.get("YFC_PYTEST_SHARD_RECEIPT")
+    if path and not hasattr(config, "workerinput"):
+        config.pluginmanager.register(ShardReceipt(path), "yfc-shard-receipt")
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -41,6 +88,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     chosen = items[number - 1 :: count]
     if not chosen:
         raise pytest.UsageError(f"Empty pytest shard {value}; refusing false green")
+    if hasattr(config, "workeroutput") and os.environ.get("YFC_PYTEST_SHARD_RECEIPT"):
+        config.workeroutput["yfc_shard_receipt"] = {
+            "shard": value,
+            "all": [_digest(item.nodeid) for item in items],
+            "selected": [_digest(item.nodeid) for item in chosen],
+        }
     deselected = [item for index, item in enumerate(items) if index % count != number - 1]
     items[:] = chosen
     config.hook.pytest_deselected(items=deselected)
