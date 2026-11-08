@@ -413,6 +413,10 @@ def test_demo_hydration_rejects_delayed_request_after_reset(client) -> None:
         "_hydration_retry_key": "before-reset",
         "_hydration_generation": generation,
     }
+    # An old tab still using the legacy transport path must be denied.
+    assert _transport(
+        client, token, "/api/v1/nutrition/hydration/entries", "POST", body
+    ).status_code == 409
     assert _transport(client, token, path, "POST", body).status_code == 200
     assert (
         client.post(
