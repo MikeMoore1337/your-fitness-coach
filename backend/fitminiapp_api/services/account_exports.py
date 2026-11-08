@@ -50,7 +50,7 @@ def _csv_cell(value: object) -> object:
         return ""
     encoded = jsonable_encoder(value)
     if isinstance(encoded, str):
-        if encoded.startswith(("=", "+", "-", "@", "\t", "\r")):
+        if encoded.startswith(("\t", "\r")) or encoded.lstrip().startswith(("=", "+", "-", "@")):
             return f"'{encoded}"
         return encoded
     if isinstance(encoded, (int, float, bool)):
