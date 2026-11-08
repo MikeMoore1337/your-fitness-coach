@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PNG } from './fixtures/landing-pixels';
@@ -775,6 +776,72 @@ async function mockNutritionApi(
         },
       });
     }
+    if (
+      (path === '/api/v1/nutrition/plans/suggestions/preview' ||
+        path === '/api/v1/nutrition/diary/suggestions/preview') &&
+      request.method() === 'POST'
+    ) {
+      const body = request.postDataJSON() as {
+        diary_date?: string;
+        plan_date?: string;
+        meal_type: string;
+        items: { position?: number; food_id: number; amount: string; amount_unit: string }[];
+      };
+      const planPreview = path.includes('/plans/');
+      const date = body.diary_date ?? body.plan_date ?? '2026-08-19';
+      const amount = Number(body.items[0]?.amount ?? '100') / 100;
+      const addition = {
+        energy_kcal: String(Number(oatmealFood.energy_kcal_per_100g) * amount),
+        protein_g: String(Number(oatmealFood.protein_g_per_100g) * amount),
+        fat_g: planPreview ? String(Number(oatmealFood.fat_g_per_100g) * amount) : null,
+        carbs_g: String(Number(oatmealFood.carbs_g_per_100g) * amount),
+        fiber_g: String(Number(oatmealFood.fiber_g_per_100g) * amount),
+      };
+      const before = planPreview ? plannerPlanned : yogurtEntry.nutrition;
+      const after = {
+        energy_kcal: String(Number(before.energy_kcal) + Number(addition.energy_kcal)),
+        protein_g: String(Number(before.protein_g) + Number(addition.protein_g)),
+        fat_g:
+          before.fat_g === null || addition.fat_g === null
+            ? null
+            : String(Number(before.fat_g) + Number(addition.fat_g)),
+        carbs_g: String(Number(before.carbs_g) + Number(addition.carbs_g)),
+        fiber_g:
+          before.fiber_g === null || addition.fiber_g === null
+            ? null
+            : String(Number(before.fiber_g) + Number(addition.fiber_g)),
+      };
+      return route.fulfill({
+        json: {
+          diary_date: date,
+          meal_type: body.meal_type,
+          items: body.items.map((item, index) => ({
+            ...item,
+            position: item.position ?? index,
+            recipe_id: null,
+            nutrition: addition,
+          })),
+          before,
+          addition,
+          after,
+          diary: yogurtEntry.nutrition,
+          planned: plannerPlanned,
+          projected_after: after,
+          targets: plannerTargets,
+          target_id: 1,
+          target_source: 'manual',
+          target_effective_from: date,
+          target_weight_kg: null,
+          target_goal: null,
+          target_estimated_bmr_kcal: null,
+          target_estimated_tdee_kcal: null,
+          constraint_status: 'not_set',
+          constraint_messages: [],
+          preference_message: null,
+          preview_token: createHash('sha256').update(JSON.stringify(body)).digest('hex'),
+        },
+      });
+    }
     if (path === '/api/v1/nutrition/plans/fill' && request.method() === 'POST') {
       plannerRevision += 1;
       return route.fulfill({ json: plannerDay('2026-08-19') });
@@ -816,6 +883,8 @@ async function mockNutritionApi(
           carbs_g: '60.000',
         },
         remaining_confidence: 'partial',
+        remaining_includes_plan: false,
+        not_calculable: false,
         limitations: ['Часть БЖУ неизвестна: неполные записи не превращаются в нули.'],
         max_candidates: 6,
         candidates: [
@@ -1189,6 +1258,7 @@ test('Task 747 mocked TMA keeps plan fill explicit and bridges one planned item 
       request.url().includes('/api/v1/nutrition/plans/fill') && request.method() === 'POST',
   );
   await planSuggestions.getByRole('button', { name: 'Проверить вариант' }).click();
+  await expect(planSuggestions.getByRole('button', { name: 'Добавить в план' })).toBeEnabled();
   await planSuggestions.getByRole('button', { name: 'Добавить в план' }).click();
   expect((await fillRequest).postDataJSON()).toMatchObject({
     candidate_id: 'food:7',
@@ -1314,12 +1384,14 @@ test('macro-aware suggestions show partial evidence and require an editable conf
   await suggestions.getByLabel('Приём пищи').selectOption('dinner');
   await expect.poll(apiState.getSuggestionCommitCount).toBe(0);
 
+  await expect(suggestions.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled();
   await suggestions.getByRole('button', { name: 'Добавить выбранное' }).click();
   await expect.poll(apiState.getSuggestionCommitCount).toBe(1);
   expect(apiState.getLastSuggestionCommit()).toEqual({
     diary_date: '2026-08-19',
     meal_type: 'dinner',
     items: [{ food_id: 7, amount: '150', amount_unit: 'g' }],
+    preview_token: expect.stringMatching(/^[0-9a-f]{64}$/),
   });
 });
 

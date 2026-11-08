@@ -50,6 +50,29 @@ for (const width of [320, 390, 1280]) {
       let changedProgram = false;
       let empty = false;
       let writes = 0;
+      await page.route('**/api/v1/nutrition/diary/suggestions?**', (route) => {
+        const active = saved ? { ...target, calories: 2250 } : target;
+        const goals = empty
+          ? null
+          : {
+              energy_kcal: String(active.calories),
+              protein_g: String(active.protein_g),
+              fat_g: String(active.fat_g),
+              carbs_g: String(active.carbs_g),
+            };
+        return route.fulfill({
+          json: {
+            mode: 'deterministic',
+            diary_date: selected,
+            targets: goals,
+            remaining: goals,
+            remaining_confidence: empty ? null : 'exact',
+            limitations: [],
+            candidates: [],
+            max_candidates: 6,
+          },
+        });
+      });
       await page.route('**/api/v1/nutrition/diary?**', async (route) => {
         const diaryDate = new URL(route.request().url()).searchParams.get('diary_date');
         const active = saved ? { ...target, calories: 2250 } : target;
@@ -259,7 +282,7 @@ for (const width of [320, 390, 1280]) {
       empty = true;
       await page.goto(`/app?section=nutrition&date=${selected}`);
       await expect(page.getByText('Без цели', { exact: true })).toBeVisible();
-      await expect(page.getByText('Пока нет готовых вариантов')).toBeVisible();
+      await expect(page.getByText('Нет цели КБЖУ на эту дату')).toBeVisible();
       await capture('empty');
       await noOverflow();
     });
