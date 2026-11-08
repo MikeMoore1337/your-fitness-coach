@@ -84,41 +84,60 @@ def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(cl
         key: value for key, value in headers.items() if key != "X-YFC-Hydration-Protocol"
     }
     date = today_in_timezone("Europe/Moscow").isoformat()
-    payload = {"volume_ml": 250, "beverage_type": "water", "source": "quick_preset",
-               "diary_date": date}
-    old = client.post("/api/v1/nutrition/hydration/entries",
-                      headers={**legacy_headers, "Idempotency-Key": "legacy-water-0001"},
-                      json=payload)
+    payload = {
+        "volume_ml": 250,
+        "beverage_type": "water",
+        "source": "quick_preset",
+        "diary_date": date,
+    }
+    old = client.post(
+        "/api/v1/nutrition/hydration/entries",
+        headers={**legacy_headers, "Idempotency-Key": "legacy-water-0001"},
+        json=payload,
+    )
     assert old.status_code == 409
     assert "Обновите приложение" in old.json()["detail"]
 
     new_headers = {**headers, "Idempotency-Key": "new-water-0001"}
-    first = client.post("/api/v1/nutrition/hydration/entries",
-                        headers=new_headers, json=payload)
-    replay = client.post("/api/v1/nutrition/hydration/entries",
-                         headers=new_headers, json=payload)
+    first = client.post(
+        "/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload
+    )
+    replay = client.post(
+        "/api/v1/nutrition/hydration/entries", headers=new_headers, json=payload
+    )
     assert first.status_code == replay.status_code == 201
     assert first.json()["id"] == replay.json()["id"]
 
     # A legacy tab is rejected even after the new tab has logged a drink.
-    after = client.post("/api/v1/nutrition/hydration/entries",
-                        headers={**legacy_headers, "Idempotency-Key": "legacy-water-0002"},
-                        json=payload)
+    after = client.post(
+        "/api/v1/nutrition/hydration/entries",
+        headers={**legacy_headers, "Idempotency-Key": "legacy-water-0002"},
+        json=payload,
+    )
     assert after.status_code == 409
-    bad_version = client.post("/api/v1/nutrition/hydration/entries",
-                              headers={**headers, "Idempotency-Key": "legacy-water-0003",
-                                       "X-YFC-Hydration-Protocol": "1"},
-                              json=payload)
+    bad_version = client.post(
+        "/api/v1/nutrition/hydration/entries",
+        headers={
+            **headers,
+            "Idempotency-Key": "legacy-water-0003",
+            "X-YFC-Hydration-Protocol": "1",
+        },
+        json=payload,
+    )
     assert bad_version.status_code == 409
 
     # Never collapse two explicit new intentions just because volume and time match.
-    second = client.post("/api/v1/nutrition/hydration/entries",
-                         headers={**headers, "Idempotency-Key": "new-water-0002"},
-                         json=payload)
+    second = client.post(
+        "/api/v1/nutrition/hydration/entries",
+        headers={**headers, "Idempotency-Key": "new-water-0002"},
+        json=payload,
+    )
     assert second.status_code == 201
     assert second.json()["id"] != first.json()["id"]
-    day = client.get("/api/v1/nutrition/hydration", headers=headers,
-                     params={"diary_date": date})
+
+    day = client.get(
+        "/api/v1/nutrition/hydration", headers=headers, params={"diary_date": date}
+    )
     assert day.status_code == 200
     assert len(day.json()["entries"]) == 2
     assert day.json()["total_ml"] == 500
