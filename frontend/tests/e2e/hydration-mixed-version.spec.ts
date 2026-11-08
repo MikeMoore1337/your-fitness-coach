@@ -72,7 +72,7 @@ test('real legacy and v2 tabs cannot double-write, but distinct v2 drinks persis
 
   await oldPage.goto(`/app?section=nutrition&date=${date}`);
   await page.goto(`/app?section=nutrition&date=${date}`);
-  const hydration = (current: typeof page) => current.getByRole('region', { name: 'Гидратация' });
+  const hydration = (tab: typeof page) => tab.getByRole('region', { name: 'Гидратация' });
   const glass = (current: typeof page) =>
     hydration(current).getByRole('button', { name: /Стакан, добавить 250 мл/ });
 
