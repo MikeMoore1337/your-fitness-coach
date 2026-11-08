@@ -10,11 +10,12 @@ test('a lost water response is retried once after reload and a later glass is ne
   await installPlatformApi(page, { browserSession: true, fixedDate: date });
   const saved = new Map<string, Record<string, unknown>>();
   const keys: string[] = [];
-  await page.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+  await page.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     const request = route.request();
     const key = request.headers()['idempotency-key'];
     if (!key) throw new Error('Missing idempotency key');
+    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
     keys.push(key);
     if (!saved.has(key)) {
       saved.set(key, {
@@ -63,11 +64,12 @@ test('a second tab retries a lost response before adding a new glass', async ({
   for (const current of [page, other]) {
     await current.setViewportSize({ width: 393, height: 844 });
     await installPlatformApi(current, { browserSession: true, fixedDate: date });
-    await current.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+    await current.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
       const request = route.request();
       const key = request.headers()['idempotency-key'];
       if (!key) throw new Error('Missing idempotency key');
+    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
       keys.push(key);
       if (!saved.has(key))
         saved.set(key, {
@@ -118,11 +120,12 @@ test('a late lost response cannot undo confirmation from another tab', async ({
   });
   for (const current of [page, other]) {
     await installPlatformApi(current, { browserSession: true, fixedDate: date });
-    await current.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+    await current.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
       const request = route.request();
       const key = request.headers()['idempotency-key'];
       if (!key) throw new Error('Missing idempotency key');
+    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
       keys.push(key);
       const first = keys.length === 1;
       if (!saved.has(key))
@@ -179,11 +182,12 @@ test('simultaneous tabs use one request key without Web Locks', async ({ page, c
       Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined }),
     );
     await installPlatformApi(current, { browserSession: true, fixedDate: date });
-    await current.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+    await current.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
       const request = route.request();
       const key = request.headers()['idempotency-key'];
       if (!key) throw new Error('Missing idempotency key');
+    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
       keys.push(key);
       if (!saved.has(key))
         saved.set(key, {
@@ -229,11 +233,12 @@ test('mocked Telegram retries water after a lost response', async ({ page }) => 
   await installPlatformApi(page, { fixedDate: date });
   const saved = new Map<string, Record<string, unknown>>();
   const keys: string[] = [];
-  await page.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+  await page.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
     if (route.request().method() !== 'POST') return route.fallback();
     const request = route.request();
     const key = request.headers()['idempotency-key'];
     if (!key) throw new Error('Missing idempotency key');
+    expect(request.headers()['x-yfc-hydration-protocol']).toBe('2');
     keys.push(key);
     if (!saved.has(key))
       saved.set(key, {
