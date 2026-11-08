@@ -10,16 +10,16 @@ test('real legacy and v2 tabs cannot double-write, but distinct v2 drinks persis
   context,
 }) => {
   const oldDist = process.env.YFC_LEGACY_HYDRATION_DIST;
-  test.skip(!oldDist, 'Requires the SHA-pinned pre-change frontend built by the hydration CI lane');
+  test.skip(!oldDist, 'Requires the SHA-pinned pre-change frontend in CI');
   if (!oldDist) throw new Error('Missing the legacy frontend build');
   expect(existsSync(join(oldDist, 'index.html'))).toBe(true);
 
   const date = '2026-10-10';
   const oldPage = await context.newPage();
   let legacyJavascriptLoaded = 0;
-  await oldPage.route((url) => url.pathname === '/app', (route) =>
-    route.fulfill({ path: join(oldDist, 'index.html'), contentType: 'text/html' }),
-  );
+  await oldPage.route((url) => url.pathname === '/app', async (route) => {
+    await route.fulfill({ path: join(oldDist, 'index.html'), contentType: 'text/html' });
+  });
   await oldPage.route((url) => url.pathname.startsWith('/assets/'), async (route) => {
     const asset = new URL(route.request().url()).pathname.slice('/assets/'.length);
     if (!/^[a-zA-Z0-9._-]+$/.test(asset)) return route.abort();
@@ -72,8 +72,7 @@ test('real legacy and v2 tabs cannot double-write, but distinct v2 drinks persis
 
   await oldPage.goto(`/app?section=nutrition&date=${date}`);
   await page.goto(`/app?section=nutrition&date=${date}`);
-  const hydration = (current: typeof page) =>
-    current.getByRole('region', { name: 'Гидратация' });
+  const hydration = (current: typeof page) => current.getByRole('region', { name: 'Гидратация' });
   const glass = (current: typeof page) =>
     hydration(current).getByRole('button', { name: /Стакан, добавить 250 мл/ });
 
