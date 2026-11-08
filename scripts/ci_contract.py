@@ -467,6 +467,9 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
     ),
 }
 
+MIGRATED_RACE_COMMANDS = frozenset({"rest-pg16-replay-and-races", "program-cycle-pg16-races"})
+MIGRATED_SETUP_COMMANDS = frozenset({"migrations-upgrade", "migrations-check"})
+
 
 PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
     "frontend": (
@@ -1297,7 +1300,7 @@ def _check_prerequisite(root: Path, prerequisite: str, env: Mapping[str, str]) -
 
 
 def missing_prerequisites(
-    group: str, *, root: Path, env: Mapping[str, str] | None = None
+    group: str, *, root: Path, env: Mapping[str, str] | None = None, lane: str | None = None
 ) -> list[str]:
     if group not in COMMAND_GROUPS:
         raise CIContractError(f"Unknown CI command group: {group}")
@@ -1305,6 +1308,11 @@ def missing_prerequisites(
     return [
         missing
         for prerequisite in COMMAND_GROUPS[group].prerequisites
+        if not (
+            group == "migrated-stack"
+            and lane == "races"
+            and prerequisite in {"npm", "frontend/node_modules"}
+        )
         if (missing := _check_prerequisite(root, prerequisite, values)) is not None
     ]
 
@@ -1418,12 +1426,18 @@ def _sharded_python_command(
 
 
 def _sharded_frontend_command(
-    command: CommandSpec, *, shard_index: int, shard_count: int
+    command: CommandSpec, *, shard_index: int, shard_count: int, env: Mapping[str, str]
 ) -> CommandSpec:
     shard_label = f"{shard_index + 1}/{shard_count}"
+    selection = (
+        f"--test-list={env['YFC_E2E_TEST_LIST']}"
+        if env.get("YFC_E2E_TEST_LIST")
+        else f"--shard={shard_label}"
+    )
+    flags = (selection, "--forbid-only") if env.get("YFC_E2E_TEST_LIST") else (selection,)
     return CommandSpec(
         name=f"{command.name}-shard",
-        argv=(*command.argv, "--", f"--shard={shard_label}"),
+        argv=(*command.argv, "--", *flags),
         cwd=command.cwd,
     )
 
@@ -1459,9 +1473,12 @@ def run_group(
     env: Mapping[str, str] | None = None,
     shard: str | None = None,
     local: bool = False,
+    lane: str | None = None,
 ) -> None:
     if group not in COMMAND_GROUPS:
         raise CIContractError(f"Unknown CI command group: {group}")
+    if lane is not None and (group != "migrated-stack" or lane not in {"browser", "races"}):
+        raise CIContractError("Invalid migrated-stack lane")
     project_root = (root or Path.cwd()).resolve()
     effective_env = dict(os.environ) | dict(env or {})
     shard_index: int | None = None
@@ -1470,11 +1487,19 @@ def run_group(
         if group not in SHARDABLE_GROUPS:
             raise CIContractError(f"CI group {group} does not support sharding")
         shard_index, shard_count = parse_shard(shard)
-    missing = missing_prerequisites(group, root=project_root, env=effective_env)
+    missing = missing_prerequisites(group, root=project_root, env=effective_env, lane=lane)
     if missing:
         raise CIContractError(f"Required prerequisite missing for {group}: {', '.join(missing)}")
     spec = COMMAND_GROUPS[group]
+    if lane and not (MIGRATED_RACE_COMMANDS | MIGRATED_SETUP_COMMANDS).issubset(
+        {c.name for c in spec.commands}
+    ):
+        raise CIContractError("Migrated-stack lane commands are incomplete")
     for command in spec.commands:
+        if lane == "browser" and command.name in MIGRATED_RACE_COMMANDS:
+            continue
+        if lane == "races" and command.name not in MIGRATED_RACE_COMMANDS | MIGRATED_SETUP_COMMANDS:
+            continue
         effective_command = command
         if shard_index is not None and shard_count is not None:
             if group == "python-tests" and command.name == "python-suite":
@@ -1487,7 +1512,7 @@ def run_group(
                 )
             elif group == "frontend-e2e":
                 effective_command = _sharded_frontend_command(
-                    command, shard_index=shard_index, shard_count=shard_count
+                    command, shard_index=shard_index, shard_count=shard_count, env=effective_env
                 )
         if local:
             effective_command = _local_command(
@@ -1579,6 +1604,7 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("group", choices=sorted(COMMAND_GROUPS))
     run.add_argument("--root", type=Path, default=Path.cwd())
     run.add_argument("--shard")
+    run.add_argument("--lane", choices=("browser", "races"))
     route = subparsers.add_parser("route")
     route.add_argument(
         "--event", choices=("pull_request", "push", "schedule", "workflow_dispatch"), required=True
@@ -1614,7 +1640,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(list(groups), ensure_ascii=False))
             return 0
         if args.command == "run-group":
-            run_group(args.group, root=args.root, shard=args.shard)
+            run_group(args.group, root=args.root, shard=args.shard, lane=args.lane)
             return 0
         if args.command == "route":
             decision = route_repository(

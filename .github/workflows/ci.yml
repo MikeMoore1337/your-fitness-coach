@@ -254,7 +254,7 @@ jobs:
           browser: node-unit
 
   frontend-smoke:
-    name: Frontend smoke (${{ matrix.shard }}/5)
+    name: Frontend smoke (${{ matrix.shard }}/15)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_smoke == 'true'
     runs-on: ubuntu-latest
@@ -267,10 +267,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     env:
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-e2e-shard-{1}', github.workspace, matrix.shard) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
+      YFC_E2E_SHARD: ${{ matrix.shard }}/15
+      YFC_E2E_PLAN_DIR: ${{ github.workspace }}/.artifacts/runtime/tests/playwright-shard
 
     steps:
       - uses: actions/checkout@v4
@@ -294,6 +296,15 @@ jobs:
         if: needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
         run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Plan balanced Playwright shard
+        working-directory: frontend
+        env:
+          PW_EXTERNAL_SERVER: "1"
+          PW_TEST_REPORTER: ${{ github.workspace }}/scripts/playwright_ci_plan.cjs
+        run: |
+          npx playwright test --list --reporter=github --forbid-only
+          test -s "$YFC_E2E_PLAN_DIR/tests.txt"
+          test -s "$YFC_E2E_PLAN_DIR/plan.json"
       - name: Build frontend for smoke tests
         working-directory: frontend
         run: npx vite build
@@ -305,8 +316,17 @@ jobs:
           test -d /ms-playwright
       - name: Run shared frontend E2E group
         env:
-          PW_TEST_REPORTER: ${{ github.event_name == 'pull_request' && format('{0}/scripts/playwright_ci_timing.cjs', github.workspace) || '' }}
-        run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/5"
+          PW_TEST_REPORTER: ${{ github.workspace }}/scripts/playwright_ci_timing.cjs
+          YFC_E2E_TEST_LIST: ${{ env.YFC_E2E_PLAN_DIR }}/tests.txt
+        run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/15"
+      - name: Upload Playwright shard receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+          path: .artifacts/runtime/tests/playwright-shard/receipt.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
       - name: Upload Playwright traces on failure
         if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
@@ -699,7 +719,7 @@ jobs:
           browser: python-shard-${{ matrix.shard }}
 
   migrated-stack:
-    name: Migrated PostgreSQL stack
+    name: Migrated PostgreSQL stack (${{ matrix.lane }})
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_migrated_stack == 'true'
     runs-on: ubuntu-latest
@@ -708,12 +728,16 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [browser, races]
     env:
       # setup-python's Ubuntu 26.04 toolcache links to OpenSSL 3.3, unavailable
       # in this pinned Ubuntu 24.04 image. Use uv's portable Python instead.
       UV_SYSTEM_PYTHON: "0"
       UV_MANAGED_PYTHON: "1"
-      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/migrated-stack', github.workspace) || '' }}
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/migrated-stack-{1}', github.workspace, matrix.lane) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     services:
       db:
@@ -732,12 +756,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        if: matrix.lane == 'browser'
         id: npm-setup
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Report npm cache
+        if: matrix.lane == 'browser'
         run: |
           echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
           echo "CI_CACHE package=npm path=$(npm config get cache)"
@@ -757,21 +783,23 @@ jobs:
           uv sync --locked --no-default-groups --extra backend --group dev
           .venv/bin/python -c 'import ssl, psycopg; print(ssl.OPENSSL_VERSION, psycopg.__version__)'
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
-          npm --prefix frontend ci
+          if [ '${{ matrix.lane }}' = browser ]; then npm --prefix frontend ci; fi
       - name: Sync scheduled Pytest Allure adapter
         if: needs.scope-router.outputs.run_scheduled_report == 'true'
         run: uv sync --locked --no-default-groups --extra backend --group dev --group scheduled-report
       - name: Install scheduled Playwright reporter
-        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        if: needs.scope-router.outputs.run_scheduled_report == 'true' && matrix.lane == 'browser'
         working-directory: frontend
         run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Verify baked Playwright Chromium
+        if: matrix.lane == 'browser'
         working-directory: frontend
         run: |
           test "${PLAYWRIGHT_BROWSERS_PATH:-}" = /ms-playwright
           npx playwright --version
           test -d /ms-playwright
       - name: Build frontend preview
+        if: matrix.lane == 'browser'
         working-directory: frontend
         run: npm run build
       - name: Run shared migrated-stack group
@@ -788,7 +816,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-        run: python scripts/ci_contract.py run-group migrated-stack
+        run: python scripts/ci_contract.py run-group migrated-stack --lane ${{ matrix.lane }}
       - name: Upload encrypted Allure results
         if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
         uses: ./.github/actions/upload-allure-results
@@ -797,10 +825,10 @@ jobs:
         with:
           enabled: "true"
           source: ${{ env.ALLURE_RESULTS_DIR }}
-          bundle: .artifacts/runtime/tests/allure-bundles/migrated-stack.enc
-          artifact-name: allure-results-${{ github.run_id }}-migrated-stack
+          bundle: .artifacts/runtime/tests/allure-bundles/migrated-stack-${{ matrix.lane }}.enc
+          artifact-name: allure-results-${{ github.run_id }}-migrated-stack-${{ matrix.lane }}
           suite: migrated-stack
-          browser: chromium-api
+          browser: ${{ matrix.lane }}
 
   dependency-audit:
     name: Dependency audit
@@ -1389,6 +1417,7 @@ jobs:
             scripts/ci_contract.py
             scripts/scheduled_regression.py
             scripts/verify_pytest_shards.py
+            scripts/verify_playwright_shards.py
           sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
         with:
@@ -1402,6 +1431,15 @@ jobs:
       - name: Verify Python shard coverage
         if: needs.scope-router.outputs.run_python == 'true' && needs.python-tests.result == 'success'
         run: python scripts/verify_pytest_shards.py .artifacts/runtime/tests/python-shards
+      - name: Download Playwright shard receipts
+        if: needs.scope-router.outputs.run_frontend_smoke == 'true' && needs.frontend-smoke.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-shard-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: .artifacts/runtime/tests/playwright-shards
+      - name: Verify Playwright shard coverage
+        if: needs.scope-router.outputs.run_frontend_smoke == 'true' && needs.frontend-smoke.result == 'success'
+        run: python scripts/verify_playwright_shards.py .artifacts/runtime/tests/playwright-shards
       # The required "checks" result must deny direct feature->master PRs.
       # Same-repository dev is the sole normal production promotion source.
       - name: Require accepted dev promotion for master PR

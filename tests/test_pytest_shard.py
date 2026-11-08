@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from scripts import pytest_shard, verify_pytest_shards
+from scripts import pytest_shard, verify_playwright_shards, verify_pytest_shards
 
 
 def _invoke(value: str | None, nodeids: list[str]):
@@ -80,6 +80,27 @@ def test_receipts_reject_missing_duplicate_or_inconsistent_shards(tmp_path) -> N
     second.unlink()
     with pytest.raises(ValueError, match="Expected 2 receipts"):
         verify_pytest_shards.verify(tmp_path, 2)
+
+
+def test_playwright_receipts_reject_duplicate_or_missing_tests(tmp_path) -> None:
+    nodes = ["a", "b", "c", "d"]
+    for index in (1, 2):
+        directory = tmp_path / str(index)
+        directory.mkdir()
+        (directory / "receipt.json").write_text(
+            json.dumps({"shard": f"{index}/2", "all": nodes, "selected": nodes[index - 1 :: 2]}),
+            encoding="utf-8",
+        )
+    verify_playwright_shards.verify(tmp_path, 2)
+    second = tmp_path / "2" / "receipt.json"
+    receipt = json.loads(second.read_text(encoding="utf-8"))
+    receipt["selected"] = ["a", "d"]
+    second.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(ValueError, match="coverage differs"):
+        verify_playwright_shards.verify(tmp_path, 2)
+    second.unlink()
+    with pytest.raises(ValueError, match="Expected 2 receipts"):
+        verify_playwright_shards.verify(tmp_path, 2)
 
 
 def test_receipt_fails_when_execution_is_missing_or_duplicated(tmp_path) -> None:
