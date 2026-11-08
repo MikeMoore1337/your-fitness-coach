@@ -131,76 +131,119 @@ function renderPlanner() {
 describe('MealPlanner', () => {
   beforeEach(() => {
     apiMock.mockReset();
-    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
-      if (path.includes('/plans/suggestions'))
-        return Promise.resolve({
-          mode: 'deterministic',
-          diary_date: '2026-08-19',
-          targets,
-          remaining: {
-            energy_kcal: '1880.00',
-            protein_g: '128.000',
-            fat_g: '66.000',
-            carbs_g: '212.000',
-          },
-          remaining_confidence: 'exact',
-          limitations: [],
-          max_candidates: 6,
-          candidates: [
-            {
-              candidate_id: 'food:11',
-              candidate_kind: 'food',
-              identity_id: 11,
-              name: 'Овсянка',
-              items: [
-                {
-                  position: 0,
-                  item_kind: 'food',
-                  food_id: 11,
-                  recipe_id: null,
-                  name: 'Овсянка',
-                  brand: null,
-                  amount: '100.000',
-                  amount_unit: 'g',
-                  nutrition,
-                  nutrition_confidence: 'exact',
-                },
-              ],
-              nutrition,
-              nutrition_confidence: 'exact',
-              sources: ['recent'],
-              reasons: ['recent'],
+    apiMock.mockImplementation(
+      (path: string, options?: { method?: string; body?: { constraints?: unknown } }) => {
+        if (path === '/api/v1/nutrition/plans/suggestions/preview')
+          return Promise.resolve({
+            diary_date: '2026-08-19',
+            meal_type: 'breakfast',
+            items: [
+              {
+                position: 0,
+                item_kind: 'food',
+                food_id: 11,
+                recipe_id: null,
+                name: 'Овсянка',
+                brand: null,
+                amount: '100.000',
+                amount_unit: 'g',
+                nutrition,
+                nutrition_confidence: 'exact',
+              },
+            ],
+            before: nutrition,
+            addition: nutrition,
+            after: { energy_kcal: '240', protein_g: '24', fat_g: '8', carbs_g: '16', fiber_g: '4' },
+            diary: { energy_kcal: '0', protein_g: '0', fat_g: '0', carbs_g: '0', fiber_g: '0' },
+            planned: nutrition,
+            projected_after: {
+              energy_kcal: '240',
+              protein_g: '24',
+              fat_g: '8',
+              carbs_g: '16',
+              fiber_g: '4',
             },
-          ],
-        });
-      if (options?.method === 'POST' && path.includes('/action'))
-        return Promise.resolve({
-          action: 'consume',
-          item: { ...makeDay().slots[0]!.items[0]!, status: 'consumed', diary_entry_id: 44 },
-          day: makeDay(),
-          diary_entry_id: 44,
-          replayed: false,
-          diagnostic: 'planned_item_consumed',
-        });
-      if (options?.method === 'POST') return Promise.resolve(makeDay());
-      if (path.includes('/plans/day')) return Promise.resolve(makeDay());
-      if (path.includes('/plans/week')) return Promise.resolve(makeWeek());
-      if (path.includes('/foods/favorites'))
-        return Promise.resolve({ items: [], total: 0, limit: 20, offset: 0 });
-      if (path.includes('/foods/recent')) {
-        return Promise.resolve({
-          items: [{ id: 11, name: 'Овсянка', brand: null }],
-          total: 1,
-          limit: 20,
-          offset: 0,
-        });
-      }
-      if (path.includes('/recipes'))
-        return Promise.resolve({ items: [], total: 0, limit: 50, offset: 0 });
-      if (path.includes('/templates'))
-        return Promise.resolve({ items: [], total: 0, limit: 50, offset: 0 });
-      throw new Error(`Unexpected API call: ${path}`);
-    });
+            targets,
+            target_id: 1,
+            target_source: 'manual',
+            target_effective_from: '2026-08-19',
+            target_weight_kg: null,
+            target_goal: null,
+            constraint_status: options?.body?.constraints ? 'satisfied' : 'not_set',
+            constraint_messages: [],
+            preference_message: null,
+            preview_token: 'd'.repeat(64),
+          });
+        if (path.includes('/plans/suggestions'))
+          return Promise.resolve({
+            mode: 'deterministic',
+            diary_date: '2026-08-19',
+            targets,
+            remaining: {
+              energy_kcal: '1880.00',
+              protein_g: '128.000',
+              fat_g: '66.000',
+              carbs_g: '212.000',
+            },
+            remaining_confidence: 'exact',
+            limitations: [],
+            max_candidates: 6,
+            candidates: [
+              {
+                candidate_id: 'food:11',
+                candidate_kind: 'food',
+                identity_id: 11,
+                name: 'Овсянка',
+                items: [
+                  {
+                    position: 0,
+                    item_kind: 'food',
+                    food_id: 11,
+                    recipe_id: null,
+                    name: 'Овсянка',
+                    brand: null,
+                    amount: '100.000',
+                    amount_unit: 'g',
+                    nutrition,
+                    nutrition_confidence: 'exact',
+                  },
+                ],
+                nutrition,
+                nutrition_confidence: 'exact',
+                sources: ['recent'],
+                reasons: ['recent'],
+              },
+            ],
+          });
+        if (options?.method === 'POST' && path.includes('/action'))
+          return Promise.resolve({
+            action: 'consume',
+            item: { ...makeDay().slots[0]!.items[0]!, status: 'consumed', diary_entry_id: 44 },
+            day: makeDay(),
+            diary_entry_id: 44,
+            replayed: false,
+            diagnostic: 'planned_item_consumed',
+          });
+        if (options?.method === 'POST') return Promise.resolve(makeDay());
+        if (path.includes('/plans/day')) return Promise.resolve(makeDay());
+        if (path.includes('/plans/week')) return Promise.resolve(makeWeek());
+        if (path.includes('/foods/favorites'))
+          return Promise.resolve({ items: [], total: 0, limit: 20, offset: 0 });
+        if (path.includes('/foods/recent')) {
+          return Promise.resolve({
+            items: [{ id: 11, name: 'Овсянка', brand: null }],
+            total: 1,
+            limit: 20,
+            offset: 0,
+          });
+        }
+        if (path.includes('/recipes'))
+          return Promise.resolve({ items: [], total: 0, limit: 50, offset: 0 });
+        if (path.includes('/templates'))
+          return Promise.resolve({ items: [], total: 0, limit: 50, offset: 0 });
+        throw new Error(`Unexpected API call: ${path}`);
+      },
+    );
   });
 
   afterEach(() => cleanup());
@@ -249,6 +292,30 @@ describe('MealPlanner', () => {
     });
     fireEvent.click(verifyButton);
     expect(within(planSuggestions).getByRole('button', { name: 'Добавить в план' })).toBeVisible();
+    await waitFor(() =>
+      expect(
+        within(planSuggestions).getByRole('button', { name: 'Добавить в план' }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(within(planSuggestions).getByText('Предпочтения и ограничения'));
+    fireEvent.change(within(planSuggestions).getByLabelText('Жиры, г'), {
+      target: { value: '20' },
+    });
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/plans/suggestions/preview',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            constraints: { max_fat_g: '20', preferred_food_ids: [], excluded_food_ids: [] },
+          }),
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(
+        within(planSuggestions).getByRole('button', { name: 'Добавить в план' }),
+      ).toBeEnabled(),
+    );
     fireEvent.click(within(planSuggestions).getByRole('button', { name: 'Добавить в план' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -258,6 +325,8 @@ describe('MealPlanner', () => {
           body: expect.objectContaining({
             candidate_id: 'food:11',
             expected_revision: 1,
+            preview_token: 'd'.repeat(64),
+            constraints: { max_fat_g: '20', preferred_food_ids: [], excluded_food_ids: [] },
             items: [{ position: 0, food_id: 11, amount: '100.000', amount_unit: 'g' }],
           }),
           headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),

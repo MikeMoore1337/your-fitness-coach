@@ -43,9 +43,11 @@ function response(count: number): Response {
   return {
     mode: 'deterministic',
     diary_date: '2026-11-06',
-    targets: null,
+    targets: { energy_kcal: '2000', protein_g: '150', fat_g: '70', carbs_g: '190' },
     remaining: { energy_kcal: '500', protein_g: '50', fat_g: null, carbs_g: '60' },
     remaining_confidence: 'partial',
+    remaining_includes_plan: false,
+    not_calculable: false,
     limitations: ['Часть БЖУ неизвестна.'],
     max_candidates: 6,
     candidates: Array.from({ length: count }, (_, index) => candidate(index + 1)),
@@ -114,12 +116,13 @@ describe('компактные рекомендации дневника', () =>
     setup();
     const card = (await screen.findByText('Продукт 1')).closest('li')!;
     expect(within(card).getByText(/165 ккал · Б 31 · Ж — · У 0/)).toBeVisible();
+    expect(card).toHaveTextContent('клетчатка — г');
     expect(within(card).getByText('Частичные БЖУ')).toBeVisible();
-    expect(card).toHaveTextContent('Недавнее · Укладывается в известный остаток белка');
+    expect(card).toHaveTextContent('Недавнее · 31 г белка в пределах известного остатка 50 г');
     expect(within(card).queryByText('Неполные БЖУ')).not.toBeInTheDocument();
     fireEvent.click(within(card).getByText('Другие основания: Продукт 1'));
     expect(within(card).getByText('Избранное')).toBeVisible();
-    expect(within(region()).getByText(/Остаток: 500 ккал · Б 50/)).toBeVisible();
+    expect(within(region()).getByText(/На 6 ноября осталось: 500 ккал · белки 50/)).toBeVisible();
     expect(within(region()).getByText('Часть БЖУ неизвестна.')).toBeVisible();
     expect(
       within(card).getByRole('button', { name: 'Проверить вариант' }),
@@ -141,6 +144,32 @@ describe('компактные рекомендации дневника', () =>
     await screen.findByText('Продукт 1');
     expect(within(region()).queryByText(/Остаток:/)).not.toBeInTheDocument();
     expect(within(region()).getByText('Приблизительные БЖУ')).toBeVisible();
+  });
+
+  it('сразу показывает все превышения и не утверждает ложное соответствие белку', async () => {
+    const data = response(1);
+    data.remaining = { energy_kcal: '100', protein_g: '10', fat_g: '1', carbs_g: '1' };
+    data.candidates![0] = {
+      ...data.candidates![0]!,
+      nutrition: { ...nutrition, fat_g: '3', carbs_g: '5' },
+      reasons: ['recent', 'protein_fit', 'lower_known_fat'],
+    };
+    apiMock.mockResolvedValue(data);
+    setup();
+    const card = (await screen.findByText('Продукт 1')).closest('li')!;
+    expect(card).toHaveTextContent('калории: 165 ккал при остатке 100 ккал');
+    expect(card).toHaveTextContent('белки: 31 г при остатке 10 г');
+    expect(card).toHaveTextContent('жиры: 3 г при остатке 1 г');
+    expect(card).toHaveTextContent('углеводы: 5 г при остатке 1 г');
+    expect(card).not.toHaveTextContent('в пределах известного остатка');
+    expect(card).not.toHaveTextContent('Меньше известных жиров');
+  });
+
+  it('объясняет отсутствие цели, если вариантов нет', async () => {
+    apiMock.mockResolvedValue({ ...response(0), targets: null, remaining: null });
+    setup();
+    expect(await screen.findByText('Нет цели КБЖУ на эту дату')).toBeVisible();
+    expect(screen.queryByText('Пока нет готовых вариантов')).not.toBeInTheDocument();
   });
 
   it('сворачивает список при смене даты и набора, в том числе при возврате на дату', async () => {
@@ -170,13 +199,62 @@ describe('компактные рекомендации дневника', () =>
 
   it('открывает прежнюю проверку скрытого варианта и обновляет список после подтверждения', async () => {
     let current = response(3);
-    apiMock.mockImplementation((path: string) => {
-      if (path.endsWith('/commit')) {
-        current = response(2);
-        return Promise.resolve({ entries: [], replayed: false });
-      }
-      return Promise.resolve(current);
-    });
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { body: { diary_date: string; meal_type: string; items: { amount: string }[] } },
+      ) => {
+        if (path.endsWith('/commit')) {
+          current = response(2);
+          return Promise.resolve({ entries: [], replayed: false });
+        }
+        if (path.endsWith('/preview')) {
+          const scale = Number(options!.body.items[0]!.amount) / 100;
+          const addition = {
+            energy_kcal: String(165 * scale),
+            protein_g: String(31 * scale),
+            fat_g: null,
+            carbs_g: '0',
+            fiber_g: null,
+          };
+          const before = {
+            energy_kcal: '0',
+            protein_g: '0',
+            fat_g: '0',
+            carbs_g: '0',
+            fiber_g: '0',
+          };
+          return Promise.resolve({
+            diary_date: options!.body.diary_date,
+            meal_type: options!.body.meal_type,
+            items: [
+              {
+                ...candidate(3).items[0],
+                amount: options!.body.items[0]!.amount,
+                nutrition: addition,
+              },
+            ],
+            before,
+            addition,
+            after: addition,
+            diary: before,
+            planned: null,
+            projected_after: addition,
+            targets: response(3).targets,
+            target_id: 1,
+            target_source: null,
+            target_effective_from: '2026-11-06',
+            target_weight_kg: null,
+            target_goal: null,
+            constraint_status: 'not_set',
+            constraint_messages: [],
+            preference_message: null,
+            preview_token: 'c'.repeat(64),
+          });
+        }
+        return Promise.resolve(current);
+      },
+    );
     setup();
     await screen.findByText('Продукт 1');
     fireEvent.click(screen.getByRole('button', { name: 'Показать все 3 варианта' }));
@@ -185,6 +263,9 @@ describe('компактные рекомендации дневника', () =>
     fireEvent.change(screen.getByLabelText('Количество'), { target: { value: '150' } });
     fireEvent.change(screen.getByLabelText('Приём пищи'), { target: { value: 'dinner' } });
     expect(apiMock.mock.calls.some(([path]) => path.endsWith('/commit'))).toBe(false);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled(),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Добавить выбранное' }));
     await waitFor(() =>
       expect(apiMock.mock.calls.some(([path]) => path.endsWith('/commit'))).toBe(true),
@@ -194,6 +275,7 @@ describe('компактные рекомендации дневника', () =>
       diary_date: '2026-11-06',
       meal_type: 'dinner',
       items: [{ food_id: 3, amount: '150', amount_unit: 'g' }],
+      preview_token: 'c'.repeat(64),
     });
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: /Показать все/ })).not.toBeInTheDocument(),

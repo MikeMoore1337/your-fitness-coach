@@ -204,23 +204,24 @@ function MetricRow({
   unit: string;
 }) {
   const deviation = comparison.average_deviation;
+  const digits = unit === 'г' ? 3 : 2;
   return (
     <div className="nutrition-report-metric">
       <dt>{label}</dt>
       <dd>
         <strong>
-          {formatNumber(metric.average, 2)} <span>{unit}</span>
+          {formatNumber(metric.average, digits)} <span>{unit}</span>
         </strong>
         <small>
           {metric.sample_days
-            ? `минимум ${formatNumber(metric.minimum, 2)} · максимум ${formatNumber(metric.maximum, 2)} · по ${metric.sample_days} дн.`
+            ? `минимум ${formatNumber(metric.minimum, digits)} · максимум ${formatNumber(metric.maximum, digits)} · по ${metric.sample_days} дн.`
             : 'Нет данных по показателю'}
         </small>
       </dd>
       <dd>
         <span>Ориентир в среднем</span>
         <strong>
-          {formatNumber(comparison.average_target, 2)}{' '}
+          {formatNumber(comparison.average_target, digits)}{' '}
           {comparison.average_target == null ? '' : <span>{unit}</span>}
         </strong>
         <small>
@@ -233,7 +234,7 @@ function MetricRow({
         <span>Отклонение</span>
         <strong>
           {deviation != null && deviation > 0 ? '+' : ''}
-          {formatNumber(deviation, 2)} {deviation == null ? '' : <span>{unit}</span>}
+          {formatNumber(deviation, digits)} {deviation == null ? '' : <span>{unit}</span>}
         </strong>
       </dd>
     </div>
@@ -268,7 +269,7 @@ function ReportMetrics({ report }: { report: NutritionReport }) {
           <dt>Клетчатка</dt>
           <dd>
             <strong>
-              {formatNumber(summary.fiber_g.average, 2)} <span>г</span>
+              {formatNumber(summary.fiber_g.average, 3)} <span>г</span>
             </strong>
             <small>
               {summary.fiber_g.sample_days
@@ -329,9 +330,11 @@ function NutritionChart({
 function NutritionReportInsights({
   report,
   canOpenDiary,
+  diaryDate,
 }: {
   report: NutritionReport;
   canOpenDiary: boolean;
+  diaryDate: string;
 }) {
   const insights = report.insights ?? [];
   if (!insights.length) return null;
@@ -349,7 +352,13 @@ function NutritionReportInsights({
           <p key={insight.metric}>
             <strong>{metricLabels[insight.metric]}</strong>
             <span>{insight.message}</span>
-            {canOpenDiary && <AppLink to="/app?section=nutrition">Открыть питание</AppLink>}
+            {canOpenDiary && (
+              <AppLink to={diaryLink(diaryDate)}>
+                {insight.action_code === 'open_meal_suggestions'
+                  ? 'Посмотреть варианты на сегодня'
+                  : 'Открыть дневник на сегодня'}
+              </AppLink>
+            )}
           </p>
         ))}
       </div>
@@ -489,12 +498,10 @@ function DailyTable({
                   {point.calories == null ? '—' : `${formatNumber(point.calories, 2)} ккал`}
                 </td>
                 <td data-label="Б / Ж / У">
-                  {point.protein_g == null
+                  {point.protein_g == null && point.fat_g == null && point.carbs_g == null
                     ? '—'
-                    : `${formatNumber(point.protein_g, 2)} / ${formatNumber(point.fat_g, 2)} / ${formatNumber(point.carbs_g, 2)} г`}
-                  {point.fiber_g != null && (
-                    <small>Клетчатка: {formatNumber(point.fiber_g, 2)} г</small>
-                  )}
+                    : `${formatNumber(point.protein_g, 3)} / ${formatNumber(point.fat_g, 3)} / ${formatNumber(point.carbs_g, 3)} г`}
+                  <small>Клетчатка: {formatNumber(point.fiber_g, 3)} г</small>
                 </td>
                 <td data-label="Цель">
                   {point.target_calories == null ? 'Не задана' : `${point.target_calories} ккал`}
@@ -797,7 +804,7 @@ export function NutritionPeriodReport({
                 text="Неполные дни и отсутствие записей не превращаются в нулевые значения."
               />
               {clientId == null && (
-                <AppLink className="button-link" to="/app?section=nutrition">
+                <AppLink className="button-link" to={diaryLink(today)}>
                   Открыть дневник питания
                 </AppLink>
               )}
@@ -805,7 +812,11 @@ export function NutritionPeriodReport({
           ) : (
             <>
               <ReportMetrics report={report.data} />
-              <NutritionReportInsights report={report.data} canOpenDiary={clientId == null} />
+              <NutritionReportInsights
+                report={report.data}
+                canOpenDiary={clientId == null}
+                diaryDate={today}
+              />
               <div className="nutrition-report-adherence" aria-label="Сравнение с целью">
                 <p>
                   <strong>

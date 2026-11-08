@@ -20,6 +20,13 @@
   margin: 14px 0 0;
 }
 
+.context {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .details summary {
   min-height: 44px;
   padding: 12px 0;
@@ -35,7 +42,116 @@
 }
 
 .toggle {
-  margin-top: 10px;
+  margin-top: var(--v2-space-3, 12px);
+}
+
+.constraints {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.constraints summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.limitGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-3, 12px);
+}
+
+.limitGrid > div,
+.choiceRow > div {
+  min-width: 0;
+}
+
+.foodChoices h4 {
+  margin: 16px 0 8px;
+}
+
+.choiceHint {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.choiceRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--v2-space-2, 8px);
+}
+
+.choiceRow button:disabled:hover {
+  background: transparent;
+}
+
+.selectedFoods {
+  display: grid;
+  gap: var(--v2-space-2, 8px);
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selectedFoods li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2, 8px);
+  overflow-wrap: anywhere;
+}
+
+.selectedFoods li > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  table-layout: fixed;
+  overflow-wrap: anywhere;
+}
+
+.previewTable th,
+.previewTable td {
+  padding: 9px 3px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.previewTable th:first-child {
+  width: 34%;
+  text-align: left;
+}
+
+@media (max-width: 360px) {
+  .choiceRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .previewTable {
+    font-size: 0.75rem;
+  }
+
+  .previewTable th:first-child {
+    width: 30%;
+  }
+
+  .previewTable thead th:first-child {
+    font-size: 0.7rem;
+  }
+
+  .previewTable th,
+  .previewTable td {
+    padding-inline: 1px;
+  }
 }
 
 @media (max-width: 640px) {
