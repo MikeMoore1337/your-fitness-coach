@@ -607,8 +607,15 @@ describe('HydrationTracker', () => {
     );
     const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
     await waitFor(() => expect(glass).toBeEnabled());
+    // Await the persisted generation before sending the first request.
+    // Otherwise the reset scenario can race the initial IndexedDB fence.
+    await waitFor(() =>
+      expect(
+        Object.values(localStorage).some((value) => value.includes('"demoGeneration":0')),
+      ).toBe(true),
+    );
     fireEvent.click(glass);
-    await waitFor(() => expect(requests).toHaveLength(1), { timeout: 5_000 });
+    await waitFor(() => expect(requests).toHaveLength(1));
     generation = 1;
     await act(async () => {
       await queryClient.invalidateQueries();
