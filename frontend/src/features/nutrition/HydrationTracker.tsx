@@ -337,7 +337,7 @@ export function HydrationTracker({
     scope: string;
     generation: number;
   } | null>(null);
-  const matchesDemoScope = Boolean(readyDemoStore && readyDemoStore.scope === scope);
+  const matchesDemoScope = readyDemoStore?.scope === scope;
   const matchesDemoGeneration = readyDemoStore?.generation === demoGeneration;
   const demoStoreReady = matchesDemoScope && matchesDemoGeneration;
   const demoStorageReady = !demoToken || demoStoreReady;
