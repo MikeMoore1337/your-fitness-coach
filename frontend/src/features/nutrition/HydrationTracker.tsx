@@ -333,6 +333,13 @@ export function HydrationTracker({
     queryFn: () => api<User>('/api/v1/me'),
   });
   const demoGeneration = hydration.data?.demo_generation;
+  const [readyDemoStore, setReadyDemoStore] = useState<{
+    scope: string;
+    generation: number;
+  } | null>(null);
+  const demoStorageReady =
+    !demoToken ||
+    (readyDemoStore?.scope === scope && readyDemoStore.generation === demoGeneration);
   useLayoutEffect(() => {
     observedDemoGenerationRef.current = demoGeneration;
   }, [demoToken, demoGeneration]);
@@ -348,6 +355,8 @@ export function HydrationTracker({
   }, [demoToken, demoGeneration]);
   useEffect(() => {
     if (!scope || !demoToken || !Number.isSafeInteger(demoGeneration)) return;
+    let active = true;
+    setReadyDemoStore(null);
     void withPendingHydration(scope, (store) => {
       if (store.demoGeneration !== undefined && (demoGeneration ?? -1) < store.demoGeneration)
         return;
@@ -363,7 +372,15 @@ export function HydrationTracker({
         }
       }
       if (changed) writePendingHydration(scope, store);
-    }).catch(() => undefined);
+    })
+      .then(() => {
+        // Do not enable quick add until the generation fence commits in IDB.
+        if (active) setReadyDemoStore({ scope, generation: demoGeneration });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [scope, demoToken, demoGeneration]);
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -510,6 +527,7 @@ export function HydrationTracker({
       addInFlightRef.current ||
       add.isPending ||
       !scope ||
+      !demoStorageReady ||
       !isCurrentScope(scope) ||
       dateRef.current !== diaryDate
     )
@@ -752,7 +770,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
-            disabled={preparingAdd || add.isPending || !scope}
+            disabled={preparingAdd || add.isPending || !scope || !demoStorageReady}
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
@@ -788,7 +806,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             type="button"
-            disabled={preparingAdd || add.isPending}
+            disabled={preparingAdd || add.isPending || !demoStorageReady}
             onClick={() => void submitAdd(pending)}
           >
             Повторить без дубля
@@ -823,7 +841,7 @@ export function HydrationTracker({
             </Select>
           </Field>
           <Button
-            disabled={preparingAdd || add.isPending || !scope || !customVolume}
+            disabled={preparingAdd || add.isPending || !scope || !demoStorageReady || !customVolume}
             type="button"
             onClick={() =>
               void submitAdd({
