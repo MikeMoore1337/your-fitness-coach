@@ -24,7 +24,7 @@ test('a stale tab reuses the pending water request', async ({ page, context }) =
       };
     });
     await installPlatformApi(current, { browserSession: true, fixedDate: date });
-    await current.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+    await current.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
       const request = route.request();
       const key = request.headers()['idempotency-key'];
