@@ -4,6 +4,8 @@ const REVISION = '_coordination_revision';
 const PREVIOUS_REVISION = '_coordination_previous';
 const EPOCH = '_coordination_epoch';
 const EPOCH_KEY = '__epoch__';
+// A synchronous cross-tab tombstone survives a failed IndexedDB epoch publication.
+const RESET_MARKER_KEY = 'fit_hydration_coordination_reset_v1';
 const TIMEOUT_MS = 45_000;
 let cleanup = Promise.resolve();
 
@@ -48,10 +50,10 @@ export function hydrationRevision(raw: string | null): string | null {
   return revision;
 }
 
-async function resetDatabase(retainKey: string | null): Promise<void> {
+async function resetDatabase(retainKey: string | null, epoch: string): Promise<void> {
   if (typeof indexedDB === 'undefined') return;
   const database = await openDatabase();
-  const metadata = { epoch: randomId(), allowLegacy: false, retainKey };
+  const metadata = { epoch, allowLegacy: false, retainKey };
   try {
     // Publish the invalidation before attempting to remove account metadata.
     await new Promise<void>((resolve, reject) => {
@@ -90,7 +92,15 @@ async function resetDatabase(retainKey: string | null): Promise<void> {
 }
 
 export function resetHydrationFences(retainKey: string | null): Promise<void> {
-  cleanup = cleanup.catch(() => undefined).then(() => resetDatabase(retainKey));
+  const epoch = randomId();
+  try {
+    // Publish before any asynchronous IndexedDB write: a failed put cannot
+    // allow another tab to resurrect pending data cleared during logout.
+    localStorage.setItem(RESET_MARKER_KEY, epoch);
+  } catch {
+    return Promise.reject(new Error('Не удалось защитить очистку состояния гидратации'));
+  }
+  cleanup = cleanup.catch(() => undefined).then(() => resetDatabase(retainKey, epoch));
   return cleanup;
 }
 
@@ -121,12 +131,24 @@ export async function withHydrationFence<T>(key: string, task: () => T): Promise
               const before = localStorage.getItem(key);
               const stored = request.result as
                 { revision?: string | null; epoch?: string; legacyRetained?: boolean } | undefined;
-              const metadata = (epochRequest.result as
+              const resetEpoch = localStorage.getItem(RESET_MARKER_KEY);
+              let metadata = (epochRequest.result as
                 { epoch: string; allowLegacy: boolean; retainKey?: string | null } | undefined) ?? {
-                epoch: randomId(),
-                allowLegacy: true,
+                epoch: resetEpoch ?? randomId(),
+                allowLegacy: resetEpoch === null,
               };
-              if (!epochRequest.result) store.put(metadata, EPOCH_KEY);
+              if (resetEpoch !== null && metadata.epoch !== resetEpoch) {
+                // Do not accept a cached pre-logout localStorage snapshot even
+                // when the IndexedDB reset transaction was aborted.
+                if (before !== null) {
+                  result = { stale: true };
+                  return;
+                }
+                metadata = { epoch: resetEpoch, allowLegacy: false, retainKey: null };
+                store.put(metadata, EPOCH_KEY);
+              } else if (!epochRequest.result) {
+                store.put(metadata, EPOCH_KEY);
+              }
               const currentRevision = hydrationRevision(before);
               const dataEpoch = before === null ? undefined : JSON.parse(before)[EPOCH];
               const previous = before === null ? undefined : JSON.parse(before)[PREVIOUS_REVISION];
