@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from math import ceil
 from statistics import median
 from time import perf_counter
@@ -14,6 +14,7 @@ from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.program import UserProgram
 from fitminiapp_api.models.user import CoachClient, User, UserProfile
+from fitminiapp_api.services import lifecycle_reporting
 from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.lifecycle_reporting import lifecycle_funnel_report
 from fitminiapp_api.services.trainer_capacity_reporting import build_trainer_capacity_report
@@ -65,9 +66,18 @@ def test_lifecycle_writer_rejects_cross_account_instance_context() -> None:
 def test_lifecycle_report_reconciles_quality_boundaries_without_identity_output(
     monkeypatch,
 ) -> None:
+    # A timestamp can contain the old fixture ID without exposing identity.
+    class ClockWithIdentitySubstring(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return super().now(tz).replace(microsecond=200_191)
+
+    monkeypatch.setattr(lifecycle_reporting, "datetime", ClockWithIdentitySubstring)
     monkeypatch.setattr(settings, "app_env", "prod")
+    private_telegram_id = 8_765_432_109_876_543_210
     with get_session_context() as db:
         client = _user(db, 2001)
+        client.telegram_user_id = private_telegram_id
         other_client = _user(db, 2002)
         coach = _user(db, 1001)
         now = now_msk_naive()
@@ -155,7 +165,7 @@ def test_lifecycle_report_reconciles_quality_boundaries_without_identity_output(
     assert report["sample_status"] == "INSUFFICIENT_SAMPLE"
     assert report["milestone_retention_days"] == 180
     assert report["aggregate_retention_days"] == 730
-    assert "2001" not in str(report)
+    assert str(private_telegram_id) not in str(report)
     assert "user_id" not in str(report)
 
 
