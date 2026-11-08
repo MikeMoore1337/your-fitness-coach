@@ -419,7 +419,7 @@ export function HydrationTracker({
     }) =>
       api<HydrationEntry>('/api/v1/nutrition/hydration/entries', {
         method: 'POST',
-        headers: { 'Idempotency-Key': request.key },
+        headers: { 'Idempotency-Key': request.key, 'X-YFC-Hydration-Protocol': '2' },
         body: {
           volume_ml: request.volume,
           beverage_type: request.kind,
