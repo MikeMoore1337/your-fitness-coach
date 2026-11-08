@@ -1249,7 +1249,7 @@ export function NutritionDiary({
                   key={meal.meal_type}
                   meal={meal}
                   newEntryIds={newEntryIds}
-                  expanded={mealExpansion[meal.meal_type as MealType] ?? meal.entries.length > 0}
+                  expanded={mealExpansion[meal.meal_type as MealType] ?? false}
                   onExpandedChange={(expanded) =>
                     setMealExpansion((current) => ({
                       ...current,
