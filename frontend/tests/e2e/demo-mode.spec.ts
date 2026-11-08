@@ -1464,9 +1464,13 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await expect(nutritionPage.getByRole('dialog')).toBeVisible();
   await nutritionPage.getByRole('spinbutton', { name: 'Калории' }).fill('420');
   await nutritionPage.getByRole('button', { name: 'Сохранить Quick Add' }).click();
-  await expect(
-    nutritionPage.getByText('Овсяная каша с бананом и греческим йогуртом'),
-  ).toBeVisible();
+  // Existing meal details stay collapsed by default, including in the demo.
+  const breakfast = nutritionPage.getByRole('region', { name: 'Завтрак' });
+  const breakfastToggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+  if ((await breakfastToggle.getAttribute('aria-expanded')) === 'false') {
+    await breakfastToggle.click();
+  }
+  await expect(breakfast.getByText('Овсяная каша с бананом и греческим йогуртом')).toBeVisible();
   await nutritionPage.getByRole('button', { name: 'Продолжить' }).click();
   await expect(nutritionPage).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=progress');
   await expect(nutritionPage.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
