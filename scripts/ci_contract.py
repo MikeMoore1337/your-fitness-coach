@@ -1231,7 +1231,7 @@ def contract_payload() -> dict[str, object]:
             "frontend-e2e": {"count": FRONTEND_E2E_SHARD_COUNT, "strategy": "playwright"},
             "python-tests": {
                 "count": PYTHON_TEST_SHARD_COUNT,
-                "strategy": "pytest-node-round-robin",
+                "strategy": "pytest-node-digest-ranked",
             },
         },
         "routing": {

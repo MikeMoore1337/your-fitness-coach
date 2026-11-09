@@ -1,4 +1,4 @@
-"""Single-collection deterministic pytest sharding for GitHub Actions.
+"""Single-collection digest-ranked deterministic pytest sharding for GitHub Actions.
 
 Loaded with ``pytest -p scripts.pytest_shard --yfc-shard=1/5``.
 Sharding happens during normal test collection, eliminating the separate
@@ -99,7 +99,11 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         raise pytest.UsageError("Duplicate pytest nodeids; cannot shard safely")
 
     # Every xdist worker collects the same ordered node list.
-    chosen = items[number - 1 :: count]
+    # Rank by the immutable nodeid digest rather than collection position.
+    # Preserve original order within each shard to avoid changing fixture order.
+    ranked = sorted(items, key=lambda item: _digest(item.nodeid))
+    selected_nodeids = {item.nodeid for item in ranked[number - 1 :: count]}
+    chosen = [item for item in items if item.nodeid in selected_nodeids]
     if not chosen:
         raise pytest.UsageError(f"Empty pytest shard {value}; refusing false green")
     if hasattr(config, "workeroutput") and os.environ.get("YFC_PYTEST_SHARD_RECEIPT"):
@@ -108,6 +112,6 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             "all": [_digest(item.nodeid) for item in items],
             "selected": [_digest(item.nodeid) for item in chosen],
         }
-    deselected = [item for index, item in enumerate(items) if index % count != number - 1]
+    deselected = [item for item in items if item.nodeid not in selected_nodeids]
     items[:] = chosen
     config.hook.pytest_deselected(items=deselected)

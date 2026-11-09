@@ -22,12 +22,28 @@ def _invoke(value: str | None, nodeids: list[str]):
     return [item.nodeid for item in items], [item.nodeid for item in deselected]
 
 
+def _ranked_shard(nodes: list[str], number: int, count: int) -> list[str]:
+    selected = set(sorted(nodes)[number - 1 :: count])
+    return [node for node in nodes if node in selected]
+
+
 @pytest.mark.parametrize("count", [5, 10])
 def test_every_test_is_selected_exactly_once_across_shards(count: int) -> None:
     nodes = [f"backend/tests/test_example.py::test_{number}" for number in range(102)]
     selections = [_invoke(f"{index}/{count}", nodes) for index in range(1, count + 1)]
     assert sorted(node for selected, _ in selections for node in selected) == sorted(nodes)
     assert all(len(selected) + len(skipped) == len(nodes) for selected, skipped in selections)
+
+
+@pytest.mark.parametrize("count", [5, 10])
+def test_shard_membership_is_stable_when_collection_order_changes(count: int) -> None:
+    nodes = [f"backend/tests/test_example.py::test_{number}" for number in range(101)]
+    reversed_nodes = list(reversed(nodes))
+    for number in range(1, count + 1):
+        actual, _ = _invoke(f"{number}/{count}", nodes)
+        reversed_actual, _ = _invoke(f"{number}/{count}", reversed_nodes)
+        assert set(actual) == set(reversed_actual)
+        assert actual == [node for node in nodes if node in set(actual)]
 
 
 def test_without_shard_no_tests_are_removed() -> None:
@@ -57,17 +73,17 @@ def test_receipts_reject_missing_duplicate_or_inconsistent_shards(tmp_path) -> N
         directory = tmp_path / str(index)
         directory.mkdir()
         (directory / "receipt.json").write_text(
-            json.dumps({"shard": f"{index}/2", "all": nodes, "selected": nodes[index - 1 :: 2]}),
+            json.dumps({"shard": f"{index}/2", "all": nodes, "selected": _ranked_shard(nodes, index, 2)}),
             encoding="utf-8",
         )
     verify_pytest_shards.verify(tmp_path, 2)
     second = tmp_path / "2" / "receipt.json"
     receipt = json.loads(second.read_text(encoding="utf-8"))
-    receipt["selected"] = [nodes[0], nodes[2]]
+    receipt["selected"] = [nodes[0], nodes[0]]
     second.write_text(json.dumps(receipt), encoding="utf-8")
     with pytest.raises(ValueError, match="selection differs"):
         verify_pytest_shards.verify(tmp_path, 2)
-    receipt["selected"] = nodes[1::2]
+    receipt["selected"] = _ranked_shard(nodes, 2, 2)
     receipt["all"] = list(reversed(nodes))
     second.write_text(json.dumps(receipt), encoding="utf-8")
     with pytest.raises(ValueError, match="collection or selection differs"):

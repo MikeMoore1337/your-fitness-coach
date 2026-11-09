@@ -25,7 +25,9 @@ def verify(directory: Path, count: int) -> None:
         number, total = map(int, receipt["shard"].split("/"))
         if total != count or number not in range(1, count + 1) or number in seen:
             raise ValueError("Invalid or duplicate shard")
-        if receipt["all"] != reference or receipt["selected"] != reference[number - 1 :: count]:
+        expected_digests = set(sorted(reference)[number - 1 :: count])
+        expected_selection = [digest for digest in reference if digest in expected_digests]
+        if receipt["all"] != reference or receipt["selected"] != expected_selection:
             raise ValueError("Shard collection or selection differs")
         seen.add(number)
         selected.extend(receipt["selected"])

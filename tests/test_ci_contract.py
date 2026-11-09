@@ -598,7 +598,7 @@ def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None
     }
     assert payload["sharding"]["python-tests"] == {
         "count": ci_contract.PYTHON_TEST_SHARD_COUNT,
-        "strategy": "pytest-node-round-robin",
+        "strategy": "pytest-node-digest-ranked",
     }
     assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 5
     assert ci_contract.PYTHON_TEST_SHARD_COUNT == 5
