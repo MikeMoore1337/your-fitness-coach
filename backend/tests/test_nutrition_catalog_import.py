@@ -405,7 +405,9 @@ def test_catalog_api_requires_owner_consent_and_preserves_public_food_after_dele
         params={"q": "продукт альфа"},
     )
     assert search.status_code == 200
-    assert any(item["id"] == food_id for item in search.json()["items"])
+    found = next(item for item in search.json()["items"] if item["id"] == food_id)
+    assert found["catalog_quality"] == "community_unverified"
+    assert found["trust_level"] == "unverified"
     assert "2024-03-02" not in search.text
     assert "983201" not in search.text
     family_id = decode_token(
