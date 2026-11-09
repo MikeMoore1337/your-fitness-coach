@@ -223,6 +223,20 @@ def test_quoted_newline_uses_physical_source_rows(rows):
     assert result.rows[1].coordinates.row == 13
 
 
+def test_hash_separators_are_ignored_but_other_hash_lines_fail_closed(rows):
+    rows.insert(0, ["#-------------------------------------------"])
+    details = rows.index(["# Report Details"])
+    rows.insert(details, ["#-------------------------------------------"])
+    _, result = _validated(rows)
+    assert len(result.rows) == 6
+    assert result.rows[0].food.name == "Тестовый продукт, альфа"
+
+    rows.insert(details, ["# unknown section"])
+    result = parse(_csv(rows))
+    assert result["rows"] == []
+    assert result["diagnostics"][0]["code"] == "unknown_summary_structure"
+
+
 @pytest.mark.parametrize(
     ("change", "code"),
     [

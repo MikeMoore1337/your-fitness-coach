@@ -75,7 +75,7 @@ _PERIOD = re.compile(
     r"([0-9]{2}\.[0-9]{2}\.[0-9]{4})\s*\Z",
     re.IGNORECASE,
 )
-_SEPARATOR = re.compile(r"[-–—=_*\s]{3,}\Z")
+_SEPARATOR = re.compile(r"#?[-–—=_*\s]{3,}\Z")
 _TOTAL_LABEL = re.compile(
     r"^(?:(?:дневной|суточный|промежуточный)\s+)?"
     r"(?:итого|итог|всего|сумма)(?:$|[\s:,(.])"
