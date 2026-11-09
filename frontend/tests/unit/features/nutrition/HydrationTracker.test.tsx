@@ -4,7 +4,8 @@ import { IDBFactory } from 'fake-indexeddb';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HydrationTracker } from '../../../../src/features/nutrition/HydrationTracker';
-import { resetHydrationFences } from '../../../../src/shared/browser/hydrationFence';
+import * as hydrationPending from '../../../../src/features/nutrition/hydrationPending';
+import * as hydrationFence from '../../../../src/shared/browser/hydrationFence';
 import type { HydrationDay, HydrationEntry } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 import { AUTHENTICATED_USER_ID_STORAGE_KEY } from '../../../../src/shared/userScopedStorage';
@@ -80,6 +81,7 @@ function renderTracker(initialExpanded = false) {
 describe('HydrationTracker', () => {
   beforeEach(() => {
     vi.stubGlobal('indexedDB', new IDBFactory());
+    vi.spyOn(hydrationFence, 'withHydrationFence');
     window.history.replaceState({}, '', '/app?section=nutrition');
     sessionStorage.clear();
     localStorage.clear();
@@ -95,7 +97,10 @@ describe('HydrationTracker', () => {
 
   afterEach(async () => {
     cleanup();
-    await resetHydrationFences(null);
+    const fence = vi.mocked(hydrationFence.withHydrationFence);
+    await Promise.allSettled(fence.mock.results.map(({ value }) => value));
+    fence.mockRestore();
+    await hydrationFence.resetHydrationFences(null);
     vi.unstubAllGlobals();
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
   });
@@ -281,10 +286,13 @@ describe('HydrationTracker', () => {
     expect(requests[1]).toEqual(requests[0]);
     expect(saved.size).toBe(1);
 
+    await waitFor(() => expect(preset).toBeEnabled());
     fireEvent.click(preset);
     await waitFor(() => expect(requests).toHaveLength(3));
     expect(requests[2]?.key).not.toBe(requests[0]?.key);
     expect(saved.size).toBe(2);
+    await waitFor(() => expect(preset).toBeEnabled());
+    expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument();
   });
 
   it('keeps an uncertain request through remount and retries it for the original date', async () => {
@@ -342,6 +350,11 @@ describe('HydrationTracker', () => {
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(requests[1]).toEqual(requests[0]);
     expect(requests[1]?.body.diary_date).toBe('2026-09-01');
+    await screen.findByText('Добавлено 250 мл');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeEnabled(),
+    );
+    expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument();
   });
 
   it('asks before replacing an unresolved request with a different drink', async () => {
@@ -380,6 +393,58 @@ describe('HydrationTracker', () => {
     );
     await screen.findByText('Добавлено 500 мл');
     expect(posts).toBe(2);
+    await waitFor(() => expect(bottle).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  });
+
+  it('does not offer a retry before the prepared request has been sent', async () => {
+    let releasePreparation = () => {};
+    let notifyPrepared = () => {};
+    const prepared = new Promise<void>((resolve) => {
+      notifyPrepared = resolve;
+    });
+    const preparationReleased = new Promise<void>((resolve) => {
+      releasePreparation = resolve;
+    });
+    const original = hydrationPending.withPendingHydration;
+    const fence = vi
+      .spyOn(hydrationPending, 'withPendingHydration')
+      .mockImplementation(
+        async <T,>(scope: string, task: (store: hydrationPending.HydrationPendingStore) => T) => {
+          const result = await original(scope, task);
+          if (result && typeof result === 'object' && 'request' in result) {
+            notifyPrepared();
+            await preparationReleased;
+          }
+          return result;
+        },
+      );
+    let posts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'POST') {
+        posts += 1;
+        return Promise.reject(new Error('Нет соединения'));
+      }
+      return Promise.resolve();
+    });
+    try {
+      renderTracker();
+      const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+      await waitFor(() => expect(glass).toBeEnabled());
+      fireEvent.click(glass);
+      await act(async () => prepared);
+      expect(posts).toBe(0);
+      expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument();
+      await act(async () => releasePreparation());
+      await waitFor(() => expect(posts).toBe(1));
+      const retry = await screen.findByRole('button', { name: 'Повторить без дубля' });
+      await waitFor(() => expect(retry).toBeEnabled());
+    } finally {
+      releasePreparation();
+      fence.mockRestore();
+    }
   });
 
   it('keeps separate unresolved requests for different dates', async () => {
@@ -432,6 +497,11 @@ describe('HydrationTracker', () => {
     showDate('2026-08-31');
     await clickEnabled('Повторить без дубля');
     await waitFor(() => expect(requests).toHaveLength(4));
+    await screen.findByText('Добавлено 250 мл');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeEnabled(),
+    );
+    expect(screen.queryByRole('button', { name: 'Повторить без дубля' })).not.toBeInTheDocument();
     expect(requests[2]).toEqual(requests[0]);
     expect(requests[3]).toEqual(requests[1]);
     expect(requests[0]?.key).not.toBe(requests[1]?.key);
@@ -454,7 +524,9 @@ describe('HydrationTracker', () => {
       return Promise.resolve();
     });
     const first = renderTracker();
-    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    const firstGlass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(firstGlass).toBeEnabled());
+    fireEvent.click(firstGlass);
     await waitFor(() => expect(posts).toBe(1));
     first.unmount();
     const second = renderTracker();
@@ -465,9 +537,12 @@ describe('HydrationTracker', () => {
         </FeedbackProvider>
       </QueryClientProvider>,
     );
-    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(glass).toBeEnabled());
+    fireEvent.click(glass);
     await screen.findByRole('button', { name: 'Повторить без дубля' });
     await act(async () => rejectFirst(new Error('Нет соединения')));
+    await waitFor(() => expect(first.queryClient.isMutating()).toBe(0));
     second.unmount();
     const third = renderTracker();
     await screen.findByRole('button', { name: 'Повторить без дубля' });
@@ -775,6 +850,7 @@ describe('HydrationTracker', () => {
     fireEvent.click(first.getByRole('button', { name: /Стакан.*250 мл/ }));
     await waitFor(() => expect(keys).toHaveLength(3));
     expect(keys[2]).not.toBe(keys[0]);
+    await waitFor(() => expect(queryClient.isMutating()).toBe(0));
   });
 
   it('does not restore a late failed request after logout and same-account login', async () => {

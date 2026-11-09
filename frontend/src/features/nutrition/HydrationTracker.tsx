@@ -804,7 +804,7 @@ export function HydrationTracker({
           </Button>
         </div>
       )}
-      {pending && !add.isPending && (
+      {pending && !add.isPending && !preparingAdd && (
         <div className="hydration-mutation-error" role="alert">
           <span>
             Не удалось проверить запись: {beverageLabels[pending.kind]}, {pending.volume} мл.
