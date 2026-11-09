@@ -302,12 +302,36 @@ def _source_key(
 
 
 def _stored_identity(food: Food) -> str:
-    return food.catalog_identity or normalize_food_catalog_identity(
+    identity = food.catalog_identity or normalize_food_catalog_identity(
         food.name,
         food.brand,
         food.nutrition_basis_kind or "per_100_g",
         food.nutrition_basis_amount or Decimal("100"),
         food.nutrition_basis_unit or "g",
+    )
+    if (
+        food.food_type != "branded"
+        or food.source_name != "yfc_community"
+        or food.nutrition_basis_kind not in {"per_100_g", "per_100_ml"}
+        or not isinstance(food.canonical_facts, dict)
+        or food.canonical_facts.get("source_basis") != "per_serving"
+    ):
+        return identity
+    try:
+        canonical = CanonicalDraft.model_validate(food.canonical_facts)
+    except ValidationError:
+        return identity
+    serving = canonical.serving_size
+    if canonical.source_basis != "per_serving" or serving is None:
+        return identity
+    # Older label scans indexed the normalized basis instead of the source serving.
+    normalized_basis = "per_100_g" if serving.unit == "g" else "per_100_ml"
+    if food.nutrition_basis_kind != normalized_basis or identity != normalize_food_catalog_identity(
+        food.name, food.brand, normalized_basis, Decimal("100"), serving.unit
+    ):
+        return identity
+    return normalize_food_catalog_identity(
+        food.name, food.brand, "per_serving", Decimal("1"), "serving"
     )
 
 
@@ -357,24 +381,22 @@ def _facts_match(food: Food, proposed: PreparedCatalogFood) -> bool:
         for name in NUTRIENT_FIELDS:
             previous = getattr(current.normalized_facts, name)
             new = getattr(proposed.canonical.normalized_facts, name)
-            if previous is None or previous.basis_ref != current.source_basis:
-                source_facts = getattr(current.source_facts, name) or []
-                previous = next(
-                    (
-                        fact
-                        for fact in source_facts
-                        if fact.evidence == "read" and fact.basis_ref == current.source_basis
-                    ),
-                    None,
-                )
             if name in required and previous is None:
                 return False
-            if (
-                previous is not None
-                and new is not None
-                and (previous.value != new.value or previous.unit != new.unit)
-            ):
-                return False
+            if previous is not None and new is not None:
+                new_value = new.value
+                if previous.basis_ref != new.basis_ref:
+                    serving = current.serving_size
+                    if (
+                        current.source_basis != "per_serving"
+                        or serving is None
+                        or previous.basis_ref
+                        != ("per_100_g" if serving.unit == "g" else "per_100_ml")
+                    ):
+                        return False
+                    new_value = new.value * Decimal(100) / serving.amount
+                if previous.value != new_value or previous.unit != new.unit:
+                    return False
         return True
     if (food.nutrition_basis_kind or "per_100_g") != proposed.canonical.source_basis:
         return False

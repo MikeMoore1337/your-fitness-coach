@@ -20,6 +20,65 @@ def _migration(name):
     return migration
 
 
+def test_sqlite_catalog_migration_preserves_existing_serving_label():
+    migrations = [
+        _migration("0154_nutrition_catalog_import"),
+        _migration("0155_nutrition_catalog_indexes"),
+        _migration("0156_nutrition_catalog_check"),
+    ]
+    label = json.dumps(
+        {
+            "source_basis": "per_serving",
+            "serving_size": {"amount": "50", "unit": "ml"},
+            "normalized_facts": {
+                name: {"value": "1", "basis_ref": "per_100_ml"}
+                for name in ("energy_kcal", "protein_g", "fat_g", "carbohydrate_g")
+            },
+        }
+    )
+    with sa.create_engine("sqlite://", poolclass=sa.pool.NullPool).connect() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE foods (id INTEGER PRIMARY KEY, food_type VARCHAR(16) NOT NULL, "
+            "source_name VARCHAR(64), status TEXT NOT NULL, catalog_identity VARCHAR(512), "
+            "energy_kcal_per_100g NUMERIC, protein_g_per_100g NUMERIC, "
+            "fat_g_per_100g NUMERIC, carbs_g_per_100g NUMERIC, "
+            "canonical_complete BOOLEAN, canonical_facts JSON, nutrition_basis_kind TEXT, "
+            "standard_serving_amount NUMERIC, standard_serving_unit TEXT, "
+            "CONSTRAINT ck_foods_active_nutrients CHECK "
+            "(status <> 'active' OR (energy_kcal_per_100g IS NOT NULL "
+            "AND protein_g_per_100g IS NOT NULL AND fat_g_per_100g IS NOT NULL "
+            "AND carbs_g_per_100g IS NOT NULL) OR canonical_complete = true))"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE nutrition_import_drafts (id TEXT PRIMARY KEY, owner_user_id INTEGER NOT NULL)"
+        )
+        connection.execute(
+            sa.text(
+                "INSERT INTO foods (id, food_type, source_name, status, canonical_complete, "
+                "canonical_facts, nutrition_basis_kind, standard_serving_amount, standard_serving_unit) VALUES "
+                "(1, 'branded', 'yfc_community', 'active', true, :facts, 'per_100_ml', 50, 'ml')"
+            ),
+            {"facts": label},
+        )
+        connection.commit()
+        for migration in migrations:
+            context = MigrationContext.configure(connection)
+            with context.begin_transaction(), Operations.context(context):
+                migration.upgrade()
+        assert connection.exec_driver_sql("SELECT count(*) FROM foods").scalar_one() == 1
+        invalid = json.loads(label)
+        invalid["serving_size"]["unit"] = "g"
+        with pytest.raises(sa.exc.IntegrityError), connection.begin_nested():
+            connection.execute(
+                sa.text(
+                    "INSERT INTO foods (id, food_type, source_name, status, canonical_complete, "
+                    "canonical_facts, nutrition_basis_kind, standard_serving_amount, standard_serving_unit) VALUES "
+                    "(2, 'branded', 'yfc_community', 'active', true, :facts, 'per_100_ml', 50, 'ml')"
+                ),
+                {"facts": json.dumps(invalid)},
+            )
+
+
 def test_postgres_catalog_migration_enforces_identity_and_guards_data():
     if engine.dialect.name != "postgresql":
         pytest.skip("requires PostgreSQL concurrent index and constraints")
@@ -38,13 +97,32 @@ def test_postgres_catalog_migration_enforces_identity_and_guards_data():
             "energy_kcal_per_100g NUMERIC, protein_g_per_100g NUMERIC, "
             "fat_g_per_100g NUMERIC, carbs_g_per_100g NUMERIC, "
             "canonical_complete BOOLEAN, canonical_facts JSON, nutrition_basis_kind TEXT, "
+            "standard_serving_amount NUMERIC, standard_serving_unit TEXT, "
             "CONSTRAINT ck_foods_active_nutrients CHECK "
             "(status <> 'active' OR (energy_kcal_per_100g IS NOT NULL "
             "AND protein_g_per_100g IS NOT NULL AND fat_g_per_100g IS NOT NULL "
-            "AND carbs_g_per_100g IS NOT NULL)))"
+            "AND carbs_g_per_100g IS NOT NULL) OR canonical_complete = true))"
         )
         connection.exec_driver_sql(
             "CREATE TABLE nutrition_import_drafts (id TEXT PRIMARY KEY, owner_user_id INTEGER NOT NULL)"
+        )
+        serving_label = json.dumps(
+            {
+                "source_basis": "per_serving",
+                "serving_size": {"amount": "50", "unit": "ml"},
+                "normalized_facts": {
+                    name: {"value": "1", "basis_ref": "per_100_ml"}
+                    for name in ("energy_kcal", "protein_g", "fat_g", "carbohydrate_g")
+                },
+            }
+        )
+        connection.execute(
+            sa.text(
+                "INSERT INTO foods (id, food_type, source_name, status, canonical_complete, "
+                "canonical_facts, nutrition_basis_kind, standard_serving_amount, standard_serving_unit) VALUES "
+                "(8, 'branded', 'yfc_community', 'active', true, :facts, 'per_100_ml', 50, 'ml')"
+            ),
+            {"facts": serving_label},
         )
         connection.commit()
         try:
@@ -96,6 +174,17 @@ def test_postgres_catalog_migration_enforces_identity_and_guards_data():
                     ),
                     {"facts": json.dumps(wrong_basis)},
                 )
+            invalid_serving = json.loads(serving_label)
+            invalid_serving["serving_size"]["unit"] = "g"
+            with pytest.raises(sa.exc.IntegrityError), connection.begin_nested():
+                connection.execute(
+                    sa.text(
+                        "INSERT INTO foods (id, food_type, source_name, status, canonical_complete, "
+                        "canonical_facts, nutrition_basis_kind, standard_serving_amount, standard_serving_unit) VALUES "
+                        "(9, 'branded', 'yfc_community', 'active', true, :facts, 'per_100_ml', 50, 'ml')"
+                    ),
+                    {"facts": json.dumps(invalid_serving)},
+                )
             with pytest.raises(sa.exc.IntegrityError), connection.begin_nested():
                 connection.exec_driver_sql(
                     "INSERT INTO foods (id, food_type, source_name, status, canonical_complete) "
@@ -123,7 +212,7 @@ def test_postgres_catalog_migration_enforces_identity_and_guards_data():
                 Operations.context(context),
             ):
                 migrations[2].downgrade()
-            assert connection.exec_driver_sql("SELECT count(*) FROM foods").scalar_one() == 2
+            assert connection.exec_driver_sql("SELECT count(*) FROM foods").scalar_one() == 3
         finally:
             connection.rollback()
             connection.exec_driver_sql('SET search_path TO "public"')

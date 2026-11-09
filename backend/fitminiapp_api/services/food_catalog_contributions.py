@@ -205,6 +205,29 @@ def find_shared_food(
     if existing is not None:
         return _remember_catalog_identity(existing, identity)
 
+    if canonical.source_basis == "per_serving" and canonical.serving_size is not None:
+        serving = canonical.serving_size
+        normalized_basis = "per_100_g" if serving.unit == "g" else "per_100_ml"
+        old_identity = normalize_food_catalog_identity(
+            name, brand, normalized_basis, Decimal("100"), serving.unit
+        )
+        old_candidates = (
+            query.filter(
+                Food.food_type == "branded",
+                Food.source_name == "yfc_community",
+                Food.catalog_identity == old_identity,
+            )
+            .with_for_update()
+            .all()
+        )
+        for candidate in old_candidates:
+            try:
+                previous = validate_canonical_draft(candidate.canonical_facts)
+            except ValueError:
+                continue
+            if previous.source_basis == "per_serving" and previous.serving_size == serving:
+                return candidate
+
     # Older community rows predate catalog_identity. Match only their exact
     # normalized name/brand/basis, never a fuzzy candidate.
     candidates = (

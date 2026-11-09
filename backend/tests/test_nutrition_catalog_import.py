@@ -14,18 +14,23 @@ from test_training_analytics import _auth, _user_id
 
 from fitminiapp_api.api.v1 import nutrition_imports
 from fitminiapp_api.db.session import engine, get_session_context
-from fitminiapp_api.models.food import Food
+from fitminiapp_api.models.food import Food, normalize_food_catalog_identity
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
     NutritionCatalogIdentifier,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.nutrition_label.parser import build_draft_from_ocr
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV1
+from fitminiapp_api.schemas.nutrition_label import NutritionLabelConfirmRequest
+from fitminiapp_api.services import nutrition_catalog_import as catalog_service
 from fitminiapp_api.services.accounts import delete_user_cascade
+from fitminiapp_api.services.food_catalog_contributions import find_shared_food
 from fitminiapp_api.services.foods import FoodError, calculate_food_amount, search_foods
 from fitminiapp_api.services.jwt import decode_token
 from fitminiapp_api.services.nutrition_catalog_import import (
+    _facts_match,
     catalog_import_preview,
     confirm_catalog_alias,
     confirm_catalog_import,
@@ -37,9 +42,286 @@ from fitminiapp_api.services.nutrition_import_drafts import (
     create_nutrition_import_draft,
 )
 from fitminiapp_api.services.nutrition_import_runner import ADAPTERS, NutritionImportAdapter
+from fitminiapp_api.services.nutrition_label import _canonical_from_confirmation, _make_food
 from fitminiapp_api.services.token_service import revoke_refresh_token_family
 
 FIXTURE = Path(__file__).parent / "fixtures" / "nutrition_import" / "neutral-golden.json"
+
+
+def _corrected_serving_label(unit):
+    scan = build_draft_from_ocr(
+        f"Per serving\nServing size 50 {unit}\nEnergy 63 kcal\nProtein 4 g\nFat 3 g\nCarbohydrate 5 g"
+    )
+    request = NutritionLabelConfirmRequest.model_validate(
+        {
+            "revision": 1,
+            "name": "Тестовый продукт Альфа",
+            "brand": "Бренд Тест",
+            "visibility": "share_to_yfc_catalog",
+            "nutrition": {
+                "source_basis": "per_serving",
+                "serving_size": {"amount": "50", "unit": unit},
+                "energy_kcal": "65",
+                "protein_g": "4",
+                "fat_g": "3",
+                "carbohydrate_g": "5",
+            },
+        }
+    )
+    canonical = _canonical_from_confirmation(scan, request)
+    return request, canonical
+
+
+@pytest.mark.parametrize("unit", ["g", "ml"])
+@pytest.mark.parametrize(("energy", "matches"), [("65", True), ("63", False)])
+def test_catalog_matching_uses_corrected_label_values(unit, energy, matches):
+    request, canonical = _corrected_serving_label(unit)
+    food = _make_food(User(), request, canonical, shared=True, visibility="share_to_yfc_catalog")
+    document = NutritionImportV1.model_validate_json(FIXTURE.read_bytes())
+    row = document.rows[0].model_dump(mode="json")
+    row["nutrition"]["basis"] = "per_serving"
+    row["serving_measure"] = {"amount": "50", "unit": unit}
+    for name, value, fact_unit in (
+        ("energy_kcal", "65", "kcal"),
+        ("protein_g", "4", "g"),
+        ("fat_g", "3", "g"),
+        ("carbohydrate_g", "5", "g"),
+    ):
+        row["nutrition"]["facts"][name] = {"value": value, "unit": fact_unit, "evidence": "read"}
+
+    def proposal(energy):
+        row["nutrition"]["facts"]["energy_kcal"]["value"] = energy
+        return prepare_catalog_food(
+            type(document.rows[0]).model_validate(row),
+            document.source,
+            allowed_publication_rights=frozenset({"owner_reported"}),
+            allowed_food_kinds=frozenset({"standard_food"}),
+        ).food
+
+    assert _facts_match(food, proposal(energy)) is matches
+
+
+def test_existing_shared_label_with_normalized_serving_millilitres_remains_valid(client):
+    request, canonical = _corrected_serving_label("ml")
+    with get_session_context() as db:
+        db.add(
+            _make_food(User(), request, canonical, shared=True, visibility="share_to_yfc_catalog")
+        )
+        db.flush()
+        db.rollback()
+
+
+@pytest.mark.parametrize(
+    "serving",
+    [
+        None,
+        {"amount": "0", "unit": "ml"},
+        {"amount": "50", "unit": "g"},
+        {"amount": "60", "unit": "ml"},
+    ],
+)
+def test_normalized_label_rejects_invalid_serving_measure(client, serving):
+    request, canonical = _corrected_serving_label("ml")
+    food = _make_food(User(), request, canonical, shared=True, visibility="share_to_yfc_catalog")
+    food.canonical_facts = {**food.canonical_facts, "serving_size": serving}
+    with get_session_context() as db:
+        db.add(food)
+        with pytest.raises(IntegrityError):
+            db.flush()
+        db.rollback()
+
+
+@pytest.mark.parametrize("unit", ["g", "ml"])
+@pytest.mark.parametrize("legacy_identity", [False, True])
+def test_catalog_preview_matches_confirmed_serving_label(
+    client, monkeypatch, unit, legacy_identity
+):
+    _auth(client, 983900)
+    monkeypatch.setitem(
+        ADAPTERS,
+        "synthetic-catalog",
+        NutritionImportAdapter(
+            "fatsecret",
+            "synthetic-v1",
+            "synthetic-v1",
+            ",",
+            FIXTURE,
+            catalog_source="diary_export",
+            catalog_publication_rights=frozenset({"owner_reported"}),
+            catalog_food_kinds=frozenset({"branded_food"}),
+            catalog_source_versions=frozenset({None}),
+        ),
+    )
+    request, canonical = _corrected_serving_label(unit)
+    with get_session_context() as db:
+        user = db.get(User, _user_id(983900))
+        food = _make_food(user, request, canonical, shared=True, visibility="share_to_yfc_catalog")
+        if legacy_identity:
+            food.catalog_identity = normalize_food_catalog_identity(
+                food.name,
+                food.brand,
+                food.nutrition_basis_kind,
+                food.nutrition_basis_amount,
+                food.nutrition_basis_unit,
+            )
+        db.add(food)
+        db.flush()
+        existing = find_shared_food(
+            db, name=request.name, brand=request.brand, barcode=None, canonical=canonical
+        )
+        assert existing is not None and existing.id == food.id
+        document = NutritionImportV1.model_validate_json(FIXTURE.read_bytes()).model_dump(
+            mode="json"
+        )
+        document["rows"] = [document["rows"][0]]
+        row = document["rows"][0]
+        row["food"] = {"name": request.name, "brand": request.brand, "kind": "branded_food"}
+        row["nutrition"]["basis"] = "per_serving"
+        row["serving_measure"] = {"amount": "50", "unit": unit}
+        for name, value, fact_unit in (
+            ("protein_g", "4", "g"),
+            ("fat_g", "3", "g"),
+            ("carbohydrate_g", "5", "g"),
+        ):
+            row["nutrition"]["facts"][name] = {
+                "value": value,
+                "unit": fact_unit,
+                "evidence": "read",
+            }
+        for energy, outcome in (("65", "reuse"), ("63", "conflict")):
+            row["nutrition"]["facts"]["energy_kcal"]["value"] = energy
+            draft = create_nutrition_import_draft(
+                db,
+                user,
+                document=NutritionImportV1.model_validate(document),
+                source=b"name,amount\nsynthetic,100\n",
+                filename="synthetic.csv",
+                content_type="text/csv",
+                delimiter=",",
+                parser_version="synthetic-v1",
+                upload_key=f"label-match-{energy}",
+                adapter_id="synthetic-catalog",
+            )
+            assert catalog_import_preview(db, user, draft.id)["rows"][0]["outcome"] == outcome
+        db.rollback()
+
+
+def test_legacy_serving_match_does_not_merge_a_per_100_product(client):
+    _auth(client, 983902)
+    request, canonical = _corrected_serving_label("g")
+    per_100 = canonical.model_copy(update={"source_basis": "per_100_g", "serving_size": None})
+    with get_session_context() as db:
+        user = db.get(User, _user_id(983902))
+        db.add(_make_food(user, request, per_100, shared=True, visibility="share_to_yfc_catalog"))
+        db.flush()
+        assert (
+            find_shared_food(
+                db, name=request.name, brand=request.brand, barcode=None, canonical=canonical
+            )
+            is None
+        )
+        db.rollback()
+
+
+def test_postgresql_concurrent_import_and_label_share_one_identity(client, monkeypatch):
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL transaction and uniqueness behavior")
+    _auth(client, 983901)
+    monkeypatch.setitem(
+        ADAPTERS,
+        "synthetic-catalog",
+        NutritionImportAdapter(
+            "fatsecret",
+            "synthetic-v1",
+            "synthetic-v1",
+            ",",
+            FIXTURE,
+            catalog_source="diary_export",
+            catalog_publication_rights=frozenset({"owner_reported"}),
+            catalog_food_kinds=frozenset({"branded_food"}),
+            catalog_source_versions=frozenset({None}),
+        ),
+    )
+    request, canonical = _corrected_serving_label("g")
+    document = NutritionImportV1.model_validate_json(FIXTURE.read_bytes()).model_dump(mode="json")
+    document["rows"] = [document["rows"][0]]
+    row = document["rows"][0]
+    row["food"] = {"name": request.name, "brand": request.brand, "kind": "branded_food"}
+    row["nutrition"]["basis"] = "per_serving"
+    row["serving_measure"] = {"amount": "50", "unit": "g"}
+    for name, value, unit in (
+        ("energy_kcal", "65", "kcal"),
+        ("protein_g", "4", "g"),
+        ("fat_g", "3", "g"),
+        ("carbohydrate_g", "5", "g"),
+    ):
+        row["nutrition"]["facts"][name] = {"value": value, "unit": unit, "evidence": "read"}
+    with get_session_context() as db:
+        user = db.get(User, _user_id(983901))
+        draft = create_nutrition_import_draft(
+            db,
+            user,
+            document=NutritionImportV1.model_validate(document),
+            source=b"name,amount\nsynthetic,100\n",
+            filename="synthetic.csv",
+            content_type="text/csv",
+            delimiter=",",
+            parser_version="synthetic-v1",
+            upload_key="label-concurrent-upload",
+            adapter_id="synthetic-catalog",
+        )
+        draft_id = draft.id
+        preview = catalog_import_preview(db, user, draft_id)
+        assert preview["rows"][0]["outcome"] == "publish"
+    barrier = Barrier(2)
+    write_plan = catalog_service.write_catalog_plan
+
+    def synchronized_write(*args, **kwargs):
+        barrier.wait(timeout=20)
+        return write_plan(*args, **kwargs)
+
+    monkeypatch.setattr(catalog_service, "write_catalog_plan", synchronized_write)
+
+    def publish_import():
+        with get_session_context() as db:
+            try:
+                user = db.get(User, _user_id(983901))
+                confirm_catalog_import(
+                    db,
+                    user,
+                    draft_id,
+                    revision=preview["revision"],
+                    preview_signature=preview["preview_signature"],
+                    confirm_key="label-concurrent-confirm",
+                    row_indexes=[0],
+                    confirmed=True,
+                )
+                db.commit()
+                return "ok"
+            except IntegrityError:
+                db.rollback()
+                return "conflict"
+
+    def publish_label():
+        with get_session_context() as db:
+            user = db.get(User, _user_id(983901))
+            db.add(
+                _make_food(user, request, canonical, shared=True, visibility="share_to_yfc_catalog")
+            )
+            barrier.wait(timeout=20)
+            try:
+                db.commit()
+                return "ok"
+            except IntegrityError:
+                db.rollback()
+                return "conflict"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda action: action(), [publish_import, publish_label]))
+    assert sorted(outcomes) == ["conflict", "ok"]
+    with get_session_context() as db:
+        foods = db.query(Food).filter_by(name=request.name, brand=request.brand).all()
+        assert len(foods) == 1
 
 
 def test_catalog_preparation_requires_trusted_rights_complete_facts_and_known_serving():
