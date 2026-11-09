@@ -42,9 +42,9 @@ class ShardReceipt:
         if report.when == "setup":
             self.executed.append(digest)
         if report.when in {"setup", "call", "teardown"}:
-            self.duration_ms[digest] = self.duration_ms.get(digest, 0.0) + max(
-                report.duration, 0.0
-            ) * 1000
+            self.duration_ms[digest] = (
+                self.duration_ms.get(digest, 0.0) + max(report.duration, 0.0) * 1000
+            )
 
     def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
         if exitstatus != 0:

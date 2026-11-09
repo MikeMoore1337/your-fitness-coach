@@ -114,7 +114,6 @@ def test_receipt_fails_when_execution_is_missing_or_duplicated(tmp_path) -> None
         assert not receipt.path.exists()
 
 
-
 def test_receipt_tracks_all_test_phases_without_changing_selection(tmp_path) -> None:
     nodeid = "backend/tests/test_example.py::test_case"
     digest = pytest_shard._digest(nodeid)
@@ -144,6 +143,7 @@ def test_receipt_refuses_success_when_timing_is_incomplete(tmp_path) -> None:
 
     assert session.exitstatus == 1
     assert not receipt.path.exists()
+
 
 def test_receipts_cover_real_xdist_execution(tmp_path) -> None:
     root = Path(__file__).resolve().parents[1]
