@@ -1,4 +1,4 @@
-import { createCrossContextCoordinator } from '../../shared/browser/crossContextLock';
+import { withHydrationFence } from '../../shared/browser/hydrationFence';
 import {
   HYDRATION_PENDING_SESSION_PREFIX,
   HYDRATION_PENDING_STORAGE_PREFIX,
@@ -21,7 +21,6 @@ export type HydrationPendingStore = {
 };
 
 export const HYDRATION_PENDING_EVENT = 'fit:hydration-pending';
-const coordinator = createCrossContextCoordinator({ requireSharedLock: true });
 const kinds = new Set(['water', 'tea', 'coffee', 'milk', 'juice', 'other']);
 
 export async function demoHydrationScope(token: string): Promise<string> {
@@ -126,7 +125,7 @@ function migratePending(scope: string): HydrationPendingStore {
 
 export function withPendingHydration<T>(
   scope: string,
-  task: (store: HydrationPendingStore) => T | Promise<T>,
+  task: (store: HydrationPendingStore) => T,
 ): Promise<T> {
-  return coordinator.run(`hydration:${scope}`, () => task(migratePending(scope)));
+  return withHydrationFence(pendingStorageKey(scope), () => task(migratePending(scope)));
 }

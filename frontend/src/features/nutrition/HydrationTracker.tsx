@@ -310,6 +310,7 @@ export function HydrationTracker({
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const quickAddRef = useRef<HTMLDivElement>(null);
   const addInFlightRef = useRef(false);
+  const [preparingAdd, setPreparingAdd] = useState(false);
   const [customVolume, setCustomVolume] = useState('');
   const [beverageType, setBeverageType] = useState('water');
   const [undoEntry, setUndoEntry] = useState<HydrationEntry | null>(null);
@@ -332,6 +333,14 @@ export function HydrationTracker({
     queryFn: () => api<User>('/api/v1/me'),
   });
   const demoGeneration = hydration.data?.demo_generation;
+  const [readyDemoStore, setReadyDemoStore] = useState<{
+    scope: string;
+    generation: number;
+  } | null>(null);
+  const matchesDemoScope = readyDemoStore?.scope === scope;
+  const matchesDemoGeneration = readyDemoStore?.generation === demoGeneration;
+  const demoStoreReady = matchesDemoScope && matchesDemoGeneration;
+  const demoStorageReady = !demoToken || demoStoreReady;
   useLayoutEffect(() => {
     observedDemoGenerationRef.current = demoGeneration;
   }, [demoToken, demoGeneration]);
@@ -346,7 +355,11 @@ export function HydrationTracker({
     lastDemoGenerationRef.current = demoGeneration;
   }, [demoToken, demoGeneration]);
   useEffect(() => {
-    if (!scope || !demoToken || !Number.isSafeInteger(demoGeneration)) return;
+    if (!scope || !demoToken || typeof demoGeneration !== 'number') return;
+    if (!Number.isSafeInteger(demoGeneration)) return;
+    const generation = demoGeneration;
+    let active = true;
+    // Readiness is keyed by scope and generation; an old key is never reusable.
     void withPendingHydration(scope, (store) => {
       if (store.demoGeneration !== undefined && (demoGeneration ?? -1) < store.demoGeneration)
         return;
@@ -362,7 +375,15 @@ export function HydrationTracker({
         }
       }
       if (changed) writePendingHydration(scope, store);
-    }).catch(() => undefined);
+    })
+      .then(() => {
+        // Do not enable quick add until the generation fence commits in IDB.
+        if (active) setReadyDemoStore({ scope, generation });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [scope, demoToken, demoGeneration]);
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -370,6 +391,7 @@ export function HydrationTracker({
       !initialExpanded ||
       !scope ||
       !hydration.data ||
+      !demoStorageReady ||
       !quickAddRef.current ||
       url.searchParams.get('hydration') !== 'quick'
     ) {
@@ -386,7 +408,7 @@ export function HydrationTracker({
       `${url.pathname}${url.search}${url.hash}`,
     );
     window.dispatchEvent(new PopStateEvent('popstate'));
-  }, [initialExpanded, hydration.data, scope]);
+  }, [initialExpanded, hydration.data, scope, demoStorageReady]);
   const loadedGoal = hydration.data?.goal;
   const loadedGoalIsReference = loadedGoal?.source === 'national_academies_beverages';
   const goalMode = goalModeDraft ?? (loadedGoal && !loadedGoalIsReference ? 'manual' : 'reference');
@@ -416,9 +438,12 @@ export function HydrationTracker({
       demo: boolean;
       boundary?: AuthDiscard;
     }) =>
-      api<HydrationEntry>('/api/v1/nutrition/hydration/entries', {
+      api<HydrationEntry>('/api/v1/nutrition/hydration/entries/v2', {
         method: 'POST',
-        headers: { 'Idempotency-Key': request.key },
+        headers: {
+          'Idempotency-Key': request.key,
+          'X-YFC-Hydration-Protocol': '2',
+        },
         body: {
           volume_ml: request.volume,
           beverage_type: request.kind,
@@ -501,13 +526,16 @@ export function HydrationTracker({
     },
     onSettled: () => {
       addInFlightRef.current = false;
+      setPreparingAdd(false);
     },
   });
+  const addUnavailable = preparingAdd || add.isPending || !demoStorageReady;
   const submitAdd = async (payload: Pick<AddRequest, 'volume' | 'kind' | 'source'>) => {
     if (
       addInFlightRef.current ||
       add.isPending ||
       !scope ||
+      !demoStorageReady ||
       !isCurrentScope(scope) ||
       dateRef.current !== diaryDate
     )
@@ -521,6 +549,7 @@ export function HydrationTracker({
       return;
     }
     addInFlightRef.current = true;
+    setPreparingAdd(true);
     const boundary = demoToken
       ? undefined
       : { ...authDiscardSnapshot(), userId: Number(scope.slice(5)) };
@@ -603,6 +632,7 @@ export function HydrationTracker({
       );
     }
     addInFlightRef.current = false;
+    setPreparingAdd(false);
   };
   const undo = useMutation({
     mutationFn: (entryId: number) =>
@@ -748,7 +778,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
-            disabled={add.isPending || !scope}
+            disabled={addUnavailable || !scope}
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
@@ -784,7 +814,7 @@ export function HydrationTracker({
           <Button
             variant="secondary"
             type="button"
-            disabled={add.isPending}
+            disabled={addUnavailable}
             onClick={() => void submitAdd(pending)}
           >
             Повторить без дубля
@@ -819,7 +849,7 @@ export function HydrationTracker({
             </Select>
           </Field>
           <Button
-            disabled={add.isPending || !scope || !customVolume}
+            disabled={addUnavailable || !scope || !customVolume}
             type="button"
             onClick={() =>
               void submitAdd({

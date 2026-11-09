@@ -1,8 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { webcrypto } from 'node:crypto';
+import { IDBFactory } from 'fake-indexeddb';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HydrationTracker } from '../../../../src/features/nutrition/HydrationTracker';
+import { resetHydrationFences } from '../../../../src/shared/browser/hydrationFence';
 import type { HydrationDay, HydrationEntry } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 import { AUTHENTICATED_USER_ID_STORAGE_KEY } from '../../../../src/shared/userScopedStorage';
@@ -77,6 +79,7 @@ function renderTracker(initialExpanded = false) {
 
 describe('HydrationTracker', () => {
   beforeEach(() => {
+    vi.stubGlobal('indexedDB', new IDBFactory());
     window.history.replaceState({}, '', '/app?section=nutrition');
     sessionStorage.clear();
     localStorage.clear();
@@ -90,8 +93,10 @@ describe('HydrationTracker', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
+    await resetHydrationFences(null);
+    vi.unstubAllGlobals();
     Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
   });
 
@@ -222,7 +227,7 @@ describe('HydrationTracker', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
-        '/api/v1/nutrition/hydration/entries',
+        '/api/v1/nutrition/hydration/entries/v2',
         expect.objectContaining({
           method: 'POST',
           body: expect.objectContaining({ volume_ml: 250, source: 'quick_preset' }),
@@ -246,7 +251,7 @@ describe('HydrationTracker', () => {
       ) => {
         if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
         if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
-        if (path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST') {
+        if (path === '/api/v1/nutrition/hydration/entries/v2' && options?.method === 'POST') {
           const key = options.headers?.['Idempotency-Key'];
           if (!key) throw new Error('Missing idempotency key');
           requests.push({ key, body: options.body });
@@ -269,6 +274,7 @@ describe('HydrationTracker', () => {
     const preset = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
     fireEvent.click(preset);
     await screen.findByRole('button', { name: 'Повторить без дубля' });
+    await waitFor(() => expect(preset).toBeEnabled());
     fireEvent.click(preset);
     await screen.findByText('Добавлено 250 мл');
     expect(requests).toHaveLength(2);
@@ -295,7 +301,7 @@ describe('HydrationTracker', () => {
       ) => {
         if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
         if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
-        if (path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST') {
+        if (path === '/api/v1/nutrition/hydration/entries/v2' && options?.method === 'POST') {
           const key = options.headers?.['Idempotency-Key'];
           if (!key || !options.body) throw new Error('Missing hydration request');
           requests.push({ key, body: options.body });
@@ -352,9 +358,16 @@ describe('HydrationTracker', () => {
       return Promise.resolve();
     });
     renderTracker();
-    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
-    await screen.findByRole('button', { name: 'Повторить без дубля' });
-    fireEvent.click(screen.getByRole('button', { name: /Бутылка.*500 мл/ }));
+    const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(glass).toBeEnabled());
+    fireEvent.click(glass);
+    // The request and the pending-state update are async IndexedDB operations.
+    // Assert the failed POST first so a missing retry button cannot hide a dropped click.
+    await waitFor(() => expect(posts).toBe(1), { timeout: 5_000 });
+    await screen.findByRole('button', { name: 'Повторить без дубля' }, { timeout: 5_000 });
+    const bottle = screen.getByRole('button', { name: /Бутылка.*500 мл/ });
+    await waitFor(() => expect(bottle).toBeEnabled());
+    fireEvent.click(bottle);
     const dialog = await screen.findByRole('dialog', { name: 'Добавить другую запись?' });
     expect(within(dialog).getByText(/Предыдущая запись могла сохраниться/)).toBeVisible();
     expect(posts).toBe(1);
@@ -403,16 +416,21 @@ describe('HydrationTracker', () => {
           </FeedbackProvider>
         </QueryClientProvider>,
       );
-    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    const clickEnabled = async (name: string | RegExp) => {
+      const button = await screen.findByRole('button', { name });
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+    };
+    await clickEnabled(/Стакан.*250 мл/);
     await screen.findByRole('button', { name: 'Повторить без дубля' });
     showDate('2026-08-31');
-    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await clickEnabled(/Стакан.*250 мл/);
     await screen.findByRole('button', { name: 'Повторить без дубля' });
     showDate('2026-09-01');
-    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    await clickEnabled('Повторить без дубля');
     await screen.findByText('Добавлено 250 мл');
     showDate('2026-08-31');
-    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    await clickEnabled('Повторить без дубля');
     await waitFor(() => expect(requests).toHaveLength(4));
     expect(requests[2]).toEqual(requests[0]);
     expect(requests[3]).toEqual(requests[1]);
@@ -510,7 +528,10 @@ describe('HydrationTracker', () => {
     expect(JSON.stringify(localStorage)).not.toContain('synthetic-session');
     first.unmount();
     render(demo);
-    fireEvent.click(await screen.findByRole('button', { name: 'Повторить без дубля' }));
+    const retry = await screen.findByRole('button', { name: 'Повторить без дубля' });
+    // The new demo context must persist its IndexedDB generation fence first.
+    await waitFor(() => expect(retry).toBeEnabled());
+    fireEvent.click(retry);
     await screen.findByText('Добавлено 250 мл');
     expect(requests).toHaveLength(2);
     expect(requests[1]).toEqual(requests[0]);
@@ -594,6 +615,13 @@ describe('HydrationTracker', () => {
     );
     const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
     await waitFor(() => expect(glass).toBeEnabled());
+    // Await the persisted generation before sending the first request.
+    // Otherwise the reset scenario can race the initial IndexedDB fence.
+    await waitFor(() =>
+      expect(
+        Object.values(localStorage).some((value) => value.includes('"demoGeneration":0')),
+      ).toBe(true),
+    );
     fireEvent.click(glass);
     await waitFor(() => expect(requests).toHaveLength(1));
     generation = 1;
@@ -680,7 +708,7 @@ describe('HydrationTracker', () => {
       expect(
         apiMock.mock.calls.filter(
           ([path, options]) =>
-            path === '/api/v1/nutrition/hydration/entries' && options?.method === 'POST',
+            path === '/api/v1/nutrition/hydration/entries/v2' && options?.method === 'POST',
         ),
       ).toHaveLength(0);
     } finally {
@@ -724,7 +752,10 @@ describe('HydrationTracker', () => {
         </FeedbackProvider>
       </QueryClientProvider>,
     );
-    const regions = await screen.findAllByRole('region', { name: 'Гидратация' });
+    await waitFor(() =>
+      expect(screen.getAllByRole('region', { name: 'Гидратация' })).toHaveLength(2),
+    );
+    const regions = screen.getAllByRole('region', { name: 'Гидратация' });
     const first = within(regions[0]!);
     const second = within(regions[1]!);
     fireEvent.click(first.getByRole('button', { name: /Стакан.*250 мл/ }));
@@ -761,7 +792,7 @@ describe('HydrationTracker', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
-        '/api/v1/nutrition/hydration/entries',
+        '/api/v1/nutrition/hydration/entries/v2',
         expect.objectContaining({ method: 'POST' }),
       ),
     );
@@ -811,7 +842,7 @@ describe('HydrationTracker', () => {
       if (delayed)
         await waitFor(() =>
           expect(apiMock).toHaveBeenCalledWith(
-            '/api/v1/nutrition/hydration/entries',
+            '/api/v1/nutrition/hydration/entries/v2',
             expect.objectContaining({ method: 'POST' }),
           ),
         );

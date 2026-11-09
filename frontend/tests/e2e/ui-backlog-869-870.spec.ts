@@ -173,7 +173,7 @@ for (const theme of themes) {
             .locator('strong')
             .evaluate((node) => getComputedStyle(node).whiteSpace),
         ).toBe('nowrap');
-        await page.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+        await page.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
           if (route.request().method() !== 'POST') return route.fallback();
           await route.fulfill({
             status: 201,

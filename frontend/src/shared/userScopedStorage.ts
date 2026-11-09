@@ -2,6 +2,7 @@ import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   LEGACY_AUTH_CANARY_KEY,
 } from './auth/legacySessionKeys';
+import { resetHydrationFences } from './browser/hydrationFence';
 
 export { AUTHENTICATED_USER_ID_STORAGE_KEY } from './auth/legacySessionKeys';
 const LAST_AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_last_authenticated_user_id_v1';
@@ -291,6 +292,8 @@ export function clearSensitiveUserScopedStorage(
   } catch {
     // Storage is optional in restrictive webviews.
   }
+
+  void resetHydrationFences(retainedHydrationKey).catch(() => undefined);
 
   try {
     const retainedKey = pendingUserId
