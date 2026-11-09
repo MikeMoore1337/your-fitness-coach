@@ -435,7 +435,10 @@ def _compare_day_meals(
 
 
 def _details(
-    records: list[tuple[int, list[str]]], ends: dict[int, int], report: dict[str, Any]
+    records: list[tuple[int, list[str]]],
+    ends: dict[int, int],
+    report: dict[str, Any],
+    period_bounds: tuple[str, str] | None = None,
 ) -> None:
     if not records or not _header(records[0][1], DETAIL_HEADERS, DETAIL_HEADERS_SHORT):
         raise _FormatError("unknown_detail_header", records[0][0] if records else None)
@@ -452,8 +455,13 @@ def _details(
             _compare_day_meals(day_total, day_meals, report)
 
     def validate_period(value: str, row: int) -> str:
-        summary = report["original_summaries"][0]
-        start, end = summary.get("period_start"), summary.get("period_end")
+        if period_bounds is not None:
+            start, end = period_bounds
+        elif report["original_summaries"]:
+            summary = report["original_summaries"][0]
+            start, end = summary.get("period_start"), summary.get("period_end")
+        else:
+            start, end = None, None
         if (start is not None and value < start) or (end is not None and value > end):
             raise _FormatError("date_outside_period", row)
         return value
@@ -684,25 +692,34 @@ def parse(content: bytes) -> dict[str, Any]:
             if row in (["# Period Summary"], ["# Report Details"])
         ]
         if (
-            len(markers) != 2
-            or records[markers[0]][1] != ["# Period Summary"]
-            or records[markers[1]][1] != ["# Report Details"]
+            len(markers) == 2
+            and records[markers[0]][1] == ["# Period Summary"]
+            and records[markers[1]][1] == ["# Report Details"]
         ):
-            raise _FormatError("unknown_sections")
-        metadata = None
-        prefix = records[: markers[0]]
-        if prefix:
-            if len(prefix) != 1 or len(prefix[0][1]) != 3 or prefix[0][1][0] != _REPORT_TITLE:
+            metadata = None
+            prefix = records[: markers[0]]
+            if prefix:
+                if len(prefix) != 1 or len(prefix[0][1]) != 3 or prefix[0][1][0] != _REPORT_TITLE:
+                    raise _FormatError("unknown_sections")
+                row_number, title = prefix[0]
+                metadata = (
+                    row_number,
+                    _long_date(title[1], row_number),
+                    _long_date(title[2], row_number),
+                )
+            _summary(records[markers[0] + 1 : markers[1]], report, metadata)
+            section = "report_details"
+            _details(records[markers[1] + 1 :], ends, report)
+        elif len(markers) == 1 and records[markers[0]][1] == ["# Report Details"]:
+            prefix = records[: markers[0]]
+            if len(prefix) != 1 or len(prefix[0][1]) != 2 or prefix[0][1][0] != _REPORT_TITLE:
                 raise _FormatError("unknown_sections")
             row_number, title = prefix[0]
-            metadata = (
-                row_number,
-                _long_date(title[1], row_number),
-                _long_date(title[2], row_number),
-            )
-        _summary(records[markers[0] + 1 : markers[1]], report, metadata)
-        section = "report_details"
-        _details(records[markers[1] + 1 :], ends, report)
+            day = _long_date(title[1], row_number)
+            section = "report_details"
+            _details(records[markers[0] + 1 :], ends, report, (day, day))
+        else:
+            raise _FormatError("unknown_sections")
     except NutritionImportValidationError as exc:
         report = _document()
         report["diagnostics"].append({"code": exc.code, "severity": "error"})

@@ -51,6 +51,19 @@ DETAIL_HEADER = [
     "Холестерин (мг)",
     "Калий (мг)",
 ]
+SHORT_DETAIL_HEADER = [
+    "Метка",
+    "Кал ( ккал)",
+    "Жир( г)",
+    "Н/жир( г)",
+    "Углев( г)",
+    "Клетч( г)",
+    "Сахар( г)",
+    "Белк( г)",
+    "Натри( мг)",
+    "Холес( мг)",
+    "Калий( мг)",
+]
 NUTRIENTS = ["12,30000001", "2,00", "0,50", "4,00", "", "0,00", "3,00", "1,00", "0,00", "5,00"]
 
 
@@ -239,19 +252,6 @@ def test_hash_separators_are_ignored_but_other_hash_lines_fail_closed(rows):
 
 def test_russian_detailed_report_layout_preserves_context_and_skips_totals():
     summary_header = ["Сводка", "Кал ( ккал)", "Жир( г)", "Углев( г)", "Белк( г)"]
-    detail_header = [
-        "Метка",
-        "Кал ( ккал)",
-        "Жир( г)",
-        "Н/жир( г)",
-        "Углев( г)",
-        "Клетч( г)",
-        "Сахар( г)",
-        "Белк( г)",
-        "Натри( мг)",
-        "Холес( мг)",
-        "Калий( мг)",
-    ]
     rows = [
         ["#-------------------------------------------"],
         [
@@ -265,7 +265,7 @@ def test_russian_detailed_report_layout_preserves_context_and_skips_totals():
         ["Всего", "12,30", "2,00", "4,00", "3,00"],
         ["Перекус/Другое", "12,30", "2,00", "4,00", "3,00"],
         ["# Report Details"],
-        detail_header,
+        SHORT_DETAIL_HEADER[:],
         ["Суббота, марта 2, 2024", *NUTRIENTS],
         ["Перекус/Другое", *NUTRIENTS],
         ["Синтетический продукт", *NUTRIENTS],
@@ -306,6 +306,96 @@ def test_russian_detailed_report_layout_preserves_context_and_skips_totals():
         rejected = parse(_csv(invalid))
         assert rejected["rows"] == []
         assert rejected["diagnostics"][0]["code"] == code
+
+
+def test_single_day_report_has_no_fabricated_summary_and_checks_its_date():
+    rows = [
+        ["#-------------------------------------------"],
+        ["# Food Diary Report - Detailed Report", "Суббота, марта 2, 2024"],
+        ["#-------------------------------------------"],
+        ["# Report Details"],
+        SHORT_DETAIL_HEADER[:],
+        ["Суббота, марта 2, 2024", *NUTRIENTS],
+        ["Завтрак", *NUTRIENTS],
+        ["Синтетический продукт", *NUTRIENTS],
+        ["100 г"],
+        ["Всего", *NUTRIENTS],
+    ]
+    _, result = _validated(rows)
+    assert result.original_summaries == []
+    assert len(result.rows) == 1
+    assert result.rows[0].diary_date.isoformat() == "2024-03-02"
+    assert result.rows[0].food.name == "Синтетический продукт"
+    assert [(item.scope, item.coordinates.row) for item in result.original_totals] == [
+        ("day", 6),
+        ("meal", 7),
+        ("unknown", 8),
+        ("unknown", 10),
+    ]
+    assert not any(issue.code == "summary_aggregation_unknown" for issue in result.diagnostics)
+    daily_facts = next(item.facts for item in result.original_totals if item.coordinates.row == 8)
+    assert daily_facts.fiber_g.evidence == "absent"
+    assert daily_facts.sugars_g.value == Decimal("0.00")
+    assert (
+        next(
+            cell for cell in result.original_detail_cells if cell.coordinates.row == 8
+        ).source_value
+        == "0,50"
+    )
+
+    period_rows = [
+        [
+            "# Food Diary Report - Detailed Report",
+            "Суббота, марта 2, 2024",
+            "Воскресенье, марта 3, 2024",
+        ],
+        ["# Period Summary"],
+        SUMMARY_HEADER[:],
+        ["# Report Details"],
+        *rows[4:],
+    ]
+    _, period = _validated(period_rows)
+    period_item = period.rows[0]
+    period_facts = next(
+        item.facts
+        for item in period.original_totals
+        if item.coordinates.row == period_item.coordinates.row
+    )
+    assert period_item.food == result.rows[0].food
+    assert period_item.diary_date == result.rows[0].diary_date
+    assert period_item.serving_label == result.rows[0].serving_label
+    assert period_facts == daily_facts
+
+    for change, code in (
+        (lambda r: r[1].__setitem__(0, "# Unknown Report"), "unknown_sections"),
+        (lambda r: r[1].__setitem__(1, "Воскресенье, марта 3, 2024"), "date_outside_period"),
+        (lambda r: r[4].__setitem__(2, "Жир(мг)"), "unknown_detail_header"),
+        (lambda r: r.append(["# Report Details"]), "unknown_sections"),
+        (lambda r: r.pop(1), "unknown_sections"),
+    ):
+        invalid = deepcopy(rows)
+        change(invalid)
+        rejected = parse(_csv(invalid))
+        assert rejected["rows"] == []
+        assert rejected["diagnostics"][0]["code"] == code
+
+
+def test_single_day_report_with_no_foods_does_not_create_entries():
+    rows = [
+        ["# Food Diary Report - Detailed Report", "Суббота, марта 2, 2024"],
+        ["# Report Details"],
+        SHORT_DETAIL_HEADER[:],
+        ["Суббота, марта 2, 2024", *([""] * 10)],
+        ["Завтрак", *([""] * 10)],
+        ["Обед", *([""] * 10)],
+        ["Ужин", *([""] * 10)],
+        ["Перекус/Другое", *([""] * 10)],
+        ["Всего", *([""] * 10)],
+    ]
+    _, result = _validated(rows)
+    assert result.rows == []
+    assert result.original_summaries == []
+    assert result.original_totals == []
 
 
 def test_descriptive_quantity_does_not_taint_the_following_date(rows):
@@ -594,6 +684,27 @@ def test_api_upload_uses_worker_and_keeps_unconfirmed_data_private(client, rows)
         },
     )
     assert confirm.status_code == 409 and confirm.json()["detail"]["code"] == "unresolved_rows"
+
+    daily_rows = [
+        ["# Food Diary Report - Detailed Report", "Четверг, февраля 29, 2024"],
+        ["# Report Details"],
+        SHORT_DETAIL_HEADER[:],
+        ["Четверг, февраля 29, 2024", *NUTRIENTS],
+        ["Завтрак", *NUTRIENTS],
+        ["Синтетический продукт", *NUTRIENTS],
+        ["100 г"],
+        ["Всего", *NUTRIENTS],
+    ]
+    daily = upload(daily_rows, "synthetic-day-api-884")
+    assert daily.status_code == 201
+    daily_preview = daily.json()
+    assert daily_preview["original_summaries"] == []
+    assert len(daily_preview["rows"]) == 1
+    assert daily_preview["rows"][0]["source"]["diary_date"] == "2024-02-29"
+    assert (
+        client.get(f"/api/v1/nutrition/imports/{daily_preview['id']}", headers=other).status_code
+        == 404
+    )
 
     invalid = deepcopy(rows)
     invalid[6][1] = "Калории (кДж)"
