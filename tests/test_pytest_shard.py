@@ -73,7 +73,9 @@ def test_receipts_reject_missing_duplicate_or_inconsistent_shards(tmp_path) -> N
         directory = tmp_path / str(index)
         directory.mkdir()
         (directory / "receipt.json").write_text(
-            json.dumps({"shard": f"{index}/2", "all": nodes, "selected": _ranked_shard(nodes, index, 2)}),
+            json.dumps(
+                {"shard": f"{index}/2", "all": nodes, "selected": _ranked_shard(nodes, index, 2)}
+            ),
             encoding="utf-8",
         )
     verify_pytest_shards.verify(tmp_path, 2)
