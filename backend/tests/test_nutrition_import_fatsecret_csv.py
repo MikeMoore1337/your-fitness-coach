@@ -237,12 +237,166 @@ def test_hash_separators_are_ignored_but_other_hash_lines_fail_closed(rows):
     assert result["diagnostics"][0]["code"] == "unknown_summary_structure"
 
 
+def test_russian_detailed_report_layout_preserves_context_and_skips_totals():
+    summary_header = ["Сводка", "Кал ( ккал)", "Жир( г)", "Углев( г)", "Белк( г)"]
+    detail_header = [
+        "Метка",
+        "Кал ( ккал)",
+        "Жир( г)",
+        "Н/жир( г)",
+        "Углев( г)",
+        "Клетч( г)",
+        "Сахар( г)",
+        "Белк( г)",
+        "Натри( мг)",
+        "Холес( мг)",
+        "Калий( мг)",
+    ]
+    rows = [
+        ["#-------------------------------------------"],
+        [
+            "# Food Diary Report - Detailed Report",
+            "Суббота, марта 2, 2024",
+            "Воскресенье, марта 3, 2024",
+        ],
+        ["#-------------------------------------------"],
+        ["# Period Summary"],
+        summary_header,
+        ["Всего", "12,30", "2,00", "4,00", "3,00"],
+        ["Перекус/Другое", "12,30", "2,00", "4,00", "3,00"],
+        ["# Report Details"],
+        detail_header,
+        ["Суббота, марта 2, 2024", *NUTRIENTS],
+        ["Перекус/Другое", *NUTRIENTS],
+        ["Синтетический продукт", *NUTRIENTS],
+        ["2 порции (100 г)"],
+        ["Всего", *NUTRIENTS],
+    ]
+    _, result = _validated(rows)
+    assert len(result.rows) == 1
+    assert result.rows[0].food.name == "Синтетический продукт"
+    assert result.rows[0].diary_date.isoformat() == "2024-03-02"
+    assert result.rows[0].meal_type == "snacks"
+    assert result.rows[0].serving_label == "2 порции (100 г)"
+    assert result.rows[0].quantity == Decimal("2")
+    assert result.rows[0].amount_unit == "serving"
+    assert result.rows[0].serving_measure is None
+    assert [(x.scope, x.coordinates.row) for x in result.original_totals] == [
+        ("day", 10),
+        ("meal", 11),
+        ("unknown", 12),
+        ("unknown", 14),
+    ]
+    summary = result.original_summaries[0]
+    assert (summary.period_start.isoformat(), summary.period_end.isoformat()) == (
+        "2024-03-02",
+        "2024-03-03",
+    )
+    assert summary.aggregation.kind == "unknown"
+
+    for change, code in (
+        (lambda r: r[1].__setitem__(0, "# Unknown Report"), "unknown_sections"),
+        (lambda r: r[1].__setitem__(1, "Понедельник, марта 4, 2024"), "invalid_period"),
+        (lambda r: r[9].__setitem__(0, "Вторник, марта 2, 2024"), "invalid_date"),
+        (lambda r: r[9].__setitem__(0, "Суббота, марта 32, 2024"), "invalid_date"),
+        (lambda r: r[8].__setitem__(2, "Жир(мг)"), "unknown_detail_header"),
+    ):
+        invalid = deepcopy(rows)
+        change(invalid)
+        rejected = parse(_csv(invalid))
+        assert rejected["rows"] == []
+        assert rejected["diagnostics"][0]["code"] == code
+
+
+def test_descriptive_quantity_does_not_taint_the_following_date(rows):
+    rows[10] = ["1 чашка (100 г)"]
+    _, result = _validated(rows)
+    assert any(issue.code == "unknown_unit" for issue in result.rows[0].diagnostics)
+    assert result.rows[0].serving_label == "1 чашка (100 г)"
+    assert result.rows[1].diary_date.isoformat() == "2024-02-29"
+    assert not any(issue.code == "source_context_ambiguous" for issue in result.rows[1].diagnostics)
+
+    rows[10] = ["2 x 3 порции (100 г)"]
+    _, result = _validated(rows)
+    assert result.rows[0].quantity is None and result.rows[0].amount_unit is None
+    assert any(issue.code == "quantity_unrecognized" for issue in result.rows[0].diagnostics)
+    assert result.rows[1].diary_date.isoformat() == "2024-02-29"
+
+    rows[10] = ["1 марта (2024 г)"]
+    _, result = _validated(rows)
+    assert result.rows[1].diary_date is None
+    assert any(issue.code == "source_context_ambiguous" for issue in result.rows[1].diagnostics)
+
+
+def test_serving_with_comma_keeps_quantity_without_guessing_mass(rows):
+    rows[10] = ["1 порция, 100 г"]
+    _, result = _validated(rows)
+    assert result.rows[0].quantity == Decimal("1")
+    assert result.rows[0].amount_unit == "serving"
+    assert result.rows[0].serving_measure is None
+    assert result.rows[0].serving_label == "1 порция, 100 г"
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("Понедельник, января 1, 2024", "2024-01-01"),
+        ("Четверг, февраля 29, 2024", "2024-02-29"),
+        ("Среда, мая 1, 2024", "2024-05-01"),
+        ("Вторник, октября 1, 2024", "2024-10-01"),
+        ("Вторник, декабря 31, 2024", "2024-12-31"),
+    ],
+)
+def test_russian_report_dates_across_months(rows, label, expected):
+    rows[1] = ["Период: 01.01.2024–31.12.2024"]
+    rows[7] = [label, *NUTRIENTS]
+    _, result = _validated(rows)
+    assert result.rows[0].diary_date.isoformat() == expected
+    assert result.original_totals[0].scope == "day"
+
+
+def test_daily_meal_totals_are_compared_only_with_complete_source_values():
+    def values(energy):
+        return [energy, *([""] * 9)]
+
+    rows = [
+        ["# Period Summary"],
+        SUMMARY_HEADER[:],
+        ["# Report Details"],
+        DETAIL_HEADER[:],
+        ["Суббота, марта 2, 2024", *values("10")],
+    ]
+    for meal, energy in (("Завтрак", "1"), ("Обед", "2"), ("Ужин", "3"), ("Перекус", "4")):
+        rows.extend(
+            [[meal, *values(energy)], ["Синтетический продукт", *values(energy)], ["100 г"]]
+        )
+
+    _, result = _validated(rows)
+    assert not any(issue.code == "day_meal_totals_differ" for issue in result.diagnostics)
+
+    rows[4][1] = "11"
+    _, result = _validated(rows)
+    issue = next(issue for issue in result.diagnostics if issue.code == "day_meal_totals_differ")
+    assert issue.severity == "warning" and issue.coordinates.row == 5
+    assert issue.field == "energy_kcal"
+
+    rows[8][1] = ""
+    _, result = _validated(rows)
+    assert not any(issue.code == "day_meal_totals_differ" for issue in result.diagnostics)
+
+    rows[8][1] = "2"
+    rows[14][0] = "Ужин"
+    _, result = _validated(rows)
+    assert not any(issue.code == "day_meal_totals_differ" for issue in result.diagnostics)
+
+
 @pytest.mark.parametrize(
     ("change", "code"),
     [
         (lambda r: r[6].__setitem__(1, "Калории (кДж)"), "unknown_detail_header"),
         (lambda r: r[2].__setitem__(1, "Неизвестно"), "unknown_summary_structure"),
         (lambda r: r[7].__setitem__(0, "Дата: 31.02.2024"), "invalid_date"),
+        (lambda r: r[7].__setitem__(0, "Дата: 01.01.2024"), "date_outside_period"),
         (lambda r: r[10].__setitem__(0, "Дата: 01.03.2024"), "quantity_association_ambiguous"),
         (lambda r: r[10].__setitem__(0, "Дата 01.03.2024"), "quantity_association_ambiguous"),
         (lambda r: r[10].__setitem__(0, "01.03.2024"), "quantity_association_ambiguous"),
@@ -251,6 +405,7 @@ def test_hash_separators_are_ignored_but_other_hash_lines_fail_closed(rows):
         (lambda r: r[9].__setitem__(0, "Промежуточный итог"), "unknown_total_scope"),
         (lambda r: r[9].__setitem__(0, "Дневной итог"), "unknown_total_scope"),
         (lambda r: r[11].__setitem__(0, "Итого, приём пищи"), "unknown_total_scope"),
+        (lambda r: r[9].__setitem__(0, "Всего"), "unknown_total_scope"),
         (lambda r: r[9].__setitem__(0, "Дата: 01.03.2024"), "unknown_detail_structure"),
         (lambda r: r[9].pop(), "unknown_detail_structure"),
         (lambda r: r.append(["# Report Details"]), "unknown_sections"),
