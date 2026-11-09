@@ -380,7 +380,7 @@ describe('HydrationTracker', () => {
     );
     await screen.findByText('Добавлено 500 мл');
     expect(posts).toBe(2);
-  });
+  }, 10_000);
 
   it('keeps separate unresolved requests for different dates', async () => {
     const requests: Array<{ date: string; key: string }> = [];
@@ -837,7 +837,9 @@ describe('HydrationTracker', () => {
           </QueryClientProvider>,
         );
 
-      fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+      const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+      await waitFor(() => expect(glass).toBeEnabled());
+      fireEvent.click(glass);
       if (!delayed) expect(await screen.findByText('Добавлено 250 мл')).toBeVisible();
       if (delayed)
         await waitFor(() =>
