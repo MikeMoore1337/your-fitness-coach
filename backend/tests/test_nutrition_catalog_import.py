@@ -26,7 +26,10 @@ from fitminiapp_api.schemas.nutrition_import import NutritionImportV1
 from fitminiapp_api.schemas.nutrition_label import NutritionLabelConfirmRequest
 from fitminiapp_api.services import nutrition_catalog_import as catalog_service
 from fitminiapp_api.services.accounts import delete_user_cascade
-from fitminiapp_api.services.food_catalog_contributions import find_shared_food
+from fitminiapp_api.services.food_catalog_contributions import (
+    canonical_facts_match,
+    find_shared_food,
+)
 from fitminiapp_api.services.foods import FoodError, calculate_food_amount, search_foods
 from fitminiapp_api.services.jwt import decode_token
 from fitminiapp_api.services.nutrition_catalog_import import (
@@ -98,7 +101,10 @@ def test_catalog_matching_uses_corrected_label_values(unit, energy, matches):
             allowed_food_kinds=frozenset({"standard_food"}),
         ).food
 
-    assert _facts_match(food, proposal(energy)) is matches
+    imported = proposal(energy)
+    assert _facts_match(food, imported) is matches
+    imported_food = Food(canonical_facts=imported.canonical.model_dump(mode="json"))
+    assert canonical_facts_match(imported_food, canonical) is matches
 
 
 def test_existing_shared_label_with_normalized_serving_millilitres_remains_valid(client):
@@ -109,6 +115,15 @@ def test_existing_shared_label_with_normalized_serving_millilitres_remains_valid
         )
         db.flush()
         db.rollback()
+
+
+def test_canonical_match_rejects_different_serving_sizes():
+    _, canonical = _corrected_serving_label("g")
+    assert canonical.serving_size is not None
+    other_size = canonical.serving_size.model_copy(update={"amount": Decimal("100")})
+    other = canonical.model_copy(update={"serving_size": other_size})
+    food = Food(canonical_facts=canonical.model_dump(mode="json"))
+    assert not canonical_facts_match(food, other)
 
 
 @pytest.mark.parametrize(

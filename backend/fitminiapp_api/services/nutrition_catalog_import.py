@@ -42,6 +42,7 @@ from fitminiapp_api.schemas.nutrition_import import ImportFoodRow, ImportSource
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.food_catalog_contributions import (
     add_catalog_contribution,
+    canonical_fact_values_match,
     payload_digest,
 )
 from fitminiapp_api.services.nutrition_import_drafts import (
@@ -383,20 +384,17 @@ def _facts_match(food: Food, proposed: PreparedCatalogFood) -> bool:
             new = getattr(proposed.canonical.normalized_facts, name)
             if name in required and previous is None:
                 return False
-            if previous is not None and new is not None:
-                new_value = new.value
-                if previous.basis_ref != new.basis_ref:
-                    serving = current.serving_size
-                    if (
-                        current.source_basis != "per_serving"
-                        or serving is None
-                        or previous.basis_ref
-                        != ("per_100_g" if serving.unit == "g" else "per_100_ml")
-                    ):
-                        return False
-                    new_value = new.value * Decimal(100) / serving.amount
-                if previous.value != new_value or previous.unit != new.unit:
-                    return False
+            if (
+                previous is not None
+                and new is not None
+                and not canonical_fact_values_match(
+                    previous,
+                    new,
+                    source_basis=current.source_basis,
+                    serving_size=current.serving_size,
+                )
+            ):
+                return False
         return True
     if (food.nutrition_basis_kind or "per_100_g") != proposed.canonical.source_basis:
         return False
