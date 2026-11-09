@@ -19,7 +19,11 @@ from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.nutrition_import import NutritionImportDraft
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.food_diary import FoodDiaryEntryCreate
-from fitminiapp_api.schemas.nutrition_import import NutritionImportV1, NutritionImportV2
+from fitminiapp_api.schemas.nutrition_import import (
+    NutritionImportV1,
+    NutritionImportV2,
+    NutritionImportV3,
+)
 from fitminiapp_api.services.food_diary import (
     FoodDiaryError,
     _calculate_amount,
@@ -115,7 +119,7 @@ def create_nutrition_import_draft(
     db: Session,
     user: User,
     *,
-    document: NutritionImportV1 | NutritionImportV2,
+    document: NutritionImportV1 | NutritionImportV2 | NutritionImportV3,
     source: bytes,
     filename: str,
     content_type: str,
@@ -134,7 +138,12 @@ def create_nutrition_import_draft(
         raise NutritionDraftError("unsupported_format", 415)
     validate_csv_upload(source, filename=filename, content_type=content_type, delimiter=delimiter)
     source_sha256 = _digest(source)
-    data = document.model_dump(mode="json")
+    data = document.model_dump(
+        mode="json", exclude_defaults=isinstance(document, NutritionImportV3)
+    )
+    if isinstance(document, NutritionImportV3):
+        for row in data["rows"]:
+            row.setdefault("diagnostics", [])
     serialized = _canonical(data)
     validate_adapter_result(
         serialized,
@@ -388,6 +397,7 @@ def nutrition_import_preview(db: Session, user: User, draft_id: str) -> dict:
         "rows": rows,
         "original_totals": document["original_totals"],
         "original_summaries": document.get("original_summaries", []),
+        "original_detail_cells": document.get("original_detail_cells", []),
         "diagnostics": document["diagnostics"],
         "preview_signature": signature,
     }

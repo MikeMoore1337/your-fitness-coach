@@ -12,7 +12,11 @@ from typing import Literal
 
 from pydantic import ValidationError
 
-from fitminiapp_api.schemas.nutrition_import import NutritionImportV1, NutritionImportV2
+from fitminiapp_api.schemas.nutrition_import import (
+    NutritionImportV1,
+    NutritionImportV2,
+    NutritionImportV3,
+)
 
 MAX_UPLOAD_BYTES = 512 * 1024
 MAX_CSV_ROWS = 2_000
@@ -137,7 +141,7 @@ def _reject_json_constant(_value: str) -> None:
 
 def validate_adapter_result(
     payload: bytes, *, provider: str, adapter_version: str, source_format: str
-) -> NutritionImportV1 | NutritionImportV2:
+) -> NutritionImportV1 | NutritionImportV2 | NutritionImportV3:
     """Validate a bounded adapter result without converting between contract versions."""
     if not payload or len(payload) > MAX_ADAPTER_BYTES:
         raise NutritionImportValidationError("adapter_size")
@@ -149,11 +153,13 @@ def validate_adapter_result(
         if not isinstance(data, dict):
             raise NutritionImportValidationError("adapter_shape")
         version = data.get("schema_version")
-        result: NutritionImportV1 | NutritionImportV2
+        result: NutritionImportV1 | NutritionImportV2 | NutritionImportV3
         if version == "nutrition-import-v1":
             result = NutritionImportV1.model_validate(data)
         elif version == "nutrition-import-v2":
             result = NutritionImportV2.model_validate(data)
+        elif version == "nutrition-import-v3":
+            result = NutritionImportV3.model_validate(data)
         else:
             raise NutritionImportValidationError("unsupported_version")
     except NutritionImportValidationError:
