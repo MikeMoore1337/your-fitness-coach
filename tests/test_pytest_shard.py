@@ -114,6 +114,37 @@ def test_receipt_fails_when_execution_is_missing_or_duplicated(tmp_path) -> None
         assert not receipt.path.exists()
 
 
+
+def test_receipt_tracks_all_test_phases_without_changing_selection(tmp_path) -> None:
+    nodeid = "backend/tests/test_example.py::test_case"
+    digest = pytest_shard._digest(nodeid)
+    receipt = pytest_shard.ShardReceipt(str(tmp_path / "receipt.json"))
+    receipt.collections = [{"shard": "1/1", "all": [digest], "selected": [digest]}]
+    for phase, seconds in (("setup", 0.25), ("call", 1.0), ("teardown", 0.005)):
+        receipt.pytest_runtest_logreport(
+            SimpleNamespace(nodeid=nodeid, when=phase, duration=seconds)
+        )
+    session = SimpleNamespace(exitstatus=0)
+    receipt.pytest_sessionfinish(session, 0)
+
+    assert session.exitstatus == 0
+    payload = json.loads(receipt.path.read_text(encoding="utf-8"))
+    assert payload["selected"] == [digest]
+    assert payload["duration_ms"] == {digest: 1255}
+
+
+def test_receipt_refuses_success_when_timing_is_incomplete(tmp_path) -> None:
+    nodeid = "backend/tests/test_example.py::test_case"
+    digest = pytest_shard._digest(nodeid)
+    receipt = pytest_shard.ShardReceipt(str(tmp_path / "receipt.json"))
+    receipt.collections = [{"shard": "1/1", "all": [digest], "selected": [digest]}]
+    receipt.executed = [digest]
+    session = SimpleNamespace(exitstatus=0)
+    receipt.pytest_sessionfinish(session, 0)
+
+    assert session.exitstatus == 1
+    assert not receipt.path.exists()
+
 def test_receipts_cover_real_xdist_execution(tmp_path) -> None:
     root = Path(__file__).resolve().parents[1]
     suite = tmp_path / "test_cases.py"

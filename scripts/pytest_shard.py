@@ -29,6 +29,8 @@ class ShardReceipt:
         self.path = Path(path)
         self.collections: list[dict] = []
         self.executed: list[str] = []
+        # Worker-reported setup/call/teardown time per hashed test id (not CI wall time).
+        self.duration_ms: dict[str, float] = {}
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_testnodedown(self, node, error) -> None:
@@ -36,8 +38,13 @@ class ShardReceipt:
             self.collections.append(node.workeroutput["yfc_shard_receipt"])
 
     def pytest_runtest_logreport(self, report) -> None:
+        digest = _digest(report.nodeid)
         if report.when == "setup":
-            self.executed.append(_digest(report.nodeid))
+            self.executed.append(digest)
+        if report.when in {"setup", "call", "teardown"}:
+            self.duration_ms[digest] = self.duration_ms.get(digest, 0.0) + max(
+                report.duration, 0.0
+            ) * 1000
 
     def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
         if exitstatus != 0:
@@ -51,6 +58,13 @@ class ShardReceipt:
             print("Python shard execution differs from selection", file=sys.stderr)
             session.exitstatus = 1
             return
+        if set(self.duration_ms) != set(receipt["selected"]):
+            print("Python shard timing report is incomplete", file=sys.stderr)
+            session.exitstatus = 1
+            return
+        receipt["duration_ms"] = {
+            digest: round(self.duration_ms[digest]) for digest in receipt["selected"]
+        }
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(receipt), encoding="utf-8")
 
