@@ -203,6 +203,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
 }
 
 ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
+    "nutrition_catalog_identifiers": "shared catalog identity mappings, not user-owned records",
     "account_data_exports": "short-lived generated archive bytes and download capability metadata",
     "auth_action_tokens": "hashed authentication actions and session-family metadata",
     "oauth_transactions": "short-lived browser OAuth state, PKCE, nonce, and recovery metadata",
@@ -1676,6 +1677,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                     "provider",
                     "source",
                     "parser_version",
+                    "adapter_id",
                     "schema_version",
                     "status",
                     "revision",
@@ -1683,6 +1685,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                     "skipped_rows",
                     "resolutions",
                     "receipt",
+                    "catalog_receipt",
                     "created_at",
                     "expires_at",
                 ),

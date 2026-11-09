@@ -108,3 +108,29 @@ class NutritionCatalogContribution(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=now_msk_naive, onupdate=now_msk_naive
     )
+
+
+class NutritionCatalogIdentifier(Base):
+    """A confirmed source identifier or alias pointing to an existing food."""
+
+    __tablename__ = "nutrition_catalog_identifiers"
+    __table_args__ = (
+        CheckConstraint("kind IN ('source', 'alias')", name="ck_nutrition_catalog_identifier_kind"),
+        CheckConstraint(
+            "(kind = 'source' AND provider IS NOT NULL AND source IS NOT NULL "
+            "AND identity_source IS NOT NULL AND source_id IS NOT NULL) OR "
+            "(kind = 'alias' AND provider IS NULL AND source IS NULL "
+            "AND identity_source IS NULL AND source_id IS NULL)",
+            name="ck_nutrition_catalog_identifier_shape",
+        ),
+        UniqueConstraint("kind", "key_hash", name="uq_nutrition_catalog_identifier_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    food_id: Mapped[int] = mapped_column(ForeignKey("foods.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    identity_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(128), nullable=True)

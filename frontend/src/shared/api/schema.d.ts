@@ -5447,6 +5447,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/imports/catalog/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog Conflicts */
+        get: operations["catalog_conflicts_api_v1_nutrition_imports_catalog_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/catalog/conflicts/{contribution_id}/confirm-alias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Catalog Confirm Alias */
+        post: operations["catalog_confirm_alias_api_v1_nutrition_imports_catalog_conflicts__contribution_id__confirm_alias_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Catalog */
+        get: operations["preview_catalog_api_v1_nutrition_imports__draft_id__catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/catalog/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Catalog */
+        post: operations["confirm_catalog_api_v1_nutrition_imports__draft_id__catalog_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/imports/{draft_id}/confirm": {
         parameters: {
             query?: never;
@@ -8791,6 +8859,140 @@ export interface components {
             zone: number;
             /** Duration Minutes */
             duration_minutes: number;
+        };
+        /** CatalogAliasConfirmRequest */
+        CatalogAliasConfirmRequest: {
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** CatalogAliasReceipt */
+        CatalogAliasReceipt: {
+            /** Food Id */
+            food_id: number;
+            /** Contribution Id */
+            contribution_id: number;
+        };
+        /** CatalogCandidate */
+        CatalogCandidate: {
+            /** Food Id */
+            food_id: number;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+        };
+        /** CatalogConflict */
+        CatalogConflict: {
+            /** Id */
+            id: number;
+            /** Food Id */
+            food_id: number;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** CatalogImportConfirmRequest */
+        CatalogImportConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /** Confirm Key */
+            confirm_key: string;
+            /** Row Indexes */
+            row_indexes: number[];
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** CatalogImportPreview */
+        CatalogImportPreview: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            source: components["schemas"]["ImportSource"];
+            /** Rows */
+            rows: components["schemas"]["CatalogImportPreviewRow"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** CatalogImportPreviewRow */
+        CatalogImportPreviewRow: {
+            /** Index */
+            index: number;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "reuse" | "publish" | "conflict" | "needs_review" | "private_only" | "skipped";
+            /** Reason */
+            reason: string | null;
+            /** Food Id */
+            food_id: number | null;
+            product: components["schemas"]["CatalogProductPreview"] | null;
+            /** Suggestions */
+            suggestions: components["schemas"]["CatalogCandidate"][];
+            /** Suggestions Evaluated */
+            suggestions_evaluated: boolean;
+        };
+        /** CatalogImportReceipt */
+        CatalogImportReceipt: {
+            /** Rows */
+            rows: components["schemas"]["CatalogImportRow"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** CatalogImportRow */
+        CatalogImportRow: {
+            /** Index */
+            index: number;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "reuse" | "publish" | "conflict" | "needs_review" | "private_only" | "skipped";
+            /** Reason */
+            reason: string | null;
+            /** Food Id */
+            food_id: number | null;
+        };
+        /** CatalogProductPreview */
+        CatalogProductPreview: {
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Barcode */
+            barcode: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard_food" | "branded_food";
+            /** Nutrition */
+            nutrition: {
+                [key: string]: unknown;
+            };
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
         };
         /** CheckInFieldCatalogItem */
         CheckInFieldCatalogItem: {
@@ -33800,6 +34002,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_conflicts_api_v1_nutrition_imports_catalog_conflicts_get: {
+        parameters: {
+            query?: {
+                after_id?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogConflict"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_confirm_alias_api_v1_nutrition_imports_catalog_conflicts__contribution_id__confirm_alias_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contribution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogAliasConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogAliasReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_catalog_api_v1_nutrition_imports__draft_id__catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_catalog_api_v1_nutrition_imports__draft_id__catalog_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogImportConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportReceipt"];
                 };
             };
             /** @description Validation Error */

@@ -74,6 +74,7 @@ from fitminiapp_api.schemas.nutrition_label import (
 )
 from fitminiapp_api.services.food_catalog_contributions import (
     canonical_facts_match,
+    catalog_identity_for_payload,
     find_shared_food,
 )
 from fitminiapp_api.services.foods import get_food_response
@@ -764,6 +765,13 @@ def _make_food(
         name=request.name,
         brand=request.brand,
         barcode=request.barcode,
+        catalog_identity=(
+            catalog_identity_for_payload(
+                name=request.name, brand=request.brand, canonical=canonical
+            )
+            if shared
+            else None
+        ),
         **projection,
         **serving,
         nutrition_basis_kind=basis_kind,
