@@ -238,7 +238,7 @@ def test_catalog_requires_verified_license_and_import_is_idempotent() -> None:
         assert stored.name == "Овсяная крупа цельная"
 
 
-def test_food_migration_upgrades_from_previous_head(tmp_path: Path) -> None:
+def test_food_migration_upgrades_from_previous_head(tmp_path: Path, request) -> None:
     migration_path = (
         Path(__file__).resolve().parents[1]
         / "alembic"
@@ -252,6 +252,7 @@ def test_food_migration_upgrades_from_previous_head(tmp_path: Path) -> None:
     assert migration.down_revision == "0033_auth_session_families"
 
     engine = create_engine(f"sqlite:///{(tmp_path / 'food-migration.db').as_posix()}")
+    request.addfinalizer(engine.dispose)
     metadata = MetaData()
     Table("users", metadata, Column("id", Integer, primary_key=True))
     metadata.create_all(engine)
@@ -297,5 +298,3 @@ def test_food_migration_upgrades_from_previous_head(tmp_path: Path) -> None:
         }
         migration.downgrade()
         assert "foods" not in inspect(connection).get_table_names()
-
-    engine.dispose()

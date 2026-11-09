@@ -31,10 +31,11 @@ class NutritionImportDraft(Base):
         UniqueConstraint(
             "owner_user_id", "confirm_key_hash", name="uq_nutrition_import_owner_confirm"
         ),
-        UniqueConstraint(
+        Index(
+            "uq_nutrition_import_owner_catalog_confirm",
             "owner_user_id",
             "catalog_confirm_key_hash",
-            name="uq_nutrition_import_owner_catalog_confirm",
+            unique=True,
         ),
         Index("ix_nutrition_import_owner_created", "owner_user_id", "created_at"),
         Index("ix_nutrition_import_expiry", "expires_at"),

@@ -50,6 +50,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
             "CREATE TABLE program_template_exercise_weeks (id INTEGER PRIMARY KEY, week_number INTEGER CONSTRAINT ck_program_template_exercise_weeks_number CHECK (week_number >= 1 AND week_number <= 24))",
             "CREATE TABLE user_programs (id INTEGER PRIMARY KEY)",
             "CREATE TABLE nutrition_targets (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL)",
+            "CREATE TABLE foods (id INTEGER PRIMARY KEY, catalog_identity VARCHAR(512), food_type TEXT, source_name TEXT, status TEXT NOT NULL, energy_kcal_per_100g NUMERIC, protein_g_per_100g NUMERIC, fat_g_per_100g NUMERIC, carbs_g_per_100g NUMERIC, canonical_complete BOOLEAN, canonical_facts JSON, nutrition_basis_kind TEXT, CONSTRAINT ck_foods_active_nutrients CHECK (status <> 'active' OR (energy_kcal_per_100g IS NOT NULL AND protein_g_per_100g IS NOT NULL AND fat_g_per_100g IS NOT NULL AND carbs_g_per_100g IS NOT NULL)))",
             "CREATE TABLE user_workouts (id INTEGER PRIMARY KEY, user_program_id INTEGER NOT NULL, week_number INTEGER NOT NULL, day_number INTEGER NOT NULL, status TEXT, completed_at TEXT)",
             "CREATE TABLE user_workout_exercises (id INTEGER PRIMARY KEY, prescribed_sets INTEGER NOT NULL, prescribed_reps VARCHAR(32) NOT NULL, rest_seconds INTEGER NOT NULL)",
             "CREATE TABLE users (id INTEGER PRIMARY KEY)",
@@ -84,7 +85,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0153_nutrition_import_drafts",)
+            ("0156_nutrition_catalog_check",)
         ]
         assert connection.exec_driver_sql(
             "SELECT status, self_assigned_program_id, self_assignment_request_hash FROM program_imports"
