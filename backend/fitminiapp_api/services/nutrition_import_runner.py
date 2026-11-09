@@ -29,6 +29,13 @@ class NutritionImportAdapter:
     parser_version: str
     delimiter: Literal[",", ";", "\t"]
     module_path: Path
+    # Grant these policies only to reviewed classifiers and verified product identities, not CSV claims.
+    catalog_source: str | None = None
+    catalog_publication_rights: frozenset[str] = frozenset()
+    catalog_food_kinds: frozenset[str] = frozenset()
+    catalog_source_versions: frozenset[str | None] = frozenset()
+    catalog_identity_sources: frozenset[str] = frozenset()
+    catalog_attribution: str | None = None
 
 
 ADAPTERS: dict[str, NutritionImportAdapter] = {}

@@ -145,6 +145,23 @@ class Food(Base):
             name="ck_foods_active_nutrients",
         ),
         CheckConstraint(
+            "source_name IS NULL OR source_name <> 'yfc_community' OR status <> 'active' "
+            "OR (energy_kcal_per_100g IS NOT NULL AND protein_g_per_100g IS NOT NULL "
+            "AND fat_g_per_100g IS NOT NULL AND carbs_g_per_100g IS NOT NULL) "
+            "OR (canonical_complete IS TRUE AND canonical_facts IS NOT NULL "
+            "AND nutrition_basis_kind IS NOT NULL "
+            "AND nutrition_basis_kind IN ('per_100_g', 'per_100_ml', 'per_serving') "
+            "AND (canonical_facts ->> 'source_basis') IS NOT NULL "
+            "AND (canonical_facts ->> 'source_basis') IN ('per_100_g', 'per_100_ml', 'per_serving') "
+            "AND (canonical_facts -> 'normalized_facts' -> 'energy_kcal' ->> 'basis_ref') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'energy_kcal' ->> 'basis_ref') = nutrition_basis_kind "
+            "AND (canonical_facts -> 'normalized_facts' -> 'energy_kcal' ->> 'value') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'protein_g' ->> 'value') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'fat_g' ->> 'value') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'carbohydrate_g' ->> 'value') IS NOT NULL)",
+            name="ck_foods_community_nutrients",
+        ),
+        CheckConstraint(
             "food_type = 'user' OR status <> 'active' OR trust_level = 'verified' "
             "OR catalog_quality = 'community_unverified'",
             name="ck_foods_active_catalog_trust",
@@ -212,6 +229,19 @@ class Food(Base):
             ),
             sqlite_where=text(
                 "catalog_identity IS NOT NULL AND food_type = 'branded' "
+                "AND source_name = 'yfc_community'"
+            ),
+        ),
+        Index(
+            "uq_foods_community_shared_identity",
+            "catalog_identity",
+            unique=True,
+            postgresql_where=text(
+                "catalog_identity IS NOT NULL AND food_type IN ('system', 'branded') "
+                "AND source_name = 'yfc_community'"
+            ),
+            sqlite_where=text(
+                "catalog_identity IS NOT NULL AND food_type IN ('system', 'branded') "
                 "AND source_name = 'yfc_community'"
             ),
         ),
