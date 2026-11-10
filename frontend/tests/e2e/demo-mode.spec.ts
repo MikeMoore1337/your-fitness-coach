@@ -1455,6 +1455,11 @@ test('nutrition and coach scenarios render shared production surfaces with local
     hasTouch: true,
   });
   const nutritionPage = await nutritionContext.newPage();
+  // The demo fixture inserts breakfast; time-based Quick Add must select that meal.
+  // Pin only this scenario to 09:00 Europe/Moscow; other scenarios use the real clock.
+  const demoBreakfastTime = new Date();
+  demoBreakfastTime.setUTCHours(6, 0, 0, 0);
+  await nutritionPage.clock.setFixedTime(demoBreakfastTime);
   await installDemoTransport(nutritionPage);
   await nutritionPage.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
   await expect(nutritionPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
