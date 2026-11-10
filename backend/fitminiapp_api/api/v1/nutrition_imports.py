@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import re
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import (
     APIRouter,
@@ -14,7 +17,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -51,6 +54,10 @@ from fitminiapp_api.services.nutrition_import_drafts import (
     create_nutrition_import_draft,
     nutrition_import_preview,
     set_resolutions,
+)
+from fitminiapp_api.services.nutrition_import_fatsecret_url import (
+    FatSecretShareUrlTransport,
+    FatSecretUrlError,
 )
 from fitminiapp_api.services.nutrition_import_limits import (
     acquire_parser_slot,
@@ -123,9 +130,27 @@ def _process_upload(
 ) -> dict:
     reserve_upload_attempt(db, user)
     acquire_parser_slot(db, user)
+    return _create_draft(db, user, source, filename, content_type, adapter_id, upload_key)
+
+
+def _create_draft(
+    db: Session,
+    user: User,
+    source: bytes,
+    filename: str | None,
+    content_type: str | None,
+    adapter_id: str,
+    upload_key: str,
+    *,
+    transport: Literal["upload", "url"] = "upload",
+) -> dict:
     document = run_nutrition_import_adapter(
         adapter_id, source, filename=filename, content_type=content_type
     )
+    if transport == "url":
+        if any(diagnostic.severity == "error" for diagnostic in document.diagnostics):
+            raise FatSecretUrlError("incompatible_content")
+        document.source.transport = "url"
     adapter = ADAPTERS[adapter_id]
     draft = create_nutrition_import_draft(
         db,
@@ -144,6 +169,150 @@ def _process_upload(
     preview = ImportPreview.model_validate(nutrition_import_preview(db, user, draft.id))
     db.commit()
     return preview.model_dump(mode="json")
+
+
+def _process_url(db: Session, user: User, url: SecretStr, upload_key: str) -> dict:
+    try:
+        reserve_upload_attempt(db, user)
+        acquire_parser_slot(db, user)
+        source, content_type = FatSecretShareUrlTransport().fetch(
+            url.get_secret_value(), limit=MAX_UPLOAD_BYTES
+        )
+    finally:
+        del url
+    is_pdf = content_type == "application/pdf"
+    adapter_id = "fatsecret-pdf-v1" if is_pdf else "fatsecret-csv-v1"
+    if adapter_id not in ADAPTERS:
+        raise FatSecretUrlError("pdf_unavailable" if is_pdf else "network_error")
+    return _create_draft(
+        db,
+        user,
+        source,
+        "fatsecret.pdf" if is_pdf else "fatsecret.csv",
+        content_type,
+        adapter_id,
+        upload_key,
+        transport="url",
+    )
+
+
+def _url_payload(body: bytes) -> str | None:
+    if len(body) > 4096:
+        return None
+    try:
+
+        def unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
+            if len({key for key, _ in pairs}) != len(pairs):
+                raise ValueError
+            return dict(pairs)
+
+        payload = json.loads(body, object_pairs_hook=unique)
+        if not isinstance(payload, dict) or set(payload) != {"url"}:
+            return None
+        return payload["url"] if isinstance(payload["url"], str) else None
+    except ValueError, UnicodeDecodeError:
+        return None
+
+
+def _url_error(code: str, status: int = 400) -> HTTPException:
+    messages = {
+        "invalid_url": "Не удалось проверить ссылку FatSecret.",
+        "unsafe_address": "Не удалось безопасно подключиться к FatSecret.",
+        "redirect": "Ссылка перенаправляет на другую страницу.",
+        "upstream_403": "Нет доступа к ссылке FatSecret.",
+        "upstream_404": "Отчёт по ссылке не найден.",
+        "upstream_410": "Отчёт по ссылке больше недоступен.",
+        "upstream_429": "FatSecret временно ограничил загрузку.",
+        "dns_error": "Не удалось найти сервер FatSecret.",
+        "tls_error": "Не удалось проверить защищённое соединение с FatSecret.",
+        "timeout": "Сервер FatSecret не ответил вовремя.",
+        "too_large": "Файл превышает допустимый размер.",
+        "incomplete_response": "Файл получен не полностью.",
+        "incompatible_content": "Содержимое ссылки не похоже на поддерживаемый отчёт FatSecret.",
+        "pdf_unavailable": "Импорт PDF пока не поддерживается.",
+        "rate_limited": "Слишком много загрузок. Повторите позже.",
+        "parser_busy": "Импорт занят. Попробуйте позже.",
+    }
+    message = messages.get(code, "Не удалось получить или обработать отчёт.")
+    return HTTPException(
+        status_code=status,
+        detail={"code": code, "message": f"{message} Загрузите файл вручную."},
+        headers={"Cache-Control": "no-store, private"},
+    )
+
+
+@router.post(
+    "/fatsecret-url",
+    response_model=ImportPreview,
+    status_code=201,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string", "maxLength": 2048, "writeOnly": True}
+                        },
+                        "required": ["url"],
+                        "additionalProperties": False,
+                    }
+                }
+            },
+        },
+        "parameters": [
+            {
+                "in": "header",
+                "name": "Idempotency-Key",
+                "required": True,
+                "schema": {"type": "string", "minLength": 8, "maxLength": 128},
+            }
+        ],
+    },
+)
+async def upload_fatsecret_url(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    keys = request.headers.getlist("Idempotency-Key")
+    body = await request.body()
+    value = _url_payload(body)
+    del body
+    if (
+        request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        != "application/json"
+        or len(keys) != 1
+        or re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", keys[0], re.ASCII) is None
+        or value is None
+    ):
+        del value
+        raise _url_error("invalid_url") from None
+    url = SecretStr(value)
+    del value
+    try:
+        result = await run_in_threadpool(_process_url, db, current_user, url, keys[0])
+        response.headers["Cache-Control"] = "no-store, private"
+        return result
+    except FatSecretUrlError as exc:
+        db.rollback()
+        code = exc.code
+        status = 429 if code == "upstream_429" else 413 if code == "too_large" else 400
+        if code in {"dns_error", "tls_error", "timeout", "network_error", "upstream_error"}:
+            status = 503
+        raise _url_error(code, status) from None
+    except NutritionDraftError as exc:
+        db.rollback()
+        raise _url_error(exc.code, exc.status_code) from None
+    except NutritionImportValidationError as exc:
+        db.rollback()
+        error = _error(exc)
+        raise _url_error(exc.code, error.status_code) from None
+    except SQLAlchemyError, ValidationError, KeyError:
+        db.rollback()
+        raise _url_error("storage_unavailable", 503) from None
 
 
 @router.post("", response_model=ImportPreview, status_code=201)

@@ -1,4 +1,6 @@
 import logging
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,7 +10,10 @@ from test_training_analytics import _auth, _user_id
 from fitminiapp_api.api.v1 import nutrition_imports
 from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
-from fitminiapp_api.models.nutrition_import import NutritionImportUploadAttempt
+from fitminiapp_api.models.nutrition_import import (
+    NutritionImportDraft,
+    NutritionImportUploadAttempt,
+)
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV1
 from fitminiapp_api.services.account_export import build_account_export
@@ -18,6 +23,14 @@ from fitminiapp_api.services.nutrition_import_runner import NutritionImportAdapt
 
 URL = "/api/v1/nutrition/imports"
 FIXTURE = Path(__file__).parent / "fixtures" / "nutrition_import" / "neutral-golden.json"
+FATSECRET_URL = (
+    "https://foods.fatsecret.com/export/fake_account/fake_token/fake_report/"
+    "month/food/FoodDiary_Test_24_foods.csv?lang=ru&mkt=RU"
+)
+FATSECRET_SOURCE = (
+    (FIXTURE.parent / "synthetic-summary-ru.csv").read_bytes()
+    + "Дата: 02.03.2024\nЗавтрак\nТестовый продукт,100,2,0,3,0,0,10,0,0,0\n100 г\n".encode()
+)
 
 
 @pytest.fixture
@@ -44,6 +57,261 @@ def _upload(client, headers, *, key="upload-key-123", adapter="synthetic"):
         data={"adapter_id": adapter},
         files={"file": ("synthetic.csv", b"name,amount\nsynthetic,100\n", "text/csv")},
     )
+
+
+@pytest.fixture
+def fatsecret_url_transport(monkeypatch):
+    from fitminiapp_api.services.nutrition_import_fatsecret_url import FatSecretShareUrlTransport
+
+    monkeypatch.setattr(
+        FatSecretShareUrlTransport, "fetch", lambda self, url, limit: (FATSECRET_SOURCE, "text/csv")
+    )
+    if sys.platform != "linux" or getattr(os, "geteuid", lambda: 0)() == 0:
+        from fitminiapp_api.schemas.nutrition_import import NutritionImportV3
+        from fitminiapp_api.services.nutrition_import_fatsecret_csv import parse
+
+        monkeypatch.setattr(
+            nutrition_imports,
+            "run_nutrition_import_adapter",
+            lambda adapter_id, source, **kwargs: NutritionImportV3.model_validate(parse(source)),
+        )
+
+
+def _fatsecret_url_upload(client, headers, *, key="fatsecret-key-123", url=FATSECRET_URL):
+    return client.post(
+        f"{URL}/fatsecret-url",
+        headers={**headers, "Idempotency-Key": key},
+        json={"url": url},
+    )
+
+
+def _fatsecret_file_upload(client, headers, *, key="fatsecret-key-123"):
+    return client.post(
+        URL,
+        headers={**headers, "Idempotency-Key": key},
+        data={"adapter_id": "fatsecret-csv-v1"},
+        files={"file": ("synthetic.csv", FATSECRET_SOURCE, "text/csv")},
+    )
+
+
+@pytest.mark.parametrize("first_transport", ["url", "upload"])
+def test_fatsecret_url_uses_same_draft_as_upload_and_preserves_privacy(
+    client, postgres, fatsecret_url_transport, caplog, first_transport
+):
+    from fitminiapp_api.models.food import Food
+
+    headers = _auth(client, 983_100)
+    other = _auth(client, 983_101)
+    caplog.set_level(logging.DEBUG)
+    with get_session_context() as db:
+        before = (db.query(Food).count(), db.query(FoodDiaryEntry).count())
+    first = _fatsecret_url_upload if first_transport == "url" else _fatsecret_file_upload
+    second = _fatsecret_file_upload if first_transport == "url" else _fatsecret_url_upload
+    uploaded = first(client, headers)
+    assert uploaded.status_code == 201, uploaded.text
+    preview = uploaded.json()
+    assert preview["source"]["transport"] == first_transport
+    assert len(preview["rows"]) == 1
+    repeated = second(client, headers)
+    assert repeated.status_code == 201, repeated.text
+    assert repeated.json() == preview
+    assert client.get(f"{URL}/{preview['id']}", headers=other).status_code == 404
+    assert (
+        client.post(
+            f"{URL}/{preview['id']}/confirm",
+            headers=other,
+            json={
+                "revision": preview["revision"],
+                "preview_signature": preview["preview_signature"],
+                "confirm_key": "other-user-key-123",
+                "confirmed": True,
+            },
+        ).status_code
+        == 404
+    )
+    catalog = client.get(f"{URL}/{preview['id']}/catalog", headers=headers)
+    assert catalog.status_code == 200
+    assert [row["outcome"] for row in catalog.json()["rows"]] == ["needs_review"]
+    with get_session_context() as db:
+        assert (db.query(Food).count(), db.query(FoodDiaryEntry).count()) == before
+        draft = db.get(NutritionImportDraft, preview["id"])
+        assert "fake_token" not in str(draft.document)
+        assert "fake_report" not in str(draft.document)
+    assert "fake_token" not in caplog.text and "fake_report" not in caplog.text
+
+
+def test_fatsecret_url_repeat_does_not_duplicate_confirmed_diary_entries(
+    client, postgres, fatsecret_url_transport
+):
+    headers = _auth(client, 983_102)
+    with get_session_context() as db:
+        food = _active_food()
+        db.add(food)
+        db.flush()
+        food_id = food.id
+
+    def resolve_and_confirm(preview, key):
+        resolved = client.post(
+            f"{URL}/{preview['id']}/resolve",
+            headers=headers,
+            json={
+                "revision": preview["revision"],
+                "matches": [{"index": 0, "food_id": food_id}],
+                "skipped_rows": [],
+            },
+        )
+        assert resolved.status_code == 200, resolved.text
+        current = resolved.json()
+        return client.post(
+            f"{URL}/{preview['id']}/confirm",
+            headers=headers,
+            json={
+                "revision": current["revision"],
+                "preview_signature": current["preview_signature"],
+                "confirm_key": key,
+                "confirmed": True,
+            },
+        )
+
+    first = _fatsecret_url_upload(client, headers).json()
+    assert resolve_and_confirm(first, "confirm-url-123").status_code == 200
+    second_response = _fatsecret_file_upload(client, headers, key="second-upload-123")
+    assert second_response.status_code == 201, second_response.text
+    duplicate = resolve_and_confirm(second_response.json(), "confirm-file-123")
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["code"] == "duplicate_import"
+    with get_session_context() as db:
+        assert db.query(FoodDiaryEntry).filter_by(user_id=_user_id(983_102)).count() == 1
+
+
+def test_fatsecret_same_key_rejects_different_content(
+    client, postgres, fatsecret_url_transport, monkeypatch
+):
+    from fitminiapp_api.services.nutrition_import_fatsecret_url import FatSecretShareUrlTransport
+
+    headers = _auth(client, 983_107)
+    assert _fatsecret_file_upload(client, headers).status_code == 201
+    monkeypatch.setattr(
+        FatSecretShareUrlTransport,
+        "fetch",
+        lambda self, url, limit: (FATSECRET_SOURCE + b"\n", "text/csv"),
+    )
+    conflict = _fatsecret_url_upload(client, headers)
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["code"] == "upload_key_conflict"
+    assert "вручную" in conflict.json()["detail"]["message"]
+
+
+def test_fatsecret_pdf_candidate_requires_registered_adapter(
+    client, postgres, fatsecret_url_transport, monkeypatch
+):
+    from fitminiapp_api.services.nutrition_import_fatsecret_url import FatSecretShareUrlTransport
+
+    headers = _auth(client, 983_109)
+    monkeypatch.setattr(
+        FatSecretShareUrlTransport,
+        "fetch",
+        lambda self, url, limit: (b"%PDF-1.7\nsynthetic", "application/pdf"),
+    )
+    response = _fatsecret_url_upload(client, headers, url=FATSECRET_URL.replace(".csv", ".pdf"))
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "pdf_unavailable"
+    assert "вручную" in response.json()["detail"]["message"]
+    with get_session_context() as db:
+        assert (
+            db.query(NutritionImportDraft).filter_by(owner_user_id=_user_id(983_109)).count() == 0
+        )
+
+
+@pytest.mark.parametrize(
+    ("code", "status"),
+    [
+        ("upstream_403", 400),
+        ("upstream_404", 400),
+        ("upstream_410", 400),
+        ("upstream_429", 429),
+        ("redirect", 400),
+        ("dns_error", 503),
+        ("tls_error", 503),
+        ("timeout", 503),
+        ("too_large", 413),
+        ("incomplete_response", 400),
+        ("pdf_unavailable", 400),
+    ],
+)
+def test_fatsecret_url_failures_offer_file_upload(
+    client, postgres, fatsecret_url_transport, monkeypatch, code, status
+):
+    from fitminiapp_api.services.nutrition_import_fatsecret_url import (
+        FatSecretShareUrlTransport,
+        FatSecretUrlError,
+    )
+
+    def fail(self, url, *, limit):
+        raise FatSecretUrlError(code)
+
+    monkeypatch.setattr(FatSecretShareUrlTransport, "fetch", fail)
+    response = _fatsecret_url_upload(client, _auth(client, 983_108))
+    assert response.status_code == status
+    assert response.json()["detail"]["code"] == code
+    assert "вручную" in response.json()["detail"]["message"]
+    assert "fake_token" not in response.text and "fake_report" not in response.text
+
+
+def test_fatsecret_url_rejects_bad_request_and_html_without_leaking_link(
+    client, postgres, fatsecret_url_transport, monkeypatch, caplog
+):
+    from fitminiapp_api.services.nutrition_import_fatsecret_url import FatSecretShareUrlTransport
+
+    headers = _auth(client, 983_103)
+    caplog.set_level(logging.DEBUG)
+    malformed = client.post(
+        f"{URL}/fatsecret-url",
+        headers={**headers, "Idempotency-Key": "valid-key-123", "Content-Type": "application/json"},
+        content='{"url":"fake_token", "url":"fake_report"}',
+    )
+    assert malformed.status_code == 400
+    monkeypatch.setattr(
+        FatSecretShareUrlTransport,
+        "fetch",
+        lambda self, url, limit: (b"<html>login</html>", "text/csv"),
+    )
+    bad_content = _fatsecret_url_upload(client, headers)
+    assert bad_content.status_code == 400
+    assert bad_content.json()["detail"]["code"] == "incompatible_content"
+    assert "вручную" in bad_content.json()["detail"]["message"]
+    assert "fake_token" not in bad_content.text + caplog.text
+    assert "fake_report" not in bad_content.text + caplog.text
+    assert client.post(f"{URL}/fatsecret-url", json={"url": FATSECRET_URL}).status_code == 401
+
+
+def test_fatsecret_url_respects_shared_rate_and_concurrency_limits(
+    client, postgres, fatsecret_url_transport, monkeypatch
+):
+    from fitminiapp_api.services.nutrition_import_fatsecret_url import (
+        FatSecretShareUrlTransport,
+        FatSecretUrlError,
+    )
+
+    headers = _auth(client, 983_104)
+    _auth(client, 983_105)
+    _auth(client, 983_106)
+    with get_session_context() as db1, get_session_context() as db2:
+        acquire_parser_slot(db1, db1.get(User, _user_id(983_105)))
+        acquire_parser_slot(db2, db2.get(User, _user_id(983_106)))
+        busy = _fatsecret_url_upload(client, headers)
+        assert busy.status_code == 429 and busy.json()["detail"]["code"] == "parser_busy"
+        assert "вручную" in busy.json()["detail"]["message"]
+
+    def fail(self, url, *, limit):
+        raise FatSecretUrlError("invalid_url")
+
+    monkeypatch.setattr(FatSecretShareUrlTransport, "fetch", fail)
+    for _ in range(9):
+        assert _fatsecret_url_upload(client, headers).status_code == 400
+    limited = _fatsecret_url_upload(client, headers)
+    assert limited.status_code == 429
+    assert limited.json()["detail"]["code"] == "rate_limited"
 
 
 def test_unknown_adapter_fails_closed_and_per_user_rate_limit(client, postgres):

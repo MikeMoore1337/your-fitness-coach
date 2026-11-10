@@ -150,6 +150,7 @@ def create_nutrition_import_draft(
         provider=document.source.provider,
         adapter_version=document.source.adapter_version,
         source_format=document.source.source_format,
+        transport=document.source.transport,
     )
     document_sha256 = _digest(serialized)
     fingerprint_data = {
@@ -180,7 +181,20 @@ def create_nutrition_import_draft(
         if existing.upload_fingerprint != fingerprint and not (
             existing.adapter_id is None and existing.upload_fingerprint == legacy_fingerprint
         ):
-            raise NutritionDraftError("upload_key_conflict", 409)
+            alternate = dict(data)
+            alternate["source"] = {
+                **data["source"],
+                "transport": "upload" if document.source.transport == "url" else "url",
+            }
+            alternate_fingerprint = _digest(
+                _canonical({**fingerprint_data, "document": _digest(_canonical(alternate))})
+            )
+            if (
+                adapter_id != "fatsecret-csv-v1"
+                or existing.adapter_id != adapter_id
+                or existing.upload_fingerprint != alternate_fingerprint
+            ):
+                raise NutritionDraftError("upload_key_conflict", 409)
         return get_nutrition_import_draft(db, user, existing.id, allow_confirmed=True)
     active_count = (
         db.query(NutritionImportDraft.id)

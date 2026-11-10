@@ -140,7 +140,12 @@ def _reject_json_constant(_value: str) -> None:
 
 
 def validate_adapter_result(
-    payload: bytes, *, provider: str, adapter_version: str, source_format: str
+    payload: bytes,
+    *,
+    provider: str,
+    adapter_version: str,
+    source_format: str,
+    transport: Literal["upload", "url"] = "upload",
 ) -> NutritionImportV1 | NutritionImportV2 | NutritionImportV3:
     """Validate a bounded adapter result without converting between contract versions."""
     if not payload or len(payload) > MAX_ADAPTER_BYTES:
@@ -170,7 +175,7 @@ def validate_adapter_result(
         result.source.provider != provider
         or result.source.adapter_version != adapter_version
         or result.source.source_format != source_format
-        or result.source.transport != "upload"
+        or result.source.transport != transport
     ):
         raise NutritionImportValidationError("source_mismatch")
     return result

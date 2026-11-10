@@ -88,6 +88,10 @@ boundary.
 Ключевые invariants: scheme/host/redirect/IP policy по реальной задаче, bounded timeout/body size,
 отсутствие доступа к loopback/link-local/internal metadata/service networks без явного contract.
 
+Импорт FatSecret принимает только ограниченный шаблон URL экспорта; проверяет все DNS-адреса и
+фактический адрес прямого соединения, TLS hostname и размер ответа. Секретные сегменты ссылки
+не сохраняются и не включаются в диагностику. Redirects и системные proxy не используются.
+
 ### B8. GitHub Actions -> registry/artifacts -> production VPS
 
 CI имеет privileged delivery capabilities.
