@@ -3820,8 +3820,16 @@ test('water undo cannot remove an entry moved in another tab', async ({ page, co
   await expect(water.getByRole('button', { name: 'Отменить', exact: true })).toHaveCount(0);
   expect(entries).toHaveLength(1);
   expect(entries[0]).toMatchObject({ diary_date: '2026-08-18', volume_ml: 250 });
+  const targets = otherTab.waitForResponse(
+    (response) => response.url().includes('/nutrition/targets/for-date?target_date=2026-08-18'),
+  );
+  const suggestions = otherTab.waitForResponse(
+    (response) => response.url().includes('/nutrition/diary/suggestions?diary_date=2026-08-18'),
+  );
   await otherTab.getByRole('button', { name: /18 августа/i }).click();
+  await Promise.all([targets, suggestions]);
   await expect(otherWater.locator('.hydration-entry').filter({ hasText: '250 мл' })).toBeVisible();
+  await otherTab.waitForLoadState('networkidle');
 });
 
 test('#1429 primary actions remain reachable with 200% text scaling', async ({
