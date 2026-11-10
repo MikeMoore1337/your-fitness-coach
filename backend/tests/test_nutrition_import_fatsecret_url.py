@@ -88,6 +88,12 @@ def test_public_ipv4_and_ipv6_are_allowed():
     assert transport._public_ip("2606:4700:4700::1111")
 
 
+def test_default_tls_context_verifies_certificates_and_hostnames():
+    context = ssl.create_default_context()
+    assert context.check_hostname
+    assert context.verify_mode == ssl.CERT_REQUIRED
+
+
 @pytest.fixture
 def network(monkeypatch):
     state = {
@@ -130,6 +136,7 @@ def network(monkeypatch):
     class FakeContext:
         def wrap_socket(self, raw, *, server_hostname):
             state["sni"].append(server_hostname)
+            assert self.minimum_version == ssl.TLSVersion.TLSv1_2
             return raw
 
     class FakeResponse:
@@ -271,6 +278,7 @@ def test_real_http_parser_handles_chunked_framing_without_network(monkeypatch, t
     class Context:
         def wrap_socket(self, raw, *, server_hostname):
             assert server_hostname == transport.HOST
+            assert self.minimum_version == ssl.TLSVersion.TLSv1_2
             return raw
 
     monkeypatch.setattr(

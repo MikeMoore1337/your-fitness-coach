@@ -144,7 +144,9 @@ def _download(url: str, limit: int) -> tuple[bytes, str]:
                 cast(str, sockaddr[0])
             ):
                 raise FatSecretUrlError("unsafe_address")
-            with ssl.create_default_context().wrap_socket(raw, server_hostname=HOST) as connection:
+            context = ssl.create_default_context()
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            with context.wrap_socket(raw, server_hostname=HOST) as connection:
                 connection.settimeout(READ_SECONDS)
                 request = (
                     f"GET {target} HTTP/1.1\r\nHost: {HOST}\r\n"
