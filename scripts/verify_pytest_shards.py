@@ -6,8 +6,10 @@ from collections import Counter
 from pathlib import Path
 
 if __package__:
+    from scripts.pytest_shard_plan import select_shards
     from scripts.scheduled_regression import PYTHON_TEST_SHARD_COUNT
 else:
+    from pytest_shard_plan import select_shards
     from scheduled_regression import PYTHON_TEST_SHARD_COUNT
 
 
@@ -19,13 +21,14 @@ def verify(directory: Path, count: int) -> None:
     reference = receipts[0]["all"]
     if not reference or len(reference) != len(set(reference)):
         raise ValueError("Empty or duplicate collection")
+    assignments = select_shards(reference, count)
     seen = set()
     selected = []
     for receipt in receipts:
         number, total = map(int, receipt["shard"].split("/"))
         if total != count or number not in range(1, count + 1) or number in seen:
             raise ValueError("Invalid or duplicate shard")
-        expected_digests = set(sorted(reference)[number - 1 :: count])
+        expected_digests = assignments[number - 1]
         expected_selection = [digest for digest in reference if digest in expected_digests]
         if receipt["all"] != reference or receipt["selected"] != expected_selection:
             raise ValueError("Shard collection or selection differs")

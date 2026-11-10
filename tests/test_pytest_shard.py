@@ -8,7 +8,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from scripts import pytest_shard, verify_playwright_shards, verify_pytest_shards
+from scripts import (
+    pytest_shard,
+    pytest_shard_plan,
+    verify_playwright_shards,
+    verify_pytest_shards,
+)
 
 
 def _invoke(value: str | None, nodeids: list[str]):
@@ -23,7 +28,7 @@ def _invoke(value: str | None, nodeids: list[str]):
 
 
 def _ranked_shard(nodes: list[str], number: int, count: int) -> list[str]:
-    selected = set(sorted(nodes)[number - 1 :: count])
+    selected = pytest_shard_plan.select_shards(nodes, count)[number - 1]
     return [node for node in nodes if node in selected]
 
 
@@ -44,6 +49,26 @@ def test_shard_membership_is_stable_when_collection_order_changes(count: int) ->
         reversed_actual, _ = _invoke(f"{number}/{count}", reversed_nodes)
         assert set(actual) == set(reversed_actual)
         assert actual == [node for node in nodes if node in set(actual)]
+
+
+def test_cost_balancing_preserves_unknown_tests_and_collection_independence() -> None:
+    nodes = [pytest_shard._digest(f"node-{index}") for index in range(20)]
+    costly = set(nodes[:2])
+    costs = {node[:16]: 50_000 for node in costly}
+    planned = pytest_shard_plan.select_shards(nodes, 2, costs_ms=costs)
+    assert all(len(bucket & costly) == 1 for bucket in planned)
+    assert set().union(*planned) == set(nodes)
+    assert not (planned[0] & planned[1])
+    assert planned == pytest_shard_plan.select_shards(
+        list(reversed(nodes)), 2, costs_ms=costs
+    )
+
+
+def test_cost_plan_rejects_invalid_or_duplicate_collections() -> None:
+    digest = pytest_shard._digest("node")
+    for collected in ([digest, digest], ["not-a-sha256"]):
+        with pytest.raises(ValueError):
+            pytest_shard_plan.select_shards(collected, 2)
 
 
 def test_without_shard_no_tests_are_removed() -> None:

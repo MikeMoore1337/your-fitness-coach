@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from scripts.pytest_shard_plan import select_shards
+
 _SHARD_RE = re.compile(r"([1-9][0-9]*)/([1-9][0-9]*)\Z")
 
 
@@ -98,11 +100,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     if len({item.nodeid for item in items}) != len(items):
         raise pytest.UsageError("Duplicate pytest nodeids; cannot shard safely")
 
-    # Every xdist worker collects the same ordered node list.
-    # Rank by the immutable nodeid digest rather than collection position.
-    # Preserve original order within each shard to avoid changing fixture order.
-    ranked = sorted(items, key=lambda item: _digest(item.nodeid))
-    selected_nodeids = {item.nodeid for item in ranked[number - 1 :: count]}
+    # Every xdist worker uses the same immutable digest-based cost plan.
+    # Preserve original collection order within a shard to protect fixture order.
+    selected_digests = select_shards([_digest(item.nodeid) for item in items], count)[
+        number - 1
+    ]
+    selected_nodeids = {
+        item.nodeid for item in items if _digest(item.nodeid) in selected_digests
+    }
     chosen = [item for item in items if item.nodeid in selected_nodeids]
     if not chosen:
         raise pytest.UsageError(f"Empty pytest shard {value}; refusing false green")

@@ -1438,6 +1438,7 @@ jobs:
             scripts/ci_contract.py
             scripts/scheduled_regression.py
             scripts/verify_pytest_shards.py
+            scripts/pytest_shard_plan.py
             scripts/verify_playwright_shards.py
           sparse-checkout-cone-mode: false
       - uses: actions/setup-python@v5
