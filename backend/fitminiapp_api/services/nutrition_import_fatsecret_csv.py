@@ -5,11 +5,13 @@ from __future__ import annotations
 import csv
 import io
 import re
+from collections import Counter
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from fitminiapp_api.services.nutrition_import_validation import (
+    MAX_ADAPTER_LIST,
     NutritionImportValidationError,
     validate_csv_upload,
 )
@@ -62,6 +64,7 @@ MEALS = {
     "перекусы": "snacks",
     "перекус/другое": "snacks",
 }
+_MAX_COMPARISON_DIAGNOSTICS = 1_000
 UNITS = {
     "г": "g",
     "гр": "g",
@@ -397,8 +400,53 @@ def _amount(label: str, row: int) -> tuple[str | None, str | None, str | None, s
     return fact["value"], canonical_unit, unit, None if canonical_unit else "unknown_unit"
 
 
+def _compare_source_values(
+    total: dict[str, Any],
+    parts: list[dict[str, Any]],
+    cells: dict[int, dict[str, Any]],
+    code: str,
+    diagnostics: list[dict[str, Any]],
+) -> None:
+    if not parts:
+        return
+    for field, unit in DETAIL_FIELDS:
+        facts = [
+            cells.get(item["coordinates"]["row"]) if field is None else item["facts"].get(field)
+            for item in (total, *parts)
+        ]
+        if any(
+            fact is None or fact["evidence"] != "read" or fact["unit"] != unit for fact in facts
+        ):
+            continue
+        values = [Decimal(fact["value"]) for fact in facts if fact is not None]
+        if values[0] != sum(values[1:], Decimal(0)):
+            if len(diagnostics) >= _MAX_COMPARISON_DIAGNOSTICS:
+                if len(diagnostics) == _MAX_COMPARISON_DIAGNOSTICS:
+                    diagnostics.append(
+                        _diagnostic(
+                            "source_differences_truncated",
+                            "report_details",
+                            total["coordinates"]["row"],
+                            severity="warning",
+                        )
+                    )
+                return
+            diagnostics.append(
+                _diagnostic(
+                    code,
+                    "report_details",
+                    total["coordinates"]["row"],
+                    severity="warning",
+                    field=field or "source_column_4",
+                )
+            )
+
+
 def _compare_day_meals(
-    day: dict[str, Any] | None, meals: list[dict[str, Any]], report: dict[str, Any]
+    day: dict[str, Any] | None,
+    meals: list[dict[str, Any]],
+    cells: dict[int, dict[str, Any]],
+    diagnostics: list[dict[str, Any]],
 ) -> None:
     if (
         day is None
@@ -412,26 +460,7 @@ def _compare_day_meals(
         }
     ):
         return
-    for field, unit in DETAIL_FIELDS:
-        if field is None:
-            continue
-        facts = [day["facts"].get(field), *(meal["facts"].get(field) for meal in meals)]
-        if any(
-            fact is None or fact["evidence"] != "read" or fact["unit"] != unit for fact in facts
-        ):
-            continue
-        values = [Decimal(fact["value"]) for fact in facts]
-        if values[0] != sum(values[1:], Decimal(0)):
-            report["diagnostics"].append(
-                _diagnostic(
-                    "day_meal_totals_differ",
-                    "report_details",
-                    day["coordinates"]["row"],
-                    severity="warning",
-                    field=field,
-                )
-            )
-            return
+    _compare_source_values(day, meals, cells, "day_meal_totals_differ", diagnostics)
 
 
 def _details(
@@ -448,11 +477,47 @@ def _details(
     context_ambiguous = False
     day_total: dict[str, Any] | None = None
     day_meals: list[dict[str, Any]] = []
+    meal_sections: list[dict[str, Any]] = []
+    comparison_diagnostics: list[dict[str, Any]] = []
+    day_cell_start = 0
     duplicate_day_total = False
 
     def finish_day() -> None:
-        if not context_ambiguous and not duplicate_day_total:
-            _compare_day_meals(day_total, day_meals, report)
+        if context_ambiguous:
+            return
+        cells = {
+            cell["coordinates"]["row"]: cell["fact"]
+            for cell in report["original_detail_cells"][day_cell_start:]
+            if cell["source_column"] == 4
+        }
+        section_counts = Counter(section["meal_type"] for section in meal_sections)
+        for section in meal_sections:
+            if section["total"] is None or section_counts[section["meal_type"]] != 1:
+                continue
+            _compare_source_values(
+                section["total"],
+                section["entries"],
+                cells,
+                "meal_source_values_differ",
+                comparison_diagnostics,
+            )
+        if (
+            not duplicate_day_total
+            and len(meal_sections) == 4
+            and set(section_counts)
+            == {
+                "breakfast",
+                "lunch",
+                "dinner",
+                "snacks",
+            }
+        ):
+            _compare_day_meals(day_total, day_meals, cells, comparison_diagnostics)
+            if day_total is not None:
+                entries = [entry for section in meal_sections for entry in section["entries"]]
+                _compare_source_values(
+                    day_total, entries, cells, "day_source_values_differ", comparison_diagnostics
+                )
 
     def validate_period(value: str, row: int) -> str:
         if period_bounds is not None:
@@ -483,11 +548,13 @@ def _details(
             )
             context_ambiguous = False
             day_total, day_meals, duplicate_day_total = None, [], False
+            meal_sections, day_cell_start = [], len(report["original_detail_cells"])
         elif len(row) == 11 and _LONG_DATE.fullmatch(label):
             finish_day()
             current_date, meal = validate_period(_long_date(label, row_number), row_number), None
             context_ambiguous = False
             day_total, day_meals, duplicate_day_total = None, [], False
+            meal_sections, day_cell_start = [], len(report["original_detail_cells"])
             if any(value.strip() for value in row[1:]):
                 facts, invalid = _detail_facts(row_number, row, header, report)
                 day_total = {
@@ -510,6 +577,8 @@ def _details(
             if current_date is None:
                 raise _FormatError("meal_without_date", row_number)
             meal = MEALS[key]
+            section: dict[str, Any] = {"meal_type": meal, "total": None, "entries": []}
+            meal_sections.append(section)
             if len(row) == 11 and any(value.strip() for value in row[1:]):
                 facts, invalid = _detail_facts(row_number, row, header, report)
                 meal_total = {
@@ -521,6 +590,7 @@ def _details(
                 }
                 report["original_totals"].append(meal_total)
                 day_meals.append(meal_total)
+                section["total"] = meal_total
                 if invalid:
                     report["diagnostics"].append(
                         _diagnostic(
@@ -630,15 +700,15 @@ def _details(
                     "diagnostics": diagnostics,
                 }
             )
-            report["original_totals"].append(
-                {
-                    "scope": "unknown",
-                    "coordinates": _coordinates("report_details", row_number),
-                    "diary_date": None if context_ambiguous else current_date,
-                    "meal_type": meal,
-                    "facts": facts,
-                }
-            )
+            entry = {
+                "scope": "unknown",
+                "coordinates": _coordinates("report_details", row_number),
+                "diary_date": None if context_ambiguous else current_date,
+                "meal_type": meal,
+                "facts": facts,
+            }
+            report["original_totals"].append(entry)
+            meal_sections[-1]["entries"].append(entry)
             measured_amount = _MEASURED_AMOUNT.fullmatch(amount[0].strip())
             known_measure_shape = (
                 measured_amount is not None
@@ -664,6 +734,17 @@ def _details(
                 "totals_not_comparable", "report_details", records[0][0], severity="warning"
             )
         )
+    remaining = MAX_ADAPTER_LIST - len(report["diagnostics"])
+    if len(comparison_diagnostics) > remaining:
+        if remaining <= 0:
+            raise _FormatError("adapter_diagnostics_limit", records[0][0])
+        comparison_diagnostics = comparison_diagnostics[: remaining - 1]
+        comparison_diagnostics.append(
+            _diagnostic(
+                "source_differences_truncated", "report_details", records[0][0], severity="warning"
+            )
+        )
+    report["diagnostics"].extend(comparison_diagnostics)
 
 
 def parse(content: bytes) -> dict[str, Any]:

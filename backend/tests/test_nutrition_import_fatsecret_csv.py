@@ -16,6 +16,7 @@ from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV1, NutritionImportV2
 from fitminiapp_api.schemas.nutrition_import_engine import ImportPreview
+from fitminiapp_api.services import nutrition_import_fatsecret_csv
 from fitminiapp_api.services.nutrition_catalog_import import catalog_import_preview
 from fitminiapp_api.services.nutrition_import_drafts import (
     NutritionDraftError,
@@ -480,6 +481,109 @@ def test_daily_meal_totals_are_compared_only_with_complete_source_values():
     assert not any(issue.code == "day_meal_totals_differ" for issue in result.diagnostics)
 
 
+def _source_comparison_rows():
+    def values(energy, fat, unmapped):
+        return [energy, fat, unmapped, *([""] * 7)]
+
+    return [
+        ["# Period Summary"],
+        SUMMARY_HEADER[:],
+        ["# Report Details"],
+        DETAIL_HEADER[:],
+        ["Суббота, марта 2, 2024", *values("11", "2", "0,30")],
+        ["Завтрак", *values("10", "2,1", "0,20")],
+        ["Синтетический продукт A", *values("4", "0,8", "0,08")],
+        ["100 г"],
+        ["Синтетический продукт B", *values("6", "1,2", "0,12")],
+        ["100 г"],
+        ["Обед", *values("0", "0", "0")],
+        ["Ужин", *values("0", "0", "0")],
+        ["Перекус", *values("0", "0", "0")],
+    ]
+
+
+def test_source_differences_preserve_opaque_column_and_do_not_guess_rounding():
+    _, result = _validated(_source_comparison_rows())
+    differences = {
+        (issue.code, issue.field, issue.coordinates.row)
+        for issue in result.diagnostics
+        if issue.code
+        in {
+            "day_meal_totals_differ",
+            "meal_source_values_differ",
+            "day_source_values_differ",
+        }
+    }
+    assert differences == {
+        ("meal_source_values_differ", "fat_g", 6),
+        ("day_meal_totals_differ", "energy_kcal", 5),
+        ("day_meal_totals_differ", "fat_g", 5),
+        ("day_meal_totals_differ", "source_column_4", 5),
+        ("day_source_values_differ", "energy_kcal", 5),
+        ("day_source_values_differ", "source_column_4", 5),
+    }
+    assert all(row.nutrition.basis is None for row in result.rows)
+    cell = next(cell for cell in result.original_detail_cells if cell.coordinates.row == 7)
+    assert cell.source_value == "0,08" and cell.nutrient_field is None
+    assert (
+        "округл"
+        not in json.dumps(
+            [issue.model_dump() for issue in result.diagnostics], ensure_ascii=False
+        ).lower()
+    )
+
+
+def test_source_comparisons_skip_missing_values_and_ambiguous_context():
+    rows = _source_comparison_rows()
+    rows[8][2] = rows[8][3] = ""
+    _, result = _validated(rows)
+    assert not any(
+        issue.code in {"meal_source_values_differ", "day_source_values_differ"}
+        and issue.field in {"fat_g", "source_column_4"}
+        for issue in result.diagnostics
+    )
+    assert any(
+        issue.code == "day_meal_totals_differ" and issue.field == "source_column_4"
+        for issue in result.diagnostics
+    )
+
+    rows = _source_comparison_rows()
+    rows.insert(10, ["Завтрак"])
+    _, result = _validated(rows)
+    assert not any(
+        issue.code
+        in {"day_meal_totals_differ", "meal_source_values_differ", "day_source_values_differ"}
+        for issue in result.diagnostics
+    )
+
+    rows = _source_comparison_rows()
+    rows[7] = ["неизвестная порция"]
+    _, result = _validated(rows)
+    assert not any(
+        issue.code
+        in {"day_meal_totals_differ", "meal_source_values_differ", "day_source_values_differ"}
+        for issue in result.diagnostics
+    )
+
+
+def test_source_difference_diagnostics_are_bounded(monkeypatch):
+    monkeypatch.setattr(nutrition_import_fatsecret_csv, "_MAX_COMPARISON_DIAGNOSTICS", 2)
+    _, result = _validated(_source_comparison_rows())
+    assert sum(issue.code == "source_differences_truncated" for issue in result.diagnostics) == 1
+
+
+def test_source_differences_respect_shared_adapter_diagnostics_limit(monkeypatch):
+    monkeypatch.setattr(nutrition_import_fatsecret_csv, "MAX_ADAPTER_LIST", 4)
+    _, result = _validated(_source_comparison_rows())
+    assert len(result.diagnostics) == 4
+    assert result.diagnostics[-1].code == "source_differences_truncated"
+
+    monkeypatch.setattr(nutrition_import_fatsecret_csv, "MAX_ADAPTER_LIST", 2)
+    result = parse(_csv(_source_comparison_rows()))
+    assert result["rows"] == []
+    assert result["diagnostics"][0]["code"] == "adapter_diagnostics_limit"
+
+
 @pytest.mark.parametrize(
     ("change", "code"),
     [
@@ -562,6 +666,10 @@ def test_draft_and_preview_preserve_cells_without_canonical_writes(rows):
         assert preview.schema_version == "nutrition-import-v3"
         assert preview.original_detail_cells[1].source_value == "0,50"
         assert preview.original_detail_cells[1].mapping_evidence == "unknown"
+        assert any(
+            issue.code == "meal_source_values_differ" and issue.field == "energy_kcal"
+            for issue in preview.diagnostics
+        )
         assert preview.rows[4].status == "invalid"
         assert all(
             row["outcome"] == "needs_review"
