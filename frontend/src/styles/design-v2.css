@@ -1780,7 +1780,8 @@ body:has(.app-shell--design-v2) {
 }
 
 .nutrition-diary--design-v2 .nutrition-diary__intro .eyebrow,
-.nutrition-diary--design-v2 .nutrition-day-summary__head .eyebrow {
+.nutrition-diary--design-v2 .nutrition-day-summary__head .eyebrow,
+.nutrition-diary--design-v2 .nutrition-food-card__header .eyebrow {
   color: var(--v2-accent-text);
   font-size: 0.68rem;
   letter-spacing: 0.12em;

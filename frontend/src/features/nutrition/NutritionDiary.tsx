@@ -942,6 +942,7 @@ export function NutritionDiary({
   });
   const dateLabel = formatDate(selectedDate, today);
   const meals = useMemo(() => normalizeMeals(diary.data?.meals ?? []), [diary.data?.meals]);
+  const hasDiaryEntries = meals.some((meal) => meal.entries.length > 0);
   const newEntryIds = useMemo(
     () => (lastAddedEntryId == null ? new Set<number>() : new Set([lastAddedEntryId])),
     [lastAddedEntryId],
@@ -1220,27 +1221,44 @@ export function NutritionDiary({
               <div>
                 <span className="eyebrow">Дневник приёмов пищи</span>
                 <h2 id="nutrition-food-title">Еда</h2>
-                {readOnlyEntries && (
-                  <p className="muted demo-capability-notice" role="status">
-                    Новые записи можно добавить в демо-сессию. Редактирование, удаление и
-                    копирование существующих записей доступно после входа.
-                  </p>
+                {!readOnlyEntries && !hasDiaryEntries && (
+                  <span className="sr-only" id="nutrition-copy-empty">
+                    В этом дне нет записей для копирования.
+                  </span>
                 )}
               </div>
-              {!readOnlyEntries && diary.data.meals.some((meal) => meal.entries.length > 0) && (
-                <button
-                  className="nutrition-food-card__copy"
-                  type="button"
-                  onClick={() =>
-                    setCopySubject({
-                      scope: 'day',
-                      sourceDate: selectedDate,
-                      label: `Все записи за ${dateLabel.title.toLowerCase()}`,
-                    })
-                  }
+              <Button
+                className="nutrition-food-card__copy"
+                variant="secondary"
+                type="button"
+                disabled={readOnlyEntries || !hasDiaryEntries}
+                aria-describedby={
+                  readOnlyEntries
+                    ? 'nutrition-copy-readonly'
+                    : !hasDiaryEntries
+                      ? 'nutrition-copy-empty'
+                      : undefined
+                }
+                onClick={() =>
+                  setCopySubject({
+                    scope: 'day',
+                    sourceDate: selectedDate,
+                    label: 'Все записи питания',
+                  })
+                }
+              >
+                <Icon name="sync" size={16} />
+                <span>Копировать день</span>
+              </Button>
+              {readOnlyEntries && (
+                <p
+                  className="muted demo-capability-notice"
+                  id="nutrition-copy-readonly"
+                  role="status"
                 >
-                  Скопировать день
-                </button>
+                  Новые записи можно добавить в демо-сессию. Редактирование, удаление и копирование
+                  существующих записей доступно после входа.
+                </p>
               )}
             </header>
             <div className="nutrition-meals">
