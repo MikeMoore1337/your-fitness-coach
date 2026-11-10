@@ -388,7 +388,7 @@ describe('HydrationTracker', () => {
     ).not.toBeInTheDocument();
     const orb = container.querySelector('.hydration-orb');
     expect(orb).toHaveAttribute('aria-hidden', 'true');
-    expect(orb).toHaveTextContent('H2O');
+    expect(orb).toHaveTextContent('Вода');
   });
 
   it('shows the actual amount above the goal and caps the circle fill', async () => {

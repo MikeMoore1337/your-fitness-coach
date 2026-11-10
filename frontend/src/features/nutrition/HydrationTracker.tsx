@@ -814,13 +814,7 @@ export function HydrationTracker({
         >
           {target && progress !== null && <span style={{ height: `${progress}%` }} />}
           <strong>
-            {target && progress !== null ? (
-              `${Math.round(data.progress_percent ?? 0)}%`
-            ) : (
-              <>
-                H<sub>2</sub>O
-              </>
-            )}
+            {target && progress !== null ? `${Math.round(data.progress_percent ?? 0)}%` : 'Вода'}
           </strong>
         </div>
       </header>

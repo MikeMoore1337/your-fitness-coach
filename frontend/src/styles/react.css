@@ -7005,12 +7005,6 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     0.5px 0.5px 0 var(--v2-on-lime);
 }
 
-.hydration-orb strong sub {
-  font-size: 0.75em;
-  line-height: 0;
-  vertical-align: sub;
-}
-
 :root[data-color-scheme='light'] .hydration-orb strong,
 .hydration-orb--filled strong {
   color: var(--v2-on-lime);
