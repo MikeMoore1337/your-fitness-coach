@@ -1,14 +1,21 @@
+import asyncio
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 
 import pytest
+from fastapi import Depends, FastAPI
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from test_food_diary import _active_food
 from test_training_analytics import _auth, _user_id
 
+from fitminiapp_api.api.dependencies.auth import require_user
 from fitminiapp_api.api.v1 import nutrition_imports
-from fitminiapp_api.db.session import engine, get_session_context
+from fitminiapp_api.db.session import engine, get_db, get_session_context
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.nutrition_import import (
     NutritionImportDraft,
@@ -312,6 +319,74 @@ def test_fatsecret_url_respects_shared_rate_and_concurrency_limits(
     limited = _fatsecret_url_upload(client, headers)
     assert limited.status_code == 429
     assert limited.json()["detail"]["code"] == "rate_limited"
+
+
+def test_cancelled_fatsecret_url_keeps_slot_until_fetch_finishes(client, postgres, monkeypatch):
+    from fitminiapp_api.services.nutrition_import_fatsecret_url import (
+        FatSecretShareUrlTransport,
+        FatSecretUrlError,
+    )
+    from fitminiapp_api.services.nutrition_import_limits import _PARSER_LOCK_NAMESPACE
+
+    _auth(client, 983_110)
+    user_id = _user_id(983_110)
+    app = FastAPI()
+    app.include_router(nutrition_imports.router, prefix=URL)
+
+    def authenticated_user(db: Session = Depends(get_db)):
+        return db.get(User, user_id)
+
+    app.dependency_overrides[require_user] = authenticated_user
+    started, release, finished = threading.Event(), threading.Event(), threading.Event()
+
+    def blocked_fetch(self, url, *, limit):
+        started.set()
+        try:
+            assert release.wait(10)
+            raise FatSecretUrlError("network_error")
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(FatSecretShareUrlTransport, "fetch", blocked_fetch)
+
+    def slot_available():
+        with engine.connect() as connection:
+            return connection.execute(
+                text("SELECT pg_try_advisory_xact_lock(:namespace, 0)"),
+                {"namespace": _PARSER_LOCK_NAMESPACE},
+            ).scalar_one()
+
+    async def exercise():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
+            task = asyncio.create_task(
+                http.post(
+                    f"{URL}/fatsecret-url",
+                    headers={"Idempotency-Key": "cancel-test-123"},
+                    json={"url": FATSECRET_URL},
+                )
+            )
+            try:
+                assert await asyncio.to_thread(started.wait, 5)
+                assert not slot_available()
+                task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await task
+                assert not finished.is_set()
+                assert not slot_available()
+            finally:
+                release.set()
+                assert await asyncio.to_thread(finished.wait, 5)
+            for _ in range(100):
+                if slot_available():
+                    break
+                await asyncio.sleep(0.05)
+            else:
+                pytest.fail("parser slot remained locked after worker exited")
+
+    asyncio.run(exercise())
+    with get_session_context() as db:
+        assert db.query(NutritionImportDraft).filter_by(owner_user_id=user_id).count() == 0
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
 
 
 def test_unknown_adapter_fails_closed_and_per_user_rate_limit(client, postgres):

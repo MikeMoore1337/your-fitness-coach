@@ -24,7 +24,7 @@ from starlette.concurrency import run_in_threadpool
 
 from fitminiapp_api.api.dependencies.auth import require_root_admin, require_user
 from fitminiapp_api.core.rate_limit import limiter
-from fitminiapp_api.db.session import get_db
+from fitminiapp_api.db.session import SessionLocal, get_db
 from fitminiapp_api.models.token import RefreshToken
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import_engine import (
@@ -171,29 +171,34 @@ def _create_draft(
     return preview.model_dump(mode="json")
 
 
-def _process_url(db: Session, user: User, url: SecretStr, upload_key: str) -> dict:
-    try:
-        reserve_upload_attempt(db, user)
-        acquire_parser_slot(db, user)
-        source, content_type = FatSecretShareUrlTransport().fetch(
-            url.get_secret_value(), limit=MAX_UPLOAD_BYTES
+def _process_url(user_id: int, url: SecretStr, upload_key: str) -> dict:
+    # The worker owns its session and locks even if the request is cancelled.
+    with SessionLocal() as db:
+        user = db.get(User, user_id)
+        if user is None:
+            raise NutritionDraftError("access_revoked", 401)
+        try:
+            reserve_upload_attempt(db, user)
+            acquire_parser_slot(db, user)
+            source, content_type = FatSecretShareUrlTransport().fetch(
+                url.get_secret_value(), limit=MAX_UPLOAD_BYTES
+            )
+        finally:
+            del url
+        is_pdf = content_type == "application/pdf"
+        adapter_id = "fatsecret-pdf-v1" if is_pdf else "fatsecret-csv-v1"
+        if adapter_id not in ADAPTERS:
+            raise FatSecretUrlError("pdf_unavailable" if is_pdf else "network_error")
+        return _create_draft(
+            db,
+            user,
+            source,
+            "fatsecret.pdf" if is_pdf else "fatsecret.csv",
+            content_type,
+            adapter_id,
+            upload_key,
+            transport="url",
         )
-    finally:
-        del url
-    is_pdf = content_type == "application/pdf"
-    adapter_id = "fatsecret-pdf-v1" if is_pdf else "fatsecret-csv-v1"
-    if adapter_id not in ADAPTERS:
-        raise FatSecretUrlError("pdf_unavailable" if is_pdf else "network_error")
-    return _create_draft(
-        db,
-        user,
-        source,
-        "fatsecret.pdf" if is_pdf else "fatsecret.csv",
-        content_type,
-        adapter_id,
-        upload_key,
-        transport="url",
-    )
 
 
 def _url_payload(body: bytes) -> str | None:
@@ -292,26 +297,24 @@ async def upload_fatsecret_url(
         raise _url_error("invalid_url") from None
     url = SecretStr(value)
     del value
+    user_id = current_user.id
     try:
-        result = await run_in_threadpool(_process_url, db, current_user, url, keys[0])
+        db.close()
+        result = await run_in_threadpool(_process_url, user_id, url, keys[0])
         response.headers["Cache-Control"] = "no-store, private"
         return result
     except FatSecretUrlError as exc:
-        db.rollback()
         code = exc.code
         status = 429 if code == "upstream_429" else 413 if code == "too_large" else 400
         if code in {"dns_error", "tls_error", "timeout", "network_error", "upstream_error"}:
             status = 503
         raise _url_error(code, status) from None
     except NutritionDraftError as exc:
-        db.rollback()
         raise _url_error(exc.code, exc.status_code) from None
     except NutritionImportValidationError as exc:
-        db.rollback()
         error = _error(exc)
         raise _url_error(exc.code, error.status_code) from None
     except SQLAlchemyError, ValidationError, KeyError:
-        db.rollback()
         raise _url_error("storage_unavailable", 503) from None
 
 
