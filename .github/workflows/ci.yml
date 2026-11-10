@@ -283,12 +283,14 @@ jobs:
             .github
             frontend
             scripts
+            tests/fixtures
             docs/app-experience-v3/stage-0/prototype
             docs/ux/post-release-reset/prototype
             docs/ux/final-issues-acceptance/visual-package-20261013
             docs/ux-proposals/issue-827-v12
       - name: Verify E2E sparse fixture dependencies
         run: |
+          test -s tests/fixtures/progress-report-canonical.json
           test -s docs/ux-proposals/issue-827-v12/fixtures.json
           test -s docs/app-experience-v3/stage-0/prototype/index.html
           test -s docs/ux/post-release-reset/prototype/index.html
