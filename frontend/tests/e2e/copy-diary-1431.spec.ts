@@ -32,6 +32,7 @@ const entry = {
   created_at: '2026-11-06T08:00:00Z',
   updated_at: '2026-11-06T08:00:00Z',
 };
+const existingEntry = { ...entry, id: 40, diary_date: target, food_name: 'Обед на месте' };
 
 for (const width of [320, 360, 393, 430, 1280]) {
   for (const theme of ['dark', 'light'] as const) {
@@ -55,8 +56,8 @@ for (const width of [320, 360, 393, 430, 1280]) {
         const entries =
           date === today
             ? [entry]
-            : copied && date === target
-              ? [{ ...entry, id: 42, diary_date: target }]
+            : date === target
+              ? [existingEntry, ...(copied ? [{ ...entry, id: 42, diary_date: target }] : [])]
               : [];
         const totals = entries.length
           ? nutrition
@@ -121,10 +122,64 @@ for (const width of [320, 360, 393, 430, 1280]) {
       });
 
       await page.goto(`/app?section=nutrition&date=${today}`);
-      const open = page.getByRole('button', { name: 'Скопировать день' });
-      await open.click();
-      const dialog = page.getByRole('dialog', { name: 'Повторить день' });
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      const foodCard = page.locator('.nutrition-food-card');
+      const open = foodCard.getByRole('button', { name: 'Копировать день' });
+      await expect(open).toBeEnabled();
+      await expect(open).toHaveClass(/ui-button--secondary/);
+      await expect(open.locator('[data-icon="sync"]')).toHaveCount(1);
+      await expect(foodCard.locator('.nutrition-meal')).toHaveCount(4);
+      const buttonBounds = await open.boundingBox();
+      const cardBounds = await foodCard.boundingBox();
+      const titleBounds = await foodCard.getByRole('heading', { name: 'Еда' }).boundingBox();
+      expect(buttonBounds).not.toBeNull();
+      expect(cardBounds).not.toBeNull();
+      expect(titleBounds).not.toBeNull();
+      expect(buttonBounds!.height).toBeGreaterThanOrEqual(44);
+      expect(buttonBounds!.x).toBeGreaterThanOrEqual(titleBounds!.x + titleBounds!.width);
+      expect(buttonBounds!.y).toBeLessThan(titleBounds!.y + titleBounds!.height);
+      expect(buttonBounds!.x).toBeGreaterThanOrEqual(cardBounds!.x);
+      expect(buttonBounds!.x + buttonBounds!.width).toBeLessThanOrEqual(
+        cardBounds!.x + cardBounds!.width,
+      );
+      const contrast = await open.evaluate((button) => {
+        const foreground = getComputedStyle(button).color;
+        const background = getComputedStyle(
+          button.closest('.nutrition-food-card')!,
+        ).backgroundColor;
+        const luminance = (color: string) => {
+          const channels = (color.match(/[\d.]+/g) ?? []).map(Number);
+          if (channels.length < 3 || (color.startsWith('rgba(') && channels[3] !== 1)) {
+            throw new Error(`Cannot measure contrast for ${color}`);
+          }
+          return channels.slice(0, 3).reduce((sum, value, index) => {
+            const channel = value / 255;
+            const linear =
+              channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+            return sum + linear * [0.2126, 0.7152, 0.0722][index]!;
+          }, 0);
+        };
+        const fg = luminance(foreground);
+        const bg = luminance(background);
+        return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+      });
+      expect(contrast).toBeGreaterThanOrEqual(4.5);
+      await open.focus();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Shift+Tab');
+      await expect(open).toBeFocused();
+      expect(await open.evaluate((button) => button.matches(':focus-visible'))).toBe(true);
+      expect(
+        await open.evaluate((button) => parseFloat(getComputedStyle(button).outlineWidth)),
+      ).toBeGreaterThanOrEqual(2);
+      await page.keyboard.press('Enter');
+      const dialog = page.getByRole('dialog', { name: 'Копировать записи дня' });
       const date = dialog.getByLabel('Дата назначения');
+      await expect(dialog.getByText('Все записи питания', { exact: true })).toBeVisible();
+      await expect(dialog.getByText(/6 ноября 2026/)).toBeVisible();
+      await expect(
+        dialog.getByText(/Исходные записи и существующие записи дня назначения сохранятся/),
+      ).toBeVisible();
       await expect(date).toBeFocused();
       await expect(date).toHaveValue('');
       await expect(date).toHaveAttribute('max', today);
@@ -154,6 +209,8 @@ for (const width of [320, 360, 393, 430, 1280]) {
       await open.click();
       await date.fill(target);
       await expect(dialog.getByText('Завтрак', { exact: true })).toBeVisible();
+      await expect(dialog.getByText('Записей: 1', { exact: true })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Подтвердить' }).focus();
       expect(requests).toEqual([{ source_date: today, target_date: target }]);
       const confirm = dialog.getByRole('button', { name: 'Подтвердить' });
       await confirm.click();
@@ -172,6 +229,7 @@ for (const width of [320, 360, 393, 430, 1280]) {
       });
       releaseCommit();
       await expect(dialog).toHaveCount(0);
+      await expect(page.getByText(/Добавлено записей: 1 · 5 ноября 2026/)).toBeVisible();
       const days = await page.evaluate(
         async ({ source, destination }) => {
           const get = async (date: string) =>
@@ -181,7 +239,18 @@ for (const width of [320, 360, 393, 430, 1280]) {
         { source: today, destination: target },
       );
       expect(days[0].meals[0].entries).toEqual([entry]);
-      expect(days[1].meals[0].entries).toEqual([{ ...entry, id: 42, diary_date: target }]);
+      expect(days[1].meals[0].entries).toEqual([
+        existingEntry,
+        { ...entry, id: 42, diary_date: target },
+      ]);
+
+      await page.goto('/app?section=nutrition&date=2026-11-04');
+      const emptyCopy = foodCard.getByRole('button', { name: 'Копировать день' });
+      await expect(emptyCopy).toBeDisabled();
+      await expect(emptyCopy).toHaveAccessibleDescription(
+        'В этом дне нет записей для копирования.',
+      );
+      await expect(foodCard.getByText('Пока без записей')).toHaveCount(4);
     });
   }
 }

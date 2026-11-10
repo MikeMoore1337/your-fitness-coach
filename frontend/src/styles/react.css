@@ -9113,19 +9113,29 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   padding: 0;
   overflow: hidden;
 }
-.nutrition-food-card__header {
+.nutrition-section-card__header.nutrition-food-card__header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   padding: 17px;
 }
+.nutrition-food-card__header > div {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.nutrition-food-card__header > .demo-capability-notice {
+  flex-basis: 100%;
+  max-width: none;
+  border-inline-start-width: 1px;
+}
 .nutrition-food-card__copy {
-  min-height: 36px;
-  padding: 7px 9px;
-  background: transparent;
-  color: var(--muted);
+  min-width: 0;
+  gap: 4px;
+  padding: 6px 8px;
   font-size: 0.76rem;
 }
-.nutrition-food-card__copy:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+.nutrition-food-card__copy .yfc-icon {
+  flex-shrink: 0;
 }
 .nutrition-food-card .nutrition-meals {
   gap: 0;
@@ -11473,7 +11483,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   .nutrition-food-card {
     padding: 0;
   }
-  .nutrition-food-card__header {
+  .nutrition-section-card__header.nutrition-food-card__header {
     padding: 14px;
   }
   .nutrition-food-card .nutrition-meals {
