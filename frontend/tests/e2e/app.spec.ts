@@ -2191,8 +2191,11 @@ test('notification nutrition deep links open the intended quick entry context', 
   await page.getByRole('button', { name: 'Закрыть добавление' }).click();
 
   await page.goto('/app?section=nutrition&date=2030-01-10&hydration=quick');
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  await expect(hydration.getByRole('button', { name: /Стакан.*250 мл/ })).toBeFocused();
+  await hydration.getByText('Другой напиток или объём').click();
   await expect(
-    page.getByRole('region', { name: 'Другой объём' }).getByLabel('Объём, мл'),
+    hydration.getByRole('region', { name: 'Другой напиток или объём' }).getByLabel('Объём, мл'),
   ).toBeVisible();
 });
 

@@ -57,6 +57,7 @@ const day: HydrationDay = {
   ],
   presets: [
     { id: null, label: 'Стакан', volume_ml: 250, beverage_type: 'water', is_default: true },
+    { id: null, label: 'Большой стакан', volume_ml: 350, beverage_type: 'water', is_default: true },
     { id: null, label: 'Бутылка', volume_ml: 500, beverage_type: 'water', is_default: true },
   ],
   last_logged_at: '2026-09-01T06:00:00Z',
@@ -123,12 +124,46 @@ describe('HydrationTracker', () => {
     expect(window.location.search).toBe('?section=nutrition&date=2026-09-01');
     expect(window.location.hash).toBe('#diary');
     expect(window.history.state).toEqual({ returnTo: 'today' });
-    const volume = within(screen.getByRole('region', { name: 'Другой объём' })).getByLabelText(
-      'Объём, мл',
-    );
+    fireEvent.click(screen.getByText('Другой напиток или объём'));
+    const volume = within(
+      screen.getByRole('region', { name: 'Другой напиток или объём' }),
+    ).getByLabelText('Объём, мл');
     fireEvent.change(volume, { target: { value: '425' } });
     await queryClient.invalidateQueries();
     expect(volume).toHaveValue(425);
+    expect(scroll).toHaveBeenCalledTimes(1);
+  });
+
+  it('focuses a requested quick action after a pending write settles', async () => {
+    const scroll = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scroll,
+    });
+    let resolveAdd: (entry: HydrationEntry) => void = () => {};
+    const response = new Promise<HydrationEntry>((resolve) => {
+      resolveAdd = resolve;
+    });
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'POST') return response;
+      return Promise.resolve();
+    });
+    const { rerender, queryClient } = renderTracker();
+    const preset = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    fireEvent.click(preset);
+    await waitFor(() => expect(preset).toBeDisabled());
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <HydrationTracker diaryDate="2026-09-01" quickAddRequest={1} />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+    expect(scroll).not.toHaveBeenCalled();
+    await act(async () => resolveAdd({ ...day.entries[0]!, id: 11, volume_ml: 250 }));
+    await waitFor(() => expect(preset).toHaveFocus());
     expect(scroll).toHaveBeenCalledTimes(1);
   });
 
@@ -159,15 +194,24 @@ describe('HydrationTracker', () => {
 
   it('shows a compact factual summary and quick presets', async () => {
     renderTracker();
-    expect(await screen.findByRole('heading', { name: 'Напитки' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Вода и напитки' })).toBeVisible();
     expect(screen.getByText('850 из 2200 мл')).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).toHaveAttribute(
       'aria-valuetext',
-      '850 из 2200 миллилитров',
+      '850 из 2200 миллилитров, 39%',
     );
-    expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeVisible();
     expect(
-      within(screen.getByRole('region', { name: 'Другой объём' })).getByLabelText('Объём, мл'),
+      within(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).getByText('39%'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeVisible();
+    expect(screen.getByText('Другой напиток или объём').closest('details')).not.toHaveAttribute(
+      'open',
+    );
+    fireEvent.click(screen.getByText('Другой напиток или объём'));
+    expect(
+      within(screen.getByRole('region', { name: 'Другой напиток или объём' })).getByLabelText(
+        'Объём, мл',
+      ),
     ).toBeVisible();
     expect(screen.getByText('История за день')).toBeVisible();
     expect(screen.getByText('Личный ориентир', { exact: true })).toBeVisible();
@@ -175,7 +219,13 @@ describe('HydrationTracker', () => {
 
   it.each([
     { entries: [], label: '0 записей', toggle: false },
+    { entries: [day.entries[0]], label: '1 запись', toggle: false },
     { entries: [day.entries[0], { ...day.entries[0], id: 11 }], label: '2 записи', toggle: false },
+    {
+      entries: [day.entries[0], { ...day.entries[0], id: 11 }, { ...day.entries[0], id: 12 }],
+      label: '3 записи',
+      toggle: false,
+    },
     {
       entries: [
         day.entries[0],
@@ -200,7 +250,7 @@ describe('HydrationTracker', () => {
     expect(await screen.findByText(label, { exact: true })).toBeVisible();
     if (entries.length > 0) {
       const history = screen.getByRole('list');
-      expect(within(history).getAllByRole('button', { name: 'Изменить' })).toHaveLength(
+      expect(within(history).getAllByRole('button', { name: /^Изменить запись:/ })).toHaveLength(
         Math.min(entries.length, 3),
       );
     } else {
@@ -218,9 +268,168 @@ describe('HydrationTracker', () => {
     expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggleButton);
     expect(screen.getByText('Вся история · всего 4', { exact: true })).toBeVisible();
-    expect(within(history).getAllByRole('button', { name: 'Изменить' })).toHaveLength(4);
+    expect(within(history).getAllByRole('button', { name: /^Изменить запись:/ })).toHaveLength(4);
     fireEvent.click(screen.getByRole('button', { name: 'Свернуть историю' }));
-    expect(within(history).getAllByRole('button', { name: 'Изменить' })).toHaveLength(3);
+    expect(within(history).getAllByRole('button', { name: /^Изменить запись:/ })).toHaveLength(3);
+  });
+
+  it.each([
+    ['Стакан', 250],
+    ['Большой стакан', 350],
+    ['Бутылка', 500],
+  ])('adds %s as water in one action', async (label, volume) => {
+    renderTracker();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(`${label}.*${volume} мл`) }),
+    );
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/hydration/entries/v2',
+        expect.objectContaining({
+          body: expect.objectContaining({ volume_ml: volume, beverage_type: 'water' }),
+        }),
+      ),
+    );
+  });
+
+  it('adds a custom drink and explains that it does not change nutrition totals', async () => {
+    renderTracker();
+    await screen.findByText('Другой напиток или объём');
+    fireEvent.click(screen.getByText('Другой напиток или объём'));
+    const custom = screen.getByRole('region', { name: 'Другой напиток или объём' });
+    expect(within(custom).getByText(/не изменяет калории и кофеин/)).toBeVisible();
+    fireEvent.change(within(custom).getByLabelText('Объём, мл'), { target: { value: '425' } });
+    fireEvent.change(within(custom).getByLabelText('Напиток'), { target: { value: 'tea' } });
+    fireEvent.click(within(custom).getByRole('button', { name: 'Добавить' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/hydration/entries/v2',
+        expect.objectContaining({
+          body: expect.objectContaining({ volume_ml: 425, beverage_type: 'tea', source: 'manual' }),
+        }),
+      ),
+    );
+  });
+
+  it('shows the saved drink type and sends the matching preset payload', async () => {
+    const label = 'Д'.repeat(40);
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?'))
+        return Promise.resolve({
+          ...day,
+          presets: [
+            ...day.presets,
+            { id: 4, label, volume_ml: 420, beverage_type: 'coffee', is_default: false },
+          ],
+        });
+      return Promise.resolve({
+        ...day.entries[0],
+        id: 11,
+        volume_ml: 420,
+        beverage_type: 'coffee',
+      });
+    });
+    renderTracker();
+    const preset = await screen.findByRole('button', {
+      name: new RegExp(`${label}.*420 мл.*Кофе`),
+    });
+    expect(preset).toHaveTextContent(`${label} · Кофе`);
+    fireEvent.click(preset);
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/hydration/entries/v2',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            volume_ml: 420,
+            beverage_type: 'coffee',
+            source: 'quick_preset',
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('lets the user choose the beverage when saving a container', async () => {
+    renderTracker();
+    await screen.findByText('Мои кружки и бутылки');
+    fireEvent.click(screen.getByText('Мои кружки и бутылки'));
+    const presets = screen.getByRole('region', { name: 'Мои кружки и бутылки' });
+    fireEvent.change(within(presets).getByLabelText('Название'), { target: { value: 'Кружка' } });
+    fireEvent.change(within(presets).getByLabelText('Объём, мл'), { target: { value: '420' } });
+    fireEvent.change(within(presets).getByLabelText('Напиток в ёмкости'), {
+      target: { value: 'coffee' },
+    });
+    fireEvent.click(within(presets).getByRole('button', { name: 'Добавить' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/hydration/presets',
+        expect.objectContaining({
+          body: { label: 'Кружка', volume_ml: 420, beverage_type: 'coffee' },
+        }),
+      ),
+    );
+  });
+
+  it.each([
+    [null, null, 'Ориентир не задан'],
+    [{ ...day.goal!, enabled: false }, null, 'Ориентир не задан'],
+    [day.goal, null, 'Прогресс недоступен'],
+  ])('does not present missing progress as zero', async (goal, progress, message) => {
+    apiMock.mockImplementation((path: string) =>
+      path === '/api/v1/me'
+        ? Promise.resolve({ profile: { sex: 'female' } })
+        : Promise.resolve({ ...day, goal, progress_percent: progress }),
+    );
+    const { container } = renderTracker();
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(
+      screen.queryByRole('progressbar', { name: 'Прогресс гидратации' }),
+    ).not.toBeInTheDocument();
+    const orb = container.querySelector('.hydration-orb');
+    expect(orb).toHaveAttribute('aria-hidden', 'true');
+    expect(orb).toHaveTextContent('H2O');
+  });
+
+  it('shows the actual amount above the goal and caps the circle fill', async () => {
+    apiMock.mockImplementation((path: string) =>
+      path === '/api/v1/me'
+        ? Promise.resolve({ profile: { sex: 'female' } })
+        : Promise.resolve({ ...day, total_ml: 2300, progress_percent: 104.5 }),
+    );
+    renderTracker();
+    expect(await screen.findByText('2300 из 2200 мл')).toBeVisible();
+    expect(screen.getByText('Выше ориентира на 100 мл')).toBeVisible();
+    expect(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).toHaveAttribute(
+      'aria-valuetext',
+      '2300 из 2200 миллилитров, 105%',
+    );
+    expect(
+      within(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).getByText('105%'),
+    ).toBeVisible();
+  });
+
+  it('does not send a second request for a double click while the first is pending', async () => {
+    let resolveAdd: (entry: HydrationEntry) => void = () => {};
+    const response = new Promise<HydrationEntry>((resolve) => {
+      resolveAdd = resolve;
+    });
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'POST') return response;
+      return Promise.resolve();
+    });
+    renderTracker();
+    const preset = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    fireEvent.click(preset);
+    fireEvent.click(preset);
+    const posts = () =>
+      apiMock.mock.calls.filter(([path]) => path === '/api/v1/nutrition/hydration/entries/v2');
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    await act(async () => resolveAdd({ ...day.entries[0]!, id: 11, volume_ml: 250 }));
+    await screen.findByText('Добавлено 250 мл');
+    expect(posts()).toHaveLength(1);
   });
 
   it('quick-adds once and offers explicit undo', async () => {
@@ -1023,8 +1232,8 @@ describe('HydrationTracker', () => {
     expect(screen.getByText(/для здоровых взрослых/i)).toBeVisible();
     expect(screen.getByLabelText('Мне 18 лет или больше')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'История за день' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Изменить' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Удалить' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Изменить запись:/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Удалить запись:/ })).toBeVisible();
   });
 
   it('initializes the editor from an existing manual goal', async () => {
