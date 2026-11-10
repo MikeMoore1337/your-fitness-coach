@@ -74,3 +74,88 @@ class ImportPreview(BaseModel):
 class ImportReceipt(BaseModel):
     entry_ids: list[int]
     preview_signature: str
+
+
+class CatalogImportRow(BaseModel):
+    index: int
+    outcome: Literal["reuse", "publish", "conflict", "needs_review", "private_only", "skipped"]
+    reason: str | None
+    food_id: int | None
+
+
+class CatalogProductPreview(BaseModel):
+    name: str
+    brand: str | None
+    barcode: str | None
+    kind: Literal["standard_food", "branded_food"]
+    nutrition: dict[str, Any]
+    provenance: dict[str, Any]
+
+
+class CatalogCandidate(BaseModel):
+    food_id: int
+    name: str
+    brand: str | None
+
+
+class CatalogImportPreviewRow(CatalogImportRow):
+    product: CatalogProductPreview | None
+    suggestions: list[CatalogCandidate]
+    suggestions_evaluated: bool
+
+
+class CatalogImportPreview(BaseModel):
+    id: str
+    revision: int
+    expires_at: datetime
+    source: ImportSource
+    rows: list[CatalogImportPreviewRow]
+    preview_signature: str
+
+
+class CatalogImportConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(ge=1, strict=True)
+    preview_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirm_key: str = Field(min_length=8, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    row_indexes: list[Annotated[int, Field(ge=0, strict=True)]] = Field(
+        min_length=1, max_length=2000
+    )
+    confirmed: Literal[True]
+
+    @field_validator("confirmed", mode="before")
+    @classmethod
+    def require_explicit_true(cls, value: object) -> object:
+        if value is not True:
+            raise ValueError("explicit confirmation is required")
+        return value
+
+
+class CatalogImportReceipt(BaseModel):
+    rows: list[CatalogImportRow]
+    preview_signature: str
+
+
+class CatalogConflict(BaseModel):
+    id: int
+    food_id: int
+    payload: dict[str, Any]
+    preview_signature: str
+
+
+class CatalogAliasConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    preview_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirmed: Literal[True]
+
+    @field_validator("confirmed", mode="before")
+    @classmethod
+    def require_explicit_true(cls, value: object) -> object:
+        if value is not True:
+            raise ValueError("explicit confirmation is required")
+        return value
+
+
+class CatalogAliasReceipt(BaseModel):
+    food_id: int
+    contribution_id: int

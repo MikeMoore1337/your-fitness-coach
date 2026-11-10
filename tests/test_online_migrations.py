@@ -308,6 +308,21 @@ def test_rotation_index_validation_is_exact_and_scoped(tmp_path: Path) -> None:
         validate_added_migration(_migration(tmp_path / "9999_unrelated.py", source))
 
 
+def test_catalog_index_validation_is_exact_and_scoped(tmp_path: Path) -> None:
+    source_path = (
+        Path(__file__).resolve().parents[1]
+        / "backend/alembic/versions/0155_nutrition_catalog_indexes.py"
+    )
+    source = source_path.read_text(encoding="utf-8")
+    validate_added_migration(source_path)
+    weakened = source.replace("AND indnkeyatts = 2 AND indnatts = 2", "AND indnkeyatts >= 1")
+    assert weakened != source
+    with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+        validate_added_migration(_migration(tmp_path / source_path.name, weakened))
+    with pytest.raises(OnlineMigrationError, match="SQL execution outside"):
+        validate_added_migration(_migration(tmp_path / "9999_unrelated.py", source))
+
+
 @pytest.mark.parametrize("operation", ["drop_table", "drop_column", "alter_column"])
 def test_online_migration_rejects_destructive_contract_operation(
     tmp_path: Path, operation: str

@@ -94,6 +94,7 @@ from fitminiapp_api.models.nutrition_import import (
 )
 from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
+    NutritionCatalogIdentifier,
     NutritionLabelDraft,
 )
 from fitminiapp_api.models.nutrition_plan import (
@@ -235,6 +236,7 @@ __all__ = [
     "NotificationDelivery",
     "NotificationSetting",
     "NutritionCatalogContribution",
+    "NutritionCatalogIdentifier",
     "NutritionImportDraft",
     "NutritionImportUploadAttempt",
     "NutritionLabelDraft",

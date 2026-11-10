@@ -31,6 +31,12 @@ class NutritionImportDraft(Base):
         UniqueConstraint(
             "owner_user_id", "confirm_key_hash", name="uq_nutrition_import_owner_confirm"
         ),
+        Index(
+            "uq_nutrition_import_owner_catalog_confirm",
+            "owner_user_id",
+            "catalog_confirm_key_hash",
+            unique=True,
+        ),
         Index("ix_nutrition_import_owner_created", "owner_user_id", "created_at"),
         Index("ix_nutrition_import_expiry", "expires_at"),
     )
@@ -45,6 +51,7 @@ class NutritionImportDraft(Base):
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     source: Mapped[str] = mapped_column(String(64), nullable=False)
     parser_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    adapter_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -55,6 +62,9 @@ class NutritionImportDraft(Base):
     confirm_key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     confirm_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     receipt: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    catalog_confirm_key_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    catalog_confirm_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    catalog_receipt: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

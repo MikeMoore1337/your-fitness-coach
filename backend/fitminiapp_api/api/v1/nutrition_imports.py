@@ -9,6 +9,7 @@ from fastapi import (
     Form,
     Header,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -18,17 +19,29 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.api.dependencies.auth import require_root_admin, require_user
 from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.token import RefreshToken
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import_engine import (
+    CatalogAliasConfirmRequest,
+    CatalogAliasReceipt,
+    CatalogConflict,
+    CatalogImportConfirmRequest,
+    CatalogImportPreview,
+    CatalogImportReceipt,
     ImportCancelRequest,
     ImportConfirmRequest,
     ImportPreview,
     ImportReceipt,
     ImportResolveRequest,
+)
+from fitminiapp_api.services.nutrition_catalog_import import (
+    catalog_import_preview,
+    confirm_catalog_alias,
+    confirm_catalog_import,
+    list_catalog_conflicts,
 )
 from fitminiapp_api.services.nutrition_import_drafts import (
     NutritionDraftError,
@@ -48,6 +61,7 @@ from fitminiapp_api.services.nutrition_import_validation import (
     MAX_UPLOAD_BYTES,
     NutritionImportValidationError,
 )
+from fitminiapp_api.services.root_admin import has_verified_root_identity
 
 router = APIRouter()
 
@@ -123,6 +137,7 @@ def _process_upload(
         delimiter=adapter.delimiter,
         parser_version=adapter.parser_version,
         upload_key=upload_key,
+        adapter_id=adapter_id,
     )
     if draft.status == "confirmed":
         raise NutritionDraftError("already_confirmed", 409)
@@ -227,6 +242,119 @@ def _lock_active_session(db: Session, user: User, family_id: str | None) -> None
     )
     if active is None:
         raise NutritionDraftError("access_revoked", 401)
+
+
+@router.get("/catalog/conflicts", response_model=list[CatalogConflict])
+def catalog_conflicts(
+    response: Response,
+    after_id: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+    _: User = Depends(require_root_admin),
+    db: Session = Depends(get_db),
+):
+    response.headers["Cache-Control"] = "no-store, private"
+    return list_catalog_conflicts(db, after_id=after_id, limit=limit)
+
+
+@router.post(
+    "/catalog/conflicts/{contribution_id}/confirm-alias", response_model=CatalogAliasReceipt
+)
+def catalog_confirm_alias(
+    contribution_id: int,
+    payload: CatalogAliasConfirmRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_root_admin),
+    db: Session = Depends(get_db),
+):
+    try:
+        _lock_active_session(db, current_user, getattr(request.state, "session_family_id", None))
+        if not has_verified_root_identity(db, current_user):
+            raise NutritionDraftError("access_revoked", 401)
+        result = confirm_catalog_alias(
+            db, current_user, contribution_id, preview_signature=payload.preview_signature
+        )
+        receipt = CatalogAliasReceipt.model_validate(result)
+        db.commit()
+        response.headers["Cache-Control"] = "no-store, private"
+        return receipt
+    except NutritionDraftError as exc:
+        db.rollback()
+        raise _error(exc) from exc
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "alias_conflict", "message": "Обновите предпросмотр импорта"},
+            headers={"Cache-Control": "no-store, private"},
+        ) from None
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.get("/{draft_id}/catalog", response_model=CatalogImportPreview)
+@limiter.limit("30/minute")
+def preview_catalog(
+    draft_id: str,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    del request
+    try:
+        response.headers["Cache-Control"] = "no-store, private"
+        return CatalogImportPreview.model_validate(
+            catalog_import_preview(db, current_user, draft_id)
+        )
+    except NutritionDraftError as exc:
+        raise _error(exc) from exc
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.post("/{draft_id}/catalog/confirm", response_model=CatalogImportReceipt)
+@limiter.limit("30/minute")
+def confirm_catalog(
+    draft_id: str,
+    payload: CatalogImportConfirmRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        _lock_active_session(db, current_user, getattr(request.state, "session_family_id", None))
+        result = CatalogImportReceipt.model_validate(
+            confirm_catalog_import(
+                db,
+                current_user,
+                draft_id,
+                revision=payload.revision,
+                preview_signature=payload.preview_signature,
+                confirm_key=payload.confirm_key,
+                row_indexes=payload.row_indexes,
+                confirmed=payload.confirmed,
+            )
+        )
+        db.commit()
+        response.headers["Cache-Control"] = "no-store, private"
+        return result
+    except NutritionDraftError as exc:
+        db.rollback()
+        raise _error(exc) from exc
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "import_conflict", "message": "Обновите предпросмотр импорта"},
+            headers={"Cache-Control": "no-store, private"},
+        ) from None
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
 
 
 @router.post("/{draft_id}/confirm", response_model=ImportReceipt)

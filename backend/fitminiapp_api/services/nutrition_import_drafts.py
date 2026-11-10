@@ -92,15 +92,14 @@ def get_nutrition_import_draft(
     document = draft.document
     if not isinstance(document, dict) or not isinstance(document.get("source"), dict):
         raise NutritionDraftError("draft_changed", 409)
-    fingerprint = _digest(
-        _canonical(
-            {
-                "content": draft.source_sha256,
-                "document": draft.document_sha256,
-                "parser": draft.parser_version,
-            }
-        )
-    )
+    fingerprint_data = {
+        "content": draft.source_sha256,
+        "document": draft.document_sha256,
+        "parser": draft.parser_version,
+    }
+    if draft.adapter_id is not None:
+        fingerprint_data["adapter_id"] = draft.adapter_id
+    fingerprint = _digest(_canonical(fingerprint_data))
     if (
         _digest(_canonical(document)) != draft.document_sha256
         or draft.upload_fingerprint != fingerprint
@@ -123,8 +122,13 @@ def create_nutrition_import_draft(
     delimiter: Literal[",", ";", "\t"],
     parser_version: str,
     upload_key: str,
+    adapter_id: str | None = None,
 ) -> NutritionImportDraft:
-    if not _KEY.fullmatch(upload_key) or not _IDENTIFIER.fullmatch(parser_version):
+    if (
+        not _KEY.fullmatch(upload_key)
+        or not _IDENTIFIER.fullmatch(parser_version)
+        or (adapter_id is not None and not _IDENTIFIER.fullmatch(adapter_id))
+    ):
         raise NutritionDraftError("invalid_metadata", 422)
     if document.source.source_format != "csv":
         raise NutritionDraftError("unsupported_format", 415)
@@ -139,15 +143,14 @@ def create_nutrition_import_draft(
         source_format=document.source.source_format,
     )
     document_sha256 = _digest(serialized)
-    fingerprint = _digest(
-        _canonical(
-            {
-                "content": source_sha256,
-                "document": document_sha256,
-                "parser": parser_version,
-            }
-        )
-    )
+    fingerprint_data = {
+        "content": source_sha256,
+        "document": document_sha256,
+        "parser": parser_version,
+    }
+    if adapter_id is not None:
+        fingerprint_data["adapter_id"] = adapter_id
+    fingerprint = _digest(_canonical(fingerprint_data))
     key_hash = _digest(upload_key.encode("ascii"))
     _lock_user(db, user)
     existing = (
@@ -156,7 +159,18 @@ def create_nutrition_import_draft(
         .first()
     )
     if existing is not None:
-        if existing.upload_fingerprint != fingerprint:
+        legacy_fingerprint = _digest(
+            _canonical(
+                {
+                    "content": source_sha256,
+                    "document": document_sha256,
+                    "parser": parser_version,
+                }
+            )
+        )
+        if existing.upload_fingerprint != fingerprint and not (
+            existing.adapter_id is None and existing.upload_fingerprint == legacy_fingerprint
+        ):
             raise NutritionDraftError("upload_key_conflict", 409)
         return get_nutrition_import_draft(db, user, existing.id, allow_confirmed=True)
     active_count = (
@@ -180,6 +194,7 @@ def create_nutrition_import_draft(
         provider=document.source.provider,
         source=document.source.source,
         parser_version=parser_version,
+        adapter_id=adapter_id,
         schema_version=document.schema_version,
         status="pending",
         revision=1,
@@ -475,6 +490,9 @@ def cancel_nutrition_import_draft(db: Session, user: User, draft_id: str, *, rev
     draft.document = {}
     draft.skipped_rows = []
     draft.resolutions = {}
+    draft.catalog_confirm_key_hash = None
+    draft.catalog_confirm_fingerprint = None
+    draft.catalog_receipt = None
     db.flush()
 
 
