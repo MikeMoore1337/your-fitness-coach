@@ -7,6 +7,7 @@ from fitminiapp_api.schemas.nutrition_import import (
     ImportDiagnostic,
     ImportFoodRow,
     ImportSource,
+    OriginalDetailCell,
     OriginalSummary,
     OriginalTotal,
 )
@@ -59,7 +60,7 @@ class ImportPreview(BaseModel):
     id: str
     revision: int
     expires_at: datetime
-    schema_version: Literal["nutrition-import-v1", "nutrition-import-v2"]
+    schema_version: Literal["nutrition-import-v1", "nutrition-import-v2", "nutrition-import-v3"]
     parser_version: str
     content_sha256: str
     completeness: Literal["complete", "partial", "unknown"]
@@ -67,6 +68,7 @@ class ImportPreview(BaseModel):
     rows: list[ImportPreviewRow]
     original_totals: list[OriginalTotal]
     original_summaries: list[OriginalSummary]
+    original_detail_cells: list[OriginalDetailCell] = Field(default_factory=list)
     diagnostics: list[ImportDiagnostic]
     preview_signature: str
 

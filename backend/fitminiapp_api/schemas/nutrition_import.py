@@ -302,6 +302,17 @@ class OriginalSummaryValue(ImportModel):
         return self
 
 
+class OriginalDetailCell(OriginalSummaryValue):
+    coordinates: SourceCoordinates = Field(repr=False)
+    source_column: int = Field(ge=1, strict=True)
+
+    @model_validator(mode="after")
+    def require_detail(self) -> OriginalDetailCell:
+        if self.coordinates.section_kind != "detail":
+            raise ValueError("detail cells require detail coordinates")
+        return self
+
+
 class OriginalSummaryRow(ImportModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
 
@@ -424,4 +435,57 @@ class NutritionImportV2(ImportModel):
         _validate_import_coordinates(
             self.source, self.rows, self.original_totals, tuple(coordinates)
         )
+        return self
+
+
+class NutritionImportV3(ImportModel):
+    schema_version: Literal["nutrition-import-v3"]
+    source: ImportSource
+    completeness: Literal["complete", "partial", "unknown"]
+    rows: list[ImportFoodRow] = Field(repr=False)
+    original_totals: list[OriginalTotal] = Field(repr=False)
+    original_summaries: list[OriginalSummary] = Field(repr=False)
+    original_detail_cells: list[OriginalDetailCell] = Field(max_length=2000, repr=False)
+    diagnostics: list[ImportDiagnostic] = Field(repr=False)
+
+    @model_validator(mode="after")
+    def validate_format_coordinates(self) -> NutritionImportV3:
+        coordinates: list[SourceCoordinates] = []
+        for summary in self.original_summaries:
+            coordinates.append(summary.header_coordinates)
+            if summary.period_coordinates is not None:
+                coordinates.append(summary.period_coordinates)
+            coordinates.extend(row.coordinates for row in summary.rows)
+        coordinates.extend(cell.coordinates for cell in self.original_detail_cells)
+        coordinates.extend(
+            diagnostic.coordinates
+            for diagnostic in self.diagnostics
+            if diagnostic.coordinates is not None
+        )
+        coordinates.extend(
+            diagnostic.coordinates
+            for row in self.rows
+            for diagnostic in row.diagnostics
+            if diagnostic.coordinates is not None
+        )
+        _validate_import_coordinates(
+            self.source, self.rows, self.original_totals, tuple(coordinates)
+        )
+        cells = [
+            (
+                cell.coordinates.section,
+                cell.coordinates.page,
+                cell.coordinates.row,
+                cell.source_column,
+            )
+            for cell in self.original_detail_cells
+        ]
+        if len(cells) != len(set(cells)):
+            raise ValueError("detail cells must have unique coordinates")
+        source_rows = {
+            (item.coordinates.section, item.coordinates.page, item.coordinates.row)
+            for item in (*self.rows, *self.original_totals)
+        }
+        if any(cell[:3] not in source_rows for cell in cells):
+            raise ValueError("detail cells must refer to a source row")
         return self

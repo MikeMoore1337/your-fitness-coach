@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from fitminiapp_api.schemas.nutrition_import import NutritionImportV1, NutritionImportV2
+from fitminiapp_api.schemas.nutrition_import import (
+    NutritionImportV1,
+    NutritionImportV2,
+    NutritionImportV3,
+)
 from fitminiapp_api.services.nutrition_import_validation import (
     MAX_ADAPTER_BYTES,
     NutritionImportValidationError,
@@ -38,12 +42,20 @@ class NutritionImportAdapter:
     catalog_attribution: str | None = None
 
 
-ADAPTERS: dict[str, NutritionImportAdapter] = {}
+ADAPTERS: dict[str, NutritionImportAdapter] = {
+    "fatsecret-csv-v1": NutritionImportAdapter(
+        provider="fatsecret",
+        adapter_version="fatsecret-csv-v1",
+        parser_version="fatsecret-csv-v1",
+        delimiter=",",
+        module_path=Path(__file__).with_name("nutrition_import_fatsecret_csv.py"),
+    )
+}
 
 
 def run_nutrition_import_adapter(
     adapter_id: str, source: bytes, *, filename: str | None, content_type: str | None
-) -> NutritionImportV1 | NutritionImportV2:
+) -> NutritionImportV1 | NutritionImportV2 | NutritionImportV3:
     adapter = ADAPTERS.get(adapter_id)
     if adapter is None:
         raise NutritionImportValidationError("adapter_unavailable")
