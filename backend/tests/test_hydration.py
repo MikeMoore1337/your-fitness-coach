@@ -3,17 +3,23 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from threading import Barrier
+from time import monotonic, sleep
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from fitminiapp_api.core.timezone import today_in_timezone
 from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
 from fitminiapp_api.models.user import User
-from fitminiapp_api.schemas.hydration import HydrationEntryCreate, HydrationGoalSave
+from fitminiapp_api.schemas.hydration import (
+    HydrationEntryCreate,
+    HydrationEntryUpdate,
+    HydrationGoalSave,
+)
 from fitminiapp_api.services import hydration as hydration_service
 from fitminiapp_api.services.account_export import (
     ACCOUNT_EXPORT_SCHEMA_VERSION,
@@ -31,6 +37,15 @@ def _auth(client, telegram_user_id: int) -> dict[str, str]:
         "Authorization": f"Bearer {response.json()['access_token']}",
         "X-YFC-Hydration-Protocol": "2",
     }
+
+
+def _delete_entry(client, headers, entry, mode="undo"):
+    return client.request(
+        "DELETE",
+        f"/api/v1/nutrition/hydration/entries/{entry['id']}-{mode}",
+        headers=headers,
+        json={key: entry[key] for key in ("created_at", "updated_at", "diary_date")},
+    )
 
 
 def test_hydration_quick_add_is_idempotent_and_isolated(client) -> None:
@@ -69,13 +84,7 @@ def test_hydration_quick_add_is_idempotent_and_isolated(client) -> None:
         params={"diary_date": diary_date},
     )
     assert other_day.json()["total_ml"] == 0
-    entry_id = first.json()["id"]
-    assert (
-        client.delete(
-            f"/api/v1/nutrition/hydration/entries/{entry_id}", headers=other_headers
-        ).status_code
-        == 404
-    )
+    assert _delete_entry(client, other_headers, first.json()).status_code == 404
 
 
 def test_legacy_hydration_write_is_blocked_without_collapsing_distinct_drinks(client) -> None:
@@ -237,12 +246,170 @@ def test_hydration_entry_can_be_edited_backdated_and_deleted(client) -> None:
     assert updated.json()["beverage_type"] == "tea"
     assert updated.json()["diary_date"] == "2026-08-20"
     assert updated.json()["source"] == "history_edit"
-    assert (
-        client.delete(
-            f"/api/v1/nutrition/hydration/entries/{created.json()['id']}", headers=headers
-        ).status_code
-        == 204
+    assert _delete_entry(client, headers, updated.json(), "delete").status_code == 204
+
+
+def test_hydration_undo_rejects_edited_entries_and_legacy_clients(client) -> None:
+    headers = _auth(client, 81_015)
+    created = client.post(
+        "/api/v1/nutrition/hydration/entries/v2",
+        headers={**headers, "Idempotency-Key": "hydration-undo-guard"},
+        json={"volume_ml": 250, "beverage_type": "water", "source": "quick_preset"},
+    ).json()
+    path = f"/api/v1/nutrition/hydration/entries/{created['id']}"
+    assert client.delete(path, headers=headers).status_code == 409
+    assert client.delete(path + "-undo", headers=headers).status_code == 422
+    updated = client.patch(
+        path,
+        headers=headers,
+        json={
+            "volume_ml": 420,
+            "beverage_type": "tea",
+            "occurred_at": "2026-08-20T08:30:00Z",
+        },
     )
+    assert updated.status_code == 200
+    assert _delete_entry(client, headers, created).status_code == 409
+    # Even a replay that returns the edited version is not an undoable addition.
+    assert _delete_entry(client, headers, updated.json()).status_code == 409
+    assert _delete_entry(client, headers, created, "delete").status_code == 409
+    day = client.get(
+        "/api/v1/nutrition/hydration", headers=headers, params={"diary_date": "2026-08-20"}
+    ).json()
+    assert [(entry["id"], entry["volume_ml"]) for entry in day["entries"]] == [(created["id"], 420)]
+    assert _delete_entry(client, headers, updated.json(), "delete").status_code == 204
+
+
+def test_hydration_undo_deletes_an_unchanged_entry(client) -> None:
+    headers = _auth(client, 81_016)
+    created = client.post(
+        "/api/v1/nutrition/hydration/entries/v2",
+        headers={**headers, "Idempotency-Key": "hydration-undo-unchanged"},
+        json={"volume_ml": 250, "beverage_type": "water", "source": "manual"},
+    ).json()
+    assert _delete_entry(client, headers, created).status_code == 204
+    assert _delete_entry(client, headers, created).status_code == 404
+
+
+def test_hydration_same_day_edits_advance_version_even_when_clock_does_not(
+    client, monkeypatch
+) -> None:
+    headers = _auth(client, 81_019)
+    created = client.post(
+        "/api/v1/nutrition/hydration/entries/v2",
+        headers={**headers, "Idempotency-Key": "hydration-undo-same-day"},
+        json={"volume_ml": 250, "beverage_type": "water", "source": "manual"},
+    ).json()
+    monkeypatch.setattr(hydration_service, "now_for_user_naive", lambda _user: datetime(2000, 1, 1))
+    path = f"/api/v1/nutrition/hydration/entries/{created['id']}"
+    body = {
+        "volume_ml": 250,
+        "beverage_type": "water",
+        "occurred_at": created["occurred_at"],
+    }
+    first = client.patch(path, headers=headers, json=body).json()
+    second = client.patch(path, headers=headers, json=body).json()
+    assert first["diary_date"] == second["diary_date"] == created["diary_date"]
+    assert datetime.fromisoformat(created["updated_at"]) < datetime.fromisoformat(
+        first["updated_at"]
+    )
+    assert datetime.fromisoformat(first["updated_at"]) < datetime.fromisoformat(
+        second["updated_at"]
+    )
+    assert _delete_entry(client, headers, created).status_code == 409
+    assert _delete_entry(client, headers, first, "delete").status_code == 409
+    assert _delete_entry(client, headers, second, "delete").status_code == 204
+
+
+def test_guarded_hydration_delete_is_rejected_by_the_old_server() -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    deleted = []
+
+    @app.delete("/hydration/entries/{entry_id}")
+    def old_delete(entry_id: int):
+        deleted.append(entry_id)
+
+    with TestClient(app) as old_client:
+        assert old_client.delete("/hydration/entries/41-undo").status_code == 422
+        assert old_client.delete("/hydration/entries/41-delete").status_code == 422
+    assert deleted == []
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+@pytest.mark.parametrize("first", ["edit", "undo"])
+def test_hydration_concurrent_edit_and_undo_preserve_the_winning_change(client, first) -> None:
+    telegram_id = 81_017 if first == "edit" else 81_018
+    headers = _auth(client, telegram_id)
+    entry = client.post(
+        "/api/v1/nutrition/hydration/entries/v2",
+        headers={**headers, "Idempotency-Key": "hydration-undo-race"},
+        json={"volume_ml": 250, "beverage_type": "water", "source": "manual"},
+    ).json()
+
+    def edit():
+        return client.patch(
+            f"/api/v1/nutrition/hydration/entries/{entry['id']}",
+            headers=headers,
+            json={"volume_ml": 400, "beverage_type": "tea", "occurred_at": entry["occurred_at"]},
+        )
+
+    def undo():
+        return _delete_entry(client, headers, entry)
+
+    with get_session_context() as db, ThreadPoolExecutor(max_workers=1) as executor:
+        user = db.query(User).filter(User.telegram_user_id == telegram_id).one()
+        row = (
+            db.query(HydrationEntry)
+            .filter_by(id=entry["id"], user_id=user.id)
+            .with_for_update()
+            .one()
+        )
+        if first == "undo":
+            db.delete(row)
+            db.flush()
+        future = executor.submit(undo if first == "edit" else edit)
+        try:
+            deadline = monotonic() + 5
+            blocked = False
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as probe:
+                while monotonic() < deadline:
+                    blocked = bool(
+                        probe.execute(
+                            text(
+                                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+                                "WHERE pid <> pg_backend_pid() AND wait_event_type = 'Lock' "
+                                "AND query LIKE '%hydration_entries%')"
+                            )
+                        ).scalar()
+                    )
+                    if blocked:
+                        break
+                    sleep(0.02)
+            assert blocked, "the competing request never waited on the locked entry"
+            if first == "edit":
+                hydration_service.update_hydration_entry(
+                    db,
+                    user,
+                    entry["id"],
+                    HydrationEntryUpdate(
+                        volume_ml=400, beverage_type="tea", occurred_at=entry["occurred_at"]
+                    ),
+                )
+            else:
+                db.commit()
+        finally:
+            db.rollback()
+        response = future.result(timeout=5)
+    assert response.status_code == (409 if first == "edit" else 404)
+    day = client.get(
+        "/api/v1/nutrition/hydration",
+        headers=headers,
+        params={"diary_date": entry["diary_date"]},
+    ).json()
+    assert [item["volume_ml"] for item in day["entries"]] == ([400] if first == "edit" else [])
 
 
 def test_reference_goal_versions_and_optional_profile_reuse(client) -> None:

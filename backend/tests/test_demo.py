@@ -476,6 +476,54 @@ def test_demo_hydration_retry_reuses_entry_and_rejects_key_conflicts(client) -> 
     assert another.json()["id"] != first.json()["id"]
 
 
+def test_demo_hydration_undo_rejects_edits_and_reset_reuse(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    path = "/api/v1/nutrition/hydration/entries"
+    generation = _transport(client, token, "/api/v1/nutrition/hydration").json()["demo_generation"]
+    create = {"volume_ml": 250, "beverage_type": "water", "source": "manual"}
+    entry = _transport(client, token, path + "/v2", "POST", create).json()
+    snapshot = {
+        **{key: entry[key] for key in ("created_at", "updated_at", "diary_date")},
+        "_hydration_generation": generation,
+    }
+    entry_path = f"{path}/{entry['id']}"
+    assert _transport(client, token, entry_path, "DELETE").status_code == 409
+    edited = _transport(
+        client,
+        token,
+        entry_path,
+        "PATCH",
+        {"volume_ml": 400, "beverage_type": "tea", "occurred_at": "2026-08-20T08:30:00Z"},
+    )
+    assert edited.status_code == 200
+    assert _transport(client, token, entry_path + "-undo", "DELETE", snapshot).status_code == 409
+    assert (
+        _transport(client, token, "/api/v1/nutrition/hydration?diary_date=2026-08-20").json()[
+            "entries"
+        ][0]["volume_ml"]
+        == 400
+    )
+    assert (
+        client.post(
+            "/api/v1/demo/sessions/current/reset", headers={"X-Demo-Session": token}
+        ).status_code
+        == 200
+    )
+    replacement = _transport(client, token, path + "/v2", "POST", create).json()
+    assert replacement["id"] == entry["id"]
+    assert _transport(client, token, entry_path + "-undo", "DELETE", snapshot).status_code == 409
+    new_generation = _transport(client, token, "/api/v1/nutrition/hydration").json()[
+        "demo_generation"
+    ]
+    new_snapshot = {
+        **{key: replacement[key] for key in ("created_at", "updated_at", "diary_date")},
+        "_hydration_generation": new_generation,
+    }
+    assert (
+        _transport(client, token, entry_path + "-undo", "DELETE", new_snapshot).status_code == 200
+    )
+
+
 def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_writes(
     client,
 ) -> None:
@@ -497,7 +545,17 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
     assert any(item.id == entry.id for item in after.entries)
     assert (
         _transport(
-            client, nutrition_token, f"/api/v1/nutrition/hydration/entries/{entry.id}", "DELETE"
+            client,
+            nutrition_token,
+            f"/api/v1/nutrition/hydration/entries/{entry.id}-delete",
+            "DELETE",
+            {
+                **{
+                    key: added_water.json()[key]
+                    for key in ("created_at", "updated_at", "diary_date")
+                },
+                "_hydration_generation": before["demo_generation"],
+            },
         ).status_code
         == 200
     )

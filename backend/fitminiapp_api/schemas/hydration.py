@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class HydrationBeverageType(StrEnum):
@@ -71,6 +71,19 @@ class HydrationEntryUpdate(BaseModel):
     volume_ml: int = Field(ge=1, le=5000)
     beverage_type: HydrationBeverageType
     occurred_at: datetime
+
+
+class HydrationEntryDelete(BaseModel):
+    created_at: datetime
+    updated_at: datetime
+    diary_date: date
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def require_naive_version(cls, value: datetime) -> datetime:
+        if value.utcoffset() is not None:
+            raise ValueError("Версия записи должна быть без часового пояса")
+        return value
 
 
 class HydrationEntryResponse(BaseModel):

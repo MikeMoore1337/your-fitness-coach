@@ -942,12 +942,80 @@ describe('HydrationTracker', () => {
       expect(await screen.findByText('Добавлено 250 мл')).toBeVisible();
       fireEvent.click(screen.getByRole('button', { name: 'Отменить' }));
       await waitFor(() =>
-        expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/hydration/entries/11', {
+        expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/hydration/entries/11-undo', {
           method: 'DELETE',
+          body: {
+            created_at: added.created_at,
+            updated_at: added.updated_at,
+            diary_date: added.diary_date,
+          },
         }),
       );
     },
   );
+
+  it('clears undo after editing the added entry', async () => {
+    const first = day.entries[0]!;
+    let entry: HydrationEntry | null = null;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?'))
+        return Promise.resolve({ ...day, entries: entry ? [entry, first] : [first] });
+      if (path.endsWith('/entries/v2') && options?.method === 'POST') {
+        entry = { ...first, id: 11, volume_ml: 250 };
+        return Promise.resolve(entry);
+      }
+      if (path.endsWith('/entries/11') && options?.method === 'PATCH' && entry) {
+        entry = null;
+        return Promise.resolve({ ...first, id: 11, diary_date: '2026-08-31' });
+      }
+      return Promise.resolve();
+    });
+    renderTracker(true);
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await screen.findByText('Добавлено 250 мл');
+    const row = (
+      await within(screen.getByRole('list')).findByText('250 мл', { exact: true })
+    ).closest('li')!;
+    fireEvent.click(within(row).getByRole('button', { name: 'Изменить' }));
+    fireEvent.change(within(row).getByLabelText('Дата и время'), {
+      target: { value: '2026-08-31T10:00' },
+    });
+    fireEvent.click(within(row).getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(screen.queryByText('Добавлено 250 мл')).not.toBeInTheDocument());
+  });
+
+  it('drops stale undo and refreshes after an edit in another tab', async () => {
+    const added = { ...day.entries[0]!, id: 11, volume_ml: 250 };
+    const conflict = Object.assign(new Error('Запись изменилась.'), { status: 409 });
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) return Promise.resolve(day);
+      if (options?.method === 'DELETE') return Promise.reject(conflict);
+      return Promise.resolve(added);
+    });
+    renderTracker();
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Отменить' }));
+    expect(await screen.findByText('Запись изменилась.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Отменить' })).not.toBeInTheDocument();
+  });
+
+  it('does not offer undo for a replay of an edited entry', async () => {
+    let hydrationReads = 0;
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) {
+        hydrationReads += 1;
+        return Promise.resolve(day);
+      }
+      return Promise.resolve({ ...day.entries[0], id: 11, source: 'history_edit' });
+    });
+    renderTracker();
+    fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+    await waitFor(() => expect(hydrationReads).toBeGreaterThan(1));
+    expect(screen.queryByRole('button', { name: 'Отменить' })).not.toBeInTheDocument();
+  });
 
   it('reveals adult/reference boundaries and history without hiding edit actions', async () => {
     renderTracker();

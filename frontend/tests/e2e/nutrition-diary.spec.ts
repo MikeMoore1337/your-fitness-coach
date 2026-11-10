@@ -282,6 +282,7 @@ async function mockNutritionApi(
   hydrationGoalEnabled = true,
   repeatCandidate?: { source_date: string; source_meal_type: 'lunch'; entry_count: number },
   filterHydrationByDate = false,
+  sharedHydrationEntries?: HydrationEntry[],
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
@@ -290,8 +291,9 @@ async function mockNutritionApi(
   let entries: FoodDiaryEntry[] = [yogurtEntry];
   let suggestionCommitCount = 0;
   let lastSuggestionCommit: unknown = null;
-  let hydrationEntries: HydrationEntry[] =
-    hydrationState === 'empty'
+  const hydrationEntries: HydrationEntry[] =
+    sharedHydrationEntries ??
+    (hydrationState === 'empty'
       ? []
       : [
           {
@@ -316,7 +318,7 @@ async function mockNutritionApi(
             created_at: '2026-08-19T12:40:00',
             updated_at: '2026-08-19T12:40:00',
           },
-        ];
+        ]);
   let dayStatus: 'incomplete' | 'complete' = 'incomplete';
   const plannerTargets = {
     energy_kcal: '2000.00',
@@ -567,20 +569,42 @@ async function mockNutritionApi(
         created_at: '2026-08-19T13:00:00',
         updated_at: '2026-08-19T13:00:00',
       };
-      hydrationEntries = [created, ...hydrationEntries];
+      hydrationEntries.unshift(created);
       return route.fulfill({ status: 201, json: created });
     }
     if (path.startsWith('/api/v1/nutrition/hydration/entries/') && request.method() === 'DELETE') {
-      const id = Number(path.split('/').at(-1));
-      hydrationEntries = hydrationEntries.filter((entry) => entry.id !== id);
+      const [rawId, mode] = (path.split('/').at(-1) ?? '').split('-');
+      const index = hydrationEntries.findIndex((entry) => entry.id === Number(rawId));
+      const entry = hydrationEntries[index];
+      if (!mode) return route.fulfill({ status: 409 });
+      if (!entry) return route.fulfill({ status: 404 });
+      const expected = request.postDataJSON() as Pick<
+        HydrationEntry,
+        'created_at' | 'updated_at' | 'diary_date'
+      >;
+      if (
+        entry.created_at !== expected.created_at ||
+        entry.updated_at !== expected.updated_at ||
+        entry.diary_date !== expected.diary_date ||
+        (mode === 'undo' && entry.source === 'history_edit')
+      )
+        return route.fulfill({ status: 409, json: { detail: 'Запись изменилась.' } });
+      hydrationEntries.splice(index, 1);
       return route.fulfill({ status: 204, body: '' });
     }
     if (path.startsWith('/api/v1/nutrition/hydration/entries/') && request.method() === 'PATCH') {
       const id = Number(path.split('/').at(-1));
       const body = request.postDataJSON() as Partial<HydrationEntry>;
-      hydrationEntries = hydrationEntries.map((entry) =>
-        entry.id === id ? { ...entry, ...body } : entry,
-      );
+      const index = hydrationEntries.findIndex((entry) => entry.id === id);
+      const current = hydrationEntries[index];
+      if (current)
+        hydrationEntries[index] = {
+          ...current,
+          ...body,
+          diary_date: body.occurred_at?.slice(0, 10) ?? current.diary_date,
+          source: 'history_edit',
+          updated_at: '2026-08-19T13:00:00.000001',
+        };
       return route.fulfill({ json: hydrationEntries.find((entry) => entry.id === id) });
     }
     if (path === '/api/v1/nutrition/hydration/goal' && request.method() === 'POST') {
@@ -3768,6 +3792,36 @@ test('#1429 water add edit delete and selected dates stay in sync', async ({ pag
   await expect(hydration.getByText('750 из 2200 мл')).toBeVisible();
   await hydration.getByRole('button', { name: 'Отменить', exact: true }).click();
   await expect(hydration.getByText('500 из 2200 мл')).toBeVisible();
+});
+
+test('water undo cannot remove an entry moved in another tab', async ({ page, context }) => {
+  const entries: HydrationEntry[] = [];
+  const otherTab = await context.newPage();
+  for (const tab of [page, otherTab]) {
+    await tab.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await mockNutritionApi(tab, 'empty', 'female', undefined, true, undefined, true, entries);
+  }
+  await page.goto('/app?section=nutrition');
+  const water = page.getByRole('region', { name: 'Гидратация' });
+  await water.getByRole('button', { name: /Стакан.*250 мл/ }).click();
+  await expect(water.getByText('Добавлено 250 мл')).toBeVisible();
+
+  await otherTab.goto('/app?section=nutrition');
+  const otherWater = otherTab.getByRole('region', { name: 'Гидратация' });
+  const row = otherWater.locator('.hydration-entry').filter({ hasText: '250 мл' });
+  await row.getByRole('button', { name: 'Изменить' }).click();
+  const editor = otherWater.locator('.hydration-entry__editor');
+  await editor.getByLabel('Дата и время').fill('2026-08-18T10:00');
+  await editor.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(row).toHaveCount(0);
+
+  await water.getByRole('button', { name: 'Отменить', exact: true }).click();
+  await expect(page.getByText('Запись изменилась.')).toBeVisible();
+  await expect(water.getByRole('button', { name: 'Отменить', exact: true })).toHaveCount(0);
+  expect(entries).toHaveLength(1);
+  expect(entries[0]).toMatchObject({ diary_date: '2026-08-18', volume_ml: 250 });
+  await otherTab.getByRole('button', { name: /18 августа/i }).click();
+  await expect(otherWater.locator('.hydration-entry').filter({ hasText: '250 мл' })).toBeVisible();
 });
 
 test('#1429 primary actions remain reachable with 200% text scaling', async ({
