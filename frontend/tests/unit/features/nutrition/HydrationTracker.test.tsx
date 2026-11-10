@@ -977,7 +977,7 @@ describe('HydrationTracker', () => {
     const row = (
       await within(screen.getByRole('list')).findByText('250 мл', { exact: true })
     ).closest('li')!;
-    fireEvent.click(within(row).getByRole('button', { name: 'Изменить' }));
+    fireEvent.click(within(row).getByRole('button', { name: /^Изменить/ }));
     fireEvent.change(within(row).getByLabelText('Дата и время'), {
       target: { value: '2026-08-31T10:00' },
     });

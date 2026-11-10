@@ -3809,7 +3809,7 @@ test('water undo cannot remove an entry moved in another tab', async ({ page, co
   await otherTab.goto('/app?section=nutrition');
   const otherWater = otherTab.getByRole('region', { name: 'Гидратация' });
   const row = otherWater.locator('.hydration-entry').filter({ hasText: '250 мл' });
-  await row.getByRole('button', { name: 'Изменить' }).click();
+  await row.getByRole('button', { name: /^Изменить/ }).click();
   const editor = otherWater.locator('.hydration-entry__editor');
   await editor.getByLabel('Дата и время').fill('2026-08-18T10:00');
   await editor.getByRole('button', { name: 'Сохранить' }).click();
