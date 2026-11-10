@@ -6940,7 +6940,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 12px;
   padding: 20px 20px 12px;
 }
 
@@ -6956,6 +6956,17 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-hydration-report p {
   margin: 0;
   color: var(--muted);
+}
+
+.hydration-card__header h2 {
+  font-size: var(--font-size-section);
+}
+
+.hydration-card__header p {
+  color: var(--v2-text-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: left;
 }
 
 .hydration-orb {
@@ -6976,7 +6987,6 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   right: 0;
   bottom: 0;
   left: 0;
-  min-height: 4px;
   background: var(--v2-lime);
   transition: height 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -6995,75 +7005,97 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     0.5px 0.5px 0 var(--v2-on-lime);
 }
 
-.hydration-orb strong sub {
-  font-size: 0.75em;
-  line-height: 0;
-  vertical-align: sub;
+:root[data-color-scheme='light'] .hydration-orb strong,
+.hydration-orb--filled strong {
+  color: var(--v2-on-lime);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
 }
 
-.hydration-progress {
-  height: 7px;
-  margin: 0 20px 16px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--v2-lime, var(--accent)) 14%, var(--surface-strong));
-}
-
-.hydration-progress > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--v2-lime);
-  transition: width 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.hydration-progress-note {
+  margin: 0 20px 12px;
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .hydration-presets {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 5rem), 1fr));
   gap: 8px;
-  padding: 0 20px 16px;
+  padding: 0 20px 8px;
 }
 
 .hydration-presets .ui-button {
-  min-height: 58px;
+  min-height: 54px;
   flex-direction: column;
   gap: 2px;
   padding: 8px 10px;
+  background: var(--v2-surface-secondary);
 }
 
 .hydration-presets .ui-button span {
   max-width: 100%;
   overflow-wrap: anywhere;
   white-space: normal;
+  color: var(--muted);
+  font-weight: 400;
   text-align: center;
 }
 
 .hydration-presets .ui-button strong {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: var(--v2-space-1);
-  color: var(--v2-accent-text, var(--accent-strong));
+  max-width: 100%;
+  color: var(--v2-text-primary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* Keep the approved mobile volume-first layout without changing desktop buttons. */
+.hydration-saved-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 12px;
+}
+
+.hydration-saved-presets .ui-button {
+  max-width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+  white-space: normal;
+  font-weight: 400;
+  text-align: left;
+}
+
+.hydration-saved-presets .ui-button > .yfc-icon {
+  flex-shrink: 0;
+  margin-top: 0.15em;
+}
+
+.hydration-saved-presets .ui-button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Keep quick volumes readable on narrow screens. */
 @media (max-width: 760px) {
   .hydration-presets .ui-button {
-    min-height: 72px;
-    gap: 5px;
+    min-height: 54px;
+    gap: 2px;
     padding: 8px 4px;
   }
 
   .hydration-presets .ui-button span {
-    overflow-wrap: normal;
-    word-break: normal;
+    overflow-wrap: anywhere;
     font-size: 0.76rem;
     line-height: 1.2;
   }
 
   .hydration-presets .ui-button strong {
     order: -1;
-    white-space: nowrap;
   }
 }
 
@@ -7099,11 +7131,11 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .hydration-card__section,
 .hydration-details {
   border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-strong) 62%, transparent);
+  background: var(--v2-surface);
 }
 
 .hydration-card__section {
-  padding: 18px 20px;
+  padding: 12px 20px;
 }
 
 .hydration-section-head {
@@ -7111,16 +7143,17 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
 }
 
-.hydration-section-head p {
-  margin-top: 4px;
-  font-size: 0.82rem;
+.hydration-section-head h3 {
+  font-size: var(--font-size-body);
 }
 
 .hydration-history__count {
   flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--font-size-caption);
   text-align: right;
 }
 
@@ -7154,12 +7187,16 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-details__summary {
-  min-height: 56px;
-  font-weight: 800;
+  min-height: 48px;
+  font-weight: 600;
 }
 
 .hydration-details__body {
   padding: 0 0 18px;
+}
+
+.hydration-details__body > .hydration-note {
+  margin-top: 12px;
 }
 
 .hydration-form-row,
@@ -7238,8 +7275,8 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .hydration-history {
   display: grid;
-  gap: 8px;
-  margin: 12px 0 0;
+  gap: 0;
+  margin: 4px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -7264,15 +7301,18 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   background: var(--surface);
 }
 
+.hydration-custom-presets li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .hydration-entry {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
+  gap: 8px;
+  min-height: 54px;
+  border-bottom: 1px solid var(--border);
 }
 
 .hydration-entry > div:first-child {
@@ -7294,7 +7334,14 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-entry > .hydration-entry__actions {
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-top: 0;
+}
+
+.hydration-entry__icon {
+  width: var(--touch-target);
+  padding: 0;
 }
 
 .hydration-entry__editor {
@@ -7346,14 +7393,12 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   .hydration-card__header {
     padding: 16px 14px 10px;
   }
-  .hydration-progress {
+  .hydration-progress-note {
     margin-inline: 14px;
   }
-  .hydration-presets {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, max(5rem, 25%)), 1fr));
-    overflow-x: auto;
+  .hydration-presets,
+  .hydration-saved-presets {
     padding-inline: 14px;
-    scrollbar-width: none;
   }
   .hydration-card__section {
     padding-inline: 14px;
@@ -7374,11 +7419,23 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     grid-column: 1 / -1;
     justify-self: start;
   }
-  .hydration-entry {
-    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+@media (min-width: 361px) and (max-width: 760px) {
+  .hydration-custom-form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   }
-  .hydration-entry > .hydration-entry__actions {
-    grid-column: 1 / -1;
+  .hydration-custom-form > .ui-button {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 240px) {
+  .hydration-card__header {
+    flex-wrap: wrap;
+  }
+  .hydration-presets {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -8864,6 +8921,9 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   margin-top: 7px;
   color: var(--muted);
   line-height: 1.5;
+}
+.nutrition-diary__water-action {
+  justify-self: start;
 }
 .nutrition-diary__intro-actions {
   display: flex;
@@ -11803,8 +11863,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
     transform: none !important;
     transition: none !important;
   }
-  .hydration-orb > span,
-  .hydration-progress > span {
+  .hydration-orb > span {
     transition: none !important;
   }
 }

@@ -925,6 +925,7 @@ export function NutritionDiary({
       : null;
   });
   const [copySubject, setCopySubject] = useState<CopySubject | null>(null);
+  const [hydrationQuickAddRequest, setHydrationQuickAddRequest] = useState(0);
   const [lastAddedEntryId, setLastAddedEntryId] = useState<number | null>(null);
   const [mealExpansion, setMealExpansion] = useState<Partial<Record<MealType, boolean>>>({});
   const [pendingRepeats, setPendingRepeats] = useState<Record<string, RepeatRequest>>({});
@@ -1139,6 +1140,15 @@ export function NutritionDiary({
         }}
       />
 
+      <Button
+        className="nutrition-diary__water-action"
+        variant="secondary"
+        type="button"
+        onClick={() => setHydrationQuickAddRequest((value) => value + 1)}
+      >
+        <Icon name="water" size={16} /> Добавить воду
+      </Button>
+
       {diary.isLoading && <LoadingState label="Загружаем дневник…" />}
       {diary.error && (
         <ErrorState message={(diary.error as Error).message} retry={() => void diary.refetch()} />
@@ -1311,7 +1321,11 @@ export function NutritionDiary({
         </>
       )}
 
-      <HydrationTracker diaryDate={selectedDate} initialExpanded={initialHydrationOpen} />
+      <HydrationTracker
+        diaryDate={selectedDate}
+        initialExpanded={initialHydrationOpen}
+        quickAddRequest={hydrationQuickAddRequest}
+      />
 
       {diary.data && (
         <>
