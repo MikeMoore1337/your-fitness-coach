@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from math import isfinite
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
+from zoneinfo import ZoneInfo
 
 from fitminiapp_api.schemas.coach_capacity import CoachCapacityBottleneck, CoachCapacityResponse
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
@@ -737,8 +738,8 @@ def _add_hydration_entry(session: _DemoSession, payload: dict[str, Any]) -> dict
         "diary_date": _hydration_date(payload.get("diary_date"), _today(session)),
         "timezone": "Europe/Moscow",
         "source": payload.get("source", "manual"),
-        "created_at": _iso(_now(session)),
-        "updated_at": _iso(_now(session)),
+        "created_at": _iso(_now(session) + timedelta(microseconds=session.revision)),
+        "updated_at": _iso(_now(session) + timedelta(microseconds=session.revision)),
     }
     if retry_key is not None:
         stored["_hydration_retry_key"] = retry_key
@@ -759,17 +760,17 @@ def _update_hydration_entry(
     if stored is None:
         raise DemoActionForbiddenError
     try:
-        datetime.fromisoformat(payload["occurred_at"].replace("Z", "+00:00"))
+        occurred_at = datetime.fromisoformat(payload["occurred_at"].replace("Z", "+00:00"))
     except ValueError as exc:
         raise DemoActionForbiddenError from exc
-    changed = any(
-        stored.get(key) != payload[key] for key in ("volume_ml", "beverage_type", "occurred_at")
-    )
-    if changed:
-        for key in ("volume_ml", "beverage_type", "occurred_at"):
-            stored[key] = payload[key]
-        stored["updated_at"] = _iso(_now(session))
-        session.revision += 1
+    for key in ("volume_ml", "beverage_type", "occurred_at"):
+        stored[key] = payload[key]
+    if occurred_at.tzinfo is not None:
+        occurred_at = occurred_at.astimezone(ZoneInfo("Europe/Moscow"))
+    stored["diary_date"] = occurred_at.date().isoformat()
+    stored["source"] = "history_edit"
+    stored["updated_at"] = _iso(_now(session) + timedelta(microseconds=session.revision))
+    session.revision += 1
     return _hydration_entry(session, stored)
 
 
@@ -2828,15 +2829,34 @@ def handle_demo_transport(
         method in {"PATCH", "DELETE"}
         and len(parts) == 4
         and parts[:3] == ["nutrition", "hydration", "entries"]
-        and parts[3].isdigit()
+        and (parts[3].isdigit() or parts[3].endswith(("-undo", "-delete")))
     ):
-        entry_id = int(parts[3])
+        raw_id, _, mode = parts[3].partition("-")
+        if not raw_id.isdigit():
+            raise DemoActionForbiddenError
+        if method == "DELETE" and not mode:
+            raise DemoTransitionError
+        if method == "PATCH" and mode:
+            raise DemoActionForbiddenError
+        entry_id = int(raw_id)
         entries = session.state.setdefault("hydration_entries", [])
         stored = next((item for item in entries if int(item["id"]) == entry_id), None)
         if stored is None:
             raise DemoActionForbiddenError
         if method == "PATCH":
             return _update_hydration_entry(session, entry_id, _request_body(body))
+        expected = _request_body(body)
+        if set(expected) != {"created_at", "updated_at", "diary_date", "_hydration_generation"}:
+            raise DemoActionForbiddenError
+        generation = expected["_hydration_generation"]
+        if isinstance(generation, bool) or not isinstance(generation, int):
+            raise DemoActionForbiddenError
+        if generation != session.hydration_generation or any(
+            expected[key] != stored[key] for key in ("created_at", "updated_at", "diary_date")
+        ):
+            raise DemoTransitionError
+        if mode == "undo" and stored["source"] not in {"quick_preset", "manual"}:
+            raise DemoTransitionError
         entries.remove(stored)
         session.revision += 1
         return None

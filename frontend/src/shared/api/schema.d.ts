@@ -13735,6 +13735,24 @@ export interface components {
              */
             source: string;
         };
+        /** HydrationEntryDelete */
+        HydrationEntryDelete: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+        };
         /** HydrationEntryResponse */
         HydrationEntryResponse: {
             /** Id */
@@ -31241,11 +31259,15 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                entry_id: number;
+                entry_id: number | string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["HydrationEntryDelete"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {

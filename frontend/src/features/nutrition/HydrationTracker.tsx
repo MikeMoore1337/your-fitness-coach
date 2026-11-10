@@ -81,7 +81,31 @@ function hydrationEntryCountLabel(count: number): string {
   return 'записей';
 }
 
-function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChanged(): void }) {
+function deleteHydrationEntry(
+  entry: HydrationEntry,
+  mode: 'undo' | 'delete',
+  demoGeneration?: number,
+) {
+  return api<void>(`/api/v1/nutrition/hydration/entries/${entry.id}-${mode}`, {
+    method: 'DELETE',
+    body: {
+      created_at: entry.created_at,
+      updated_at: entry.updated_at,
+      diary_date: entry.diary_date,
+      ...(demoGeneration === undefined ? {} : { _hydration_generation: demoGeneration }),
+    },
+  });
+}
+
+function HydrationEntryRow({
+  entry,
+  demoGeneration,
+  onChanged,
+}: {
+  entry: HydrationEntry;
+  demoGeneration?: number;
+  onChanged(): void;
+}) {
   const { confirm, toast } = useFeedback();
   const [editing, setEditing] = useState(false);
   const [volume, setVolume] = useState(String(entry.volume_ml));
@@ -107,8 +131,7 @@ function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChan
     onError: (reason) => toast((reason as Error).message, 'error'),
   });
   const remove = useMutation({
-    mutationFn: () =>
-      api<void>(`/api/v1/nutrition/hydration/entries/${entry.id}`, { method: 'DELETE' }),
+    mutationFn: () => deleteHydrationEntry(entry, 'delete', demoGeneration),
     onSuccess: () => {
       onChanged();
       toast('Запись удалена');
@@ -313,7 +336,9 @@ export function HydrationTracker({
   const [preparingAdd, setPreparingAdd] = useState(false);
   const [customVolume, setCustomVolume] = useState('');
   const [beverageType, setBeverageType] = useState('water');
-  const [undoEntry, setUndoEntry] = useState<HydrationEntry | null>(null);
+  const [undoEntry, setUndoEntry] = useState<(HydrationEntry & { demoGeneration?: number }) | null>(
+    null,
+  );
   const [goalModeDraft, setGoalMode] = useState<'reference' | 'manual' | null>(null);
   const [sexDraft, setSex] = useState<'male' | 'female' | null>();
   const [adultConfirmedDraft, setAdultConfirmed] = useState<boolean>();
@@ -478,7 +503,11 @@ export function HydrationTracker({
         await refresh();
         return;
       }
-      setUndoEntry(entry);
+      setUndoEntry(
+        entry.source === 'quick_preset' || entry.source === 'manual'
+          ? { ...entry, demoGeneration: request.demoGeneration }
+          : null,
+      );
       setCustomVolume('');
       await refresh();
       trackCoreProductEvent(
@@ -635,14 +664,20 @@ export function HydrationTracker({
     setPreparingAdd(false);
   };
   const undo = useMutation({
-    mutationFn: (entryId: number) =>
-      api<void>(`/api/v1/nutrition/hydration/entries/${entryId}`, { method: 'DELETE' }),
+    mutationFn: (entry: HydrationEntry & { demoGeneration?: number }) =>
+      deleteHydrationEntry(entry, 'undo', entry.demoGeneration),
     onSuccess: async () => {
       setUndoEntry(null);
       await refresh();
       toast('Добавление отменено');
     },
-    onError: (reason) => toast((reason as Error).message, 'error'),
+    onError: (reason) => {
+      if ([404, 409].includes((reason as { status?: number }).status ?? 0)) {
+        setUndoEntry(null);
+        void refresh();
+      }
+      toast((reason as Error).message, 'error');
+    },
   });
   const saveGoal = useMutation({
     mutationFn: (key: string) =>
@@ -799,7 +834,12 @@ export function HydrationTracker({
       {undoEntry?.diary_date === diaryDate && (
         <div className="hydration-undo" role="status">
           <span>Добавлено {undoEntry.volume_ml} мл</span>
-          <Button variant="secondary" type="button" onClick={() => undo.mutate(undoEntry.id)}>
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={undo.isPending}
+            onClick={() => undo.mutate(undoEntry)}
+          >
             Отменить
           </Button>
         </div>
@@ -883,7 +923,15 @@ export function HydrationTracker({
         ) : (
           <ul id="hydration-history-list" className="hydration-history" aria-live="polite">
             {historyEntries.map((entry) => (
-              <HydrationEntryRow entry={entry} key={entry.id} onChanged={() => void refresh()} />
+              <HydrationEntryRow
+                entry={entry}
+                key={entry.id}
+                demoGeneration={demoToken ? demoGeneration : undefined}
+                onChanged={() => {
+                  setUndoEntry((current) => (current?.id === entry.id ? null : current));
+                  void refresh();
+                }}
+              />
             ))}
           </ul>
         )}

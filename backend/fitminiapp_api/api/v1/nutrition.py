@@ -56,6 +56,7 @@ from fitminiapp_api.schemas.grocery_list import (
 from fitminiapp_api.schemas.hydration import (
     HydrationDayResponse,
     HydrationEntryCreate,
+    HydrationEntryDelete,
     HydrationEntryResponse,
     HydrationEntryUpdate,
     HydrationGoalResponse,
@@ -609,12 +610,18 @@ def edit_hydration_entry(
 
 @router.delete("/hydration/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_hydration_entry(
-    entry_id: int,
+    entry_id: int | Annotated[str, StringConstraints(pattern=r"^[1-9][0-9]*-(undo|delete)$")],
+    payload: HydrationEntryDelete | None = None,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    if isinstance(entry_id, int):
+        raise HTTPException(status_code=409, detail="Обновите приложение для безопасного удаления.")
+    if payload is None:
+        raise HTTPException(status_code=422, detail="Укажите версию записи.")
+    raw_id, mode = entry_id.split("-")
     try:
-        delete_hydration_entry(db, current_user, entry_id)
+        delete_hydration_entry(db, current_user, int(raw_id), payload, undo=mode == "undo")
     except HydrationError as exc:
         _raise_hydration_http_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
