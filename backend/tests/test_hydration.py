@@ -380,7 +380,8 @@ def test_hydration_concurrent_edit_and_undo_preserve_the_winning_change(client, 
                         probe.execute(
                             text(
                                 "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
-                                "WHERE pid <> pg_backend_pid() AND wait_event_type = 'Lock' "
+                                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+                                "AND wait_event_type = 'Lock' "
                                 "AND query LIKE '%hydration_entries%')"
                             )
                         ).scalar()
