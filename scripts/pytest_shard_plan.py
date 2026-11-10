@@ -13,8 +13,8 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 
-_DIGEST = re.compile(r"[0-9a-f]{64}\\Z")
-_PREFIX = re.compile(r"[0-9a-f]{16}\\Z")
+_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+_PREFIX = re.compile(r"[0-9a-f]{16}\Z")
 _UNKNOWN_COST_MS = 2300
 _RECORDED_COST_LINES = """1efec5b508d3bd9a 18840
 c4e8e1cf35e6b70f 15716
