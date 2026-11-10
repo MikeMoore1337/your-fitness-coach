@@ -282,6 +282,7 @@ jobs:
           sparse-checkout: |
             .github
             frontend
+            backend/assets/exercise-guides
             scripts
             tests/fixtures
             docs/app-experience-v3/stage-0/prototype
@@ -291,6 +292,11 @@ jobs:
       - name: Verify E2E sparse fixture dependencies
         run: |
           test -s tests/fixtures/progress-report-canonical.json
+          test -s backend/assets/exercise-guides/bench-press-start.jpg
+          test -s backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg
+          test -s backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif
+          test -s backend/assets/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg
+          test -s backend/assets/exercise-guides/exercises-media/incline-bench-press/poster-1280.jpg
           test -s docs/ux-proposals/issue-827-v12/fixtures.json
           test -s docs/app-experience-v3/stage-0/prototype/index.html
           test -s docs/ux/post-release-reset/prototype/index.html
