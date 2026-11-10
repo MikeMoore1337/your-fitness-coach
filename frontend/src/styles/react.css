@@ -7020,7 +7020,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .hydration-presets {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 5rem), 1fr));
   gap: 8px;
   padding: 0 20px 8px;
 }
@@ -7051,6 +7051,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   max-width: 100%;
   color: var(--v2-text-primary);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .hydration-saved-presets {
@@ -7095,7 +7096,6 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
   .hydration-presets .ui-button strong {
     order: -1;
-    white-space: normal;
   }
 }
 
@@ -7147,7 +7147,6 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-section-head h3 {
-  font-family: var(--font-body);
   font-size: var(--font-size-body);
 }
 
