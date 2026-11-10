@@ -59,9 +59,7 @@ def test_cost_balancing_preserves_unknown_tests_and_collection_independence() ->
     assert all(len(bucket & costly) == 1 for bucket in planned)
     assert set().union(*planned) == set(nodes)
     assert not (planned[0] & planned[1])
-    assert planned == pytest_shard_plan.select_shards(
-        list(reversed(nodes)), 2, costs_ms=costs
-    )
+    assert planned == pytest_shard_plan.select_shards(list(reversed(nodes)), 2, costs_ms=costs)
 
 
 def test_cost_plan_rejects_invalid_or_duplicate_collections() -> None:
