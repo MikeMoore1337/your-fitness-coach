@@ -1459,17 +1459,17 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await nutritionPage.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
   await expect(nutritionPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
   await expect(nutritionPage.getByText('AI Coach', { exact: true })).toHaveCount(0);
+  const breakfast = nutritionPage.getByRole('region', { name: 'Завтрак' });
+  const breakfastToggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+  // Existing meals start collapsed; a successful Quick Add expands its target meal.
+  await expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
   await expect(nutritionPage.getByRole('button', { name: 'Быстрый ввод' })).toBeVisible();
   await nutritionPage.getByRole('button', { name: 'Быстрый ввод' }).click();
   await expect(nutritionPage.getByRole('dialog')).toBeVisible();
   await nutritionPage.getByRole('spinbutton', { name: 'Калории' }).fill('420');
   await nutritionPage.getByRole('button', { name: 'Сохранить Quick Add' }).click();
-  // Existing meal details stay collapsed by default, including in the demo.
-  const breakfast = nutritionPage.getByRole('region', { name: 'Завтрак' });
-  const breakfastToggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
-  if ((await breakfastToggle.getAttribute('aria-expanded')) === 'false') {
-    await breakfastToggle.click();
-  }
+  await expect(nutritionPage.getByRole('dialog')).toHaveCount(0);
+  await expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
   await expect(breakfast.getByText('Овсяная каша с бананом и греческим йогуртом')).toBeVisible();
   await nutritionPage.getByRole('button', { name: 'Продолжить' }).click();
   await expect(nutritionPage).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=progress');
