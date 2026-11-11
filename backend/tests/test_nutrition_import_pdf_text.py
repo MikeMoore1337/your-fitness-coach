@@ -70,3 +70,13 @@ def test_page_and_text_limits_fail_closed(monkeypatch):
     monkeypatch.setattr(nutrition_import_pdf_text, "MAX_TEXT", 5)
     with pytest.raises(NutritionImportValidationError, match="pdf_text_limit"):
         extract_pdf_lines(source)
+
+
+def test_object_limit_fails_closed(monkeypatch):
+    stream = BytesIO()
+    pdf = Canvas(stream)
+    pdf.drawString(50, 700, "Synthetic")
+    pdf.save()
+    monkeypatch.setattr(nutrition_import_pdf_text, "MAX_OBJECTS", 1)
+    with pytest.raises(NutritionImportValidationError, match="pdf_objects_limit"):
+        extract_pdf_lines(stream.getvalue())

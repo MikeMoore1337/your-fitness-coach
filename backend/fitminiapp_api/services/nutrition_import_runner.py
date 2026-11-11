@@ -71,11 +71,10 @@ def run_nutrition_import_adapter(
         raise NutritionImportValidationError("adapter_unavailable")
     if adapter.source_format == "pdf":
         validate_pdf_upload(source, filename=filename, content_type=content_type)
-        # PDF parsing remains unavailable until worker filesystem and network isolation is proven.
-        raise NutritionImportValidationError("adapter_execution_unavailable")
-    validate_csv_upload(
-        source, filename=filename, content_type=content_type, delimiter=adapter.delimiter
-    )
+    else:
+        validate_csv_upload(
+            source, filename=filename, content_type=content_type, delimiter=adapter.delimiter
+        )
     if sys.platform != "linux" or not hasattr(os, "memfd_create") or os.geteuid() == 0:
         raise NutritionImportValidationError("adapter_execution_unavailable")
     try:
@@ -86,11 +85,12 @@ def run_nutrition_import_adapter(
     try:
         worker = Path(__file__).with_name("nutrition_import_adapter_worker.py")
         process = subprocess.Popen(
-            [sys.executable, "-I", str(worker), str(adapter.module_path)],
+            [sys.executable, "-I", str(worker), str(adapter.module_path), adapter.source_format],
             stdin=subprocess.PIPE,
             stdout=descriptor,
             stderr=subprocess.DEVNULL,
             env={},
+            close_fds=True,
             start_new_session=True,
         )
         try:
@@ -101,12 +101,17 @@ def run_nutrition_import_adapter(
             raise NutritionImportValidationError("adapter_failed")
         os.lseek(descriptor, 0, os.SEEK_SET)
         output = os.read(descriptor, MAX_ADAPTER_BYTES + 1)
-        return validate_adapter_result(
+        result = validate_adapter_result(
             output,
             provider=adapter.provider,
             adapter_version=adapter.adapter_version,
             source_format=adapter.source_format,
         )
+        if adapter.source_format == "pdf" and any(
+            issue.code == "pdf_no_text" for issue in result.diagnostics
+        ):
+            raise NutritionImportValidationError("pdf_no_text")
+        return result
     except OSError:
         raise NutritionImportValidationError("adapter_execution_unavailable") from None
     finally:

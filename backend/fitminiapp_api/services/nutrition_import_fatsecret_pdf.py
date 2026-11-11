@@ -30,6 +30,11 @@ _MEALS = {
     "snacks/other": "Перекус",
     "snacks": "Перекус",
 }
+_HEADER_FIELDS = {
+    label: index
+    for profile in (_EN_HEADERS, csv_adapter.DETAIL_HEADERS, csv_adapter.DETAIL_HEADERS_SHORT)
+    for index, label in enumerate(profile)
+}
 
 
 def _groups(lines: list[PdfLine]) -> list[list[PdfLine]]:
@@ -72,6 +77,47 @@ def _attach_pages(value: object, pages: dict[int, int]) -> None:
             _attach_pages(child, pages)
 
 
+def _compare_days(report: dict[str, Any]) -> None:
+    if any(
+        item["code"] in {"source_context_ambiguous", "quantity_unrecognized"}
+        for row in report["rows"]
+        for item in row["diagnostics"]
+    ):
+        return
+    totals = report["original_totals"]
+    cells = {
+        cell["coordinates"]["row"]: cell["fact"]
+        for cell in report["original_detail_cells"]
+        if cell["source_column"] == 4
+    }
+    diagnostics: list[dict[str, Any]] = []
+    days: dict[str, list[dict[str, Any]]] = {}
+    for item in totals:
+        if item.get("diary_date"):
+            days.setdefault(item["diary_date"], []).append(item)
+    for same_day in days.values():
+        day_totals = [item for item in same_day if item["scope"] == "day"]
+        if len(day_totals) != 1:
+            continue
+        entries = [
+            item for item in same_day if item["scope"] == "unknown" and item.get("meal_type")
+        ]
+        csv_adapter._compare_source_values(
+            day_totals[0], entries, cells, "day_source_values_differ", diagnostics
+        )
+    existing = {
+        (item["code"], item.get("field"), item.get("coordinates", {}).get("row"))
+        for item in report["diagnostics"]
+    }
+    for item in diagnostics:
+        key = (item["code"], item.get("field"), item["coordinates"]["row"])
+        if key not in existing:
+            if len(report["diagnostics"]) >= csv_adapter.MAX_ADAPTER_LIST:
+                raise csv_adapter._FormatError("adapter_diagnostics_limit")
+            report["diagnostics"].append(item)
+            existing.add(key)
+
+
 def parse(source: bytes) -> dict[str, Any]:
     report = csv_adapter._document()
     report["source"].update(adapter_version=ADAPTER_VERSION, source_format="pdf")
@@ -80,6 +126,10 @@ def parse(source: bytes) -> dict[str, Any]:
         records: list[tuple[int, list[str]]] = []
         pages: dict[int, int] = {}
         positions: list[float] | None = None
+        column_fields: list[int] = []
+        row_headers: dict[int, dict[int, str]] = {}
+        row_fields: dict[int, list[int]] = {}
+        current_headers: dict[int, str] = {}
         section = False
         meal_record: int | None = None
         current_date: str | None = None
@@ -95,12 +145,11 @@ def parse(source: bytes) -> dict[str, Any]:
                 continue
             values = [part.text.strip() for part in group]
             header = tuple(value.casefold() for value in values[-10:])
-            if header in {
-                _EN_HEADERS,
-                csv_adapter.DETAIL_HEADERS,
-                csv_adapter.DETAIL_HEADERS_SHORT,
-            }:
+            mapped_header = [_HEADER_FIELDS.get(value) for value in header]
+            if len(mapped_header) == 10 and set(mapped_header) == set(range(10)):
                 positions = [part.bbox[0] for part in group[-10:]]
+                column_fields = [int(index) for index in mapped_header if index is not None]
+                current_headers = dict(zip(column_fields, values[-10:], strict=True))
                 if not records:
                     records.append((1, ["Метка", *csv_adapter.DETAIL_HEADERS]))
                     pages[1] = group[0].page
@@ -111,6 +160,8 @@ def parse(source: bytes) -> dict[str, Any]:
                 continue
             record_id = len(records) + 1
             page = group[0].page
+            row_headers[record_id] = current_headers
+            row_fields[record_id] = column_fields
             day = _date(text)
             if day is not None:
                 continuation = None
@@ -153,9 +204,10 @@ def parse(source: bytes) -> dict[str, Any]:
                     left.append(part.text.strip())
                 else:
                     index = min(range(10), key=lambda i: abs(positions[i] - x))
-                    if abs(positions[index] - x) > 18 or cells[index]:
+                    field = column_fields[index]
+                    if abs(positions[index] - x) > 18 or cells[field]:
                         raise csv_adapter._FormatError("pdf_column_ambiguous", record_id)
-                    cells[index] = part.text.strip()
+                    cells[field] = part.text.strip()
             label = " ".join(left).strip()
             total = re.fullmatch(r"(?:total|итого|всего)\s+(.+)", label, re.I)
             if total and total.group(1).casefold() in {*_MEALS, *csv_adapter.MEALS}:
@@ -164,6 +216,8 @@ def parse(source: bytes) -> dict[str, Any]:
                     raise csv_adapter._FormatError("unknown_total_scope", record_id)
                 records[meal_record][1].extend(cells)
                 pages[records[meal_record][0]] = page
+                row_headers[records[meal_record][0]] = current_headers
+                row_fields[records[meal_record][0]] = column_fields
                 continue
             if label.casefold() in {"total", "итого", "всего"}:
                 continuation = None
@@ -181,6 +235,7 @@ def parse(source: bytes) -> dict[str, Any]:
         if not records:
             raise csv_adapter._FormatError("pdf_no_details")
         csv_adapter._details(records, {row: row for row, _ in records}, report)
+        _compare_days(report)
         units = {
             "g": "g",
             "grams": "g",
@@ -198,6 +253,11 @@ def parse(source: bytes) -> dict[str, Any]:
                     item for item in row["diagnostics"] if item["code"] != "unknown_unit"
                 ]
         _attach_pages(report, pages)
+        for cell in report["original_detail_cells"]:
+            row = cell["coordinates"]["row"]
+            field = cell["source_column"] - 2
+            cell["source_header"] = row_headers[row][field]
+            cell["source_column"] = row_fields[row].index(field) + 2
     except (NutritionImportValidationError, csv_adapter._FormatError) as exc:
         report = csv_adapter._document()
         report["source"].update(adapter_version=ADAPTER_VERSION, source_format="pdf")

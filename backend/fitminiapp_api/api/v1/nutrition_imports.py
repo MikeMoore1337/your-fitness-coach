@@ -94,6 +94,7 @@ def _error(exc: NutritionDraftError | NutritionImportValidationError) -> HTTPExc
         "duplicate_import": "Эти строки уже были импортированы",
         "adapter_unavailable": "Этот источник импорта пока не поддерживается",
         "invalid_encoding": "Сохраните файл в кодировке UTF-8",
+        "pdf_no_text": "В PDF не найден текст. Загрузите файл CSV",
         "rate_limited": "Слишком много загрузок. Повторите позже",
         "parser_busy": "Импорт занят. Попробуйте позже",
     }
