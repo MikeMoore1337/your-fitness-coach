@@ -134,7 +134,7 @@ def _parse_ru_report(lines: list[PdfLine]) -> dict[str, Any]:
     current_page = 0
     meal_index: int | None = None
     meal_indent: float | None = None
-    food: tuple[str, list[str], int] | None = None
+    food: tuple[str, list[str], int, float, float] | None = None
     next_row = 1
     in_summary = False
     repeated: dict[tuple[str, int, int], set[int]] = {}
@@ -160,6 +160,7 @@ def _parse_ru_report(lines: list[PdfLine]) -> dict[str, Any]:
         if all(
             item.page_height
             and item.bbox[3] > item.page_height - 25
+            and not re.search(r"\d", item.text)
             and len(repeated.get((item.text, round(item.bbox[0]), round(item.bbox[3])), set())) > 1
             for item in group
         ):
@@ -215,6 +216,17 @@ def _parse_ru_report(lines: list[PdfLine]) -> dict[str, Any]:
         if day is not None:
             if pending_date is not None:
                 raise error("pdf_date_ambiguous")
+            if columns is not None and records:
+                if food is not None:
+                    raise error("quantity_association_ambiguous")
+                if day != active_date:
+                    records.append(
+                        (next_row, ["Дата: " + datetime.fromisoformat(day).strftime("%d.%m.%Y")])
+                    )
+                    pages[next_row] = first.page
+                    next_row += 1
+                    active_date, meal_index, meal_indent = day, None, None
+                continue
             pending_date = (day, first.page)
             continue
         if in_summary:
@@ -261,9 +273,24 @@ def _parse_ru_report(lines: list[PdfLine]) -> dict[str, Any]:
         elif label and any(cells):
             if food is not None or meal_index is None:
                 raise error("pdf_row_ambiguous")
-            food = (label, cells, first.page)
+            food = (label, cells, first.page, first.bbox[0], first.bbox[3])
+        elif (
+            label
+            and not any(cells)
+            and food is not None
+            and food[0].endswith("-")
+            and first.bbox[3] - first.bbox[1] > 8.5
+        ):
+            name, facts, food_page, food_x, food_y = food
+            if (
+                first.page != food_page
+                or abs(first.bbox[0] - food_x) >= 3
+                or not 0 < food_y - first.bbox[3] <= 18
+            ):
+                raise error("pdf_row_ambiguous")
+            food = (name + " " + label, facts, food_page, food_x, first.bbox[3])
         elif label and not any(cells) and food is not None and first.bbox[3] - first.bbox[1] <= 8.5:
-            name, facts, food_page = food
+            name, facts, food_page, _, _ = food
             records.append((next_row, [name, *facts]))
             pages[next_row] = food_page
             next_row += 1

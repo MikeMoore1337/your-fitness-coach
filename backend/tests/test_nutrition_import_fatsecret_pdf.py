@@ -112,7 +112,13 @@ def synthetic_pdf(
 
 
 def synthetic_ru_report(
-    *, ambiguous=False, split_portion=False, duplicate=False, food_override=None
+    *,
+    ambiguous=False,
+    split_portion=False,
+    duplicate=False,
+    food_override=None,
+    second_date=False,
+    wrapped=False,
 ):
     output = BytesIO()
     pdf = Canvas(output, pagesize=(842, 595), pageCompression=0)
@@ -165,6 +171,8 @@ def synthetic_ru_report(
             pdf.drawString(25, 490, "100 г")
             pdf.setFont("SyntheticReportInter", 10)
         name = long_name if page == 2 or duplicate else "Синтетический продукт Б"
+        if page == 3 and wrapped == "hyphen":
+            name += " -"
         if page == 2 and food_override:
             name = food_override
         pdf.drawString(25, 455, name)
@@ -174,8 +182,10 @@ def synthetic_ru_report(
             if not ambiguous or i == 0:
                 pdf.drawCentredString(x, 453, value)
         if page == 3 or not split_portion:
+            if page == 3 and wrapped:
+                pdf.drawString(25, 443, "продолжение")
             pdf.setFont("SyntheticReportInter", 8)
-            pdf.drawString(25, 443, "100 г")
+            pdf.drawString(25, 431 if page == 3 and wrapped else 443, "100 г")
         if page == 3:
             pdf.setFont("SyntheticReportInter", 10)
             for y in (415, 385):
@@ -184,6 +194,18 @@ def synthetic_ru_report(
                     xs, ("42", "2", "0", "4", "0", "0", "6", "8", "0", "10"), strict=True
                 ):
                     pdf.drawCentredString(x, y, value)
+            if second_date:
+                pdf.setFont("SyntheticReportInter", 14)
+                pdf.drawString(27, 350, "Воскресенье, марта 3, 2024")
+                pdf.setFont("SyntheticReportInter", 10)
+                pdf.drawString(25, 325, "Обед")
+                pdf.drawString(25, 305, "Другой продукт")
+                for x, value in zip(
+                    xs, ("21", "1", "0", "2", "0", "0", "3", "4", "0", "5"), strict=True
+                ):
+                    pdf.drawCentredString(x, 303, value)
+                pdf.setFont("SyntheticReportInter", 8)
+                pdf.drawString(25, 293, "100 г")
         if page == 2:
             pdf.showPage()
     pdf.save()
@@ -271,6 +293,42 @@ def test_ru_report_two_line_headers_summary_and_page_continuation():
     assert len([item for item in document.original_totals if item.scope == "meal"]) == 1
     assert len([item for item in document.original_totals if item.scope == "day"]) == 1
     assert not any(item.code.endswith("_differ") for item in document.diagnostics)
+
+
+def test_ru_report_accepts_new_date_without_repeated_header_on_same_page():
+    source, _ = synthetic_ru_report(second_date=True)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert [(str(row.diary_date), row.meal_type) for row in document.rows] == [
+        ("2024-03-02", "breakfast"),
+        ("2024-03-02", "breakfast"),
+        ("2024-03-03", "lunch"),
+    ]
+
+
+def test_ru_report_preserves_hyphenated_food_continuation():
+    source, _ = synthetic_ru_report(wrapped="hyphen")
+    document = NutritionImportV3.model_validate(parse(source))
+    assert document.rows[1].food.name == "Синтетический продукт Б - продолжение"
+    assert document.rows[1].amount_unit == "g"
+
+
+def test_ru_report_rejects_unverified_food_continuation():
+    source, _ = synthetic_ru_report(wrapped="plain")
+    document = NutritionImportV3.model_validate(parse(source))
+    assert document.rows == []
+    assert document.diagnostics[0].code == "pdf_row_ambiguous"
+
+
+def test_repeated_numeric_content_at_page_top_is_not_discarded(monkeypatch):
+    source, _ = synthetic_ru_report()
+    lines = nutrition_import_fatsecret_pdf.extract_pdf_lines(source)
+    lines.extend(
+        PdfLine(page, (25, 583, 85, 590), "Product 99", page_height=595) for page in (2, 3)
+    )
+    monkeypatch.setattr(nutrition_import_fatsecret_pdf, "extract_pdf_lines", lambda _: lines)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert document.rows == []
+    assert document.diagnostics
 
 
 def test_ru_report_does_not_guess_ambiguous_merged_column():
