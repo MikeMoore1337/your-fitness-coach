@@ -21,6 +21,7 @@ from fitminiapp_api.services.nutrition_import_validation import (
     NutritionImportValidationError,
     validate_adapter_result,
     validate_csv_upload,
+    validate_pdf_upload,
 )
 
 MAX_ADAPTER_SECONDS = 5
@@ -33,6 +34,7 @@ class NutritionImportAdapter:
     parser_version: str
     delimiter: Literal[",", ";", "\t"]
     module_path: Path
+    source_format: Literal["csv", "pdf"] = "csv"
     # Grant these policies only to reviewed classifiers and verified product identities, not CSV claims.
     catalog_source: str | None = None
     catalog_publication_rights: frozenset[str] = frozenset()
@@ -49,7 +51,15 @@ ADAPTERS: dict[str, NutritionImportAdapter] = {
         parser_version="fatsecret-csv-v1",
         delimiter=",",
         module_path=Path(__file__).with_name("nutrition_import_fatsecret_csv.py"),
-    )
+    ),
+    "fatsecret-pdf-v1": NutritionImportAdapter(
+        provider="fatsecret",
+        adapter_version="fatsecret-pdf-v1",
+        parser_version="fatsecret-pdf-v1",
+        delimiter=",",
+        module_path=Path(__file__).with_name("nutrition_import_fatsecret_pdf.py"),
+        source_format="pdf",
+    ),
 }
 
 
@@ -59,6 +69,10 @@ def run_nutrition_import_adapter(
     adapter = ADAPTERS.get(adapter_id)
     if adapter is None:
         raise NutritionImportValidationError("adapter_unavailable")
+    if adapter.source_format == "pdf":
+        validate_pdf_upload(source, filename=filename, content_type=content_type)
+        # PDF parsing remains unavailable until worker filesystem and network isolation is proven.
+        raise NutritionImportValidationError("adapter_execution_unavailable")
     validate_csv_upload(
         source, filename=filename, content_type=content_type, delimiter=adapter.delimiter
     )
@@ -91,7 +105,7 @@ def run_nutrition_import_adapter(
             output,
             provider=adapter.provider,
             adapter_version=adapter.adapter_version,
-            source_format="csv",
+            source_format=adapter.source_format,
         )
     except OSError:
         raise NutritionImportValidationError("adapter_execution_unavailable") from None

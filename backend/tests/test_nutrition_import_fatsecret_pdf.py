@@ -9,10 +9,22 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 
+from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.models.food import Food
+from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV3
+from fitminiapp_api.services.nutrition_import_drafts import (
+    NutritionDraftError,
+    create_nutrition_import_draft,
+    get_nutrition_import_draft,
+    nutrition_import_preview,
+)
 from fitminiapp_api.services.nutrition_import_fatsecret_csv import DETAIL_HEADERS, SUMMARY_HEADERS
 from fitminiapp_api.services.nutrition_import_fatsecret_csv import parse as parse_csv
 from fitminiapp_api.services.nutrition_import_fatsecret_pdf import parse
+from fitminiapp_api.services.nutrition_import_runner import run_nutrition_import_adapter
+from fitminiapp_api.services.nutrition_import_validation import NutritionImportValidationError
 
 
 def synthetic_pdf(*, russian=False, second_page=False):
@@ -109,3 +121,41 @@ def test_page_break_and_repeated_header_preserve_both_entries():
         ("Synthetic food", 1),
         ("Another food", 2),
     ]
+
+
+def test_pdf_document_can_create_a_private_draft_without_canonical_writes():
+    source = synthetic_pdf()
+    document = NutritionImportV3.model_validate(parse(source))
+    with get_session_context() as db:
+        owner = User(telegram_user_id=984_910, measurement_eligibility="test")
+        other = User(telegram_user_id=984_911, measurement_eligibility="test")
+        db.add_all([owner, other])
+        db.flush()
+        before = (db.query(Food).count(), db.query(FoodDiaryEntry).count())
+        draft = create_nutrition_import_draft(
+            db,
+            owner,
+            document=document,
+            source=source,
+            filename="report.pdf",
+            content_type="application/pdf",
+            delimiter=",",
+            parser_version="fatsecret-pdf-v1",
+            upload_key="synthetic-pdf-913",
+            adapter_id="fatsecret-pdf-v1",
+        )
+        preview = nutrition_import_preview(db, owner, draft.id)
+        assert preview["rows"][0]["source"]["food"]["name"] == "Synthetic food"
+        with pytest.raises(NutritionDraftError, match="not_found"):
+            get_nutrition_import_draft(db, other, draft.id)
+        assert (db.query(Food).count(), db.query(FoodDiaryEntry).count()) == before
+
+
+def test_pdf_worker_stays_closed_until_isolation_is_available():
+    with pytest.raises(NutritionImportValidationError, match="adapter_execution_unavailable"):
+        run_nutrition_import_adapter(
+            "fatsecret-pdf-v1",
+            synthetic_pdf(),
+            filename="report.pdf",
+            content_type="application/pdf",
+        )
