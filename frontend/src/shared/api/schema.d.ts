@@ -13735,6 +13735,24 @@ export interface components {
              */
             source: string;
         };
+        /** HydrationEntryDelete */
+        HydrationEntryDelete: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+        };
         /** HydrationEntryResponse */
         HydrationEntryResponse: {
             /** Id */
@@ -13993,7 +14011,7 @@ export interface components {
              * Schema Version
              * @enum {string}
              */
-            schema_version: "nutrition-import-v1" | "nutrition-import-v2";
+            schema_version: "nutrition-import-v1" | "nutrition-import-v2" | "nutrition-import-v3";
             /** Parser Version */
             parser_version: string;
             /** Content Sha256 */
@@ -14010,6 +14028,8 @@ export interface components {
             original_totals: components["schemas"]["OriginalTotal"][];
             /** Original Summaries */
             original_summaries: components["schemas"]["OriginalSummary"][];
+            /** Original Detail Cells */
+            original_detail_cells?: components["schemas"]["OriginalDetailCell"][];
             /** Diagnostics */
             diagnostics: components["schemas"]["ImportDiagnostic"][];
             /** Preview Signature */
@@ -16044,6 +16064,25 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** OriginalDetailCell */
+        OriginalDetailCell: {
+            /** Source Column */
+            source_column: number;
+            /** Source Header */
+            source_header?: string | null;
+            /** Source Value */
+            source_value?: string | null;
+            /** Nutrient Field */
+            nutrient_field?: string | null;
+            /**
+             * Mapping Evidence
+             * @default unknown
+             * @enum {string}
+             */
+            mapping_evidence: "unknown" | "source_label" | "source_profile" | "provider_documentation";
+            fact: components["schemas"]["NutrientFact"];
+            coordinates: components["schemas"]["SourceCoordinates"];
         };
         /** OriginalSummary */
         OriginalSummary: {
@@ -31220,11 +31259,15 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                entry_id: number;
+                entry_id: number | string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["HydrationEntryDelete"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {

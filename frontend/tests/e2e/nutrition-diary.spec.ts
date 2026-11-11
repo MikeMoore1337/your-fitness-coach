@@ -2,7 +2,6 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { PNG } from './fixtures/landing-pixels';
 import type {
   FoodDiaryEntry,
   HydrationEntry,
@@ -282,6 +281,7 @@ async function mockNutritionApi(
   hydrationGoalEnabled = true,
   repeatCandidate?: { source_date: string; source_meal_type: 'lunch'; entry_count: number },
   filterHydrationByDate = false,
+  sharedHydrationEntries?: HydrationEntry[],
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
@@ -290,8 +290,9 @@ async function mockNutritionApi(
   let entries: FoodDiaryEntry[] = [yogurtEntry];
   let suggestionCommitCount = 0;
   let lastSuggestionCommit: unknown = null;
-  let hydrationEntries: HydrationEntry[] =
-    hydrationState === 'empty'
+  const hydrationEntries: HydrationEntry[] =
+    sharedHydrationEntries ??
+    (hydrationState === 'empty'
       ? []
       : [
           {
@@ -316,7 +317,7 @@ async function mockNutritionApi(
             created_at: '2026-08-19T12:40:00',
             updated_at: '2026-08-19T12:40:00',
           },
-        ];
+        ]);
   let dayStatus: 'incomplete' | 'complete' = 'incomplete';
   const plannerTargets = {
     energy_kcal: '2000.00',
@@ -567,20 +568,42 @@ async function mockNutritionApi(
         created_at: '2026-08-19T13:00:00',
         updated_at: '2026-08-19T13:00:00',
       };
-      hydrationEntries = [created, ...hydrationEntries];
+      hydrationEntries.unshift(created);
       return route.fulfill({ status: 201, json: created });
     }
     if (path.startsWith('/api/v1/nutrition/hydration/entries/') && request.method() === 'DELETE') {
-      const id = Number(path.split('/').at(-1));
-      hydrationEntries = hydrationEntries.filter((entry) => entry.id !== id);
+      const [rawId, mode] = (path.split('/').at(-1) ?? '').split('-');
+      const index = hydrationEntries.findIndex((entry) => entry.id === Number(rawId));
+      const entry = hydrationEntries[index];
+      if (!mode) return route.fulfill({ status: 409 });
+      if (!entry) return route.fulfill({ status: 404 });
+      const expected = request.postDataJSON() as Pick<
+        HydrationEntry,
+        'created_at' | 'updated_at' | 'diary_date'
+      >;
+      if (
+        entry.created_at !== expected.created_at ||
+        entry.updated_at !== expected.updated_at ||
+        entry.diary_date !== expected.diary_date ||
+        (mode === 'undo' && entry.source === 'history_edit')
+      )
+        return route.fulfill({ status: 409, json: { detail: 'Запись изменилась.' } });
+      hydrationEntries.splice(index, 1);
       return route.fulfill({ status: 204, body: '' });
     }
     if (path.startsWith('/api/v1/nutrition/hydration/entries/') && request.method() === 'PATCH') {
       const id = Number(path.split('/').at(-1));
       const body = request.postDataJSON() as Partial<HydrationEntry>;
-      hydrationEntries = hydrationEntries.map((entry) =>
-        entry.id === id ? { ...entry, ...body } : entry,
-      );
+      const index = hydrationEntries.findIndex((entry) => entry.id === id);
+      const current = hydrationEntries[index];
+      if (current)
+        hydrationEntries[index] = {
+          ...current,
+          ...body,
+          diary_date: body.occurred_at?.slice(0, 10) ?? current.diary_date,
+          source: 'history_edit',
+          updated_at: '2026-08-19T13:00:00.000001',
+        };
       return route.fulfill({ json: hydrationEntries.find((entry) => entry.id === id) });
     }
     if (path === '/api/v1/nutrition/hydration/goal' && request.method() === 'POST') {
@@ -1494,6 +1517,97 @@ test('hydration visual evidence: mobile web compact and quick add', async ({ pag
   });
 });
 
+test('the nutrition shortcut focuses water, then one press records it', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const hydrationApi = await mockNutritionApi(page, 'loading');
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+  const shortcut = page.getByRole('button', { name: 'Добавить воду', exact: true });
+  await expect(shortcut).toBeInViewport({ ratio: 1 });
+  await page.keyboard.press('Tab');
+  await shortcut.focus();
+  await page.keyboard.press('Enter');
+  hydrationApi.releaseHydrationLoading();
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  const preset = hydration.getByRole('button', { name: /Стакан.*250 мл/ });
+  await expect(preset).toBeFocused();
+  await expect(preset).toBeInViewport({ ratio: 1 });
+  const dock = page.locator('#appBottomNav');
+  const dockBox = await dock.boundingBox();
+  if (dockBox) {
+    const presetBox = await preset.boundingBox();
+    expect(presetBox!.y + presetBox!.height).toBeLessThan(dockBox.y);
+  }
+  await preset.press('Enter');
+  await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
+  await expect(hydration.getByText('1100 из 2200 мл', { exact: true })).toBeVisible();
+});
+
+for (const width of [320, 360, 393, 430, 1280]) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`#1441 hydration AFTER ${width} ${theme}`, async ({ page }, testInfo) => {
+      await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+      await mockNutritionApi(page);
+      await page.goto('/app?section=nutrition&date=2026-08-19');
+      const hydration = page.getByRole('region', { name: 'Гидратация' });
+      await expect(hydration.getByText('850 из 2200 мл')).toBeVisible();
+      await hydration.screenshot({ path: testInfo.outputPath('filled.png') });
+      await hydration.getByText('Другой напиток или объём').click();
+      await expect(hydration.getByText(/не изменяет калории и кофеин/)).toBeVisible();
+      await hydration.screenshot({ path: testInfo.outputPath('custom.png') });
+      await page.getByRole('button', { name: 'Добавить воду', exact: true }).click();
+      const preset = hydration.getByRole('button', { name: /Стакан.*250 мл/ });
+      await expect(preset).toBeFocused();
+      await page.screenshot({ path: testInfo.outputPath('viewport.png') });
+      await preset.click();
+      await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
+      await hydration.screenshot({ path: testInfo.outputPath('undo.png') });
+      await expect(preset).toBeEnabled();
+      await preset.click();
+      await expect(hydration.getByText('Последние 3 · всего 4')).toBeVisible();
+      await hydration.getByRole('button', { name: 'Показать всю историю' }).click();
+      await expect(hydration.locator('.hydration-history .hydration-entry')).toHaveCount(4);
+      const historyAction = hydration
+        .locator('.hydration-history .hydration-entry')
+        .first()
+        .getByRole('button', { name: /^Изменить запись:/ });
+      const deleteAction = hydration
+        .locator('.hydration-history .hydration-entry')
+        .first()
+        .getByRole('button', { name: /^Удалить запись:/ });
+      const historyActionBox = await historyAction.boundingBox();
+      const deleteActionBox = await deleteAction.boundingBox();
+      expect(historyActionBox!.width).toBeGreaterThanOrEqual(44);
+      expect(historyActionBox!.height).toBeGreaterThanOrEqual(44);
+      expect(deleteActionBox!.width).toBeGreaterThanOrEqual(44);
+      expect(deleteActionBox!.height).toBeGreaterThanOrEqual(44);
+      expect(
+        deleteActionBox!.x - historyActionBox!.x - historyActionBox!.width,
+      ).toBeGreaterThanOrEqual(8);
+      await hydration.screenshot({ path: testInfo.outputPath('history-open.png') });
+      if (width < 500) {
+        const lastAction = hydration
+          .locator('.hydration-history .hydration-entry')
+          .last()
+          .getByRole('button', { name: /^Удалить запись:/ });
+        await lastAction.focus();
+        await expect(lastAction).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.press('Tab');
+        await expect(lastAction).toBeFocused();
+        await expect(lastAction).toHaveCSS('outline-style', 'solid');
+        const actionBox = await lastAction.boundingBox();
+        const dockBox = await page.locator('#appBottomNav').boundingBox();
+        if (dockBox) expect(actionBox!.y + actionBox!.height).toBeLessThan(dockBox.y);
+        await page.screenshot({ path: testInfo.outputPath('history-focus.png') });
+      }
+    });
+  }
+}
+
 test('hydration history keeps the last three visible and preserves native disclosures', async ({
   page,
 }) => {
@@ -1523,7 +1637,7 @@ test('hydration history keeps the last three visible and preserves native disclo
   await expect(rows).toHaveCount(3);
 
   const details = hydration.locator('details');
-  await expect(details).toHaveCount(2);
+  await expect(details).toHaveCount(3);
   for (const detail of await details.all()) {
     const summary = detail.locator(':scope > summary');
     await expect(summary.locator('svg[data-icon="disclosure-closed"]')).toHaveCount(1);
@@ -1568,21 +1682,22 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await hydration.getByText('Личный ориентир', { exact: true }).click();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
-  const orbText = hydration.locator('.hydration-orb strong');
-  await expect(orbText).toHaveCSS('color', 'rgb(245, 245, 245)');
-  await expect(orbText).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+  await expect(hydration.getByRole('progressbar', { name: 'Прогресс гидратации' })).toHaveAttribute(
+    'aria-valuetext',
+    '850 из 2200 миллилитров, 39%',
+  );
   await hydration.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
   });
 });
 
-test.describe('#974 hydration orb contrast candidate', () => {
+test.describe('#1441 hydration progress', () => {
   test.use({ deviceScaleFactor: 2 });
 
   for (const theme of ['dark', 'light'] as const) {
     for (const percent of [0, 25, 50, 75, 100, 103]) {
-      test(`${theme} ${percent}% remains readable across the fill boundary`, async ({
+      test(`${theme} ${percent}% preserves the actual amount and caps the fill`, async ({
         page,
       }, info) => {
         await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
@@ -1593,57 +1708,63 @@ test.describe('#974 hydration orb contrast candidate', () => {
         await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
 
         const hydration = page.getByRole('region', { name: 'Гидратация' });
-        const orb = hydration.locator('.hydration-orb');
-        const text = orb.locator('strong');
-        const fill = orb.locator(':scope > span');
-        await expect(text).toHaveText(`${percent}%`);
-        await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
-        await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
-        expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe(
-          `${Math.min(percent, 100)}%`,
+        const orb = hydration.getByRole('progressbar', { name: 'Прогресс гидратации' });
+        await expect(orb).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(orb).toHaveAttribute(
+          'aria-valuetext',
+          `${percent * 10} из 1000 миллилитров, ${percent}%`,
         );
-
-        const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
-        const orbBox = boxes[0];
-        const textBox = boxes[1];
-        if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
-        expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
-        expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
-        expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
-        expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
-
-        const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
-        const brightPixels = screenshot.data.reduce((count, channel, index) => {
-          if (index % 4 !== 0) return count;
-          const green = screenshot.data[index + 1] ?? 0;
-          const blue = screenshot.data[index + 2] ?? 0;
-          return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
-        }, 0);
-        expect(brightPixels).toBeGreaterThan(8);
+        await expect(orb).toHaveAttribute('aria-valuenow', String(Math.min(percent * 10, 1000)));
+        await expect(orb).toContainText(`${percent}%`);
+        expect(
+          await orb.locator('span').evaluate((element) => (element as HTMLElement).style.height),
+        ).toBe(`${Math.min(percent, 100)}%`);
+        const bounds = await orb.boundingBox();
+        expect(bounds!.width).toBe(bounds!.height);
+        if (percent <= 25 || percent >= 75) {
+          const contrast = await orb.evaluate((element, filled) => {
+            const text = element.querySelector('strong')!;
+            const background = filled ? element.querySelector('span')! : element;
+            const luminance = (value: string) => {
+              const channels = value
+                .match(/[\d.]+/g)!
+                .slice(0, 3)
+                .map((channel) => {
+                  const normalized = Number(channel) / 255;
+                  return normalized <= 0.04045
+                    ? normalized / 12.92
+                    : ((normalized + 0.055) / 1.055) ** 2.4;
+                });
+              return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+            };
+            const foreground = luminance(getComputedStyle(text).color);
+            const surface = luminance(getComputedStyle(background).backgroundColor);
+            return (Math.max(foreground, surface) + 0.05) / (Math.min(foreground, surface) + 0.05);
+          }, percent >= 75);
+          expect(contrast).toBeGreaterThanOrEqual(4.5);
+        }
+        if (percent > 100)
+          await expect(hydration.getByText('Выше ориентира на 30 мл')).toBeVisible();
+        expect(bounds!.width).toBeGreaterThan(0);
 
         if (CAPTURE_974_AFTER) {
           await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
-          await orb.screenshot({
+          await hydration.screenshot({
             path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-${percent}.png`),
             scale: 'device',
           });
         }
       });
     }
-  }
-});
 
-test.describe('#974 hydration orb H₂O without an enabled goal', () => {
-  test.use({ deviceScaleFactor: 2 });
-
-  for (const theme of ['dark', 'light'] as const) {
-    test(`${theme} H₂O remains readable with a disabled goal`, async ({ page }, info) => {
+    test(`${theme} disabled goal is shown as unknown, not zero progress`, async ({
+      page,
+    }, info) => {
       await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
       await mockNutritionApi(page, 'data', 'female', undefined, false);
-
       const hydrationResponse = page.waitForResponse((response) => {
         const url = new URL(response.url());
         return (
@@ -1654,41 +1775,16 @@ test.describe('#974 hydration orb H₂O without an enabled goal', () => {
       const hydrationPayload = await (await hydrationResponse).json();
       expect(hydrationPayload.goal).toMatchObject({ enabled: false, target_ml: null });
       expect(hydrationPayload.progress_percent).toBeNull();
-
       const hydration = page.getByRole('region', { name: 'Гидратация' });
-      const orb = hydration.locator('.hydration-orb');
-      const text = orb.locator('strong');
-      const fill = orb.locator(':scope > span');
-      await expect(text).toHaveText('H2O');
-      await expect(text.locator('sub')).toHaveText('2');
-      await expect(text.locator('sub')).toHaveCSS('vertical-align', 'sub');
-      await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
-      await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
       await expect(hydration.getByText('850 мл записано', { exact: true })).toBeVisible();
-      expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe('0%');
-
-      const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
-      const orbBox = boxes[0];
-      const textBox = boxes[1];
-      if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
-      expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
-      expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
-      expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
-      expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
-
-      const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
-      const brightPixels = screenshot.data.reduce((count, channel, index) => {
-        if (index % 4 !== 0) return count;
-        const green = screenshot.data[index + 1] ?? 0;
-        const blue = screenshot.data[index + 2] ?? 0;
-        return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
-      }, 0);
-      expect(brightPixels).toBeGreaterThan(8);
-
+      await expect(hydration.getByText('Ориентир не задан')).toBeVisible();
+      await expect(hydration.getByRole('progressbar', { name: 'Прогресс гидратации' })).toHaveCount(
+        0,
+      );
       if (CAPTURE_974_AFTER) {
         await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
-        await orb.screenshot({
-          path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-h2o-disabled.png`),
+        await hydration.screenshot({
+          path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-disabled.png`),
           scale: 'device',
         });
       }
@@ -1705,7 +1801,7 @@ for (const mode of ['light', 'dark'] as const) {
     await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
     const hydration = page.getByRole('region', { name: 'Гидратация' });
     await hydration.getByText('Мои кружки и бутылки', { exact: true }).click();
-    await expect(hydration.getByText('Термокружка · 420 мл')).toBeVisible();
+    await expect(hydration.getByText('Термокружка · 420 мл · Чай')).toBeVisible();
     await hydration.screenshot({
       path: `../.artifacts/runtime/tests/screenshots/task-81/desktop-${mode}-expanded.png`,
     });
@@ -1756,7 +1852,11 @@ test('hydration touch matrix has no horizontal overflow and keeps controls reach
       const box = await quickButtons.nth(index).boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(44);
     }
-    const customVolume = hydration.getByRole('region', { name: 'Другой объём', exact: true });
+    await hydration.getByText('Другой напиток или объём').click();
+    const customVolume = hydration.getByRole('region', {
+      name: 'Другой напиток или объём',
+      exact: true,
+    });
     const volume = customVolume.getByLabel('Объём, мл');
     await expect(volume).toHaveCount(1);
     await volume.focus();
@@ -2970,8 +3070,9 @@ for (const width of [360, 393, 430]) {
         await preset.click();
         await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
         await expect(hydration.getByText('1100 из 2200 мл', { exact: true })).toBeVisible();
+        await hydration.getByText('Другой напиток или объём').click();
         const volume = hydration
-          .getByRole('region', { name: 'Другой объём' })
+          .getByRole('region', { name: 'Другой напиток или объём' })
           .getByLabel('Объём, мл');
         await volume.fill('425');
         await page.evaluate(() => {
@@ -2991,7 +3092,13 @@ for (const width of [360, 393, 430]) {
         );
         await page.reload();
         await expect(
-          hydration.getByRole('region', { name: 'Другой объём' }).getByLabel('Объём, мл'),
+          hydration.getByRole('region', { name: 'Другой напиток или объём' }),
+        ).toHaveCount(0);
+        await hydration.getByText('Другой напиток или объём').click();
+        await expect(
+          hydration
+            .getByRole('region', { name: 'Другой напиток или объём' })
+            .getByLabel('Объём, мл'),
         ).toBeVisible();
         await expect(preset).not.toBeFocused();
       });
@@ -3745,13 +3852,13 @@ test('#1429 water add edit delete and selected dates stay in sync', async ({ pag
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await expect(hydration.getByText('850 из 2200 мл')).toBeVisible();
   const row = hydration.locator('.hydration-entry').filter({ hasText: '350 мл' });
-  await row.getByRole('button', { name: 'Изменить' }).click();
+  await row.getByRole('button', { name: /^Изменить запись:/ }).click();
   const editor = hydration.locator('.hydration-entry__editor');
   await editor.getByLabel('Объём, мл').fill('450');
   await editor.getByRole('button', { name: 'Сохранить' }).click();
   await expect(hydration.getByText('950 из 2200 мл')).toBeVisible();
   const updated = hydration.locator('.hydration-entry').filter({ hasText: '450 мл' });
-  await updated.getByRole('button', { name: 'Удалить' }).click();
+  await updated.getByRole('button', { name: /^Удалить запись:/ }).click();
   await page
     .getByRole('dialog', { name: 'Удалить напиток?' })
     .getByRole('button', { name: 'Удалить' })
@@ -3768,6 +3875,44 @@ test('#1429 water add edit delete and selected dates stay in sync', async ({ pag
   await expect(hydration.getByText('750 из 2200 мл')).toBeVisible();
   await hydration.getByRole('button', { name: 'Отменить', exact: true }).click();
   await expect(hydration.getByText('500 из 2200 мл')).toBeVisible();
+});
+
+test('water undo cannot remove an entry moved in another tab', async ({ page, context }) => {
+  const entries: HydrationEntry[] = [];
+  const otherTab = await context.newPage();
+  for (const tab of [page, otherTab]) {
+    await tab.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+    await mockNutritionApi(tab, 'empty', 'female', undefined, true, undefined, true, entries);
+  }
+  await page.goto('/app?section=nutrition');
+  const water = page.getByRole('region', { name: 'Гидратация' });
+  await water.getByRole('button', { name: /Стакан.*250 мл/ }).click();
+  await expect(water.getByText('Добавлено 250 мл')).toBeVisible();
+
+  await otherTab.goto('/app?section=nutrition');
+  const otherWater = otherTab.getByRole('region', { name: 'Гидратация' });
+  const row = otherWater.locator('.hydration-entry').filter({ hasText: '250 мл' });
+  await row.getByRole('button', { name: /^Изменить/ }).click();
+  const editor = otherWater.locator('.hydration-entry__editor');
+  await editor.getByLabel('Дата и время').fill('2026-08-18T10:00');
+  await editor.getByRole('button', { name: 'Сохранить' }).click();
+  await expect(row).toHaveCount(0);
+
+  await water.getByRole('button', { name: 'Отменить', exact: true }).click();
+  await expect(page.getByText('Запись изменилась.')).toBeVisible();
+  await expect(water.getByRole('button', { name: 'Отменить', exact: true })).toHaveCount(0);
+  expect(entries).toHaveLength(1);
+  expect(entries[0]).toMatchObject({ diary_date: '2026-08-18', volume_ml: 250 });
+  const targets = otherTab.waitForResponse((response) =>
+    response.url().includes('/nutrition/targets/for-date?target_date=2026-08-18'),
+  );
+  const suggestions = otherTab.waitForResponse((response) =>
+    response.url().includes('/nutrition/diary/suggestions?diary_date=2026-08-18'),
+  );
+  await otherTab.getByRole('button', { name: /18 августа/i }).click();
+  await Promise.all([targets, suggestions]);
+  await expect(otherWater.locator('.hydration-entry').filter({ hasText: '250 мл' })).toBeVisible();
+  await otherTab.waitForLoadState('networkidle');
 });
 
 test('#1429 primary actions remain reachable with 200% text scaling', async ({

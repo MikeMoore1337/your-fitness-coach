@@ -116,7 +116,10 @@ const zeroNutrition = {
   fiber_g: null,
 };
 
-function renderDiary({ initialFoodQuickAdd = false }: { initialFoodQuickAdd?: boolean } = {}) {
+function renderDiary({
+  initialFoodQuickAdd = false,
+  readOnlyEntries = false,
+}: { initialFoodQuickAdd?: boolean; readOnlyEntries?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -126,6 +129,7 @@ function renderDiary({ initialFoodQuickAdd = false }: { initialFoodQuickAdd?: bo
         <NutritionDiary
           initialDate="2026-08-19"
           initialFoodQuickAdd={initialFoodQuickAdd}
+          readOnlyEntries={readOnlyEntries}
           timeZone="Europe/Moscow"
         />
       </FeedbackProvider>
@@ -148,6 +152,28 @@ describe('NutritionDiary', () => {
   afterEach(() => {
     vi.useRealTimers();
     cleanup();
+  });
+
+  it('explains why copying is unavailable when the day is empty', async () => {
+    apiMock.mockResolvedValue(makeDay([]));
+    renderDiary();
+
+    const button = await screen.findByRole('button', { name: 'Копировать день' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription('В этом дне нет записей для копирования.');
+    expect(screen.getAllByText('Пока без записей')).toHaveLength(4);
+  });
+
+  it('shows the unavailable copy action and its explanation in read-only demo', async () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary({ readOnlyEntries: true });
+
+    const button = await screen.findByRole('button', { name: 'Копировать день' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      /копирование существующих записей доступно после входа/,
+    );
+    expect(screen.getByText(/копирование существующих записей доступно после входа/)).toBeVisible();
   });
 
   it('opens the quick food entry requested by the global action', async () => {

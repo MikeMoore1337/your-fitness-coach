@@ -7,7 +7,6 @@ import { haptic } from '../../shared/telegram/useTelegram';
 import {
   Button,
   DisclosureIcon,
-  EmptyState,
   ErrorState,
   Field,
   Input,
@@ -29,9 +28,6 @@ import {
   type HydrationAddRequest as AddRequest,
   type PendingHydration,
 } from './hydrationPending';
-
-// Inter has no Unicode subscript ₂; its ordinary 2 is rendered below the baseline.
-const waterFormula = 'H₂O';
 
 const beverageLabels: Record<string, string> = {
   water: 'Вода',
@@ -81,7 +77,31 @@ function hydrationEntryCountLabel(count: number): string {
   return 'записей';
 }
 
-function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChanged(): void }) {
+function deleteHydrationEntry(
+  entry: HydrationEntry,
+  mode: 'undo' | 'delete',
+  demoGeneration?: number,
+) {
+  return api<void>(`/api/v1/nutrition/hydration/entries/${entry.id}-${mode}`, {
+    method: 'DELETE',
+    body: {
+      created_at: entry.created_at,
+      updated_at: entry.updated_at,
+      diary_date: entry.diary_date,
+      ...(demoGeneration === undefined ? {} : { _hydration_generation: demoGeneration }),
+    },
+  });
+}
+
+function HydrationEntryRow({
+  entry,
+  demoGeneration,
+  onChanged,
+}: {
+  entry: HydrationEntry;
+  demoGeneration?: number;
+  onChanged(): void;
+}) {
   const { confirm, toast } = useFeedback();
   const [editing, setEditing] = useState(false);
   const [volume, setVolume] = useState(String(entry.volume_ml));
@@ -107,8 +127,7 @@ function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChan
     onError: (reason) => toast((reason as Error).message, 'error'),
   });
   const remove = useMutation({
-    mutationFn: () =>
-      api<void>(`/api/v1/nutrition/hydration/entries/${entry.id}`, { method: 'DELETE' }),
+    mutationFn: () => deleteHydrationEntry(entry, 'delete', demoGeneration),
     onSuccess: () => {
       onChanged();
       toast('Запись удалена');
@@ -178,21 +197,35 @@ function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChan
         <>
           <div>
             <strong>{entry.volume_ml} мл</strong>
-            <span>{beverageLabels[entry.beverage_type]}</span>
+            <span>
+              {beverageLabels[entry.beverage_type]} ·{' '}
+              <time dateTime={entry.occurred_at}>
+                {new Intl.DateTimeFormat('ru-RU', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: entry.timezone,
+                }).format(new Date(entry.occurred_at))}
+              </time>
+            </span>
           </div>
-          <time dateTime={entry.occurred_at}>
-            {new Intl.DateTimeFormat('ru-RU', {
-              hour: '2-digit',
-              minute: '2-digit',
-              timeZone: entry.timezone,
-            }).format(new Date(entry.occurred_at))}
-          </time>
           <div className="hydration-entry__actions">
-            <Button variant="secondary" type="button" onClick={() => setEditing(true)}>
-              Изменить
+            <Button
+              className="hydration-entry__icon"
+              variant="ghost"
+              aria-label={`Изменить запись: ${beverageLabels[entry.beverage_type]}, ${entry.volume_ml} мл`}
+              type="button"
+              onClick={() => setEditing(true)}
+            >
+              <Icon name="edit" size={20} />
             </Button>
-            <Button variant="danger" type="button" onClick={() => void requestDelete()}>
-              Удалить
+            <Button
+              className="hydration-entry__icon"
+              variant="ghost"
+              aria-label={`Удалить запись: ${beverageLabels[entry.beverage_type]}, ${entry.volume_ml} мл`}
+              type="button"
+              onClick={() => void requestDelete()}
+            >
+              <Icon name="trash" size={20} />
             </Button>
           </div>
         </>
@@ -204,9 +237,11 @@ function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChan
 export function HydrationTracker({
   diaryDate,
   initialExpanded = false,
+  quickAddRequest = 0,
 }: {
   diaryDate: string;
   initialExpanded?: boolean;
+  quickAddRequest?: number;
 }) {
   const queryClient = useQueryClient();
   const { toast, confirm } = useFeedback();
@@ -309,11 +344,14 @@ export function HydrationTracker({
   };
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const quickAddRef = useRef<HTMLDivElement>(null);
+  const consumedQuickAddRequest = useRef(0);
   const addInFlightRef = useRef(false);
   const [preparingAdd, setPreparingAdd] = useState(false);
   const [customVolume, setCustomVolume] = useState('');
   const [beverageType, setBeverageType] = useState('water');
-  const [undoEntry, setUndoEntry] = useState<HydrationEntry | null>(null);
+  const [undoEntry, setUndoEntry] = useState<(HydrationEntry & { demoGeneration?: number }) | null>(
+    null,
+  );
   const [goalModeDraft, setGoalMode] = useState<'reference' | 'manual' | null>(null);
   const [sexDraft, setSex] = useState<'male' | 'female' | null>();
   const [adultConfirmedDraft, setAdultConfirmed] = useState<boolean>();
@@ -385,30 +423,6 @@ export function HydrationTracker({
       active = false;
     };
   }, [scope, demoToken, demoGeneration]);
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (
-      !initialExpanded ||
-      !scope ||
-      !hydration.data ||
-      !demoStorageReady ||
-      !quickAddRef.current ||
-      url.searchParams.get('hydration') !== 'quick'
-    ) {
-      return;
-    }
-    const button = quickAddRef.current.querySelector<HTMLButtonElement>('button:not(:disabled)');
-    if (!button) return;
-    button.focus({ preventScroll: true });
-    quickAddRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
-    url.searchParams.delete('hydration');
-    window.history.replaceState(
-      window.history.state,
-      '',
-      `${url.pathname}${url.search}${url.hash}`,
-    );
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  }, [initialExpanded, hydration.data, scope, demoStorageReady]);
   const loadedGoal = hydration.data?.goal;
   const loadedGoalIsReference = loadedGoal?.source === 'national_academies_beverages';
   const goalMode = goalModeDraft ?? (loadedGoal && !loadedGoalIsReference ? 'manual' : 'reference');
@@ -478,7 +492,11 @@ export function HydrationTracker({
         await refresh();
         return;
       }
-      setUndoEntry(entry);
+      setUndoEntry(
+        entry.source === 'quick_preset' || entry.source === 'manual'
+          ? { ...entry, demoGeneration: request.demoGeneration }
+          : null,
+      );
       setCustomVolume('');
       await refresh();
       trackCoreProductEvent(
@@ -530,6 +548,35 @@ export function HydrationTracker({
     },
   });
   const addUnavailable = preparingAdd || add.isPending || !demoStorageReady;
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const routeRequested = initialExpanded && url.searchParams.get('hydration') === 'quick';
+    const pageRequested = quickAddRequest !== consumedQuickAddRequest.current;
+    if (
+      (!routeRequested && !pageRequested) ||
+      !scope ||
+      !hydration.data ||
+      !demoStorageReady ||
+      addUnavailable ||
+      !quickAddRef.current
+    ) {
+      return;
+    }
+    const button = quickAddRef.current.querySelector<HTMLButtonElement>('button:not(:disabled)');
+    if (!button) return;
+    button.focus({ preventScroll: true });
+    quickAddRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
+    consumedQuickAddRequest.current = quickAddRequest;
+    if (routeRequested) {
+      url.searchParams.delete('hydration');
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  }, [initialExpanded, hydration.data, scope, demoStorageReady, quickAddRequest, addUnavailable]);
   const submitAdd = async (payload: Pick<AddRequest, 'volume' | 'kind' | 'source'>) => {
     if (
       addInFlightRef.current ||
@@ -635,14 +682,20 @@ export function HydrationTracker({
     setPreparingAdd(false);
   };
   const undo = useMutation({
-    mutationFn: (entryId: number) =>
-      api<void>(`/api/v1/nutrition/hydration/entries/${entryId}`, { method: 'DELETE' }),
+    mutationFn: (entry: HydrationEntry & { demoGeneration?: number }) =>
+      deleteHydrationEntry(entry, 'undo', entry.demoGeneration),
     onSuccess: async () => {
       setUndoEntry(null);
       await refresh();
       toast('Добавление отменено');
     },
-    onError: (reason) => toast((reason as Error).message, 'error'),
+    onError: (reason) => {
+      if ([404, 409].includes((reason as { status?: number }).status ?? 0)) {
+        setUndoEntry(null);
+        void refresh();
+      }
+      toast((reason as Error).message, 'error');
+    },
   });
   const saveGoal = useMutation({
     mutationFn: (key: string) =>
@@ -729,7 +782,8 @@ export function HydrationTracker({
   const pendingItems = pendingState.scope === scope ? (pendingState.entries[diaryDate] ?? []) : [];
   const pending = pendingItems[0];
   const target = data.goal?.enabled ? data.goal.target_ml : null;
-  const progress = Math.min(data.progress_percent ?? 0, 100);
+  const progress =
+    data.progress_percent == null ? null : Math.max(0, Math.min(data.progress_percent, 100));
   const hasFullHistory = data.entries.length > 3;
   const showFullHistory = hasFullHistory && historyExpanded;
   const historyEntries = showFullHistory ? data.entries : data.entries.slice(0, 3);
@@ -741,67 +795,105 @@ export function HydrationTracker({
       <header className="hydration-card__header">
         <div>
           <span className="eyebrow">Гидратация</span>
-          <h2 id="hydration-title">Напитки</h2>
+          <h2 id="hydration-title">Вода и напитки</h2>
           <p>{target ? `${data.total_ml} из ${target} мл` : `${data.total_ml} мл записано`}</p>
         </div>
-        <div className="hydration-orb" aria-hidden="true">
-          <span style={{ height: `${progress}%` }} />
+        <div
+          className={`hydration-orb${target && progress !== null && progress >= 70 ? ' hydration-orb--filled' : ''}`}
+          role={target && progress !== null ? 'progressbar' : undefined}
+          aria-label={target && progress !== null ? 'Прогресс гидратации' : undefined}
+          aria-valuemin={target && progress !== null ? 0 : undefined}
+          aria-valuemax={target && progress !== null ? target : undefined}
+          aria-valuenow={target && progress !== null ? Math.min(data.total_ml, target) : undefined}
+          aria-valuetext={
+            target && progress !== null
+              ? `${data.total_ml} из ${target} миллилитров, ${Math.round(data.progress_percent ?? 0)}%`
+              : undefined
+          }
+          aria-hidden={target && progress !== null ? undefined : true}
+        >
+          {target && progress !== null && <span style={{ height: `${progress}%` }} />}
           <strong>
-            {target ? (
-              `${Math.round(data.progress_percent ?? 0)}%`
-            ) : (
-              <>
-                {waterFormula[0]}
-                <sub>2</sub>
-                {waterFormula[2]}
-              </>
-            )}
+            {target && progress !== null ? `${Math.round(data.progress_percent ?? 0)}%` : 'Вода'}
           </strong>
         </div>
       </header>
-      <div
-        className="hydration-progress"
-        role={target ? 'progressbar' : undefined}
-        aria-label={target ? 'Прогресс гидратации' : undefined}
-        aria-hidden={target ? undefined : true}
-        aria-valuemin={0}
-        aria-valuemax={target ?? undefined}
-        aria-valuenow={target ? Math.min(data.total_ml, target) : undefined}
-        aria-valuetext={
-          target ? `${data.total_ml} из ${target} миллилитров` : `${data.total_ml} миллилитров`
-        }
-      >
-        <span style={{ width: `${progress}%` }} />
-      </div>
+      {(!target || progress === null) && (
+        <p className="hydration-progress-note">
+          {target ? 'Прогресс недоступен' : 'Ориентир не задан'}
+        </p>
+      )}
+      {target && data.total_ml > target && (
+        <p className="hydration-progress-note">Выше ориентира на {data.total_ml - target} мл</p>
+      )}
       <div ref={quickAddRef} className="hydration-presets" aria-label="Быстро добавить напиток">
-        {data.presets.map((preset) => (
-          <Button
-            variant="secondary"
-            aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
-            disabled={addUnavailable || !scope}
-            key={`${preset.id ?? 'default'}-${preset.label}`}
-            type="button"
-            onClick={() =>
-              void submitAdd({
-                volume: preset.volume_ml,
-                kind: preset.beverage_type,
-                source: 'quick_preset',
-              })
-            }
-          >
-            <span>{preset.label}</span>
-            <strong>
-              <Icon name="plus" size={16} /> {preset.volume_ml} мл
-            </strong>
-          </Button>
-        ))}
+        {data.presets
+          .filter((preset) => preset.is_default)
+          .map((preset) => (
+            <Button
+              variant="secondary"
+              aria-label={`${preset.label}, добавить ${preset.volume_ml} мл, ${beverageLabels[preset.beverage_type]}`}
+              disabled={addUnavailable || !scope}
+              key={`${preset.id ?? 'default'}-${preset.label}`}
+              type="button"
+              onClick={() =>
+                void submitAdd({
+                  volume: preset.volume_ml,
+                  kind: preset.beverage_type,
+                  source: 'quick_preset',
+                })
+              }
+            >
+              <strong>
+                <Icon name="plus" size={16} /> {preset.volume_ml} мл
+              </strong>
+              <span>{beverageLabels[preset.beverage_type]}</span>
+            </Button>
+          ))}
       </div>
+      {data.presets.some((preset) => !preset.is_default) && (
+        <div className="hydration-saved-presets">
+          {data.presets
+            .filter((preset) => !preset.is_default)
+            .map((preset) => (
+              <Button
+                variant="secondary"
+                aria-label={`${preset.label}, добавить ${preset.volume_ml} мл, ${beverageLabels[preset.beverage_type]}`}
+                disabled={addUnavailable || !scope}
+                key={preset.id}
+                type="button"
+                onClick={() =>
+                  void submitAdd({
+                    volume: preset.volume_ml,
+                    kind: preset.beverage_type,
+                    source: 'quick_preset',
+                  })
+                }
+              >
+                <Icon name="plus" size={16} />
+                <span>
+                  {preset.volume_ml} мл · {preset.label} · {beverageLabels[preset.beverage_type]}
+                </span>
+              </Button>
+            ))}
+        </div>
+      )}
       {undoEntry?.diary_date === diaryDate && (
         <div className="hydration-undo" role="status">
           <span>Добавлено {undoEntry.volume_ml} мл</span>
-          <Button variant="secondary" type="button" onClick={() => undo.mutate(undoEntry.id)}>
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={undo.isPending}
+            onClick={() => undo.mutate(undoEntry)}
+          >
             Отменить
           </Button>
+        </div>
+      )}
+      {add.isPaused && (
+        <div className="hydration-mutation-error" role="status">
+          Нет сети. Запись напитка ожидает соединения.
         </div>
       )}
       {pending && !add.isPending && !preparingAdd && (
@@ -821,69 +913,80 @@ export function HydrationTracker({
           </Button>
         </div>
       )}
-      <section className="hydration-card__section" aria-labelledby="hydration-custom-title">
-        <h3 id="hydration-custom-title">Другой объём</h3>
-        <div className="hydration-form-row">
-          <Field label="Объём, мл" labelFor="hydration-custom-volume">
-            <Input
-              id="hydration-custom-volume"
-              inputMode="numeric"
-              min="1"
-              max="5000"
-              type="number"
-              value={customVolume}
-              onChange={(event) => setCustomVolume(event.target.value)}
-            />
-          </Field>
-          <Field label="Напиток" labelFor="hydration-custom-kind">
-            <Select
-              id="hydration-custom-kind"
-              value={beverageType}
-              onChange={(event) => setBeverageType(event.target.value)}
-            >
-              {Object.entries(beverageLabels).map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Button
-            disabled={addUnavailable || !scope || !customVolume}
-            type="button"
-            onClick={() =>
-              void submitAdd({
-                volume: Number(customVolume),
-                kind: beverageType,
-                source: 'manual',
-              })
-            }
-          >
-            {add.isPending ? 'Добавляем…' : 'Добавить'}
-          </Button>
-        </div>
-        <p className="hydration-note">
-          Запись напитка не изменяет калории и кофеин в дневнике питания.
-        </p>
-      </section>
+      <div className="hydration-details">
+        <details>
+          <summary className="hydration-details__summary yfc-disclosure-summary">
+            <span id="hydration-custom-title">Другой напиток или объём</span>
+            <DisclosureIcon />
+          </summary>
+          <section className="hydration-details__body" aria-labelledby="hydration-custom-title">
+            <div className="hydration-form-row hydration-custom-form">
+              <Field label="Объём, мл" labelFor="hydration-custom-volume">
+                <Input
+                  id="hydration-custom-volume"
+                  inputMode="numeric"
+                  min="1"
+                  max="5000"
+                  type="number"
+                  value={customVolume}
+                  onChange={(event) => setCustomVolume(event.target.value)}
+                />
+              </Field>
+              <Field label="Напиток" labelFor="hydration-custom-kind">
+                <Select
+                  id="hydration-custom-kind"
+                  value={beverageType}
+                  onChange={(event) => setBeverageType(event.target.value)}
+                >
+                  {Object.entries(beverageLabels).map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Button
+                disabled={addUnavailable || !scope || !customVolume}
+                type="button"
+                onClick={() =>
+                  void submitAdd({
+                    volume: Number(customVolume),
+                    kind: beverageType,
+                    source: 'manual',
+                  })
+                }
+              >
+                {add.isPending ? 'Добавляем…' : 'Добавить'}
+              </Button>
+            </div>
+            <p className="hydration-note">
+              Запись напитка не изменяет калории и кофеин в дневнике питания.
+            </p>
+          </section>
+        </details>
+      </div>
 
       <section className="hydration-card__section" aria-labelledby="hydration-history-title">
         <div className="hydration-section-head">
           <div>
             <h3 id="hydration-history-title">История за день</h3>
-            <p>Последние записи сразу после добавления воды</p>
           </div>
-          <span className="eyebrow hydration-history__count">{historyCount}</span>
+          <span className="hydration-history__count">{historyCount}</span>
         </div>
         {data.entries.length === 0 ? (
-          <EmptyState
-            title="Напитков пока нет"
-            text="Быстро добавьте стакан или укажите другой объём."
-          />
+          <p className="hydration-empty">Напитков пока нет</p>
         ) : (
           <ul id="hydration-history-list" className="hydration-history" aria-live="polite">
             {historyEntries.map((entry) => (
-              <HydrationEntryRow entry={entry} key={entry.id} onChanged={() => void refresh()} />
+              <HydrationEntryRow
+                entry={entry}
+                key={entry.id}
+                demoGeneration={demoToken ? demoGeneration : undefined}
+                onChanged={() => {
+                  setUndoEntry((current) => (current?.id === entry.id ? null : current));
+                  void refresh();
+                }}
+              />
             ))}
           </ul>
         )}
@@ -1046,6 +1149,19 @@ export function HydrationTracker({
                   onChange={(event) => setPresetVolume(event.target.value)}
                 />
               </Field>
+              <Field label="Напиток в ёмкости" labelFor="hydration-preset-kind">
+                <Select
+                  id="hydration-preset-kind"
+                  value={beverageType}
+                  onChange={(event) => setBeverageType(event.target.value)}
+                >
+                  {Object.entries(beverageLabels).map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
               <Button
                 variant="secondary"
                 disabled={!presetName.trim() || !presetVolume || savePreset.isPending}
@@ -1062,7 +1178,8 @@ export function HydrationTracker({
                   .map((preset) => (
                     <li key={preset.id}>
                       <span>
-                        {preset.label} · {preset.volume_ml} мл
+                        {preset.label} · {preset.volume_ml} мл ·{' '}
+                        {beverageLabels[preset.beverage_type]}
                       </span>
                       <Button
                         variant="danger"

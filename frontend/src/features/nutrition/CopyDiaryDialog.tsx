@@ -212,7 +212,9 @@ export function CopyDiaryDialog({
       toast(
         result.replayed
           ? 'Копия уже была добавлена — повторов не создано'
-          : `Добавлено записей: ${result.entries.length}`,
+          : subject.scope === 'day'
+            ? `Добавлено записей: ${result.entries.length} · ${formatDate(result.target_date)}`
+            : `Добавлено записей: ${result.entries.length}`,
       );
       submittingRef.current = false;
       if (variables.revision === revisionRef.current) onClose();
@@ -242,7 +244,7 @@ export function CopyDiaryDialog({
       ? 'Повторить продукт'
       : subject.scope === 'meal'
         ? 'Повторить приём пищи'
-        : 'Повторить день';
+        : 'Копировать записи дня';
   const submit = () => {
     const previousAttempt =
       confirmationKeyRef.current?.revision === revisionRef.current
@@ -301,6 +303,12 @@ export function CopyDiaryDialog({
             submit();
           }}
         >
+          {subject.scope === 'day' && (
+            <p className="nutrition-copy__notice">
+              Все записи питания будут добавлены в другую дату. Исходные записи и существующие
+              записи дня назначения сохранятся.
+            </p>
+          )}
           <dl className="nutrition-copy__source">
             <div>
               <dt>Что копируем</dt>
@@ -368,7 +376,11 @@ export function CopyDiaryDialog({
                 <h3 id="nutrition-copy-preview-title">Что будет добавлено</h3>
               </div>
               {targetDateValid && preview.isSuccess && !preview.isFetching && (
-                <span>{preview.data.entries.length} записей</span>
+                <span>
+                  {subject.scope === 'day'
+                    ? `Записей: ${preview.data.entries.length}`
+                    : `${preview.data.entries.length} записей`}
+                </span>
               )}
             </div>
             {!targetDateValid ? (
@@ -399,9 +411,11 @@ export function CopyDiaryDialog({
               <p className="nutrition-copy__preview-state">Подходящих записей не найдено.</p>
             )}
           </section>
-          <p className="nutrition-copy__notice">
-            Новые записи добавятся к уже существующим. Ничего в выбранном дне не будет заменено.
-          </p>
+          {subject.scope !== 'day' && (
+            <p className="nutrition-copy__notice">
+              Новые записи добавятся к уже существующим. Ничего в выбранном дне не будет заменено.
+            </p>
+          )}
           {confirmation.error && (
             <div className="nutrition-inline-error" role="alert">
               <span>

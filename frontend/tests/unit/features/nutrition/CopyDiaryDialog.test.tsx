@@ -17,7 +17,7 @@ const entry = {
   entry_kind: 'food',
   nutrition_confidence: 'exact',
 };
-const result = { entries: [entry], replayed: false };
+const result = { entries: [entry], replayed: false, target_date: '2026-11-05' };
 const error = (status: number) => Object.assign(new Error('private server detail'), { status });
 
 function renderDialog(sourceDate = today) {
@@ -75,6 +75,10 @@ describe('CopyDiaryDialog day dates', () => {
       path.endsWith('/preview') ? preview() : result,
     );
     const { onClose } = renderDialog();
+    expect(screen.getByRole('dialog', { name: 'Копировать записи дня' })).toBeVisible();
+    expect(
+      screen.getByText(/Исходные записи и существующие записи дня назначения сохранятся/),
+    ).toBeVisible();
     changeTarget('2026-11-05');
     await screen.findByText('Овсяная каша');
     expect(apiMock).toHaveBeenCalledWith(
@@ -83,6 +87,7 @@ describe('CopyDiaryDialog day dates', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Подтвердить' }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(/Добавлено записей: 1 · 5 ноября 2026/)).toBeVisible();
     expect(apiMock).toHaveBeenLastCalledWith(
       '/api/v1/nutrition/diary/copy/day',
       expect.objectContaining({
