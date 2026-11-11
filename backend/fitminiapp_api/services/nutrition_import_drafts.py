@@ -36,6 +36,7 @@ from fitminiapp_api.services.food_diary import (
 from fitminiapp_api.services.nutrition_import_validation import (
     validate_adapter_result,
     validate_csv_upload,
+    validate_pdf_upload,
 )
 
 DRAFT_TTL = timedelta(hours=24)
@@ -134,9 +135,14 @@ def create_nutrition_import_draft(
         or (adapter_id is not None and not _IDENTIFIER.fullmatch(adapter_id))
     ):
         raise NutritionDraftError("invalid_metadata", 422)
-    if document.source.source_format != "csv":
+    if document.source.source_format == "csv":
+        validate_csv_upload(
+            source, filename=filename, content_type=content_type, delimiter=delimiter
+        )
+    elif document.source.source_format == "pdf":
+        validate_pdf_upload(source, filename=filename, content_type=content_type)
+    else:
         raise NutritionDraftError("unsupported_format", 415)
-    validate_csv_upload(source, filename=filename, content_type=content_type, delimiter=delimiter)
     source_sha256 = _digest(source)
     data = document.model_dump(
         mode="json", exclude_defaults=isinstance(document, NutritionImportV3)

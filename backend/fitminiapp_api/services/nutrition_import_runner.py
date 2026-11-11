@@ -21,6 +21,7 @@ from fitminiapp_api.services.nutrition_import_validation import (
     NutritionImportValidationError,
     validate_adapter_result,
     validate_csv_upload,
+    validate_pdf_upload,
 )
 
 MAX_ADAPTER_SECONDS = 5
@@ -33,6 +34,7 @@ class NutritionImportAdapter:
     parser_version: str
     delimiter: Literal[",", ";", "\t"]
     module_path: Path
+    source_format: Literal["csv", "pdf"] = "csv"
     # Grant these policies only to reviewed classifiers and verified product identities, not CSV claims.
     catalog_source: str | None = None
     catalog_publication_rights: frozenset[str] = frozenset()
@@ -49,7 +51,15 @@ ADAPTERS: dict[str, NutritionImportAdapter] = {
         parser_version="fatsecret-csv-v1",
         delimiter=",",
         module_path=Path(__file__).with_name("nutrition_import_fatsecret_csv.py"),
-    )
+    ),
+    "fatsecret-pdf-v1": NutritionImportAdapter(
+        provider="fatsecret",
+        adapter_version="fatsecret-pdf-v1",
+        parser_version="fatsecret-pdf-v1",
+        delimiter=",",
+        module_path=Path(__file__).with_name("nutrition_import_fatsecret_pdf.py"),
+        source_format="pdf",
+    ),
 }
 
 
@@ -59,9 +69,12 @@ def run_nutrition_import_adapter(
     adapter = ADAPTERS.get(adapter_id)
     if adapter is None:
         raise NutritionImportValidationError("adapter_unavailable")
-    validate_csv_upload(
-        source, filename=filename, content_type=content_type, delimiter=adapter.delimiter
-    )
+    if adapter.source_format == "pdf":
+        validate_pdf_upload(source, filename=filename, content_type=content_type)
+    else:
+        validate_csv_upload(
+            source, filename=filename, content_type=content_type, delimiter=adapter.delimiter
+        )
     if sys.platform != "linux" or not hasattr(os, "memfd_create") or os.geteuid() == 0:
         raise NutritionImportValidationError("adapter_execution_unavailable")
     try:
@@ -72,11 +85,12 @@ def run_nutrition_import_adapter(
     try:
         worker = Path(__file__).with_name("nutrition_import_adapter_worker.py")
         process = subprocess.Popen(
-            [sys.executable, "-I", str(worker), str(adapter.module_path)],
+            [sys.executable, "-I", str(worker), str(adapter.module_path), adapter.source_format],
             stdin=subprocess.PIPE,
             stdout=descriptor,
             stderr=subprocess.DEVNULL,
             env={},
+            close_fds=True,
             start_new_session=True,
         )
         try:
@@ -87,12 +101,25 @@ def run_nutrition_import_adapter(
             raise NutritionImportValidationError("adapter_failed")
         os.lseek(descriptor, 0, os.SEEK_SET)
         output = os.read(descriptor, MAX_ADAPTER_BYTES + 1)
-        return validate_adapter_result(
+        result = validate_adapter_result(
             output,
             provider=adapter.provider,
             adapter_version=adapter.adapter_version,
-            source_format="csv",
+            source_format=adapter.source_format,
         )
+        if adapter.source_format == "pdf":
+            for issue in result.diagnostics:
+                if issue.code in {
+                    "invalid_pdf",
+                    "pdf_encrypted",
+                    "pdf_no_text",
+                    "pdf_active_content",
+                    "pdf_objects_limit",
+                    "pdf_pages_limit",
+                    "pdf_text_limit",
+                }:
+                    raise NutritionImportValidationError(issue.code)
+        return result
     except OSError:
         raise NutritionImportValidationError("adapter_execution_unavailable") from None
     finally:

@@ -444,6 +444,26 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
     )
 
 
+def test_frontend_checks_uses_pinned_browser_and_managed_python() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    frontend = workflow.split("  frontend:\n", 1)[1].split("  frontend-smoke:\n", 1)[0]
+    smoke = workflow.split("  frontend-smoke:\n", 1)[1].split("  frontend-mobile-regression:\n", 1)[
+        0
+    ]
+    image_line = next(
+        line.strip() for line in smoke.splitlines() if "mcr.microsoft.com/playwright:" in line
+    )
+    assert "@sha256:" in image_line and image_line in frontend
+    assert "playwright install --with-deps" not in frontend
+    assert "chromium.launch()" in frontend and "page.title()" in frontend
+    assert 'UV_MANAGED_PYTHON: "1"' in frontend
+    assert "uv python install 3.14" in frontend
+    assert "uv python find --managed-python 3.14" in frontend
+    assert "GIT_CONFIG_KEY_0: safe.directory" in frontend
+    assert "GIT_CONFIG_VALUE_0: ${{ github.workspace }}" in frontend
+    assert "run-group frontend-checks" in frontend and "run-group frontend-unit" in frontend
+
+
 def test_frontend_smoke_uses_existing_pinned_browser_container_without_apt() -> None:
     workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     smoke = workflow.split("  frontend-smoke:\n", 1)[1]

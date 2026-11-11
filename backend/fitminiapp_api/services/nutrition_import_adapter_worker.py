@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import codecs
 import importlib
 import importlib.util
 import json
@@ -29,7 +30,15 @@ def main() -> None:
         raise ValueError("adapter unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    result = module.parse(sys.stdin.buffer.read(512 * 1024 + 1))
+    if len(sys.argv) > 2 and sys.argv[2] == "pdf":
+        import _strptime  # noqa: F401
+
+        from fitminiapp_api.services.nutrition_import_pdf_sandbox import install_pdf_sandbox
+
+        codecs.lookup("UTF-16BE")
+        install_pdf_sandbox()
+    limit = 2 * 1024 * 1024 if len(sys.argv) > 2 and sys.argv[2] == "pdf" else 512 * 1024
+    result = module.parse(sys.stdin.buffer.read(limit + 1))
     sys.stdout.buffer.write(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode())
 
 

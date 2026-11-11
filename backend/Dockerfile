@@ -25,6 +25,7 @@ RUN apt-get update \
         fonts-dejavu-core \
         libbrotli1=1.1.0-2+deb13u1 \
         libexpat1 \
+        libseccomp2 \
         libgl1 \
         tesseract-ocr \
         tesseract-ocr-eng \
