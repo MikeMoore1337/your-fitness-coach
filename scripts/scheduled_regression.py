@@ -21,8 +21,8 @@ WEEKLY_RETENTION_DAYS: Final = 35
 RAW_RESULTS_RETENTION_DAYS: Final = 3
 MAX_BUNDLE_BYTES: Final = 50 * 1024 * 1024
 MAX_REPORT_BYTES: Final = 100 * 1024 * 1024
-FRONTEND_E2E_SHARD_COUNT: Final = 5
-PYTHON_TEST_SHARD_COUNT: Final = 5
+FRONTEND_E2E_SHARD_COUNT: Final = 10
+PYTHON_TEST_SHARD_COUNT: Final = 10
 
 RUN_KINDS: tuple[str, ...] = ("daily", "weekly")
 PROFILE_BY_RUN_KIND: Mapping[str, str] = {
@@ -59,7 +59,8 @@ REPORT_BUNDLES_BY_RUN_KIND: Mapping[str, tuple[tuple[str, str], ...]] = {
             ("python-tests", f"python-shard-{shard}")
             for shard in range(1, PYTHON_TEST_SHARD_COUNT + 1)
         ),
-        ("migrated-stack", "chromium-api"),
+        ("migrated-stack", "browser"),
+        ("migrated-stack", "races"),
     ),
     "weekly": (
         ("frontend-checks", "node-unit"),
@@ -76,7 +77,8 @@ REPORT_BUNDLES_BY_RUN_KIND: Mapping[str, tuple[tuple[str, str], ...]] = {
             ("python-tests", f"python-shard-{shard}")
             for shard in range(1, PYTHON_TEST_SHARD_COUNT + 1)
         ),
-        ("migrated-stack", "chromium-api"),
+        ("migrated-stack", "browser"),
+        ("migrated-stack", "races"),
     ),
 }
 

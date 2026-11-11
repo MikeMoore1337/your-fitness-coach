@@ -604,7 +604,7 @@ describe('HydrationTracker', () => {
     expect(posts).toBe(2);
     await waitFor(() => expect(bottle).toBeEnabled());
     expect(screen.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
-  });
+  }, 10_000);
 
   it('does not offer a retry before the prepared request has been sent', async () => {
     let releasePreparation = () => {};
@@ -1122,7 +1122,9 @@ describe('HydrationTracker', () => {
           </QueryClientProvider>,
         );
 
-      fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
+      const glass = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+      await waitFor(() => expect(glass).toBeEnabled());
+      fireEvent.click(glass);
       if (!delayed) expect(await screen.findByText('Добавлено 250 мл')).toBeVisible();
       if (delayed)
         await waitFor(() =>

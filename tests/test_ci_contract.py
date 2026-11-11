@@ -150,7 +150,7 @@ def test_frontend_e2e_shard_is_forwarded_to_playwright(monkeypatch, tmp_path: Pa
     monkeypatch.setattr(
         ci_contract,
         "missing_prerequisites",
-        lambda group, *, root, env: [],
+        lambda group, *, root, env, lane=None: [],
     )
 
     def fake_run(argv, **kwargs):
@@ -164,12 +164,49 @@ def test_frontend_e2e_shard_is_forwarded_to_playwright(monkeypatch, tmp_path: Pa
     assert calls[0][-2:] == ["--", "--shard=2/4"]
 
 
+def test_frontend_e2e_balanced_test_list_is_forwarded(monkeypatch, tmp_path: Path) -> None:
+    calls = []
+    monkeypatch.setattr(ci_contract, "missing_prerequisites", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        ci_contract, "_run_command", lambda command, **kwargs: calls.append(kwargs["argv"])
+    )
+    ci_contract.run_group(
+        "frontend-e2e", root=tmp_path, env={"YFC_E2E_TEST_LIST": "chosen.txt"}, shard="2/15"
+    )
+    assert calls[0][-3:] == ["--", "--test-list=chosen.txt", "--forbid-only"]
+
+
+def test_playwright_shard_planner_preserves_serial_and_unsafe_titles() -> None:
+    root = Path(__file__).resolve().parents[1]
+    program = r"""
+const assert = require('node:assert/strict');
+const { plan } = require('./scripts/playwright_ci_plan.cjs');
+const path = require('node:path');
+const root = process.cwd();
+const make = (id, file, title, serial = false) => ({
+  id, location: {file: path.join(root, file)},
+  titlePath: () => ['', 'chromium', file, title],
+  parent: {_parallelMode: serial ? 'serial' : 'parallel', parent: null},
+});
+const tests = [make('a','a.spec.ts','first',true), make('b','a.spec.ts','second',true),
+  make('c','b.spec.ts','unsafe › title'), make('d','b.spec.ts','other'),
+  make('e','c.spec.ts','standalone')];
+const suite = {allTests: () => tests};
+const plans = [plan({rootDir: root}, suite, 1, 2), plan({rootDir: root}, suite, 2, 2)];
+assert.deepEqual(plans.flatMap(x => x.selected).sort(), ['a','b','c','d','e']);
+for (const [a,b] of [['a','b'],['c','d']]) assert(plans.some(x => x.selected.includes(a) && x.selected.includes(b)));
+assert.throws(() => plan({rootDir:root}, {allTests: () => [tests[0],tests[0]]}, 1, 2));
+"""
+    result = subprocess.run(["node", "-e", program], cwd=root, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_python_shard_collects_and_runs_only_its_node_ids(monkeypatch, tmp_path: Path) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr(
         ci_contract,
         "missing_prerequisites",
-        lambda group, *, root, env: [],
+        lambda group, *, root, env, lane=None: [],
     )
     collected = "\n".join(
         [
@@ -241,6 +278,21 @@ def test_migrations_use_the_selected_python_interpreter() -> None:
         "-n",
         "1",
     )  # The worker owns a disposable database, not the migrated one.
+
+
+def test_migrated_lanes_run_each_test_command_once(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(ci_contract, "missing_prerequisites", lambda *args, **kwargs: [])
+    calls = []
+    monkeypatch.setattr(
+        ci_contract, "_run_command", lambda command, **kwargs: calls.append(command.name)
+    )
+    for lane in ("browser", "races"):
+        ci_contract.run_group("migrated-stack", root=tmp_path, env={}, lane=lane)
+    original = [command.name for command in ci_contract.COMMAND_GROUPS["migrated-stack"].commands]
+    for name in original:
+        assert calls.count(name) == (2 if name in ci_contract.MIGRATED_SETUP_COMMANDS else 1)
+    with pytest.raises(ci_contract.CIContractError, match="Invalid migrated-stack lane"):
+        ci_contract.run_group("python-tests", root=tmp_path, lane="races")
 
 
 def test_cross_browser_group_migrates_database_for_ready_backend() -> None:
@@ -403,15 +455,15 @@ def test_allure_dependencies_are_scheduled_only() -> None:
     assert "ALLURE_RESULTS_DIR:" in workflow[python_job_start:python_steps_start]
 
 
-def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> None:
+def test_workflow_keeps_frontend_and_python_shards_independent() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-    assert "name: Frontend smoke (${{ matrix.shard }}/5)" in workflow
-    assert "name: Python tests (${{ matrix.shard }}/5)" in workflow
-    assert workflow.count("        shard: [1, 2, 3, 4, 5]") == 2
-    assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/5"' in workflow
-    assert 'run-group python-tests --shard "${{ matrix.shard }}/5"' in workflow
+    assert "name: Frontend smoke (${{ matrix.shard }}/10)" in workflow
+    assert "name: Python tests (${{ matrix.shard }}/10)" in workflow
+    assert workflow.count("        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]") == 2
+    assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/10"' in workflow
+    assert 'run-group python-tests --shard "${{ matrix.shard }}/10"' in workflow
     assert "name: Frontend (${{ matrix.lane }})" in workflow
     assert "        lane: [checks, unit]" in workflow
     assert "run-group frontend-checks" in workflow
@@ -425,11 +477,11 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
         == 0
     )
     assert (
-        "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/5)\n    needs: scope-router\n    if:"
+        "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/10)\n    needs: scope-router\n    if:"
         in workflow
     )
     assert (
-        "  migrated-stack:\n    name: Migrated PostgreSQL stack\n    needs: scope-router\n    if:"
+        "  migrated-stack:\n    name: Migrated PostgreSQL stack (${{ matrix.lane }})\n    needs: scope-router\n    if:"
         in workflow
     )
     assert "run-group frontend-mobile-regression" in workflow
@@ -442,6 +494,71 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
         "playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
         in workflow
     )
+
+
+def test_required_checks_verify_current_attempt_python_receipts() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    python_job = workflow.split("  python-tests:\n", 1)[1].split("  migrated-stack:\n", 1)[0]
+    checks = workflow.split("  checks:\n", 1)[1]
+    assert "YFC_PYTEST_SHARD_RECEIPT:" in python_job
+    assert "if-no-files-found: error" in python_job
+    assert (
+        "pytest-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}"
+        in python_job
+    )
+    assert "pytest-shard-${{ github.run_id }}-${{ github.run_attempt }}-*" in checks
+    assert "scripts/verify_pytest_shards.py" in checks
+    assert (
+        checks.count(
+            "needs.scope-router.outputs.run_python == 'true' && needs.python-tests.result == 'success'"
+        )
+        == 2
+    )
+
+
+def test_required_checks_verify_current_attempt_playwright_receipts() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    smoke = workflow.split("  frontend-smoke:\n", 1)[1].split("  frontend-mobile-regression:\n", 1)[
+        0
+    ]
+    checks = workflow.split("  checks:\n", 1)[1]
+    assert "scripts/playwright_ci_plan.cjs" in smoke
+    assert "scripts/playwright_ci_timing.cjs" in smoke
+    assert (
+        "playwright-shard-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}"
+        in smoke
+    )
+    assert "if-no-files-found: error" in smoke
+    assert "playwright-shard-${{ github.run_id }}-${{ github.run_attempt }}-*" in checks
+    assert "scripts/verify_playwright_shards.py" in checks
+    assert (
+        checks.count(
+            "needs.scope-router.outputs.run_frontend_smoke == 'true' && needs.frontend-smoke.result == 'success'"
+        )
+        == 2
+    )
+
+
+def test_frontend_checks_uses_pinned_browser_and_managed_python() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    frontend = workflow.split("  frontend:\n", 1)[1].split("  frontend-smoke:\n", 1)[0]
+    smoke = workflow.split("  frontend-smoke:\n", 1)[1].split("  frontend-mobile-regression:\n", 1)[
+        0
+    ]
+    image_line = next(
+        line.strip() for line in smoke.splitlines() if "mcr.microsoft.com/playwright:" in line
+    )
+    assert "@sha256:" in image_line and image_line in frontend
+    assert "playwright install --with-deps" not in frontend
+    assert "chromium.launch()" in frontend and "page.title()" in frontend
+    assert 'node-version: "24"' in frontend
+    assert 'UV_MANAGED_PYTHON: "1"' in frontend
+    assert "uv python install 3.14" in frontend
+    assert "uv python find --managed-python 3.14" in frontend
+    assert "uses: actions/setup-python@v5" not in frontend
+    assert "GIT_CONFIG_KEY_0: safe.directory" in frontend
+    assert "GIT_CONFIG_VALUE_0: ${{ github.workspace }}" in frontend
+    assert "run-group frontend-checks" in frontend and "run-group frontend-unit" in frontend
 
 
 def test_frontend_smoke_uses_existing_pinned_browser_container_without_apt() -> None:
@@ -480,6 +597,10 @@ def test_migrated_postgres_stack_uses_prebuilt_chromium_and_service_dns() -> Non
     assert "npx playwright install --with-deps chromium" not in migrated
     assert "Cache Playwright browsers" not in migrated
     assert "test -d /ms-playwright" in migrated
+    assert "lane: [browser, races]" in migrated
+    assert "fail-fast: false" in migrated
+    assert "image: postgres:16-alpine" in migrated
+    assert "run-group migrated-stack --lane ${{ matrix.lane }}" in migrated
     assert migrated.count("postgresql+psycopg://fitminiapp:test-password@db:5432/") == 2
     assert "run-group migrated-stack" in migrated
     assert 'UV_SYSTEM_PYTHON: "0"' in migrated
@@ -499,10 +620,10 @@ def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None
     }
     assert payload["sharding"]["python-tests"] == {
         "count": ci_contract.PYTHON_TEST_SHARD_COUNT,
-        "strategy": "pytest-node-round-robin",
+        "strategy": "pytest-node-digest-ranked",
     }
-    assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 5
-    assert ci_contract.PYTHON_TEST_SHARD_COUNT == 5
+    assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 10
+    assert ci_contract.PYTHON_TEST_SHARD_COUNT == 10
 
 
 def test_cross_stack_profile_includes_delivery_policy_gates() -> None:
