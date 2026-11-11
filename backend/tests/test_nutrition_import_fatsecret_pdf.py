@@ -2,6 +2,7 @@ import csv
 import io
 import os
 import platform
+import random
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
@@ -10,6 +11,8 @@ from pathlib import Path
 from threading import Barrier
 
 import pytest
+from PIL import Image
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
@@ -47,12 +50,18 @@ def synthetic_pdf(
     reordered=False,
     day_mismatch=False,
     repeat_header=True,
+    large=False,
 ):
     stream = BytesIO()
     pdf = Canvas(stream, pagesize=(1800, 800), pageCompression=0)
     font = Path(__file__).parents[1] / "fitminiapp_api/assets/fonts/Inter-Regular.ttf"
     pdfmetrics.registerFont(TTFont("SyntheticInter", str(font)))
     pdf.setFont("SyntheticInter", 10)
+    if large:
+        pixels = random.Random(913).randbytes(620 * 620 * 3)
+        pdf.drawImage(
+            ImageReader(Image.frombytes("RGB", (620, 620), pixels)), 0, 0, width=10, height=10
+        )
     pdf.drawString(20, 770, "Report Details")
     headers = [
         "Calories",
@@ -100,6 +109,85 @@ def synthetic_pdf(
         pdf.drawString(400, 700, "10")
     pdf.save()
     return stream.getvalue()
+
+
+def synthetic_ru_report(
+    *, ambiguous=False, split_portion=False, duplicate=False, food_override=None
+):
+    output = BytesIO()
+    pdf = Canvas(output, pagesize=(842, 595), pageCompression=0)
+    font = Path(__file__).parents[1] / "fitminiapp_api/assets/fonts/Inter-Regular.ttf"
+    pdfmetrics.registerFont(TTFont("SyntheticReportInter", str(font)))
+
+    def header(page):
+        pdf.setFont("SyntheticReportInter", 12)
+        pdf.drawString(25, 575, "Synthetic report")
+        pdf.drawString(330, 575, "Synthetic period")
+        pdf.drawString(728, 575, "Synthetic account")
+        pdf.setFont("SyntheticReportInter", 8)
+        pdf.drawRightString(817, 18, f"Page {page}")
+
+    def columns(labels, units, xs):
+        pdf.setFont("SyntheticReportInter", 10)
+        for label, unit, x in zip(labels, units, xs, strict=True):
+            pdf.drawCentredString(x, 520, label)
+            pdf.drawCentredString(x, 508, unit)
+
+    header(1)
+    pdf.setFont("SyntheticReportInter", 14)
+    pdf.drawString(27, 544, "Period Summary")
+    pdf.setFont("SyntheticReportInter", 10)
+    pdf.drawString(27, 520, "Сводка")
+    columns(("Кал", "Жир", "Углев", "Белк"), ("(ккал)", "(г)", "(г)", "(г)"), (211, 271, 331, 391))
+    for y, label in ((490, "Завтрак"), (475, "Всего")):
+        pdf.drawString(27, y, label)
+        for x, value in zip((211, 271, 331, 391), ("42", "2", "4", "6"), strict=True):
+            pdf.drawCentredString(x, y, value)
+    pdf.showPage()
+    labels = ("Кал", "Жир", "Н/жир", "Углев", "Клетч", "Сахар", "Белк", "Натри", "Холес", "Калий")
+    units = ("(ккал)", "(г)", "(г)", "(г)", "(г)", "(г)", "(г)", "(мг)", "(мг)", "(мг)")
+    xs = tuple(247 + 60 * i for i in range(10))
+    long_name = "Синтетический продукт "
+    while pdfmetrics.stringWidth(long_name + "образец ", "SyntheticReportInter", 10) < 208:
+        long_name += "образец "
+    long_name = long_name.strip()
+    while pdfmetrics.stringWidth(long_name, "SyntheticReportInter", 10) < 210:
+        long_name += "а"
+    for page in (2, 3):
+        header(page)
+        pdf.setFont("SyntheticReportInter", 14)
+        pdf.drawString(27, 544, "Суббота, марта 2, 2024")
+        columns(labels, units, xs)
+        if page == 2:
+            pdf.drawString(25, 470, "Завтрак")
+        elif split_portion:
+            pdf.setFont("SyntheticReportInter", 8)
+            pdf.drawString(25, 490, "100 г")
+            pdf.setFont("SyntheticReportInter", 10)
+        name = long_name if page == 2 or duplicate else "Синтетический продукт Б"
+        if page == 2 and food_override:
+            name = food_override
+        pdf.drawString(25, 455, name)
+        for i, (x, value) in enumerate(
+            zip(xs, ("21", "1", "0", "2", "0", "0", "3", "4", "0", "5"), strict=True)
+        ):
+            if not ambiguous or i == 0:
+                pdf.drawCentredString(x, 453, value)
+        if page == 3 or not split_portion:
+            pdf.setFont("SyntheticReportInter", 8)
+            pdf.drawString(25, 443, "100 г")
+        if page == 3:
+            pdf.setFont("SyntheticReportInter", 10)
+            for y in (415, 385):
+                pdf.drawString(27, y, "Всего")
+                for x, value in zip(
+                    xs, ("42", "2", "0", "4", "0", "0", "6", "8", "0", "10"), strict=True
+                ):
+                    pdf.drawCentredString(x, y, value)
+        if page == 2:
+            pdf.showPage()
+    pdf.save()
+    return output.getvalue(), long_name
 
 
 @pytest.mark.parametrize(
@@ -171,6 +259,43 @@ def test_reordered_columns_follow_header_labels():
     assert facts.fat_g.value == Decimal("1")
     assert result.original_detail_cells[0].source_header == "Sat. Fat"
     assert result.original_detail_cells[0].source_column == 10
+
+
+def test_ru_report_two_line_headers_summary_and_page_continuation():
+    source, long_name = synthetic_ru_report()
+    document = NutritionImportV3.model_validate(parse(source))
+    assert [item.food.name for item in document.rows] == [long_name, "Синтетический продукт Б"]
+    assert [item.coordinates.page for item in document.rows] == [2, 3]
+    assert all(item.meal_type == "breakfast" and item.amount_unit == "g" for item in document.rows)
+    assert len(document.original_summaries) == 1
+    assert len([item for item in document.original_totals if item.scope == "meal"]) == 1
+    assert len([item for item in document.original_totals if item.scope == "day"]) == 1
+    assert not any(item.code.endswith("_differ") for item in document.diagnostics)
+
+
+def test_ru_report_does_not_guess_ambiguous_merged_column():
+    source, _ = synthetic_ru_report(ambiguous=True)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert document.rows == []
+    assert document.diagnostics[0].code == "pdf_column_ambiguous"
+    assert document.diagnostics[0].coordinates.page == 2
+    assert document.diagnostics[0].coordinates.row > 0
+
+
+def test_ru_report_preserves_duplicate_and_portion_split_between_pages():
+    source, long_name = synthetic_ru_report(split_portion=True, duplicate=True)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert [row.food.name for row in document.rows] == [long_name, long_name]
+    assert document.rows[0].coordinates.page == 2
+    assert document.rows[0].quantity_coordinates[0].page == 3
+    assert any(item.code == "possible_duplicate" for item in document.rows[1].diagnostics)
+
+
+def test_ru_report_does_not_treat_food_named_like_total_as_total():
+    source, _ = synthetic_ru_report(food_override="Всего")
+    document = NutritionImportV3.model_validate(parse(source))
+    assert document.rows == []
+    assert document.diagnostics[0].code == "pdf_total_ambiguous"
 
 
 def test_overlapping_column_candidates_fail_closed(monkeypatch):
@@ -309,6 +434,7 @@ def test_pdf_worker_is_unavailable_on_unsupported_platform():
 def test_real_pdf_upload_is_private_and_creates_no_canonical_rows(client):
     if engine.dialect.name != "postgresql":
         pytest.skip("requires PostgreSQL transaction locks")
+    from test_nutrition_import_pdf_text import _truncated_pdf
     from test_training_analytics import _auth
 
     owner = _auth(client, 984_912)
@@ -334,6 +460,16 @@ def test_real_pdf_upload_is_private_and_creates_no_canonical_rows(client):
     assert (
         client.get(f"/api/v1/nutrition/imports/{preview['id']}", headers=other).status_code == 404
     )
+    large_source = synthetic_pdf(large=True)
+    assert 1024 * 1024 < len(large_source) < 2 * 1024 * 1024
+    large = client.post(
+        "/api/v1/nutrition/imports",
+        headers={**owner, "Idempotency-Key": "synthetic-pdf-large-913"},
+        data={"adapter_id": "fatsecret-pdf-v1"},
+        files={"file": ("synthetic.pdf", large_source, "application/pdf")},
+    )
+    assert large.status_code == 201, large.text
+    assert len(large.json()["rows"]) == 1
     blank = BytesIO()
     image_only = Canvas(blank)
     image_only.rect(20, 20, 50, 50, fill=1)
@@ -349,6 +485,15 @@ def test_real_pdf_upload_is_private_and_creates_no_canonical_rows(client):
         "code": "pdf_no_text",
         "message": "В PDF не найден текст. Загрузите файл CSV",
     }
+    corrupt = client.post(
+        "/api/v1/nutrition/imports",
+        headers={**owner, "Idempotency-Key": "synthetic-pdf-corrupt-913"},
+        data={"adapter_id": "fatsecret-pdf-v1"},
+        files={"file": ("synthetic.pdf", _truncated_pdf(), "application/pdf")},
+    )
+    assert corrupt.status_code == 400
+    assert corrupt.json()["detail"]["code"] == "invalid_pdf"
+    assert "SYNTHETIC_PRIVATE_913" not in corrupt.text
     with get_session_context() as db:
         assert (db.query(Food).count(), db.query(FoodDiaryEntry).count()) == before
 

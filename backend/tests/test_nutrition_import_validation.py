@@ -9,6 +9,7 @@ from fitminiapp_api.services.nutrition_import_validation import (
     MAX_CSV_FIELDS,
     MAX_CSV_ROWS,
     MAX_FIELD_CHARS,
+    MAX_PDF_UPLOAD_BYTES,
     MAX_UPLOAD_BYTES,
     NutritionImportValidationError,
     validate_adapter_result,
@@ -23,7 +24,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "nutrition_import"
     ("source", "filename", "content_type", "code"),
     [
         (b"", "report.pdf", "application/pdf", "upload_size"),
-        (b"%PDF-" + b"x" * MAX_UPLOAD_BYTES, "report.pdf", "application/pdf", "upload_size"),
+        (b"%PDF-" + b"x" * MAX_PDF_UPLOAD_BYTES, "report.pdf", "application/pdf", "upload_size"),
         (b"name,food", "report.pdf", "application/pdf", "unsupported_bytes"),
         (b"%PDF-1.7", "report.csv", "application/pdf", "invalid_filename"),
         (b"%PDF-1.7", "../report.pdf", "application/pdf", "invalid_filename"),
@@ -41,6 +42,9 @@ def test_pdf_upload_envelope_rejects_invalid_inputs(source, filename, content_ty
 
 def test_pdf_upload_envelope_accepts_signature_without_claiming_structure_is_valid():
     validate_pdf_upload(b"%PDF-1.7\n", filename="report.PDF", content_type="application/pdf")
+    validate_pdf_upload(
+        b"%PDF-" + b"x" * MAX_UPLOAD_BYTES, filename="report.pdf", content_type="application/pdf"
+    )
 
 
 def _upload(data: bytes, filename: str = "import.csv", content_type: str = "text/csv") -> None:

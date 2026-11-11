@@ -37,7 +37,8 @@ def main() -> None:
 
         codecs.lookup("UTF-16BE")
         install_pdf_sandbox()
-    result = module.parse(sys.stdin.buffer.read(512 * 1024 + 1))
+    limit = 2 * 1024 * 1024 if len(sys.argv) > 2 and sys.argv[2] == "pdf" else 512 * 1024
+    result = module.parse(sys.stdin.buffer.read(limit + 1))
     sys.stdout.buffer.write(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode())
 
 

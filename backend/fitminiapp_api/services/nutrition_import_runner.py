@@ -107,10 +107,18 @@ def run_nutrition_import_adapter(
             adapter_version=adapter.adapter_version,
             source_format=adapter.source_format,
         )
-        if adapter.source_format == "pdf" and any(
-            issue.code == "pdf_no_text" for issue in result.diagnostics
-        ):
-            raise NutritionImportValidationError("pdf_no_text")
+        if adapter.source_format == "pdf":
+            for issue in result.diagnostics:
+                if issue.code in {
+                    "invalid_pdf",
+                    "pdf_encrypted",
+                    "pdf_no_text",
+                    "pdf_active_content",
+                    "pdf_objects_limit",
+                    "pdf_pages_limit",
+                    "pdf_text_limit",
+                }:
+                    raise NutritionImportValidationError(issue.code)
         return result
     except OSError:
         raise NutritionImportValidationError("adapter_execution_unavailable") from None

@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from io import BytesIO
 
+from pdfminer import settings as pdf_settings
 from pdfminer.converter import PDFPageAggregator
-from pdfminer.layout import LAParams, LTContainer, LTTextLine
+from pdfminer.layout import LAParams, LTChar, LTContainer, LTTextLine
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
@@ -41,6 +42,8 @@ class PdfLine:
     page: int
     bbox: tuple[float, float, float, float]
     text: str
+    chars: tuple[tuple[str, float, float, float, float], ...] = ()
+    page_height: float = 0
 
 
 def _check_object(value: object) -> None:
@@ -65,6 +68,8 @@ def _check_object(value: object) -> None:
 
 def extract_pdf_lines(source: bytes) -> list[PdfLine]:
     """Extract text with page coordinates; callers must enforce upload and OS limits."""
+    original_strict = pdf_settings.STRICT
+    pdf_settings.STRICT = True
     try:
         document = PDFDocument(PDFParser(BytesIO(source)), fallback=False)
         if document.encryption is not None or not document.is_extractable:
@@ -86,7 +91,8 @@ def extract_pdf_lines(source: bytes) -> list[PdfLine]:
             if page_number > MAX_PAGES:
                 raise NutritionImportValidationError("pdf_pages_limit")
             interpreter.process_page(page)
-            pending: list[object] = [device.get_result()]
+            layout = device.get_result()
+            pending: list[object] = [layout]
             while pending:
                 item = pending.pop()
                 if isinstance(item, LTTextLine):
@@ -96,7 +102,17 @@ def extract_pdf_lines(source: bytes) -> list[PdfLine]:
                         raise NutritionImportValidationError("pdf_text_limit")
                     if text:
                         lines.append(
-                            PdfLine(page_number, (item.x0, item.y0, item.x1, item.y1), text)
+                            PdfLine(
+                                page_number,
+                                (item.x0, item.y0, item.x1, item.y1),
+                                text,
+                                tuple(
+                                    (char.get_text(), char.x0, char.x1, char.y0, char.y1)
+                                    for char in item
+                                    if isinstance(char, LTChar)
+                                ),
+                                layout.height,
+                            )
                         )
                 elif isinstance(item, LTContainer):
                     pending.extend(reversed(list(item)))
@@ -107,3 +123,5 @@ def extract_pdf_lines(source: bytes) -> list[PdfLine]:
         raise
     except Exception:
         raise NutritionImportValidationError("invalid_pdf") from None
+    finally:
+        pdf_settings.STRICT = original_strict

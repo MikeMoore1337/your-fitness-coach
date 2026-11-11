@@ -58,6 +58,7 @@ from fitminiapp_api.services.nutrition_import_limits import (
 )
 from fitminiapp_api.services.nutrition_import_runner import ADAPTERS, run_nutrition_import_adapter
 from fitminiapp_api.services.nutrition_import_validation import (
+    MAX_PDF_UPLOAD_BYTES,
     MAX_UPLOAD_BYTES,
     NutritionImportValidationError,
 )
@@ -95,6 +96,7 @@ def _error(exc: NutritionDraftError | NutritionImportValidationError) -> HTTPExc
         "adapter_unavailable": "Этот источник импорта пока не поддерживается",
         "invalid_encoding": "Сохраните файл в кодировке UTF-8",
         "pdf_no_text": "В PDF не найден текст. Загрузите файл CSV",
+        "invalid_pdf": "PDF повреждён или не поддерживается. Загрузите файл CSV",
         "rate_limited": "Слишком много загрузок. Повторите позже",
         "parser_busy": "Импорт занят. Попробуйте позже",
     }
@@ -161,7 +163,11 @@ async def upload(
 ):
     del request
     try:
-        source = await file.read(MAX_UPLOAD_BYTES + 1)
+        adapter = ADAPTERS.get(adapter_id)
+        limit = (
+            MAX_PDF_UPLOAD_BYTES if adapter and adapter.source_format == "pdf" else MAX_UPLOAD_BYTES
+        )
+        source = await file.read(limit + 1)
         return await run_in_threadpool(
             _process_upload,
             db,

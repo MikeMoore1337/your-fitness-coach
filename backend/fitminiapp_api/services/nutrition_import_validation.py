@@ -19,6 +19,7 @@ from fitminiapp_api.schemas.nutrition_import import (
 )
 
 MAX_UPLOAD_BYTES = 512 * 1024
+MAX_PDF_UPLOAD_BYTES = 2 * 1024 * 1024
 MAX_CSV_ROWS = 2_000
 MAX_CSV_FIELDS = 64
 MAX_FIELD_CHARS = 1_024
@@ -56,7 +57,7 @@ def validate_pdf_upload(source: bytes, *, filename: str | None, content_type: st
         raise NutritionImportValidationError("invalid_filename")
     if content_type is None or content_type.split(";", 1)[0].strip().lower() != "application/pdf":
         raise NutritionImportValidationError("unsupported_type")
-    if not source or len(source) > MAX_UPLOAD_BYTES:
+    if not source or len(source) > MAX_PDF_UPLOAD_BYTES:
         raise NutritionImportValidationError("upload_size")
     if not source.startswith(b"%PDF-"):
         raise NutritionImportValidationError("unsupported_bytes")
