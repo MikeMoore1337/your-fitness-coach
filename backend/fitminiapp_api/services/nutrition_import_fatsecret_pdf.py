@@ -53,7 +53,10 @@ def _date(text: str) -> str | None:
     if csv_adapter._LONG_DATE.fullmatch(text):
         return csv_adapter._long_date(text, 0)
     try:
-        return datetime.strptime(text, "%A, %B %d, %Y").date().isoformat()
+        value = datetime.strptime(text, "%A, %B %d, %Y").date()
+        if value.strftime("%A").casefold() != text.split(",", 1)[0].casefold():
+            raise csv_adapter._FormatError("invalid_date")
+        return value.isoformat()
     except ValueError:
         return None
 
@@ -80,6 +83,8 @@ def parse(source: bytes) -> dict[str, Any]:
         section = False
         meal_record: int | None = None
         current_date: str | None = None
+        current_date_page: int | None = None
+        continuation: tuple[int, int, float, float] | None = None
         for group in groups:
             text = " ".join(part.text for part in group).strip()
             key = text.casefold()
@@ -108,6 +113,9 @@ def parse(source: bytes) -> dict[str, Any]:
             page = group[0].page
             day = _date(text)
             if day is not None:
+                continuation = None
+                if day == current_date and page == current_date_page:
+                    raise csv_adapter._FormatError("pdf_date_ambiguous", record_id)
                 if day != current_date:
                     current_date = day
                     records.append(
@@ -115,13 +123,28 @@ def parse(source: bytes) -> dict[str, Any]:
                     )
                     pages[record_id] = page
                     meal_record = None
+                current_date_page = page
                 continue
             meal = _MEALS.get(key, text if key in csv_adapter.MEALS else None)
             if meal:
                 records.append((record_id, [meal]))
                 pages[record_id] = page
                 meal_record = len(records) - 1
+                continuation = None
                 continue
+            # shortcut: only hyphenated wraps are joined; upgrade after validating report geometry.
+            if continuation and len(group) == 1:
+                index, previous_page, previous_x, previous_y = continuation
+                item = group[0]
+                if (
+                    page == previous_page
+                    and abs(item.bbox[0] - previous_x) < 3
+                    and 0 < previous_y - item.bbox[3] <= 18
+                    and records[index][1][0].endswith("-")
+                ):
+                    records[index][1][0] += " " + item.text.strip()
+                    continuation = (index, page, previous_x, item.bbox[3])
+                    continue
             cells = [""] * 10
             left: list[str] = []
             for part in group:
@@ -136,12 +159,14 @@ def parse(source: bytes) -> dict[str, Any]:
             label = " ".join(left).strip()
             total = re.fullmatch(r"(?:total|итого|всего)\s+(.+)", label, re.I)
             if total and total.group(1).casefold() in {*_MEALS, *csv_adapter.MEALS}:
+                continuation = None
                 if meal_record is None or len(records[meal_record][1]) != 1:
                     raise csv_adapter._FormatError("unknown_total_scope", record_id)
                 records[meal_record][1].extend(cells)
                 pages[records[meal_record][0]] = page
                 continue
             if label.casefold() in {"total", "итого", "всего"}:
+                continuation = None
                 records.append((record_id, ["Итого за день", *cells]))
                 pages[record_id] = page
                 continue
@@ -150,6 +175,7 @@ def parse(source: bytes) -> dict[str, Any]:
             amount, food = left
             records.append((record_id, [food, *cells]))
             pages[record_id] = page
+            continuation = (len(records) - 1, page, group[1].bbox[0], group[1].bbox[3])
             records.append((record_id + 1, [amount]))
             pages[record_id + 1] = page
         if not records:

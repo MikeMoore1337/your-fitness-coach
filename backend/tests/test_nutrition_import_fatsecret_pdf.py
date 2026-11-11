@@ -27,7 +27,9 @@ from fitminiapp_api.services.nutrition_import_runner import run_nutrition_import
 from fitminiapp_api.services.nutrition_import_validation import NutritionImportValidationError
 
 
-def synthetic_pdf(*, russian=False, second_page=False, mismatch=False, amount=None):
+def synthetic_pdf(
+    *, russian=False, second_page=False, mismatch=False, amount=None, wrapped=False, hyphen=False
+):
     stream = BytesIO()
     pdf = Canvas(stream, pagesize=(1800, 800), pageCompression=0)
     font = Path(__file__).parents[1] / "fitminiapp_api/assets/fonts/Inter-Regular.ttf"
@@ -53,9 +55,12 @@ def synthetic_pdf(*, russian=False, second_page=False, mismatch=False, amount=No
     pdf.drawString(20, 700, "Дата: 02.03.2024" if russian else "Date: 02.03.2024")
     pdf.drawString(20, 670, "Завтрак" if russian else "Breakfast")
     pdf.drawString(20, 640, amount or ("100 г" if russian else "100 g"))
-    pdf.drawString(160, 640, "Тестовый продукт" if russian else "Synthetic food")
+    name = "Тестовый продукт" if russian else "Synthetic food"
+    pdf.drawString(160, 640, name + (" -" if hyphen else ""))
     for i, text in enumerate(["12.3", "1", "0", "2", "0", "0", "3", "4", "0", "5"]):
         pdf.drawString(400 + 130 * i, 640, text)
+    if wrapped:
+        pdf.drawString(160, 625, "continued")
     if mismatch:
         pdf.drawString(20, 610, "Total Breakfast")
         pdf.drawString(400, 610, "99")
@@ -140,6 +145,32 @@ def test_unknown_serving_unit_remains_unresolved():
     row = result.rows[0]
     assert row.source_unit == "cups" and row.amount_unit is None and row.serving_measure is None
     assert any(item.code == "unknown_unit" for item in row.diagnostics)
+
+
+def test_summary_only_and_corrupt_pdf_never_create_rows():
+    stream = BytesIO()
+    pdf = Canvas(stream)
+    pdf.drawString(20, 700, "Period Summary")
+    pdf.drawString(20, 670, "Synthetic aggregate 100")
+    pdf.save()
+    for source, code in [
+        (stream.getvalue(), "pdf_no_details"),
+        (b"%PDF-1.7\ninvalid", "invalid_pdf"),
+    ]:
+        result = NutritionImportV3.model_validate(parse(source))
+        assert result.rows == []
+        assert result.diagnostics[0].code == code
+
+
+def test_unrecognized_wrapped_row_cannot_be_silently_imported():
+    result = NutritionImportV3.model_validate(parse(synthetic_pdf(wrapped=True)))
+    assert result.rows == []
+    assert result.diagnostics[0].code == "pdf_row_ambiguous"
+
+
+def test_explicit_hyphenated_continuation_is_kept_with_its_food():
+    result = NutritionImportV3.model_validate(parse(synthetic_pdf(wrapped=True, hyphen=True)))
+    assert [row.food.name for row in result.rows] == ["Synthetic food - continued"]
 
 
 def test_pdf_document_can_create_a_private_draft_without_canonical_writes():
