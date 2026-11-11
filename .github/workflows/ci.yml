@@ -185,12 +185,16 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend == 'true'
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         lane: [checks, unit]
     env:
+      UV_SYSTEM_PYTHON: "0"
+      UV_MANAGED_PYTHON: "1"
       ALLURE_RESULTS_DIR: ${{ matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-checks', github.workspace) || '' }}
       ALLURE_VITEST_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-vitest/dist/reporter.js
     steps:
@@ -207,24 +211,28 @@ jobs:
         run: |
           echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
           echo "CI_CACHE package=npm path=$(npm config get cache)"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
-        if: matrix.lane == 'checks'
         with:
           version: "0.11.32"
           enable-cache: true
           cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: frontend
+      - name: Install container-compatible Python 3.14
+        run: |
+          uv python install 3.14
+          python_path="$(uv python find --managed-python 3.14)"
+          "$python_path" -c 'import ssl; print(ssl.OPENSSL_VERSION)'
+          echo "$(dirname "$python_path")" >> "$GITHUB_PATH"
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Install PR Playwright browser
+      - name: Verify Chromium and system libraries
         if: matrix.lane == 'checks'
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: |
+          test "${PLAYWRIGHT_BROWSERS_PATH:-}" = /ms-playwright
+          node -e 'const { chromium } = require("@playwright/test"); (async () => { const browser = await chromium.launch(); const page = await browser.newPage(); await page.setContent("<title>Chromium ready</title>"); if (await page.title() !== "Chromium ready") throw new Error("Chromium page failed"); console.log(`Chromium ${browser.version()} launched`); await browser.close(); })().catch(error => { console.error(error); process.exit(1); });'
       - name: Install scheduled Vitest reporter
         if: matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
