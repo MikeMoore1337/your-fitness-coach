@@ -244,6 +244,10 @@ jobs:
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Run shared frontend checks group
         if: matrix.lane == 'checks'
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: safe.directory
+          GIT_CONFIG_VALUE_0: ${{ github.workspace }}
         run: python scripts/ci_contract.py run-group frontend-checks
       - name: Run shared frontend unit group
         if: matrix.lane == 'unit'

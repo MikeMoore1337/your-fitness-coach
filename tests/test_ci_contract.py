@@ -556,6 +556,8 @@ def test_frontend_checks_uses_pinned_browser_and_managed_python() -> None:
     assert "uv python install 3.14" in frontend
     assert "uv python find --managed-python 3.14" in frontend
     assert "uses: actions/setup-python@v5" not in frontend
+    assert "GIT_CONFIG_KEY_0: safe.directory" in frontend
+    assert "GIT_CONFIG_VALUE_0: ${{ github.workspace }}" in frontend
     assert "run-group frontend-checks" in frontend and "run-group frontend-unit" in frontend
 
 
