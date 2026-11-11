@@ -27,7 +27,7 @@ from fitminiapp_api.services.nutrition_import_runner import run_nutrition_import
 from fitminiapp_api.services.nutrition_import_validation import NutritionImportValidationError
 
 
-def synthetic_pdf(*, russian=False, second_page=False):
+def synthetic_pdf(*, russian=False, second_page=False, mismatch=False, amount=None):
     stream = BytesIO()
     pdf = Canvas(stream, pagesize=(1800, 800), pageCompression=0)
     font = Path(__file__).parents[1] / "fitminiapp_api/assets/fonts/Inter-Regular.ttf"
@@ -52,10 +52,13 @@ def synthetic_pdf(*, russian=False, second_page=False):
         pdf.drawString(400 + 130 * i, 740, text)
     pdf.drawString(20, 700, "Дата: 02.03.2024" if russian else "Date: 02.03.2024")
     pdf.drawString(20, 670, "Завтрак" if russian else "Breakfast")
-    pdf.drawString(20, 640, "100 г" if russian else "100 g")
+    pdf.drawString(20, 640, amount or ("100 г" if russian else "100 g"))
     pdf.drawString(160, 640, "Тестовый продукт" if russian else "Synthetic food")
     for i, text in enumerate(["12.3", "1", "0", "2", "0", "0", "3", "4", "0", "5"]):
         pdf.drawString(400 + 130 * i, 640, text)
+    if mismatch:
+        pdf.drawString(20, 610, "Total Breakfast")
+        pdf.drawString(400, 610, "99")
     if second_page:
         pdf.drawString(20, 30, "Page 1")
         pdf.showPage()
@@ -121,6 +124,22 @@ def test_page_break_and_repeated_header_preserve_both_entries():
         ("Synthetic food", 1),
         ("Another food", 2),
     ]
+
+
+def test_mismatched_meal_total_is_reported_before_confirm():
+    result = NutritionImportV3.model_validate(parse(synthetic_pdf(mismatch=True)))
+    assert len(result.rows) == 1
+    assert any(
+        item.code == "meal_source_values_differ" and item.field == "energy_kcal"
+        for item in result.diagnostics
+    )
+
+
+def test_unknown_serving_unit_remains_unresolved():
+    result = NutritionImportV3.model_validate(parse(synthetic_pdf(amount="2 cups")))
+    row = result.rows[0]
+    assert row.source_unit == "cups" and row.amount_unit is None and row.serving_measure is None
+    assert any(item.code == "unknown_unit" for item in row.diagnostics)
 
 
 def test_pdf_document_can_create_a_private_draft_without_canonical_writes():
