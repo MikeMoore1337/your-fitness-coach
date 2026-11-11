@@ -43,6 +43,25 @@ def _has_unsafe_controls(value: str) -> bool:
     )
 
 
+def validate_pdf_upload(source: bytes, *, filename: str | None, content_type: str | None) -> None:
+    """Validate the upload envelope; PDF structure is checked by the bounded parser."""
+    if (
+        not filename
+        or len(filename) > 120
+        or not filename.casefold().endswith(".pdf")
+        or ".." in filename
+        or any(char in filename for char in "/\\:?#")
+        or any(unicodedata.category(char) in {"Cc", "Cs"} for char in filename)
+    ):
+        raise NutritionImportValidationError("invalid_filename")
+    if content_type is None or content_type.split(";", 1)[0].strip().lower() != "application/pdf":
+        raise NutritionImportValidationError("unsupported_type")
+    if not source or len(source) > MAX_UPLOAD_BYTES:
+        raise NutritionImportValidationError("upload_size")
+    if not source.startswith(b"%PDF-"):
+        raise NutritionImportValidationError("unsupported_bytes")
+
+
 def validate_csv_upload(
     source: bytes,
     *,
