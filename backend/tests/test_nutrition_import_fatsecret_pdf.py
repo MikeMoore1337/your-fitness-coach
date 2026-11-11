@@ -19,6 +19,7 @@ from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV3
+from fitminiapp_api.services import nutrition_import_fatsecret_pdf
 from fitminiapp_api.services.nutrition_import_drafts import (
     NutritionDraftError,
     confirm_nutrition_import_draft,
@@ -30,6 +31,7 @@ from fitminiapp_api.services.nutrition_import_drafts import (
 from fitminiapp_api.services.nutrition_import_fatsecret_csv import DETAIL_HEADERS, SUMMARY_HEADERS
 from fitminiapp_api.services.nutrition_import_fatsecret_csv import parse as parse_csv
 from fitminiapp_api.services.nutrition_import_fatsecret_pdf import parse
+from fitminiapp_api.services.nutrition_import_pdf_text import PdfLine
 from fitminiapp_api.services.nutrition_import_runner import run_nutrition_import_adapter
 from fitminiapp_api.services.nutrition_import_validation import NutritionImportValidationError
 
@@ -44,6 +46,7 @@ def synthetic_pdf(
     hyphen=False,
     reordered=False,
     day_mismatch=False,
+    repeat_header=True,
 ):
     stream = BytesIO()
     pdf = Canvas(stream, pagesize=(1800, 800), pageCompression=0)
@@ -89,8 +92,9 @@ def synthetic_pdf(
         pdf.drawString(20, 30, "Page 1")
         pdf.showPage()
         pdf.setFont("SyntheticInter", 10)
-        for i, text in enumerate(headers):
-            pdf.drawString(400 + 130 * i, 740, text)
+        if repeat_header:
+            for i, text in enumerate(headers):
+                pdf.drawString(400 + 130 * i, 740, text)
         pdf.drawString(20, 700, "100 g")
         pdf.drawString(160, 700, "Another food")
         pdf.drawString(400, 700, "10")
@@ -152,6 +156,14 @@ def test_page_break_and_repeated_header_preserve_both_entries():
     ]
 
 
+def test_page_without_verified_header_fails_closed():
+    result = NutritionImportV3.model_validate(
+        parse(synthetic_pdf(second_page=True, repeat_header=False))
+    )
+    assert result.rows == []
+    assert result.diagnostics[0].code == "unknown_detail_header"
+
+
 def test_reordered_columns_follow_header_labels():
     result = NutritionImportV3.model_validate(parse(synthetic_pdf(reordered=True)))
     facts = result.original_totals[0].facts
@@ -159,6 +171,30 @@ def test_reordered_columns_follow_header_labels():
     assert facts.fat_g.value == Decimal("1")
     assert result.original_detail_cells[0].source_header == "Sat. Fat"
     assert result.original_detail_cells[0].source_column == 10
+
+
+def test_overlapping_column_candidates_fail_closed(monkeypatch):
+    def line(text, x, y):
+        return PdfLine(1, (x, y - 8, x + 8, y), text)
+
+    lines = [line("Report Details", 20, 770)]
+    lines.extend(
+        line(label, 400 + i * 30, 740)
+        for i, label in enumerate(nutrition_import_fatsecret_pdf._EN_HEADERS)
+    )
+    lines.extend(
+        [
+            line("Date: 02.03.2024", 20, 700),
+            line("Breakfast", 20, 670),
+            line("100 g", 20, 640),
+            line("Synthetic food", 160, 640),
+            line("12.3", 415, 640),
+        ]
+    )
+    monkeypatch.setattr(nutrition_import_fatsecret_pdf, "extract_pdf_lines", lambda _: lines)
+    result = NutritionImportV3.model_validate(parse(b"synthetic"))
+    assert result.rows == []
+    assert result.diagnostics[0].code == "pdf_column_ambiguous"
 
 
 def test_mismatched_meal_total_is_reported_before_confirm():

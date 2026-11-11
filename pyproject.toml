@@ -34,7 +34,7 @@ backend = [
     "slowapi",
     "onnxruntime==1.30.0",
     "rapidocr==3.9.2",
-    "pdfminer-six==20251107",
+    "pdfminer-six==20260107",
 ]
 bot = [
     "aiogram",

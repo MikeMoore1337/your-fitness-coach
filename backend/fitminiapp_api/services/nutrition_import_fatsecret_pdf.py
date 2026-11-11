@@ -126,6 +126,7 @@ def parse(source: bytes) -> dict[str, Any]:
         records: list[tuple[int, list[str]]] = []
         pages: dict[int, int] = {}
         positions: list[float] | None = None
+        header_page: int | None = None
         column_fields: list[int] = []
         row_headers: dict[int, dict[int, str]] = {}
         row_fields: dict[int, list[int]] = {}
@@ -148,13 +149,14 @@ def parse(source: bytes) -> dict[str, Any]:
             mapped_header = [_HEADER_FIELDS.get(value) for value in header]
             if len(mapped_header) == 10 and set(mapped_header) == set(range(10)):
                 positions = [part.bbox[0] for part in group[-10:]]
+                header_page = group[0].page
                 column_fields = [int(index) for index in mapped_header if index is not None]
                 current_headers = dict(zip(column_fields, values[-10:], strict=True))
                 if not records:
                     records.append((1, ["Метка", *csv_adapter.DETAIL_HEADERS]))
                     pages[1] = group[0].page
                 continue
-            if positions is None:
+            if positions is None or header_page != group[0].page:
                 raise csv_adapter._FormatError("unknown_detail_header")
             if re.fullmatch(r"(?:page|страница)\s+\d+(?:\s*/\s*\d+)?", key):
                 continue
@@ -203,9 +205,12 @@ def parse(source: bytes) -> dict[str, Any]:
                 if x < positions[0] - 5:
                     left.append(part.text.strip())
                 else:
-                    index = min(range(10), key=lambda i: abs(positions[i] - x))
+                    candidates = [i for i, pos in enumerate(positions) if abs(pos - x) <= 18]
+                    if len(candidates) != 1:
+                        raise csv_adapter._FormatError("pdf_column_ambiguous", record_id)
+                    index = candidates[0]
                     field = column_fields[index]
-                    if abs(positions[index] - x) > 18 or cells[field]:
+                    if cells[field]:
                         raise csv_adapter._FormatError("pdf_column_ambiguous", record_id)
                     cells[field] = part.text.strip()
             label = " ".join(left).strip()
