@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from reportlab.pdfbase import pdfdoc
 from reportlab.pdfgen.canvas import Canvas
 
 pytestmark = pytest.mark.skipif(
@@ -108,3 +109,32 @@ def test_worker_processes_valid_pdf_after_filter():
     document = json.loads(result.stdout)
     assert len(document["rows"]) == 1
     assert document["rows"][0]["food"]["name"] == "Synthetic food"
+
+
+def test_worker_rejects_embedded_file():
+    stream = io.BytesIO()
+    pdf = Canvas(stream)
+    pdf.drawString(50, 700, "Synthetic")
+    embedded = pdfdoc.PDFStream(
+        pdfdoc.PDFDictionary({"Type": pdfdoc.PDFName("EmbeddedFile")}), b"synthetic attachment"
+    )
+    file_spec = pdfdoc.PDFDictionary(
+        {
+            "Type": pdfdoc.PDFName("Filespec"),
+            "F": pdfdoc.PDFString("synthetic.txt"),
+            "EF": pdfdoc.PDFDictionary({"F": pdf._doc.Reference(embedded)}),
+        }
+    )
+    pdf._doc.Catalog.Names = pdfdoc.PDFDictionary(
+        {
+            "EmbeddedFiles": pdfdoc.PDFDictionary(
+                {"Names": pdfdoc.PDFArray([pdfdoc.PDFString("synthetic.txt"), file_spec])}
+            )
+        }
+    )
+    pdf.save()
+    result = run_worker(PARSER, stream.getvalue())
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    document = json.loads(result.stdout)
+    assert document["rows"] == []
+    assert document["diagnostics"][0]["code"] == "pdf_active_content"

@@ -2,6 +2,7 @@ from io import BytesIO
 
 import pytest
 from reportlab.lib.pdfencrypt import StandardEncryption
+from reportlab.pdfbase import pdfdoc
 from reportlab.pdfgen.canvas import Canvas
 
 from fitminiapp_api.services import nutrition_import_pdf_text
@@ -52,6 +53,32 @@ def test_rejects_active_content_and_encrypted_pdf():
     pdf.save()
     with pytest.raises(NutritionImportValidationError, match=r"invalid_pdf|pdf_encrypted"):
         extract_pdf_lines(stream.getvalue())
+
+
+def test_rejects_pdf_with_embedded_file():
+    output = BytesIO()
+    pdf = Canvas(output)
+    pdf.drawString(50, 700, "Synthetic")
+    embedded = pdfdoc.PDFStream(
+        pdfdoc.PDFDictionary({"Type": pdfdoc.PDFName("EmbeddedFile")}), b"synthetic attachment"
+    )
+    file_spec = pdfdoc.PDFDictionary(
+        {
+            "Type": pdfdoc.PDFName("Filespec"),
+            "F": pdfdoc.PDFString("synthetic.txt"),
+            "EF": pdfdoc.PDFDictionary({"F": pdf._doc.Reference(embedded)}),
+        }
+    )
+    pdf._doc.Catalog.Names = pdfdoc.PDFDictionary(
+        {
+            "EmbeddedFiles": pdfdoc.PDFDictionary(
+                {"Names": pdfdoc.PDFArray([pdfdoc.PDFString("synthetic.txt"), file_spec])}
+            )
+        }
+    )
+    pdf.save()
+    with pytest.raises(NutritionImportValidationError, match="pdf_active_content"):
+        extract_pdf_lines(output.getvalue())
 
 
 def test_page_and_text_limits_fail_closed(monkeypatch):
