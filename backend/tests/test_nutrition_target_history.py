@@ -205,7 +205,7 @@ def test_effective_history_resolves_each_calendar_day_and_export_contains_all_ve
     ]
 
 
-def test_active_trainer_can_assign_but_revoked_trainer_cannot_write_or_read_history(client) -> None:
+def test_trainer_cannot_assign_without_consent_and_loses_history_after_revocation(client) -> None:
     coach_headers = _auth(client, 55_004, is_coach=True)
     client_headers = _auth(client, 55_005)
     coach_id = _user_id(55_004)
@@ -218,11 +218,19 @@ def test_active_trainer_can_assign_but_revoked_trainer_cannot_write_or_read_hist
         json=_manual_payload(target_telegram_user_id=55_005, note="Ориентир от тренера"),
         headers=coach_headers,
     )
-    assert assigned.status_code == 200, assigned.text
-    assert assigned.json()["source"] == "trainer"
-    assert assigned.json()["created_by"]["telegram_user_id"] == 55_004
+    assert assigned.status_code == 409, assigned.text
+    own_target = client.post(
+        "/api/v1/nutrition/targets/manual", json=_manual_payload(), headers=client_headers
+    )
+    assert own_target.status_code == 200
     own_history = client.get("/api/v1/nutrition/targets/history", headers=client_headers)
-    assert own_history.json()["items"][0]["source"] == "trainer"
+    assert own_history.json()["items"][0]["source"] == "manual"
+    coach_history = client.get(
+        "/api/v1/nutrition/targets/history?target_telegram_user_id=55005",
+        headers=coach_headers,
+    )
+    assert coach_history.status_code == 200
+    assert coach_history.json()["items"][0]["id"] == own_target.json()["id"]
 
     with get_session_context() as db:
         relation = db.query(CoachClient).filter(CoachClient.coach_user_id == coach_id).one()

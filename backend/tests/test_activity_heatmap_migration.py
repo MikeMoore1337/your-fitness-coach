@@ -54,6 +54,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
             "CREATE TABLE user_workouts (id INTEGER PRIMARY KEY, user_program_id INTEGER NOT NULL, week_number INTEGER NOT NULL, day_number INTEGER NOT NULL, status TEXT, completed_at TEXT)",
             "CREATE TABLE user_workout_exercises (id INTEGER PRIMARY KEY, prescribed_sets INTEGER NOT NULL, prescribed_reps VARCHAR(32) NOT NULL, rest_seconds INTEGER NOT NULL)",
             "CREATE TABLE users (id INTEGER PRIMARY KEY)",
+            "CREATE TABLE coach_clients (id INTEGER PRIMARY KEY)",
             "CREATE TABLE user_workout_sets (id INTEGER PRIMARY KEY, actual_weight NUMERIC, actual_reps INTEGER, is_completed BOOLEAN)",
             "CREATE TABLE user_profiles (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL)",
             "INSERT INTO program_templates VALUES (1, 16)",
@@ -85,7 +86,7 @@ def test_activity_and_cycle_migrations_converge_without_rewriting_facts(starting
         command.upgrade(config, "head")
         connection.commit()
         assert connection.exec_driver_sql("SELECT version_num FROM alembic_version").all() == [
-            ("0156_nutrition_catalog_check",)
+            ("0158_coach_nutrition_proposals",)
         ]
         assert connection.exec_driver_sql(
             "SELECT status, self_assigned_program_id, self_assignment_request_hash FROM program_imports"

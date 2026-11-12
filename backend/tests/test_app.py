@@ -22,6 +22,7 @@ from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.notification import Notification, NotificationSetting
+from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.program import (
     ProgramTemplate,
     UserProgram,
@@ -689,7 +690,7 @@ def test_client_can_save_detailed_activity_and_multiple_cardio_trainings(client)
     )
 
 
-def test_coach_can_assign_kbju_to_own_client(client):
+def test_coach_cannot_assign_kbju_without_client_confirmation(client):
     coach_headers = auth(
         client,
         telegram_user_id=6101,
@@ -715,15 +716,20 @@ def test_coach_can_assign_kbju_to_own_client(client):
         headers=coach_headers,
     )
 
-    assert saved.status_code == 200
-    data = saved.json()
-    assert data["telegram_user_id"] == 6102
-    assert data["assigned_by"]["username"] == "nutrition_coach"
+    assert saved.status_code == 409
+    assert client.get("/api/v1/me", headers=client_headers).json()["profile"]["kbju"] is None
+    own_payload = {
+        key: value
+        for key, value in json.loads(saved.request.content).items()
+        if key != "target_telegram_user_id"
+    }
+    own = client.post("/api/v1/nutrition/targets", json=own_payload, headers=client_headers)
+    assert own.status_code == 200
 
     me = client.get("/api/v1/me", headers=client_headers).json()
     kbju = me["profile"]["kbju"]
     assert kbju["telegram_user_id"] == 6102
-    assert kbju["assigned_by"]["full_name"] == "КБЖУ Тренер"
+    assert kbju["id"] == own.json()["id"]
 
 
 def test_client_parameter_and_weight_changes_recalculate_kbju_and_notify(client):
@@ -887,15 +893,17 @@ def test_calculated_kbju_api_rejects_infeasible_macros_without_saving(client):
     assert created.json()["calories"] < created.json()["tdee"]
 
 
-def test_coach_profile_and_measurement_changes_preserve_explicit_trainer_target(client):
+@pytest.mark.parametrize("legacy_trainer_target", [False, True])
+def test_coach_profile_and_measurement_changes_preserve_client_target(
+    client, legacy_trainer_target
+):
     coach_headers = auth(client, telegram_user_id=6104, is_coach=True)
     client_headers = auth(client, telegram_user_id=6105, is_coach=False)
     client_user = client.get("/api/v1/me", headers=client_headers).json()
     accept_coach_invite(client, coach_headers, client_headers)
-    client.post(
+    initial = client.post(
         "/api/v1/nutrition/targets",
         json={
-            "target_telegram_user_id": 6105,
             "sex": "female",
             "weight_kg": 64.5,
             "height_cm": 168,
@@ -904,8 +912,15 @@ def test_coach_profile_and_measurement_changes_preserve_explicit_trainer_target(
             "cardio_trainings_per_week": 2,
             "goal": "fat_loss",
         },
-        headers=coach_headers,
+        headers=client_headers,
     )
+    assert initial.status_code == 200
+    if legacy_trainer_target:
+        with get_session_context() as db:
+            target = db.get(NutritionTarget, initial.json()["id"])
+            target.source = "trainer"
+            target.assigned_by_user_id = db.query(User.id).filter_by(telegram_user_id=6104).scalar()
+    original_notifications = client.get("/api/v1/notifications", headers=client_headers).json()
 
     profile = client.patch(
         f"/api/v1/coach/clients/{client_user['id']}/profile",
@@ -924,13 +939,11 @@ def test_coach_profile_and_measurement_changes_preserve_explicit_trainer_target(
 
     kbju = client.get("/api/v1/me", headers=client_headers).json()["profile"]["kbju"]
     assert kbju["weight_kg"] == 64.5
-    assert kbju["assigned_by"]["telegram_user_id"] == 6104
+    assert kbju["id"] == initial.json()["id"]
+    if legacy_trainer_target:
+        assert kbju["assigned_by"]["telegram_user_id"] == 6104
     notifications = client.get("/api/v1/notifications", headers=client_headers).json()
-    nutrition_notifications = [
-        row for row in notifications if row["title"] == "Ориентиры КБЖУ обновлены"
-    ]
-    assert len(nutrition_notifications) == 1
-    assert "Тренер обновил ориентиры питания" in nutrition_notifications[0]["body"]
+    assert len(notifications) == len(original_notifications)
 
 
 def test_nutrition_form_only_notifies_when_calculation_inputs_change(client):
