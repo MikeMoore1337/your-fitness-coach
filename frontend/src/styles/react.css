@@ -9492,9 +9492,6 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
     transform: translateY(4px);
   }
 }
-.nutrition-day-summary {
-  container-type: inline-size;
-}
 .nutrition-targets {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -9516,7 +9513,7 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 .nutrition-target .data-viz-progress__label strong {
   font-variant-numeric: tabular-nums;
 }
-@container (max-width: 280px) {
+@media (max-width: 350px) {
   .nutrition-targets {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 11px;

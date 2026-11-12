@@ -83,6 +83,80 @@ test('macro summary remains readable across viewport sizes', async ({ page }, te
   }
 });
 
+for (const theme of ['light', 'dark'] as const) {
+  for (const state of ['zero', 'unknown', 'excess'] as const) {
+    test(`macro summary ${state} ${theme}`, async ({ page }, testInfo) => {
+      await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+      await mockNutritionApi(page);
+      const targets = { energy_kcal: '2000', protein_g: '140', fat_g: '70', carbs_g: '220' };
+      const totals =
+        state === 'zero'
+          ? { ...zeroNutrition }
+          : {
+              ...zeroNutrition,
+              energy_kcal: state === 'excess' ? '2400' : '1200',
+              protein_g: state === 'unknown' ? null : '150',
+              fat_g: '30',
+              carbs_g: '100',
+            };
+      const remaining =
+        state === 'zero'
+          ? { ...targets }
+          : {
+              energy_kcal: state === 'excess' ? '-400' : '800',
+              protein_g: state === 'unknown' ? null : '-10',
+              fat_g: '40',
+              carbs_g: '120',
+            };
+      await page.route('**/api/v1/nutrition/diary?*', (route) =>
+        route.fulfill({
+          json: {
+            diary_date: '2026-08-19',
+            timezone: 'Europe/Moscow',
+            meals: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type) => ({
+              meal_type,
+              entries: [],
+              totals: zeroNutrition,
+            })),
+            totals,
+            targets,
+            remaining,
+            status: 'incomplete',
+            status_is_explicit: false,
+          },
+        }),
+      );
+      await page.goto('/app?section=nutrition');
+      const summary = nutritionDaySummary(page);
+      await expect(summary.locator('.nutrition-target')).toHaveCount(4);
+      if (state === 'zero') await expect(summary.getByText('Осталось 2 000 ккал')).toBeVisible();
+      if (state === 'unknown') {
+        await expect(summary.getByText('Нет данных', { exact: true })).toBeVisible();
+        await expect(summary.getByText('Цель: 140 г')).toBeVisible();
+      }
+      if (state === 'excess')
+        await expect(summary.getByText('Выше ориентира на 400 ккал')).toBeVisible();
+      for (const width of [393, 1280]) {
+        await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
+        if (process.env.MACRO_STATE_CAPTURE_DIR) {
+          await mkdir(process.env.MACRO_STATE_CAPTURE_DIR, { recursive: true });
+          await summary.screenshot({
+            path: resolve(
+              process.env.MACRO_STATE_CAPTURE_DIR,
+              `${testInfo.project.name}-${theme}-${width}-${state}.png`,
+            ),
+          });
+        }
+      }
+    });
+  }
+}
+
 const CAPTURE_974_AFTER = process.env.CAPTURE_974_AFTER === '1';
 const ISSUE_974_AFTER_DIR = resolve(
   process.env.CAPTURE_974_AFTER_DIR ??
