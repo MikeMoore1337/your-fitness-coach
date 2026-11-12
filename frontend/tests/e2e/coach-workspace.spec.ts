@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 import { installTelegramHarness } from './fixtures/mobile-tma';
 import { expectSelectedChoice } from './fixtures/selected-state';
 
@@ -1467,9 +1469,15 @@ async function openCoach(page: Page) {
 }
 
 for (const surface of ['desktop', 'mobile', 'tma'] as const) {
-  test(`Issue 954: тренер проверяет и отправляет предложение (${surface})`, async ({ page }) => {
+  test(`Issue 954: тренер проверяет и отправляет предложение (${surface})`, async ({
+    page,
+  }, testInfo) => {
     if (surface !== 'desktop') await page.setViewportSize({ width: 390, height: 844 });
     if (surface === 'tma') await installTelegramHarness(page);
+    const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+    const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+    if (evidence)
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
     await mockCoachWorkspace(page);
     let sent = false;
     await page.route('**/api/v1/coach-nutrition-proposals/clients/11', async (route) => {
@@ -1496,6 +1504,16 @@ for (const surface of ['desktop', 'mobile', 'tma'] as const) {
     await page.getByLabel('Углеводы, г', { exact: true }).fill('180');
     await page.getByRole('button', { name: 'Проверить изменения' }).click();
     await expect(page.getByRole('region', { name: 'Проверка предложения' })).toContainText('2000');
+    if (evidence) {
+      mkdirSync(evidence, { recursive: true });
+      await page.screenshot({
+        path: path.join(
+          evidence,
+          `${testInfo.project.name}-${surface}-${theme}-trainer-review.png`,
+        ),
+        fullPage: true,
+      });
+    }
     expect(sent).toBe(false);
     await page.getByRole('button', { name: 'Отправить предложение' }).click();
     await expect.poll(() => sent).toBe(true);

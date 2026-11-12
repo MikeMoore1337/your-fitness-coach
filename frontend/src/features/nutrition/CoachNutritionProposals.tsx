@@ -6,12 +6,13 @@ import { addCalendarDays, dateInputValue } from '../../shared/dateTime';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { DisclosureIcon } from '../../shared/ui/common';
+import './coach-nutrition-proposals.css';
 
 type Proposal = components['schemas']['CoachNutritionProposalResponse'];
 type Create = components['schemas']['CoachNutritionProposalCreate-Input'];
 type Plan = components['schemas']['CoachNutritionPlanPreview'];
 type Assignments = components['schemas']['CoachNutritionTargetAssignments'];
-const labels: Record<Proposal['status'], string> = {
+const labels: Record<string, string> = {
   pending: 'Ожидает ответа',
   accepted: 'Принято',
   rejected: 'Отклонено',
@@ -46,7 +47,7 @@ function Comparison({
   ] as const;
   return (
     <>
-      <div className="table-scroll">
+      <div className="coach-nutrition-comparison">
         <table>
           <thead>
             <tr>
@@ -331,16 +332,18 @@ export function TrainerNutritionProposals({
           <h4>Что увидит клиент</h4>
           <Comparison proposal={preview} />
           <p>Прошедшие дни и дневник не изменятся.</p>
-          <button type="button" className="secondary" onClick={() => setPreview(null)}>
-            Вернуться к изменениям
-          </button>{' '}
-          <button
-            type="button"
-            disabled={send.isPending}
-            onClick={() => send.mutate(preview.request)}
-          >
-            {send.isPending ? 'Отправляем…' : 'Отправить предложение'}
-          </button>
+          <div className="coach-nutrition-review-actions">
+            <button type="button" className="secondary" onClick={() => setPreview(null)}>
+              Вернуться к изменениям
+            </button>
+            <button
+              type="button"
+              disabled={send.isPending}
+              onClick={() => send.mutate(preview.request)}
+            >
+              {send.isPending ? 'Отправляем…' : 'Отправить предложение'}
+            </button>
+          </div>
         </section>
       )}
       <details className="top-gap">

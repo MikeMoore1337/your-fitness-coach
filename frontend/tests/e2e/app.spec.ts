@@ -12,9 +12,13 @@ test.use({ serviceWorkers: 'block' });
 
 for (const decision of ['accept', 'reject'] as const) {
   for (const surface of ['desktop', 'mobile', 'tma'] as const) {
-    test(`Issue 954: клиент выбирает ${decision} (${surface})`, async ({ page }) => {
+    test(`Issue 954: клиент выбирает ${decision} (${surface})`, async ({ page }, testInfo) => {
       if (surface !== 'desktop') await page.setViewportSize({ width: 390, height: 844 });
       if (surface === 'tma') await installTelegramHarness(page);
+      const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+      const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+      if (evidence)
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
       await mockApi(page);
       let status = 'pending';
       const proposal = {
@@ -41,12 +45,30 @@ for (const decision of ['accept', 'reject'] as const) {
       await page.goto('/app?section=nutrition');
       if (surface !== 'tma') await page.getByRole('button', { name: 'Клиент' }).click();
       await expect(page.getByRole('heading', { name: 'Проверьте изменения' })).toBeVisible();
+      if (evidence && decision === 'accept') {
+        mkdirSync(evidence, { recursive: true });
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${surface}-${theme}-client-review.png`,
+          ),
+          fullPage: true,
+        });
+      }
       await page
         .getByRole('button', { name: decision === 'accept' ? 'Принять изменения' : 'Отклонить' })
         .click();
       await expect(
         page.getByRole('heading', { name: decision === 'accept' ? 'Принято' : 'Отклонено' }),
       ).toBeVisible();
+      if (evidence)
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${surface}-${theme}-client-${decision}.png`,
+          ),
+          fullPage: true,
+        });
     });
   }
 }

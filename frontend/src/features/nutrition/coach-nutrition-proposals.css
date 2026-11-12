@@ -1,0 +1,31 @@
+.coach-nutrition-comparison {
+  overflow-x: auto;
+}
+
+.coach-nutrition-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-nutrition-comparison th,
+.coach-nutrition-comparison td {
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.coach-nutrition-comparison th:first-child {
+  text-align: left;
+}
+
+.coach-nutrition-review-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.coach-nutrition-review-actions button {
+  min-height: 44px;
+}
