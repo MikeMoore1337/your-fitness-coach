@@ -177,6 +177,31 @@ describe('NutritionDiary', () => {
     expect(within(summary).queryByRole('progressbar', { name: /Белки/ })).not.toBeInTheDocument();
   });
 
+  it('preserves a zero goal and zero consumption', async () => {
+    const day = makeDay([]);
+    day.targets!.energy_kcal = '0';
+    day.remaining!.energy_kcal = '0';
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = await screen.findByRole('complementary', { name: 'КБЖУ' });
+    expect(
+      within(summary).getByRole('progressbar', { name: 'Калории: 0 из 0 ккал' }),
+    ).toBeVisible();
+    expect(within(summary).getByText('Осталось 0 ккал')).toBeVisible();
+  });
+
+  it('preserves the significant excess status', async () => {
+    const day = makeDay();
+    day.totals = { ...day.totals, energy_kcal: '2400' };
+    day.remaining!.energy_kcal = '-400';
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = await screen.findByRole('complementary', { name: 'КБЖУ' });
+    expect(within(summary).getByText('Выше ориентира на 400 ккал')).toBeVisible();
+  });
+
   it('shows the unavailable copy action and its explanation in read-only demo', async () => {
     apiMock.mockResolvedValue(makeDay());
     renderDiary({ readOnlyEntries: true });
