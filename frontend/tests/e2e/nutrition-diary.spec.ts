@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { chromium, expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -13,6 +13,122 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
+if (process.env.MACRO_NATIVE_ZOOM === '1') {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`native Chromium 200 percent zoom ${theme}`, async () => {
+      test.setTimeout(90_000);
+      const extension = resolve('../.artifacts/runtime/tests/1435-zoom-extension');
+      await mkdir(extension, { recursive: true });
+      await writeFile(
+        resolve(extension, 'manifest.json'),
+        JSON.stringify({
+          manifest_version: 3,
+          name: 'YFC local zoom test',
+          version: '1.0',
+          permissions: ['tabs'],
+          background: { service_worker: 'background.js' },
+        }),
+      );
+      await writeFile(
+        resolve(extension, 'background.js'),
+        'chrome.runtime.onInstalled.addListener(() => {});',
+      );
+      const context = await chromium.launchPersistentContext('', {
+        headless: true,
+        channel: 'chromium',
+        viewport: { width: 1280, height: 900 },
+        args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+      });
+      try {
+        const worker =
+          context.serviceWorkers()[0] ??
+          (await context.waitForEvent('serviceworker', { timeout: 15_000 }));
+        const page = context.pages()[0] ?? (await context.newPage());
+        await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+        await mockNutritionApi(page);
+        await page.goto(
+          new URL(
+            '/app?section=nutrition',
+            process.env.PW_BASE_URL ?? `http://127.0.0.1:${process.env.PW_PREVIEW_PORT ?? '4173'}`,
+          ).toString(),
+        );
+        const summary = nutritionDaySummary(page);
+        await expect(summary.getByRole('progressbar')).toHaveCount(4);
+        await page.evaluate(() => document.fonts.ready);
+        const zoom = await worker.evaluate<number>(`(async () => {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          await chrome.tabs.setZoom(tab.id, 2);
+          return chrome.tabs.getZoom(tab.id);
+        })()`);
+        expect(zoom).toBe(2);
+        for (const width of [320, 360, 393, 430, 1280]) {
+          await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+          expect(
+            await worker.evaluate<number>(
+              `(async () => { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); return chrome.tabs.getZoom(tab.id); })()`,
+            ),
+          ).toBe(2);
+          const metrics = await page.evaluate(() => ({
+            dpr: devicePixelRatio,
+            innerWidth,
+            clientWidth: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+          }));
+          console.log('NATIVE_ZOOM', JSON.stringify({ theme, width, zoom, ...metrics }));
+          expect(metrics.dpr).toBe(2);
+          expect(Math.abs(metrics.innerWidth - width / 2)).toBeLessThanOrEqual(1);
+          expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+          const targets = summary.locator('.nutrition-target');
+          await expect(targets).toHaveCount(4);
+          for (const label of ['Калории', 'Белки', 'Жиры', 'Углеводы'])
+            await expect(targets.getByText(label, { exact: true })).toBeVisible();
+          const fits = await summary.evaluate((root) => {
+            const card = root.getBoundingClientRect();
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            while (walker.nextNode()) {
+              if (!walker.currentNode.textContent?.trim()) continue;
+              const range = document.createRange();
+              range.selectNodeContents(walker.currentNode);
+              for (const rect of range.getClientRects())
+                if (rect.width && (rect.left < card.left || rect.right > card.right)) return false;
+            }
+            return true;
+          });
+          console.log('SUMMARY_TEXT_FITS', JSON.stringify({ theme, width, fits }));
+          if (process.env.MACRO_BEFORE !== '1') expect(fits).toBe(true);
+          if (process.env.MACRO_ZOOM_CAPTURE_DIR) {
+            await mkdir(process.env.MACRO_ZOOM_CAPTURE_DIR, { recursive: true });
+            const cdp = await context.newCDPSession(page);
+            for (const [part, element] of [
+              ['top', summary],
+              ['middle', targets.nth(1)],
+              ['bottom', targets.last()],
+            ] as const) {
+              await element.evaluate((node) => node.scrollIntoView({ block: 'start' }));
+              const capture = await cdp.send('Page.captureScreenshot', {
+                format: 'png',
+                fromSurface: true,
+              });
+              await writeFile(
+                resolve(
+                  process.env.MACRO_ZOOM_CAPTURE_DIR,
+                  `chromium-${theme}-${width}-${part}.png`,
+                ),
+                Buffer.from(capture.data, 'base64'),
+              );
+            }
+            await cdp.detach();
+          }
+        }
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
+
 test('macro summary remains readable across viewport sizes', async ({ page }, testInfo) => {
   const theme = process.env.MACRO_THEME === 'dark' ? 'dark' : 'light';
   await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
@@ -22,6 +138,7 @@ test('macro summary remains readable across viewport sizes', async ({ page }, te
   await page.goto('/app?section=nutrition');
   const summary = nutritionDaySummary(page);
   await expect(summary.getByRole('progressbar')).toHaveCount(4);
+  await page.evaluate(() => document.fonts.ready);
   for (const width of [320, 360, 393, 430, 1280]) {
     await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
     await expect(summary).toBeVisible();
