@@ -46,7 +46,9 @@ def upgrade() -> None:
         sa.Column("request_hash", sa.String(64), nullable=False),
         sa.Column("status", sa.String(16), nullable=False, server_default="pending"),
         sa.Column("decision_key", sa.String(128), nullable=True),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+        ),
         sa.Column("decided_at", sa.DateTime(), nullable=True),
         sa.CheckConstraint(
             "status IN ('pending', 'accepted', 'rejected')",
