@@ -293,9 +293,9 @@ def _active_clients(
     *,
     limit: int,
     offset: int,
-) -> tuple[list[tuple[User, str | None]], int]:
+) -> tuple[list[tuple[User, str | None, bool]], int]:
     query = (
-        db.query(User, CoachClient.private_name)
+        db.query(User, CoachClient.private_name, CoachClient.nutrition_access)
         .join(CoachClient, CoachClient.client_user_id == User.id)
         .filter(
             CoachClient.coach_user_id == coach.id,
@@ -315,7 +315,7 @@ def _active_clients(
         .limit(limit)
         .all()
     )
-    return [(client, private_name) for client, private_name in rows], total
+    return [(client, private_name, access) for client, private_name, access in rows], total
 
 
 def build_trainer_client_summaries(
@@ -329,7 +329,7 @@ def build_trainer_client_summaries(
     date_to: date | None = None,
 ) -> dict:
     client_rows, total = _active_clients(db, coach, limit=limit, offset=offset)
-    clients = [client for client, _private_name in client_rows]
+    clients = [client for client, _private_name, _access in client_rows]
     period_bounds = None
     effective_period_days = 30 if period_days is None else int(period_days)
     if date_from is not None or date_to is not None:
@@ -364,12 +364,12 @@ def build_trainer_client_summaries(
         db,
         clients,
         effective_period_days,
-        nutrition_visible_user_ids={client.id for client in clients},
+        nutrition_visible_user_ids={client.id for client, _, access in client_rows if access},
         period_bounds=period_bounds,
     )
     names = {
         client.id: private_name or (client.profile.full_name if client.profile else None)
-        for client, private_name in client_rows
+        for client, private_name, _access in client_rows
     }
     for summary in summaries:
         summary["client_name"] = names[summary["user_id"]]
@@ -397,6 +397,8 @@ def build_progress_summary_for_range(
     user: User,
     period_start: date,
     period_end: date,
+    *,
+    nutrition_visible: bool = True,
 ) -> dict:
     if period_end < period_start:
         raise ValueError("period_end must not be before period_start")
@@ -407,7 +409,7 @@ def build_progress_summary_for_range(
         db,
         [user],
         period_days,
-        nutrition_visible_user_ids={user.id},
+        nutrition_visible_user_ids={user.id} if nutrition_visible else set(),
         period_bounds={user.id: (period_start, period_end)},
     )[0]
 

@@ -1039,6 +1039,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/trainer/nutrition-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Trainer Nutrition Access */
+        get: operations["read_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_get"];
+        /** Set Trainer Nutrition Access */
+        put: operations["set_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/coach-invites/link/preview": {
         parameters: {
             query?: never;
@@ -2974,6 +2992,108 @@ export interface paths {
         post?: never;
         /** Remove Coach Client Invite By Id */
         delete: operations["remove_coach_client_invite_by_id_api_v1_coach_client_invites_id__invite_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Proposals */
+        get: operations["get_proposals_api_v1_coach_nutrition_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Proposal */
+        post: operations["post_proposal_api_v1_coach_nutrition_proposals_clients__client_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Client Day */
+        get: operations["get_client_day_api_v1_coach_nutrition_proposals_clients__client_id__day_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}/target-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Client Target History */
+        get: operations["get_client_target_history_api_v1_coach_nutrition_proposals_clients__client_id__target_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}/target-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Client Target Assignments */
+        get: operations["get_client_target_assignments_api_v1_coach_nutrition_proposals_clients__client_id__target_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/{proposal_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Decision */
+        post: operations["post_decision_api_v1_coach_nutrition_proposals__proposal_id__decision_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -9728,6 +9848,127 @@ export interface components {
         CoachInviteTokenRequest: {
             /** Token */
             token: string;
+        };
+        /** CoachNutritionPlanPreview */
+        CoachNutritionPlanPreview: {
+            /** Target Id */
+            target_id: number | null;
+            day: components["schemas"]["NutritionPlanDayResponse"];
+            program: components["schemas"]["NutritionScheduleProgramContext"] | null;
+            program_day: components["schemas"]["NutritionProgramDayResponse"] | null;
+            binding: components["schemas"]["NutritionScheduleBindingStatus"] | null;
+        };
+        /** CoachNutritionProposalCreate */
+        "CoachNutritionProposalCreate-Input": {
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Expected Target Id */
+            expected_target_id: number | null;
+            /** Expected Plan Revision */
+            expected_plan_revision: number;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Item Id */
+            item_id?: number | null;
+            /** Item Amount */
+            item_amount?: number | string | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** CoachNutritionProposalCreate */
+        "CoachNutritionProposalCreate-Output": {
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Expected Target Id */
+            expected_target_id: number | null;
+            /** Expected Plan Revision */
+            expected_plan_revision: number;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Item Id */
+            item_id?: number | null;
+            /** Item Amount */
+            item_amount?: string | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** CoachNutritionProposalDecision */
+        CoachNutritionProposalDecision: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "accept" | "reject";
+            /** Version */
+            version: number;
+        };
+        /** CoachNutritionProposalResponse */
+        CoachNutritionProposalResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Target Id */
+            target_id: number | null;
+            /** Plan Revision */
+            plan_revision: number;
+            request: components["schemas"]["CoachNutritionProposalCreate-Output"];
+            /** Before */
+            before: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "rejected";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /** CoachNutritionTargetAssignments */
+        CoachNutritionTargetAssignments: {
+            /** Dates */
+            dates: components["schemas"]["NutritionDateOverrideResponse"][];
+            /** Schedule */
+            schedule: components["schemas"]["NutritionScheduleRuleResponse"][];
         };
         /** CoachOperationsTodayResponse */
         CoachOperationsTodayResponse: {
@@ -19843,6 +20084,13 @@ export interface components {
             /** Client Name */
             client_name?: string | null;
         };
+        /** TrainerNutritionAccess */
+        TrainerNutritionAccess: {
+            /** Relationship Id */
+            relationship_id: number;
+            /** Nutrition Access */
+            nutrition_access: boolean;
+        };
         /** TrainerResponse */
         TrainerResponse: {
             /** Id */
@@ -24253,6 +24501,59 @@ export interface operations {
             };
         };
     };
+    read_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainerNutritionAccess"];
+                };
+            };
+        };
+    };
+    set_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainerNutritionAccess"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainerNutritionAccess"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     preview_invite_link_api_v1_me_coach_invites_link_preview_post: {
         parameters: {
             query?: never;
@@ -28361,6 +28662,206 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_proposals_api_v1_coach_nutrition_proposals_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionProposalResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_proposal_api_v1_coach_nutrition_proposals_clients__client_id__post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachNutritionProposalCreate-Input"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_day_api_v1_coach_nutrition_proposals_clients__client_id__day_get: {
+        parameters: {
+            query: {
+                target_date: string;
+            };
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionPlanPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_target_history_api_v1_coach_nutrition_proposals_clients__client_id__target_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionTargetHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_target_assignments_api_v1_coach_nutrition_proposals_clients__client_id__target_assignments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionTargetAssignments"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_decision_api_v1_coach_nutrition_proposals__proposal_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                proposal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachNutritionProposalDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionProposalResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -687,6 +687,24 @@ async function mockCoachWorkspace(
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    if (path.includes('/coach-nutrition-proposals/clients/') && path.endsWith('/day'))
+      return route.fulfill({
+        json: {
+          target_id: null,
+          day: {
+            plan_date: url.searchParams.get('target_date'),
+            revision: 0,
+            targets: null,
+            slots: [],
+          },
+          program: null,
+          program_day: null,
+          binding: null,
+        },
+      });
+    if (path.endsWith('/target-assignments'))
+      return route.fulfill({ json: { dates: [], schedule: [] } });
+    if (path.includes('/coach-nutrition-proposals')) return route.fulfill({ json: [] });
     if (path.endsWith('/public/config'))
       return route.fulfill({
         json: { app_env: 'dev', enable_dev_auth: true, telegram_bot_username: 'fit_bot' },
@@ -1446,6 +1464,42 @@ async function openCoach(page: Page) {
   await page.getByRole('button', { name: 'Тренер' }).click();
   await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
+}
+
+for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+  test(`Issue 954: тренер проверяет и отправляет предложение (${surface})`, async ({ page }) => {
+    if (surface !== 'desktop') await page.setViewportSize({ width: 390, height: 844 });
+    if (surface === 'tma') await installTelegramHarness(page);
+    await mockCoachWorkspace(page);
+    let sent = false;
+    await page.route('**/api/v1/coach-nutrition-proposals/clients/11', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      expect(route.request().postDataJSON()).toMatchObject({ calories: 2000, protein_g: 150 });
+      sent = true;
+      await route.fulfill({ status: 201, json: { id: 1 } });
+    });
+    await page.goto('/coach');
+    if (surface !== 'tma') await page.getByRole('button', { name: 'Тренер' }).click();
+    await trainerPrimaryNavigation(page)
+      .getByRole('link', { name: 'Клиенты', exact: true })
+      .click();
+    if (surface !== 'desktop')
+      await page
+        .getByRole('button', { name: /Анна Петрова/ })
+        .first()
+        .click();
+    await page.locator('#coach-client-nutrition > summary').click();
+    await page.getByRole('button', { name: 'Предложить изменение' }).click();
+    await page.getByLabel('Энергия, ккал', { exact: true }).fill('2000');
+    await page.getByLabel('Белки, г', { exact: true }).fill('150');
+    await page.getByLabel('Жиры, г', { exact: true }).fill('70');
+    await page.getByLabel('Углеводы, г', { exact: true }).fill('180');
+    await page.getByRole('button', { name: 'Проверить изменения' }).click();
+    await expect(page.getByRole('region', { name: 'Проверка предложения' })).toContainText('2000');
+    expect(sent).toBe(false);
+    await page.getByRole('button', { name: 'Отправить предложение' }).click();
+    await expect.poll(() => sent).toBe(true);
+  });
 }
 
 function trainerPrimaryNavigation(page: Page) {

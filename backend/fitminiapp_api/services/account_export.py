@@ -26,6 +26,7 @@ from fitminiapp_api.models.coach_crm import (
     CoachSessionSeries,
     CoachTask,
 )
+from fitminiapp_api.models.coach_nutrition_proposal import CoachNutritionProposal
 from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
@@ -175,6 +176,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "exercise_guide_metadata": "custom_exercises",
     "exercise_alternatives": "custom_exercises",
     "coach_clients": "coaching_relationships",
+    "coach_nutrition_proposals": "coach_nutrition_proposals",
     "coach_session_series": "coach_session_series",
     "coach_business_sessions": "coach_business_sessions",
     "coach_packages": "coach_packages",
@@ -1244,6 +1246,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(CoachClient.created_at.asc(), CoachClient.id.asc())
         .all()
     )
+    coach_nutrition_proposals = (
+        db.query(CoachNutritionProposal)
+        .filter(CoachNutritionProposal.client_user_id == user.id)
+        .order_by(CoachNutritionProposal.id.asc())
+        .all()
+    )
     session_series = (
         db.query(CoachSessionSeries)
         .filter(
@@ -1845,6 +1853,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "id": relation.id,
                 "role": "coach" if relation.coach_user_id == user.id else "client",
                 "status": relation.status,
+                "nutrition_access": relation.nutrition_access,
                 **(
                     {"operational_status": relation.operational_status or "active"}
                     if relation.coach_user_id == user.id
@@ -1856,6 +1865,26 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "ended_reason": relation.ended_reason,
             }
             for relation in relations
+        ],
+        "coach_nutrition_proposals": [
+            _fields(
+                proposal,
+                (
+                    "id",
+                    "coach_user_id",
+                    "relationship_id",
+                    "version",
+                    "target_date",
+                    "target_id",
+                    "plan_revision",
+                    "request",
+                    "before",
+                    "status",
+                    "created_at",
+                    "decided_at",
+                ),
+            )
+            for proposal in coach_nutrition_proposals
         ],
         "coach_session_series": [
             _fields(

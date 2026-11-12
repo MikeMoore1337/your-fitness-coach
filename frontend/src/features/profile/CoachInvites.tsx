@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
+import type { components } from '../../shared/api/schema';
 import type { CoachInvitePreview } from '../../shared/api/types';
 import { useAuth } from '../../app/AuthProvider';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Badge, Card } from '../../shared/ui/common';
+
+type TrainerNutritionAccess = components['schemas']['TrainerNutritionAccess'];
 
 export function tokenFromInvite(value: string): string {
   const trimmed = value.trim();
@@ -32,6 +35,25 @@ export function CoachInvites({
 }) {
   const { user, reloadUser } = useAuth();
   const { toast, confirm } = useFeedback();
+  const queryClient = useQueryClient();
+  const accessKey = ['me', 'trainer-nutrition-access', user?.trainer?.id] as const;
+  const nutritionAccess = useQuery({
+    queryKey: accessKey,
+    enabled: Boolean(user?.trainer),
+    queryFn: () => api<TrainerNutritionAccess>('/api/v1/me/trainer/nutrition-access'),
+  });
+  const updateNutritionAccess = useMutation({
+    mutationFn: (nutrition_access: boolean) =>
+      api<TrainerNutritionAccess>('/api/v1/me/trainer/nutrition-access', {
+        method: 'PUT',
+        body: { nutrition_access, relationship_id: nutritionAccess.data?.relationship_id },
+      }),
+    onSuccess: async (data) => {
+      queryClient.setQueryData(accessKey, data);
+      toast(data.nutrition_access ? 'Доступ к питанию открыт' : 'Доступ к питанию закрыт');
+    },
+    onError: (reason) => toast((reason as Error).message, 'error'),
+  });
   const handledInitialToken = useRef<string | null>(null);
   const [inviteInput, setInviteInput] = useState('');
   const [preview, setPreview] = useState<{ token: string; data: CoachInvitePreview } | null>(null);
@@ -92,6 +114,27 @@ export function CoachInvites({
         <span>Текущий тренер</span>
         <strong>{user?.trainer?.full_name || user?.trainer?.username || 'Не назначен'}</strong>
       </div>
+      {user?.trainer && (
+        <div className="top-gap">
+          {nutritionAccess.isError ? (
+            <p role="alert">Не удалось загрузить доступ к питанию.</p>
+          ) : (
+            <label>
+              <input
+                type="checkbox"
+                checked={nutritionAccess.data?.nutrition_access ?? false}
+                disabled={!nutritionAccess.data || updateNutritionAccess.isPending}
+                onChange={(event) => updateNutritionAccess.mutate(event.target.checked)}
+              />{' '}
+              Разрешить тренеру доступ к питанию
+            </label>
+          )}
+          <p className="muted">
+            Настройка не разрывает связь с тренером. При закрытом доступе недельные итоги и полные
+            отчёты, содержащие питание, тренеру недоступны.
+          </p>
+        </div>
+      )}
       <div className="toolbar wrap top-gap">
         {user?.trainer?.chat_url && (
           <a className="button-link" href={user.trainer.chat_url} target="_blank" rel="noreferrer">

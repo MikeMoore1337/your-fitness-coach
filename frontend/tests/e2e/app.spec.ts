@@ -10,6 +10,47 @@ import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 test.use({ serviceWorkers: 'block' });
 
+for (const decision of ['accept', 'reject'] as const) {
+  for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+    test(`Issue 954: клиент выбирает ${decision} (${surface})`, async ({ page }) => {
+      if (surface !== 'desktop') await page.setViewportSize({ width: 390, height: 844 });
+      if (surface === 'tma') await installTelegramHarness(page);
+      await mockApi(page);
+      let status = 'pending';
+      const proposal = {
+        id: 1,
+        version: 1,
+        target_date: '2030-01-10',
+        before: { target: null, item: null },
+        request: {
+          target_date: '2030-01-10',
+          calories: 2000,
+          protein_g: 150,
+          fat_g: 70,
+          carbs_g: 180,
+        },
+      };
+      await page.route('**/api/v1/coach-nutrition-proposals**', async (route) => {
+        if (route.request().method() === 'POST') {
+          expect(route.request().postDataJSON()).toEqual({ decision, version: 1 });
+          status = decision === 'accept' ? 'accepted' : 'rejected';
+          return route.fulfill({ json: { ...proposal, status } });
+        }
+        return route.fulfill({ json: [{ ...proposal, status }] });
+      });
+      await page.goto('/app?section=nutrition');
+      if (surface !== 'tma') await page.getByRole('button', { name: 'Клиент' }).click();
+      await expect(page.getByRole('heading', { name: 'Проверьте изменения' })).toBeVisible();
+      await page
+        .getByRole('button', { name: decision === 'accept' ? 'Принять изменения' : 'Отклонить' })
+        .click();
+      await expect(
+        page.getByRole('heading', { name: decision === 'accept' ? 'Принято' : 'Отклонено' }),
+      ).toBeVisible();
+    });
+  }
+}
+
 test.describe('универсальная геометрия предпросмотра #1185', () => {
   test.use({ hasTouch: true });
   for (const width of [320, 360, 393, 430]) {

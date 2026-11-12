@@ -25,7 +25,7 @@ from fitminiapp_api.schemas.coach_reviews import (
     CoachCheckInReviewRequest,
 )
 from fitminiapp_api.services.audit import record_audit_event
-from fitminiapp_api.services.coach_clients import get_client_managed_by_coach
+from fitminiapp_api.services.coach_clients import get_client_with_nutrition_access
 from fitminiapp_api.services.program_common import ProgramError
 
 
@@ -126,6 +126,7 @@ def list_coach_check_in_reviews(
                 CoachClient.client_user_id == WeeklyCheckIn.user_id,
                 CoachClient.coach_user_id == coach.id,
                 CoachClient.status == "active",
+                CoachClient.nutrition_access.is_(True),
             ),
         )
         .outerjoin(UserProfile, UserProfile.user_id == User.id)
@@ -187,7 +188,7 @@ def review_coach_check_in(
     if check_in is None:
         raise CoachReviewError("Недельный итог не найден", 404)
     try:
-        client = get_client_managed_by_coach(db, coach, check_in.user_id)
+        client = get_client_with_nutrition_access(db, coach, check_in.user_id)
     except ProgramError as exc:
         raise CoachReviewError("Недельный итог не найден", 404) from exc
 

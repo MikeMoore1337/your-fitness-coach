@@ -3,6 +3,7 @@ import type { NutritionTarget } from '../../shared/api/types';
 import type { components } from '../../shared/api/schema';
 import { dateInputValue } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
+import { ClientNutritionProposals } from './CoachNutritionProposals';
 import { NutritionDiary } from './NutritionDiary';
 import { NutritionTargets } from './NutritionTargets';
 import type { MealType } from './FoodPickerDialog';
@@ -61,6 +62,7 @@ export function NutritionPage({
           </AppLink>
         </nav>
       )}
+      {!demoSafeMode && <ClientNutritionProposals />}
       <div className="nutrition-day-content" ref={dayView} hidden={view !== 'day'}>
         <NutritionDiary
           initialDate={initialDate}

@@ -511,7 +511,8 @@ def test_schedule_requires_active_trainer_and_rejects_invalid_scope(client) -> N
         "day_type": "training",
         "week_type": None,
     }
-    request_headers = {**coach, "Idempotency-Key": "coach-schedule-goal"}
+    request_headers = {**athlete, "Idempotency-Key": "coach-schedule-goal"}
+    coach_headers = {**coach, "Idempotency-Key": "coach-direct-schedule-goal"}
     missing_week = client.post(
         "/api/v1/nutrition/targets/schedule",
         json={**rule, "week_type": "heavy"},
@@ -533,6 +534,12 @@ def test_schedule_requires_active_trainer_and_rejects_invalid_scope(client) -> N
     with get_session_context() as db:
         assert db.query(NutritionTargetScheduleRule).filter_by(user_id=athlete_id).count() == 0
         assert db.query(NutritionScheduleBinding).filter_by(user_id=athlete_id).count() == 0
+    assert (
+        client.post(
+            "/api/v1/nutrition/targets/schedule", json=rule, headers=coach_headers
+        ).status_code
+        == 409
+    )
     saved = client.post("/api/v1/nutrition/targets/schedule", json=rule, headers=request_headers)
     assert saved.status_code == 200, saved.text
     with get_session_context() as db:
@@ -541,7 +548,7 @@ def test_schedule_requires_active_trainer_and_rejects_invalid_scope(client) -> N
         ).one().status = "ended"
     assert (
         client.post(
-            "/api/v1/nutrition/targets/schedule", json=rule, headers=request_headers
+            "/api/v1/nutrition/targets/schedule", json=rule, headers=coach_headers
         ).status_code
         == 403
     )

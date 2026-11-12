@@ -687,7 +687,7 @@ export function NutritionForm({
           </>
         )}
       </fieldset>
-      <NutritionTargetHistory targetTelegramId={targetTelegramId} />
+      <NutritionTargetHistory targetTelegramId={targetTelegramId} clientId={clientId} />
     </>
   );
 

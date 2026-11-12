@@ -23,12 +23,16 @@ from sqlalchemy import (
 
 from fitminiapp_api import main as main_module
 from fitminiapp_api.core import timezone as timezone_module
-from fitminiapp_api.db.session import engine, get_session_context
+from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
 from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import FoodDiaryBatchOperation, FoodDiaryEntry
 from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.nutrition_power import NutritionMealTemplate
 from fitminiapp_api.models.user import User
+from fitminiapp_api.schemas.nutrition import NutritionDateOverrideSave
+from fitminiapp_api.schemas.nutrition_plan import NutritionPlanItemUpdate
+from fitminiapp_api.services.nutrition import save_nutrition_date_override
+from fitminiapp_api.services.nutrition_plan import update_plan_item
 
 
 def _auth(client, telegram_user_id: int) -> dict[str, str]:
@@ -70,6 +74,59 @@ def _store_food(name: str, *, owner_id: int | None = None) -> int:
 
 def _today() -> date:
     return timezone_module.today_in_timezone("Europe/Moscow")
+
+
+def test_target_and_plan_changes_can_roll_back_together(client) -> None:
+    headers = _auth(client, 74954)
+    food_id = _store_food("Продукт для плана")
+    plan_date = _today() + timedelta(days=1)
+    added = client.post(
+        "/api/v1/nutrition/plans/items",
+        headers={**headers, "Idempotency-Key": "atomic-plan-74954"},
+        params={"plan_date": plan_date.isoformat(), "meal_type": "lunch", "expected_revision": 0},
+        json={"food_id": food_id, "amount": "100", "amount_unit": "g"},
+    )
+    assert added.status_code == 201, added.text
+    item_id = _items(added.json())[0]["id"]
+
+    with SessionLocal() as db:
+        user = db.query(User).filter_by(telegram_user_id=74954).one()
+        save_nutrition_date_override(
+            db,
+            user,
+            NutritionDateOverrideSave(
+                effective_from=plan_date,
+                calories=2000,
+                protein_g=150,
+                fat_g=70,
+                carbs_g=180,
+            ),
+            "atomic-target-74954",
+            commit=False,
+        )
+        updated = update_plan_item(
+            db,
+            user,
+            item_id,
+            NutritionPlanItemUpdate(amount=Decimal("150"), expected_revision=1),
+            commit=False,
+        )
+        assert updated.revision == 2
+        db.rollback()
+
+    day = client.get(
+        "/api/v1/nutrition/plans/day", headers=headers, params={"plan_date": plan_date.isoformat()}
+    )
+    assert day.status_code == 200
+    assert day.json()["revision"] == 1
+    assert Decimal(str(_items(day.json())[0]["amount"])) == Decimal("100")
+    target = client.get(
+        "/api/v1/nutrition/targets/for-date",
+        headers=headers,
+        params={"target_date": plan_date.isoformat()},
+    )
+    assert target.status_code == 200
+    assert target.json()["target"] is None
 
 
 def _items(day: dict) -> list[dict]:

@@ -1714,6 +1714,7 @@ def list_clients(
             CoachClient.private_name,
             CoachClient.operational_status,
             CoachClient.labels,
+            CoachClient.nutrition_access,
         )
         .join(CoachClient, CoachClient.client_user_id == User.id)
         .options(joinedload(User.profile))
@@ -1739,8 +1740,9 @@ def list_clients(
         .all()
     )
 
-    client_users = [user for user, _private_name, _operational_status, _labels in clients]
+    client_users = [user for user, _private_name, _operational_status, _labels, _access in clients]
     users_by_id = {user.id: user for user in client_users}
+    nutrition_user_ids = [user.id for user, _, _, _, access in clients if access]
     # One extra query for all clients, never one query per client.
     # Keep each client's local-day cutoff, but group clients sharing that date
     # so the SQL predicate count does not grow with the client list.
@@ -1790,11 +1792,11 @@ def list_clients(
             )
         )
         .filter(
-            NutritionTarget.user_id.in_(users_by_id),
+            NutritionTarget.user_id.in_(nutrition_user_ids),
             NutritionTarget.effective_to.is_(None),
         )
         .all()
-        if users_by_id
+        if nutrition_user_ids
         else []
     )
     nutrition_by_user_id = {
@@ -1817,7 +1819,7 @@ def list_clients(
             labels=labels,
             latest_weight_kg=latest_weight_by_user.get(user.id),
         )
-        for user, private_name, operational_status, labels in clients
+        for user, private_name, operational_status, labels, _access in clients
     ] + [_client_entry_from_invite(invite) for invite in invites]
 
 

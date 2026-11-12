@@ -29,6 +29,7 @@ from fitminiapp_api.models.coach_crm import (
     CoachSessionSeries,
     CoachTask,
 )
+from fitminiapp_api.models.coach_nutrition_proposal import CoachNutritionProposal
 from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.coach_workflow_templates import (
     CoachCommunicationDraft,
@@ -184,6 +185,7 @@ __all__ = [
     "CoachClient",
     "CoachClientInvite",
     "CoachCommunicationDraft",
+    "CoachNutritionProposal",
     "CoachPackage",
     "CoachPackageLedgerEntry",
     "CoachPayment",

@@ -86,6 +86,23 @@ def get_client_managed_by_coach(db: Session, coach: User, client_id: int) -> Use
     return client
 
 
+def get_client_with_nutrition_access(db: Session, coach: User, client_id: int) -> User:
+    client = get_client_managed_by_coach(db, coach, client_id)
+    allowed = (
+        db.query(CoachClient.id)
+        .filter(
+            CoachClient.coach_user_id == coach.id,
+            CoachClient.client_user_id == client.id,
+            CoachClient.status == "active",
+            CoachClient.nutrition_access.is_(True),
+        )
+        .first()
+    )
+    if allowed is None:
+        raise ProgramError("Client nutrition access not found")
+    return client
+
+
 def _get_existing_user_by_telegram_id(db: Session, telegram_user_id: int) -> User | None:
     return db.query(User).filter(User.telegram_user_id == telegram_user_id).first()
 
@@ -400,6 +417,36 @@ def remove_current_trainer(db: Session, client: User) -> None:
         relation.ended_at = now_msk_naive()
         relation.ended_reason = "removed_by_client"
     db.commit()
+
+
+def trainer_nutrition_access(
+    db: Session, client: User, access: bool | None = None, relationship_id: int | None = None
+) -> dict[str, int | bool]:
+    if access is not None:
+        db.query(User.id).filter(User.id == client.id).with_for_update().one()
+    query = db.query(CoachClient).filter(
+        CoachClient.client_user_id == client.id, CoachClient.status == "active"
+    )
+    if access is not None:
+        query = query.with_for_update()
+    relation = query.first()
+    if relation is None:
+        raise ProgramError("Client link not found")
+    if relationship_id is not None and relation.id != relationship_id:
+        raise ProgramError("Trainer changed")
+    if access is not None and relation.nutrition_access != access:
+        relation.nutrition_access = access
+        record_audit_event(
+            db,
+            actor_user_id=client.id,
+            target_user_id=client.id,
+            action="coach.nutrition_access_changed",
+            resource_type="coach_client",
+            resource_id=relation.id,
+            details={"nutrition_access": access},
+        )
+        db.commit()
+    return {"relationship_id": relation.id, "nutrition_access": relation.nutrition_access}
 
 
 def create_coach_invite_link(db: Session, coach: User) -> dict:

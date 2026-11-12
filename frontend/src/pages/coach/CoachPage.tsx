@@ -24,6 +24,7 @@ import { CoachProgramOperations } from '../../features/coach/CoachProgramOperati
 import { TrainerModeSwitch } from '../../features/trainer/TrainerModeSwitch';
 import { ExerciseCatalog } from '../../features/exercises/ExerciseCatalog';
 import { NutritionForm } from '../../features/nutrition/NutritionForm';
+import { TrainerNutritionProposals } from '../../features/nutrition/CoachNutritionProposals';
 import { NutritionPeriodReport } from '../../features/workouts/NutritionReport';
 import { ProgramBuilder } from '../../features/programs/ProgramBuilder';
 import { AssignedProgramDetails } from '../../features/programs/AssignedProgramDetails';
@@ -1156,13 +1157,20 @@ function CoachClientDetail({
                 clientId={client.id}
               />
             )}
+            {client.status === 'active' && capabilities.canMutateProfile && (
+              <TrainerNutritionProposals
+                key={client.id}
+                clientId={client.id}
+                timeZone={client.timezone}
+              />
+            )}
             <NutritionForm
               key={JSON.stringify([client.id, client.kbju])}
               clientId={client.id}
               targetTelegramId={client.telegram_user_id}
               initial={client.kbju}
               timeZone={client.timezone}
-              readOnly={!capabilities.canMutateProfile}
+              readOnly
             />
           </>
         )}

@@ -207,6 +207,8 @@ def save_nutrition_schedule_rule(
     idempotency_key: str,
 ) -> NutritionScheduleRuleResponse:
     target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    if current_user.id != target_user.id:
+        raise NutritionConflictError("Изменение тренера требует подтверждения клиента")
     key, fingerprint = nutrition_request_identity(current_user, payload, idempotency_key)
     db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
     lock_nutrition_authorization(db, current_user, target_user)
@@ -469,6 +471,8 @@ def confirm_nutrition_schedule_binding(
     idempotency_key: str,
 ) -> NutritionScheduleBindingResponse:
     user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    if current_user.id != user.id:
+        raise NutritionConflictError("Изменение тренера требует подтверждения клиента")
     key, fingerprint = nutrition_request_identity(current_user, payload, idempotency_key)
     db.query(User.id).filter(User.id == user.id).with_for_update().one()
     lock_nutrition_authorization(db, current_user, user)
