@@ -446,7 +446,7 @@ def trainer_nutrition_access(
             details={"nutrition_access": access},
         )
         db.commit()
-    return {"relationship_id": relation.id, "nutrition_access": relation.nutrition_access}
+    return {"relationship_id": relation.id, "nutrition_access": bool(relation.nutrition_access)}
 
 
 def create_coach_invite_link(db: Session, coach: User) -> dict:

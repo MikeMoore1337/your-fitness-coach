@@ -347,8 +347,8 @@ class CoachClient(Base):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="active", server_default="active"
     )
-    nutrition_access: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default=text("true")
+    nutrition_access: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True, default=True, server_default=text("true")
     )
     operational_status: Mapped[str | None] = mapped_column(
         String(16), nullable=True, default="active", server_default="active"
