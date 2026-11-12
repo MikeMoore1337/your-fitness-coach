@@ -3454,7 +3454,6 @@ for (const width of [320, 360, 393, 430, 1280, 1440]) {
       await page.goto('/app?section=nutrition');
 
       const selectors = [
-        '.nutrition-repeat-default',
         '.nutrition-day-summary',
         '.nutrition-food-card',
         '.hydration-card',
@@ -3462,6 +3461,9 @@ for (const width of [320, 360, 393, 430, 1280, 1440]) {
         '.nutrition-suggestions',
       ];
       for (const selector of selectors) await expect(page.locator(selector)).toBeVisible();
+      await expect(
+        page.getByRole('region', { name: 'Обед' }).getByTestId('nutrition-repeat-default'),
+      ).toBeVisible();
       const positions = await page.evaluate(
         (items) =>
           items.map((selector) => {
@@ -3651,8 +3653,9 @@ for (const theme of ['light', 'dark'] as const) {
     });
     await page.goto('/app?section=nutrition');
     const repeat = page.getByTestId('nutrition-repeat-default');
-    await expect(page.getByText('Повторить вчерашний завтрак')).toBeVisible();
+    await expect(page.getByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
     await capture1429(page, `${testInfo.project.name}-${theme}-393-empty.png`);
+    await repeat.scrollIntoViewIfNeeded();
     await repeat.focus();
     const scrollBefore = await page.evaluate(() => window.scrollY);
     await page.keyboard.press('Enter');
@@ -3663,7 +3666,7 @@ for (const theme of ['light', 'dark'] as const) {
     await repeat.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByText('Завтрак добавлен')).toBeVisible();
-    await expect(page.getByText('Повторить вчерашний обед')).toBeVisible();
+    await expect(page.getByText('Обед за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(
       Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore),
@@ -3678,7 +3681,7 @@ for (const theme of ['light', 'dark'] as const) {
     await retryUndo.focus();
     await page.keyboard.press('Enter');
     await expect(page.getByText('Повтор завтрака отменён')).toBeVisible();
-    await expect(page.getByText('Повторить вчерашний завтрак')).toBeVisible();
+    await expect(page.getByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
     await capture1429(page, `${testInfo.project.name}-${theme}-393-undone.png`);
     const breakfast = page.getByRole('region', { name: 'Завтрак' });
     await breakfast.getByRole('button', { name: 'Завтрак' }).click();
