@@ -36,13 +36,22 @@ it('не даёт вводить цели до загрузки плана', () 
 });
 
 it('тренер проверяет сравнение перед отправкой предложения', async () => {
-  apiMock.mockImplementation((path: string, options?: { method?: string }) => {
-    if (options?.method === 'POST') return Promise.resolve({ id: 1 });
-    if (path.includes('/target-assignments')) return Promise.resolve({ dates: [], schedule: [] });
-    if (path.includes('/day?'))
-      return Promise.resolve({ target_id: null, day: { revision: 0, targets: null, slots: [] } });
-    return Promise.resolve([]);
-  });
+  apiMock.mockImplementation(
+    (path: string, options?: { method?: string; body?: Record<string, unknown> }) => {
+      if (options?.method === 'POST')
+        return Promise.resolve({
+          id: 1,
+          status: 'pending',
+          target_date: options.body?.target_date,
+          request: options.body,
+          before: { target: null, item: null },
+        });
+      if (path.includes('/target-assignments')) return Promise.resolve({ dates: [], schedule: [] });
+      if (path.includes('/day?'))
+        return Promise.resolve({ target_id: null, day: { revision: 0, targets: null, slots: [] } });
+      return Promise.resolve([]);
+    },
+  );
   setup(<TrainerNutritionProposals clientId={123} timeZone="Europe/Moscow" />);
   fireEvent.click(screen.getByRole('button', { name: 'Предложить изменение' }));
   await screen.findByText(/Текущая цель/);
@@ -108,4 +117,33 @@ it('показывает ошибку загрузки вместо пустог
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Не удалось загрузить предложения тренера',
   );
+});
+
+it('позволяет вернуться к дневнику, если открытое предложение исчезло', async () => {
+  apiMock.mockResolvedValue([]);
+  const onClose = vi.fn();
+  setup(<ClientNutritionProposals focused onClose={onClose} />);
+  expect(await screen.findByText('Предложений пока нет.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'К питанию' }));
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('объясняет устаревшее предложение и предлагает обновить данные', async () => {
+  const proposal = {
+    id: 7,
+    version: 1,
+    status: 'pending',
+    target_date: '2030-05-01',
+    before: { target: null, item: null },
+    request: { target_date: '2030-05-01', calories: 2000, protein_g: 150, fat_g: 70, carbs_g: 180 },
+  };
+  apiMock.mockImplementation((_path: string, options?: { method?: string }) =>
+    options?.method === 'POST'
+      ? Promise.reject(Object.assign(new Error('Цель изменилась'), { status: 409 }))
+      : Promise.resolve([proposal]),
+  );
+  setup(<ClientNutritionProposals />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Принять изменения' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Данные изменились');
+  expect(screen.getByRole('button', { name: 'Обновить данные' })).toBeInTheDocument();
 });

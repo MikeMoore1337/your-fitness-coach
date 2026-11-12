@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { components } from '../../shared/api/schema';
-import { addCalendarDays, dateInputValue } from '../../shared/dateTime';
+import { addCalendarDays, dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput } from '../../shared/ui/PickerInput';
-import { DisclosureIcon } from '../../shared/ui/common';
+import { Button, DisclosureIcon } from '../../shared/ui/common';
+import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import './coach-nutrition-proposals.css';
 
 type Proposal = components['schemas']['CoachNutritionProposalResponse'];
@@ -74,7 +75,13 @@ function Comparison({
         </p>
       )}
       <p className="muted">
-        Дата: {proposal.request.target_date}. Неизвестные значения показаны как «—».
+        Дата:{' '}
+        {formatCalendarDate(proposal.request.target_date, {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })}{' '}
+        · Неизвестные значения показаны как «—».
       </p>
       {proposal.request.comment && <p>Комментарий: {proposal.request.comment}</p>}
     </>
@@ -84,9 +91,13 @@ function Comparison({
 export function TrainerNutritionProposals({
   clientId,
   timeZone,
+  onEditingChange,
+  onAccessDenied,
 }: {
   clientId: number;
   timeZone?: string | null;
+  onEditingChange?: (editing: boolean) => void;
+  onAccessDenied?: () => void;
 }) {
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
@@ -108,6 +119,15 @@ export function TrainerNutritionProposals({
   const populatedDate = useRef<string | null>(null);
   const [confirmEnergy, setConfirmEnergy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
+  useTelegramOverlayBackButton(editing || selectedProposal !== null, () => {
+    if (selectedProposal) setSelectedProposal(null);
+    else if (preview) setPreview(null);
+    else setEditing(false);
+  });
+  useEffect(() => {
+    onEditingChange?.(editing || selectedProposal !== null);
+  }, [editing, selectedProposal, onEditingChange]);
   const requestKey = useRef(key());
   const listKey = ['coach-nutrition-proposals', clientId] as const;
   const list = useQuery({
@@ -127,10 +147,19 @@ export function TrainerNutritionProposals({
         `/api/v1/coach-nutrition-proposals/clients/${clientId}/day?target_date=${encodeURIComponent(date)}`,
       ),
   });
+  const planData = plan.isError ? undefined : plan.data;
   useEffect(() => {
-    if (!plan.data || plan.data.day.plan_date !== date || populatedDate.current === date) return;
+    if (
+      [plan.error, assignments.error, list.error].some((error) =>
+        [403, 404].includes((error as { status?: number } | null)?.status ?? 0),
+      )
+    )
+      onAccessDenied?.();
+  }, [plan.error, assignments.error, list.error, onAccessDenied]);
+  useEffect(() => {
+    if (!planData || planData.day.plan_date !== date || populatedDate.current === date) return;
     populatedDate.current = date;
-    const target = plan.data.day.targets;
+    const target = planData.day.targets;
     setValues((current) => ({
       ...current,
       calories: target?.energy_kcal ?? '',
@@ -140,7 +169,7 @@ export function TrainerNutritionProposals({
       item: '',
       amount: '',
     }));
-  }, [date, plan.data]);
+  }, [date, planData]);
   const send = useMutation({
     mutationFn: (body: Create) =>
       api<Proposal>(`/api/v1/coach-nutrition-proposals/clients/${clientId}`, {
@@ -148,9 +177,10 @@ export function TrainerNutritionProposals({
         headers: { 'Idempotency-Key': requestKey.current },
         body,
       }),
-    onSuccess: async () => {
+    onSuccess: async (proposal) => {
       setPreview(null);
       setEditing(false);
+      setSelectedProposal(proposal);
       requestKey.current = key();
       await queryClient.invalidateQueries({ queryKey: listKey });
       toast('Предложение отправлено');
@@ -158,7 +188,7 @@ export function TrainerNutritionProposals({
     onError: (error) => toast((error as Error).message, 'error'),
   });
   const items =
-    plan.data?.day.slots
+    planData?.day.slots
       .flatMap((slot) => slot.items)
       .filter((item) => item.status === 'planned' && item.available) ?? [];
   const selected = items.find((item) => String(item.id) === values.item);
@@ -169,16 +199,14 @@ export function TrainerNutritionProposals({
     requestKey.current = key();
   };
   const before = {
-    target: plan.data?.day.targets
+    target: planData?.day.targets
       ? {
-          calories: Number(plan.data.day.targets.energy_kcal),
+          calories: Number(planData.day.targets.energy_kcal),
           protein_g:
-            plan.data.day.targets.protein_g === null
-              ? null
-              : Number(plan.data.day.targets.protein_g),
-          fat_g: plan.data.day.targets.fat_g === null ? null : Number(plan.data.day.targets.fat_g),
+            planData.day.targets.protein_g === null ? null : Number(planData.day.targets.protein_g),
+          fat_g: planData.day.targets.fat_g === null ? null : Number(planData.day.targets.fat_g),
           carbs_g:
-            plan.data.day.targets.carbs_g === null ? null : Number(plan.data.day.targets.carbs_g),
+            planData.day.targets.carbs_g === null ? null : Number(planData.day.targets.carbs_g),
         }
       : null,
     item: selected ?? null,
@@ -188,27 +216,95 @@ export function TrainerNutritionProposals({
       className="nutrition-section-card top-gap"
       aria-labelledby="coach-nutrition-proposal-title"
     >
-      <h3 id="coach-nutrition-proposal-title">Предложения по питанию</h3>
-      {!editing && (
-        <button type="button" onClick={() => setEditing(true)}>
-          Предложить изменение
-        </button>
+      <h3 id="coach-nutrition-proposal-title">
+        {selectedProposal
+          ? selectedProposal.status === 'pending'
+            ? 'Ожидает ответа'
+            : selectedProposal.status === 'accepted'
+              ? 'Предложение принято'
+              : 'Предложение отклонено'
+          : preview
+            ? 'Что увидит клиент'
+            : editing
+              ? 'Изменить будущий план'
+              : 'Назначено и запланировано'}
+      </h3>
+      {selectedProposal && (
+        <section className="coach-nutrition-selected">
+          <p>
+            {labels[selectedProposal.status]} ·{' '}
+            {formatCalendarDate(selectedProposal.target_date, {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </p>
+          <Comparison proposal={selectedProposal} />
+          <div className="coach-nutrition-notice">
+            <strong>
+              {selectedProposal.status === 'accepted'
+                ? 'Будущий план обновлён'
+                : selectedProposal.status === 'rejected'
+                  ? 'План не изменён'
+                  : 'План ещё не изменён'}
+            </strong>
+            <p>
+              {selectedProposal.status === 'pending'
+                ? 'Изменения вступят в силу только после принятия клиентом.'
+                : 'Прошедшие дни и дневник сохранены.'}
+            </p>
+          </div>
+          <Button type="button" variant="secondary" onClick={() => setSelectedProposal(null)}>
+            К отчёту клиента
+          </Button>
+        </section>
       )}
-      {editing && !preview && (
+      {!editing && !selectedProposal && (
+        <>
+          {plan.isPending && <p role="status">Загружаем план…</p>}
+          {plan.isError && <p role="alert">Не удалось загрузить план. Обновите страницу.</p>}
+          {planData && (
+            <div className="coach-nutrition-assigned">
+              <p>
+                <span>Цель на {formatCalendarDate(date, { day: 'numeric', month: 'long' })}</span>
+                <strong>
+                  {planData.day.targets?.energy_kcal ?? '—'} {planData.day.targets ? 'ккал' : ''}
+                </strong>
+              </p>
+              <p>
+                <span>Тренировочная программа</span>
+                <strong>{planData.program?.title ?? 'Нет данных'}</strong>
+              </p>
+              <p>
+                <span>План питания</span>
+                <strong>
+                  {planData.day.slots.flatMap((slot) => slot.items).length
+                    ? 'Запланировано'
+                    : 'Нет данных'}
+                </strong>
+              </p>
+            </div>
+          )}
+          <button type="button" onClick={() => setEditing(true)}>
+            Предложить изменение
+          </button>
+        </>
+      )}
+      {editing && !preview && !selectedProposal && (
         <p>Клиент увидит сравнение и сам примет решение. План до этого не изменится.</p>
       )}
-      {editing && !preview && (
+      {editing && !preview && !selectedProposal && (
         <form
-          className="stack"
+          className="stack coach-nutrition-form"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!plan.data) return;
+            if (!planData) return;
             setPreview({
               before,
               request: {
                 target_date: date,
-                expected_target_id: plan.data.target_id,
-                expected_plan_revision: plan.data.day.revision,
+                expected_target_id: planData.target_id,
+                expected_plan_revision: planData.day.revision,
                 calories: Number(values.calories),
                 protein_g: Number(values.protein_g),
                 fat_g: Number(values.fat_g),
@@ -237,22 +333,21 @@ export function TrainerNutritionProposals({
           </label>
           {plan.isPending && <p role="status">Загружаем план…</p>}
           {plan.isError && <p role="alert">Не удалось загрузить план. Обновите страницу.</p>}
-          {plan.data && (
+          {planData && (
             <p className="muted">
-              Текущая цель: {plan.data.day.targets?.energy_kcal ?? '—'} ккал · версия плана{' '}
-              {plan.data.day.revision}.
+              Текущая цель: {planData.day.targets?.energy_kcal ?? '—'} ккал · версия плана{' '}
+              {planData.day.revision}.
             </p>
           )}
-          {plan.data && (
+          {planData && (
             <p className="muted">
-              Программа: {plan.data.program?.title ?? 'нет данных'} ·{' '}
-              {plan.data.program_day?.day_type === 'training'
+              Программа: {planData.program?.title ?? 'нет данных'} ·{' '}
+              {planData.program_day?.day_type === 'training'
                 ? 'тренировочный день'
-                : plan.data.program_day?.day_type === 'rest'
+                : planData.program_day?.day_type === 'rest'
                   ? 'день отдыха'
                   : 'тип дня не определён'}
-              .
-              {plan.data.binding?.program_changed && ' Программа изменилась после назначения цели.'}
+              .{planData.binding?.program_changed && ' Программа изменилась после назначения цели.'}
             </p>
           )}
           {(
@@ -270,13 +365,13 @@ export function TrainerNutritionProposals({
                 min={min}
                 max={max}
                 required
-                disabled={!plan.data}
+                disabled={!planData}
                 value={values[name]}
                 onChange={(event) => update(name, event.target.value)}
               />
             </label>
           ))}
-          <label>
+          <label className="coach-nutrition-energy-confirm">
             <input
               type="checkbox"
               checked={confirmEnergy}
@@ -320,23 +415,29 @@ export function TrainerNutritionProposals({
               onChange={(event) => update('comment', event.target.value)}
             />
           </label>
-          <button type="submit" disabled={!plan.data || send.isPending}>
-            Проверить изменения
-          </button>
-          <button type="button" className="secondary" onClick={() => setEditing(false)}>
+          <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
             Отмена
+          </Button>
+          <button type="submit" disabled={!planData || send.isPending}>
+            Проверить изменения
           </button>
         </form>
       )}
-      {preview && (
+      {preview && !selectedProposal && (
         <section aria-label="Проверка предложения" className="top-gap">
-          <h4>Что увидит клиент</h4>
           <Comparison proposal={preview} />
           <p>Прошедшие дни и дневник не изменятся.</p>
+          {send.error && (
+            <div className="coach-nutrition-notice" role="alert">
+              <strong>Не удалось отправить предложение</strong>
+              <p>{(send.error as Error).message}</p>
+              <p>План не изменён. Обновите данные перед повторной проверкой.</p>
+            </div>
+          )}
           <div className="coach-nutrition-review-actions">
-            <button type="button" className="secondary" onClick={() => setPreview(null)}>
+            <Button type="button" variant="secondary" onClick={() => setPreview(null)}>
               Вернуться к изменениям
-            </button>
+            </Button>
             <button
               type="button"
               disabled={send.isPending}
@@ -347,55 +448,78 @@ export function TrainerNutritionProposals({
           </div>
         </section>
       )}
-      <details className="top-gap">
-        <summary className="yfc-disclosure-summary">
-          <span>История назначений по датам и правилам</span>
-          <DisclosureIcon />
-        </summary>
-        {assignments.isPending && <p role="status">Загружаем назначения…</p>}
-        {assignments.isError && <p role="alert">Не удалось загрузить назначения.</p>}
-        {assignments.data &&
-          assignments.data.dates.length === 0 &&
-          assignments.data.schedule.length === 0 && <p>Назначений пока нет.</p>}
-        {assignments.data?.dates.map((row) => (
-          <p key={`date-${row.target.id}`}>
-            Дата {row.date}
-            {row.day_type ? ` · ${dayTypes[row.day_type]}` : ''}: {row.target.calories} ккал · Б{' '}
-            {row.target.protein_g} · Ж {row.target.fat_g} · У {row.target.carbs_g} г
-          </p>
-        ))}
-        {assignments.data?.schedule.map((row) => (
-          <p key={`rule-${row.id}`}>
-            {scopes[row.scope]} с {row.effective_from} · {dayTypes[row.day_type]}
-            {row.week_type ? ` · ${weekTypes[row.week_type]}` : ''}: {row.target.calories} ккал · Б{' '}
-            {row.target.protein_g} · Ж {row.target.fat_g} · У {row.target.carbs_g} г
-          </p>
-        ))}
-      </details>
-      <h4>Предложения</h4>
-      {list.isPending && <p role="status">Загружаем…</p>}
-      {list.isError && <p role="alert">Не удалось загрузить предложения.</p>}
-      {list.data?.length === 0 && <p>Предложений пока нет.</p>}
-      {list.data?.map((proposal) => (
-        <div key={proposal.id} className="top-gap">
-          <strong>
-            {labels[proposal.status]} · {proposal.target_date}
-          </strong>
-          <Comparison proposal={proposal} />
-        </div>
-      ))}
+      {!editing && !selectedProposal && (
+        <>
+          <details className="top-gap">
+            <summary className="yfc-disclosure-summary">
+              <span>История назначений по датам и правилам</span>
+              <DisclosureIcon />
+            </summary>
+            {assignments.isPending && <p role="status">Загружаем назначения…</p>}
+            {assignments.isError && <p role="alert">Не удалось загрузить назначения.</p>}
+            {!assignments.isError &&
+              assignments.data &&
+              assignments.data.dates.length === 0 &&
+              assignments.data.schedule.length === 0 && <p>Назначений пока нет.</p>}
+            {!assignments.isError &&
+              assignments.data?.dates.map((row) => (
+                <p key={`date-${row.target.id}`}>
+                  Дата {row.date}
+                  {row.day_type ? ` · ${dayTypes[row.day_type]}` : ''}: {row.target.calories} ккал ·
+                  Б {row.target.protein_g} · Ж {row.target.fat_g} · У {row.target.carbs_g} г
+                </p>
+              ))}
+            {!assignments.isError &&
+              assignments.data?.schedule.map((row) => (
+                <p key={`rule-${row.id}`}>
+                  {scopes[row.scope]} с {row.effective_from} · {dayTypes[row.day_type]}
+                  {row.week_type ? ` · ${weekTypes[row.week_type]}` : ''}: {row.target.calories}{' '}
+                  ккал · Б {row.target.protein_g} · Ж {row.target.fat_g} · У {row.target.carbs_g} г
+                </p>
+              ))}
+          </details>
+          <h4>Предложения</h4>
+          {list.isPending && <p role="status">Загружаем…</p>}
+          {list.isError && <p role="alert">Не удалось загрузить предложения.</p>}
+          {!list.isError && list.data?.length === 0 && <p>Предложений пока нет.</p>}
+          {!list.isError &&
+            list.data?.map((proposal) => (
+              <div key={proposal.id} className="top-gap">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setSelectedProposal(proposal)}
+                >
+                  {labels[proposal.status]} · {proposal.target_date}
+                </Button>
+              </div>
+            ))}
+        </>
+      )}
     </section>
   );
 }
 
-export function ClientNutritionProposals() {
+export function ClientNutritionProposals({
+  focused = true,
+  onOpen,
+  onClose,
+}: {
+  focused?: boolean;
+  onOpen?: () => void;
+  onClose?: () => void;
+} = {}) {
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
   const keys = useRef<Record<string, string>>({});
+  const title = useRef<HTMLHeadingElement>(null);
   const proposals = useQuery({
     queryKey: ['my-coach-nutrition-proposals'],
     queryFn: () => api<Proposal[]>('/api/v1/coach-nutrition-proposals'),
   });
+  useEffect(() => {
+    if (focused && proposals.data?.length) title.current?.focus();
+  }, [focused, proposals.data?.length]);
   const decide = useMutation({
     mutationFn: ({ proposal, decision }: { proposal: Proposal; decision: 'accept' | 'reject' }) => {
       const identity = `${proposal.id}-${decision}`;
@@ -412,37 +536,114 @@ export function ClientNutritionProposals() {
     },
     onError: (error) => toast((error as Error).message, 'error'),
   });
-  if (proposals.isPending) return <p role="status">Загружаем предложения тренера…</p>;
-  if (proposals.isError) return <p role="alert">Не удалось загрузить предложения тренера.</p>;
-  if (!proposals.data?.length) return null;
+  if (proposals.isPending || proposals.isError || !proposals.data?.length) {
+    if (!focused && !proposals.isError && !proposals.isPending) return null;
+    return (
+      <section className="nutrition-section-card coach-nutrition-focused">
+        {focused && onClose && (
+          <Button type="button" variant="secondary" onClick={onClose}>
+            К питанию
+          </Button>
+        )}
+        {proposals.isPending ? (
+          <p role="status">Загружаем предложения тренера…</p>
+        ) : proposals.isError ? (
+          <p role="alert">Не удалось загрузить предложения тренера.</p>
+        ) : (
+          <p>Предложений пока нет.</p>
+        )}
+      </section>
+    );
+  }
+  if (!focused) {
+    return (
+      <section className="nutrition-section-card coach-nutrition-entry">
+        <h2>Предложения тренера</h2>
+        <p>Проверьте предложенные изменения и выберите решение.</p>
+        <button type="button" onClick={onOpen}>
+          Открыть предложения
+        </button>
+      </section>
+    );
+  }
   return (
-    <section className="nutrition-section-card" aria-labelledby="client-nutrition-proposals">
-      <h2 id="client-nutrition-proposals">Предложения тренера</h2>
+    <section
+      className="nutrition-section-card coach-nutrition-focused"
+      aria-labelledby="client-nutrition-proposals"
+    >
+      {onClose && (
+        <Button type="button" variant="secondary" onClick={onClose}>
+          К питанию
+        </Button>
+      )}
+      <h1 id="client-nutrition-proposals" ref={title} tabIndex={-1}>
+        Предложения тренера
+      </h1>
       {proposals.data.map((proposal) => (
         <article key={proposal.id} className="top-gap">
           <h3>{proposal.status === 'pending' ? 'Проверьте изменения' : labels[proposal.status]}</h3>
           <Comparison proposal={proposal} />
-          {proposal.status === 'pending' && (
-            <>
-              <p>До вашего решения план не изменится. Прошедшие дни сохранятся.</p>
-              <div className="toolbar wrap">
-                <button
-                  type="button"
-                  disabled={decide.isPending}
-                  onClick={() => decide.mutate({ proposal, decision: 'accept' })}
-                >
-                  Принять изменения
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={decide.isPending}
-                  onClick={() => decide.mutate({ proposal, decision: 'reject' })}
-                >
-                  Отклонить
-                </button>
-              </div>
-            </>
+          {decide.error && decide.variables?.proposal.id === proposal.id && (
+            <div className="coach-nutrition-notice" role="alert">
+              <strong>
+                {(decide.error as { status?: number }).status === 409
+                  ? 'Данные изменились'
+                  : 'Предложение недоступно'}
+              </strong>
+              <p>{(decide.error as Error).message}</p>
+              <p>
+                {[404, 409].includes((decide.error as { status?: number }).status ?? 0)
+                  ? 'План не изменён этим запросом. Обновите данные или обратитесь к тренеру.'
+                  : 'Проверьте статус предложения после обновления данных.'}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  decide.reset();
+                  void proposals.refetch();
+                }}
+              >
+                Обновить данные
+              </Button>
+            </div>
+          )}
+          {proposal.status === 'pending' &&
+            !(
+              decide.variables?.proposal.id === proposal.id &&
+              [404, 409].includes((decide.error as { status?: number } | null)?.status ?? 0)
+            ) && (
+              <>
+                <div className="coach-nutrition-notice">
+                  <strong>Решать вам</strong>
+                  <p>До вашего решения план не изменится. Прошедшие дни сохранятся.</p>
+                </div>
+                <div className="coach-nutrition-review-actions">
+                  <button
+                    type="button"
+                    disabled={decide.isPending}
+                    onClick={() => decide.mutate({ proposal, decision: 'accept' })}
+                  >
+                    Принять изменения
+                  </button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={decide.isPending}
+                    onClick={() => decide.mutate({ proposal, decision: 'reject' })}
+                  >
+                    Отклонить
+                  </Button>
+                </div>
+              </>
+            )}
+          {proposal.status === 'accepted' && (
+            <p className="coach-nutrition-notice">
+              Будущий план обновлён. Прошедшие дни и дневник сохранены.
+            </p>
+          )}
+          {proposal.status === 'rejected' && (
+            <p className="coach-nutrition-notice">План не изменён.</p>
           )}
         </article>
       ))}

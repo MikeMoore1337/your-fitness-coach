@@ -5,7 +5,7 @@ import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
 import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
-import { installTelegramHarness } from './fixtures/mobile-tma';
+import { installTelegramHarness, TelegramHarness } from './fixtures/mobile-tma';
 import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 test.use({ serviceWorkers: 'block' });
@@ -13,10 +13,15 @@ test.use({ serviceWorkers: 'block' });
 for (const decision of ['accept', 'reject'] as const) {
   for (const surface of ['desktop', 'mobile', 'tma'] as const) {
     test(`Issue 954: клиент выбирает ${decision} (${surface})`, async ({ page }, testInfo) => {
-      if (surface !== 'desktop') await page.setViewportSize({ width: 390, height: 844 });
-      if (surface === 'tma') await installTelegramHarness(page);
+      const mobileWidth = Number(process.env.ISSUE_954_MOBILE_WIDTH ?? 390);
+      const captureSurface =
+        surface === 'mobile' && mobileWidth !== 390 ? `mobile-${mobileWidth}` : surface;
+      if (surface !== 'desktop') await page.setViewportSize({ width: mobileWidth, height: 844 });
+
       const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
       const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+      if (surface === 'tma') await installTelegramHarness(page, { colorScheme: theme });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       if (evidence)
         await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
       await mockApi(page);
@@ -25,13 +30,18 @@ for (const decision of ['accept', 'reject'] as const) {
         id: 1,
         version: 1,
         target_date: '2030-01-10',
-        before: { target: null, item: null },
+        before: {
+          target: { calories: 1900, protein_g: 110, fat_g: 70, carbs_g: 210 },
+          item: { name: 'Творог', amount: '100', amount_unit: 'g' },
+        },
         request: {
           target_date: '2030-01-10',
           calories: 2000,
           protein_g: 150,
           fat_g: 70,
           carbs_g: 180,
+          item_amount: '150',
+          comment: 'Посмотри, подходит ли тебе такой вариант.',
         },
       };
       await page.route('**/api/v1/coach-nutrition-proposals**', async (route) => {
@@ -44,15 +54,31 @@ for (const decision of ['accept', 'reject'] as const) {
       });
       await page.goto('/app?section=nutrition');
       if (surface !== 'tma') await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Открыть предложения' }).click();
+      await expect(
+        page.getByRole('heading', { name: 'Предложения тренера', level: 1 }),
+      ).toBeFocused();
+      if (evidence) await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expect(page.getByRole('heading', { name: 'Проверьте изменения' })).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
       if (evidence && decision === 'accept') {
         mkdirSync(evidence, { recursive: true });
+        if (surface !== 'desktop')
+          await page.screenshot({
+            path: path.join(
+              evidence,
+              `${testInfo.project.name}-${captureSurface}-${theme}-client-review-viewport.png`,
+            ),
+          });
         await page.screenshot({
           path: path.join(
             evidence,
-            `${testInfo.project.name}-${surface}-${theme}-client-review.png`,
+            `${testInfo.project.name}-${captureSurface}-${theme}-client-review.png`,
           ),
           fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
         });
       }
       await page
@@ -65,10 +91,88 @@ for (const decision of ['accept', 'reject'] as const) {
         await page.screenshot({
           path: path.join(
             evidence,
-            `${testInfo.project.name}-${surface}-${theme}-client-${decision}.png`,
+            `${testInfo.project.name}-${captureSurface}-${theme}-client-${decision}.png`,
           ),
           fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
         });
+      if (surface === 'tma') {
+        await new TelegramHarness(page).clickBack();
+        await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
+      }
+    });
+  }
+}
+
+for (const code of [404, 409] as const) {
+  for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+    test(`Issue 954: недоступное предложение ${code} (${surface})`, async ({ page }, testInfo) => {
+      const mobileWidth = Number(process.env.ISSUE_954_MOBILE_WIDTH ?? 390);
+      const captureSurface =
+        surface === 'mobile' && mobileWidth !== 390 ? `mobile-${mobileWidth}` : surface;
+      if (surface !== 'desktop') await page.setViewportSize({ width: mobileWidth, height: 844 });
+
+      const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+      const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+      if (surface === 'tma') await installTelegramHarness(page, { colorScheme: theme });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      if (evidence)
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockApi(page);
+      await page.route('**/api/v1/coach-nutrition-proposals**', async (route) => {
+        if (route.request().method() === 'POST')
+          return route.fulfill({
+            status: code,
+            json: { detail: code === 409 ? 'Цель изменилась' : 'Предложение недоступно' },
+          });
+        return route.fulfill({
+          json: [
+            {
+              id: 1,
+              version: 1,
+              status: 'pending',
+              target_date: '2030-01-10',
+              before: { target: null, item: null },
+              request: {
+                target_date: '2030-01-10',
+                calories: 2000,
+                protein_g: 150,
+                fat_g: 70,
+                carbs_g: 180,
+              },
+            },
+          ],
+        });
+      });
+      await page.goto('/app?section=nutrition');
+      if (surface !== 'tma') await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Открыть предложения' }).click();
+      if (evidence) await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await page.getByRole('button', { name: 'Принять изменения' }).click();
+      await expect(page.locator('.coach-nutrition-focused').getByRole('alert')).toContainText(
+        code === 409 ? 'Данные изменились' : 'Предложение недоступно',
+      );
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      if (evidence) {
+        mkdirSync(evidence, { recursive: true });
+        if (surface !== 'desktop')
+          await page.screenshot({
+            path: path.join(
+              evidence,
+              `${testInfo.project.name}-${captureSurface}-${theme}-client-${code === 409 ? 'stale' : 'unavailable'}-viewport.png`,
+            ),
+          });
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-client-${code === 409 ? 'stale' : 'unavailable'}.png`,
+          ),
+          fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+        });
+      }
     });
   }
 }
