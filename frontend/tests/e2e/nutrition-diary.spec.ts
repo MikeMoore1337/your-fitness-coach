@@ -3254,6 +3254,15 @@ for (const width of [320, 360, 393, 430, 1280]) {
       await expect(totals).toContainText('Белки— г');
       await expect(totals).toContainText('Жиры21,8 г');
       await expect(totals).toContainText('Углеводы— г');
+      if (process.env.MACRO_STATE_CAPTURE_DIR) {
+        await mkdir(process.env.MACRO_STATE_CAPTURE_DIR, { recursive: true });
+        await nutritionDaySummary(page).screenshot({
+          path: resolve(
+            process.env.MACRO_STATE_CAPTURE_DIR,
+            `${testInfo.project.name}-${theme}-${width}-no-goal.png`,
+          ),
+        });
+      }
       for (const name of ['Завтрак', 'Обед', 'Ужин', 'Перекусы']) {
         const toggle = page
           .getByRole('region', { name })
