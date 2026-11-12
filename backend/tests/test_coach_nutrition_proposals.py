@@ -115,6 +115,30 @@ def test_coach_reads_web_client_target_history_by_client_identity(client) -> Non
     assert client.get(url, headers=coach).status_code == 404
 
 
+def test_multiple_versions_reject_stale_acceptance(client) -> None:
+    athlete, coach, _, athlete_id, _, payload = _setup(client)
+    path = f"/api/v1/coach-nutrition-proposals/clients/{athlete_id}"
+    first = client.post(path, json=payload, headers={**coach, "Idempotency-Key": "version-one-954"})
+    second = client.post(
+        path, json=payload, headers={**coach, "Idempotency-Key": "version-two-954"}
+    )
+    assert first.status_code == second.status_code == 201
+    assert [first.json()["version"], second.json()["version"]] == [1, 2]
+    first_decision = client.post(
+        f"/api/v1/coach-nutrition-proposals/{first.json()['id']}/decision",
+        json={"decision": "accept", "version": 1},
+        headers={**athlete, "Idempotency-Key": "accept-version-one"},
+    )
+    assert first_decision.status_code == 200
+    second_decision = client.post(
+        f"/api/v1/coach-nutrition-proposals/{second.json()['id']}/decision",
+        json={"decision": "accept", "version": 2},
+        headers={**athlete, "Idempotency-Key": "accept-version-two"},
+    )
+    assert second_decision.status_code == 409
+    assert len(client.get("/api/v1/nutrition/targets/dates", headers=athlete).json()) == 1
+
+
 def test_revocation_and_stale_target_prevent_acceptance(client) -> None:
     athlete, coach, _, athlete_id, relation_id, payload = _setup(client)
     path = f"/api/v1/coach-nutrition-proposals/clients/{athlete_id}"
