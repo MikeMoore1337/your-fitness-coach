@@ -1,0 +1,152 @@
+.coach-nutrition-comparison {
+  overflow-x: auto;
+}
+
+.coach-nutrition-comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-nutrition-comparison th,
+.coach-nutrition-comparison td {
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.coach-nutrition-comparison th:first-child {
+  text-align: left;
+}
+
+.coach-nutrition-review-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.coach-nutrition-review-actions button {
+  min-height: 44px;
+}
+
+.coach-nutrition-workspace,
+.coach-nutrition-focused,
+.coach-nutrition-report,
+.coach-nutrition-entry,
+.coach-nutrition-selected {
+  display: grid;
+  gap: var(--v2-space-4, 16px);
+  min-width: 0;
+}
+
+.coach-os:has(.coach-nutrition-workspace) .coach-os-header,
+.coach-os:has(.coach-nutrition-workspace) .coach-client-roster {
+  display: none;
+}
+
+.coach-os:has(.coach-nutrition-workspace) .coach-client-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.coach-nutrition-workspace > header h1,
+.coach-nutrition-focused > h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-page);
+}
+
+.coach-nutrition-workspace > header p,
+.coach-nutrition-focused p,
+.coach-nutrition-report p,
+.coach-nutrition-entry p {
+  margin: 0;
+}
+
+.coach-nutrition-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach-nutrition-metrics > div {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.coach-nutrition-metrics dt {
+  color: var(--muted);
+}
+.coach-nutrition-metrics dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.coach-nutrition-notice {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.coach-nutrition-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.coach-nutrition-form > * {
+  grid-column: 1 / -1;
+}
+.coach-nutrition-form > .field:has(input[type='number']),
+.coach-nutrition-form > .field:has(input[type='date']) {
+  grid-column: auto;
+}
+.coach-nutrition-form > .field:has(input[type='date']) {
+  grid-column: 1 / -1;
+}
+.coach-nutrition-form input {
+  min-width: 0;
+}
+
+.coach-nutrition-energy-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.coach-nutrition-energy-confirm input {
+  flex: none;
+  width: auto;
+  margin-top: 4px;
+}
+.coach-nutrition-assigned p {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.coach-nutrition-assigned strong {
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .coach-nutrition-focused button,
+  .coach-nutrition-entry button,
+  .coach-nutrition-review-actions button {
+    width: 100%;
+    min-height: 44px;
+  }
+  .coach-nutrition-selected button {
+    width: 100%;
+    min-height: 44px;
+  }
+  .coach-nutrition-workspace .nutrition-section-card > button {
+    width: 100%;
+    min-height: 44px;
+  }
+}

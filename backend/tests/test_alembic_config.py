@@ -121,7 +121,15 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
     assert auth_families is not None
     assert relocated_marker is not None
     assert auth_families.down_revision == legacy_support.revision
-    assert revisions.get_heads() == ["0156_nutrition_catalog_check"]
+    assert revisions.get_heads() == ["0158_coach_nutrition_proposals"]
+    assert (
+        revisions.get_revision("0158_coach_nutrition_proposals").down_revision
+        == "0157_coach_nutrition_access"
+    )
+    assert (
+        revisions.get_revision("0157_coach_nutrition_access").down_revision
+        == "0156_nutrition_catalog_check"
+    )
     assert (
         revisions.get_revision("0156_nutrition_catalog_check").down_revision
         == "0155_nutrition_catalog_indexes"

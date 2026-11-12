@@ -95,7 +95,7 @@ from fitminiapp_api.services.cardio import (
     serialize_cardio_session,
     update_cardio_session,
 )
-from fitminiapp_api.services.coach_clients import get_client_managed_by_coach
+from fitminiapp_api.services.coach_clients import get_client_with_nutrition_access
 from fitminiapp_api.services.exercise_catalog import (
     _source_exercise_slug,
     get_visible_exercise_display_map,
@@ -1283,7 +1283,7 @@ def workout_progress_report_download_file(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Ссылка недействительна"
             )
         try:
-            subject = get_client_managed_by_coach(db, actor, grant.subject_user_id)
+            subject = get_client_with_nutrition_access(db, actor, grant.subject_user_id)
         except ProgramError as exc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Ссылка недействительна"

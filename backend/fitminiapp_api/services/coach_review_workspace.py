@@ -12,7 +12,7 @@ from fitminiapp_api.models.check_in import WeeklyCheckIn
 from fitminiapp_api.models.coach_crm import CoachBusinessSession, CoachTask
 from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.program import UserProgram
-from fitminiapp_api.models.user import User
+from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.coach_crm import CoachTaskResponse
 from fitminiapp_api.schemas.coach_review_workspace import (
     CoachReviewActionState,
@@ -146,7 +146,9 @@ def _measurement_facts(check_in: WeeklyCheckIn | None) -> CoachReviewMeasurement
     )
 
 
-def _snapshot(check_in: WeeklyCheckIn | None) -> CoachReviewCheckInSnapshot | None:
+def _snapshot(
+    check_in: WeeklyCheckIn | None, *, nutrition_visible: bool = True
+) -> CoachReviewCheckInSnapshot | None:
     if check_in is None:
         return None
     return CoachReviewCheckInSnapshot(
@@ -157,7 +159,7 @@ def _snapshot(check_in: WeeklyCheckIn | None) -> CoachReviewCheckInSnapshot | No
         status=cast(object, check_in.status),
         training=_training_facts(check_in),
         progression=_progression_facts(check_in),
-        nutrition=_nutrition_facts(check_in),
+        nutrition=_nutrition_facts(check_in) if nutrition_visible else CoachReviewNutritionFacts(),
         measurements=_measurement_facts(check_in),
     )
 
@@ -413,6 +415,17 @@ def _build(
     clients: list[User],
 ) -> dict[int, CoachReviewWorkspaceResponse]:
     client_ids = [client.id for client in clients]
+    nutrition_visible_ids = {
+        client_id
+        for (client_id,) in db.query(CoachClient.client_user_id)
+        .filter(
+            CoachClient.coach_user_id == coach.id,
+            CoachClient.client_user_id.in_(client_ids),
+            CoachClient.status == "active",
+            CoachClient.nutrition_access.is_not(False),
+        )
+        .all()
+    }
     check_ins = (
         db.query(WeeklyCheckIn)
         .filter(WeeklyCheckIn.user_id.in_(client_ids), WeeklyCheckIn.status == "completed")
@@ -436,8 +449,11 @@ def _build(
     result: dict[int, CoachReviewWorkspaceResponse] = {}
     for client in clients:
         rows = check_ins_by_client.get(client.id, [])
-        current = _snapshot(rows[0] if rows else None)
-        previous = _snapshot(rows[1] if len(rows) > 1 else None)
+        nutrition_visible = client.id in nutrition_visible_ids
+        current = _snapshot(rows[0] if rows else None, nutrition_visible=nutrition_visible)
+        previous = _snapshot(
+            rows[1] if len(rows) > 1 else None, nutrition_visible=nutrition_visible
+        )
         training = current.training if current else CoachReviewTrainingFacts()
         progression = current.progression if current else CoachReviewProgressionFacts()
         nutrition = current.nutrition if current else CoachReviewNutritionFacts()

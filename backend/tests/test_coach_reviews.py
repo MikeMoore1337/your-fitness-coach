@@ -279,3 +279,20 @@ def test_review_workspace_composes_bounded_facts_and_trainer_private_notes(clien
         ).status_code
         == 404
     )
+    with get_session_context() as db:
+        link = db.query(CoachClient).filter_by(client_user_id=managed_id).one()
+        link.nutrition_access = False
+    hidden = client.get(
+        f"/api/v1/coach/clients/{managed_id}/review-workspace", headers=coach_headers
+    )
+    assert hidden.status_code == 200, hidden.text
+    assert hidden.json()["training_actuals"]["completed_workouts"] == 3
+    assert all(value is None for value in hidden.json()["nutrition"].values())
+    assert all(change["domain"] != "nutrition" for change in hidden.json()["meaningful_changes"])
+    assert (
+        client.get(
+            f"/api/v1/coach/clients/{managed_id}/weekly-check-ins", headers=coach_headers
+        ).status_code
+        == 404
+    )
+    assert client.get("/api/v1/coach/check-ins/review", headers=coach_headers).json()["total"] == 0

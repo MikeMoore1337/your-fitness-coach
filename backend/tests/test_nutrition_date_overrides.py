@@ -11,6 +11,7 @@ from fitminiapp_api.core.timezone import today_msk
 from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.nutrition import NutritionTarget, NutritionTargetDateOverride
 from fitminiapp_api.models.user import CoachClient, User
+from fitminiapp_api.services import coach_nutrition_proposals as proposal_service
 from fitminiapp_api.services import nutrition as nutrition_service
 
 
@@ -170,7 +171,13 @@ def test_date_override_rejects_past_and_revoked_trainer(client) -> None:
         json=payload,
         headers={**coach, "Idempotency-Key": "trainer-override-952"},
     )
-    assert saved.status_code == 200
+    assert saved.status_code == 409
+    own_saved = client.post(
+        "/api/v1/nutrition/targets/dates",
+        json={**payload, "target_telegram_user_id": None},
+        headers={**athlete, "Idempotency-Key": "client-override-952"},
+    )
+    assert own_saved.status_code == 200
     past = client.post(
         "/api/v1/nutrition/targets/dates",
         json={
@@ -195,6 +202,124 @@ def test_date_override_rejects_past_and_revoked_trainer(client) -> None:
         "/api/v1/nutrition/targets/dates?target_telegram_user_id=952301", headers=coach
     )
     assert denied_history.status_code == 403
+
+
+def test_active_coach_without_nutrition_access_cannot_read_or_assign_targets(client) -> None:
+    athlete = _auth(client, 952901)
+    coach = _auth(client, 952902, coach=True)
+    own_target = client.post(
+        "/api/v1/nutrition/targets/manual",
+        headers=athlete,
+        json={"calories": 2000, "protein_g": 150, "fat_g": 70, "carbs_g": 180},
+    )
+    assert own_target.status_code == 200
+    with get_session_context() as db:
+        athlete_id = db.query(User.id).filter_by(telegram_user_id=952901).scalar()
+        coach_id = db.query(User.id).filter_by(telegram_user_id=952902).scalar()
+        db.add(
+            CoachClient(
+                coach_user_id=coach_id,
+                client_user_id=athlete_id,
+                status="active",
+            )
+        )
+    with get_session_context() as db:
+        relation_id = db.query(CoachClient.id).filter_by(client_user_id=athlete_id).scalar()
+    stale = client.put(
+        "/api/v1/me/trainer/nutrition-access",
+        headers=athlete,
+        json={"nutrition_access": False, "relationship_id": 999999999},
+    )
+    assert stale.status_code == 409
+    assert client.get("/api/v1/me/trainer/nutrition-access", headers=athlete).json() == {
+        "relationship_id": relation_id,
+        "nutrition_access": True,
+    }
+    revoked = client.put(
+        "/api/v1/me/trainer/nutrition-access",
+        headers=athlete,
+        json={"nutrition_access": False, "relationship_id": relation_id},
+    )
+    assert revoked.status_code == 200
+    assert revoked.json()["nutrition_access"] is False
+    tomorrow = (today_msk() + timedelta(days=1)).isoformat()
+    payload = {
+        "target_telegram_user_id": 952901,
+        "calories": 2000,
+        "protein_g": 150,
+        "fat_g": 70,
+        "carbs_g": 180,
+        "effective_from": tomorrow,
+    }
+    denied = client.post(
+        "/api/v1/nutrition/targets/dates",
+        json=payload,
+        headers={**coach, "Idempotency-Key": "access-revoked-952901"},
+    )
+    assert denied.status_code == 403
+    history = client.get(
+        "/api/v1/nutrition/targets/dates?target_telegram_user_id=952901", headers=coach
+    )
+    assert history.status_code == 403
+    for suffix in ("nutrition-report", "nutrition-report.csv", "progress-report"):
+        response = client.get(f"/api/v1/coach/clients/{athlete_id}/{suffix}", headers=coach)
+        assert response.status_code == 404
+    summary = client.get(f"/api/v1/coach/clients/{athlete_id}/summary", headers=coach)
+    assert summary.status_code == 200
+    assert summary.json()["nutrition"]["visible"] is False
+    roster = client.get("/api/v1/coach/clients", headers=coach)
+    assert roster.status_code == 200
+    assert next(row for row in roster.json() if row["id"] == athlete_id)["kbju"] is None
+    own = client.get("/api/v1/nutrition/targets/dates", headers=athlete)
+    assert own.status_code == 200
+    with get_session_context() as db:
+        link = (
+            db.query(CoachClient).filter_by(coach_user_id=coach_id, client_user_id=athlete_id).one()
+        )
+        assert link.status == "active"
+    restored = client.put(
+        "/api/v1/me/trainer/nutrition-access",
+        headers=athlete,
+        json={"nutrition_access": True, "relationship_id": relation_id},
+    )
+    assert restored.status_code == 200
+    download = client.post(
+        f"/api/v1/coach/clients/{athlete_id}/progress-report/download-link", headers=coach
+    )
+    assert download.status_code == 200, download.text
+    download_path = download.json()["url"].split("/api/v1/", 1)[1]
+    allowed = client.post(
+        "/api/v1/nutrition/targets/dates",
+        json=payload,
+        headers={**coach, "Idempotency-Key": "access-restored-952901"},
+    )
+    assert allowed.status_code == 409
+    assert (
+        client.put(
+            "/api/v1/me/trainer/nutrition-access",
+            headers=athlete,
+            json={"nutrition_access": False, "relationship_id": relation_id},
+        ).status_code
+        == 200
+    )
+    assert client.get(f"/api/v1/{download_path}").status_code == 404
+    with get_session_context() as db:
+        old_link = db.get(CoachClient, relation_id)
+        old_link.status = "ended"
+        db.flush()
+        db.add(CoachClient(coach_user_id=coach_id, client_user_id=athlete_id, status="active"))
+    stale_link = client.put(
+        "/api/v1/me/trainer/nutrition-access",
+        headers=athlete,
+        json={"nutrition_access": False, "relationship_id": relation_id},
+    )
+    assert stale_link.status_code == 409
+    assert (
+        client.get("/api/v1/me/trainer/nutrition-access", headers=athlete).json()[
+            "nutrition_access"
+        ]
+        is True
+    )
 
 
 def test_override_history_export_and_account_deletion(client) -> None:
@@ -252,26 +377,36 @@ def test_deleting_trainer_anonymizes_override_author_without_deleting_client_goa
         athlete_id = db.query(User.id).filter_by(telegram_user_id=952306).scalar()
         coach_id = db.query(User.id).filter_by(telegram_user_id=952307).scalar()
         db.add(CoachClient(coach_user_id=coach_id, client_user_id=athlete_id, status="active"))
-    saved = client.post(
-        "/api/v1/nutrition/targets/dates",
+    proposal = client.post(
+        f"/api/v1/coach-nutrition-proposals/clients/{athlete_id}",
         json={
-            "target_telegram_user_id": 952306,
+            "target_date": (today_msk() + timedelta(days=1)).isoformat(),
+            "expected_target_id": None,
+            "expected_plan_revision": 0,
             "calories": 2000,
             "protein_g": 150,
             "fat_g": 70,
             "carbs_g": 180,
-            "effective_from": today_msk().isoformat(),
         },
         headers={**coach, "Idempotency-Key": "trainer-date-goal"},
     )
-    assert saved.status_code == 200
+    assert proposal.status_code == 201, proposal.text
+    decision = client.post(
+        f"/api/v1/coach-nutrition-proposals/{proposal.json()['id']}/decision",
+        json={"decision": "accept", "version": 1},
+        headers={**athlete, "Idempotency-Key": "accept-trainer-date-goal"},
+    )
+    assert decision.status_code == 200, decision.text
+    before = client.get("/api/v1/nutrition/targets/dates", headers=athlete).json()[0]["target"][
+        "id"
+    ]
     deleted = client.request(
         "DELETE", "/api/v1/me/account", json={"confirmation": "DELETE"}, headers=coach
     )
     assert deleted.status_code == 204
     history = client.get("/api/v1/nutrition/targets/dates", headers=athlete)
     assert history.status_code == 200
-    assert history.json()[0]["target"]["id"] == saved.json()["target"]["id"]
+    assert history.json()[0]["target"]["id"] == before
     assert history.json()[0]["target"]["created_by"] is None
 
 
@@ -377,29 +512,35 @@ def test_concurrent_date_override_retry_creates_one_version(client) -> None:
 def test_revoked_trainer_cannot_finish_a_write_started_before_revocation(
     client, monkeypatch
 ) -> None:
-    _auth(client, 952308)
+    athlete = _auth(client, 952308)
     coach = _auth(client, 952309, coach=True)
     with get_session_context() as db:
         athlete_id = db.query(User.id).filter_by(telegram_user_id=952308).scalar()
         coach_id = db.query(User.id).filter_by(telegram_user_id=952309).scalar()
         db.add(CoachClient(coach_user_id=coach_id, client_user_id=athlete_id, status="active"))
+    proposal = client.post(
+        f"/api/v1/coach-nutrition-proposals/clients/{athlete_id}",
+        json={
+            "target_date": (today_msk() + timedelta(days=1)).isoformat(),
+            "expected_target_id": None,
+            "expected_plan_revision": 0,
+            "calories": 2000,
+            "protein_g": 150,
+            "fat_g": 70,
+            "carbs_g": 180,
+        },
+        headers={**coach, "Idempotency-Key": "revoke-race-proposal"},
+    )
+    assert proposal.status_code == 201, proposal.text
     authorized_read = Event()
-    original = nutrition_service._resolve_target_user
+    original = proposal_service._lock_client
 
     def signal_after_initial_check(*args, **kwargs):
         result = original(*args, **kwargs)
         authorized_read.set()
         return result
 
-    monkeypatch.setattr(nutrition_service, "_resolve_target_user", signal_after_initial_check)
-    payload = {
-        "target_telegram_user_id": 952308,
-        "calories": 2000,
-        "protein_g": 150,
-        "fat_g": 70,
-        "carbs_g": 180,
-        "effective_from": today_msk().isoformat(),
-    }
+    monkeypatch.setattr(proposal_service, "_lock_client", signal_after_initial_check)
     with ThreadPoolExecutor(max_workers=1) as pool:
         with get_session_context() as db:
             relation = (
@@ -408,17 +549,17 @@ def test_revoked_trainer_cannot_finish_a_write_started_before_revocation(
                 .with_for_update()
                 .one()
             )
-            relation.status = "ended"
+            relation.nutrition_access = False
             db.flush()
             request = pool.submit(
                 client.post,
-                "/api/v1/nutrition/targets/dates",
-                json=payload,
-                headers={**coach, "Idempotency-Key": "revoked-date-write"},
+                f"/api/v1/coach-nutrition-proposals/{proposal.json()['id']}/decision",
+                json={"decision": "accept", "version": 1},
+                headers={**athlete, "Idempotency-Key": "revoked-proposal-decision"},
             )
             assert authorized_read.wait(timeout=5)
             assert not request.done()
         response = request.result(timeout=10)
-    assert response.status_code == 403
+    assert response.status_code == 404
     with get_session_context() as db:
         assert db.query(NutritionTargetDateOverride).filter_by(user_id=athlete_id).count() == 0

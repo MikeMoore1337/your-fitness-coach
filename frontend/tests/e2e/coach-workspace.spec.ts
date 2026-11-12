@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { installTelegramHarness } from './fixtures/mobile-tma';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { installTelegramHarness, TelegramHarness } from './fixtures/mobile-tma';
 import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
@@ -687,6 +689,37 @@ async function mockCoachWorkspace(
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    if (path.includes('/coach-nutrition-proposals/clients/') && path.endsWith('/day'))
+      return route.fulfill({
+        json: {
+          target_id: 44,
+          day: {
+            plan_date: url.searchParams.get('target_date'),
+            revision: 0,
+            targets: { energy_kcal: 1900, protein_g: 110, fat_g: 70, carbs_g: 210 },
+            slots: [
+              {
+                items: [
+                  {
+                    id: 41,
+                    name: 'Творог',
+                    amount: '100',
+                    amount_unit: 'g',
+                    status: 'planned',
+                    available: true,
+                  },
+                ],
+              },
+            ],
+          },
+          program: null,
+          program_day: null,
+          binding: null,
+        },
+      });
+    if (path.endsWith('/target-assignments'))
+      return route.fulfill({ json: { dates: [], schedule: [] } });
+    if (path.includes('/coach-nutrition-proposals')) return route.fulfill({ json: [] });
     if (path.endsWith('/public/config'))
       return route.fulfill({
         json: { app_env: 'dev', enable_dev_auth: true, telegram_bot_username: 'fit_bot' },
@@ -1448,10 +1481,388 @@ async function openCoach(page: Page) {
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
 }
 
+for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+  test(`Issue 954: тренер проверяет и отправляет предложение (${surface})`, async ({
+    page,
+  }, testInfo) => {
+    const mobileWidth = Number(process.env.ISSUE_954_MOBILE_WIDTH ?? 390);
+    const captureSurface =
+      surface === 'mobile' && mobileWidth !== 390 ? `mobile-${mobileWidth}` : surface;
+    if (surface !== 'desktop') await page.setViewportSize({ width: mobileWidth, height: 844 });
+
+    const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+    const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+    if (surface === 'tma') await installTelegramHarness(page, { colorScheme: theme });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    if (evidence)
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockCoachWorkspace(page);
+    let sent = false;
+    let proposalStatus = 'pending';
+    let requestBody: Record<string, unknown> = {};
+    await page.route('**/api/v1/coach-nutrition-proposals?client_id=*', async (route) => {
+      await route.fulfill({
+        json: sent
+          ? [
+              {
+                id: 1,
+                version: 1,
+                status: proposalStatus,
+                target_date: requestBody.target_date,
+                request: requestBody,
+                before: {
+                  target: { calories: 1900, protein_g: 110, fat_g: 70, carbs_g: 210 },
+                  item: { name: 'Творог', amount: '100', amount_unit: 'g' },
+                },
+              },
+            ]
+          : [],
+      });
+    });
+    await page.route('**/api/v1/coach-nutrition-proposals/clients/11', async (route) => {
+      expect(route.request().method()).toBe('POST');
+      expect(route.request().postDataJSON()).toMatchObject({ calories: 2000, protein_g: 150 });
+      requestBody = route.request().postDataJSON();
+      sent = true;
+      await route.fulfill({
+        status: 201,
+        json: {
+          id: 1,
+          version: 1,
+          status: 'pending',
+          target_date: requestBody.target_date,
+          request: requestBody,
+          before: {
+            target: { calories: 1900, protein_g: 110, fat_g: 70, carbs_g: 210 },
+            item: { name: 'Творог', amount: '100', amount_unit: 'g' },
+          },
+        },
+      });
+    });
+    await page.goto('/coach');
+    if (surface !== 'tma') await page.getByRole('button', { name: 'Тренер' }).click();
+    await trainerPrimaryNavigation(page)
+      .getByRole('link', { name: 'Клиенты', exact: true })
+      .click();
+    if (surface !== 'desktop')
+      await page
+        .getByRole('button', { name: /Анна Петрова/ })
+        .first()
+        .click();
+    await page.locator('#coach-client-nutrition > summary').click();
+    await page.getByRole('button', { name: 'Открыть питание клиента' }).click();
+    if (evidence) await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+    await expect(
+      page.getByRole('heading', { name: 'Питание · Анна Петрова', level: 1 }),
+    ).toBeFocused();
+    await expect(
+      page.getByRole('button', { name: 'Подробный отчёт и история целей' }),
+    ).toBeVisible();
+    await expect(page.getByText('Цель на', { exact: false })).toBeVisible();
+    if (evidence) {
+      mkdirSync(evidence, { recursive: true });
+      if (surface !== 'desktop')
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-trainer-report-viewport.png`,
+          ),
+        });
+      await page.screenshot({
+        path: path.join(
+          evidence,
+          `${testInfo.project.name}-${captureSurface}-${theme}-trainer-report.png`,
+        ),
+        fullPage: true,
+        style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+      });
+    }
+    await page.getByRole('button', { name: 'Предложить изменение' }).click();
+    await expect(page.getByText(/Текущая цель:/)).toBeVisible();
+    if (evidence)
+      await page.screenshot({
+        path: path.join(
+          evidence,
+          `${testInfo.project.name}-${captureSurface}-${theme}-trainer-edit.png`,
+        ),
+        fullPage: true,
+        style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+      });
+    await page.getByLabel('Энергия, ккал', { exact: true }).fill('2000');
+    await page.getByLabel('Белки, г', { exact: true }).fill('150');
+    await page.getByLabel('Жиры, г', { exact: true }).fill('70');
+    await page.getByLabel('Углеводы, г', { exact: true }).fill('180');
+    await page.getByRole('combobox', { name: 'Приём пищи' }).selectOption('41');
+    await page.getByLabel('Предлагаемое количество, г').fill('150');
+    await page.getByRole('button', { name: 'Проверить изменения' }).click();
+    await expect(page.getByRole('region', { name: 'Проверка предложения' })).toContainText('2000');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    if (evidence) {
+      mkdirSync(evidence, { recursive: true });
+      if (surface !== 'desktop')
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-trainer-review-viewport.png`,
+          ),
+        });
+      await page.screenshot({
+        path: path.join(
+          evidence,
+          `${testInfo.project.name}-${captureSurface}-${theme}-trainer-review.png`,
+        ),
+        fullPage: true,
+        style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+      });
+    }
+    expect(sent).toBe(false);
+    await page.getByRole('button', { name: 'Отправить предложение' }).click();
+    await expect.poll(() => sent).toBe(true);
+    await expect(page.getByRole('heading', { name: 'Ожидает ответа' })).toBeVisible();
+    if (evidence)
+      await page.screenshot({
+        path: path.join(
+          evidence,
+          `${testInfo.project.name}-${captureSurface}-${theme}-trainer-sent.png`,
+        ),
+        fullPage: true,
+        style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+      });
+    for (const [status, label] of [
+      ['accepted', 'Принято'],
+      ['rejected', 'Отклонено'],
+    ] as const) {
+      proposalStatus = status;
+      await page.reload();
+      await page.locator('#coach-client-nutrition > summary').click();
+      await page.getByRole('button', { name: 'Открыть питание клиента' }).click();
+      await page.getByRole('button', { name: new RegExp(label) }).click();
+      await expect(
+        page.getByRole('heading', {
+          name: status === 'accepted' ? 'Предложение принято' : 'Предложение отклонено',
+        }),
+      ).toBeVisible();
+      if (evidence)
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-trainer-${status}.png`,
+          ),
+          fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+        });
+    }
+    if (surface === 'tma') {
+      await new TelegramHarness(page).clickBack();
+      await expect(
+        page.getByRole('button', { name: 'Подробный отчёт и история целей' }),
+      ).toBeVisible();
+      await new TelegramHarness(page).clickBack();
+      await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeVisible();
+    }
+  });
+}
+
 function trainerPrimaryNavigation(page: Page) {
   return page
     .getByRole('navigation', { name: 'Основная навигация' })
     .locator('.app-bottom-nav__primary');
+}
+
+test('Issue 954: отзыв убирает ранее загруженные данные питания', async ({ page }) => {
+  await mockCoachWorkspace(page);
+  let revoked = false;
+  await page.route('**/api/v1/coach-nutrition-proposals/clients/11/day?*', (route) => {
+    if (revoked) return route.fulfill({ status: 404, json: { detail: 'План недоступен' } });
+    const date = new URL(route.request().url()).searchParams.get('target_date');
+    return route.fulfill({
+      json: {
+        target_id: 44,
+        day: {
+          plan_date: date,
+          revision: 0,
+          targets: { energy_kcal: 1900, protein_g: 110, fat_g: 70, carbs_g: 210 },
+          slots: [],
+        },
+        program: null,
+        program_day: null,
+        binding: null,
+      },
+    });
+  });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await page.locator('#coach-client-nutrition > summary').click();
+  await page.getByRole('button', { name: 'Открыть питание клиента' }).click();
+  await expect(page.locator('.coach-nutrition-assigned')).toContainText('1900');
+  revoked = true;
+  await page.getByRole('button', { name: 'Предложить изменение' }).click();
+  await page.getByLabel('Будущая дата').fill('2030-01-11');
+  await expect(page.getByText('Доступ к питанию закрыт')).toBeVisible();
+  await expect(page.locator('.coach-nutrition-assigned')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Предложить изменение' })).toHaveCount(0);
+});
+
+for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+  test(`Issue 954: отозванное питание скрыто (${surface})`, async ({ page }, testInfo) => {
+    const mobileWidth = Number(process.env.ISSUE_954_MOBILE_WIDTH ?? 390);
+    const captureSurface =
+      surface === 'mobile' && mobileWidth !== 390 ? `mobile-${mobileWidth}` : surface;
+    if (surface !== 'desktop') await page.setViewportSize({ width: mobileWidth, height: 844 });
+
+    const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+    const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+    if (surface === 'tma') await installTelegramHarness(page, { colorScheme: theme });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    if (evidence)
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockCoachWorkspace(page);
+    await page.route('**/api/v1/coach-nutrition-proposals/clients/11/day?*', (route) =>
+      route.fulfill({ status: 404, json: { detail: 'План недоступен' } }),
+    );
+    await page.goto('/coach');
+    if (surface !== 'tma') await page.getByRole('button', { name: 'Тренер' }).click();
+    await trainerPrimaryNavigation(page)
+      .getByRole('link', { name: 'Клиенты', exact: true })
+      .click();
+    if (surface !== 'desktop')
+      await page
+        .getByRole('button', { name: /Анна Петрова/ })
+        .first()
+        .click();
+    await page.locator('#coach-client-nutrition > summary').click();
+    await page.getByRole('button', { name: 'Открыть питание клиента' }).click();
+    if (evidence) await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+    await expect(page.getByText('Доступ к питанию закрыт')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Предложить изменение' })).toHaveCount(0);
+    await expect(page.getByText('Творог', { exact: false })).toHaveCount(0);
+    if (evidence) {
+      mkdirSync(evidence, { recursive: true });
+      await page.screenshot({
+        path: path.join(
+          evidence,
+          `${testInfo.project.name}-${captureSurface}-${theme}-trainer-revoked.png`,
+        ),
+        fullPage: true,
+        style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+      });
+    }
+  });
+}
+
+for (const scenario of ['empty', 'program', 'error', 'loading'] as const) {
+  for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+    test(`Issue 954: состояние ${scenario} (${surface})`, async ({ page }, testInfo) => {
+      const mobileWidth = Number(process.env.ISSUE_954_MOBILE_WIDTH ?? 390);
+      const captureSurface =
+        surface === 'mobile' && mobileWidth !== 390 ? `mobile-${mobileWidth}` : surface;
+      if (surface !== 'desktop') await page.setViewportSize({ width: mobileWidth, height: 844 });
+
+      const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+      const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+      if (surface === 'tma') await installTelegramHarness(page, { colorScheme: theme });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      if (evidence)
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockCoachWorkspace(page);
+      if (scenario === 'empty' || scenario === 'program') {
+        await page.route('**/api/v1/coach-nutrition-proposals/clients/11/day?*', (route) =>
+          route.fulfill({
+            json: {
+              target_id: null,
+              day: {
+                plan_date: new URL(route.request().url()).searchParams.get('target_date'),
+                revision: 0,
+                targets: null,
+                slots: [],
+              },
+              program: scenario === 'program' ? { title: 'Новая программа' } : null,
+              program_day: null,
+              binding: scenario === 'program' ? { program_changed: true } : null,
+            },
+          }),
+        );
+      }
+      if (scenario === 'empty' || scenario === 'error' || scenario === 'loading') {
+        await page.route('**/api/v1/coach/clients/11/nutrition-report?*', async (route) => {
+          if (scenario === 'error')
+            return route.fulfill({ status: 500, json: { detail: 'Ошибка загрузки' } });
+          if (scenario === 'loading') {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+          const report = coachNutritionReport(new URL(route.request().url()));
+          if (scenario === 'empty') {
+            const emptyMetric = (metric: typeof report.summary.calories) => ({
+              ...metric,
+              average: null,
+              sample_days: 0,
+            });
+            return route.fulfill({
+              json: {
+                ...report,
+                insights: [],
+                daily: report.daily.map((day) => ({ ...day, status: 'missing' })),
+                summary: {
+                  ...report.summary,
+                  logged_days: 0,
+                  complete_days: 0,
+                  incomplete_days: 0,
+                  missing_days: report.summary.eligible_days,
+                  calories: emptyMetric(report.summary.calories),
+                  protein_g: emptyMetric(report.summary.protein_g),
+                  fat_g: emptyMetric(report.summary.fat_g),
+                  carbs_g: emptyMetric(report.summary.carbs_g),
+                },
+              },
+            });
+          }
+          return route.fulfill({ json: report });
+        });
+      }
+      await page.goto('/coach');
+      if (surface !== 'tma') await page.getByRole('button', { name: 'Тренер' }).click();
+      await trainerPrimaryNavigation(page)
+        .getByRole('link', { name: 'Клиенты', exact: true })
+        .click();
+      if (surface !== 'desktop')
+        await page
+          .getByRole('button', { name: /Анна Петрова/ })
+          .first()
+          .click();
+      await page.locator('#coach-client-nutrition > summary').click();
+      await page.getByRole('button', { name: 'Открыть питание клиента' }).click();
+      if (evidence) await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      if (scenario === 'program') {
+        await page.getByRole('button', { name: 'Предложить изменение' }).click();
+        await expect(page.getByText('Программа изменилась после назначения цели.')).toBeVisible();
+      }
+      if (scenario === 'empty')
+        await expect(page.locator('.coach-nutrition-metrics')).toContainText('—');
+      if (scenario === 'error')
+        await expect(page.locator('.coach-nutrition-report').getByRole('alert')).toBeVisible({
+          timeout: 15000,
+        });
+      if (scenario === 'loading')
+        await expect(page.getByText('Собираем отчёт по питанию…')).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      if (evidence) {
+        mkdirSync(evidence, { recursive: true });
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-trainer-${scenario}.png`,
+          ),
+          fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+        });
+      }
+    });
+  }
 }
 
 async function captureTask291Evidence(page: Page, name: string) {

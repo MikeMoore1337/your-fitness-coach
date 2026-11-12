@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, apiFile } from '../../shared/api/client';
 import type { NutritionReport, NutritionReportPeriod } from '../../shared/api/types';
 import { dateInputValue, formatCalendarDate } from '../../shared/dateTime';
@@ -536,19 +536,28 @@ export function NutritionPeriodReport({
   clientId,
   controlledPeriod,
   showSelector = true,
+  compact = false,
+  onAccessDenied,
 }: {
   canExport?: boolean;
   clientId?: number;
   controlledPeriod?: ControlledNutritionPeriod;
   showSelector?: boolean;
+  compact?: boolean;
+  onAccessDenied?: () => void;
 }) {
   const initial = useMemo(
     () =>
       clientId == null
         ? initialReportState()
-        : { period: 'days_30' as const, dateFrom: '', dateTo: '' },
-    [clientId],
+        : {
+            period: compact ? ('days_7' as const) : ('days_30' as const),
+            dateFrom: '',
+            dateTo: '',
+          },
+    [clientId, compact],
   );
+  const [showFullReport, setShowFullReport] = useState(false);
   const [period, setPeriod] = useState<NutritionReportPeriod>(initial.period);
   const [selectedPeriod, setSelectedPeriod] = useState<NutritionReportPeriod>(initial.period);
   const [dateFrom, setDateFrom] = useState(initial.dateFrom);
@@ -573,6 +582,13 @@ export function NutritionPeriodReport({
       api<NutritionReport>(reportPath(activePeriod, activeDateFrom, activeDateTo, false, clientId)),
     placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    if (
+      clientId != null &&
+      [403, 404].includes((report.error as { status?: number } | null)?.status ?? 0)
+    )
+      onAccessDenied?.();
+  }, [clientId, report.error, onAccessDenied]);
   const today = report.data
     ? dateInputValue(new Date(), report.data.timezone)
     : dateInputValue(new Date());
@@ -641,12 +657,97 @@ export function NutritionPeriodReport({
   const pointsByDate = new Map(report.data?.daily.map((point) => [point.diary_date, point]));
   const showWeek = report.data && ['days_7', 'current_week'].includes(report.data.period);
 
+  if (compact && !showFullReport) {
+    return (
+      <section
+        className="nutrition-section-card coach-nutrition-report"
+        aria-labelledby="coach-nutrition-report-title"
+      >
+        <h3 id="coach-nutrition-report-title">Отчёт о питании</h3>
+        <SegmentedControl
+          ariaLabel="Период отчёта по питанию"
+          value={selectedPeriod}
+          options={reportPeriods.slice(0, 3)}
+          onChange={selectPeriod}
+        />
+        {report.isLoading && !report.data ? (
+          <LoadingState label="Собираем отчёт по питанию…" />
+        ) : report.error ? (
+          <ErrorState
+            message={(report.error as Error).message}
+            retry={() => void report.refetch()}
+          />
+        ) : (
+          report.data && (
+            <>
+              <p className="muted">
+                {periodLabel(report.data)} · {report.data.timezone}
+              </p>
+              {showWeek && (
+                <WeekStrip
+                  anchorDate={report.data.period_start}
+                  ariaLabel="Дни отчёта по питанию"
+                  getDayMeta={(date) => weekMeta(pointsByDate.get(date), null)}
+                  legend={NUTRITION_WEEK_LEGEND}
+                  mode="overview"
+                  rangeStart={report.data.period_start}
+                  title="Дни отчёта"
+                  today={report.data.daily.find((point) => point.is_current_day)?.diary_date ?? ''}
+                />
+              )}
+              <p className="muted">
+                {report.data.summary.complete_days} завершено ·{' '}
+                {report.data.summary.incomplete_days} не завершено ·{' '}
+                {report.data.summary.missing_days} нет данных
+              </p>
+              {report.data.summary.logged_days === 0 && (
+                <p>
+                  За выбранный период нет завершённых дней. Сравнить питание с целью пока нельзя.
+                </p>
+              )}
+              <dl className="coach-nutrition-metrics">
+                {(
+                  [
+                    ['Энергия', report.data.summary.calories, 'ккал'],
+                    ['Белки', report.data.summary.protein_g, 'г'],
+                    ['Жиры', report.data.summary.fat_g, 'г'],
+                    ['Углеводы', report.data.summary.carbs_g, 'г'],
+                  ] as const
+                ).map(([label, metric, unit]) => (
+                  <div key={label}>
+                    <dt>{label} · в среднем</dt>
+                    <dd>
+                      {formatNumber(metric.average)} {metric.average == null ? '' : unit}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <NutritionReportInsights
+                report={report.data}
+                canOpenDiary={false}
+                diaryDate={today}
+              />
+            </>
+          )
+        )}
+        <Button type="button" variant="secondary" onClick={() => setShowFullReport(true)}>
+          Подробный отчёт и история целей
+        </Button>
+      </section>
+    );
+  }
+
   return (
     <section
       className="progress-section nutrition-period-report"
       id="nutrition-period-report"
       aria-labelledby="nutrition-period-report-title"
     >
+      {compact && (
+        <Button type="button" variant="secondary" onClick={() => setShowFullReport(false)}>
+          К краткому отчёту
+        </Button>
+      )}
       <header className="progress-section__head nutrition-period-report__head">
         <div>
           <span className="progress-section__eyebrow">Фактический дневник</span>
@@ -724,7 +825,7 @@ export function NutritionPeriodReport({
 
       {report.isLoading && !report.data ? (
         <LoadingState label="Собираем отчёт по питанию…" />
-      ) : report.error && !report.data ? (
+      ) : report.error && (!report.data || clientId != null) ? (
         <ErrorState message={(report.error as Error).message} retry={() => void report.refetch()} />
       ) : report.data ? (
         <>

@@ -1012,6 +1012,8 @@ def update_plan_item(
     user: User,
     item_id: int,
     payload: NutritionPlanItemUpdate,
+    *,
+    commit: bool = True,
 ) -> NutritionPlanDayResponse:
     try:
         item = _owned_item_query(db, user, item_id)
@@ -1051,7 +1053,10 @@ def update_plan_item(
             except (RecipeError, FoodError, NutritionPlanError) as exc:
                 raise NutritionPlanError("planned source cannot be recalculated") from exc
         plan.revision += 1
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return _build_day(db, user, plan.plan_date)
     except Exception:
         db.rollback()

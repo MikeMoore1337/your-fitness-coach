@@ -139,6 +139,7 @@ from fitminiapp_api.services.coach_capacity import build_coach_capacity_snapshot
 from fitminiapp_api.services.coach_clients import (
     create_coach_invite_link,
     get_client_managed_by_coach,
+    get_client_with_nutrition_access,
     remove_client_for_coach,
     revoke_coach_invite,
     update_client_labels,
@@ -355,6 +356,13 @@ def update_client_workout_comment(
 def _managed_client(db: Session, coach: User, client_id: int) -> User:
     try:
         return get_client_managed_by_coach(db, coach, client_id)
+    except ProgramError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def _nutrition_client(db: Session, coach: User, client_id: int) -> User:
+    try:
+        return get_client_with_nutrition_access(db, coach, client_id)
     except ProgramError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -1107,13 +1115,20 @@ def coach_client_progress_summary(
 ):
     client = _managed_client(db, current_user, client_id)
     try:
+        try:
+            get_client_with_nutrition_access(db, current_user, client_id)
+            nutrition_visible = True
+        except ProgramError:
+            nutrition_visible = False
         bounds = resolve_progress_bounds(
             client,
             period_days,
             date_from=date_from,
             date_to=date_to,
         )
-        return build_progress_summary_for_range(db, client, bounds.start, bounds.end)
+        return build_progress_summary_for_range(
+            db, client, bounds.start, bounds.end, nutrition_visible=nutrition_visible
+        )
     except PeriodBoundsError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
 
@@ -1149,7 +1164,7 @@ def coach_client_nutrition_report(
     current_user: User = Depends(require_coach),
     db: Session = Depends(get_db),
 ):
-    client = _managed_client(db, current_user, client_id)
+    client = _nutrition_client(db, current_user, client_id)
     return _client_nutrition_report_or_422(db, client, period, date_from, date_to)
 
 
@@ -1165,7 +1180,7 @@ def coach_client_progress_report(
     current_user: User = Depends(require_coach),
     db: Session = Depends(get_db),
 ):
-    client = _managed_client(db, current_user, client_id)
+    client = _nutrition_client(db, current_user, client_id)
     try:
         return build_progress_report(
             db,
@@ -1207,7 +1222,7 @@ def coach_client_progress_report_download_link(
     current_user: User = Depends(require_coach),
     db: Session = Depends(get_db),
 ) -> ProgressReportDownloadLinkResponse:
-    client = _managed_client(db, current_user, client_id)
+    client = _nutrition_client(db, current_user, client_id)
     try:
         report = build_progress_report(
             db,
@@ -1244,7 +1259,7 @@ def coach_client_nutrition_report_export(
     current_user: User = Depends(require_coach),
     db: Session = Depends(get_db),
 ):
-    client = _managed_client(db, current_user, client_id)
+    client = _nutrition_client(db, current_user, client_id)
     report = _client_nutrition_report_or_422(db, client, period, date_from, date_to)
     filename = f"nutrition-report-{report['period_start']}-{report['period_end']}.csv"
     return Response(
@@ -1265,7 +1280,7 @@ def coach_client_weekly_check_ins(
     current_user: User = Depends(require_coach),
     db: Session = Depends(get_db),
 ):
-    client = _managed_client(db, current_user, client_id)
+    client = _nutrition_client(db, current_user, client_id)
     return list_weekly_check_ins(db, client, limit=limit, offset=offset)
 
 

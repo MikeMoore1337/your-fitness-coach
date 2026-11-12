@@ -356,6 +356,7 @@ def _resolve_target_user(
                 CoachClient.coach_user_id == current_user.id,
                 CoachClient.client_user_id == target_user.id,
                 CoachClient.status == "active",
+                CoachClient.nutrition_access.is_not(False),
             )
             .first()
         )
@@ -374,6 +375,7 @@ def lock_nutrition_authorization(db: Session, actor: User, target_user: User) ->
             CoachClient.coach_user_id == actor.id,
             CoachClient.client_user_id == target_user.id,
             CoachClient.status == "active",
+            CoachClient.nutrition_access.is_not(False),
         )
         .with_for_update()
         .first()
@@ -846,6 +848,8 @@ def recalculate_nutrition_target(
     changed_by: User,
 ) -> bool:
     """Version a calculated target; never silently rewrite manual/trainer values."""
+    if changed_by.id != target_user.id:
+        return False
     target = get_current_nutrition_target(db, target_user.id)
     if target is None or target.source != "calculated":
         return False
@@ -933,6 +937,8 @@ def save_nutrition_target(
     payload: NutritionTargetSave,
 ) -> NutritionTargetResponse:
     target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    if current_user.id != target_user.id:
+        raise NutritionConflictError("Изменение тренера требует подтверждения клиента")
     calculations = calculate_nutrition(payload)
     ensure_profile(db, target_user)
     daily_routine, steps_range, _ = _daily_activity(payload)
@@ -1028,6 +1034,8 @@ def save_manual_nutrition_target(
     payload: NutritionManualTargetSave,
 ) -> NutritionTargetResponse:
     target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    if current_user.id != target_user.id:
+        raise NutritionConflictError("Изменение тренера требует подтверждения клиента")
     _validate_manual_target_energy(payload)
     ensure_profile(db, target_user)
     # Build the retry snapshot under the same per-user lock used for versioning.
@@ -1105,8 +1113,12 @@ def save_nutrition_date_override(
     current_user: User,
     payload: NutritionDateOverrideSave,
     idempotency_key: str,
+    *,
+    commit: bool = True,
 ) -> NutritionDateOverrideResponse:
     target_user = _resolve_target_user(db, current_user, payload.target_telegram_user_id)
+    if current_user.id != target_user.id:
+        raise NutritionConflictError("Изменение тренера требует подтверждения клиента")
     key, fingerprint = nutrition_request_identity(current_user, payload, idempotency_key)
     db.query(User.id).filter(User.id == target_user.id).with_for_update().one()
     lock_nutrition_authorization(db, current_user, target_user)
@@ -1163,8 +1175,11 @@ def save_nutrition_date_override(
                 request_hash=fingerprint,
             )
         )
-        db.commit()
-        db.refresh(target)
+        if commit:
+            db.commit()
+            db.refresh(target)
+        else:
+            db.flush()
     response = build_nutrition_target_response_for_user(db, target, target_user)
     if response is None:
         raise NutritionError("Цель питания не найдена")

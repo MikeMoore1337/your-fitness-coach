@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NutritionTarget } from '../../shared/api/types';
 import type { components } from '../../shared/api/schema';
 import { dateInputValue } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
+import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+import { ClientNutritionProposals } from './CoachNutritionProposals';
 import { NutritionDiary } from './NutritionDiary';
 import { NutritionTargets } from './NutritionTargets';
 import type { MealType } from './FoodPickerDialog';
@@ -35,7 +37,15 @@ export function NutritionPage({
   returnPath?: string;
   timeZone?: string | null;
 }) {
-  const [view, setView] = useState<'day' | 'settings' | 'override'>('day');
+  const [view, setView] = useState<'day' | 'settings' | 'override' | 'proposal'>('day');
+  const root = useRef<HTMLDivElement>(null);
+  const closeProposal = useCallback(() => {
+    setView('day');
+    requestAnimationFrame(() =>
+      root.current?.querySelector<HTMLButtonElement>('.coach-nutrition-entry button')?.focus(),
+    );
+  }, []);
+  useTelegramOverlayBackButton(view === 'proposal', closeProposal);
   const dayView = useRef<HTMLDivElement>(null);
   const [selectedDate, setSelectedDate] = useState(
     initialDate || dateInputValue(new Date(), timeZone || undefined),
@@ -53,13 +63,20 @@ export function NutritionPage({
   }, []);
 
   return (
-    <div className="nutrition-experience">
+    <div className="nutrition-experience" ref={root}>
       {returnPath && (
         <nav aria-label="Возврат к отчёту по питанию" className="nutrition-report-return">
           <AppLink className="button-link secondary-link" to={returnPath}>
             К отчёту по питанию
           </AppLink>
         </nav>
+      )}
+      {!demoSafeMode && (view === 'day' || view === 'proposal') && (
+        <ClientNutritionProposals
+          focused={view === 'proposal'}
+          onOpen={() => setView('proposal')}
+          onClose={closeProposal}
+        />
       )}
       <div className="nutrition-day-content" ref={dayView} hidden={view !== 'day'}>
         <NutritionDiary
@@ -92,7 +109,7 @@ export function NutritionPage({
           entryPoint="nutrition"
         />
       </div>
-      {view !== 'day' && (
+      {view !== 'day' && view !== 'proposal' && (
         <NutritionTargets
           mode={view}
           date={selectedDate}

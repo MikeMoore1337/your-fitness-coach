@@ -24,6 +24,7 @@ import { CoachProgramOperations } from '../../features/coach/CoachProgramOperati
 import { TrainerModeSwitch } from '../../features/trainer/TrainerModeSwitch';
 import { ExerciseCatalog } from '../../features/exercises/ExerciseCatalog';
 import { NutritionForm } from '../../features/nutrition/NutritionForm';
+import { TrainerNutritionProposals } from '../../features/nutrition/CoachNutritionProposals';
 import { NutritionPeriodReport } from '../../features/workouts/NutritionReport';
 import { ProgramBuilder } from '../../features/programs/ProgramBuilder';
 import { AssignedProgramDetails } from '../../features/programs/AssignedProgramDetails';
@@ -875,8 +876,71 @@ function CoachClientDetail({
   const [progressRequest, setProgressRequest] = useState<number | null>(null);
   const [reportRequest, setReportRequest] = useState<number | null>(null);
   const [reviewWorkspaceRequest, setReviewWorkspaceRequest] = useState<number | null>(null);
+  const [nutritionFocused, setNutritionFocused] = useState(false);
+  const [nutritionEditing, setNutritionEditing] = useState(false);
+  const [nutritionDenied, setNutritionDenied] = useState(false);
+  const nutritionTitle = useRef<HTMLHeadingElement>(null);
+  const nutritionTrigger = useRef<HTMLAnchorElement>(null);
+  const denyNutrition = useCallback(() => setNutritionDenied(true), []);
+  const closeNutrition = useCallback(() => {
+    setNutritionFocused(false);
+    requestAnimationFrame(() => nutritionTrigger.current?.focus());
+  }, []);
+  useTelegramOverlayBackButton(nutritionFocused, closeNutrition);
+  useEffect(() => {
+    if (nutritionFocused) nutritionTitle.current?.focus();
+  }, [nutritionFocused]);
   if (client.id == null) return null;
   const activeProgram = programs.find((program) => program.is_active);
+  if (nutritionFocused) {
+    return (
+      <article className="coach-nutrition-workspace">
+        <Button type="button" variant="secondary" onClick={closeNutrition}>
+          К клиенту
+        </Button>
+        <header>
+          <h1 ref={nutritionTitle} tabIndex={-1}>
+            Питание · {clientDisplayName(client)}
+          </h1>
+          <p>Отчёт, план и предложения в одном месте</p>
+        </header>
+        {nutritionDenied || (summary && !summary.nutrition.visible) ? (
+          <EmptyState
+            title="Доступ к питанию закрыт"
+            text="Связь или разрешение изменились. Обратитесь к клиенту, чтобы уточнить доступ."
+          />
+        ) : (
+          <>
+            {!nutritionEditing && (
+              <NutritionPeriodReport
+                canExport={capabilities.canExport}
+                clientId={client.id}
+                compact
+                onAccessDenied={denyNutrition}
+              />
+            )}
+            {client.status === 'active' && capabilities.canMutateProfile && (
+              <TrainerNutritionProposals
+                clientId={client.id}
+                timeZone={client.timezone}
+                onEditingChange={setNutritionEditing}
+                onAccessDenied={denyNutrition}
+              />
+            )}
+            {!nutritionEditing && (
+              <NutritionForm
+                clientId={client.id}
+                targetTelegramId={client.telegram_user_id}
+                initial={client.kbju}
+                timeZone={client.timezone}
+                readOnly
+              />
+            )}
+          </>
+        )}
+      </article>
+    );
+  }
   return (
     <article className="coach-client-detail" aria-labelledby="coach-client-detail-title">
       <header className="coach-client-detail__header">
@@ -932,8 +996,12 @@ function CoachClientDetail({
           </a>
           <a
             href="#coach-client-nutrition"
-            onClick={() => {
+            ref={nutritionTrigger}
+            onClick={(event) => {
+              event.preventDefault();
               onQuickAction('nutrition');
+              setNutritionDenied(false);
+              setNutritionFocused(true);
             }}
           >
             Питание
@@ -1142,6 +1210,16 @@ function CoachClientDetail({
             : 'Агрегаты питания не доступны'
         }
       >
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            setNutritionDenied(false);
+            setNutritionFocused(true);
+          }}
+        >
+          Открыть питание клиента
+        </Button>
         {summary && !summary.nutrition.visible ? (
           <EmptyState
             title="Нет доступа к сводке питания"
@@ -1156,13 +1234,20 @@ function CoachClientDetail({
                 clientId={client.id}
               />
             )}
+            {client.status === 'active' && capabilities.canMutateProfile && (
+              <TrainerNutritionProposals
+                key={client.id}
+                clientId={client.id}
+                timeZone={client.timezone}
+              />
+            )}
             <NutritionForm
               key={JSON.stringify([client.id, client.kbju])}
               clientId={client.id}
               targetTelegramId={client.telegram_user_id}
               initial={client.kbju}
               timeZone={client.timezone}
-              readOnly={!capabilities.canMutateProfile}
+              readOnly
             />
           </>
         )}

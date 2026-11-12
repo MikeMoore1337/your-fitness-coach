@@ -7,6 +7,7 @@ from fitminiapp_api.api.v1 import (
     bot,
     check_ins,
     coach,
+    coach_nutrition_proposals,
     demo,
     hermes,
     hermes_articles,
@@ -39,6 +40,11 @@ api_router.include_router(
     program_imports.router, prefix="/programs/imports", tags=["program-imports"]
 )
 api_router.include_router(coach.router, prefix="/coach", tags=["coach"])
+api_router.include_router(
+    coach_nutrition_proposals.router,
+    prefix="/coach-nutrition-proposals",
+    tags=["coach-nutrition-proposals"],
+)
 api_router.include_router(workouts.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(workout_copy.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(
