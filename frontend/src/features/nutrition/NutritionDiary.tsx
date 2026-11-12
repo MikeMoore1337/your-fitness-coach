@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import { addCalendarDays, calendarWeek, dateInputValue } from '../../shared/dateTime';
@@ -101,12 +101,6 @@ function formatDate(value: string, today: string): { title: string; subtitle: st
   if (value === today) return { title: 'Сегодня', subtitle: weekday };
   if (value === addCalendarDays(today, -1)) return { title: 'Вчера', subtitle: weekday };
   return { title: weekday, subtitle: String(date.getFullYear()) };
-}
-
-function shortDate(value: string): string {
-  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(
-    new Date(`${value}T12:00:00`),
-  );
 }
 
 function amountLabel(entry: FoodDiaryEntry): string {
@@ -562,6 +556,8 @@ function MealSection({
   onCopy,
   onRepeatYesterday,
   onCopyEntry,
+  repeatAction,
+  repeatFeedback,
   readOnly = false,
 }: {
   meal: FoodDiaryMeal;
@@ -572,6 +568,8 @@ function MealSection({
   onCopy: () => void;
   onRepeatYesterday: () => void;
   onCopyEntry: (entry: FoodDiaryEntry) => void;
+  repeatAction?: ReactNode;
+  repeatFeedback?: ReactNode;
   readOnly?: boolean;
 }) {
   const hasEntries = meal.entries.length > 0;
@@ -611,6 +609,8 @@ function MealSection({
           </Button>
         </div>
       </header>
+      {repeatAction}
+      {repeatFeedback}
       <div className="nutrition-meal__content" hidden={!expanded} id={contentId}>
         <div className="nutrition-meal__secondary-actions">
           <button
@@ -818,51 +818,6 @@ function NutritionWeekSelector({
   );
 }
 
-function RepeatCandidateCard({
-  candidate,
-  targetDate,
-  today,
-  readOnly,
-  busy,
-  disabled,
-  onRepeat,
-}: {
-  candidate: NonNullable<FoodDiaryDay['repeat_candidate']>;
-  targetDate: string;
-  today: string;
-  readOnly: boolean;
-  busy: boolean;
-  disabled: boolean;
-  onRepeat: () => void;
-}) {
-  if (readOnly) return null;
-  const sourceLabel = formatDate(candidate.source_date, today);
-  const isYesterday = candidate.source_date === addCalendarDays(targetDate, -1);
-  const actionLabel = isYesterday
-    ? `Повторить вчерашний ${mealLabels[candidate.source_meal_type].toLowerCase()}`
-    : `Повторить ${mealLabels[candidate.source_meal_type].toLowerCase()} за ${shortDate(candidate.source_date)}`;
-  return (
-    <section className="nutrition-repeat-default" aria-label="Быстрый повтор">
-      <div>
-        <span className="eyebrow">Быстрый путь</span>
-        <strong>{actionLabel}</strong>
-        <span>
-          {candidate.entry_count} {plural(candidate.entry_count, 'запись', 'записи', 'записей')} ·{' '}
-          {sourceLabel.subtitle}
-        </span>
-      </div>
-      <Button
-        type="button"
-        onClick={onRepeat}
-        disabled={disabled}
-        data-testid="nutrition-repeat-default"
-      >
-        {busy ? 'Добавляем…' : 'Повторить'}
-      </Button>
-    </section>
-  );
-}
-
 function defaultMealType(timeZone?: string | null): MealType {
   try {
     const hour = Number(
@@ -947,11 +902,6 @@ export function NutritionDiary({
   const newEntryIds = useMemo(
     () => (lastAddedEntryId == null ? new Set<number>() : new Set([lastAddedEntryId])),
     [lastAddedEntryId],
-  );
-  const hasRepeatCandidate = Boolean(
-    (pendingRepeats[selectedDate] || diary.data?.repeat_candidate) &&
-    diary.data?.status !== 'fasted' &&
-    !readOnlyEntries,
   );
   const refreshDiary = async () => {
     await Promise.all([
@@ -1109,7 +1059,7 @@ export function NutritionDiary({
         <div className="nutrition-diary__intro-actions">
           <Button
             className="nutrition-diary__primary-action"
-            variant={hasRepeatCandidate ? 'secondary' : 'primary'}
+            variant="primary"
             type="button"
             aria-label="Добавить продукт в текущий приём пищи"
             data-testid="nutrition-add-product"
@@ -1155,66 +1105,6 @@ export function NutritionDiary({
       )}
       {diary.data && (
         <>
-          {candidate && diary.data.status !== 'fasted' && (
-            <RepeatCandidateCard
-              candidate={candidate}
-              targetDate={selectedDate}
-              today={today}
-              readOnly={readOnlyEntries}
-              busy={repeat.isPending && repeat.variables?.date === selectedDate}
-              disabled={repeat.isPending || undoRepeat.isPending}
-              onRepeat={() => {
-                keepRepeatFocus.current =
-                  document.activeElement?.getAttribute('data-testid') ===
-                  'nutrition-repeat-default';
-                submitRepeat();
-              }}
-            />
-          )}
-          {!readOnlyEntries && repeatNotice?.date === selectedDate && (
-            <div
-              ref={repeatFeedback}
-              tabIndex={-1}
-              className={`${repeatNotice.kind.endsWith('error') || repeatNotice.kind === 'conflict' ? 'hydration-mutation-error' : 'hydration-undo'} nutrition-repeat-feedback`}
-              role={
-                repeatNotice.kind.endsWith('error') || repeatNotice.kind === 'conflict'
-                  ? 'alert'
-                  : 'status'
-              }
-            >
-              <span>
-                {repeatNotice.kind === 'added' &&
-                  `${mealLabels[repeatNotice.meal]} добавлен${repeatNotice.meal === 'snacks' ? 'ы' : ''}`}
-                {repeatNotice.kind === 'already-removed' && 'Записи повтора уже удалены'}
-                {repeatNotice.kind === 'undone' &&
-                  `Повтор ${mealGenitive[repeatNotice.meal]} отменён`}
-                {repeatNotice.kind === 'repeat-error' &&
-                  `Не удалось проверить, добавлен ли ${mealLabels[repeatNotice.meal].toLowerCase()}. Попробуйте ещё раз.`}
-                {repeatNotice.kind === 'conflict' &&
-                  'Не удалось повторить приём пищи. Проверьте записи и попробуйте ещё раз.'}
-                {repeatNotice.kind === 'undo-error' &&
-                  `Не удалось отменить повтор. Проверьте записи ${mealGenitive[repeatNotice.meal]}.`}
-              </span>
-              {(repeatNotice.kind === 'added' || repeatNotice.kind === 'undo-error') &&
-                repeatUndo &&
-                repeatUndo.entries.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    disabled={undoRepeat.isPending || repeat.isPending}
-                    aria-label={`${repeatNotice.kind === 'undo-error' ? 'Повторить отмену' : 'Отменить повтор'} ${mealGenitive[repeatUndo.meal]}`}
-                    onClick={(event) => {
-                      if (undoInFlight.current || repeatInFlight.current) return;
-                      keepRepeatFocus.current = document.activeElement === event.currentTarget;
-                      undoInFlight.current = true;
-                      undoRepeat.mutate(repeatUndo);
-                    }}
-                  >
-                    {repeatNotice.kind === 'undo-error' ? 'Повторить отмену' : 'Отменить'}
-                  </Button>
-                )}
-            </div>
-          )}
           <DaySummary
             day={diary.data}
             selectedDate={selectedDate}
@@ -1277,6 +1167,81 @@ export function NutritionDiary({
                   key={meal.meal_type}
                   meal={meal}
                   newEntryIds={newEntryIds}
+                  repeatAction={
+                    candidate &&
+                    candidate.entry_count > 0 &&
+                    candidate.source_meal_type === meal.meal_type &&
+                    diary.data.status !== 'fasted' &&
+                    !readOnlyEntries ? (
+                      <div className="nutrition-meal__repeat">
+                        <span>{`${mealLabels[candidate.source_meal_type]} за ${new Date(`${candidate.source_date}T12:00:00`).toLocaleDateString('ru-RU')} — в дневник за ${new Date(`${selectedDate}T12:00:00`).toLocaleDateString('ru-RU')}`}</span>
+                        <Button
+                          variant="secondary"
+                          type="button"
+                          disabled={repeat.isPending || undoRepeat.isPending}
+                          data-testid="nutrition-repeat-default"
+                          onClick={(event) => {
+                            keepRepeatFocus.current =
+                              document.activeElement === event.currentTarget;
+                            submitRepeat();
+                          }}
+                        >
+                          {repeat.isPending && repeat.variables?.date === selectedDate
+                            ? 'Добавляем…'
+                            : 'Повторить'}
+                        </Button>
+                      </div>
+                    ) : null
+                  }
+                  repeatFeedback={
+                    !readOnlyEntries &&
+                    repeatNotice?.date === selectedDate &&
+                    repeatNotice.meal === meal.meal_type ? (
+                      <div
+                        ref={repeatFeedback}
+                        tabIndex={-1}
+                        className={`${repeatNotice.kind.endsWith('error') || repeatNotice.kind === 'conflict' ? 'hydration-mutation-error' : 'hydration-undo'} nutrition-repeat-feedback`}
+                        role={
+                          repeatNotice.kind.endsWith('error') || repeatNotice.kind === 'conflict'
+                            ? 'alert'
+                            : 'status'
+                        }
+                      >
+                        <span>
+                          {repeatNotice.kind === 'added' &&
+                            `${mealLabels[repeatNotice.meal]} добавлен${repeatNotice.meal === 'snacks' ? 'ы' : ''}`}
+                          {repeatNotice.kind === 'already-removed' && 'Записи повтора уже удалены'}
+                          {repeatNotice.kind === 'undone' &&
+                            `Повтор ${mealGenitive[repeatNotice.meal]} отменён`}
+                          {repeatNotice.kind === 'repeat-error' &&
+                            `Не удалось проверить, добавлен ли ${mealLabels[repeatNotice.meal].toLowerCase()}. Попробуйте ещё раз.`}
+                          {repeatNotice.kind === 'conflict' &&
+                            'Не удалось повторить приём пищи. Проверьте записи и попробуйте ещё раз.'}
+                          {repeatNotice.kind === 'undo-error' &&
+                            `Не удалось отменить повтор. Проверьте записи ${mealGenitive[repeatNotice.meal]}.`}
+                        </span>
+                        {(repeatNotice.kind === 'added' || repeatNotice.kind === 'undo-error') &&
+                          repeatUndo &&
+                          repeatUndo.entries.length > 0 && (
+                            <Button
+                              variant="secondary"
+                              type="button"
+                              disabled={undoRepeat.isPending || repeat.isPending}
+                              aria-label={`${repeatNotice.kind === 'undo-error' ? 'Повторить отмену' : 'Отменить повтор'} ${mealGenitive[repeatUndo.meal]}`}
+                              onClick={(event) => {
+                                if (undoInFlight.current || repeatInFlight.current) return;
+                                keepRepeatFocus.current =
+                                  document.activeElement === event.currentTarget;
+                                undoInFlight.current = true;
+                                undoRepeat.mutate(repeatUndo);
+                              }}
+                            >
+                              {repeatNotice.kind === 'undo-error' ? 'Повторить отмену' : 'Отменить'}
+                            </Button>
+                          )}
+                      </div>
+                    ) : null
+                  }
                   expanded={mealExpansion[meal.meal_type as MealType] ?? false}
                   onExpandedChange={(expanded) =>
                     setMealExpansion((current) => ({

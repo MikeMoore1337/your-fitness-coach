@@ -37,7 +37,7 @@ test('Task 543 keeps one Today action for the current rest-day state', async ({ 
   await captureEvidence(page, 'today-rest-mobile-light-390.png');
 });
 
-test('Task 543 keeps the repeat meal as Nutrition primary in mocked dark TMA', async ({ page }) => {
+test('Nutrition keeps contextual repeat available in mocked dark TMA', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await installTelegramHarness(page, {
@@ -55,12 +55,12 @@ test('Task 543 keeps the repeat meal as Nutrition primary in mocked dark TMA', a
   const repeat = page.getByTestId('nutrition-repeat-default');
   const addProduct = page.getByTestId('nutrition-add-product');
   await expect(repeat).toBeVisible();
-  await expect(repeat).toHaveClass(/ui-button--primary/);
-  await expect(addProduct).toHaveClass(/ui-button--secondary/);
+  await expect(repeat).toHaveClass(/ui-button--secondary/);
+  await expect(addProduct).toHaveClass(/ui-button--primary/);
   await expectNoHorizontalOverflow(page);
   await expectTouchTargets(
     page.locator(
-      '.nutrition-diary__intro-actions button:visible, .nutrition-repeat-default button:visible',
+      '.nutrition-diary__intro-actions button:visible, .nutrition-meal__repeat button:visible',
     ),
   );
   await captureEvidence(page, 'nutrition-repeat-mobile-dark-tma-390.png');

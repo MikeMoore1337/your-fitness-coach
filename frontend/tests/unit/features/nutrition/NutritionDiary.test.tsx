@@ -279,9 +279,10 @@ describe('NutritionDiary', () => {
     renderDiary();
 
     const defaultRepeat = await screen.findByTestId('nutrition-repeat-default');
-    expect(screen.getByText('Повторить вчерашний завтрак')).toBeVisible();
-    expect(defaultRepeat).toHaveClass('ui-button--primary');
-    expect(screen.getByTestId('nutrition-add-product')).toHaveClass('ui-button--secondary');
+    expect(screen.getByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
+    expect(defaultRepeat).toHaveClass('ui-button--secondary');
+    expect(within(breakfastSection()).getByTestId('nutrition-repeat-default')).toBeVisible();
+    expect(screen.getByTestId('nutrition-add-product')).toHaveClass('ui-button--primary');
     const breakfast = within(breakfastSection()).getByRole('button', { name: 'Завтрак' });
     const lunch = within(screen.getByRole('region', { name: 'Обед' })).getByRole('button', {
       name: 'Обед',
@@ -291,7 +292,7 @@ describe('NutritionDiary', () => {
     fireEvent.click(lunch);
     fireEvent.click(defaultRepeat);
     expect(await screen.findByText('Завтрак добавлен')).toBeVisible();
-    expect(await screen.findByText('Повторить вчерашний обед')).toBeVisible();
+    expect(await screen.findByText('Обед за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
     expect(breakfast).toHaveAttribute('aria-expanded', 'false');
     expect(lunch).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -303,11 +304,50 @@ describe('NutritionDiary', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Отменить повтор завтрака' }));
     expect(await screen.findByText('Повтор завтрака отменён')).toBeVisible();
-    expect(await screen.findByText('Повторить вчерашний завтрак')).toBeVisible();
+    expect(
+      await screen.findByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026'),
+    ).toBeVisible();
     expect(apiMock).toHaveBeenCalledWith(`/api/v1/nutrition/diary/entries/${entry.id}~undo`, {
       method: 'DELETE',
       headers: { 'X-Diary-Entry-Version': entry.created_at },
     });
+  });
+
+  it.each([
+    ['breakfast', 'Завтрак'],
+    ['lunch', 'Обед'],
+    ['dinner', 'Ужин'],
+    ['snacks', 'Перекусы'],
+  ] as const)('offers %s repeat in the collapsed meal with both dates', async (meal, label) => {
+    apiMock.mockResolvedValue({
+      ...makeDay([]),
+      repeat_candidate: { source_date: '2026-08-12', source_meal_type: meal, entry_count: 1 },
+    });
+    renderDiary();
+    const section = await screen.findByRole('region', { name: label });
+    expect(within(section).getByRole('button', { name: label })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(
+      within(section).getByText(`${label} за 12.08.2026 — в дневник за 19.08.2026`),
+    ).toBeVisible();
+    expect(within(section).getByTestId('nutrition-repeat-default')).toBeVisible();
+    expect(screen.getAllByTestId('nutrition-repeat-default')).toHaveLength(1);
+  });
+
+  it('does not offer a repeat for an empty source', async () => {
+    apiMock.mockResolvedValue({
+      ...makeDay([]),
+      repeat_candidate: {
+        source_date: '2026-08-18',
+        source_meal_type: 'breakfast',
+        entry_count: 0,
+      },
+    });
+    renderDiary();
+    await screen.findByRole('region', { name: 'Завтрак' });
+    expect(screen.queryByTestId('nutrition-repeat-default')).not.toBeInTheDocument();
   });
 
   it('retries an uncertain quick repeat with the same preview and idempotency key', async () => {
