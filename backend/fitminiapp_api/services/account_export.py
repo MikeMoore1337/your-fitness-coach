@@ -1853,7 +1853,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "id": relation.id,
                 "role": "coach" if relation.coach_user_id == user.id else "client",
                 "status": relation.status,
-                "nutrition_access": relation.nutrition_access,
+                "nutrition_access": relation.nutrition_access is not False,
                 **(
                     {"operational_status": relation.operational_status or "active"}
                     if relation.coach_user_id == user.id

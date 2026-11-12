@@ -422,7 +422,7 @@ def _build(
             CoachClient.coach_user_id == coach.id,
             CoachClient.client_user_id.in_(client_ids),
             CoachClient.status == "active",
-            CoachClient.nutrition_access.is_(True),
+            CoachClient.nutrition_access.is_not(False),
         )
         .all()
     }

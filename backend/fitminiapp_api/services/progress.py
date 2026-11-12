@@ -315,7 +315,9 @@ def _active_clients(
         .limit(limit)
         .all()
     )
-    return [(client, private_name, bool(access)) for client, private_name, access in rows], total
+    return [
+        (client, private_name, access is not False) for client, private_name, access in rows
+    ], total
 
 
 def build_trainer_client_summaries(

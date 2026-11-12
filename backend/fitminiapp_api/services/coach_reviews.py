@@ -126,7 +126,7 @@ def list_coach_check_in_reviews(
                 CoachClient.client_user_id == WeeklyCheckIn.user_id,
                 CoachClient.coach_user_id == coach.id,
                 CoachClient.status == "active",
-                CoachClient.nutrition_access.is_(True),
+                CoachClient.nutrition_access.is_not(False),
             ),
         )
         .outerjoin(UserProfile, UserProfile.user_id == User.id)

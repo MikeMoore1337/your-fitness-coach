@@ -356,7 +356,7 @@ def _resolve_target_user(
                 CoachClient.coach_user_id == current_user.id,
                 CoachClient.client_user_id == target_user.id,
                 CoachClient.status == "active",
-                CoachClient.nutrition_access.is_(True),
+                CoachClient.nutrition_access.is_not(False),
             )
             .first()
         )
@@ -375,7 +375,7 @@ def lock_nutrition_authorization(db: Session, actor: User, target_user: User) ->
             CoachClient.coach_user_id == actor.id,
             CoachClient.client_user_id == target_user.id,
             CoachClient.status == "active",
-            CoachClient.nutrition_access.is_(True),
+            CoachClient.nutrition_access.is_not(False),
         )
         .with_for_update()
         .first()

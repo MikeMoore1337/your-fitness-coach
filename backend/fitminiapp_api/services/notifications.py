@@ -291,7 +291,7 @@ def resolve_notification_destination(
                 CoachClient.coach_user_id == handoff.trainer_user_id,
                 CoachClient.client_user_id == handoff.sender_user_id,
                 CoachClient.status == "active",
-                CoachClient.nutrition_access.is_(True),
+                CoachClient.nutrition_access.is_not(False),
                 User.id == user.id,
                 User.is_active.is_(True),
                 User.is_coach.is_(True),

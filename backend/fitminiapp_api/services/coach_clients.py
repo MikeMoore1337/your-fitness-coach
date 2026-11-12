@@ -94,7 +94,7 @@ def get_client_with_nutrition_access(db: Session, coach: User, client_id: int) -
             CoachClient.coach_user_id == coach.id,
             CoachClient.client_user_id == client.id,
             CoachClient.status == "active",
-            CoachClient.nutrition_access.is_(True),
+            CoachClient.nutrition_access.is_not(False),
         )
         .first()
     )
@@ -446,7 +446,10 @@ def trainer_nutrition_access(
             details={"nutrition_access": access},
         )
         db.commit()
-    return {"relationship_id": relation.id, "nutrition_access": bool(relation.nutrition_access)}
+    return {
+        "relationship_id": relation.id,
+        "nutrition_access": relation.nutrition_access is not False,
+    }
 
 
 def create_coach_invite_link(db: Session, coach: User) -> dict:

@@ -19,14 +19,13 @@ def test_access_migration_preserves_existing_links_and_revocation(tmp_path: Path
         connection.execute(text("INSERT INTO coach_clients (id) VALUES (1)"))
         migration.op = Operations(MigrationContext.configure(connection))
         migration.upgrade()
-        assert connection.execute(text("SELECT nutrition_access FROM coach_clients")).scalar() == 1
+        assert (
+            connection.execute(text("SELECT nutrition_access FROM coach_clients")).scalar() is None
+        )
         connection.execute(text("UPDATE coach_clients SET nutrition_access = false"))
         with pytest.raises(RuntimeError, match="Cannot discard revoked nutrition access"):
             migration.downgrade()
         connection.execute(text("UPDATE coach_clients SET nutrition_access = NULL"))
-        with pytest.raises(RuntimeError, match="Cannot discard revoked nutrition access"):
-            migration.downgrade()
-        connection.execute(text("UPDATE coach_clients SET nutrition_access = true"))
         migration.downgrade()
         assert connection.execute(text("SELECT id FROM coach_clients")).scalar() == 1
     engine.dispose()

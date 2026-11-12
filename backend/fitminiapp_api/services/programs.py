@@ -1742,7 +1742,7 @@ def list_clients(
 
     client_users = [user for user, _private_name, _operational_status, _labels, _access in clients]
     users_by_id = {user.id: user for user in client_users}
-    nutrition_user_ids = [user.id for user, _, _, _, access in clients if access]
+    nutrition_user_ids = [user.id for user, _, _, _, access in clients if access is not False]
     # One extra query for all clients, never one query per client.
     # Keep each client's local-day cutoff, but group clients sharing that date
     # so the SQL predicate count does not grow with the client list.

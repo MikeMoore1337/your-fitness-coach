@@ -178,6 +178,33 @@ def test_changed_program_prevents_acceptance(client) -> None:
     )
 
 
+def test_pre_migration_link_keeps_access_until_explicit_revocation(client) -> None:
+    athlete, coach, _, athlete_id, relation_id, payload = _setup(client)
+    with get_session_context() as db:
+        db.get(CoachClient, relation_id).nutrition_access = None
+    access = client.get("/api/v1/me/trainer/nutrition-access", headers=athlete)
+    assert access.status_code == 200 and access.json()["nutrition_access"] is True
+    path = f"/api/v1/coach-nutrition-proposals/clients/{athlete_id}"
+    assert (
+        client.post(
+            path, json=payload, headers={**coach, "Idempotency-Key": "legacy-access-954"}
+        ).status_code
+        == 201
+    )
+    revoked = client.put(
+        "/api/v1/me/trainer/nutrition-access",
+        headers=athlete,
+        json={"relationship_id": relation_id, "nutrition_access": False},
+    )
+    assert revoked.status_code == 200
+    assert (
+        client.post(
+            path, json=payload, headers={**coach, "Idempotency-Key": "revoked-access-954"}
+        ).status_code
+        == 404
+    )
+
+
 def test_failed_plan_change_rolls_back_the_target_and_decision(client) -> None:
     athlete, coach, _, athlete_id, _, payload = _setup(client)
     with get_session_context() as db:

@@ -49,7 +49,7 @@ def _relationship(
         CoachClient.coach_user_id == coach_id,
         CoachClient.client_user_id == client_id,
         CoachClient.status == "active",
-        CoachClient.nutrition_access.is_(True),
+        CoachClient.nutrition_access.is_not(False),
     )
     if relationship_id is not None:
         query = query.filter(CoachClient.id == relationship_id)
@@ -193,7 +193,7 @@ def list_proposals(
         db.query(CoachNutritionProposal)
         .filter_by(coach_user_id=actor.id, client_user_id=client_id)
         .join(CoachClient, CoachClient.id == CoachNutritionProposal.relationship_id)
-        .filter(CoachClient.status == "active", CoachClient.nutrition_access.is_(True))
+        .filter(CoachClient.status == "active", CoachClient.nutrition_access.is_not(False))
         .order_by(CoachNutritionProposal.id.desc())
         .limit(50)
         .all()

@@ -82,7 +82,7 @@ def _active_relationship_for_sender(
         .filter(
             CoachClient.client_user_id == sender.id,
             CoachClient.status == "active",
-            CoachClient.nutrition_access.is_(True),
+            CoachClient.nutrition_access.is_not(False),
             User.is_active.is_(True),
             User.is_coach.is_(True),
         )
@@ -466,7 +466,7 @@ def list_trainer_report_handoffs(
             CoachClient.coach_user_id == trainer.id,
             CoachClient.client_user_id == client_id,
             CoachClient.status == "active",
-            CoachClient.nutrition_access.is_(True),
+            CoachClient.nutrition_access.is_not(False),
         )
         .first()
     )
@@ -498,7 +498,7 @@ def get_report_handoff_view(
     if context is None:
         raise ReportHandoffError("Отчёт недоступен", status_code=404)
     sender, _relation, trainer = context
-    if actor.id == trainer.id and not _relation.nutrition_access:
+    if actor.id == trainer.id and _relation.nutrition_access is False:
         raise ReportHandoffError("Отчёт недоступен", status_code=404)
     report = _build_handoff_report(
         db,
@@ -535,7 +535,7 @@ def retry_report_handoff(
     if context is None:
         raise ReportHandoffError("Отчёт недоступен", status_code=404)
     _sender, _relation, trainer = context
-    if not _relation.nutrition_access:
+    if _relation.nutrition_access is False:
         raise ReportHandoffError("Отчёт недоступен", status_code=404)
     if handoff.last_retry_idempotency_key == normalized_key:
         return _handoff_response(db, handoff, trainer)
