@@ -164,6 +164,19 @@ describe('NutritionDiary', () => {
     expect(screen.getAllByText('Пока без записей')).toHaveLength(4);
   });
 
+  it('shows the existing goal when a macro total is unknown', async () => {
+    const day = makeDay();
+    day.totals = { ...day.totals, protein_g: null };
+    day.remaining!.protein_g = null;
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = await screen.findByRole('complementary', { name: 'КБЖУ' });
+    expect(within(summary).getByText('Нет данных')).toBeVisible();
+    expect(within(summary).getByText('Цель: 140 г')).toBeVisible();
+    expect(within(summary).queryByRole('progressbar', { name: /Белки/ })).not.toBeInTheDocument();
+  });
+
   it('shows the unavailable copy action and its explanation in read-only demo', async () => {
     apiMock.mockResolvedValue(makeDay());
     renderDiary({ readOnlyEntries: true });

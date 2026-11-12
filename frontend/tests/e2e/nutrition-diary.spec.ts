@@ -13,6 +13,76 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
+test('macro summary remains readable across viewport sizes', async ({ page }, testInfo) => {
+  const theme = process.env.MACRO_THEME === 'dark' ? 'dark' : 'light';
+  await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+  await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition');
+  const summary = nutritionDaySummary(page);
+  await expect(summary.getByRole('progressbar')).toHaveCount(4);
+  for (const width of [320, 360, 393, 430, 1280]) {
+    await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+    await expect(summary).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    const targets = summary.locator('.nutrition-target');
+    await expect(targets).toHaveCount(4);
+    const boxes = await targets.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y };
+      }),
+    );
+    expect(
+      await targets
+        .locator('.data-viz-progress__label, small')
+        .evaluateAll((elements) =>
+          elements.every((element) => element.scrollWidth <= element.clientWidth + 1),
+        ),
+    ).toBe(true);
+    if (process.env.MACRO_BEFORE !== '1') {
+      if (width === 320) expect(boxes[1]!.y).toBeGreaterThan(boxes[0]!.y);
+      else expect(boxes[1]!.y).toBeCloseTo(boxes[0]!.y, 0);
+    }
+    await expect(
+      summary.getByRole('progressbar', { name: /Калории: 2\s020 из 2\s000 ккал/ }),
+    ).toBeVisible();
+    await expect(summary.getByText('Немного выше ориентира: 20 ккал')).toBeVisible();
+    const measurement = await summary.evaluate((element) => ({
+      height: element.getBoundingClientRect().height,
+      visibleActions: [...document.querySelectorAll('button, a[href]')].filter((control) => {
+        const box = control.getBoundingClientRect();
+        const style = getComputedStyle(control);
+        return (
+          /^(Добавить продукт|Быстрый ввод|Добавить воду|Настройки КБЖУ|Изменить на эту дату)$/.test(
+            control.textContent?.trim() ?? '',
+          ) &&
+          box.width > 0 &&
+          box.height > 0 &&
+          box.top >= 0 &&
+          box.bottom <= innerHeight &&
+          style.visibility !== 'hidden' &&
+          style.display !== 'none'
+        );
+      }).length,
+    }));
+    console.log(JSON.stringify({ browser: testInfo.project.name, width, ...measurement }));
+    if (process.env.MACRO_CAPTURE_DIR) {
+      await mkdir(process.env.MACRO_CAPTURE_DIR, { recursive: true });
+      await summary.screenshot({
+        path: resolve(
+          process.env.MACRO_CAPTURE_DIR,
+          `${testInfo.project.name}-${theme}-${width}.png`,
+        ),
+      });
+    }
+  }
+});
+
 const CAPTURE_974_AFTER = process.env.CAPTURE_974_AFTER === '1';
 const ISSUE_974_AFTER_DIR = resolve(
   process.env.CAPTURE_974_AFTER_DIR ??
@@ -3179,6 +3249,11 @@ for (const width of [320, 360, 393, 430, 1280]) {
         }),
       );
       await page.goto('/app?section=nutrition');
+      const totals = nutritionDaySummary(page).getByLabel('Сумма макронутриентов');
+      await expect(totals).toBeVisible();
+      await expect(totals).toContainText('Белки— г');
+      await expect(totals).toContainText('Жиры21,8 г');
+      await expect(totals).toContainText('Углеводы— г');
       for (const name of ['Завтрак', 'Обед', 'Ужин', 'Перекусы']) {
         const toggle = page
           .getByRole('region', { name })

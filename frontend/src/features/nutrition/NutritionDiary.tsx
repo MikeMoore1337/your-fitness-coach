@@ -128,11 +128,11 @@ function nutritionEntryMeta(entry: FoodDiaryEntry): string {
 }
 
 function targetStatus(remaining: number, target: number, unit: string): string {
-  if (remaining >= 0) return `Осталось ${formatNumber(remaining)} ${unit}`;
+  if (remaining >= 0) return `Осталось ${formatNumber(remaining)}\u00a0${unit}`;
   const over = Math.abs(remaining);
   if (target > 0 && over / target <= 0.05)
-    return `Немного выше ориентира: ${formatNumber(over)} ${unit}`;
-  return `Выше ориентира на ${formatNumber(over)} ${unit}`;
+    return `Немного выше ориентира: ${formatNumber(over)}\u00a0${unit}`;
+  return `Выше ориентира на ${formatNumber(over)}\u00a0${unit}`;
 }
 
 function MacroProgress({
@@ -155,6 +155,16 @@ function MacroProgress({
           <span>{label}</span>
           <strong>Нет данных</strong>
         </div>
+        {total !== null && (
+          <small>
+            Записано: {formatNumber(total, 1)} {unit}
+          </small>
+        )}
+        {target !== null && (
+          <small>
+            Цель: {formatNumber(target, 1)} {unit}
+          </small>
+        )}
         <small>Quick Add содержит только калории; макронутриенты не считаются нулевыми.</small>
       </div>
     );
