@@ -270,6 +270,7 @@ export function TrainerNutritionProposals({
                 min={min}
                 max={max}
                 required
+                disabled={!plan.data}
                 value={values[name]}
                 onChange={(event) => update(name, event.target.value)}
               />

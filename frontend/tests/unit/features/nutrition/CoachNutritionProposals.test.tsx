@@ -24,6 +24,17 @@ afterEach(() => {
   apiMock.mockReset();
 });
 
+it('не даёт вводить цели до загрузки плана', () => {
+  apiMock.mockImplementation((path: string) =>
+    path.includes('/day?')
+      ? new Promise(() => {})
+      : Promise.resolve(path.includes('/target-assignments') ? { dates: [], schedule: [] } : []),
+  );
+  setup(<TrainerNutritionProposals clientId={123} timeZone="Europe/Moscow" />);
+  fireEvent.click(screen.getByRole('button', { name: 'Предложить изменение' }));
+  expect(screen.getByLabelText('Энергия, ккал')).toBeDisabled();
+});
+
 it('тренер проверяет сравнение перед отправкой предложения', async () => {
   apiMock.mockImplementation((path: string, options?: { method?: string }) => {
     if (options?.method === 'POST') return Promise.resolve({ id: 1 });
