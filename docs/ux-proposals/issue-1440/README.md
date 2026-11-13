@@ -50,9 +50,9 @@
 | Переход к воде и нижний dock | [открыть](evidence/chromium-light-393-water-viewport.png) | [открыть](evidence/chromium-dark-393-water-viewport.png) | [открыть](evidence/webkit-light-393-water-viewport.png) | [открыть](evidence/webkit-dark-393-water-viewport.png) |
 | Фокус при уменьшенном окне 393 × 430 | [открыть](evidence/chromium-light-393-short-viewport-focus.png) | [открыть](evidence/chromium-dark-393-short-viewport-focus.png) | [открыть](evidence/webkit-light-393-short-viewport-focus.png) | [открыть](evidence/webkit-dark-393-short-viewport-focus.png) |
 
-Длинное название ёмкости: [chromium light](evidence/chromium-light-320-long-name.png) · [chromium dark](evidence/chromium-dark-320-long-name.png) · [webkit light](evidence/webkit-light-320-long-name.png) · [webkit dark](evidence/webkit-dark-320-long-name.png) · 
+Длинное название ёмкости: [chromium light](evidence/chromium-light-320-long-name.png) · [chromium dark](evidence/chromium-dark-320-long-name.png) · [webkit light](evidence/webkit-light-320-long-name.png) · [webkit dark](evidence/webkit-dark-320-long-name.png) ·
 
-Узкий reflow 160 × 422 CSS px (приближение доступной ширины, **не проверка фактического browser zoom 200%**): [chromium light](evidence/chromium-light-160-reflow.png) · [chromium dark](evidence/chromium-dark-160-reflow.png) · [webkit light](evidence/webkit-light-160-reflow.png) · [webkit dark](evidence/webkit-dark-160-reflow.png) · 
+Узкий reflow 160 × 422 CSS px (приближение доступной ширины, **не проверка фактического browser zoom 200%**): [chromium light](evidence/chromium-light-160-reflow.png) · [chromium dark](evidence/chromium-dark-160-reflow.png) · [webkit light](evidence/webkit-light-160-reflow.png) · [webkit dark](evidence/webkit-dark-160-reflow.png) ·
 
 ## До и предложено
 
