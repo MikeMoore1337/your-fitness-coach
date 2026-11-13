@@ -31,6 +31,7 @@ from fitminiapp_api.schemas.nutrition_import_engine import (
     CatalogImportConfirmRequest,
     CatalogImportPreview,
     CatalogImportReceipt,
+    CatalogReviewRequest,
     ImportCancelRequest,
     ImportConfirmRequest,
     ImportPreview,
@@ -88,6 +89,7 @@ def _error(exc: NutritionDraftError | NutritionImportValidationError) -> HTTPExc
         "not_found": "Черновик не найден",
         "access_revoked": "Сессия недействительна или истекла",
         "draft_unavailable": "Черновик больше недоступен",
+        "already_confirmed": "Импорт уже подтверждён",
         "draft_changed": "Черновик изменился. Загрузите файл снова",
         "stale_revision": "Черновик изменился. Обновите предпросмотр",
         "preview_changed": "Данные изменились. Проверьте предпросмотр снова",
@@ -322,6 +324,36 @@ def preview_catalog(
         raise _storage_error() from None
 
 
+@router.post("/{draft_id}/catalog/review", response_model=CatalogImportPreview)
+@limiter.limit("30/minute")
+def review_catalog(
+    draft_id: str,
+    payload: CatalogReviewRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    del request
+    try:
+        response.headers["Cache-Control"] = "no-store, private"
+        return CatalogImportPreview.model_validate(
+            catalog_import_preview(
+                db,
+                current_user,
+                draft_id,
+                revision=payload.revision,
+                corrections=payload.corrections,
+                choices=payload.choices,
+            )
+        )
+    except NutritionDraftError as exc:
+        raise _error(exc) from exc
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
 @router.post("/{draft_id}/catalog/confirm", response_model=CatalogImportReceipt)
 @limiter.limit("30/minute")
 def confirm_catalog(
@@ -344,6 +376,8 @@ def confirm_catalog(
                 confirm_key=payload.confirm_key,
                 row_indexes=payload.row_indexes,
                 confirmed=payload.confirmed,
+                corrections=payload.corrections,
+                choices=payload.choices,
             )
         )
         db.commit()

@@ -45,6 +45,9 @@ for (const width of [360, 393])
         );
         await expect(surface.locator('h1').first()).toBeVisible();
         await expect(page.locator('[role="status"][aria-busy="true"]')).toHaveCount(0);
+        if (route === '/app?section=nutrition') {
+          await expect(surface.locator('.nutrition-meal__header > div > h2')).toHaveCount(4);
+        }
         await page.evaluate(() => document.fonts.ready);
         const mismatches = await surface.evaluate((element) => {
           const family = (node: Element) =>
@@ -56,7 +59,12 @@ for (const width of [360, 393])
           ]
             .filter((node) => node.getBoundingClientRect().height > 0)
             .filter((node) => !node.closest('h1,h2,h3') || /^H[123]$/.test(node.tagName))
-            .filter((node) => family(node) !== (/^H[123]$/.test(node.tagName) ? 'Oswald' : 'Inter'))
+            .filter((node) => {
+              const displayHeading =
+                /^H[123]$/.test(node.tagName) &&
+                !node.matches('.nutrition-meal__header > div > h2');
+              return family(node) !== (displayHeading ? 'Oswald' : 'Inter');
+            })
             .map((node) => ({
               tag: node.tagName,
               text: node.textContent?.slice(0, 80),

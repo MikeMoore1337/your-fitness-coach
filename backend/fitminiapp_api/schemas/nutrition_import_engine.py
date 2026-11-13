@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.nutrition_import import (
     ImportDiagnostic,
@@ -11,6 +11,7 @@ from fitminiapp_api.schemas.nutrition_import import (
     OriginalSummary,
     OriginalTotal,
 )
+from fitminiapp_api.schemas.nutrition_label import NutritionLabelFactsEdit
 
 
 class RowResolution(BaseModel):
@@ -115,14 +116,51 @@ class CatalogImportPreview(BaseModel):
     preview_signature: str
 
 
+class CatalogProductCorrection(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    index: int = Field(ge=0, strict=True)
+    name: str = Field(min_length=1, max_length=256)
+    brand: str | None = Field(default=None, max_length=128)
+    kind: Literal["standard_food", "branded_food", "personal_recipe", "arbitrary"]
+    nutrition: NutritionLabelFactsEdit | None = None
+    confirmed: Literal[True]
+
+    @field_validator("confirmed", mode="before")
+    @classmethod
+    def require_explicit_true(cls, value: object) -> object:
+        if value is not True:
+            raise ValueError("explicit confirmation is required")
+        return value
+
+    @model_validator(mode="after")
+    def require_nutrition_for_public_products(self) -> CatalogProductCorrection:
+        if self.kind in {"standard_food", "branded_food"} and self.nutrition is None:
+            raise ValueError("public products require reviewed nutrition")
+        return self
+
+
+class CatalogConflictChoice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    index: int = Field(ge=0, strict=True)
+    action: Literal["reuse", "skip"]
+    food_id: int | None = Field(default=None, gt=0, strict=True)
+
+
+class CatalogReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(ge=1, strict=True)
+    corrections: list[CatalogProductCorrection] = Field(max_length=2000)
+    choices: list[CatalogConflictChoice] = Field(default_factory=list, max_length=2000)
+
+
 class CatalogImportConfirmRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     revision: int = Field(ge=1, strict=True)
     preview_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
     confirm_key: str = Field(min_length=8, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
-    row_indexes: list[Annotated[int, Field(ge=0, strict=True)]] = Field(
-        min_length=1, max_length=2000
-    )
+    row_indexes: list[Annotated[int, Field(ge=0, strict=True)]] = Field(max_length=2000)
+    corrections: list[CatalogProductCorrection] = Field(default_factory=list, max_length=2000)
+    choices: list[CatalogConflictChoice] = Field(default_factory=list, max_length=2000)
     confirmed: Literal[True]
 
     @field_validator("confirmed", mode="before")
@@ -135,6 +173,7 @@ class CatalogImportConfirmRequest(BaseModel):
 
 class CatalogImportReceipt(BaseModel):
     rows: list[CatalogImportRow]
+    excluded_rows: list[CatalogImportRow] = Field(default_factory=list)
     preview_signature: str
 
 

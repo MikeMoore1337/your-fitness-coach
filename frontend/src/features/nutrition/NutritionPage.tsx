@@ -13,6 +13,7 @@ import type { MealType } from './FoodPickerDialog';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MealPlanner } from './MealPlanner';
 import { GroceryList } from './GroceryList';
+import { NutritionImport } from './NutritionImport';
 
 export function NutritionPage({
   initial,
@@ -39,7 +40,7 @@ export function NutritionPage({
   returnPath?: string;
   timeZone?: string | null;
 }) {
-  const [view, setView] = useState<'day' | 'settings' | 'override' | 'proposal'>('day');
+  const [view, setView] = useState<'day' | 'settings' | 'override' | 'proposal' | 'import'>('day');
   const root = useRef<HTMLDivElement>(null);
   const closeProposal = useCallback(() => {
     setView('day');
@@ -127,6 +128,20 @@ export function NutritionPage({
               </span>
               <Icon name="chevron-right" size={20} />
             </Button>
+            {!demoSafeMode && !readOnlyEntries && (
+              <Button
+                className="nutrition-extras__setting"
+                type="button"
+                variant="secondary"
+                onClick={() => setView('import')}
+              >
+                <span>
+                  <strong>Импорт питания</strong>
+                  <small>Добавить продукты из экспорта FatSecret</small>
+                </span>
+                <Icon name="chevron-right" size={20} />
+              </Button>
+            )}
             {!demoSafeMode && (
               <MealPlanner
                 initialDate={initialDate}
@@ -148,7 +163,8 @@ export function NutritionPage({
           entryPoint="nutrition"
         />
       </div>
-      {view !== 'day' && view !== 'proposal' && (
+      {view === 'import' && <NutritionImport onClose={() => setView('day')} />}
+      {view !== 'day' && view !== 'proposal' && view !== 'import' && (
         <NutritionTargets
           mode={view}
           date={selectedDate}

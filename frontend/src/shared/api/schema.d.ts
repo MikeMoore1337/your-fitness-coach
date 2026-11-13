@@ -5618,6 +5618,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/imports/{draft_id}/catalog/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Catalog */
+        post: operations["review_catalog_api_v1_nutrition_imports__draft_id__catalog_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/imports/{draft_id}/catalog/confirm": {
         parameters: {
             query?: never;
@@ -9019,6 +9036,18 @@ export interface components {
             /** Preview Signature */
             preview_signature: string;
         };
+        /** CatalogConflictChoice */
+        CatalogConflictChoice: {
+            /** Index */
+            index: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "reuse" | "skip";
+            /** Food Id */
+            food_id?: number | null;
+        };
         /** CatalogImportConfirmRequest */
         CatalogImportConfirmRequest: {
             /** Revision */
@@ -9029,6 +9058,10 @@ export interface components {
             confirm_key: string;
             /** Row Indexes */
             row_indexes: number[];
+            /** Corrections */
+            corrections?: components["schemas"]["CatalogProductCorrection"][];
+            /** Choices */
+            choices?: components["schemas"]["CatalogConflictChoice"][];
             /**
              * Confirmed
              * @constant
@@ -9075,6 +9108,8 @@ export interface components {
         CatalogImportReceipt: {
             /** Rows */
             rows: components["schemas"]["CatalogImportRow"][];
+            /** Excluded Rows */
+            excluded_rows?: components["schemas"]["CatalogImportRow"][];
             /** Preview Signature */
             preview_signature: string;
         };
@@ -9091,6 +9126,26 @@ export interface components {
             reason: string | null;
             /** Food Id */
             food_id: number | null;
+        };
+        /** CatalogProductCorrection */
+        CatalogProductCorrection: {
+            /** Index */
+            index: number;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard_food" | "branded_food" | "personal_recipe" | "arbitrary";
+            nutrition?: components["schemas"]["NutritionLabelFactsEdit"] | null;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
         };
         /** CatalogProductPreview */
         CatalogProductPreview: {
@@ -9113,6 +9168,15 @@ export interface components {
             provenance: {
                 [key: string]: unknown;
             };
+        };
+        /** CatalogReviewRequest */
+        CatalogReviewRequest: {
+            /** Revision */
+            revision: number;
+            /** Corrections */
+            corrections: components["schemas"]["CatalogProductCorrection"][];
+            /** Choices */
+            choices?: components["schemas"]["CatalogConflictChoice"][];
         };
         /** CheckInFieldCatalogItem */
         CheckInFieldCatalogItem: {
@@ -34636,6 +34700,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_catalog_api_v1_nutrition_imports__draft_id__catalog_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogReviewRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

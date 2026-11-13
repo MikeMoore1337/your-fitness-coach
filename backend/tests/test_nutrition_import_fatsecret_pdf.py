@@ -484,6 +484,60 @@ def test_pdf_worker_is_unavailable_on_unsupported_platform():
 
 
 @pytest.mark.skipif(
+    sys.platform != "linux" or getattr(os, "geteuid", lambda: 0)() == 0,
+    reason="requires a non-root Linux parser worker",
+)
+def test_real_pdf_upload_review_and_catalog_confirm(client):
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL transaction locks")
+    from test_training_analytics import _auth
+
+    owner = _auth(client, 984_940)
+    other = _auth(client, 984_941)
+    root = "/api/v1/nutrition/imports"
+    upload = client.post(
+        root,
+        headers={**owner, "Idempotency-Key": "pdf-full-885"},
+        data={"adapter_id": "fatsecret-pdf-v1"},
+        files={"file": ("synthetic.pdf", synthetic_pdf(), "application/pdf")},
+    )
+    assert upload.status_code == 201, upload.text
+    draft = upload.json()
+    index = draft["rows"][0]["index"]
+    correction = {
+        "index": index,
+        "name": "Синтетический продукт PDF 885",
+        "kind": "standard_food",
+        "nutrition": {
+            "source_basis": "per_100_g",
+            "energy_kcal": "65",
+            "protein_g": "4",
+            "fat_g": "3",
+            "carbohydrate_g": "5",
+        },
+        "confirmed": True,
+    }
+    body = {"revision": draft["revision"], "corrections": [correction], "choices": []}
+    endpoint = f"{root}/{draft['id']}/catalog"
+    preview = client.post(f"{endpoint}/review", headers=owner, json=body)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["rows"][index]["outcome"] == "publish"
+    confirm = {
+        **body,
+        "preview_signature": preview.json()["preview_signature"],
+        "confirm_key": "pdf-full-confirm-885",
+        "row_indexes": [index],
+        "confirmed": True,
+    }
+    result = client.post(f"{endpoint}/confirm", headers=owner, json=confirm)
+    assert result.status_code == 200, result.text
+    assert result.json()["rows"][0]["outcome"] == "publish"
+    assert client.post(f"{endpoint}/confirm", headers=owner, json=confirm).json() == result.json()
+    food_id = result.json()["rows"][0]["food_id"]
+    assert client.get(f"/api/v1/nutrition/foods/{food_id}", headers=other).status_code == 200
+
+
+@pytest.mark.skipif(
     sys.platform != "linux"
     or platform.machine() != "x86_64"
     or getattr(os, "geteuid", lambda: 0)() == 0,

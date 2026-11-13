@@ -3,21 +3,32 @@ import io
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from decimal import Decimal
+from threading import Barrier
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 from test_training_analytics import _auth
 
 from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV1, NutritionImportV2
-from fitminiapp_api.schemas.nutrition_import_engine import ImportPreview
+from fitminiapp_api.schemas.nutrition_import_engine import (
+    CatalogConflictChoice,
+    CatalogProductCorrection,
+    ImportPreview,
+)
 from fitminiapp_api.services import nutrition_import_fatsecret_csv
-from fitminiapp_api.services.nutrition_catalog_import import catalog_import_preview
+from fitminiapp_api.services.nutrition_catalog_import import (
+    catalog_import_preview,
+    confirm_catalog_import,
+)
 from fitminiapp_api.services.nutrition_import_drafts import (
     NutritionDraftError,
     create_nutrition_import_draft,
@@ -26,6 +37,7 @@ from fitminiapp_api.services.nutrition_import_drafts import (
     set_resolutions,
 )
 from fitminiapp_api.services.nutrition_import_fatsecret_csv import parse
+from fitminiapp_api.services.nutrition_import_runner import ADAPTERS
 from fitminiapp_api.services.nutrition_import_validation import (
     MAX_CSV_ROWS,
     MAX_UPLOAD_BYTES,
@@ -66,6 +78,395 @@ SHORT_DETAIL_HEADER = [
     "Калий( мг)",
 ]
 NUTRIENTS = ["12,30000001", "2,00", "0,50", "4,00", "", "0,00", "3,00", "1,00", "0,00", "5,00"]
+
+
+@pytest.mark.parametrize("adapter_id", ["fatsecret-csv-v1", "fatsecret-pdf-v1"])
+def test_owner_reported_permission_does_not_classify_products(adapter_id):
+    adapter = ADAPTERS[adapter_id]
+    assert adapter.catalog_publication_rights == frozenset({"owner_reported"})
+    assert adapter.catalog_source == "diary_export"
+    assert adapter.catalog_food_kinds == frozenset()
+
+
+def test_review_and_confirm_corrected_fatsecret_row(rows):
+    source, document = _validated(rows)
+    with get_session_context() as db:
+        owner = User(telegram_user_id=984_110, measurement_eligibility="test")
+        other = User(telegram_user_id=984_111, measurement_eligibility="test")
+        db.add_all([owner, other])
+        db.flush()
+        draft = create_nutrition_import_draft(
+            db,
+            owner,
+            document=document,
+            source=source,
+            filename="synthetic.csv",
+            content_type="text/csv",
+            delimiter=",",
+            parser_version="fatsecret-csv-v1",
+            upload_key="synthetic-review-885",
+            adapter_id="fatsecret-csv-v1",
+        )
+        index = next(
+            i
+            for i, row in enumerate(document.rows)
+            if not any(issue.severity == "error" for issue in row.diagnostics)
+        )
+        correction = CatalogProductCorrection.model_validate(
+            {
+                "index": index,
+                "name": "Синтетический продукт",
+                "kind": "standard_food",
+                "nutrition": {
+                    "source_basis": "per_100_g",
+                    "energy_kcal": "65",
+                    "protein_g": "4",
+                    "fat_g": "3",
+                    "carbohydrate_g": "5",
+                },
+                "confirmed": True,
+            }
+        )
+        before = db.query(Food).count()
+        preview = catalog_import_preview(db, owner, draft.id, revision=1, corrections=[correction])
+        assert preview["rows"][index]["outcome"] == "publish"
+        assert db.query(Food).count() == before
+        with pytest.raises(NutritionDraftError, match="not_found"):
+            catalog_import_preview(db, other, draft.id, revision=1, corrections=[correction])
+        with pytest.raises(NutritionDraftError, match="stale_revision"):
+            catalog_import_preview(db, owner, draft.id, revision=2, corrections=[correction])
+        with pytest.raises(NutritionDraftError, match="invalid_rows"):
+            catalog_import_preview(db, owner, draft.id, revision=1, corrections=[correction] * 2)
+        kwargs = {
+            "revision": 1,
+            "preview_signature": preview["preview_signature"],
+            "confirm_key": "confirm-correction-885",
+            "row_indexes": [index],
+            "confirmed": True,
+            "corrections": [correction],
+        }
+        altered = correction.model_copy(deep=True)
+        assert altered.nutrition is not None
+        altered.nutrition.fat_g = Decimal("9")
+        with pytest.raises(NutritionDraftError, match="preview_changed"):
+            confirm_catalog_import(db, owner, draft.id, **{**kwargs, "corrections": [altered]})
+        receipt = confirm_catalog_import(db, owner, draft.id, **kwargs)
+        assert receipt["rows"][0]["outcome"] == "publish"
+        assert len(receipt["excluded_rows"]) == len(document.rows) - 1
+        assert confirm_catalog_import(db, owner, draft.id, **kwargs) == receipt
+        assert db.query(Food).count() == before + 1
+        second = create_nutrition_import_draft(
+            db,
+            other,
+            document=document,
+            source=source,
+            filename="synthetic.csv",
+            content_type="text/csv",
+            delimiter=",",
+            parser_version="fatsecret-csv-v1",
+            upload_key="synthetic-review-886",
+            adapter_id="fatsecret-csv-v1",
+        )
+        conflict = catalog_import_preview(db, other, second.id, revision=1, corrections=[altered])
+        assert conflict["rows"][index]["outcome"] == "conflict"
+        food_id = conflict["rows"][index]["food_id"]
+        forged = CatalogConflictChoice(index=index, action="reuse", food_id=999999)
+        with pytest.raises(NutritionDraftError, match="invalid_rows"):
+            catalog_import_preview(
+                db, other, second.id, revision=1, corrections=[altered], choices=[forged]
+            )
+        choice = CatalogConflictChoice(index=index, action="reuse", food_id=food_id)
+        resolved = catalog_import_preview(
+            db, other, second.id, revision=1, corrections=[altered], choices=[choice]
+        )
+        assert resolved["rows"][index]["reason"] == "user_selected_existing"
+        contributions_before = db.query(NutritionCatalogContribution).count()
+        reused = confirm_catalog_import(
+            db,
+            other,
+            second.id,
+            revision=1,
+            preview_signature=resolved["preview_signature"],
+            confirm_key="confirm-reuse-885",
+            row_indexes=[index],
+            confirmed=True,
+            corrections=[altered],
+            choices=[choice],
+        )
+        assert reused["rows"][0]["food_id"] == food_id
+        assert db.query(NutritionCatalogContribution).count() == contributions_before
+        assert db.query(Food).count() == before + 1
+        third = create_nutrition_import_draft(
+            db,
+            owner,
+            document=document,
+            source=source,
+            filename="synthetic.csv",
+            content_type="text/csv",
+            delimiter=",",
+            parser_version="fatsecret-csv-v1",
+            upload_key="synthetic-review-887",
+            adapter_id="fatsecret-csv-v1",
+        )
+        skip = CatalogConflictChoice(index=index, action="skip")
+        skipped_preview = catalog_import_preview(db, owner, third.id, revision=1, choices=[skip])
+        skipped = confirm_catalog_import(
+            db,
+            owner,
+            third.id,
+            revision=1,
+            preview_signature=skipped_preview["preview_signature"],
+            confirm_key="confirm-skip-885",
+            row_indexes=[],
+            confirmed=True,
+            choices=[skip],
+        )
+        assert skipped["rows"] == []
+        assert skipped["excluded_rows"][index]["outcome"] == "skipped"
+        assert db.query(Food).count() == before + 1
+        db.rollback()
+
+
+def test_catalog_review_api_enforces_owner_and_explicit_confirmation(client, rows):
+    owner_headers = _auth(client, 984120)
+    other_headers = _auth(client, 984121)
+    source, document = _validated(rows)
+    with get_session_context() as db:
+        owner = db.query(User).filter_by(telegram_user_id=984120).one()
+        draft = create_nutrition_import_draft(
+            db,
+            owner,
+            document=document,
+            source=source,
+            filename="synthetic.csv",
+            content_type="text/csv",
+            delimiter=",",
+            parser_version="fatsecret-csv-v1",
+            upload_key="synthetic-api-885",
+            adapter_id="fatsecret-csv-v1",
+        )
+        draft_id = draft.id
+        db.commit()
+    index = next(
+        i
+        for i, row in enumerate(document.rows)
+        if not any(issue.severity == "error" for issue in row.diagnostics)
+    )
+    correction = {
+        "index": index,
+        "name": "Синтетический продукт",
+        "kind": "standard_food",
+        "nutrition": {
+            "source_basis": "per_100_g",
+            "energy_kcal": "65",
+            "protein_g": "4",
+            "fat_g": "3",
+            "carbohydrate_g": "5",
+        },
+        "confirmed": True,
+    }
+    root = f"/api/v1/nutrition/imports/{draft_id}/catalog"
+    body = {"revision": 1, "corrections": [correction], "choices": []}
+    assert client.post(f"{root}/review", headers=other_headers, json=body).status_code == 404
+    assert (
+        client.post(
+            f"{root}/review", headers=owner_headers, json={**body, "revision": 2}
+        ).status_code
+        == 409
+    )
+    invalid = {**correction, "confirmed": False}
+    assert (
+        client.post(
+            f"{root}/review", headers=owner_headers, json={**body, "corrections": [invalid]}
+        ).status_code
+        == 422
+    )
+    preview = client.post(f"{root}/review", headers=owner_headers, json=body)
+    assert preview.status_code == 200
+    assert preview.headers["cache-control"] == "no-store, private"
+    confirm = {
+        **body,
+        "preview_signature": preview.json()["preview_signature"],
+        "confirm_key": "api-confirm-885",
+        "row_indexes": [index],
+        "confirmed": True,
+    }
+    assert client.post(f"{root}/confirm", headers=other_headers, json=confirm).status_code == 404
+    assert (
+        client.post(
+            f"{root}/confirm", headers=owner_headers, json={**confirm, "confirmed": False}
+        ).status_code
+        == 422
+    )
+    result = client.post(f"{root}/confirm", headers=owner_headers, json=confirm)
+    assert result.status_code == 200
+    assert result.json()["rows"][0]["outcome"] == "publish"
+    assert (
+        client.post(f"{root}/confirm", headers=owner_headers, json=confirm).json() == result.json()
+    )
+
+
+def test_completed_catalog_imports_do_not_exhaust_active_draft_limit(rows):
+    source, document = _validated(rows)
+    with get_session_context() as db:
+        owner = User(telegram_user_id=984139, measurement_eligibility="test")
+        db.add(owner)
+        db.flush()
+        for index in range(4):
+            draft = create_nutrition_import_draft(
+                db,
+                owner,
+                document=document,
+                source=source,
+                filename="synthetic.csv",
+                content_type="text/csv",
+                delimiter=",",
+                parser_version="fatsecret-csv-v1",
+                upload_key=f"limit-upload-885-{index}",
+                adapter_id="fatsecret-csv-v1",
+            )
+            preview = catalog_import_preview(db, owner, draft.id)
+            receipt = confirm_catalog_import(
+                db,
+                owner,
+                draft.id,
+                revision=1,
+                preview_signature=preview["preview_signature"],
+                confirm_key=f"limit-confirm-885-{index}",
+                row_indexes=[],
+                confirmed=True,
+            )
+            assert receipt["rows"] == []
+        other = User(telegram_user_id=984138, measurement_eligibility="test")
+        db.add(other)
+        db.flush()
+        for index in range(3):
+            create_nutrition_import_draft(
+                db,
+                other,
+                document=document,
+                source=source,
+                filename="synthetic.csv",
+                content_type="text/csv",
+                delimiter=",",
+                parser_version="fatsecret-csv-v1",
+                upload_key=f"pending-upload-885-{index}",
+                adapter_id="fatsecret-csv-v1",
+            )
+        with pytest.raises(NutritionDraftError, match="draft_limit"):
+            create_nutrition_import_draft(
+                db,
+                other,
+                document=document,
+                source=source,
+                filename="synthetic.csv",
+                content_type="text/csv",
+                delimiter=",",
+                parser_version="fatsecret-csv-v1",
+                upload_key="pending-upload-885-fourth",
+                adapter_id="fatsecret-csv-v1",
+            )
+        db.rollback()
+
+
+def test_concurrent_corrected_imports_do_not_duplicate_catalog_food(rows):
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL transaction and uniqueness behavior")
+    source, document = _validated(rows)
+    index = next(
+        i
+        for i, row in enumerate(document.rows)
+        if not any(issue.severity == "error" for issue in row.diagnostics)
+    )
+    correction = CatalogProductCorrection.model_validate(
+        {
+            "index": index,
+            "name": "Синтетический продукт гонка 885",
+            "kind": "standard_food",
+            "nutrition": {
+                "source_basis": "per_100_g",
+                "energy_kcal": "65",
+                "protein_g": "4",
+                "fat_g": "3",
+                "carbohydrate_g": "5",
+            },
+            "confirmed": True,
+        }
+    )
+    drafts = []
+    with get_session_context() as db:
+        for number in range(2):
+            user = User(telegram_user_id=984140 + number, measurement_eligibility="test")
+            db.add(user)
+            db.flush()
+            draft = create_nutrition_import_draft(
+                db,
+                user,
+                document=document,
+                source=source,
+                filename="synthetic.csv",
+                content_type="text/csv",
+                delimiter=",",
+                parser_version="fatsecret-csv-v1",
+                upload_key=f"concurrent-upload-885-{number}",
+                adapter_id="fatsecret-csv-v1",
+            )
+            preview = catalog_import_preview(
+                db, user, draft.id, revision=1, corrections=[correction]
+            )
+            drafts.append((user.id, draft.id, preview["preview_signature"], number))
+        db.commit()
+    barrier = Barrier(2)
+
+    def submit(item):
+        user_id, draft_id, signature, number = item
+        with get_session_context() as db:
+            user = db.get(User, user_id)
+            barrier.wait(timeout=10)
+            try:
+                result = confirm_catalog_import(
+                    db,
+                    user,
+                    draft_id,
+                    revision=1,
+                    preview_signature=signature,
+                    confirm_key=f"concurrent-confirm-885-{number}",
+                    row_indexes=[index],
+                    confirmed=True,
+                    corrections=[correction],
+                )
+                db.commit()
+                return result["rows"][0]["outcome"]
+            except IntegrityError, NutritionDraftError:
+                db.rollback()
+                return "refresh"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(submit, drafts))
+    assert results.count("publish") == 1
+    with get_session_context() as db:
+        assert db.query(Food).filter_by(name="Синтетический продукт гонка 885").count() == 1
+        for (user_id, draft_id, _, number), result in zip(drafts, results, strict=True):
+            if result != "refresh":
+                continue
+            user = db.get(User, user_id)
+            preview = catalog_import_preview(
+                db, user, draft_id, revision=1, corrections=[correction]
+            )
+            assert preview["rows"][index]["outcome"] == "reuse"
+            receipt = confirm_catalog_import(
+                db,
+                user,
+                draft_id,
+                revision=1,
+                preview_signature=preview["preview_signature"],
+                confirm_key=f"concurrent-confirm-885-retry-{number}",
+                row_indexes=[index],
+                confirmed=True,
+                corrections=[correction],
+            )
+            assert receipt["rows"][0]["outcome"] == "reuse"
+        assert db.query(Food).filter_by(name="Синтетический продукт гонка 885").count() == 1
 
 
 @pytest.fixture
@@ -822,3 +1223,61 @@ def test_api_upload_uses_worker_and_keeps_unconfirmed_data_private(client, rows)
     assert failed["rows"] == [] and failed["diagnostics"][0]["code"] == "unknown_detail_header"
     with get_session_context() as db:
         assert (db.query(Food).count(), db.query(FoodDiaryEntry).count()) == before
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux"
+    or not hasattr(os, "memfd_create")
+    or getattr(os, "geteuid", lambda: 0)() == 0,
+    reason="requires a non-root Linux process with memfd",
+)
+def test_real_csv_upload_review_and_catalog_confirm(client, rows):
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL transaction locks")
+    owner = _auth(client, 984_230)
+    other = _auth(client, 984_231)
+    root = "/api/v1/nutrition/imports"
+    upload = client.post(
+        root,
+        headers={**owner, "Idempotency-Key": "csv-full-885"},
+        data={"adapter_id": "fatsecret-csv-v1"},
+        files={"file": ("synthetic.csv", _csv(rows), "text/csv")},
+    )
+    assert upload.status_code == 201, upload.text
+    draft = upload.json()
+    index = next(
+        row["index"]
+        for row in draft["rows"]
+        if not any(item["severity"] == "error" for item in row["source"].get("diagnostics", []))
+    )
+    correction = {
+        "index": index,
+        "name": "Синтетический продукт тест 885",
+        "kind": "standard_food",
+        "nutrition": {
+            "source_basis": "per_100_g",
+            "energy_kcal": "65",
+            "protein_g": "4",
+            "fat_g": "3",
+            "carbohydrate_g": "5",
+        },
+        "confirmed": True,
+    }
+    body = {"revision": draft["revision"], "corrections": [correction], "choices": []}
+    endpoint = f"{root}/{draft['id']}/catalog"
+    preview = client.post(f"{endpoint}/review", headers=owner, json=body)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["rows"][index]["outcome"] == "publish"
+    confirm = {
+        **body,
+        "preview_signature": preview.json()["preview_signature"],
+        "confirm_key": "csv-full-confirm-885",
+        "row_indexes": [index],
+        "confirmed": True,
+    }
+    first = client.post(f"{endpoint}/confirm", headers=owner, json=confirm)
+    assert first.status_code == 200, first.text
+    assert first.json()["rows"][0]["outcome"] == "publish"
+    assert client.post(f"{endpoint}/confirm", headers=owner, json=confirm).json() == first.json()
+    food_id = first.json()["rows"][0]["food_id"]
+    assert client.get(f"/api/v1/nutrition/foods/{food_id}", headers=other).status_code == 200

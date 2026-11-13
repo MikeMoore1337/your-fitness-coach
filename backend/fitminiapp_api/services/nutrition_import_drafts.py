@@ -193,6 +193,7 @@ def create_nutrition_import_draft(
         .filter(
             NutritionImportDraft.owner_user_id == user.id,
             NutritionImportDraft.status == "pending",
+            NutritionImportDraft.catalog_confirm_key_hash.is_(None),
             NutritionImportDraft.expires_at > _now(),
         )
         .count()
@@ -502,6 +503,8 @@ def cancel_nutrition_import_draft(db: Session, user: User, draft_id: str, *, rev
     draft = get_nutrition_import_draft(db, user, draft_id, lock=True)
     if draft.revision != revision:
         raise NutritionDraftError("stale_revision", 409)
+    if draft.catalog_receipt is not None:
+        raise NutritionDraftError("already_confirmed", 409)
     draft.status = "cancelled"
     draft.document = {}
     draft.skipped_rows = []
