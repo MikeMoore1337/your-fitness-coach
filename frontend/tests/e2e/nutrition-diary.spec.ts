@@ -1692,10 +1692,10 @@ test('Task 748 grocery list derives recipe items and keeps manual changes usable
   await proposalsLoaded;
   await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
 
+  await page.getByTestId('nutrition-extras').locator('summary').first().click();
   await expect(
     page.getByTestId('meal-planner').getByText('План питания', { exact: true }),
   ).toBeVisible();
-  await page.getByTestId('nutrition-extras').locator('summary').first().click();
   const grocery = page.getByTestId('grocery-list');
   await expect(grocery).toBeVisible();
   await expect(grocery.getByText('Список покупок', { exact: true })).toBeVisible();
