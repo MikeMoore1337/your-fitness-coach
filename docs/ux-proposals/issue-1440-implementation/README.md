@@ -1,5 +1,7 @@
 # Питание: сравнение реализации с макетом #1440
 
+> Эти снимки показывают предыдущую версию. После замечаний владельца гидратация возвращена к виду BEFORE, а подбор сделан сворачиваемым. [Актуальные снимки и пояснение](revision/README.md).
+
 Исходный dev: [f1251b12](https://github.com/MikeMoore1337/your-fitness-coach/commit/f1251b12fcfbd5ebbf7728e2b62253523dba9fe3). Код проверяемой объединённой версии: [8bd5c7a0](https://github.com/MikeMoore1337/your-fitness-coach/commit/8bd5c7a0ca22784f1cf0f7110053b5f1feb481a6). Она включает изменения [#1482](https://github.com/MikeMoore1337/your-fitness-coach/pull/1482) и [#1483](https://github.com/MikeMoore1337/your-fitness-coach/pull/1483). Исходный принятый [макет с двумя лаймовыми кнопками](https://github.com/MikeMoore1337/your-fitness-coach/tree/37204e064a738f80a3428c81aa63130ea4feb60c/docs/ux-proposals/issue-1479/after).
 
 Реальные рендеры локального приложения с синтетическими ответами API, не скриншоты production и не физические устройства. Одинаковый тестовый день и содержимое; возможны отличия из-за динамических состояний и изменений интерфейса. Chromium 151.0.7922.34 и Playwright WebKit 26.5, viewport: 844 px по высоте на мобильных размерах, 900 px на 1280; снимки полной страницы.
