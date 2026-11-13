@@ -3,6 +3,7 @@ import type { NutritionTarget } from '../../shared/api/types';
 import type { components } from '../../shared/api/schema';
 import { dateInputValue } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
+import { Button, DisclosureIcon } from '../../shared/ui/common';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import { ClientNutritionProposals } from './CoachNutritionProposals';
 import { NutritionDiary } from './NutritionDiary';
@@ -47,6 +48,7 @@ export function NutritionPage({
   }, []);
   useTelegramOverlayBackButton(view === 'proposal', closeProposal);
   const dayView = useRef<HTMLDivElement>(null);
+  const extrasSettingsFocus = useRef(false);
   const [selectedDate, setSelectedDate] = useState(
     initialDate || dateInputValue(new Date(), timeZone || undefined),
   );
@@ -61,6 +63,19 @@ export function NutritionPage({
     window.addEventListener('hashchange', openFromHash);
     return () => window.removeEventListener('hashchange', openFromHash);
   }, []);
+
+  const openHydrationDestination = useCallback(
+    (targetId: 'hydration-goal-details' | 'hydration-presets-details' | 'hydration-history-section') => {
+      const target = dayView.current?.querySelector<HTMLElement>(`#${targetId}`);
+      if (!target) return;
+      if (target instanceof HTMLDetailsElement) target.open = true;
+      requestAnimationFrame(() => {
+        target.scrollIntoView({ block: 'center', behavior: 'instant' });
+        target.querySelector<HTMLElement>('summary, h3')?.focus({ preventScroll: true });
+      });
+    },
+    [],
+  );
 
   return (
     <div className="nutrition-experience" ref={root}>
@@ -98,12 +113,61 @@ export function NutritionPage({
           }}
           timeZone={timeZone}
         />
-        {!demoSafeMode && (
-          <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
-        )}
-        {!demoSafeMode && (
-          <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
-        )}
+        <details className="nutrition-section-card nutrition-extras" data-testid="nutrition-extras">
+          <summary className="nutrition-extras__summary yfc-disclosure-summary">
+            <span className="nutrition-extras__label">
+              <span className="eyebrow">Настройки и планирование</span>
+              <strong>Дополнительно</strong>
+            </span>
+            <DisclosureIcon />
+          </summary>
+          <div className="nutrition-extras__body">
+            <div
+              className="nutrition-extras__links"
+              role="group"
+              aria-label="Дополнительные действия питания"
+            >
+              <Button
+                data-nutrition-focus="extras-settings"
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  extrasSettingsFocus.current = true;
+                  setView('settings');
+                }}
+              >
+                Настройки КБЖУ
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => openHydrationDestination('hydration-goal-details')}
+              >
+                Личный ориентир
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => openHydrationDestination('hydration-presets-details')}
+              >
+                Мои кружки и бутылки
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => openHydrationDestination('hydration-history-section')}
+              >
+                История напитков
+              </Button>
+            </div>
+            {!demoSafeMode && (
+              <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+            )}
+            {!demoSafeMode && (
+              <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+            )}
+          </div>
+        </details>
         <AiCoachContextualEntry
           context={{ surface: 'nutrition', periodDays: 7 }}
           entryPoint="nutrition"
@@ -122,11 +186,14 @@ export function NutritionPage({
             const returnTo = view;
             if (savedDate) setSelectedDate(savedDate);
             setView('day');
-            requestAnimationFrame(() =>
-              dayView.current
-                ?.querySelector<HTMLButtonElement>(`[data-nutrition-focus="${returnTo}"]`)
-                ?.focus(),
-            );
+            requestAnimationFrame(() => {
+              const focusSelector =
+                returnTo === 'settings' && extrasSettingsFocus.current
+                  ? '[data-nutrition-focus="extras-settings"]'
+                  : `[data-nutrition-focus="${returnTo}"]`;
+              dayView.current?.querySelector<HTMLButtonElement>(focusSelector)?.focus();
+              extrasSettingsFocus.current = false;
+            });
           }}
           onSaved={onSaved}
         />

@@ -966,10 +966,10 @@ export function HydrationTracker({
         </details>
       </div>
 
-      <section className="hydration-card__section" aria-labelledby="hydration-history-title">
+      <section id="hydration-history-section" className="hydration-card__section" aria-labelledby="hydration-history-title">
         <div className="hydration-section-head">
           <div>
-            <h3 id="hydration-history-title">История за день</h3>
+            <h3 id="hydration-history-title" tabIndex={-1}>История за день</h3>
           </div>
           <span className="hydration-history__count">{historyCount}</span>
         </div>
@@ -1010,7 +1010,7 @@ export function HydrationTracker({
       </section>
 
       <div className="hydration-details">
-        <details>
+        <details id="hydration-goal-details">
           <summary className="hydration-details__summary yfc-disclosure-summary">
             <span id="hydration-goal-title">Личный ориентир</span>
             <DisclosureIcon />
@@ -1123,7 +1123,7 @@ export function HydrationTracker({
           </section>
         </details>
 
-        <details>
+        <details id="hydration-presets-details">
           <summary className="hydration-details__summary yfc-disclosure-summary">
             <span id="hydration-presets-title">Мои кружки и бутылки</span>
             <DisclosureIcon />
