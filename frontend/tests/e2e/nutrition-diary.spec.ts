@@ -1680,7 +1680,11 @@ test('Task 748 grocery list derives recipe items and keeps manual changes usable
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockNutritionApi(page);
+  await page.route('**/api/v1/coach-nutrition-proposals', (route) => route.fulfill({ json: [] }));
+  const proposalsLoaded = page.waitForResponse('**/api/v1/coach-nutrition-proposals');
   await page.goto('/app?section=nutrition&date=2026-08-19');
+  await proposalsLoaded;
+  await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
 
   await expect(
     page.getByTestId('meal-planner').getByText('План питания', { exact: true }),
@@ -1747,7 +1751,11 @@ test('Task 748 grocery list keeps its primary action clear in mocked TMA dark mo
     };
   });
   await mockNutritionApi(page);
+  await page.route('**/api/v1/coach-nutrition-proposals', (route) => route.fulfill({ json: [] }));
+  const proposalsLoaded = page.waitForResponse('**/api/v1/coach-nutrition-proposals');
   await page.goto('/app?section=nutrition&date=2026-08-19#tgWebAppPlatform=android');
+  await proposalsLoaded;
+  await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
 
   const grocery = page.getByTestId('grocery-list');
   await expect(grocery).toBeVisible();
@@ -3909,6 +3917,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
     await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
     await mockNutritionApi(page);
+    await page.route('**/api/v1/coach-nutrition-proposals', (route) => route.fulfill({ json: [] }));
+    const proposalsLoaded = page.waitForResponse('**/api/v1/coach-nutrition-proposals');
     let copiedEntries: FoodDiaryEntry[] = [];
     let undoAttempts = 0;
     let copyKey = '';
@@ -4040,6 +4050,8 @@ for (const theme of ['light', 'dark'] as const) {
       await route.fulfill({ status: 204 });
     });
     await page.goto('/app?section=nutrition');
+    await proposalsLoaded;
+    await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
     const repeat = page.getByTestId('nutrition-repeat-default');
     await expect(page.getByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
     await capture1429(page, `${testInfo.project.name}-${theme}-393-empty.png`);
