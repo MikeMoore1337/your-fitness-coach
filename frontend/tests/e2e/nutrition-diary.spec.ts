@@ -2081,7 +2081,7 @@ test.describe('#1441 hydration progress', () => {
 
   for (const theme of ['dark', 'light'] as const) {
     for (const percent of [0, 25, 50, 75, 100, 103]) {
-      test(`${theme} ${percent}% preserves the actual amount and caps the fill`, async ({
+      test(`${theme} ${percent}% preserves the actual amount and caps the horizontal fill`, async ({
         page,
       }, info) => {
         await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
@@ -2092,23 +2092,23 @@ test.describe('#1441 hydration progress', () => {
         await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
 
         const hydration = page.getByRole('region', { name: 'Гидратация' });
-        const orb = hydration.getByRole('progressbar', { name: 'Прогресс гидратации' });
-        await expect(orb).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-        await expect(orb).toHaveAttribute(
+        const bar = hydration.getByRole('progressbar', { name: 'Прогресс гидратации' });
+        await expect(bar).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(bar).toHaveAttribute(
           'aria-valuetext',
           `${percent * 10} из 1000 миллилитров, ${percent}%`,
         );
-        await expect(orb).toHaveAttribute('aria-valuenow', String(Math.min(percent * 10, 1000)));
-        await expect(orb).toContainText(`${percent}%`);
+        await expect(bar).toHaveAttribute('aria-valuenow', String(Math.min(percent * 10, 1000)));
+        await expect(bar).toContainText(`${percent}%`);
         expect(
-          await orb.locator('span').evaluate((element) => (element as HTMLElement).style.height),
+          await bar.locator('span').evaluate((element) => (element as HTMLElement).style.width),
         ).toBe(`${Math.min(percent, 100)}%`);
-        const bounds = await orb.boundingBox();
-        expect(bounds!.width).toBe(bounds!.height);
+        const bounds = await bar.boundingBox();
+        expect(bounds!.width).toBeGreaterThan(bounds!.height);
         if (percent <= 25 || percent >= 75) {
-          const contrast = await orb.evaluate((element, filled) => {
+          const contrast = await bar.evaluate((element) => {
             const text = element.querySelector('strong')!;
-            const background = filled ? element.querySelector('span')! : element;
+            const background = text;
             const luminance = (value: string) => {
               const channels = value
                 .match(/[\d.]+/g)!
@@ -2124,7 +2124,7 @@ test.describe('#1441 hydration progress', () => {
             const foreground = luminance(getComputedStyle(text).color);
             const surface = luminance(getComputedStyle(background).backgroundColor);
             return (Math.max(foreground, surface) + 0.05) / (Math.min(foreground, surface) + 0.05);
-          }, percent >= 75);
+          });
           expect(contrast).toBeGreaterThanOrEqual(4.5);
         }
         if (percent > 100)

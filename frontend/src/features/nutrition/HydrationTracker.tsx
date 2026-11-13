@@ -798,26 +798,21 @@ export function HydrationTracker({
           <h2 id="hydration-title">Вода и напитки</h2>
           <p>{target ? `${data.total_ml} из ${target} мл` : `${data.total_ml} мл записано`}</p>
         </div>
-        <div
-          className={`hydration-orb${target && progress !== null && progress >= 70 ? ' hydration-orb--filled' : ''}`}
-          role={target && progress !== null ? 'progressbar' : undefined}
-          aria-label={target && progress !== null ? 'Прогресс гидратации' : undefined}
-          aria-valuemin={target && progress !== null ? 0 : undefined}
-          aria-valuemax={target && progress !== null ? target : undefined}
-          aria-valuenow={target && progress !== null ? Math.min(data.total_ml, target) : undefined}
-          aria-valuetext={
-            target && progress !== null
-              ? `${data.total_ml} из ${target} миллилитров, ${Math.round(data.progress_percent ?? 0)}%`
-              : undefined
-          }
-          aria-hidden={target && progress !== null ? undefined : true}
-        >
-          {target && progress !== null && <span style={{ height: `${progress}%` }} />}
-          <strong>
-            {target && progress !== null ? `${Math.round(data.progress_percent ?? 0)}%` : 'Вода'}
-          </strong>
-        </div>
       </header>
+      {target && progress !== null && (
+        <div
+          className="hydration-progress"
+          role="progressbar"
+          aria-label="Прогресс гидратации"
+          aria-valuemin={0}
+          aria-valuemax={target}
+          aria-valuenow={Math.min(data.total_ml, target)}
+          aria-valuetext={`${data.total_ml} из ${target} миллилитров, ${Math.round(data.progress_percent ?? 0)}%`}
+        >
+          <span className="hydration-progress__fill" style={{ width: `${progress}%` }} />
+          <strong>{Math.round(data.progress_percent ?? 0)}%</strong>
+        </div>
+      )}
       {(!target || progress === null) && (
         <p className="hydration-progress-note">
           {target ? 'Прогресс недоступен' : 'Ориентир не задан'}
