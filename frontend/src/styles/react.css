@@ -6969,47 +6969,39 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   text-align: left;
 }
 
-.hydration-orb {
+.hydration-progress {
   position: relative;
-  display: grid;
-  flex: 0 0 72px;
-  width: 72px;
-  height: 72px;
+  display: flex;
+  height: 26px;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 0 20px 14px;
+  padding: 0 6px;
   overflow: hidden;
-  place-items: center;
   border: 1px solid var(--v2-border);
-  border-radius: 50%;
+  border-radius: 12px;
   background: var(--v2-surface-secondary);
 }
 
-.hydration-orb > span {
+.hydration-progress__fill {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  inset-block: 0;
+  inset-inline-start: 0;
+  max-width: 100%;
   background: var(--v2-lime);
-  transition: height 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: width 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.hydration-orb strong {
+.hydration-progress strong {
   position: relative;
   z-index: 1;
-  color: #f5f5f5;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
   font-variant-numeric: tabular-nums;
-  -webkit-text-stroke: 0.75px var(--v2-on-lime);
-  paint-order: stroke fill;
-  text-shadow:
-    -0.5px -0.5px 0 var(--v2-on-lime),
-    0.5px -0.5px 0 var(--v2-on-lime),
-    -0.5px 0.5px 0 var(--v2-on-lime),
-    0.5px 0.5px 0 var(--v2-on-lime);
-}
-
-:root[data-color-scheme='light'] .hydration-orb strong,
-.hydration-orb--filled strong {
-  color: var(--v2-on-lime);
-  -webkit-text-stroke: 0;
-  text-shadow: none;
+  font-size: 0.8rem;
+  line-height: 20px;
 }
 
 .hydration-progress-note {
@@ -11968,7 +11960,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
     transform: none !important;
     transition: none !important;
   }
-  .hydration-orb > span {
+  .hydration-progress__fill {
     transition: none !important;
   }
 }
