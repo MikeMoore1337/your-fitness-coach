@@ -1906,6 +1906,8 @@ test('the nutrition shortcut focuses water, then one press records it', async ({
   await page.goto('/app?section=nutrition&date=2026-08-19');
   const shortcut = page.getByRole('button', { name: 'Добавить воду', exact: true });
   await expect(shortcut).toBeInViewport({ ratio: 1 });
+  await expect(shortcut).toHaveClass(/ui-button--primary/);
+  await expect(shortcut.locator('svg')).toHaveAttribute('data-icon', 'plus');
   await page.keyboard.press('Tab');
   await shortcut.focus();
   await page.keyboard.press('Enter');

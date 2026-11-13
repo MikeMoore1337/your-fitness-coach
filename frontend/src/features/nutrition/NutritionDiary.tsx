@@ -1121,11 +1121,11 @@ export function NutritionDiary({
 
       <Button
         className="nutrition-diary__water-action"
-        variant="secondary"
+        variant="primary"
         type="button"
         onClick={() => setHydrationQuickAddRequest((value) => value + 1)}
       >
-        <Icon name="water" size={16} /> Добавить воду
+        <Icon name="plus" size={16} /> Добавить воду
       </Button>
 
       {diary.isLoading && <LoadingState label="Загружаем дневник…" />}

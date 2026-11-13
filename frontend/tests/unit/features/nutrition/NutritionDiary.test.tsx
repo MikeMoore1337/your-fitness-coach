@@ -156,6 +156,18 @@ describe('NutritionDiary', () => {
     cleanup();
   });
 
+  it('uses the same primary style and plus icon for food and water actions', () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary();
+
+    const food = screen.getByTestId('nutrition-add-product');
+    const water = screen.getByRole('button', { name: 'Добавить воду' });
+    expect(food).toHaveClass('ui-button--primary');
+    expect(water).toHaveClass('ui-button--primary');
+    expect(food.querySelector('svg')).toHaveAttribute('data-icon', 'plus');
+    expect(water.querySelector('svg')).toHaveAttribute('data-icon', 'plus');
+  });
+
   it('explains why copying is unavailable when the day is empty', async () => {
     apiMock.mockResolvedValue(makeDay([]));
     renderDiary();
