@@ -102,33 +102,3 @@ describe('NutritionPage - secondary actions (#1442)', () => {
     await waitFor(() => expect(settingsButton).toHaveFocus());
   });
 });
-
-it('temporary #1442 formatting diagnostic - remove before merge', async () => {
-  const prettier = await import('prettier');
-  const fs = await import('node:fs/promises');
-  for (const filePath of [
-    'src/features/nutrition/NutritionPage.tsx',
-    'src/features/nutrition/HydrationTracker.tsx',
-  ]) {
-    const current = await fs.readFile(filePath, 'utf8');
-    const formatted = await prettier.format(current, {
-      ...(await prettier.resolveConfig(filePath)),
-      filepath: filePath,
-      endOfLine: 'auto',
-    });
-    if (current === formatted) continue;
-    const a = current.split('\n');
-    const b = formatted.split('\n');
-    let startIndex = 0;
-    while (startIndex < a.length && a[startIndex] === b[startIndex]) startIndex++;
-    let aEnd = a.length - 1;
-    let bEnd = b.length - 1;
-    while (aEnd >= startIndex && bEnd >= startIndex && a[aEnd] === b[bEnd]) {
-      aEnd--;
-      bEnd--;
-    }
-    console.log('PRETTIER_DIAGNOSTIC', filePath);
-    console.log('BEFORE:', a.slice(Math.max(0, startIndex - 3), aEnd + 4).join('\n').slice(0, 7000));
-    console.log('AFTER:', b.slice(Math.max(0, startIndex - 3), bEnd + 4).join('\n').slice(0, 7000));
-  }
-});

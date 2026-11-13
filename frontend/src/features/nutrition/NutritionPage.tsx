@@ -67,9 +67,7 @@ export function NutritionPage({
   const openHydrationDestination = useCallback(
     (
       targetId:
-        | 'hydration-goal-details'
-        | 'hydration-presets-details'
-        | 'hydration-history-section',
+        'hydration-goal-details' | 'hydration-presets-details' | 'hydration-history-section',
     ) => {
       const target = dayView.current?.querySelector<HTMLElement>(`#${targetId}`);
       if (!target) return;

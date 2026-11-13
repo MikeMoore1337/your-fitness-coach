@@ -973,7 +973,9 @@ export function HydrationTracker({
       >
         <div className="hydration-section-head">
           <div>
-            <h3 id="hydration-history-title" tabIndex={-1}>История за день</h3>
+            <h3 id="hydration-history-title" tabIndex={-1}>
+              История за день
+            </h3>
           </div>
           <span className="hydration-history__count">{historyCount}</span>
         </div>
