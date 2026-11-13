@@ -37,6 +37,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.screenshot({ path: testInfo.outputPath(`${width}-page.png`), fullPage: true });
       await card.screenshot({ path: testInfo.outputPath(`${width}-closed.png`) });
       await toggle.focus();
+      await expect(toggle).toHaveCSS('outline-width', '1px');
       await page.keyboard.press('Enter');
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       const action = card.getByRole('button', { name: 'День заполнен' });

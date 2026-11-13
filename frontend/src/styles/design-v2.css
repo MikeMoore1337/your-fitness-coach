@@ -1818,6 +1818,11 @@ body:has(.app-shell--design-v2) {
   background: var(--v2-surface);
 }
 
+.nutrition-diary--design-v2 .nutrition-completeness .nutrition-completeness__toggle:focus-visible {
+  outline: 1px solid var(--v2-focus);
+  outline-offset: 2px;
+}
+
 .nutrition-diary--design-v2 .nutrition-entry__title > div > span,
 .nutrition-diary--design-v2 .nutrition-entry__amount,
 .nutrition-diary--design-v2 .nutrition-entry__macros {
