@@ -65,7 +65,12 @@ export function NutritionPage({
   }, []);
 
   const openHydrationDestination = useCallback(
-    (targetId: 'hydration-goal-details' | 'hydration-presets-details' | 'hydration-history-section') => {
+    (
+      targetId:
+        | 'hydration-goal-details'
+        | 'hydration-presets-details'
+        | 'hydration-history-section',
+    ) => {
       const target = dayView.current?.querySelector<HTMLElement>(`#${targetId}`);
       if (!target) return;
       if (target instanceof HTMLDetailsElement) target.open = true;
@@ -161,10 +166,18 @@ export function NutritionPage({
               </Button>
             </div>
             {!demoSafeMode && (
-              <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+              <MealPlanner
+                initialDate={initialDate}
+                readOnly={readOnlyEntries}
+                timeZone={timeZone}
+              />
             )}
             {!demoSafeMode && (
-              <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+              <GroceryList
+                initialDate={initialDate}
+                readOnly={readOnlyEntries}
+                timeZone={timeZone}
+              />
             )}
           </div>
         </details>

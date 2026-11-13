@@ -1595,6 +1595,10 @@ test('Task 746 meal planner stays separate from diary on mobile day and week vie
   await mockNutritionApi(page);
   await page.goto('/app?section=nutrition&date=2026-08-19');
 
+  const extras = page.getByTestId('nutrition-extras');
+  await expect(extras).not.toHaveAttribute('open', '');
+  await extras.locator('summary').first().click();
+  await expect(extras).toHaveAttribute('open', '');
   const planner = page.getByTestId('meal-planner');
   await expect(planner).toBeVisible();
   await planner.locator('summary').click();
@@ -1644,6 +1648,7 @@ test('Task 747 mocked TMA keeps plan fill explicit and bridges one planned item 
   await mockNutritionApi(page);
   await page.goto('/app?section=nutrition&date=2026-08-19#tgWebAppPlatform=android');
 
+  await page.getByTestId('nutrition-extras').locator('summary').first().click();
   const planner = page.getByTestId('meal-planner');
   await planner.locator('summary').click();
   const planSuggestions = planner.getByRole('region', { name: 'Варианты для плана' });
@@ -1690,6 +1695,7 @@ test('Task 748 grocery list derives recipe items and keeps manual changes usable
   await expect(
     page.getByTestId('meal-planner').getByText('План питания', { exact: true }),
   ).toBeVisible();
+  await page.getByTestId('nutrition-extras').locator('summary').first().click();
   const grocery = page.getByTestId('grocery-list');
   await expect(grocery).toBeVisible();
   await expect(grocery.getByText('Список покупок', { exact: true })).toBeVisible();
@@ -1758,6 +1764,7 @@ test('Task 748 grocery list keeps its primary action clear in mocked TMA dark mo
   await proposalsLoaded;
   await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
 
+  await page.getByTestId('nutrition-extras').locator('summary').first().click();
   const grocery = page.getByTestId('grocery-list');
   await expect(grocery).toBeVisible();
   await grocery.locator('summary').click();
@@ -1808,10 +1815,13 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   await mockNutritionApi(page, 'data', null);
   await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
 
+  const presetTitle = page
+    .getByRole('region', { name: 'Гидратация' })
+    .getByText('Мои кружки и бутылки', { exact: true });
   const cardTitles = [
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
     page.locator('.nutrition-food-card__header h2'),
-    page.getByText('Мои кружки и бутылки', { exact: true }),
+    presetTitle,
     page.getByRole('heading', { name: 'Проверка дневника' }),
   ];
   const titlePositions: number[] = [];
@@ -1831,7 +1841,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   expect(
     foodCardBox!.x + foodCardBox!.width - firstMealBox!.x - firstMealBox!.width,
   ).toBeGreaterThanOrEqual(14);
-  await expect(page.getByText('Мои кружки и бутылки', { exact: true })).toBeVisible();
+  await expect(presetTitle).toBeVisible();
   await page.screenshot({
     fullPage: true,
     path: '../.artifacts/runtime/tests/screenshots/task-81A/desktop-light-five-cards.png',

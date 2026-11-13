@@ -966,7 +966,11 @@ export function HydrationTracker({
         </details>
       </div>
 
-      <section id="hydration-history-section" className="hydration-card__section" aria-labelledby="hydration-history-title">
+      <section
+        id="hydration-history-section"
+        className="hydration-card__section"
+        aria-labelledby="hydration-history-title"
+      >
         <div className="hydration-section-head">
           <div>
             <h3 id="hydration-history-title" tabIndex={-1}>История за день</h3>
