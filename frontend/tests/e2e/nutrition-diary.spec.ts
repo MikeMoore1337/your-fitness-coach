@@ -13,6 +13,119 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1436 status disclosure remains usable in ${theme}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockNutritionApi(page);
+    let writes = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'PUT' &&
+        new URL(request.url()).pathname === '/api/v1/nutrition/diary/status'
+      )
+        writes += 1;
+    });
+    await page.goto('/app?section=nutrition');
+    const card = page.locator('.nutrition-completeness');
+    const toggle = card.getByRole('button', { name: /Изменить статус/ });
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await toggle.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath(`${width}-page.png`), fullPage: true });
+      await card.screenshot({ path: testInfo.outputPath(`${width}-closed.png`) });
+      await toggle.focus();
+      await expect(toggle).toHaveCSS('outline-width', '1px');
+      await page.keyboard.press('Enter');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const action = card.getByRole('button', { name: 'День заполнен' });
+      await expect(action).toBeVisible();
+      await card.screenshot({ path: testInfo.outputPath(`${width}-open.png`) });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await action.scrollIntoViewIfNeeded();
+      const dock = page.locator('#appBottomNav');
+      if (await dock.isVisible()) {
+        const [actionBox, dockBox] = await Promise.all([action.boundingBox(), dock.boundingBox()]);
+        const overlaps =
+          actionBox!.x < dockBox!.x + dockBox!.width &&
+          actionBox!.x + actionBox!.width > dockBox!.x &&
+          actionBox!.y < dockBox!.y + dockBox!.height &&
+          actionBox!.y + actionBox!.height > dockBox!.y;
+        expect(overlaps).toBe(false);
+      }
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggle).toBeFocused();
+    }
+    expect(writes).toBe(0);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1436 empty, loading and error states in ${theme}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockNutritionApi(page);
+    await page.route('**/api/v1/nutrition/diary?*', (route) =>
+      route.fulfill({
+        json: {
+          diary_date: '2026-08-19',
+          timezone: 'Europe/Moscow',
+          meals: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type) => ({
+            meal_type,
+            entries: [],
+            totals: zeroNutrition,
+          })),
+          totals: zeroNutrition,
+          targets: null,
+          remaining: null,
+          status: 'unlogged',
+          status_is_explicit: false,
+          repeat_candidate: null,
+        },
+      }),
+    );
+    let release = () => {};
+    const response = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/api/v1/nutrition/diary/status', async (route) => {
+      await response;
+      await route.fulfill({ status: 503, json: { detail: 'Нет соединения' } });
+    });
+    await page.goto('/app?section=nutrition');
+    const card = page.locator('.nutrition-completeness');
+    await card.getByRole('button', { name: /Изменить статус/ }).click();
+    await expect(card.getByRole('button', { name: 'День заполнен' })).toBeDisabled();
+    await expect(
+      card.getByRole('button', { name: 'Отметить день без приёмов пищи' }),
+    ).toBeEnabled();
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.screenshot({ path: testInfo.outputPath(`${width}-empty.png`) });
+    }
+    await card.getByRole('button', { name: 'Заполнен частично' }).click();
+    await expect(card.getByRole('button', { name: 'Заполнен частично' })).toBeDisabled();
+    await expect(card.getByRole('status')).toHaveText('Сохраняем статус…');
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.screenshot({ path: testInfo.outputPath(`${width}-loading.png`) });
+    }
+    release();
+    await expect(card.getByRole('alert')).toBeVisible();
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.screenshot({ path: testInfo.outputPath(`${width}-error.png`) });
+    }
+  });
+}
+
 if (process.env.MACRO_NATIVE_ZOOM === '1') {
   for (const theme of ['light', 'dark'] as const) {
     test(`native Chromium 200 percent zoom ${theme}`, async () => {
@@ -1568,7 +1681,11 @@ test('Task 748 grocery list derives recipe items and keeps manual changes usable
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockNutritionApi(page);
+  await page.route('**/api/v1/coach-nutrition-proposals', (route) => route.fulfill({ json: [] }));
+  const proposalsLoaded = page.waitForResponse('**/api/v1/coach-nutrition-proposals');
   await page.goto('/app?section=nutrition&date=2026-08-19');
+  await proposalsLoaded;
+  await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
 
   await expect(
     page.getByTestId('meal-planner').getByText('План питания', { exact: true }),
@@ -1635,7 +1752,11 @@ test('Task 748 grocery list keeps its primary action clear in mocked TMA dark mo
     };
   });
   await mockNutritionApi(page);
+  await page.route('**/api/v1/coach-nutrition-proposals', (route) => route.fulfill({ json: [] }));
+  const proposalsLoaded = page.waitForResponse('**/api/v1/coach-nutrition-proposals');
   await page.goto('/app?section=nutrition&date=2026-08-19#tgWebAppPlatform=android');
+  await proposalsLoaded;
+  await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
 
   const grocery = page.getByTestId('grocery-list');
   await expect(grocery).toBeVisible();
@@ -1691,7 +1812,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
     page.locator('.nutrition-food-card__header h2'),
     page.getByText('Мои кружки и бутылки', { exact: true }),
-    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
+    page.getByRole('heading', { name: 'Проверка дневника' }),
   ];
   const titlePositions: number[] = [];
   for (const heading of cardTitles) {
@@ -2970,6 +3091,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 
+  await page.getByRole('button', { name: /Изменить статус/ }).click();
   await page.getByRole('button', { name: 'День заполнен' }).click();
   await expect(page.getByText('Подтверждено')).toBeVisible();
 
@@ -3796,6 +3918,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
     await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
     await mockNutritionApi(page);
+    await page.route('**/api/v1/coach-nutrition-proposals', (route) => route.fulfill({ json: [] }));
+    const proposalsLoaded = page.waitForResponse('**/api/v1/coach-nutrition-proposals');
     let copiedEntries: FoodDiaryEntry[] = [];
     let undoAttempts = 0;
     let copyKey = '';
@@ -3927,6 +4051,8 @@ for (const theme of ['light', 'dark'] as const) {
       await route.fulfill({ status: 204 });
     });
     await page.goto('/app?section=nutrition');
+    await proposalsLoaded;
+    await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
     const repeat = page.getByTestId('nutrition-repeat-default');
     await expect(page.getByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
     await capture1429(page, `${testInfo.project.name}-${theme}-393-empty.png`);
