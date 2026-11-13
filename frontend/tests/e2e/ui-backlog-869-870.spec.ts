@@ -24,7 +24,7 @@ for (const theme of themes) {
       await expect(page.getByText('План питания', { exact: true })).toBeVisible();
       await expect(page.getByText('Список покупок', { exact: true })).toBeVisible();
       const planningDetails = page.locator(
-        '.nutrition-day-content > .meal-planner, .nutrition-day-content > .grocery-list',
+        '.nutrition-extras__body > .meal-planner, .nutrition-extras__body > .grocery-list',
       );
       await expect(planningDetails).toHaveCount(2);
       if (phase === 'after') {
@@ -82,7 +82,7 @@ for (const theme of themes) {
         }
         // The planning sections retain their shared frame color and spacing.
         const sectionLayout = await page
-          .locator('.nutrition-day-content > :is(.meal-planner, .grocery-list)')
+          .locator('.nutrition-extras__body > :is(.meal-planner, .grocery-list)')
           .evaluateAll((elements) =>
             elements.map((element) => {
               const bounds = element.getBoundingClientRect();
@@ -109,7 +109,7 @@ for (const theme of themes) {
           expect(item.backgroundColor).toBe(settingsLayout!.backgroundColor);
         }
         for (let index = 1; index < sectionLayout.length; index++) {
-          expect(sectionLayout[index]!.top - sectionLayout[index - 1]!.bottom).toBeCloseTo(16, 0);
+          expect(sectionLayout[index]!.top - sectionLayout[index - 1]!.bottom).toBeCloseTo(12, 0);
         }
       }
       for (const detail of await planningDetails.all()) {
@@ -145,7 +145,7 @@ for (const theme of themes) {
         path: testInfo.outputPath(`${phase}-869-hydration-${theme}-${width}.png`),
       });
       const planning = page.locator(
-        '.nutrition-day-content > .meal-planner, .nutrition-day-content > .grocery-list',
+        '.nutrition-extras__body > .meal-planner, .nutrition-extras__body > .grocery-list',
       );
       await expect(planning).toHaveCount(2);
       await planning.first().scrollIntoViewIfNeeded();
@@ -298,7 +298,7 @@ for (const theme of themes) {
     await page.goto('/app?section=nutrition&date=2026-10-10');
 
     const planningDetails = page.locator(
-      '.nutrition-day-content > .meal-planner, .nutrition-day-content > .grocery-list',
+      '.nutrition-extras__body > .meal-planner, .nutrition-extras__body > .grocery-list',
     );
     await expect(planningDetails).toHaveCount(2);
     const cardStyles = await planningDetails.evaluateAll((elements) =>
