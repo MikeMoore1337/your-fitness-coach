@@ -994,6 +994,8 @@ export function NutritionSuggestions({
   const idempotencyKey = useRef<string | null>(null);
   const submittedPreview = useRef<string | null>(null);
   const titleId = `nutrition-suggestions-title-${mode}`;
+  const contentId = useId();
+  const [diaryExpanded, setDiaryExpanded] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<NutritionSuggestion | null>(null);
   const suggestions = useQuery({
     queryKey:
@@ -1095,17 +1097,43 @@ export function NutritionSuggestions({
         'Это варианты из уже сохранённых продуктов, рецептов и шаблонов, а не предписание.' &&
       message !== 'Проверьте состав и количество перед добавлением.',
   );
+  const heading = (
+    <h2 id={titleId}>
+      {mode === 'diary' ? (
+        <button
+          type="button"
+          className={styles.sectionToggle}
+          aria-expanded={diaryExpanded}
+          aria-controls={contentId}
+          onClick={() => setDiaryExpanded((value) => !value)}
+        >
+          Варианты из вашей еды
+          <DisclosureIcon />
+        </button>
+      ) : (
+        'Варианты для плана'
+      )}
+    </h2>
+  );
 
   if (demoSafeMode) {
     return (
-      <section className="nutrition-section-card nutrition-suggestions" aria-labelledby={titleId}>
+      <section
+        className={`nutrition-section-card nutrition-suggestions ${styles.diarySection}`}
+        aria-labelledby={titleId}
+      >
         <header className="nutrition-section-card__header">
           <div>
             <span className="eyebrow">Подбор из дневника</span>
-            <h2 id={titleId}>Варианты из вашей еды</h2>
+            {heading}
           </div>
         </header>
-        <p className="muted demo-capability-notice" role="status">
+        <p
+          id={contentId}
+          hidden={!diaryExpanded}
+          className="muted demo-capability-notice"
+          role="status"
+        >
           Варианты доступны после входа в аккаунт.
         </p>
       </section>
@@ -1122,126 +1150,130 @@ export function NutritionSuggestions({
           <span className="eyebrow">
             {mode === 'plan' ? 'Подбор для плана' : 'Подбор из дневника'}
           </span>
-          <h2 id={titleId}>{mode === 'plan' ? 'Варианты для плана' : 'Варианты из вашей еды'}</h2>
-          <p className="muted">
-            {mode === 'plan'
-              ? 'Выберите сохранённый вариант и проверьте его перед добавлением в план.'
-              : 'Проверьте состав и количество перед добавлением.'}
-          </p>
+          {heading}
         </div>
       </header>
-      {suggestions.data?.remaining && !selectedCandidate && (
-        <p className={styles.context}>
-          На {formatCalendarDate(diaryDate, { day: 'numeric', month: 'long' })} осталось:{' '}
-          {formatNumber(suggestions.data.remaining.energy_kcal, 2)} ккал · белки{' '}
-          {formatNumber(suggestions.data.remaining.protein_g, 3)} г · жиры{' '}
-          {formatNumber(suggestions.data.remaining.fat_g, 3)} г · углеводы{' '}
-          {formatNumber(suggestions.data.remaining.carbs_g, 3)} г.
-          {suggestions.data.remaining_includes_plan && ' Учтён ещё не съеденный план.'}
+      <div id={contentId} hidden={mode === 'diary' && !diaryExpanded}>
+        <p className="muted">
+          {mode === 'plan'
+            ? 'Выберите сохранённый вариант и проверьте его перед добавлением в план.'
+            : 'Проверьте состав и количество перед добавлением.'}
         </p>
-      )}
-      {suggestions.data && !selectedCandidate && (
-        <p className={styles.context}>Нет сведений о предпочтениях и ограничениях.</p>
-      )}
-      {suggestions.isLoading && <LoadingState label="Подбираем варианты из сохранённых данных…" />}
-      {suggestions.error && (
-        <ErrorState
-          message={(suggestions.error as Error).message}
-          retry={() => void suggestions.refetch()}
-          retryLabel="Повторить варианты"
-        />
-      )}
-      {suggestions.data && !selectedCandidate && (
-        <>
-          {limitations.length > 0 && (
-            <div className="nutrition-suggestions__limitations" role="status">
-              {limitations.map((limitation) => (
-                <p key={limitation}>{limitation}</p>
-              ))}
-            </div>
-          )}
-          {suggestions.data.candidates?.length && mode === 'diary' ? (
-            <DiaryCandidateList
-              key={JSON.stringify([diaryDate, suggestions.data.candidates])}
-              candidates={suggestions.data.candidates}
-              remaining={suggestions.data.remaining}
-              onSelect={(nextCandidate) => {
-                idempotencyKey.current = null;
-                submittedPreview.current = null;
-                setSelectedCandidate(nextCandidate);
-              }}
-            />
-          ) : suggestions.data.candidates?.length ? (
-            <ul className="nutrition-suggestions__list">
-              {suggestions.data.candidates.map((candidate) => (
-                <CandidateCard
-                  candidate={candidate}
-                  remaining={suggestions.data.remaining}
-                  key={candidate.candidate_id}
-                  onSelect={(nextCandidate) => {
-                    idempotencyKey.current = null;
-                    submittedPreview.current = null;
-                    setSelectedCandidate(nextCandidate);
-                  }}
-                />
-              ))}
-            </ul>
-          ) : suggestions.data.not_calculable ? (
-            <EmptyState
-              title="Нельзя рассчитать варианты"
-              text="Проверьте калории и БЖУ в цели питания."
-            />
-          ) : !suggestions.data.targets ? (
-            <EmptyState
-              title="Нет цели КБЖУ на эту дату"
-              text="Без цели нельзя рассчитать остаток и подобрать вариант по нему."
-            />
-          ) : !suggestions.data.remaining ? (
-            <EmptyState
-              title="Не удалось рассчитать остаток"
-              text="Проверьте доступность запланированных продуктов и блюд."
-            />
-          ) : (
-            <EmptyState
-              title="Пока нет готовых вариантов"
-              text="Добавьте продукт или сохраните шаблон — здесь появятся только уже подтверждённые данные."
-            />
-          )}
-        </>
-      )}
-      {selectedCandidate && (
-        <SuggestionReview
-          candidate={selectedCandidate}
-          diaryDate={diaryDate}
-          initialMealType={initialMealType}
-          mode={mode}
-          planRevision={planRevision}
-          disabled={readOnly || commit.isPending}
-          pending={commit.isPending}
-          onCancel={() => {
-            idempotencyKey.current = null;
-            submittedPreview.current = null;
-            setSelectedCandidate(null);
-          }}
-          onSubmit={(mealType, items, previewToken, constraints) =>
-            commit.mutate({ mealType, items, previewToken, constraints })
-          }
-        />
-      )}
-      {commit.error && (
-        <div className="nutrition-inline-error" role="alert">
-          <span>{(commit.error as Error).message}</span>
-          <button
-            type="button"
-            onClick={() => {
-              commit.reset();
-              void queryClient.invalidateQueries({ queryKey: ['nutrition-suggestion-preview'] });
+        {suggestions.data?.remaining && !selectedCandidate && (
+          <p className={styles.context}>
+            На {formatCalendarDate(diaryDate, { day: 'numeric', month: 'long' })} осталось:{' '}
+            {formatNumber(suggestions.data.remaining.energy_kcal, 2)} ккал · белки{' '}
+            {formatNumber(suggestions.data.remaining.protein_g, 3)} г · жиры{' '}
+            {formatNumber(suggestions.data.remaining.fat_g, 3)} г · углеводы{' '}
+            {formatNumber(suggestions.data.remaining.carbs_g, 3)} г.
+            {suggestions.data.remaining_includes_plan && ' Учтён ещё не съеденный план.'}
+          </p>
+        )}
+        {suggestions.data && !selectedCandidate && (
+          <p className={styles.context}>Нет сведений о предпочтениях и ограничениях.</p>
+        )}
+        {suggestions.isLoading && (
+          <LoadingState label="Подбираем варианты из сохранённых данных…" />
+        )}
+        {suggestions.error && (
+          <ErrorState
+            message={(suggestions.error as Error).message}
+            retry={() => void suggestions.refetch()}
+            retryLabel="Повторить варианты"
+          />
+        )}
+        {suggestions.data && !selectedCandidate && (
+          <>
+            {limitations.length > 0 && (
+              <div className="nutrition-suggestions__limitations" role="status">
+                {limitations.map((limitation) => (
+                  <p key={limitation}>{limitation}</p>
+                ))}
+              </div>
+            )}
+            {suggestions.data.candidates?.length && mode === 'diary' ? (
+              <DiaryCandidateList
+                key={JSON.stringify([diaryDate, suggestions.data.candidates])}
+                candidates={suggestions.data.candidates}
+                remaining={suggestions.data.remaining}
+                onSelect={(nextCandidate) => {
+                  idempotencyKey.current = null;
+                  submittedPreview.current = null;
+                  setSelectedCandidate(nextCandidate);
+                }}
+              />
+            ) : suggestions.data.candidates?.length ? (
+              <ul className="nutrition-suggestions__list">
+                {suggestions.data.candidates.map((candidate) => (
+                  <CandidateCard
+                    candidate={candidate}
+                    remaining={suggestions.data.remaining}
+                    key={candidate.candidate_id}
+                    onSelect={(nextCandidate) => {
+                      idempotencyKey.current = null;
+                      submittedPreview.current = null;
+                      setSelectedCandidate(nextCandidate);
+                    }}
+                  />
+                ))}
+              </ul>
+            ) : suggestions.data.not_calculable ? (
+              <EmptyState
+                title="Нельзя рассчитать варианты"
+                text="Проверьте калории и БЖУ в цели питания."
+              />
+            ) : !suggestions.data.targets ? (
+              <EmptyState
+                title="Нет цели КБЖУ на эту дату"
+                text="Без цели нельзя рассчитать остаток и подобрать вариант по нему."
+              />
+            ) : !suggestions.data.remaining ? (
+              <EmptyState
+                title="Не удалось рассчитать остаток"
+                text="Проверьте доступность запланированных продуктов и блюд."
+              />
+            ) : (
+              <EmptyState
+                title="Пока нет готовых вариантов"
+                text="Добавьте продукт или сохраните шаблон — здесь появятся только уже подтверждённые данные."
+              />
+            )}
+          </>
+        )}
+        {selectedCandidate && (
+          <SuggestionReview
+            candidate={selectedCandidate}
+            diaryDate={diaryDate}
+            initialMealType={initialMealType}
+            mode={mode}
+            planRevision={planRevision}
+            disabled={readOnly || commit.isPending}
+            pending={commit.isPending}
+            onCancel={() => {
+              idempotencyKey.current = null;
+              submittedPreview.current = null;
+              setSelectedCandidate(null);
             }}
-          >
-            Изменить вариант
-          </button>
-        </div>
-      )}
+            onSubmit={(mealType, items, previewToken, constraints) =>
+              commit.mutate({ mealType, items, previewToken, constraints })
+            }
+          />
+        )}
+        {commit.error && (
+          <div className="nutrition-inline-error" role="alert">
+            <span>{(commit.error as Error).message}</span>
+            <button
+              type="button"
+              onClick={() => {
+                commit.reset();
+                void queryClient.invalidateQueries({ queryKey: ['nutrition-suggestion-preview'] });
+              }}
+            >
+              Изменить вариант
+            </button>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

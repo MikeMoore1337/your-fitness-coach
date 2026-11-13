@@ -61,6 +61,7 @@ for (const width of [320, 360, 393, 430, 1280]) {
       );
       await page.goto(`/app?section=nutrition&date=${date}`);
       const region = page.getByRole('region', { name: 'Варианты из вашей еды' });
+      await region.getByRole('button', { name: 'Варианты из вашей еды' }).click();
       await expect(region.getByText('Курица', { exact: true })).toBeVisible();
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       const phase = process.env.CAPTURE_1433;
@@ -108,6 +109,7 @@ for (const count of [0, 1, 2, 3, 6]) {
     });
     await page.goto(`/app?section=nutrition&date=${date}`);
     const region = page.getByRole('region', { name: 'Варианты из вашей еды' });
+    await region.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     if (!count) await expect(region.getByText('Не удалось рассчитать остаток')).toBeVisible();
     else await expect(region.getByText('Курица', { exact: true })).toBeVisible();
     await expect(region.locator('.nutrition-suggestion-card:visible')).toHaveCount(
@@ -186,6 +188,7 @@ for (const width of [393, 1280]) {
       });
       await page.goto(`/app?section=nutrition&date=${date}`);
       const region = page.getByRole('region', { name: 'Варианты из вашей еды' });
+      await region.getByRole('button', { name: 'Варианты из вашей еды' }).click();
       const toggle = region.getByRole('button', { name: /Показать все 6 вариантов|Свернуть/ });
       await expect(toggle).toBeVisible();
       const secondReview = region
@@ -245,6 +248,11 @@ for (const width of [393, 1280]) {
         .getByRole('navigation', { name: 'Неделя дневника' })
         .getByRole('button', { name: /5 ноября/ })
         .click();
+      await expect(region.getByRole('button', { name: 'Варианты из вашей еды' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      await region.getByRole('button', { name: 'Варианты из вашей еды' }).click();
       await expect(region.getByRole('button', { name: 'Показать все 3 варианта' })).toHaveAttribute(
         'aria-expanded',
         'false',
@@ -270,6 +278,7 @@ for (const theme of ['dark', 'light'] as const) {
     );
     await page.goto(`/app?section=nutrition&date=${date}`);
     const region = page.getByRole('region', { name: 'Варианты из вашей еды' });
+    await region.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     const retry = region.getByRole('button', { name: 'Повторить варианты' });
     await expect(retry).toBeVisible();
     if (process.env.CAPTURE_1433 === 'after') {
@@ -283,6 +292,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(region.getByRole('button', { name: 'Показать все 3 варианта' })).toBeVisible();
     count = 0;
     await page.reload();
+    await region.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     await expect(region.getByText('Пока нет готовых вариантов')).toBeVisible();
     if (process.env.CAPTURE_1433 === 'after') {
       await region.screenshot({
@@ -307,6 +317,7 @@ for (const theme of ['dark', 'light'] as const) {
     );
     await page.goto(`/app?section=nutrition&date=${date}`);
     const region = page.getByRole('region', { name: 'Варианты из вашей еды' });
+    await region.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     await expect(region.getByText(longName, { exact: true })).toBeVisible();
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
     await expect(region.getByRole('button', { name: /Показать все/ })).toBeVisible();

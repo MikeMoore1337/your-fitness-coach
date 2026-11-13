@@ -1776,6 +1776,24 @@ test('Task 748 grocery list keeps its primary action clear in mocked TMA dark mo
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
+test('diary suggestions collapse and reopen with the keyboard', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+  const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+  const toggle = suggestions.getByRole('button', { name: 'Варианты из вашей еды' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(suggestions.getByRole('button', { name: 'Проверить вариант' })).toBeHidden();
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(suggestions.getByRole('button', { name: 'Проверить вариант' })).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(suggestions.getByRole('button', { name: 'Проверить вариант' })).toBeHidden();
+  await expect(toggle).toBeFocused();
+});
+
 test('macro-aware suggestions show partial evidence and require an editable confirmation', async ({
   page,
 }) => {
@@ -1784,6 +1802,7 @@ test('macro-aware suggestions show partial evidence and require an editable conf
   await page.goto('/app?section=nutrition&date=2026-08-19');
 
   const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+  await suggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
   await expect(suggestions).toBeVisible();
   await expect(suggestions.getByText('Частичные БЖУ', { exact: true })).toBeVisible();
   await expect(
@@ -2090,7 +2109,7 @@ test.describe('#1441 hydration progress', () => {
 
   for (const theme of ['dark', 'light'] as const) {
     for (const percent of [0, 25, 50, 75, 100, 103]) {
-      test(`${theme} ${percent}% preserves the actual amount and caps the horizontal fill`, async ({
+      test(`${theme} ${percent}% preserves the actual amount and caps the circular fill`, async ({
         page,
       }, info) => {
         await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
@@ -2108,15 +2127,16 @@ test.describe('#1441 hydration progress', () => {
           `${percent * 10} из 1000 миллилитров, ${percent}%`,
         );
         await expect(bar).toHaveAttribute('aria-valuenow', String(Math.min(percent * 10, 1000)));
-        await expect(hydration.locator('.hydration-card__percent')).toHaveText(`${percent}%`);
+        await expect(bar.locator('strong')).toHaveText(`${percent}%`);
         expect(
-          await bar.locator('span').evaluate((element) => (element as HTMLElement).style.width),
+          await bar.locator('span').evaluate((element) => (element as HTMLElement).style.height),
         ).toBe(`${Math.min(percent, 100)}%`);
         const bounds = await bar.boundingBox();
-        expect(bounds!.width).toBeGreaterThan(bounds!.height);
+        expect(bounds!.width).toBeCloseTo(bounds!.height, 0);
         if (percent <= 25 || percent >= 75) {
-          const contrast = await hydration.locator('.hydration-card__percent').evaluate((text) => {
-            const background = text.closest('.hydration-card')!;
+          const contrast = await bar.locator('strong').evaluate((text, value) => {
+            const background =
+              value >= 75 ? text.parentElement!.querySelector('span')! : text.parentElement!;
             const luminance = (value: string) => {
               const channels = value
                 .match(/[\d.]+/g)!
@@ -2132,7 +2152,7 @@ test.describe('#1441 hydration progress', () => {
             const foreground = luminance(getComputedStyle(text).color);
             const surface = luminance(getComputedStyle(background).backgroundColor);
             return (Math.max(foreground, surface) + 0.05) / (Math.min(foreground, surface) + 0.05);
-          });
+          }, percent);
           expect(contrast).toBeGreaterThanOrEqual(4.5);
         }
         if (percent > 100)

@@ -54,7 +54,7 @@ function response(count: number): Response {
   };
 }
 
-function setup(mode: 'diary' | 'plan' = 'diary') {
+function setup(mode: 'diary' | 'plan' = 'diary', open = true) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -71,6 +71,9 @@ function setup(mode: 'diary' | 'plan' = 'diary') {
     </QueryClientProvider>
   );
   const view = render(tree('2026-11-06'));
+  if (mode === 'diary' && open) {
+    fireEvent.click(screen.getByRole('button', { name: 'Варианты из вашей еды' }));
+  }
   return { client, changeDate: (date: string) => view.rerender(tree(date)) };
 }
 
@@ -85,6 +88,22 @@ describe('компактные рекомендации дневника', () =>
     apiMock.mockReset();
   });
   afterEach(() => cleanup());
+
+  it('сворачивает подбор и сохраняет варианты при повторном раскрытии', async () => {
+    apiMock.mockResolvedValue(response(1));
+    setup('diary', false);
+    const toggle = screen.getByRole('button', { name: 'Варианты из вашей еды' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'Проверить вариант' })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Продукт 1')).toBeVisible();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('Продукт 1')).not.toBeVisible();
+    fireEvent.click(toggle);
+    expect(screen.getByText('Продукт 1')).toBeVisible();
+  });
 
   it.each([0, 1, 2, 3, 6])('показывает нужное число из %i вариантов', async (count) => {
     apiMock.mockResolvedValue(response(count));

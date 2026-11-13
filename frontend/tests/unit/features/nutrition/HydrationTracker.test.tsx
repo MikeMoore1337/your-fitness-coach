@@ -386,11 +386,10 @@ describe('HydrationTracker', () => {
     expect(
       screen.queryByRole('progressbar', { name: 'Прогресс гидратации' }),
     ).not.toBeInTheDocument();
-    const progressbar = container.querySelector('.hydration-progress');
-    expect(progressbar).not.toBeInTheDocument();
+    expect(container.querySelector('.hydration-orb')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('shows the actual amount above the goal and caps the horizontal fill', async () => {
+  it('shows the actual amount above the goal and caps the circular fill', async () => {
     apiMock.mockImplementation((path: string) =>
       path === '/api/v1/me'
         ? Promise.resolve({ profile: { sex: 'female' } })

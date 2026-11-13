@@ -27,6 +27,41 @@
   line-height: 1.45;
 }
 
+.diarySection header {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.diarySection header > div {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionToggle:focus-visible {
+  outline: 2px solid var(--v2-lime);
+  outline-offset: 2px;
+}
+
+.sectionToggle[aria-expanded='true'] :global(.disclosure-icon .yfc-icon) {
+  transform: rotate(90deg);
+}
+
 .details summary {
   min-height: 44px;
   padding: 12px 0;
