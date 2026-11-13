@@ -36,6 +36,7 @@ const nutrients = [
   ['carbohydrate_g', 'Углеводы', 'г'],
 ] as const;
 const statuses = { equal: 'Совпадает', different: 'Расходится', unknown: 'Нельзя сопоставить' };
+const sourceUnits: Record<string, string> = { g: 'г', ml: 'мл', serving: 'порц.', piece: 'шт.' };
 
 function rowsFor(occurrence: Proposal['occurrences'][number]): Row[] {
   return occurrence.items.map(({ source, source_index, food_id }) => ({
@@ -431,7 +432,17 @@ export function RecurringMealSuggestions({
                     className="recurring-meals__row"
                     key={`${row.sourceIndex ?? 'added'}-${index}`}
                   >
-                    <strong>{row.name}</strong>
+                    <div className="recurring-meals__row-heading">
+                      <strong>{row.name}</strong>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        aria-label={`Удалить ${row.name}`}
+                        onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                      >
+                        <Icon name="trash" size={20} />
+                      </Button>
+                    </div>
                     <div className="recurring-meals__portion">
                       <Field label="Количество" labelFor={`recurring-amount-${index}`}>
                         <Input
@@ -467,14 +478,6 @@ export function RecurringMealSuggestions({
                           <option value="serving">порция</option>
                         </Select>
                       </Field>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        aria-label={`Удалить ${row.name}`}
-                        onClick={() => setRows(rows.filter((_, i) => i !== index))}
-                      >
-                        Удалить
-                      </Button>
                     </div>
                     {!row.unit && <p>Укажите единицу порции: её не удалось определить по файлу.</p>}
                     {row.sourceIndex !== null && (
@@ -488,7 +491,10 @@ export function RecurringMealSuggestions({
                             (item) =>
                               [
                                 item.source.quantity,
-                                item.source.source_unit || item.source.amount_unit,
+                                item.source.source_unit ||
+                                  (item.source.amount_unit
+                                    ? sourceUnits[item.source.amount_unit]
+                                    : ''),
                               ]
                                 .filter(Boolean)
                                 .join(' ') || 'не указано',

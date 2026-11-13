@@ -204,6 +204,12 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByText('3 из 8 дней')).toBeVisible();
     await capture('suggestions');
     await page.getByRole('button', { name: 'Проверить состав' }).click();
+    await page.getByRole('radio', { name: '2 ноября' }).focus();
+    await page.keyboard.press('Space');
+    await expect(page.getByRole('radio', { name: '2 ноября' })).toBeChecked();
+    await page.getByRole('radio', { name: '1 ноября' }).focus();
+    await page.keyboard.press('Space');
+    await expect(page.getByRole('radio', { name: '1 ноября' })).toBeChecked();
     await capture('portions');
     await page.getByLabel('Единица').first().selectOption('');
     await capture('unit-missing');

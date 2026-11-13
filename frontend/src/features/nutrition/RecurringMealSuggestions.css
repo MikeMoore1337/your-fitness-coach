@@ -46,6 +46,7 @@
 }
 
 .recurring-meals__days label {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--v2-space-2);
@@ -54,6 +55,19 @@
   border: 1px solid var(--v2-border);
   border-radius: 999px;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.recurring-meals__days input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.recurring-meals__days label:has(input:focus-visible) {
+  outline: 2px solid var(--v2-selected-outline);
+  outline-offset: 2px;
 }
 
 .recurring-meals__days label:has(input:checked) {
@@ -66,6 +80,20 @@
   gap: var(--v2-space-2);
   padding-block: var(--v2-space-3);
   border-bottom: 1px solid var(--v2-border);
+}
+
+.recurring-meals__row-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+}
+
+.recurring-meals__main .recurring-meals__row-heading .ui-button {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
 }
 
 .recurring-meals__portion {
