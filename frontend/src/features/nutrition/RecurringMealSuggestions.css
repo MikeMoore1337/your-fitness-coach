@@ -134,3 +134,14 @@
   height: 20px;
   margin: 1px 0 0;
 }
+
+@media (max-width: 600px) {
+  .recurring-meals__main .ui-button {
+    width: 100%;
+  }
+
+  .recurring-meals__portion .ui-button,
+  .recurring-meals__search .ui-button {
+    width: auto;
+  }
+}

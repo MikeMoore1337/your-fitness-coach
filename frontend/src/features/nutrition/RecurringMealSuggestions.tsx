@@ -576,7 +576,7 @@ export function RecurringMealSuggestions({
                 <Surface>Повторяющихся сочетаний не найдено.</Surface>
               )}
               {suggestions.data?.items.map((item) => (
-                <Surface className="stack" key={item.meal_type}>
+                <Surface className="stack" key={`${item.meal_type}-${item.occurrences[0]?.date}`}>
                   <h2>{meals[item.meal_type]}</h2>
                   <p>
                     {item.repeat_days} из {suggestions.data.observed_days} дней

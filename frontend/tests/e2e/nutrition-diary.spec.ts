@@ -83,6 +83,8 @@ for (const theme of ['light', 'dark'] as const) {
     };
     let confirms = 0;
     let suggestionsEmpty = false;
+    let suggestionsExpired = false;
+    let reviewFail = true;
     const submitted: unknown[] = [];
     await page.route('**/api/v1/nutrition/templates?**', (route) =>
       route.fulfill({ json: { items: [template], total: 1, limit: 50, offset: 0 } }),
@@ -100,6 +102,10 @@ for (const theme of ['light', 'dark'] as const) {
         });
       }
       if (path.endsWith('/recurring-meals/review')) {
+        if (reviewFail) {
+          reviewFail = false;
+          return route.fulfill({ status: 503, json: { detail: 'unavailable' } });
+        }
         const body = route.request().postDataJSON();
         return route.fulfill({
           json: {
@@ -124,23 +130,25 @@ for (const theme of ['light', 'dark'] as const) {
         });
       }
       if (path.endsWith('/recurring-meals'))
-        return route.fulfill({
-          json: {
-            observed_days: 8,
-            items: suggestionsEmpty
-              ? []
-              : [
-                  {
-                    meal_type: 'breakfast',
-                    repeat_days: 3,
-                    occurrences: [
-                      { date: '2026-11-01', items },
-                      { date: '2026-11-02', items },
+        return suggestionsExpired
+          ? route.fulfill({ status: 410, json: { detail: 'draft_unavailable' } })
+          : route.fulfill({
+              json: {
+                observed_days: 8,
+                items: suggestionsEmpty
+                  ? []
+                  : [
+                      {
+                        meal_type: 'breakfast',
+                        repeat_days: 3,
+                        occurrences: [
+                          { date: '2026-11-01', items },
+                          { date: '2026-11-02', items },
+                        ],
+                      },
                     ],
-                  },
-                ],
-          },
-        });
+              },
+            });
       if (path.endsWith('/catalog/confirm'))
         return route.fulfill({
           json: {
@@ -197,6 +205,19 @@ for (const theme of ['light', 'dark'] as const) {
     await capture('suggestions');
     await page.getByRole('button', { name: 'Проверить состав' }).click();
     await capture('portions');
+    await page.getByLabel('Единица').first().selectOption('');
+    await capture('unit-missing');
+    await page.getByLabel('Единица').first().selectOption('g');
+    await page.getByLabel('Добавить продукт из каталога').fill('рис');
+    await page.getByRole('button', { name: 'Найти' }).click();
+    await page.getByRole('button', { name: 'Добавить: Рис домашний' }).click();
+    await page.getByLabel('Количество').last().fill('100');
+    await page.getByLabel('Единица').last().selectOption('g');
+    await capture('added-product');
+    await page.getByRole('button', { name: 'Удалить Рис домашний' }).click();
+    await page.getByRole('button', { name: 'Сравнить КБЖУ' }).click();
+    await expect(page.getByRole('alert')).toContainText('Не удалось проверить состав');
+    await capture('review-error');
     await page.getByRole('button', { name: 'Сравнить КБЖУ' }).click();
     await expect(
       page.locator('.recurring-meals__item-heading').getByText('Расходится'),
@@ -207,6 +228,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('button', { name: 'Сохранить шаблон' })).toBeDisabled();
     await capture('comparison');
     await page.getByRole('checkbox', { name: /Я проверил данные/ }).check();
+    await capture('consent');
     await page.getByRole('button', { name: 'Сохранить шаблон' }).click();
     await expect(page.getByRole('alert')).toContainText('Ответ не получен');
     await capture('uncertain');
@@ -237,6 +259,13 @@ for (const theme of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Посмотреть предложения' }).click();
     await expect(page.getByText('Повторяющихся сочетаний не найдено.')).toBeVisible();
     await capture('empty');
+    await page.getByRole('button', { name: 'Импорт питания', exact: true }).click();
+    suggestionsExpired = true;
+    await page.getByRole('button', { name: 'Посмотреть предложения' }).click();
+    await expect(page.getByRole('alert')).toContainText('Срок хранения импорта мог истечь', {
+      timeout: 15000,
+    });
+    await capture('expired');
   });
 }
 

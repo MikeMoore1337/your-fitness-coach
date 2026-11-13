@@ -121,6 +121,26 @@ describe('recurring meal review', () => {
     );
   });
 
+  it('keeps different recurring combinations for the same meal selectable', async () => {
+    const second = {
+      ...proposal.items[0],
+      occurrences: [
+        {
+          date: '2026-11-03',
+          items: [
+            { ...source, source: { ...source.source, food: { name: 'Каша' }, amount_unit: 'g' } },
+          ],
+        },
+      ],
+    };
+    apiMock.mockResolvedValue({ ...proposal, items: [...proposal.items, second] });
+    mount();
+    const buttons = await screen.findAllByRole('button', { name: 'Проверить состав' });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[1]!);
+    expect(screen.getByText('Каша')).toBeVisible();
+  });
+
   it('retries an uncertain confirmation with exactly the same reviewed payload and opens an existing template', async () => {
     let attempts = 0;
     apiMock.mockImplementation(async (path: string) => {
