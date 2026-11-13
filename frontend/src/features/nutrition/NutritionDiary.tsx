@@ -729,6 +729,9 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
       data-motion-revision={motion.motionRevision}
       onAnimationEnd={motion.onMotionAnimationEnd}
     >
+      <h2 id="nutrition-completeness-title" className="eyebrow">
+        Проверка дневника
+      </h2>
       <button
         type="button"
         className="nutrition-completeness__toggle"
@@ -737,9 +740,6 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
         onClick={() => setExpanded((value) => !value)}
       >
         <span className="nutrition-completeness__summary">
-          <span id="nutrition-completeness-title" className="eyebrow" role="heading" aria-level={2}>
-            Проверка дневника
-          </span>
           <strong className="nutrition-completeness__status">
             {day.status_is_explicit || day.status !== 'unlogged' ? copy.label : 'Не подтверждено'}
           </strong>
@@ -801,6 +801,7 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
             )}
           </div>
         </fieldset>
+        {update.isPending && <p role="status">Сохраняем статус…</p>}
         {update.error && (
           <div className="nutrition-inline-error" role="alert">
             <span>{(update.error as Error).message}</span>
@@ -1325,7 +1326,7 @@ export function NutritionDiary({
           <DayCompleteness
             key={diary.data.diary_date}
             day={diary.data}
-            readOnly={readOnlyEntries}
+            readOnly={readOnlyEntries || demoSafeMode}
           />
           <NutritionSuggestions
             diaryDate={selectedDate}

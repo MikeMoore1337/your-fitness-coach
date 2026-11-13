@@ -1133,6 +1133,29 @@ async function installDemoTransport(page: Page) {
   });
 }
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1436 demo status is read-only in ${theme}`, async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await installDemoTransport(page);
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const card = page.locator('.nutrition-completeness');
+    const toggle = card.getByRole('button', { name: /Изменить статус/ });
+    await toggle.click();
+    await expect(
+      card.getByRole('button', { name: 'Заполнен частично', exact: true }),
+    ).toBeDisabled();
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.scrollIntoViewIfNeeded();
+      await card.screenshot({ path: testInfo.outputPath(`${width}-readonly.png`) });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+    }
+  });
+}
+
 test('demo uses production today composition and persists one workout set through demo transport', async ({
   page,
 }) => {

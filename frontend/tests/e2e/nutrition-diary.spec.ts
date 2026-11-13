@@ -34,21 +34,94 @@ for (const theme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
       await expect(toggle).toHaveAttribute('aria-expanded', 'false');
       await toggle.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath(`${width}-page.png`), fullPage: true });
       await card.screenshot({ path: testInfo.outputPath(`${width}-closed.png`) });
       await toggle.focus();
       await page.keyboard.press('Enter');
       await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-      await expect(card.getByRole('button', { name: 'День заполнен' })).toBeVisible();
+      const action = card.getByRole('button', { name: 'День заполнен' });
+      await expect(action).toBeVisible();
       await card.screenshot({ path: testInfo.outputPath(`${width}-open.png`) });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );
+      await action.scrollIntoViewIfNeeded();
+      const dock = page.locator('#appBottomNav');
+      if (await dock.isVisible()) {
+        const [actionBox, dockBox] = await Promise.all([action.boundingBox(), dock.boundingBox()]);
+        const overlaps =
+          actionBox!.x < dockBox!.x + dockBox!.width &&
+          actionBox!.x + actionBox!.width > dockBox!.x &&
+          actionBox!.y < dockBox!.y + dockBox!.height &&
+          actionBox!.y + actionBox!.height > dockBox!.y;
+        expect(overlaps).toBe(false);
+      }
       await toggle.focus();
       await page.keyboard.press('Space');
       await expect(toggle).toHaveAttribute('aria-expanded', 'false');
       await expect(toggle).toBeFocused();
     }
     expect(writes).toBe(0);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1436 empty, loading and error states in ${theme}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockNutritionApi(page);
+    await page.route('**/api/v1/nutrition/diary?*', (route) =>
+      route.fulfill({
+        json: {
+          diary_date: '2026-08-19',
+          timezone: 'Europe/Moscow',
+          meals: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type) => ({
+            meal_type,
+            entries: [],
+            totals: zeroNutrition,
+          })),
+          totals: zeroNutrition,
+          targets: null,
+          remaining: null,
+          status: 'unlogged',
+          status_is_explicit: false,
+          repeat_candidate: null,
+        },
+      }),
+    );
+    let release = () => {};
+    const response = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/api/v1/nutrition/diary/status', async (route) => {
+      await response;
+      await route.fulfill({ status: 503, json: { detail: 'Нет соединения' } });
+    });
+    await page.goto('/app?section=nutrition');
+    const card = page.locator('.nutrition-completeness');
+    await card.getByRole('button', { name: /Изменить статус/ }).click();
+    await expect(card.getByRole('button', { name: 'День заполнен' })).toBeDisabled();
+    await expect(
+      card.getByRole('button', { name: 'Отметить день без приёмов пищи' }),
+    ).toBeEnabled();
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.screenshot({ path: testInfo.outputPath(`${width}-empty.png`) });
+    }
+    await card.getByRole('button', { name: 'Заполнен частично' }).click();
+    await expect(card.getByRole('button', { name: 'Заполнен частично' })).toBeDisabled();
+    await expect(card.getByRole('status')).toHaveText('Сохраняем статус…');
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.screenshot({ path: testInfo.outputPath(`${width}-loading.png`) });
+    }
+    release();
+    await expect(card.getByRole('alert')).toBeVisible();
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.screenshot({ path: testInfo.outputPath(`${width}-error.png`) });
+    }
   });
 }
 

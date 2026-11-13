@@ -119,7 +119,8 @@ const zeroNutrition = {
 function renderDiary({
   initialFoodQuickAdd = false,
   readOnlyEntries = false,
-}: { initialFoodQuickAdd?: boolean; readOnlyEntries?: boolean } = {}) {
+  demoSafeMode = false,
+}: { initialFoodQuickAdd?: boolean; readOnlyEntries?: boolean; demoSafeMode?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -130,6 +131,7 @@ function renderDiary({
           initialDate="2026-08-19"
           initialFoodQuickAdd={initialFoodQuickAdd}
           readOnlyEntries={readOnlyEntries}
+          demoSafeMode={demoSafeMode}
           timeZone="Europe/Moscow"
         />
       </FeedbackProvider>
@@ -945,6 +947,14 @@ describe('NutritionDiary', () => {
     expect(apiMock.mock.calls.some(([path]) => path === '/api/v1/nutrition/diary/status')).toBe(
       false,
     );
+  });
+
+  it('does not permit status changes in demo mode even when entries are editable', async () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary({ demoSafeMode: true });
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByRole('button', { name: 'День заполнен' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Заполнен частично' })).toBeDisabled();
   });
 
   it('tracks an explicit incomplete-day confirmation without diary details', async () => {
