@@ -623,7 +623,6 @@ for (let repetition = 1; repetition <= 3; repetition += 1) {
     await expect(add).toBeVisible();
     const start = performance.now();
     await add.click();
-    await page.getByText('Другие способы добавления', { exact: true }).click();
     await page.getByRole('button', { name: 'Шаблоны приёмов', exact: true }).click();
     await page.getByRole('button', { name: 'Быстро добавить в Завтрак', exact: true }).click();
     await expect(page.getByRole('dialog')).not.toBeAttached();
@@ -645,10 +644,13 @@ for (let repetition = 1; repetition <= 3; repetition += 1) {
     await page.clock.setFixedTime(new Date(`${date}T09:00:00+03:00`));
     await installPlatformApi(page, { browserSession: true, fixedDate: date });
     await page.goto('/app?section=nutrition');
-    const quick = page.getByRole('button', { name: 'Быстрый ввод', exact: true });
-    await expect(quick).toBeVisible();
     const start = performance.now();
-    await quick.click();
+    await page.getByTestId('nutrition-add-product').click();
+    await page.getByText('Другие способы добавления', { exact: true }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Быстрый ввод', exact: true })
+      .click();
     await page
       .getByRole('textbox', { name: 'Название или контекст (необязательно)' })
       .fill('Тестовый приём');
@@ -660,7 +662,7 @@ for (let repetition = 1; repetition <= 3; repetition += 1) {
     await page.reload();
     await expect(page.getByText('Тестовый приём', { exact: true })).toBeVisible();
     console.log(
-      `V13_EXTRA ${JSON.stringify({ scenario: 'manual-quick-add', engine: info.project.name, repetition, actions: 4, elapsedMs })}`,
+      `V13_EXTRA ${JSON.stringify({ scenario: 'manual-quick-add', engine: info.project.name, repetition, actions: 5, elapsedMs })}`,
     );
   });
 }

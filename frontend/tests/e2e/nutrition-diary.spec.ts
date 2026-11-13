@@ -13,6 +13,11 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
+async function openQuickAdd(page: Page) {
+  await page.getByTestId('nutrition-add-product').click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод', exact: true }).click();
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`#1436 status disclosure remains usable in ${theme}`, async ({ page }, testInfo) => {
     await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
@@ -269,14 +274,13 @@ test('macro summary remains readable across viewport sizes', async ({ page }, te
     );
     expect(
       await targets
-        .locator('.data-viz-progress__label, small')
+        .locator('.nutrition-target__summary > *, .nutrition-target > small')
         .evaluateAll((elements) =>
           elements.every((element) => element.scrollWidth <= element.clientWidth + 1),
         ),
     ).toBe(true);
     if (process.env.MACRO_BEFORE !== '1') {
-      if (width === 320) expect(boxes[1]!.y).toBeGreaterThan(boxes[0]!.y);
-      else expect(boxes[1]!.y).toBeCloseTo(boxes[0]!.y, 0);
+      expect(boxes[1]!.y).toBeCloseTo(boxes[0]!.y, 0);
     }
     await expect(
       summary.getByRole('progressbar', { name: /Калории: 2\s020 из 2\s000 ккал/ }),
@@ -288,7 +292,7 @@ test('macro summary remains readable across viewport sizes', async ({ page }, te
         const box = control.getBoundingClientRect();
         const style = getComputedStyle(control);
         return (
-          /^(Добавить продукт|Быстрый ввод|Добавить воду|Настройки КБЖУ|Изменить на эту дату)$/.test(
+          /^(Добавить еду|Добавить воду|Настройки КБЖУ|Изменить на эту дату)$/.test(
             control.textContent?.trim() ?? '',
           ) &&
           box.width > 0 &&
@@ -1595,6 +1599,8 @@ test('Task 746 meal planner stays separate from diary on mobile day and week vie
   await mockNutritionApi(page);
   await page.goto('/app?section=nutrition&date=2026-08-19');
 
+  const extras = page.getByTestId('nutrition-extras');
+  await expect(extras).toBeVisible();
   const planner = page.getByTestId('meal-planner');
   await expect(planner).toBeVisible();
   await planner.locator('summary').click();
@@ -1770,6 +1776,24 @@ test('Task 748 grocery list keeps its primary action clear in mocked TMA dark mo
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
+test('diary suggestions collapse and reopen with the keyboard', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+  const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+  const toggle = suggestions.getByRole('button', { name: 'Варианты из вашей еды' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(suggestions.getByRole('button', { name: 'Проверить вариант' })).toBeHidden();
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(suggestions.getByRole('button', { name: 'Проверить вариант' })).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(suggestions.getByRole('button', { name: 'Проверить вариант' })).toBeHidden();
+  await expect(toggle).toBeFocused();
+});
+
 test('macro-aware suggestions show partial evidence and require an editable confirmation', async ({
   page,
 }) => {
@@ -1778,6 +1802,7 @@ test('macro-aware suggestions show partial evidence and require an editable conf
   await page.goto('/app?section=nutrition&date=2026-08-19');
 
   const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+  await suggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
   await expect(suggestions).toBeVisible();
   await expect(suggestions.getByText('Частичные БЖУ', { exact: true })).toBeVisible();
   await expect(
@@ -1808,10 +1833,13 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   await mockNutritionApi(page, 'data', null);
   await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
 
+  const presetTitle = page
+    .getByRole('region', { name: 'Гидратация' })
+    .getByText('Мои кружки и бутылки', { exact: true });
   const cardTitles = [
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
     page.locator('.nutrition-food-card__header h2'),
-    page.getByText('Мои кружки и бутылки', { exact: true }),
+    presetTitle,
     page.getByRole('heading', { name: 'Проверка дневника' }),
   ];
   const titlePositions: number[] = [];
@@ -1831,7 +1859,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   expect(
     foodCardBox!.x + foodCardBox!.width - firstMealBox!.x - firstMealBox!.width,
   ).toBeGreaterThanOrEqual(14);
-  await expect(page.getByText('Мои кружки и бутылки', { exact: true })).toBeVisible();
+  await expect(presetTitle).toBeVisible();
   await page.screenshot({
     fullPage: true,
     path: '../.artifacts/runtime/tests/screenshots/task-81A/desktop-light-five-cards.png',
@@ -2081,7 +2109,7 @@ test.describe('#1441 hydration progress', () => {
 
   for (const theme of ['dark', 'light'] as const) {
     for (const percent of [0, 25, 50, 75, 100, 103]) {
-      test(`${theme} ${percent}% preserves the actual amount and caps the fill`, async ({
+      test(`${theme} ${percent}% preserves the actual amount and caps the circular fill`, async ({
         page,
       }, info) => {
         await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
@@ -2092,23 +2120,23 @@ test.describe('#1441 hydration progress', () => {
         await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
 
         const hydration = page.getByRole('region', { name: 'Гидратация' });
-        const orb = hydration.getByRole('progressbar', { name: 'Прогресс гидратации' });
-        await expect(orb).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-        await expect(orb).toHaveAttribute(
+        const bar = hydration.getByRole('progressbar', { name: 'Прогресс гидратации' });
+        await expect(bar).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(bar).toHaveAttribute(
           'aria-valuetext',
           `${percent * 10} из 1000 миллилитров, ${percent}%`,
         );
-        await expect(orb).toHaveAttribute('aria-valuenow', String(Math.min(percent * 10, 1000)));
-        await expect(orb).toContainText(`${percent}%`);
+        await expect(bar).toHaveAttribute('aria-valuenow', String(Math.min(percent * 10, 1000)));
+        await expect(bar.locator('strong')).toHaveText(`${percent}%`);
         expect(
-          await orb.locator('span').evaluate((element) => (element as HTMLElement).style.height),
+          await bar.locator('span').evaluate((element) => (element as HTMLElement).style.height),
         ).toBe(`${Math.min(percent, 100)}%`);
-        const bounds = await orb.boundingBox();
-        expect(bounds!.width).toBe(bounds!.height);
+        const bounds = await bar.boundingBox();
+        expect(bounds!.width).toBeCloseTo(bounds!.height, 0);
         if (percent <= 25 || percent >= 75) {
-          const contrast = await orb.evaluate((element, filled) => {
-            const text = element.querySelector('strong')!;
-            const background = filled ? element.querySelector('span')! : element;
+          const contrast = await bar.locator('strong').evaluate((text, value) => {
+            const background =
+              value >= 75 ? text.parentElement!.querySelector('span')! : text.parentElement!;
             const luminance = (value: string) => {
               const channels = value
                 .match(/[\d.]+/g)!
@@ -2124,7 +2152,7 @@ test.describe('#1441 hydration progress', () => {
             const foreground = luminance(getComputedStyle(text).color);
             const surface = luminance(getComputedStyle(background).backgroundColor);
             return (Math.max(foreground, surface) + 0.05) / (Math.min(foreground, surface) + 0.05);
-          }, percent >= 75);
+          }, percent);
           expect(contrast).toBeGreaterThanOrEqual(4.5);
         }
         if (percent > 100)
@@ -2996,7 +3024,10 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
 
   await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
   const initiallyCollapsedBreakfast = page.getByRole('region', { name: 'Завтрак' });
-  const breakfastToggle = initiallyCollapsedBreakfast.getByRole('button', { name: 'Завтрак' });
+  const breakfastToggle = initiallyCollapsedBreakfast.getByRole('button', {
+    name: 'Завтрак',
+    exact: true,
+  });
   await expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
   await expect(initiallyCollapsedBreakfast.getByText('Греческий йогурт')).not.toBeVisible();
   await breakfastToggle.click();
@@ -3046,20 +3077,20 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   expect(headerBox).not.toBeNull();
   expect(entryBox!.height).toBeLessThanOrEqual(96);
   expect(headerBox!.height).toBeLessThanOrEqual(124);
-  await expect(compactLunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
+  await expect(compactLunch.getByRole('button', { name: 'Обед', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
   expect((await compactLunch.boundingBox())?.height).toBeLessThanOrEqual(88);
-  await compactLunch.getByRole('button', { name: 'Обед' }).click();
-  await expect(compactLunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
+  await compactLunch.getByRole('button', { name: 'Обед', exact: true }).click();
+  await expect(compactLunch.getByRole('button', { name: 'Обед', exact: true })).toHaveAttribute(
     'aria-expanded',
     'true',
   );
   await expect(
     compactLunch.getByText('Добавьте продукт — недавние будут под рукой.'),
   ).toBeVisible();
-  await compactLunch.getByRole('button', { name: 'Обед' }).click();
+  await compactLunch.getByRole('button', { name: 'Обед', exact: true }).click();
   for (const action of await entry.locator('.nutrition-entry__actions button').all()) {
     const height = (await action.boundingBox())?.height;
     expect(height).toBeDefined();
@@ -3075,7 +3106,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await page.getByRole('button', { name: 'Следующая неделя' }).click();
   await expect(page.getByRole('heading', { name: 'Эта неделя', exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+  await openQuickAdd(page);
   const calories = page.getByRole('spinbutton', { name: 'Калории' });
   await expect(calories).toHaveAttribute('inputmode', 'decimal');
   await expect(calories).toHaveAttribute('enterkeyhint', 'next');
@@ -3198,7 +3229,7 @@ for (const theme of ['light', 'dark'] as const) {
       }, theme);
       await page.setViewportSize({ width, height: 844 });
       await page.goto('/app?section=nutrition');
-      await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+      await openQuickAdd(page);
       const calories = page.getByRole('spinbutton', { name: 'Калории' });
       const time = page.getByLabel('Время (необязательно)');
       await expect(calories).toBeVisible();
@@ -3341,7 +3372,7 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   await expect(activeNutrition).toHaveAttribute('aria-current', 'page');
   await expectSelectedChoice(activeNutrition);
   const lunch = page.getByRole('region', { name: 'Обед' });
-  await expect(lunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
+  await expect(lunch.getByRole('button', { name: 'Обед', exact: true })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
@@ -3850,7 +3881,11 @@ for (const width of [320, 360, 393, 430, 1280, 1440]) {
         source_meal_type: 'lunch',
         entry_count: 1,
       });
+      await page.route('**/api/v1/coach-nutrition-proposals', (route) =>
+        route.fulfill({ json: [] }),
+      );
       await page.goto('/app?section=nutrition');
+      await expect(page.getByText('Загружаем предложения тренера…')).toHaveCount(0);
 
       const selectors = [
         '.nutrition-day-summary',
@@ -3883,18 +3918,35 @@ for (const width of [320, 360, 393, 430, 1280, 1440]) {
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         width + 1,
       );
-      const actions = page.locator('.nutrition-diary__intro-actions button');
+      const days = page.locator('.nutrition-diary .week-strip__day');
+      await expect(days).toHaveCount(7);
+      for (const day of await days.all()) {
+        const box = (await day.boundingBox())!;
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+      }
+      const actions = page.locator('.nutrition-diary__primary-actions button');
+      await expect(actions).toHaveCount(2);
+      await expect(actions.nth(0)).toHaveAccessibleName('Добавить еду в текущий приём пищи');
+      await expect(actions.nth(1)).toHaveAccessibleName('Добавить воду');
+      const actionBoxes = await Promise.all([
+        actions.nth(0).boundingBox(),
+        actions.nth(1).boundingBox(),
+      ]);
+      expect(actionBoxes[0]!.y).toBeCloseTo(actionBoxes[1]!.y, 0);
+      expect(actionBoxes[0]!.width).toBeCloseTo(actionBoxes[1]!.width, 0);
+      const backgrounds = await actions.evaluateAll((items) =>
+        items.map((item) => getComputedStyle(item).backgroundColor),
+      );
+      expect(backgrounds[0]).toEqual(backgrounds[1]);
       for (const action of await actions.all()) {
         const dimensions = await action.evaluate((button) => ({
           scroll: button.scrollWidth,
           client: button.clientWidth,
         }));
         expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
-        if (width <= 375) {
-          const button = await action.boundingBox();
-          const intro = await page.locator('.nutrition-diary__intro').boundingBox();
-          expect(Math.abs(button!.width - intro!.width)).toBeLessThanOrEqual(1);
-        }
+        expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
       if (width < 500) {
         const presets = page.locator('.hydration-presets .ui-button');
@@ -3910,6 +3962,32 @@ for (const width of [320, 360, 393, 430, 1280, 1440]) {
     });
   }
 }
+
+test('#1440 primary actions keep visible keyboard focus in order', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition');
+  const food = page.getByTestId('nutrition-add-product');
+  const water = page.getByRole('button', { name: 'Добавить воду', exact: true });
+  for (
+    let index = 0;
+    index < 80 && !(await food.evaluate((el) => el === document.activeElement));
+    index += 1
+  ) {
+    await page.keyboard.press('Tab');
+  }
+  for (const action of [food, water]) {
+    await expect(action).toBeFocused();
+    expect(await action.evaluate((el) => el.matches(':focus-visible'))).toBe(true);
+    expect(
+      await action.evaluate((el) => {
+        const css = getComputedStyle(el);
+        return css.outlineStyle !== 'none' || css.boxShadow !== 'none';
+      }),
+    ).toBe(true);
+    await page.keyboard.press('Tab');
+  }
+});
 
 for (const theme of ['light', 'dark'] as const) {
   test(`#1429 one-click repeat advances and undo preserves keyboard access ${theme}`, async ({
@@ -4080,14 +4158,16 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Enter');
     const retryUndo = page.getByRole('button', { name: 'Повторить отмену завтрака' });
     await expect(retryUndo).toBeVisible();
+    await expect(retryUndo).toBeEnabled();
     await capture1429(page, `${testInfo.project.name}-${theme}-393-undo-error.png`);
     await retryUndo.focus();
+    await expect(retryUndo).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByText('Повтор завтрака отменён')).toBeVisible();
     await expect(page.getByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
     await capture1429(page, `${testInfo.project.name}-${theme}-393-undone.png`);
     const breakfast = page.getByRole('region', { name: 'Завтрак' });
-    await breakfast.getByRole('button', { name: 'Завтрак' }).click();
+    await breakfast.getByRole('button', { name: 'Завтрак', exact: true }).click();
     await breakfast.getByRole('button', { name: 'Повторить вчера' }).click();
     await expect(page.getByRole('dialog', { name: 'Повторить приём пищи' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Подтвердить' })).toBeEnabled();
@@ -4356,7 +4436,7 @@ test('#1429 primary actions remain reachable with 200% text scaling', async ({
     }));
     expect(size.content, (await button.textContent()) ?? '').toBeLessThanOrEqual(size.width + 1);
   }
-  await capture1429(page, `${testInfo.project.name}-light-320-text-200.png`);
+  await capture1429(page, `${testInfo.project.name}-light-320-text-200.png`, false);
 });
 
 for (const theme of ['light', 'dark'] as const) {

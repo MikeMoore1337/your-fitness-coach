@@ -213,6 +213,7 @@ for (const width of [320, 390, 1280]) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
       await page.goto(`/app?section=nutrition&date=${selected}`);
       await expect(page.getByText('По программе', { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Варианты из вашей еды' }).click();
       await expect(page.getByText('Пока нет готовых вариантов')).toBeVisible();
       await noOverflow();
       await capture('day');
@@ -282,6 +283,7 @@ for (const width of [320, 390, 1280]) {
       empty = true;
       await page.goto(`/app?section=nutrition&date=${selected}`);
       await expect(page.getByText('Без цели', { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Варианты из вашей еды' }).click();
       await expect(page.getByText('Нет цели КБЖУ на эту дату')).toBeVisible();
       await capture('empty');
       await noOverflow();

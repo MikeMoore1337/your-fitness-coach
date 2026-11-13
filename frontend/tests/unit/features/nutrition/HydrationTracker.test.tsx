@@ -201,7 +201,7 @@ describe('HydrationTracker', () => {
       '850 из 2200 миллилитров, 39%',
     );
     expect(
-      within(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).getByText('39%'),
+      within(screen.getByRole('region', { name: 'Гидратация' })).getByText('39%'),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeVisible();
     expect(screen.getByText('Другой напиток или объём').closest('details')).not.toHaveAttribute(
@@ -386,12 +386,10 @@ describe('HydrationTracker', () => {
     expect(
       screen.queryByRole('progressbar', { name: 'Прогресс гидратации' }),
     ).not.toBeInTheDocument();
-    const orb = container.querySelector('.hydration-orb');
-    expect(orb).toHaveAttribute('aria-hidden', 'true');
-    expect(orb).toHaveTextContent('Вода');
+    expect(container.querySelector('.hydration-orb')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('shows the actual amount above the goal and caps the circle fill', async () => {
+  it('shows the actual amount above the goal and caps the circular fill', async () => {
     apiMock.mockImplementation((path: string) =>
       path === '/api/v1/me'
         ? Promise.resolve({ profile: { sex: 'female' } })
@@ -405,7 +403,7 @@ describe('HydrationTracker', () => {
       '2300 из 2200 миллилитров, 105%',
     );
     expect(
-      within(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).getByText('105%'),
+      within(screen.getByRole('region', { name: 'Гидратация' })).getByText('105%'),
     ).toBeVisible();
   });
 

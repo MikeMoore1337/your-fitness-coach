@@ -3,6 +3,8 @@ import type { NutritionTarget } from '../../shared/api/types';
 import type { components } from '../../shared/api/schema';
 import { dateInputValue } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
+import { Button } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import { ClientNutritionProposals } from './CoachNutritionProposals';
 import { NutritionDiary } from './NutritionDiary';
@@ -47,6 +49,7 @@ export function NutritionPage({
   }, []);
   useTelegramOverlayBackButton(view === 'proposal', closeProposal);
   const dayView = useRef<HTMLDivElement>(null);
+  const extrasSettingsFocus = useRef(false);
   const [selectedDate, setSelectedDate] = useState(
     initialDate || dateInputValue(new Date(), timeZone || undefined),
   );
@@ -98,12 +101,48 @@ export function NutritionPage({
           }}
           timeZone={timeZone}
         />
-        {!demoSafeMode && (
-          <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
-        )}
-        {!demoSafeMode && (
-          <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
-        )}
+        <section
+          className="nutrition-extras"
+          data-testid="nutrition-extras"
+          aria-labelledby="nutrition-extras-title"
+        >
+          <header className="nutrition-extras__label">
+            <span className="eyebrow">Настройки и инструменты</span>
+            <h2 id="nutrition-extras-title">Дополнительно</h2>
+          </header>
+          <div className="nutrition-extras__body">
+            <Button
+              className="nutrition-extras__setting"
+              data-nutrition-focus="extras-settings"
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                extrasSettingsFocus.current = true;
+                setView('settings');
+              }}
+            >
+              <span>
+                <strong>Настройки КБЖУ</strong>
+                <small>Рассчитать ориентиры или указать вручную</small>
+              </span>
+              <Icon name="chevron-right" size={20} />
+            </Button>
+            {!demoSafeMode && (
+              <MealPlanner
+                initialDate={initialDate}
+                readOnly={readOnlyEntries}
+                timeZone={timeZone}
+              />
+            )}
+            {!demoSafeMode && (
+              <GroceryList
+                initialDate={initialDate}
+                readOnly={readOnlyEntries}
+                timeZone={timeZone}
+              />
+            )}
+          </div>
+        </section>
         <AiCoachContextualEntry
           context={{ surface: 'nutrition', periodDays: 7 }}
           entryPoint="nutrition"
@@ -122,11 +161,14 @@ export function NutritionPage({
             const returnTo = view;
             if (savedDate) setSelectedDate(savedDate);
             setView('day');
-            requestAnimationFrame(() =>
-              dayView.current
-                ?.querySelector<HTMLButtonElement>(`[data-nutrition-focus="${returnTo}"]`)
-                ?.focus(),
-            );
+            requestAnimationFrame(() => {
+              const focusSelector =
+                returnTo === 'settings' && extrasSettingsFocus.current
+                  ? '[data-nutrition-focus="extras-settings"]'
+                  : `[data-nutrition-focus="${returnTo}"]`;
+              dayView.current?.querySelector<HTMLButtonElement>(focusSelector)?.focus();
+              extrasSettingsFocus.current = false;
+            });
           }}
           onSaved={onSaved}
         />

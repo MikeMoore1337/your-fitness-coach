@@ -649,7 +649,8 @@ test('migrated PostgreSQL serves a real browser nutrition transaction and idempo
   await expect(page).toHaveURL(/\/app\?section=nutrition$/);
   await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+  await page.getByTestId('nutrition-add-product').click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод' }).click();
   const itemName = `Migrated PostgreSQL browser item ${Date.now()}`;
   await page.getByRole('textbox', { name: 'Название или контекст (необязательно)' }).fill(itemName);
   await page.getByRole('spinbutton', { name: 'Калории' }).fill('321');
@@ -1229,6 +1230,7 @@ testWithoutServiceWorker(
     await dayLink.click();
     await expect(page.getByRole('link', { name: 'К отчёту по питанию' })).toBeVisible();
     const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+    await suggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     await expect(
       suggestions.getByText('Тестовый продукт для проверки', { exact: true }),
     ).toBeVisible();
@@ -1480,6 +1482,7 @@ testWithoutServiceWorker(
     await expect(todayRow.getByText('300 ккал', { exact: true })).toBeVisible();
     await expect(todayRow.getByText('Клетчатка: — г')).toBeVisible();
     await report.locator(`a[href*="date=${today}"]`).first().click();
+    await suggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     await targetCard.getByRole('button', { name: 'Проверить вариант' }).click();
     await expect(review.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled();
     const changedTarget = await page.request.post('/api/v1/nutrition/targets/manual', {
@@ -1507,6 +1510,7 @@ testWithoutServiceWorker(
     );
     await emptyPage.goto(`/app?section=nutrition&date=${today}`);
     const emptySuggestions = emptyPage.getByRole('region', { name: 'Варианты из вашей еды' });
+    await emptySuggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     await expect(emptySuggestions.getByText('Нет цели КБЖУ на эту дату')).toBeVisible();
     const emptyTarget = await emptyPage.request.post('/api/v1/nutrition/targets/manual', {
       headers: { Authorization: `Bearer ${emptyToken}` },
@@ -1514,6 +1518,7 @@ testWithoutServiceWorker(
     });
     expect(emptyTarget.status()).toBe(200);
     await emptyPage.reload();
+    await emptySuggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
     await expect(emptySuggestions.getByText('Пока нет готовых вариантов')).toBeVisible();
     await emptyPage.close();
   },

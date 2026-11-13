@@ -174,15 +174,17 @@ function renderSuggestions() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <FeedbackProvider>
+        <NutritionSuggestions diaryDate="2026-08-19" initialMealType="lunch" />
+      </FeedbackProvider>
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Варианты из вашей еды' }));
   return {
     queryClient,
-    ...render(
-      <QueryClientProvider client={queryClient}>
-        <FeedbackProvider>
-          <NutritionSuggestions diaryDate="2026-08-19" initialMealType="lunch" />
-        </FeedbackProvider>
-      </QueryClientProvider>,
-    ),
+    ...view,
   };
 }
 

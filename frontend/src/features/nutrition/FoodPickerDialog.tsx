@@ -1893,6 +1893,26 @@ export function FoodPickerDialog({
                   ручное сохранение и внешние каталоги доступны после входа.
                 </p>
               )}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  trackProductEvent({
+                    name: 'nutrition_food_add_path_selected',
+                    surface: productEventSurface(),
+                    path: 'quick_add',
+                  });
+                  setEntryMethod('quick_add');
+                  trackProductEvent({
+                    name: 'food_log_started',
+                    surface: productEventSurface(),
+                    entry_method: 'quick_add',
+                  });
+                  setView('quick-add');
+                }}
+              >
+                <Icon name="plus" size={16} /> Быстрый ввод
+              </Button>
               <details className="nutrition-picker__secondary-tools">
                 <summary className="yfc-disclosure-summary">
                   Другие способы добавления
@@ -1916,26 +1936,6 @@ export function FoodPickerDialog({
                     onClick={() => setView('templates')}
                   >
                     Шаблоны приёмов
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      trackProductEvent({
-                        name: 'nutrition_food_add_path_selected',
-                        surface: productEventSurface(),
-                        path: 'quick_add',
-                      });
-                      setEntryMethod('quick_add');
-                      trackProductEvent({
-                        name: 'food_log_started',
-                        surface: productEventSurface(),
-                        entry_method: 'quick_add',
-                      });
-                      setView('quick-add');
-                    }}
-                  >
-                    <Icon name="plus" size={16} /> Быстрый ввод
                   </Button>
                   {!demoSafeMode && (
                     <Button

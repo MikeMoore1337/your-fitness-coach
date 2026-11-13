@@ -176,6 +176,13 @@ function MacroProgress({
   const meaningfullyOver = ratio > 1.1;
   return (
     <div className={`nutrition-target${meaningfullyOver ? ' is-over' : ''}`}>
+      <div className="nutrition-target__summary" aria-hidden="true">
+        <span>{label}</span>
+        <strong>{formatNumber(totalNumber, unit === 'г' ? 1 : 0)}</strong>
+        <small>
+          / {formatNumber(targetNumber, unit === 'г' ? 1 : 0)} {unit}
+        </small>
+      </div>
       <QuantitativeProgress label={label} maximum={targetNumber} unit={unit} value={totalNumber} />
       <small>{targetStatus(remainingNumber, targetNumber, unit)}</small>
     </div>
@@ -305,7 +312,12 @@ function DaySummary({
           <strong>{formatNumber(totals.energy_kcal)} ккал записано</strong>
           <p>Настройте ориентиры КБЖУ, чтобы видеть остаток на день.</p>
           {onOpenSettings ? (
-            <Button type="button" variant="secondary" onClick={onOpenSettings}>
+            <Button
+              type="button"
+              variant="secondary"
+              data-nutrition-focus="settings"
+              onClick={onOpenSettings}
+            >
               Настроить цель
             </Button>
           ) : (
@@ -327,40 +339,31 @@ function DaySummary({
           <dd>{formatNumber(totals.carbs_g, 1)} г</dd>
         </div>
       </dl>
-      {onOpenSettings && (
-        <div className="nutrition-goal-actions">
-          <Button
-            type="button"
-            variant="secondary"
-            data-nutrition-focus="settings"
-            onClick={onOpenSettings}
-          >
-            Настройки КБЖУ
-          </Button>
-          {onOverride &&
-            !readOnlyTargets &&
-            selectedDate >= today &&
-            !resolved.data?.frozen &&
-            day.status !== 'complete' &&
-            day.status !== 'fasted' && (
-              <Button
-                type="button"
-                variant="ghost"
-                data-nutrition-focus="override"
-                disabled={!resolved.isSuccess}
-                onClick={() =>
-                  onOverride(
-                    selectedDate,
-                    resolved.data?.target ?? null,
-                    resolved.data?.day_type ?? null,
-                  )
-                }
-              >
-                Изменить на эту дату
-              </Button>
-            )}
-        </div>
-      )}
+      {onOpenSettings &&
+        onOverride &&
+        !readOnlyTargets &&
+        selectedDate >= today &&
+        !resolved.data?.frozen &&
+        day.status !== 'complete' &&
+        day.status !== 'fasted' && (
+          <div className="nutrition-goal-actions">
+            <Button
+              type="button"
+              variant="ghost"
+              data-nutrition-focus="override"
+              disabled={!resolved.isSuccess}
+              onClick={() =>
+                onOverride(
+                  selectedDate,
+                  resolved.data?.target ?? null,
+                  resolved.data?.day_type ?? null,
+                )
+              }
+            >
+              Изменить на эту дату
+            </Button>
+          </div>
+        )}
     </aside>
   );
 }
@@ -614,8 +617,13 @@ function MealSection({
           </span>
         </div>
         <div className="nutrition-meal__actions">
-          <Button variant="secondary" type="button" onClick={onAdd}>
-            <Icon name="plus" size={16} /> Добавить
+          <Button
+            variant="secondary"
+            type="button"
+            aria-label={`Добавить еду: ${mealLabels[meal.meal_type as MealType]}`}
+            onClick={onAdd}
+          >
+            <Icon name="plus" size={20} />
           </Button>
         </div>
       </header>
@@ -1085,27 +1093,6 @@ export function NutritionDiary({
           <h1>Питание</h1>
           <p>{dateLabel.subtitle}</p>
         </div>
-        <div className="nutrition-diary__intro-actions">
-          <Button
-            className="nutrition-diary__primary-action"
-            variant="primary"
-            type="button"
-            aria-label="Добавить продукт в текущий приём пищи"
-            data-testid="nutrition-add-product"
-            onClick={() => setAddingTo({ mealType: defaultMealType(timeZone) })}
-          >
-            <Icon name="plus" size={16} /> <span>Добавить продукт</span>
-          </Button>
-          <Button
-            variant="secondary"
-            type="button"
-            onClick={() =>
-              setAddingTo({ mealType: defaultMealType(timeZone), initialView: 'quick-add' })
-            }
-          >
-            Быстрый ввод
-          </Button>
-        </div>
       </header>
 
       <NutritionWeekSelector
@@ -1119,14 +1106,19 @@ export function NutritionDiary({
         }}
       />
 
-      <Button
-        className="nutrition-diary__water-action"
-        variant="primary"
-        type="button"
-        onClick={() => setHydrationQuickAddRequest((value) => value + 1)}
-      >
-        <Icon name="plus" size={16} /> Добавить воду
-      </Button>
+      <div className="nutrition-diary__primary-actions">
+        <Button
+          type="button"
+          aria-label="Добавить еду в текущий приём пищи"
+          data-testid="nutrition-add-product"
+          onClick={() => setAddingTo({ mealType: defaultMealType(timeZone) })}
+        >
+          <Icon name="plus" size={16} /> <span>Добавить еду</span>
+        </Button>
+        <Button type="button" onClick={() => setHydrationQuickAddRequest((value) => value + 1)}>
+          <Icon name="plus" size={16} /> <span>Добавить воду</span>
+        </Button>
+      </div>
 
       {diary.isLoading && <LoadingState label="Загружаем дневник…" />}
       {diary.error && (
@@ -1217,7 +1209,7 @@ export function NutritionDiary({
                         >
                           {repeat.isPending && repeat.variables?.date === selectedDate
                             ? 'Добавляем…'
-                            : 'Повторить'}
+                            : `Повторить ${mealLabels[candidate.source_meal_type].toLocaleLowerCase('ru-RU')}`}
                         </Button>
                       </div>
                     ) : null
