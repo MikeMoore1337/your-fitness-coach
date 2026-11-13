@@ -38,6 +38,13 @@ const nutrients = [
 const statuses = { equal: 'Совпадает', different: 'Расходится', unknown: 'Нельзя сопоставить' };
 const sourceUnits: Record<string, string> = { g: 'г', ml: 'мл', serving: 'порц.', piece: 'шт.' };
 
+function comparisonLabel(item: Schemas['RecurringMealComparison']) {
+  const values = Object.values(item.comparison);
+  if (values.includes('different')) return statuses.different;
+  if (values.includes('unknown')) return statuses.unknown;
+  return statuses.equal;
+}
+
 function rowsFor(occurrence: Proposal['occurrences'][number]): Row[] {
   return occurrence.items.map(({ source, source_index, food_id }) => ({
     sourceIndex: source_index,
@@ -304,17 +311,7 @@ export function RecurringMealSuggestions({
                           ? 'мл'
                           : 'порц.'}
                     </h3>
-                    <span>
-                      {
-                        statuses[
-                          Object.values(item.comparison).includes('different')
-                            ? 'different'
-                            : Object.values(item.comparison).includes('unknown')
-                              ? 'unknown'
-                              : 'equal'
-                        ]
-                      }
-                    </span>
+                    <span>{comparisonLabel(item)}</span>
                   </div>
                   <div className="recurring-meals__table-wrap">
                     <table>
