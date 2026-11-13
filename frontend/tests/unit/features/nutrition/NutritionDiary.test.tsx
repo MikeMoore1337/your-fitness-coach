@@ -240,7 +240,7 @@ describe('NutritionDiary', () => {
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(
       expect.arrayContaining([
-        'Это всё за сегодня?',
+        'Проверка дневника',
         'Еда',
         'Завтрак',
         'Обед',
@@ -253,10 +253,8 @@ describe('NutritionDiary', () => {
     const sectionOrder = screen
       .getAllByRole('heading', { level: 2 })
       .map((heading) => heading.textContent)
-      .filter((heading) =>
-        ['Это всё за сегодня?', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''),
-      );
-    expect(sectionOrder).toEqual(['КБЖУ', 'Еда', 'Напитки', 'Это всё за сегодня?']);
+      .filter((heading) => ['Проверка дневника', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''));
+    expect(sectionOrder).toEqual(['КБЖУ', 'Еда', 'Напитки', 'Проверка дневника']);
     expect(screen.getByRole('progressbar', { name: /Калории: 420 из 2.+000 ккал/ })).toBeVisible();
     expect(screen.getByText('Б 18,5')).not.toBeVisible();
 
@@ -605,6 +603,7 @@ describe('NutritionDiary', () => {
     renderDiary();
 
     expect(await screen.findByText('День без приёмов пищи', { selector: 'strong' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Изменить статус/ }));
     expect(screen.getByText(/только если сознательно не ели весь день/i)).toBeVisible();
     expect(screen.queryByText(/пост/i)).not.toBeInTheDocument();
   });
@@ -842,7 +841,12 @@ describe('NutritionDiary', () => {
       throw new Error(`Unexpected API call: ${path}`);
     });
     renderDiary();
-    expect(await screen.findByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
+    const toggle = await screen.findByRole('button', { name: /Изменить статус/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'День заполнен' })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'День заполнен' }));
 
@@ -853,6 +857,94 @@ describe('NutritionDiary', () => {
       }),
     );
     expect(await screen.findByText('Подтверждено')).toBeVisible();
+  });
+
+  it('keeps a failed status action available for retry without claiming success', async () => {
+    let attempts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) {
+        return Promise.resolve(
+          attempts > 1 ? { ...makeDay(), status: 'complete', status_is_explicit: true } : makeDay(),
+        );
+      }
+      if (path === '/api/v1/nutrition/diary/status' && options?.method === 'PUT') {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new Error('Нет соединения'))
+          : Promise.resolve({ ...makeDay(), status: 'complete', status_is_explicit: true });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    const toggle = await screen.findByRole('button', { name: /Изменить статус/ });
+    fireEvent.click(toggle);
+    expect(apiMock.mock.calls.some(([path]) => path === '/api/v1/nutrition/diary/status')).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'День заполнен' }));
+    expect(await screen.findByText('Нет соединения')).toBeVisible();
+    expect(screen.getByText('Не подтверждено')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    expect(await screen.findByText('Подтверждено')).toBeVisible();
+    const requests = apiMock.mock.calls.filter(
+      ([path]) => path === '/api/v1/nutrition/diary/status',
+    );
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.[1]?.body).toEqual({ diary_date: '2026-08-19', status: 'complete' });
+  });
+
+  it('keeps a pending result on its original date after the day changes', async () => {
+    let finish: (day: FoodDiaryDay) => void = () => {};
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) {
+        const date = new URL(path, 'http://localhost').searchParams.get('diary_date');
+        return Promise.resolve({ ...makeDay(), diary_date: date ?? '2026-08-19' });
+      }
+      if (path === '/api/v1/nutrition/diary/status' && options?.method === 'PUT') {
+        return new Promise<FoodDiaryDay>((resolve) => {
+          finish = resolve;
+        });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByRole('button', { name: 'Отметить день без приёмов пищи' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'День заполнен' }));
+    fireEvent.click(screen.getByRole('button', { name: /четверг, 20 августа/i }));
+    await waitFor(() => expect(screen.getByText('Гидратация за 2026-08-20')).toBeVisible());
+    await act(async () => finish({ ...makeDay(), status: 'complete', status_is_explicit: true }));
+    expect(screen.getByText('Не подтверждено')).toBeVisible();
+    expect(screen.queryByText('Подтверждено')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['complete', true, 'День заполнен', 'Подтверждено'],
+    ['incomplete', false, 'Заполнен частично', 'Не подтверждено'],
+    ['fasted', true, 'День без приёмов пищи', 'Подтверждено'],
+    ['unlogged', false, 'Не подтверждено', 'Не подтверждено'],
+  ] as const)(
+    'shows %s status with explicitness',
+    async (status, explicit, label, confirmation) => {
+      apiMock.mockResolvedValue({ ...makeDay(), status, status_is_explicit: explicit });
+      renderDiary();
+      const toggle = await screen.findByRole('button', { name: /Изменить статус/ });
+      expect(toggle).toHaveTextContent(label);
+      expect(toggle).toHaveTextContent(confirmation);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    },
+  );
+
+  it('keeps status actions disabled in read-only mode', async () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary({ readOnlyEntries: true });
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByRole('button', { name: 'День заполнен' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Заполнен частично' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Отметить день без приёмов пищи' })).toBeDisabled();
+    expect(apiMock.mock.calls.some(([path]) => path === '/api/v1/nutrition/diary/status')).toBe(
+      false,
+    );
   });
 
   it('tracks an explicit incomplete-day confirmation without diary details', async () => {
@@ -870,7 +962,8 @@ describe('NutritionDiary', () => {
     });
 
     renderDiary();
-    expect(await screen.findByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Заполнен частично' }));
 
     await waitFor(() =>

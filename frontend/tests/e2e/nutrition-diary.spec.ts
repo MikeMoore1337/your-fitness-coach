@@ -13,6 +13,45 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1436 status disclosure remains usable in ${theme}`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockNutritionApi(page);
+    let writes = 0;
+    page.on('request', (request) => {
+      if (
+        request.method() === 'PUT' &&
+        new URL(request.url()).pathname === '/api/v1/nutrition/diary/status'
+      )
+        writes += 1;
+    });
+    await page.goto('/app?section=nutrition');
+    const card = page.locator('.nutrition-completeness');
+    const toggle = card.getByRole('button', { name: /Изменить статус/ });
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await toggle.scrollIntoViewIfNeeded();
+      await card.screenshot({ path: testInfo.outputPath(`${width}-closed.png`) });
+      await toggle.focus();
+      await page.keyboard.press('Enter');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await expect(card.getByRole('button', { name: 'День заполнен' })).toBeVisible();
+      await card.screenshot({ path: testInfo.outputPath(`${width}-open.png`) });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(toggle).toBeFocused();
+    }
+    expect(writes).toBe(0);
+  });
+}
+
 if (process.env.MACRO_NATIVE_ZOOM === '1') {
   for (const theme of ['light', 'dark'] as const) {
     test(`native Chromium 200 percent zoom ${theme}`, async () => {
@@ -1691,7 +1730,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
     page.locator('.nutrition-food-card__header h2'),
     page.getByText('Мои кружки и бутылки', { exact: true }),
-    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
+    page.getByRole('heading', { name: 'Проверка дневника' }),
   ];
   const titlePositions: number[] = [];
   for (const heading of cardTitles) {
@@ -2970,6 +3009,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 
+  await page.getByRole('button', { name: /Изменить статус/ }).click();
   await page.getByRole('button', { name: 'День заполнен' }).click();
   await expect(page.getByText('Подтверждено')).toBeVisible();
 

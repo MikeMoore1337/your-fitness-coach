@@ -9250,6 +9250,32 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   background: var(--surface-subtle);
   box-shadow: var(--shadow-sm);
 }
+.nutrition-completeness__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.nutrition-completeness__summary {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.nutrition-completeness__summary > span:last-child,
+.nutrition-completeness > div > p {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.nutrition-completeness > div:not([hidden]) {
+  display: grid;
+  gap: 10px;
+}
 .nutrition-completeness__copy {
   display: flex;
   flex-wrap: wrap;

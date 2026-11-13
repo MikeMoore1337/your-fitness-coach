@@ -691,6 +691,7 @@ const completenessCopy: Record<FoodDiaryDay['status'], { label: string; descript
 function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
+  const [expanded, setExpanded] = useState(false);
   const update = useMutation({
     mutationFn: (status: FoodDiaryDay['status']) =>
       api<FoodDiaryDay>('/api/v1/nutrition/diary/status', {
@@ -709,7 +710,7 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
         surface: productEventSurface(),
         status,
       });
-      queryClient.setQueryData(queryKeys.nutrition.diaryDate(day.diary_date), updated);
+      queryClient.setQueryData(queryKeys.nutrition.diaryDate(updated.diary_date), updated);
       await invalidateNutritionSummaries(queryClient);
       toast('Полнота дня обновлена');
     },
@@ -728,74 +729,91 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
       data-motion-revision={motion.motionRevision}
       onAnimationEnd={motion.onMotionAnimationEnd}
     >
-      <div className="nutrition-completeness__copy">
-        <div>
-          <span className="eyebrow">Проверка дневника</span>
-          <h2 id="nutrition-completeness-title">Это всё за сегодня?</h2>
-        </div>
-        <Badge tone={day.status === 'complete' || day.status === 'fasted' ? 'success' : undefined}>
-          {day.status_is_explicit ? 'Подтверждено' : 'Не подтверждено'}
-        </Badge>
-      </div>
-      <strong className="nutrition-completeness__status">{copy.label}</strong>
-      <p>{copy.description}</p>
-      {readOnly && (
-        <p className="muted demo-capability-notice" role="status">
-          Изменение статуса дневника доступно после входа.
-        </p>
-      )}
-      <fieldset className="demo-capability-fieldset" disabled={readOnly}>
-        <div className="nutrition-completeness__actions">
-          <Button
-            type="button"
-            variant="secondary"
-            aria-pressed={day.status === 'complete'}
-            data-yfc-choice="compact"
-            disabled={!hasEntries || update.isPending}
-            onClick={() => update.mutate('complete')}
-          >
-            День заполнен
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            aria-pressed={day.status === 'incomplete'}
-            data-yfc-choice="compact"
-            disabled={update.isPending}
-            onClick={() => update.mutate('incomplete')}
-          >
-            Заполнен частично
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            aria-pressed={day.status === 'fasted'}
-            data-yfc-choice="compact"
-            disabled={hasEntries || update.isPending}
-            onClick={() => update.mutate('fasted')}
-          >
-            Отметить день без приёмов пищи
-          </Button>
-          {day.status_is_explicit && (
+      <button
+        type="button"
+        className="nutrition-completeness__toggle"
+        aria-expanded={expanded}
+        aria-controls="nutrition-completeness-actions"
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <span className="nutrition-completeness__summary">
+          <span id="nutrition-completeness-title" className="eyebrow" role="heading" aria-level={2}>
+            Проверка дневника
+          </span>
+          <strong className="nutrition-completeness__status">
+            {day.status_is_explicit || day.status !== 'unlogged' ? copy.label : 'Не подтверждено'}
+          </strong>
+          {(day.status_is_explicit || day.status !== 'unlogged') && (
+            <span>{day.status_is_explicit ? 'Подтверждено' : 'Не подтверждено'}</span>
+          )}
+          <span>Изменить статус</span>
+        </span>
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} />
+      </button>
+      <div id="nutrition-completeness-actions" hidden={!expanded}>
+        <p>{copy.description}</p>
+        {readOnly && (
+          <p className="muted demo-capability-notice" role="status">
+            Изменение статуса дневника доступно после входа.
+          </p>
+        )}
+        <fieldset className="demo-capability-fieldset" disabled={readOnly}>
+          <div className="nutrition-completeness__actions">
+            <Button
+              type="button"
+              variant="secondary"
+              aria-pressed={day.status_is_explicit && day.status === 'complete'}
+              data-yfc-choice="compact"
+              disabled={!hasEntries || update.isPending}
+              onClick={() => update.mutate('complete')}
+            >
+              День заполнен
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              aria-pressed={day.status_is_explicit && day.status === 'incomplete'}
+              data-yfc-choice="compact"
+              disabled={update.isPending}
+              onClick={() => update.mutate('incomplete')}
+            >
+              Заполнен частично
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              aria-pressed={day.status_is_explicit && day.status === 'fasted'}
+              data-yfc-choice="compact"
+              disabled={hasEntries || update.isPending}
+              onClick={() => update.mutate('fasted')}
+            >
+              Отметить день без приёмов пищи
+            </Button>
+            {day.status_is_explicit && (
+              <button
+                type="button"
+                className="nutrition-completeness__reset"
+                disabled={update.isPending}
+                onClick={() => update.mutate('unlogged')}
+              >
+                Снять отметку
+              </button>
+            )}
+          </div>
+        </fieldset>
+        {update.error && (
+          <div className="nutrition-inline-error" role="alert">
+            <span>{(update.error as Error).message}</span>
             <button
               type="button"
-              className="nutrition-completeness__reset"
-              disabled={update.isPending}
-              onClick={() => update.mutate('unlogged')}
+              disabled={readOnly || update.isPending}
+              onClick={() => update.mutate(update.variables ?? day.status)}
             >
-              Снять отметку
+              Повторить
             </button>
-          )}
-        </div>
-      </fieldset>
-      {update.error && (
-        <div className="nutrition-inline-error" role="alert">
-          <span>{(update.error as Error).message}</span>
-          <button type="button" onClick={() => update.mutate(update.variables ?? day.status)}>
-            Повторить
-          </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -1304,7 +1322,11 @@ export function NutritionDiary({
 
       {diary.data && (
         <>
-          <DayCompleteness day={diary.data} readOnly={readOnlyEntries} />
+          <DayCompleteness
+            key={diary.data.diary_date}
+            day={diary.data}
+            readOnly={readOnlyEntries}
+          />
           <NutritionSuggestions
             diaryDate={selectedDate}
             initialMealType={initialMealType ?? defaultMealType(timeZone)}
