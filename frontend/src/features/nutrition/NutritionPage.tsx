@@ -163,7 +163,9 @@ export function NutritionPage({
           entryPoint="nutrition"
         />
       </div>
-      {view === 'import' && <NutritionImport onClose={() => setView('day')} />}
+      {view === 'import' && (
+        <NutritionImport diaryDate={selectedDate} onClose={() => setView('day')} />
+      )}
       {view !== 'day' && view !== 'proposal' && view !== 'import' && (
         <NutritionTargets
           mode={view}

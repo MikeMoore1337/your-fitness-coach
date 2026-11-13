@@ -11,6 +11,7 @@ import { Button, Field, Input, Select, Surface } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import type { components } from '../../shared/api/schema';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+import { RecurringMealSuggestions } from './RecurringMealSuggestions';
 import './NutritionImport.css';
 
 type ImportPreview = components['schemas']['ImportPreview'];
@@ -170,7 +171,13 @@ function ConflictCandidate({
   );
 }
 
-export function NutritionImport({ onClose }: { onClose: () => void }) {
+export function NutritionImport({
+  onClose,
+  diaryDate,
+}: {
+  onClose: () => void;
+  diaryDate: string;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [draft, setDraft] = useState<ImportPreview | null>(null);
   const [preview, setPreview] = useState<CatalogPreview | null>(null);
@@ -181,6 +188,8 @@ export function NutritionImport({ onClose }: { onClose: () => void }) {
   const [filter, setFilter] = useState('all');
   const [confirming, setConfirming] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [receiptDraftId, setReceiptDraftId] = useState<string | null>(null);
+  const [showRecurring, setShowRecurring] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recovery, setRecovery] = useState<Recovery | null>(readRecovery);
@@ -203,6 +212,8 @@ export function NutritionImport({ onClose }: { onClose: () => void }) {
       setCorrections([]);
       setChoices([]);
       setReceipt(null);
+      setReceiptDraftId(null);
+      setShowRecurring(false);
       setFile(null);
       setEditing(null);
       setConfirming(false);
@@ -305,6 +316,7 @@ export function NutritionImport({ onClose }: { onClose: () => void }) {
           timeoutMs: 60_000,
         }),
       );
+      setReceiptDraftId(draftId);
       setPending(null);
       setRecovery(null);
       try {
@@ -409,13 +421,23 @@ export function NutritionImport({ onClose }: { onClose: () => void }) {
     onClose();
   }
 
-  useTelegramOverlayBackButton(true, () => {
+  useTelegramOverlayBackButton(!showRecurring, () => {
     void cancel();
   });
 
   const selectable =
     preview?.rows.filter((row) => row.outcome === 'publish' || row.outcome === 'reuse') ?? [];
   const rowsByIndex = new Map(preview?.rows.map((row) => [row.index, row]));
+  if (showRecurring && receiptDraftId) {
+    return (
+      <RecurringMealSuggestions
+        draftId={receiptDraftId}
+        diaryDate={diaryDate}
+        onBack={() => setShowRecurring(false)}
+        onClose={onClose}
+      />
+    );
+  }
   return (
     <div className="nutrition-import stack">
       <Button
@@ -920,6 +942,15 @@ export function NutritionImport({ onClose }: { onClose: () => void }) {
                     : ''}
                 </p>
               ))}
+              {receiptDraftId && (
+                <div className="stack">
+                  <h3>Повторяющиеся приёмы пищи</h3>
+                  <p>Проверьте привычные сочетания и сохраните подходящие как шаблоны.</p>
+                  <Button type="button" variant="secondary" onClick={() => setShowRecurring(true)}>
+                    Посмотреть предложения
+                  </Button>
+                </div>
+              )}
               <Button type="button" onClick={onClose}>
                 К питанию
               </Button>

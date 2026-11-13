@@ -1,0 +1,136 @@
+.recurring-meals {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+.recurring-meals__layout {
+  display: grid;
+  gap: var(--v2-space-4);
+  align-items: start;
+}
+
+.recurring-meals__layout > * {
+  min-width: 0;
+}
+
+@media (min-width: 960px) {
+  .recurring-meals__layout {
+    grid-template-columns: minmax(0, 1fr) 285px;
+  }
+}
+
+.recurring-meals > .ui-button {
+  justify-self: start;
+  width: auto;
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+}
+
+.recurring-meals__main .ui-button {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.recurring-meals__days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  padding: 0;
+  border: 0;
+}
+
+.recurring-meals__days legend {
+  margin-bottom: var(--v2-space-2);
+  font-weight: 600;
+}
+
+.recurring-meals__days label {
+  display: flex;
+  align-items: center;
+  gap: var(--v2-space-2);
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--v2-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.recurring-meals__days label:has(input:checked) {
+  border-color: var(--v2-selected-outline);
+  background: var(--v2-selected-surface);
+}
+
+.recurring-meals__row {
+  display: grid;
+  gap: var(--v2-space-2);
+  padding-block: var(--v2-space-3);
+  border-bottom: 1px solid var(--v2-border);
+}
+
+.recurring-meals__portion {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+}
+
+.recurring-meals__portion > * {
+  flex: 1 1 110px;
+  min-width: 0;
+}
+
+.recurring-meals__search {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+}
+
+.recurring-meals__search > :first-child {
+  flex: 1 1 180px;
+}
+
+.recurring-meals__table-wrap {
+  overflow-x: auto;
+}
+
+.recurring-meals__item-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+}
+
+.recurring-meals__comparison-status {
+  display: block;
+  color: var(--v2-text-secondary);
+  font-size: 12px;
+}
+
+.recurring-meals__comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-meals__comparison th,
+.recurring-meals__comparison td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--v2-border);
+}
+
+.recurring-meals__ack {
+  display: flex;
+  align-items: start;
+  gap: var(--v2-space-2);
+}
+
+.recurring-meals__ack input {
+  flex: 0 0 auto;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+}

@@ -18,6 +18,228 @@ async function openQuickAdd(page: Page) {
   await page.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод', exact: true }).click();
 }
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`Issue 886 reviews recurring portions before saving ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockNutritionApi(page);
+    const source = (index: number, name: string, quantity: string, unit: string) => ({
+      source_index: index,
+      food_id: index + 10,
+      source: { food: { name }, quantity, amount_unit: unit },
+      original_total: { facts: { energy_kcal: { value: '112', unit: 'kcal' } } },
+      original_detail_cells: [],
+    });
+    const items = [source(0, 'Йогурт', '150', 'g'), source(1, 'Овсяные хлопья', '50', 'g')];
+    const totals = {
+      energy_kcal: '295',
+      protein_g: '14',
+      fat_g: '6',
+      carbs_g: '40',
+      fiber_g: null,
+    };
+    const template = {
+      id: 77,
+      name: 'Мой завтрак',
+      total_weight_g: '200',
+      totals,
+      created_at: '2026-11-01T12:00:00',
+      updated_at: '2026-11-01T12:00:00',
+      items: items.map((item, index) => ({
+        id: index + 1,
+        position: index,
+        item_kind: 'food',
+        food_id: item.food_id,
+        recipe_id: null,
+        name: item.source.food.name,
+        brand: null,
+        amount: item.source.quantity,
+        amount_unit: 'g',
+        weight_g: item.source.quantity,
+        nutrition: totals,
+        available: true,
+      })),
+    };
+    const draft = '123e4567-e89b-42d3-a456-426614174000';
+    const catalog = {
+      id: draft,
+      revision: 1,
+      expires_at: '2030-01-01T00:00:00Z',
+      source: {},
+      preview_signature: 'a'.repeat(64),
+      rows: [
+        {
+          index: 0,
+          outcome: 'reuse',
+          reason: null,
+          food_id: 10,
+          suggestions: [],
+          suggestions_evaluated: false,
+        },
+      ],
+    };
+    let confirms = 0;
+    let suggestionsEmpty = false;
+    const submitted: unknown[] = [];
+    await page.route('**/api/v1/nutrition/templates?**', (route) =>
+      route.fulfill({ json: { items: [template], total: 1, limit: 50, offset: 0 } }),
+    );
+    await page.route('**/api/v1/nutrition/imports**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith('/recurring-meals/confirm')) {
+        submitted.push(route.request().postDataJSON());
+        confirms++;
+        if (confirms === 1) return route.abort('failed');
+        if (confirms === 3)
+          return route.fulfill({ status: 409, json: { detail: 'preview_changed' } });
+        return route.fulfill({
+          json: { existing: confirms === 2, template },
+        });
+      }
+      if (path.endsWith('/recurring-meals/review')) {
+        const body = route.request().postDataJSON();
+        return route.fulfill({
+          json: {
+            preview_signature: 'b'.repeat(64),
+            items: body.items.map((item: { source_index: number }, index: number) => ({
+              item: body.items[index],
+              source: items.find((entry) => entry.source_index === item.source_index) ?? null,
+              catalog_nutrition: {
+                energy_kcal: '105',
+                protein_g: '8',
+                fat_g: null,
+                carbohydrate_g: '10',
+              },
+              comparison: {
+                energy_kcal: index === 0 ? 'different' : 'unknown',
+                protein_g: 'unknown',
+                fat_g: 'unknown',
+                carbohydrate_g: 'unknown',
+              },
+            })),
+          },
+        });
+      }
+      if (path.endsWith('/recurring-meals'))
+        return route.fulfill({
+          json: {
+            observed_days: 8,
+            items: suggestionsEmpty
+              ? []
+              : [
+                  {
+                    meal_type: 'breakfast',
+                    repeat_days: 3,
+                    occurrences: [
+                      { date: '2026-11-01', items },
+                      { date: '2026-11-02', items },
+                    ],
+                  },
+                ],
+          },
+        });
+      if (path.endsWith('/catalog/confirm'))
+        return route.fulfill({
+          json: {
+            rows: [{ index: 0, outcome: 'reuse', reason: null, food_id: 10 }],
+            excluded_rows: [],
+          },
+        });
+      if (path.endsWith('/catalog')) return route.fulfill({ json: catalog });
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: draft,
+          revision: 1,
+          expires_at: '2030-01-01T00:00:00Z',
+          rows: [
+            {
+              index: 0,
+              source: {
+                food: { name: 'Йогурт' },
+                coordinates: { section: 'report_details', row: 1 },
+                diagnostics: [],
+              },
+            },
+          ],
+          original_totals: [],
+          diagnostics: [],
+        },
+      });
+    });
+    const capture = async (name: string) => {
+      for (const width of [393, 1280]) {
+        await page.setViewportSize({ width, height: width === 393 ? 844 : 800 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+        await page.screenshot({
+          path: testInfo.outputPath(`${name}-${theme}-${width}.png`),
+          fullPage: true,
+        });
+      }
+      await page.setViewportSize({ width: 393, height: 844 });
+    };
+    await page.goto('/app?section=nutrition');
+    await page.getByRole('button', { name: /Импорт питания/ }).click();
+    await page
+      .locator('#nutrition-import-file')
+      .setInputFiles({ name: 'synthetic.csv', mimeType: 'text/csv', buffer: Buffer.from('test') });
+    await page.getByRole('button', { name: 'Проверить файл' }).click();
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    await page.getByRole('button', { name: 'Подтвердить импорт' }).click();
+    await capture('import-result');
+    await page.getByRole('button', { name: 'Посмотреть предложения' }).click();
+    await expect(page.getByText('3 из 8 дней')).toBeVisible();
+    await capture('suggestions');
+    await page.getByRole('button', { name: 'Проверить состав' }).click();
+    await capture('portions');
+    await page.getByRole('button', { name: 'Сравнить КБЖУ' }).click();
+    await expect(
+      page.locator('.recurring-meals__item-heading').getByText('Расходится'),
+    ).toBeVisible();
+    await expect(
+      page.locator('.recurring-meals__item-heading').getByText('Нельзя сопоставить'),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Сохранить шаблон' })).toBeDisabled();
+    await capture('comparison');
+    await page.getByRole('checkbox', { name: /Я проверил данные/ }).check();
+    await page.getByRole('button', { name: 'Сохранить шаблон' }).click();
+    await expect(page.getByRole('alert')).toContainText('Ответ не получен');
+    await capture('uncertain');
+    await page.getByRole('button', { name: 'Проверить результат' }).click();
+    await expect(page.getByText('Такой шаблон уже сохранён')).toBeVisible();
+    expect(submitted[0]).toEqual(submitted[1]);
+    await capture('existing');
+    await page.getByRole('button', { name: 'Открыть шаблон' }).click();
+    await expect(page.getByText('Мой завтрак').first()).toBeVisible();
+    await capture('template');
+    await page.getByRole('button', { name: 'Назад', exact: true }).click();
+    await page.getByRole('button', { name: 'К предложениям' }).click();
+    await page.getByRole('button', { name: 'Проверить состав' }).click();
+    await page.getByRole('button', { name: 'Сравнить КБЖУ' }).click();
+    await page.getByRole('checkbox', { name: /Я проверил данные/ }).check();
+    await page.getByRole('button', { name: 'Сохранить шаблон' }).click();
+    await expect(page.getByRole('alert')).toContainText('Данные изменились');
+    await capture('stale');
+    await page.getByRole('button', { name: 'Изменить состав' }).click();
+    await page.getByRole('button', { name: 'Сравнить КБЖУ' }).click();
+    await page.getByRole('checkbox', { name: /Я проверил данные/ }).check();
+    await page.getByRole('button', { name: 'Сохранить шаблон' }).click();
+    await expect(page.getByRole('heading', { name: 'Шаблон сохранён' })).toBeVisible();
+    await capture('saved');
+    await page.getByRole('button', { name: 'К предложениям' }).click();
+    suggestionsEmpty = true;
+    await page.getByRole('button', { name: 'Импорт питания', exact: true }).click();
+    await page.getByRole('button', { name: 'Посмотреть предложения' }).click();
+    await expect(page.getByText('Повторяющихся сочетаний не найдено.')).toBeVisible();
+    await capture('empty');
+  });
+}
+
 for (const importTheme of ['light', 'dark'] as const) {
   test(`Issue 885 requires explicit confirmation before catalog import ${importTheme}`, async ({
     page,
