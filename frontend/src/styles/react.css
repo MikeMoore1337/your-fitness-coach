@@ -8882,6 +8882,57 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   }
 }
 
+.nutrition-extras {
+  display: block;
+  min-width: 0;
+}
+
+.nutrition-extras__summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.nutrition-extras__label {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.nutrition-extras__label strong {
+  font-size: var(--font-size-section);
+  color: var(--v2-text-primary);
+}
+
+.nutrition-extras__body {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.nutrition-extras__links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.nutrition-extras__links .ui-button {
+  min-width: 0;
+  min-height: 44px;
+  white-space: normal;
+  text-align: center;
+}
+
+@media (max-width: 430px) {
+  .nutrition-extras__links {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Nutrition diary */
 .nutrition-experience,
 .nutrition-day-content,
