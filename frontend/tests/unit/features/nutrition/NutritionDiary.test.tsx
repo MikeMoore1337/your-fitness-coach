@@ -733,7 +733,8 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
 
-    fireEvent.click(screen.getByRole('button', { name: /Быстрый ввод/ }));
+    fireEvent.click(screen.getByTestId('nutrition-add-product'));
+    fireEvent.click(await screen.findByRole('button', { name: /Быстрый ввод/ }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Калории' }), {
       target: { value: '530' },
     });
@@ -808,7 +809,8 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
 
-    fireEvent.click(screen.getByRole('button', { name: /Быстрый ввод/ }));
+    fireEvent.click(screen.getByTestId('nutrition-add-product'));
+    fireEvent.click(await screen.findByRole('button', { name: /Быстрый ввод/ }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Калории' }), {
       target: { value: '680' },
     });

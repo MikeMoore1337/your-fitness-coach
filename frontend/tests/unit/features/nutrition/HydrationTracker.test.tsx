@@ -201,7 +201,7 @@ describe('HydrationTracker', () => {
       '850 из 2200 миллилитров, 39%',
     );
     expect(
-      within(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).getByText('39%'),
+      within(screen.getByRole('region', { name: 'Гидратация' })).getByText('39%'),
     ).toBeVisible();
     expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeVisible();
     expect(screen.getByText('Другой напиток или объём').closest('details')).not.toHaveAttribute(
@@ -404,7 +404,7 @@ describe('HydrationTracker', () => {
       '2300 из 2200 миллилитров, 105%',
     );
     expect(
-      within(screen.getByRole('progressbar', { name: 'Прогресс гидратации' })).getByText('105%'),
+      within(screen.getByRole('region', { name: 'Гидратация' })).getByText('105%'),
     ).toBeVisible();
   });
 

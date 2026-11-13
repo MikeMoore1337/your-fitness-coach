@@ -57,32 +57,21 @@ afterEach(() => {
 });
 
 describe('NutritionPage - secondary actions (#1442)', () => {
-  it('hides secondary settings, planning and shopping under one explicit disclosure', () => {
+  it('shows the secondary actions as separate controls in one group', () => {
     render(<NutritionPage />);
-    const extras = screen.getByTestId('nutrition-extras') as HTMLDetailsElement;
-    expect(extras.open).toBe(false);
+    const extras = screen.getByTestId('nutrition-extras');
     expect(screen.getByTestId('nutrition-diary-stub')).toBeVisible();
-    expect(within(extras).getByText('План питания')).not.toBeVisible();
-    fireEvent.click(within(extras).getByText('Дополнительно'));
-    expect(extras.open).toBe(true);
+    expect(within(extras).getByRole('button', { name: /Настройки КБЖУ/ })).toBeVisible();
     expect(within(extras).getByText('План питания')).toBeVisible();
     expect(within(extras).getByText('Список покупок')).toBeVisible();
   });
 
-  it('opens an existing hydration setting instead of duplicating its form', () => {
-    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
-      cb(0);
-      return 1;
-    });
-    Element.prototype.scrollIntoView = vi.fn();
+  it('keeps hydration settings available in their original disclosures', () => {
     render(<NutritionPage />);
-    const extras = screen.getByTestId('nutrition-extras');
-    fireEvent.click(within(extras).getByText('Дополнительно'));
-    fireEvent.click(within(extras).getByRole('button', { name: 'Личный ориентир' }));
     const goal = document.getElementById('hydration-goal-details') as HTMLDetailsElement;
+    fireEvent.click(within(goal).getByText('Личный ориентир воды'));
     expect(goal.open).toBe(true);
-    expect(within(goal).getByText('Личный ориентир воды')).toHaveFocus();
-    fireEvent.click(within(extras).getByRole('button', { name: 'Мои кружки и бутылки' }));
+    fireEvent.click(screen.getByText('Мои ёмкости'));
     expect((document.getElementById('hydration-presets-details') as HTMLDetailsElement).open).toBe(
       true,
     );
@@ -95,8 +84,7 @@ describe('NutritionPage - secondary actions (#1442)', () => {
     });
     render(<NutritionPage />);
     const extras = screen.getByTestId('nutrition-extras');
-    fireEvent.click(within(extras).getByText('Дополнительно'));
-    const settingsButton = within(extras).getByRole('button', { name: 'Настройки КБЖУ' });
+    const settingsButton = within(extras).getByRole('button', { name: /Настройки КБЖУ/ });
     fireEvent.click(settingsButton);
     fireEvent.click(screen.getByRole('button', { name: 'Закрыть настройки' }));
     await waitFor(() => expect(settingsButton).toHaveFocus());

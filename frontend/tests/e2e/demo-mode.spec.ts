@@ -1486,8 +1486,8 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await nutritionPage.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
   await expect(nutritionPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
   await expect(nutritionPage.getByText('AI Coach', { exact: true })).toHaveCount(0);
-  await expect(nutritionPage.getByRole('button', { name: 'Быстрый ввод' })).toBeVisible();
-  await nutritionPage.getByRole('button', { name: 'Быстрый ввод' }).click();
+  await nutritionPage.getByTestId('nutrition-add-product').click();
+  await nutritionPage.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод' }).click();
   await expect(nutritionPage.getByRole('dialog')).toBeVisible();
   await nutritionPage.getByRole('spinbutton', { name: 'Калории' }).fill('420');
   await nutritionPage.getByRole('button', { name: 'Сохранить Quick Add' }).click();

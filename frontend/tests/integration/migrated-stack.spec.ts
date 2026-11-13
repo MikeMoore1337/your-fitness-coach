@@ -649,7 +649,8 @@ test('migrated PostgreSQL serves a real browser nutrition transaction and idempo
   await expect(page).toHaveURL(/\/app\?section=nutrition$/);
   await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+  await page.getByTestId('nutrition-add-product').click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод' }).click();
   const itemName = `Migrated PostgreSQL browser item ${Date.now()}`;
   await page.getByRole('textbox', { name: 'Название или контекст (необязательно)' }).fill(itemName);
   await page.getByRole('spinbutton', { name: 'Калории' }).fill('321');

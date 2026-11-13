@@ -796,8 +796,18 @@ export function HydrationTracker({
         <div>
           <span className="eyebrow">Гидратация</span>
           <h2 id="hydration-title">Вода и напитки</h2>
-          <p>{target ? `${data.total_ml} из ${target} мл` : `${data.total_ml} мл записано`}</p>
         </div>
+        <p>
+          <span>
+            {target ? `${data.total_ml} из ${target} мл` : `${data.total_ml} мл записано`}
+          </span>
+          {target && progress !== null && (
+            <strong className="hydration-card__percent">
+              {' '}
+              {Math.round(data.progress_percent ?? 0)}%
+            </strong>
+          )}
+        </p>
       </header>
       {target && progress !== null && (
         <div
@@ -810,7 +820,6 @@ export function HydrationTracker({
           aria-valuetext={`${data.total_ml} из ${target} миллилитров, ${Math.round(data.progress_percent ?? 0)}%`}
         >
           <span className="hydration-progress__fill" style={{ width: `${progress}%` }} />
-          <strong>{Math.round(data.progress_percent ?? 0)}%</strong>
         </div>
       )}
       {(!target || progress === null) && (

@@ -60,7 +60,7 @@ test('Nutrition keeps contextual repeat available in mocked dark TMA', async ({ 
   await expectNoHorizontalOverflow(page);
   await expectTouchTargets(
     page.locator(
-      '.nutrition-diary__intro-actions button:visible, .nutrition-meal__repeat button:visible',
+      '.nutrition-diary__primary-actions button:visible, .nutrition-meal__repeat button:visible',
     ),
   );
   await captureEvidence(page, 'nutrition-repeat-mobile-dark-tma-390.png');

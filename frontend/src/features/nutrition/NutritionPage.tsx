@@ -3,7 +3,8 @@ import type { NutritionTarget } from '../../shared/api/types';
 import type { components } from '../../shared/api/schema';
 import { dateInputValue } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
-import { Button, DisclosureIcon } from '../../shared/ui/common';
+import { Button } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import { ClientNutritionProposals } from './CoachNutritionProposals';
 import { NutritionDiary } from './NutritionDiary';
@@ -64,22 +65,6 @@ export function NutritionPage({
     return () => window.removeEventListener('hashchange', openFromHash);
   }, []);
 
-  const openHydrationDestination = useCallback(
-    (
-      targetId:
-        'hydration-goal-details' | 'hydration-presets-details' | 'hydration-history-section',
-    ) => {
-      const target = dayView.current?.querySelector<HTMLElement>(`#${targetId}`);
-      if (!target) return;
-      if (target instanceof HTMLDetailsElement) target.open = true;
-      requestAnimationFrame(() => {
-        target.scrollIntoView({ block: 'center', behavior: 'instant' });
-        target.querySelector<HTMLElement>('summary, h3')?.focus({ preventScroll: true });
-      });
-    },
-    [],
-  );
-
   return (
     <div className="nutrition-experience" ref={root}>
       {returnPath && (
@@ -116,53 +101,32 @@ export function NutritionPage({
           }}
           timeZone={timeZone}
         />
-        <details className="nutrition-section-card nutrition-extras" data-testid="nutrition-extras">
-          <summary className="nutrition-extras__summary yfc-disclosure-summary">
-            <span className="nutrition-extras__label">
-              <span className="eyebrow">Настройки и планирование</span>
-              <strong>Дополнительно</strong>
-            </span>
-            <DisclosureIcon />
-          </summary>
+        <section
+          className="nutrition-extras"
+          data-testid="nutrition-extras"
+          aria-labelledby="nutrition-extras-title"
+        >
+          <header className="nutrition-extras__label">
+            <span className="eyebrow">Настройки и инструменты</span>
+            <h2 id="nutrition-extras-title">Дополнительно</h2>
+          </header>
           <div className="nutrition-extras__body">
-            <div
-              className="nutrition-extras__links"
-              role="group"
-              aria-label="Дополнительные действия питания"
+            <Button
+              className="nutrition-extras__setting"
+              data-nutrition-focus="extras-settings"
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                extrasSettingsFocus.current = true;
+                setView('settings');
+              }}
             >
-              <Button
-                data-nutrition-focus="extras-settings"
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  extrasSettingsFocus.current = true;
-                  setView('settings');
-                }}
-              >
-                Настройки КБЖУ
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => openHydrationDestination('hydration-goal-details')}
-              >
-                Личный ориентир
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => openHydrationDestination('hydration-presets-details')}
-              >
-                Мои кружки и бутылки
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => openHydrationDestination('hydration-history-section')}
-              >
-                История напитков
-              </Button>
-            </div>
+              <span>
+                <strong>Настройки КБЖУ</strong>
+                <small>Рассчитать ориентиры или указать вручную</small>
+              </span>
+              <Icon name="chevron-right" size={20} />
+            </Button>
             {!demoSafeMode && (
               <MealPlanner
                 initialDate={initialDate}
@@ -178,7 +142,7 @@ export function NutritionPage({
               />
             )}
           </div>
-        </details>
+        </section>
         <AiCoachContextualEntry
           context={{ surface: 'nutrition', periodDays: 7 }}
           entryPoint="nutrition"
