@@ -9457,6 +9457,7 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 }
 .nutrition-day-summary {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
   padding: 17px;
@@ -9492,20 +9493,50 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
     transform: translateY(4px);
   }
 }
-.nutrition-targets,
-.nutrition-targets__macros {
+.nutrition-targets {
   display: grid;
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
 }
 .nutrition-targets__macros {
-  gap: 11px;
+  display: contents;
 }
 .nutrition-target {
   display: grid;
+  min-width: 0;
   gap: 7px;
+}
+.nutrition-target .data-viz-progress__label {
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.nutrition-target .data-viz-progress__label strong {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 350px) {
+  .nutrition-day-summary__head {
+    flex-wrap: wrap;
+  }
+  .nutrition-goal-actions .ui-button {
+    min-width: 0;
+    padding-inline: var(--v2-space-1, 4px);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .nutrition-targets {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 11px;
+  }
+  .nutrition-target .data-viz-progress__label {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
 }
 .nutrition-target__heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
@@ -9561,7 +9592,19 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.nutrition-diary--design-v2
+  .nutrition-day-summary
+  .nutrition-targets--unset
+  ~ .nutrition-day-summary__totals {
+  display: grid;
+}
+.nutrition-targets--unset ~ .nutrition-day-summary__totals dd {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
 .nutrition-targets--unset {
+  grid-template-columns: minmax(0, 1fr);
   gap: 7px;
   padding: 14px;
   border-radius: var(--radius-control);

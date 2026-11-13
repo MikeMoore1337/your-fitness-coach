@@ -1467,6 +1467,7 @@ test('nutrition and coach scenarios render shared production surfaces with local
   // Existing meal details stay collapsed by default, including in the demo.
   const breakfast = nutritionPage.getByRole('region', { name: 'Завтрак' });
   const breakfastToggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+  await expect(breakfast.getByText('Овсяная каша с бананом и греческим йогуртом')).toBeAttached();
   if ((await breakfastToggle.getAttribute('aria-expanded')) === 'false') {
     await breakfastToggle.click();
   }
