@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from fitminiapp_api.schemas.food_diary import MealType
 from fitminiapp_api.schemas.nutrition_import import (
     ImportDiagnostic,
     ImportFoodRow,
@@ -175,6 +176,29 @@ class CatalogImportReceipt(BaseModel):
     rows: list[CatalogImportRow]
     excluded_rows: list[CatalogImportRow] = Field(default_factory=list)
     preview_signature: str
+
+
+class RecurringImportMealItem(BaseModel):
+    food_id: int
+    source: ImportFoodRow
+    original_total: OriginalTotal | None
+    original_detail_cells: list[OriginalDetailCell]
+
+
+class RecurringImportMealOccurrence(BaseModel):
+    date: date
+    items: list[RecurringImportMealItem]
+
+
+class RecurringImportMeal(BaseModel):
+    meal_type: MealType
+    repeat_days: int
+    occurrences: list[RecurringImportMealOccurrence]
+
+
+class RecurringImportMeals(BaseModel):
+    observed_days: int
+    items: list[RecurringImportMeal]
 
 
 class CatalogConflict(BaseModel):
