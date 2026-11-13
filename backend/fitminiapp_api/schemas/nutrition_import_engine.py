@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -13,6 +14,9 @@ from fitminiapp_api.schemas.nutrition_import import (
     OriginalTotal,
 )
 from fitminiapp_api.schemas.nutrition_label import NutritionLabelFactsEdit
+from fitminiapp_api.schemas.nutrition_power import (
+    NutritionMealTemplateResponse,
+)
 
 
 class RowResolution(BaseModel):
@@ -179,6 +183,7 @@ class CatalogImportReceipt(BaseModel):
 
 
 class RecurringImportMealItem(BaseModel):
+    source_index: int
     food_id: int
     source: ImportFoodRow
     original_total: OriginalTotal | None
@@ -199,6 +204,62 @@ class RecurringImportMeal(BaseModel):
 class RecurringImportMeals(BaseModel):
     observed_days: int
     items: list[RecurringImportMeal]
+
+
+class RecurringMealChoice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_index: int | None = Field(default=None, ge=0, strict=True)
+    food_id: int = Field(gt=0, strict=True)
+    amount: Decimal = Field(gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False)
+    amount_unit: Literal["g", "ml", "serving"]
+
+
+class RecurringMealReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    meal_type: MealType
+    date: date
+    name: str = Field(min_length=1, max_length=128)
+    items: list[RecurringMealChoice] = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_items(self) -> RecurringMealReviewRequest:
+        indexes = [item.source_index for item in self.items if item.source_index is not None]
+        if len(indexes) != len(set(indexes)):
+            raise ValueError("source indexes must be unique")
+        self.name = " ".join(self.name.split())
+        if not self.name:
+            raise ValueError("name must not be blank")
+        return self
+
+
+class RecurringMealConfirmRequest(RecurringMealReviewRequest):
+    preview_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirmed: Literal[True]
+    acknowledge_nutrition: Literal[True]
+
+    @field_validator("confirmed", "acknowledge_nutrition", mode="before")
+    @classmethod
+    def explicit_true(cls, value: object) -> object:
+        if value is not True:
+            raise ValueError("explicit confirmation is required")
+        return value
+
+
+class RecurringMealComparison(BaseModel):
+    item: RecurringMealChoice
+    source: RecurringImportMealItem | None
+    catalog_nutrition: dict[str, Decimal | None]
+    comparison: dict[str, Literal["equal", "different", "unknown"]]
+
+
+class RecurringMealReview(BaseModel):
+    items: list[RecurringMealComparison]
+    preview_signature: str
+
+
+class RecurringMealReceipt(BaseModel):
+    template: NutritionMealTemplateResponse
+    existing: bool
 
 
 class CatalogConflict(BaseModel):

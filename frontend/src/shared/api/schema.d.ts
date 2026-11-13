@@ -5618,6 +5618,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/imports/{draft_id}/recurring-meals/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Recurring Meals */
+        post: operations["review_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/recurring-meals/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Recurring Meals */
+        post: operations["confirm_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/imports/{draft_id}/catalog": {
         parameters: {
             query?: never;
@@ -19356,6 +19390,8 @@ export interface components {
         };
         /** RecurringImportMealItem */
         RecurringImportMealItem: {
+            /** Source Index */
+            source_index: number;
             /** Food Id */
             food_id: number;
             source: components["schemas"]["ImportFoodRow"];
@@ -19379,6 +19415,106 @@ export interface components {
             observed_days: number;
             /** Items */
             items: components["schemas"]["RecurringImportMeal"][];
+        };
+        /** RecurringMealChoice */
+        "RecurringMealChoice-Input": {
+            /** Source Index */
+            source_index?: number | null;
+            /** Food Id */
+            food_id: number;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** RecurringMealChoice */
+        "RecurringMealChoice-Output": {
+            /** Source Index */
+            source_index?: number | null;
+            /** Food Id */
+            food_id: number;
+            /** Amount */
+            amount: string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** RecurringMealComparison */
+        RecurringMealComparison: {
+            item: components["schemas"]["RecurringMealChoice-Output"];
+            source: components["schemas"]["RecurringImportMealItem"] | null;
+            /** Catalog Nutrition */
+            catalog_nutrition: {
+                [key: string]: string | null;
+            };
+            /** Comparison */
+            comparison: {
+                [key: string]: "equal" | "different" | "unknown";
+            };
+        };
+        /** RecurringMealConfirmRequest */
+        RecurringMealConfirmRequest: {
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["RecurringMealChoice-Input"][];
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+            /**
+             * Acknowledge Nutrition
+             * @constant
+             */
+            acknowledge_nutrition: true;
+        };
+        /** RecurringMealReceipt */
+        RecurringMealReceipt: {
+            template: components["schemas"]["NutritionMealTemplateResponse"];
+            /** Existing */
+            existing: boolean;
+        };
+        /** RecurringMealReview */
+        RecurringMealReview: {
+            /** Items */
+            items: components["schemas"]["RecurringMealComparison"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** RecurringMealReviewRequest */
+        RecurringMealReviewRequest: {
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["RecurringMealChoice-Input"][];
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -34763,6 +34899,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecurringImportMeals"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurringMealReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringMealReview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurringMealConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringMealReceipt"];
                 };
             };
             /** @description Validation Error */
