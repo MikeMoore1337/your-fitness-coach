@@ -44,6 +44,7 @@ class NutritionImportAdapter:
     catalog_attribution: str | None = None
 
 
+# Owner reports FatSecret export publication permission; no document was independently verified.
 ADAPTERS: dict[str, NutritionImportAdapter] = {
     "fatsecret-csv-v1": NutritionImportAdapter(
         provider="fatsecret",
@@ -51,6 +52,9 @@ ADAPTERS: dict[str, NutritionImportAdapter] = {
         parser_version="fatsecret-csv-v1",
         delimiter=",",
         module_path=Path(__file__).with_name("nutrition_import_fatsecret_csv.py"),
+        catalog_source="diary_export",
+        catalog_source_versions=frozenset({None}),
+        catalog_publication_rights=frozenset({"owner_reported"}),
     ),
     "fatsecret-pdf-v1": NutritionImportAdapter(
         provider="fatsecret",
@@ -59,6 +63,9 @@ ADAPTERS: dict[str, NutritionImportAdapter] = {
         delimiter=",",
         module_path=Path(__file__).with_name("nutrition_import_fatsecret_pdf.py"),
         source_format="pdf",
+        catalog_source="diary_export",
+        catalog_source_versions=frozenset({None}),
+        catalog_publication_rights=frozenset({"owner_reported"}),
     ),
 }
 

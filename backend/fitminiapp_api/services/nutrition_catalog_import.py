@@ -26,6 +26,7 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.nutrition_label.contracts import (
     CANONICAL_DRAFT_SCHEMA_VERSION,
     NUTRIENT_FIELDS,
+    NUTRIENT_UNITS,
     CanonicalDraft,
     CanonicalFact,
     DailyValuePercent,
@@ -39,6 +40,10 @@ from fitminiapp_api.nutrition_label.contracts import (
 )
 from fitminiapp_api.schemas.food import FoodValuesInput, UserFoodCreate
 from fitminiapp_api.schemas.nutrition_import import ImportFoodRow, ImportSource
+from fitminiapp_api.schemas.nutrition_import_engine import (
+    CatalogConflictChoice,
+    CatalogProductCorrection,
+)
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.food_catalog_contributions import (
     add_catalog_contribution,
@@ -271,6 +276,55 @@ def prepare_catalog_food(
     )
 
 
+def prepare_corrected_catalog_food(
+    row: ImportFoodRow,
+    source: ImportSource,
+    correction: CatalogProductCorrection,
+    *,
+    allowed_publication_rights: frozenset[str],
+    attribution: str | None,
+) -> CatalogPreparation:
+    """Prepare explicit user corrections without modifying the imported document."""
+    edit = correction.nutrition
+    if correction.kind in {"personal_recipe", "arbitrary"}:
+        return CatalogPreparation("private_only", "personal_or_arbitrary_food")
+    if edit is None:
+        return CatalogPreparation("needs_review", "incomplete_nutrition")
+    values = edit.model_dump(mode="json")
+    facts = {
+        key: {"value": values[key], "unit": unit, "evidence": "read"}
+        for key, unit in NUTRIENT_UNITS.items()
+        if values.get(key) is not None
+    }
+    data = row.model_dump(mode="json")
+    data["food"] = {
+        "name": correction.name,
+        "brand": correction.brand or None,
+        "kind": correction.kind,
+    }
+    data["nutrition"] = {"basis": edit.source_basis, "facts": facts}
+    data["serving_measure"] = (
+        edit.serving_size.model_dump(mode="json") if edit.serving_size is not None else None
+    )
+    corrected = ImportFoodRow.model_validate(data)
+    result = prepare_catalog_food(
+        corrected,
+        source,
+        allowed_publication_rights=allowed_publication_rights,
+        allowed_food_kinds=frozenset({"standard_food", "branded_food"}),
+        attribution=attribution,
+    )
+    if result.food is not None:
+        result.food.provenance["correction"] = "user_confirmed"
+        result.food.provenance["facts"] = {
+            key: {"evidence": "user_confirmed", "unit": fact["unit"], "source_unit": None}
+            for key, fact in facts.items()
+        }
+        result.food.canonical.warnings.append("user_corrected_fields")
+        result.food.canonical.requires_user_review = True
+    return result
+
+
 def _key(parts: object) -> str:
     data = json.dumps(parts, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
@@ -417,7 +471,12 @@ def _facts_match(food: Food, proposed: PreparedCatalogFood) -> bool:
 
 
 def catalog_plan(
-    db: Session, draft: NutritionImportDraft, *, include_suggestions: bool = True
+    db: Session,
+    draft: NutritionImportDraft,
+    *,
+    include_suggestions: bool = True,
+    corrections: list[CatalogProductCorrection] | None = None,
+    choices: list[CatalogConflictChoice] | None = None,
 ) -> tuple[list[dict], list[PreparedCatalogFood | None]]:
     source = ImportSource.model_validate(draft.document["source"])
     adapter = _adapter(draft, source)
@@ -427,15 +486,36 @@ def catalog_plan(
         else frozenset()
     )
     rows = [ImportFoodRow.model_validate(item) for item in draft.document["rows"]]
+    corrections = corrections or []
+    by_index = {item.index: item for item in corrections}
+    if (
+        len(by_index) != len(corrections)
+        or any(index >= len(rows) for index in by_index)
+        or (
+            corrections
+            and (
+                adapter is None or draft.adapter_id not in {"fatsecret-csv-v1", "fatsecret-pdf-v1"}
+            )
+        )
+    ):
+        raise NutritionDraftError("invalid_rows", 422)
     prepared = [
-        prepare_catalog_food(
+        prepare_corrected_catalog_food(
+            row,
+            source,
+            by_index[index],
+            allowed_publication_rights=rights,
+            attribution=adapter.catalog_attribution if adapter else None,
+        )
+        if index in by_index
+        else prepare_catalog_food(
             row,
             source,
             allowed_publication_rights=rights,
             allowed_food_kinds=adapter.catalog_food_kinds if adapter else frozenset(),
             attribution=adapter.catalog_attribution if adapter else None,
         )
-        for row in rows
+        for index, row in enumerate(rows)
     ]
     proposals = [item.food for item in prepared]
     source_keys = [_source_key(row, source, adapter) for row in rows]
@@ -623,6 +703,43 @@ def catalog_plan(
                 plan[row_index]["suggestions"].append(
                     {"food_id": food_id, "name": name, "brand": brand}
                 )
+    choices = choices or []
+    if len({choice.index for choice in choices}) != len(choices):
+        raise NutritionDraftError("invalid_rows", 422)
+    choice_ids = {choice.food_id for choice in choices if choice.food_id is not None}
+    choice_foods = (
+        {
+            food.id: food
+            for food in db.query(Food).filter(Food.id.in_(choice_ids)).all()
+            if food.status == "active" and food.food_type != "user"
+        }
+        if choice_ids
+        else {}
+    )
+    for choice in choices:
+        if choice.index >= len(plan):
+            raise NutritionDraftError("invalid_rows", 422)
+        entry = plan[choice.index]
+        if choice.action == "skip" and choice.food_id is None:
+            entry["outcome"] = "skipped"
+            entry["reason"] = "user_skipped"
+            entry["food_id"] = None
+        elif (
+            choice.action == "reuse"
+            and choice.food_id is not None
+            and choice.food_id in choice_foods
+            and (
+                (entry["outcome"] == "conflict" and choice.food_id == entry["food_id"])
+                or choice.food_id in {item["food_id"] for item in entry["suggestions"]}
+            )
+        ):
+            entry["outcome"] = "reuse"
+            entry["reason"] = "user_selected_existing"
+            entry["food_id"] = choice.food_id
+            entry["snapshot"] = _food_snapshot(choice_foods[choice.food_id])
+            entry["manual_reuse"] = True
+        else:
+            raise NutritionDraftError("invalid_rows", 422)
     return plan, proposals
 
 
@@ -648,7 +765,13 @@ def write_catalog_plan(
     pending_barcodes: dict[str, str] = {}
     pending_sources: dict[str, str] = {}
     chosen_foods = []
+    manual_results = []
     for item in chosen:
+        if item.get("manual_reuse"):
+            manual_results.append(
+                {key: item[key] for key in ("index", "outcome", "reason", "food_id")}
+            )
+            continue
         proposal = proposals[item["index"]]
         if proposal is None or item["outcome"] not in {"publish", "reuse", "conflict"}:
             raise ValueError("catalog_row_unavailable")
@@ -748,7 +871,7 @@ def write_catalog_plan(
         if source_keys
         else {}
     )
-    results = []
+    results = manual_results
     published_food_ids: set[int] = set()
     for item, proposal, food, payload, digest in payloads:
         if (food.id, digest) not in present:
@@ -793,9 +916,19 @@ def write_catalog_plan(
     return results
 
 
-def catalog_import_preview(db: Session, user: User, draft_id: str) -> dict:
+def catalog_import_preview(
+    db: Session,
+    user: User,
+    draft_id: str,
+    *,
+    revision: int | None = None,
+    corrections: list[CatalogProductCorrection] | None = None,
+    choices: list[CatalogConflictChoice] | None = None,
+) -> dict:
     draft = get_nutrition_import_draft(db, user, draft_id, allow_confirmed=True)
-    plan, proposals = catalog_plan(db, draft)
+    if revision is not None and draft.revision != revision:
+        raise NutritionDraftError("stale_revision", 409)
+    plan, proposals = catalog_plan(db, draft, corrections=corrections, choices=choices)
     rows = []
     for row, proposal in zip(plan, proposals, strict=True):
         product = None
@@ -844,10 +977,12 @@ def confirm_catalog_import(
     confirm_key: str,
     row_indexes: list[int],
     confirmed: bool,
+    corrections: list[CatalogProductCorrection] | None = None,
+    choices: list[CatalogConflictChoice] | None = None,
 ) -> dict:
     if confirmed is not True or not _KEY.fullmatch(confirm_key):
         raise NutritionDraftError("confirmation_required", 422)
-    if not row_indexes or len(row_indexes) != len(set(row_indexes)):
+    if len(row_indexes) != len(set(row_indexes)):
         raise NutritionDraftError("invalid_rows", 422)
     selected = set(row_indexes)
     fingerprint = _key([draft_id, revision, preview_signature, sorted(selected)])
@@ -873,13 +1008,13 @@ def confirm_catalog_import(
         .first()
     ):
         raise NutritionDraftError("confirmation_conflict", 409)
-    plan, _ = catalog_plan(db, draft, include_suggestions=False)
+    plan, _ = catalog_plan(db, draft, corrections=corrections, choices=choices)
     ids = sorted({item["food_id"] for item in plan if item["food_id"] is not None})
     if ids:
         db.query(Food).filter(Food.id.in_(ids)).order_by(
             Food.id
         ).with_for_update().populate_existing().all()
-    plan, proposals = catalog_plan(db, draft)
+    plan, proposals = catalog_plan(db, draft, corrections=corrections, choices=choices)
     if catalog_signature(draft, plan) != preview_signature:
         raise NutritionDraftError("preview_changed", 409)
     if any(index < 0 or index >= len(plan) for index in selected):
@@ -888,7 +1023,20 @@ def confirm_catalog_import(
         rows = write_catalog_plan(db, user, plan, proposals, selected)
     except ValueError as exc:
         raise NutritionDraftError(str(exc), 409) from None
-    receipt = {"rows": rows, "preview_signature": preview_signature}
+    excluded = []
+    for item in plan:
+        if item["index"] in selected:
+            continue
+        outcome = item["outcome"]
+        excluded.append(
+            {
+                "index": item["index"],
+                "outcome": "skipped" if outcome in {"publish", "reuse"} else outcome,
+                "reason": "user_skipped" if outcome in {"publish", "reuse"} else item["reason"],
+                "food_id": None,
+            }
+        )
+    receipt = {"rows": rows, "excluded_rows": excluded, "preview_signature": preview_signature}
     draft.catalog_confirm_key_hash = key_hash
     draft.catalog_confirm_fingerprint = fingerprint
     draft.catalog_receipt = receipt

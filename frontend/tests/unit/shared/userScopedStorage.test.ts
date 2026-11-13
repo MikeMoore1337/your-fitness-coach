@@ -3,6 +3,7 @@ import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   HYDRATION_PENDING_SESSION_PREFIX,
   HYDRATION_PENDING_STORAGE_PREFIX,
+  NUTRITION_IMPORT_RECOVERY_SESSION_KEY,
   USER_SCOPED_PERSISTENT_STORAGE_REGISTRY,
   activeWorkoutPointerStorageKey,
   activeWorkoutQueueStorageKey,
@@ -24,6 +25,7 @@ describe('user-scoped browser storage registry', () => {
     localStorage.setItem('fit_access_token', 'legacy-access-token');
     localStorage.setItem('fit_refresh_token', 'legacy-refresh-token');
     sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '7');
+    sessionStorage.setItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY, '{"private":true}');
     localStorage.setItem('app-theme', 'dark');
     localStorage.setItem('landing-theme', 'light');
     localStorage.setItem('fit_telegram_link_prompt_dismissed_7', 'true');
@@ -35,6 +37,7 @@ describe('user-scoped browser storage registry', () => {
     expect(localStorage.getItem('fit_access_token')).toBeNull();
     expect(localStorage.getItem('fit_refresh_token')).toBeNull();
     expect(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)).toBeNull();
+    expect(sessionStorage.getItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY)).toBeNull();
     expect(localStorage.getItem('app-theme')).toBe('dark');
     expect(localStorage.getItem('landing-theme')).toBe('light');
     expect(localStorage.getItem('fit_telegram_link_prompt_dismissed_7')).toBe('true');
@@ -105,6 +108,15 @@ describe('user-scoped browser storage registry', () => {
       expect(localStorage.getItem(key)).toBeNull();
     }
     expect(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)).toBeNull();
+  });
+
+  it('retains import recovery only for the same account during session expiry', () => {
+    const saved = JSON.stringify({ userId: '7', payload: 'synthetic' });
+    sessionStorage.setItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY, saved);
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+    expect(sessionStorage.getItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY)).toBe(saved);
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 8 });
+    expect(sessionStorage.getItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY)).toBeNull();
   });
 
   it('retains pending hydration for the same account on expiry and clears it on logout', () => {

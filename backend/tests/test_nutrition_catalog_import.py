@@ -23,6 +23,7 @@ from fitminiapp_api.models.nutrition_label import (
 from fitminiapp_api.models.user import User
 from fitminiapp_api.nutrition_label.parser import build_draft_from_ocr
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV1
+from fitminiapp_api.schemas.nutrition_import_engine import CatalogProductCorrection
 from fitminiapp_api.schemas.nutrition_label import NutritionLabelConfirmRequest
 from fitminiapp_api.services import nutrition_catalog_import as catalog_service
 from fitminiapp_api.services.accounts import delete_user_cascade
@@ -39,10 +40,13 @@ from fitminiapp_api.services.nutrition_catalog_import import (
     confirm_catalog_import,
     list_catalog_conflicts,
     prepare_catalog_food,
+    prepare_corrected_catalog_food,
 )
 from fitminiapp_api.services.nutrition_import_drafts import (
     NutritionDraftError,
+    cancel_nutrition_import_draft,
     create_nutrition_import_draft,
+    set_resolutions,
 )
 from fitminiapp_api.services.nutrition_import_runner import ADAPTERS, NutritionImportAdapter
 from fitminiapp_api.services.nutrition_label import _canonical_from_confirmation, _make_food
@@ -412,6 +416,60 @@ def test_catalog_preparation_requires_trusted_rights_complete_facts_and_known_se
     assert prepare(unsafe).reason == "unsafe_product_text"
 
 
+def test_corrected_catalog_food_requires_rights_and_complete_user_review():
+    document = NutritionImportV1.model_validate_json(FIXTURE.read_bytes())
+    correction = CatalogProductCorrection.model_validate(
+        {
+            "index": 0,
+            "name": "Йогурт",
+            "kind": "standard_food",
+            "nutrition": {
+                "source_basis": "per_100_g",
+                "energy_kcal": "65",
+                "protein_g": "4",
+                "fat_g": "3",
+                "carbohydrate_g": "5",
+            },
+            "confirmed": True,
+        }
+    )
+
+    def prepare(value, rights=frozenset({"owner_reported"})):
+        return prepare_corrected_catalog_food(
+            document.rows[0],
+            document.source,
+            value,
+            allowed_publication_rights=rights,
+            attribution=None,
+        )
+
+    assert prepare(correction, frozenset()).reason == "publication_rights_unconfirmed"
+    result = prepare(correction)
+    assert result.outcome == "publish"
+    assert result.food.provenance["correction"] == "user_confirmed"
+    assert result.food.provenance["facts"]["energy_kcal"]["evidence"] == "user_confirmed"
+    assert "user_corrected_fields" in result.food.canonical.warnings
+    incomplete = correction.model_copy(deep=True)
+    assert incomplete.nutrition is not None
+    incomplete.nutrition.fat_g = None
+    assert prepare(incomplete).reason == "incomplete_nutrition"
+    personal = correction.model_copy(update={"kind": "personal_recipe"})
+    assert prepare(personal).outcome == "private_only"
+    personal_without_facts = CatalogProductCorrection.model_validate(
+        {
+            "index": 0,
+            "name": "Личное блюдо",
+            "kind": "personal_recipe",
+            "confirmed": True,
+        }
+    )
+    assert prepare(personal_without_facts).outcome == "private_only"
+    serving = correction.model_copy(deep=True)
+    assert serving.nutrition is not None
+    serving.nutrition.source_basis = "per_serving"
+    assert prepare(serving).reason == "serving_measure_unknown"
+
+
 def test_catalog_publish_search_reuse_conflict_and_diary_isolation(client, monkeypatch):
     _auth(client, 983001)
     _auth(client, 983002)
@@ -469,6 +527,12 @@ def test_catalog_publish_search_reuse_conflict_and_diary_isolation(client, monke
         assert preview["rows"][0]["outcome"] == "publish"
         assert db.query(Food).filter_by(name="Тестовый продукт Альфа").count() == 0
         receipt = confirm(db, first_user, draft, preview, "catalog-confirm-a")
+        with pytest.raises(NutritionDraftError, match="already_confirmed"):
+            cancel_nutrition_import_draft(db, first_user, draft.id, revision=preview["revision"])
+        assert confirm(db, first_user, draft, preview, "catalog-confirm-a") == receipt
+        set_resolutions(
+            db, first_user, draft.id, revision=preview["revision"], matches={}, skipped_rows=[]
+        )
         assert confirm(db, first_user, draft, preview, "catalog-confirm-a") == receipt
         food_id = receipt["rows"][0]["food_id"]
         food = db.get(Food, food_id)

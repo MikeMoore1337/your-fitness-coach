@@ -18,6 +18,415 @@ async function openQuickAdd(page: Page) {
   await page.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод', exact: true }).click();
 }
 
+for (const importTheme of ['light', 'dark'] as const) {
+  test(`Issue 885 requires explicit confirmation before catalog import ${importTheme}`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: importTheme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), importTheme);
+    const capture = async (stage: string) => {
+      for (const width of [320, 360, 393, 430, 1280]) {
+        await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+        await page.screenshot({
+          path: testInfo.outputPath(`${stage}-${width}.png`),
+          fullPage: true,
+        });
+      }
+      await page.setViewportSize({ width: 393, height: 844 });
+    };
+    await mockNutritionApi(page);
+    let confirmations = 0;
+    let uploads = 0;
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    const confirmationRequests: unknown[] = [];
+    let corrected = false;
+    let skipped = false;
+    const row = {
+      index: 0,
+      status: 'manual_resolution_required',
+      source: {
+        food: { name: 'Тестовый продукт', kind: 'unknown' },
+        coordinates: { section: 'report_details', section_kind: 'detail', row: 1 },
+        serving_label: '100 г',
+        diagnostics: [],
+      },
+      action: null,
+      issues: [],
+    };
+    const catalog = () => ({
+      id: '123e4567-e89b-42d3-a456-426614174000',
+      revision: 1,
+      expires_at: '2030-01-01T00:00:00Z',
+      source: {},
+      preview_signature: 'a'.repeat(64),
+      rows: [
+        {
+          index: 0,
+          outcome: skipped ? 'skipped' : corrected ? 'publish' : 'needs_review',
+          reason: skipped ? 'user_skipped' : corrected ? null : 'unclassified_food',
+          food_id: null,
+          product: null,
+          suggestions: [],
+          suggestions_evaluated: false,
+        },
+      ],
+    });
+    await page.route('**/api/v1/nutrition/imports**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith('/catalog/confirm')) {
+        confirmations += 1;
+        confirmationRequests.push(route.request().postDataJSON());
+        if (confirmations === 1) return route.abort('failed');
+        return route.fulfill({
+          json: {
+            rows: [{ index: 0, outcome: 'publish', reason: null, food_id: 12 }],
+            excluded_rows: [],
+            preview_signature: 'a'.repeat(64),
+          },
+        });
+      }
+      if (path.endsWith('/catalog/review')) {
+        corrected = true;
+        skipped = route
+          .request()
+          .postDataJSON()
+          .choices.some((item: { action: string }) => item.action === 'skip');
+        return route.fulfill({ json: catalog() });
+      }
+      if (path.endsWith('/catalog')) return route.fulfill({ json: catalog() });
+      uploads += 1;
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: '123e4567-e89b-42d3-a456-426614174000',
+          revision: 1,
+          expires_at: '2030-01-01T00:00:00Z',
+          rows: [row],
+          original_totals: [],
+          diagnostics: [],
+        },
+      });
+    });
+    await page.goto('/app?section=nutrition');
+    await page.getByRole('button', { name: /Импорт питания/ }).click();
+    await capture('source');
+    await page
+      .locator('#nutrition-import-file')
+      .setInputFiles({ name: 'invalid.txt', mimeType: 'text/plain', buffer: Buffer.from('test') });
+    await page.getByRole('button', { name: 'Проверить файл' }).click();
+    await expect(page.getByRole('alert')).toContainText('Выберите непустой CSV');
+    expect(uploads).toBe(0);
+    await capture('invalid');
+    await page.locator('#nutrition-import-file').setInputFiles({
+      name: 'large.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.alloc(512 * 1024 + 1),
+    });
+    await page.getByRole('button', { name: 'Проверить файл' }).click();
+    await expect(page.getByRole('alert')).toContainText('Выберите непустой CSV');
+    expect(uploads).toBe(0);
+    await page
+      .locator('#nutrition-import-file')
+      .setInputFiles({ name: 'empty.csv', mimeType: 'text/csv', buffer: Buffer.alloc(0) });
+    await page.getByRole('button', { name: 'Проверить файл' }).click();
+    await expect(page.getByRole('alert')).toContainText('Выберите непустой CSV');
+    expect(uploads).toBe(0);
+    await page
+      .locator('#nutrition-import-file')
+      .setInputFiles({ name: 'example.csv', mimeType: 'text/csv', buffer: Buffer.from('test') });
+    await page.getByRole('button', { name: 'Проверить файл' }).click();
+    await expect(page.getByText('Тестовый продукт')).toBeVisible();
+    await capture('preview');
+    await page.getByRole('button', { name: 'Разобрать' }).click();
+    await capture('correction');
+    await page.locator('#kind-0').selectOption('standard_food');
+    await page.locator('#basis-0').selectOption('per_100_g');
+    for (const [field, value] of [
+      ['energy', '65'],
+      ['protein', '4'],
+      ['fat', '3'],
+      ['carbs', '5'],
+    ] as const)
+      await page.locator(`#${field}-0`).fill(value);
+    await page.getByRole('checkbox', { name: /Я проверил/ }).check();
+    await page.getByRole('button', { name: 'Проверить продукт' }).click();
+    await page.getByRole('button', { name: 'Разобрать' }).click();
+    await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+    await capture('skipped');
+    await page.getByRole('button', { name: 'Разобрать' }).click();
+    await page.getByRole('button', { name: 'Вернуть на проверку' }).click();
+    const continueButton = page.getByRole('button', { name: 'Продолжить' });
+    await continueButton.scrollIntoViewIfNeeded();
+    await continueButton.focus();
+    await expect(continueButton).toBeFocused();
+    const buttonRect = await continueButton.boundingBox();
+    const dockRect = await page.locator('#appBottomNav').boundingBox();
+    if (buttonRect && dockRect)
+      expect(buttonRect.y + buttonRect.height).toBeLessThanOrEqual(dockRect.y);
+    await page.keyboard.press('Enter');
+    await capture('confirmation');
+    expect(confirmations).toBe(0);
+    await page.getByRole('button', { name: 'Подтвердить импорт' }).click();
+    await expect(page.getByRole('alert')).toContainText('Ответ не получен');
+    await expect(page.getByText('Добавлено: 1')).toHaveCount(0);
+    await capture('uncertain');
+    await page.reload();
+    await page.getByRole('button', { name: /Импорт питания/ }).click();
+    await expect(page.getByRole('heading', { name: 'Проверить результат импорта' })).toBeVisible();
+    await capture('recovery');
+    await page.evaluate(() => {
+      const key = 'nutrition-import-confirm-v1';
+      const saved = JSON.parse(sessionStorage.getItem(key)!);
+      saved.expiresAt = 1;
+      sessionStorage.setItem(key, JSON.stringify(saved));
+    });
+    await page.reload();
+    await page.getByRole('button', { name: /Импорт питания/ }).click();
+    await page.getByRole('button', { name: 'Проверить результат' }).click();
+    await expect(page.getByRole('alert')).toContainText('Результат неизвестен');
+    expect(confirmations).toBe(1);
+    await page.evaluate(() => {
+      const key = 'nutrition-import-confirm-v1';
+      const saved = JSON.parse(sessionStorage.getItem(key)!);
+      saved.expiresAt = Date.parse('2030-01-01T00:00:00Z');
+      sessionStorage.setItem(key, JSON.stringify(saved));
+    });
+    await page.reload();
+    await page.getByRole('button', { name: /Импорт питания/ }).click();
+    await page.getByRole('button', { name: 'Проверить результат' }).click();
+    await expect(page.getByText('Добавлено: 1')).toBeVisible();
+    await capture('result');
+    expect(confirmations).toBe(2);
+    expect(confirmationRequests[0]).toEqual(confirmationRequests[1]);
+    expect(pageErrors).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      393,
+    );
+  });
+}
+
+for (const realTheme of ['light', 'dark'] as const) {
+  for (const sourceFormat of ['CSV', 'PDF'] as const) {
+    test(`Issue 885 real synthetic ${sourceFormat} import ${realTheme}`, async ({
+      page,
+    }, testInfo) => {
+      test.skip(!process.env.PW_REAL_IMPORT_BASE, 'requires isolated local import backend');
+      test.setTimeout(120_000);
+      const base = process.env.PW_REAL_IMPORT_BASE!;
+      const ownerId =
+        (realTheme === 'light' ? 98885101 : 98885102) +
+        (testInfo.project.name === 'webkit' ? 10 : 0) +
+        (sourceFormat === 'PDF' ? 20 : 0);
+      const productName = `Синтетический продукт UI 885 ${sourceFormat} ${realTheme} ${testInfo.project.name} ${Date.now()}`;
+      const auth = await page.request.post(`${base}/api/v1/auth/dev-login`, {
+        data: { telegram_user_id: ownerId },
+      });
+      expect(auth.ok()).toBeTruthy();
+      const token = (await auth.json()).access_token as string;
+      await page.setViewportSize({ width: 393, height: 844 });
+      await page.emulateMedia({ colorScheme: realTheme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), realTheme);
+      await mockNutritionApi(page);
+      await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+      await page.route('**/api/v1/nutrition/imports**', (route) => route.continue());
+      const capture = async (stage: string) => {
+        for (const width of [320, 360, 393, 430, 1280]) {
+          await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth),
+          ).toBeLessThanOrEqual(width);
+          await page.screenshot({
+            path: testInfo.outputPath(`${stage}-${width}.png`),
+            fullPage: true,
+          });
+        }
+        await page.setViewportSize({ width: 393, height: 844 });
+      };
+      const nutrient = ['65', '3', '0', '5', '0', '0', '4', '1', '0', '0'];
+      const csvRows = [
+        ['# Food Diary Report - Detailed Report', 'Четверг, февраля 29, 2024'],
+        ['# Report Details'],
+        [
+          'Метка',
+          'Кал ( ккал)',
+          'Жир( г)',
+          'Н/жир( г)',
+          'Углев( г)',
+          'Клетч( г)',
+          'Сахар( г)',
+          'Белк( г)',
+          'Натри( мг)',
+          'Холес( мг)',
+          'Калий( мг)',
+        ],
+        ['Четверг, февраля 29, 2024', ...nutrient],
+        ['Завтрак', ...nutrient],
+        ['Синтетический продукт UI 885', ...nutrient],
+        ['100 г'],
+        ['Всего', ...nutrient],
+      ];
+      const csv = csvRows
+        .map((cells) => cells.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(','))
+        .join('\r\n');
+      await page.goto(`${base}/app?section=nutrition`);
+      await page.getByRole('button', { name: /Импорт питания/ }).click();
+      await capture('source-real');
+      if (sourceFormat === 'PDF')
+        await page
+          .locator('#nutrition-import-file')
+          .setInputFiles(resolve('..', '.artifacts/runtime/tmp/issue885-synthetic.pdf'));
+      else
+        await page
+          .locator('#nutrition-import-file')
+          .setInputFiles({ name: 'synthetic.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+      await page.getByRole('button', { name: 'Проверить файл' }).click();
+      await expect(
+        page.getByText(sourceFormat === 'PDF' ? 'Synthetic food' : 'Синтетический продукт UI 885'),
+      ).toBeVisible();
+      await capture('preview-real');
+      await page.getByRole('button', { name: 'Разобрать' }).click();
+      await capture('correction-real');
+      await page.locator('#name-0').fill(productName);
+      await page.locator('#kind-0').selectOption('standard_food');
+      await page.locator('#basis-0').selectOption('per_100_g');
+      for (const [field, value] of [
+        ['energy', '65'],
+        ['protein', '4'],
+        ['fat', '3'],
+        ['carbs', '5'],
+      ] as const)
+        await page.locator(`#${field}-0`).fill(value);
+      await page.getByRole('checkbox', { name: /Я проверил/ }).check();
+      await page.getByRole('button', { name: 'Проверить продукт' }).click();
+      await expect(page.locator('#name-0')).toHaveCount(0);
+      await expect(page.getByText('Можно добавить', { exact: false }).first()).toBeVisible();
+      await page.getByRole('button', { name: 'Продолжить' }).click();
+      await capture('confirmation-real');
+      await page.getByRole('button', { name: 'Подтвердить импорт' }).click();
+      await expect(page.getByText('Добавлено: 1')).toBeVisible();
+      await capture('result-real');
+      const second = await page.request.post(`${base}/api/v1/auth/dev-login`, {
+        data: { telegram_user_id: ownerId + 100 },
+      });
+      const secondToken = (await second.json()).access_token as string;
+      const search = await page.request.get(
+        `${base}/api/v1/nutrition/foods/search?q=${encodeURIComponent(productName)}`,
+        { headers: { Authorization: `Bearer ${secondToken}` } },
+      );
+      expect(search.ok()).toBeTruthy();
+      expect(JSON.stringify(await search.json())).toContain(productName);
+    });
+  }
+}
+
+for (const conflictTheme of ['light', 'dark'] as const) {
+  test(`Issue 885 shows catalog conflict before reuse ${conflictTheme}`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: conflictTheme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), conflictTheme);
+    await mockNutritionApi(page);
+    let reuse = false;
+    let confirmed = 0;
+    const preview = () => ({
+      id: 'conflict-draft',
+      revision: 1,
+      expires_at: '2030-01-01T00:00:00Z',
+      source: {},
+      preview_signature: 'b'.repeat(64),
+      rows: [
+        {
+          index: 0,
+          outcome: reuse ? 'reuse' : 'conflict',
+          reason: reuse ? 'user_selected_existing' : 'catalog_facts_or_identity_conflict',
+          food_id: 12,
+          product: null,
+          suggestions: [],
+          suggestions_evaluated: false,
+        },
+      ],
+    });
+    await page.route('**/api/v1/nutrition/foods/12', (route) =>
+      route.fulfill({
+        json: {
+          id: 12,
+          name: 'Продукт каталога',
+          brand: null,
+          nutrition_basis_kind: 'per_100_g',
+          energy_kcal_per_100g: '65',
+          protein_g_per_100g: '4',
+          fat_g_per_100g: '3',
+          carbs_g_per_100g: '5',
+        },
+      }),
+    );
+    await page.route('**/api/v1/nutrition/imports**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith('/catalog/review')) {
+        reuse = true;
+        return route.fulfill({ json: preview() });
+      }
+      if (path.endsWith('/catalog/confirm')) {
+        confirmed++;
+        return route.fulfill({
+          json: {
+            rows: [{ index: 0, outcome: 'reuse', reason: 'user_selected_existing', food_id: 12 }],
+            excluded_rows: [],
+            preview_signature: 'b'.repeat(64),
+          },
+        });
+      }
+      if (path.endsWith('/catalog')) return route.fulfill({ json: preview() });
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: 'conflict-draft',
+          revision: 1,
+          rows: [
+            {
+              index: 0,
+              source: {
+                food: { name: 'Строка файла' },
+                coordinates: { section: 'report_details', row: 1 },
+                serving_label: '1 шт.',
+                diagnostics: [],
+              },
+            },
+          ],
+          original_totals: [],
+          diagnostics: [],
+        },
+      });
+    });
+    await page.goto('/app?section=nutrition');
+    await page.getByRole('button', { name: /Импорт питания/ }).click();
+    await page
+      .locator('#nutrition-import-file')
+      .setInputFiles({ name: 'example.csv', mimeType: 'text/csv', buffer: Buffer.from('test') });
+    await page.getByRole('button', { name: 'Проверить файл' }).click();
+    await page.getByRole('button', { name: 'Разобрать' }).click();
+    await expect(page.getByText(/В каталоге: Продукт каталога/)).toBeVisible();
+    for (const width of [393, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
+      await page.screenshot({ path: testInfo.outputPath(`conflict-${width}.png`), fullPage: true });
+    }
+    await page.getByRole('button', { name: 'Использовать существующий продукт' }).click();
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    expect(confirmed).toBe(0);
+    await page.getByRole('button', { name: 'Подтвердить импорт' }).click();
+    await expect(page.getByText('Использовано повторно: 1')).toBeVisible();
+    expect(confirmed).toBe(1);
+  });
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`#1436 status disclosure remains usable in ${theme}`, async ({ page }, testInfo) => {
     await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
