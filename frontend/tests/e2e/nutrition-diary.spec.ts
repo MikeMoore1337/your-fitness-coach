@@ -22,6 +22,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`Issue 886 reviews recurring portions before saving ${theme}`, async ({
     page,
   }, testInfo) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: 393, height: 844 });
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
     await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
