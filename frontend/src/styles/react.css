@@ -9276,6 +9276,9 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
   display: grid;
   gap: 10px;
 }
+.nutrition-completeness .demo-capability-notice {
+  border-inline-start-width: 1px;
+}
 .nutrition-completeness__copy {
   display: flex;
   flex-wrap: wrap;

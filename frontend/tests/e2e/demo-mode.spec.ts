@@ -1145,6 +1145,10 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(
       card.getByRole('button', { name: 'Заполнен частично', exact: true }),
     ).toBeDisabled();
+    await expect(card.locator('.demo-capability-notice')).toHaveCSS(
+      'border-inline-start-width',
+      '1px',
+    );
     for (const width of [320, 360, 393, 430, 1280]) {
       await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
       await card.scrollIntoViewIfNeeded();
