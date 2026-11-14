@@ -52,6 +52,11 @@ _RU_DETAIL_LABELS = (
 _RU_SUMMARY_LABELS = ("кал", "жир", "углев", "белк")
 _DETAIL_UNITS = ("(ккал)", "(г)", "(г)", "(г)", "(г)", "(г)", "(г)", "(мг)", "(мг)", "(мг)")
 _SUMMARY_UNITS = ("(ккал)", "(г)", "(г)", "(г)")
+_REPORT_PERIOD = re.compile(
+    r"[^\W\d_]+,\s*[^\W\d_]+\s+[0-9]{1,2}(?:,\s*[0-9]{4})?\s+[-–—]\s+"
+    r"[^\W\d_]+,\s*[^\W\d_]+\s+[0-9]{1,2},\s*[0-9]{4}\Z",
+    re.IGNORECASE,
+)
 
 
 class _PdfLayoutError(csv_adapter._FormatError):
@@ -59,6 +64,40 @@ class _PdfLayoutError(csv_adapter._FormatError):
         super().__init__(code, row)
         self.page = page
         self.section = section
+
+
+def _mark_truncated_names(report: dict[str, Any]) -> None:
+    for row in report["rows"]:
+        if row["food"]["name"].rstrip().endswith(("...", "…")):
+            row["diagnostics"].append(
+                {
+                    "code": "pdf_truncated_name",
+                    "severity": "error",
+                    "coordinates": dict(row["coordinates"]),
+                    "field": "food.name",
+                }
+            )
+
+
+def _report_header_period(
+    group: list[PdfLine], repeated: dict[tuple[str, int, int], set[int]]
+) -> str | None:
+    if (
+        len(group) != 3
+        or group[0].text.strip().casefold() != "food diary report - detailed report"
+        or "fatsecret" not in group[2].text.casefold()
+        or re.search(r"\d", group[2].text)
+        or len(group[1].text) > 240
+        or not _REPORT_PERIOD.fullmatch(group[1].text.strip())
+        or not all(item.page_height and item.bbox[3] > item.page_height - 25 for item in group)
+    ):
+        return None
+    page_sets = [
+        repeated.get((item.text, round(item.bbox[0]), round(item.bbox[3])), set()) for item in group
+    ]
+    if len(set.intersection(*page_sets)) < 2:
+        return None
+    return group[1].text.strip()
 
 
 def _split_report_cells(group: list[PdfLine], anchors: list[float]) -> tuple[str, list[str]]:
@@ -137,6 +176,11 @@ def _parse_ru_report(lines: list[PdfLine]) -> dict[str, Any]:
     food: tuple[str, list[str], int, float, float] | None = None
     next_row = 1
     in_summary = False
+    header_period: tuple[int, str] | None = None
+    has_summary = any(
+        " ".join(item.text.strip() for item in group).casefold() == "period summary"
+        for group in groups
+    )
     repeated: dict[tuple[str, int, int], set[int]] = {}
     for line in lines:
         if line.page_height and line.bbox[3] > line.page_height - 25:
@@ -153,10 +197,20 @@ def _parse_ru_report(lines: list[PdfLine]) -> dict[str, Any]:
 
         text = " ".join(item.text.strip() for item in group)
         key = text.casefold().strip()
-        if first.page != current_page:
+        new_page = first.page != current_page
+        if new_page:
             current_page = first.page
             columns = None
             pending_units = None
+        period = _report_header_period(group, repeated) if new_page and has_summary else None
+        if period is not None:
+            if header_period is None:
+                header_period = (next_row, period)
+                pages[next_row] = first.page
+                next_row += 1
+            elif header_period[1] != period:
+                raise error("invalid_period")
+            continue
         if all(
             item.page_height
             and item.bbox[3] > item.page_height - 25
@@ -303,6 +357,8 @@ def _parse_ru_report(lines: list[PdfLine]) -> dict[str, Any]:
     if pending_units or pending_date or food is not None or not records:
         raise csv_adapter._FormatError("pdf_incomplete")
     if summary:
+        if header_period is not None:
+            summary.insert(0, (header_period[0], ["Период: " + header_period[1]]))
         csv_adapter._summary(summary, report)
     csv_adapter._details(records, {row: row for row, _ in records}, report)
     _compare_days(report)
@@ -401,7 +457,9 @@ def parse(source: bytes) -> dict[str, Any]:
             tuple(item.text.strip().casefold() for item in group) == _RU_DETAIL_LABELS
             for group in groups
         ):
-            return _parse_ru_report(lines)
+            report = _parse_ru_report(lines)
+            _mark_truncated_names(report)
+            return report
         records: list[tuple[int, list[str]]] = []
         pages: dict[int, int] = {}
         positions: list[float] | None = None
@@ -554,4 +612,5 @@ def parse(source: bytes) -> dict[str, Any]:
                 "row": exc.row,
             }
         report["diagnostics"].append(diagnostic)
+    _mark_truncated_names(report)
     return report

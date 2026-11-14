@@ -51,6 +51,7 @@ def synthetic_pdf(
     day_mismatch=False,
     repeat_header=True,
     large=False,
+    food_override=None,
 ):
     stream = BytesIO()
     pdf = Canvas(stream, pagesize=(1800, 800), pageCompression=0)
@@ -84,7 +85,7 @@ def synthetic_pdf(
     pdf.drawString(20, 700, "Дата: 02.03.2024" if russian else "Date: 02.03.2024")
     pdf.drawString(20, 670, "Завтрак" if russian else "Breakfast")
     pdf.drawString(20, 640, amount or ("100 г" if russian else "100 g"))
-    name = "Тестовый продукт" if russian else "Synthetic food"
+    name = food_override or ("Тестовый продукт" if russian else "Synthetic food")
     pdf.drawString(160, 640, name + (" -" if hyphen else ""))
     values = ["12.3", "1", "0", "2", "0", "0", "3", "4", "0", "5"]
     for i, index in enumerate(order):
@@ -119,6 +120,7 @@ def synthetic_ru_report(
     food_override=None,
     second_date=False,
     wrapped=False,
+    branded_header=False,
 ):
     output = BytesIO()
     pdf = Canvas(output, pagesize=(842, 595), pageCompression=0)
@@ -127,9 +129,17 @@ def synthetic_ru_report(
 
     def header(page):
         pdf.setFont("SyntheticReportInter", 12)
-        pdf.drawString(25, 575, "Synthetic report")
-        pdf.drawString(330, 575, "Synthetic period")
-        pdf.drawString(728, 575, "Synthetic account")
+        pdf.drawString(
+            25, 575, "Food Diary Report - Detailed Report" if branded_header else "Synthetic report"
+        )
+        pdf.drawString(
+            330,
+            575,
+            "Суббота, марта 2 - Воскресенье, марта 3, 2024"
+            if branded_header
+            else "Synthetic period",
+        )
+        pdf.drawString(728, 575, "Synthetic FatSecret" if branded_header else "Synthetic account")
         pdf.setFont("SyntheticReportInter", 8)
         pdf.drawRightString(817, 18, f"Page {page}")
 
@@ -258,6 +268,35 @@ def test_pdf_and_csv_agree_on_synthetic_russian_entry():
     assert pdf.original_totals[0].facts == csv_result.original_totals[0].facts
 
 
+@pytest.mark.parametrize("name", ["Synthetic product...", "Synthetic product…"])
+@pytest.mark.parametrize("layout", ["ru", "en"])
+def test_pdf_truncated_food_names_require_review(name, layout):
+    source = (
+        synthetic_ru_report(food_override=name)[0]
+        if layout == "ru"
+        else synthetic_pdf(food_override=name)
+    )
+    document = NutritionImportV3.model_validate(parse(source))
+    row = document.rows[0]
+    assert row.food.name == name
+    issue = next(item for item in row.diagnostics if item.code == "pdf_truncated_name")
+    assert issue.severity == "error"
+    assert issue.field == "food.name" and issue.coordinates == row.coordinates
+
+
+@pytest.mark.parametrize("layout", ["ru", "en"])
+def test_pdf_complete_food_name_with_period_is_not_flagged(layout):
+    name = "Synthetic product."
+    source = (
+        synthetic_ru_report(food_override=name)[0]
+        if layout == "ru"
+        else synthetic_pdf(food_override=name)
+    )
+    row = NutritionImportV3.model_validate(parse(source)).rows[0]
+    assert row.food.name == name
+    assert not any(item.code == "pdf_truncated_name" for item in row.diagnostics)
+
+
 def test_page_break_and_repeated_header_preserve_both_entries():
     result = NutritionImportV3.model_validate(parse(synthetic_pdf(second_page=True)))
     assert [(row.food.name, row.coordinates.page) for row in result.rows] == [
@@ -329,6 +368,30 @@ def test_repeated_numeric_content_at_page_top_is_not_discarded(monkeypatch):
     document = NutritionImportV3.model_validate(parse(source))
     assert document.rows == []
     assert document.diagnostics
+
+
+def test_repeated_branded_header_preserves_unrecognized_period():
+    source, _ = synthetic_ru_report(branded_header=True)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert len(document.rows) == 2
+    summary = document.original_summaries[0]
+    assert summary.period_label == "Период: Суббота, марта 2 - Воскресенье, марта 3, 2024"
+    assert summary.period_start is None and summary.period_end is None
+    assert summary.period_coordinates.page == 1
+    assert any(item.code == "period_unrecognized" for item in document.diagnostics)
+
+
+def test_repeated_branded_header_with_extra_numeric_content_fails_closed(monkeypatch):
+    source, _ = synthetic_ru_report(branded_header=True)
+    lines = nutrition_import_fatsecret_pdf.extract_pdf_lines(source)
+    lines.extend(
+        PdfLine(page, (600, 574, 690, 583), "Synthetic product 99", page_height=595)
+        for page in (1, 2, 3)
+    )
+    monkeypatch.setattr(nutrition_import_fatsecret_pdf, "extract_pdf_lines", lambda _: lines)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert document.rows == []
+    assert any(item.severity == "error" for item in document.diagnostics)
 
 
 def test_ru_report_does_not_guess_ambiguous_merged_column():
@@ -535,6 +598,87 @@ def test_real_pdf_upload_review_and_catalog_confirm(client):
     assert client.post(f"{endpoint}/confirm", headers=owner, json=confirm).json() == result.json()
     food_id = result.json()["rows"][0]["food_id"]
     assert client.get(f"/api/v1/nutrition/foods/{food_id}", headers=other).status_code == 200
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or getattr(os, "geteuid", lambda: 0)() == 0,
+    reason="requires a non-root Linux parser worker",
+)
+def test_truncated_pdf_name_cannot_be_imported_or_published(client):
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL transaction locks")
+    from test_food_diary import _active_food
+    from test_training_analytics import _auth
+
+    owner = _auth(client, 984_950)
+    root = "/api/v1/nutrition/imports"
+    with get_session_context() as db:
+        food = _active_food()
+        db.add(food)
+        db.flush()
+        food_id = food.id
+        before = (db.query(Food).count(), db.query(FoodDiaryEntry).count())
+        db.commit()
+    upload = client.post(
+        root,
+        headers={**owner, "Idempotency-Key": "pdf-truncated-upload-888"},
+        data={"adapter_id": "fatsecret-pdf-v1"},
+        files={
+            "file": (
+                "synthetic.pdf",
+                synthetic_pdf(food_override="Synthetic food..."),
+                "application/pdf",
+            )
+        },
+    )
+    assert upload.status_code == 201, upload.text
+    draft = upload.json()
+    assert draft["rows"][0]["status"] == "invalid"
+    assert "pdf_truncated_name" in draft["rows"][0]["issues"]
+    endpoint = f"{root}/{draft['id']}"
+    resolve = client.post(
+        endpoint + "/resolve",
+        headers=owner,
+        json={
+            "revision": draft["revision"],
+            "matches": [{"index": 0, "food_id": food_id}],
+            "skipped_rows": [],
+        },
+    )
+    assert resolve.status_code == 422
+    assert resolve.json()["detail"]["code"] == "invalid_row"
+    correction = {
+        "index": 0,
+        "name": "Synthetic food full",
+        "kind": "standard_food",
+        "nutrition": {
+            "source_basis": "per_100_g",
+            "energy_kcal": "65",
+            "protein_g": "4",
+            "fat_g": "3",
+            "carbohydrate_g": "5",
+        },
+        "confirmed": True,
+    }
+    body = {"revision": draft["revision"], "corrections": [correction], "choices": []}
+    review = client.post(endpoint + "/catalog/review", headers=owner, json=body)
+    assert review.status_code == 200, review.text
+    assert review.json()["rows"][0]["outcome"] == "needs_review"
+    assert review.json()["rows"][0]["reason"] == "invalid_source_row"
+    confirm = client.post(
+        endpoint + "/catalog/confirm",
+        headers=owner,
+        json={
+            **body,
+            "preview_signature": review.json()["preview_signature"],
+            "confirm_key": "pdf-truncated-confirm-888",
+            "row_indexes": [0],
+            "confirmed": True,
+        },
+    )
+    assert confirm.status_code == 409
+    with get_session_context() as db:
+        assert (db.query(Food).count(), db.query(FoodDiaryEntry).count()) == before
 
 
 @pytest.mark.skipif(
