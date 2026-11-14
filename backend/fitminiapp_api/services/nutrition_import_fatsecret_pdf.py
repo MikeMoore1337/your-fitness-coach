@@ -61,6 +61,19 @@ class _PdfLayoutError(csv_adapter._FormatError):
         self.section = section
 
 
+def _mark_truncated_names(report: dict[str, Any]) -> None:
+    for row in report["rows"]:
+        if row["food"]["name"].rstrip().endswith(("...", "…")):
+            row["diagnostics"].append(
+                {
+                    "code": "pdf_truncated_name",
+                    "severity": "error",
+                    "coordinates": dict(row["coordinates"]),
+                    "field": "food.name",
+                }
+            )
+
+
 def _split_report_cells(group: list[PdfLine], anchors: list[float]) -> tuple[str, list[str]]:
     cells = [""] * len(anchors)
     labels: list[str] = []
@@ -401,7 +414,9 @@ def parse(source: bytes) -> dict[str, Any]:
             tuple(item.text.strip().casefold() for item in group) == _RU_DETAIL_LABELS
             for group in groups
         ):
-            return _parse_ru_report(lines)
+            report = _parse_ru_report(lines)
+            _mark_truncated_names(report)
+            return report
         records: list[tuple[int, list[str]]] = []
         pages: dict[int, int] = {}
         positions: list[float] | None = None
@@ -554,4 +569,5 @@ def parse(source: bytes) -> dict[str, Any]:
                 "row": exc.row,
             }
         report["diagnostics"].append(diagnostic)
+    _mark_truncated_names(report)
     return report
